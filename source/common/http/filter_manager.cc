@@ -880,17 +880,14 @@ void FilterManager::sendDirectLocalReply(
             state_.non_100_response_headers_encoded_ = true;
             filter_manager_callbacks_.encodeHeaders(*filter_manager_callbacks_.responseHeaders(),
                                                     end_stream);
+
             maybeEndEncode(end_stream);
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             filter_manager_callbacks_.encodeData(data, end_stream);
             maybeEndEncode(end_stream);
           }},
-      Utility::LocalReplyData{
-          filter_manager_callbacks_.requestHeaders().has_value() &&
-              Grpc::Common::hasGrpcContentType(filter_manager_callbacks_.requestHeaders()->get()),
-          code, body, grpc_status, is_head_request});
-  maybeEndEncode(state_.local_complete_);
+      Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
 }
 
 void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
@@ -1437,6 +1434,14 @@ void ActiveStreamEncoderFilter::modifyEncodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
   ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
   callback(*parent_.buffered_response_data_.get());
+}
+
+void ActiveStreamEncoderFilter::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  parent_.sendLocalReply(parent_.state_.is_grpc_request_, code, body, modify_headers, grpc_status,
+                         details);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
