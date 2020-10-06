@@ -3,7 +3,6 @@ syntax = "proto3";
 package test.common.upstream;
 
 import "validate/validate.proto";
-import "test/fuzz/common.proto";
 import "envoy/config/cluster/v3/cluster.proto";
 import "google/protobuf/empty.proto";
 
@@ -14,6 +13,7 @@ message UpdateHealthFlags {
   uint32 num_excluded_hosts = 4;
 }
 
+//Left as message in case specific load balancers need something generated for these actions
 message ChooseHost {
 }
 
@@ -30,13 +30,12 @@ message LbAction {
 }
 
 message LoadBalancerTestCase {
-  //Link in proto config for load balancing here
   envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
       [(validate.rules).message.required = true];
-  //Repeated actions here
   repeated LbAction actions = 2;
-  int64 num_hosts_in_priority_set = 3; //Require this and cap it at something
-  int64 num_hosts_in_failover_set = 4;
-  //TODO: Any validations on this?
-  repeated int64 bytestring_for_random_calls = 5; 
+  //This is capped at the max port value on an ip address - 80
+  int64 num_hosts_in_priority_set = 3 [(validate.rules).int64.lt = 65455];
+  int64 num_hosts_in_failover_set = 4 [(validate.rules).int64.lt = 65455];
+  repeated int64 bytestring_for_random_calls = 5
+      [(validate.rules).repeated = {min_items: 1, max_items: 50}];
 }

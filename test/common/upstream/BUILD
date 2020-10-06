@@ -245,10 +245,10 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "load_balancer_impl_test_lib",
     srcs = [
-        "load_balancer_impl_test_utils.cc",
+        "load_balancer_fuzz_test_utils.cc",
     ],
     hdrs = [
-        "load_balancer_impl_test_utils.h",
+        "load_balancer_fuzz_test_utils.h",
     ],
     deps = [
         ":utility_lib",

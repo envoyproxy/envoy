@@ -15,12 +15,12 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LoadBalancerTestCase input) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
-  RandomLoadBalancerFuzzTest load_balancer_fuzz;
+  std::unique_ptr<LoadBalancerFuzzBase> load_balancer_fuzz;
 
-  // TODO: Switch across type, etc.?
-  // load_balancer_fuzz = RandomLoadBalancerFuzzTest();
+  // TODO: Switch across type once added more
+  load_balancer_fuzz = std::make_unique<RandomLoadBalancerFuzzTest>();
 
-  load_balancer_fuzz.initializeAndReplay(input);
+  load_balancer_fuzz->initializeAndReplay(input);
 }
 
 } // namespace Upstream

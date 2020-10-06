@@ -13,3 +13,4 @@ actions {
 }
 num_hosts_in_priority_set: 0
 num_hosts_in_failover_set: 0
+bytestring_for_random_calls: 0

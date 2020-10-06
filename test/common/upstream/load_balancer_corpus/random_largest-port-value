@@ -1,0 +1,27 @@
+common_lb_config {
+
+}
+actions {
+  choose_host {
+  }
+}
+actions {
+  prefetch {
+  }
+}
+actions {
+  prefetch {
+  }
+}
+actions {
+  choose_host {
+  }
+}
+actions {
+  choose_host {
+  }
+}
+num_hosts_in_priority_set: 65455
+num_hosts_in_failover_set: 65455
+bytestring_for_random_calls: 2
+bytestring_for_random_calls: 3

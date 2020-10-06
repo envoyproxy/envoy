@@ -1,0 +1,31 @@
+common_lb_config {
+  healthy_panic_threshold {
+    value: 2.12199579096527e-314
+  }
+  locality_weighted_lb_config {
+  }
+}
+actions {
+  choose_host {
+  }
+}
+actions {
+  prefetch {
+  }
+}
+actions {
+  prefetch {
+  }
+}
+actions {
+  choose_host {
+  }
+}
+actions {
+  choose_host {
+  }
+}
+num_hosts_in_priority_set: 2
+num_hosts_in_failover_set: 9007199258945536
+bytestring_for_random_calls: 2
+bytestring_for_random_calls: 3
