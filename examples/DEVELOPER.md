@@ -214,35 +214,17 @@ tests do not have access to a `tty` in the CI pipeline.
 Example configuration files are tested to ensure they are valid and well-formed, and do
 not contain deprecated features.
 
-### List configs in `BUILD` file
-
-Configuration files that have been added to your sandbox should be listed in ``examples/BUILD``, in
-the ``filegroup.srcs`` section.
-
 ### Exclude configs from example configuration tests
 
-The CI script to find the configuration files will search for all files in the examples folders
-with a `yaml` or `lua` extension, to ensure that they have been added to the `BUILD` file.
+The CI script searches for all files in the examples folders with a `yaml` or `lua` extension.
 
-If your sandbox example contains non-envoy configuration files that should not be
-checked you can exclude them by setting the `EXCLUDED_BUILD_CONFIGS` in `ci/verify_examples.sh`.
+These files are bundled into a test and the `yaml` files are used to try to start an Envoy server.
 
-Given a sandbox with the name `example-sandbox`, and a configuration file that should be excluded
-named `my-config.yaml`, add `^./example-sandbox/my-config.yaml` to `EXCLUDED_BUILD_CONFIGS`
+If your example includes `yaml` files that are either not Envoy configuration, or for some reason
+cannot be tested in this way, you should add the files to the `exclude` list in the `filegroup.srcs`
+section of the `examples/BUILD` file.
 
-For example, change:
-```
-EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./cache/responses.yaml|^./jaeger-native-tracing|docker-compose"}
-```
-
-to:
-```
-EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./example-sandbox/my-config.yaml|^./cache/responses.yaml|^./jaeger-native-tracing|docker-compose"}
-```
-
-This variable is used as a regular expression, so you can exclude multiple or more targeted exclusions using an
-appropriate bash `regex`.
-
+The `exclude` patterns are evaluated as `globs` in the context of the `examples` folder.
 
 ## Verifying your sandbox
 
