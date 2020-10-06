@@ -24,21 +24,13 @@ approach to service to service communication:
   upgrades can be incredibly painful. Envoy can be deployed and upgraded quickly across an
   entire infrastructure transparently.
 
-**Modern C++11 code base:** Envoy is written in C++11. Native code was chosen because we
-believe that an architectural component such as Envoy should get out of the way as much as possible.
-Modern application developers already deal with tail latencies that are difficult to reason about
-due to deployments in shared cloud environments and the use of very productive but not particularly
-well performing languages such as PHP, Python, Ruby, Scala, etc. Native code provides generally
-excellent latency properties that don't add additional confusion to an already confusing situation.
-Unlike other native code proxy solutions written in C, C++11 provides both excellent developer
-productivity and performance.
-
 **L3/L4 filter architecture:** At its core, Envoy is an L3/L4 network proxy. A pluggable
 :ref:`filter <arch_overview_network_filters>` chain mechanism allows filters to be written to
-perform different TCP proxy tasks and inserted into the main server. Filters have already been
-written to support various tasks such as raw :ref:`TCP proxy <arch_overview_tcp_proxy>`,
-:ref:`HTTP proxy <arch_overview_http_conn_man>`, :ref:`TLS client certificate
-authentication <arch_overview_ssl_auth_filter>`, etc.
+perform different TCP/UDP proxy tasks and inserted into the main server. Filters have already been
+written to support various tasks such as raw :ref:`TCP proxy <arch_overview_tcp_proxy>`, :ref:`UDP
+proxy <arch_overview_udp_proxy>`, :ref:`HTTP proxy <arch_overview_http_conn_man>`, :ref:`TLS client
+certificate authentication <arch_overview_ssl_auth_filter>`, :ref:`Redis <arch_overview_redis>`,
+:ref:`MongoDB <arch_overview_mongo>`, :ref:`Postgres <arch_overview_postgres>`, etc.
 
 **HTTP L7 filter architecture:** HTTP is such a critical component of modern application
 architectures that Envoy :ref:`supports <arch_overview_http_filters>` an additional HTTP L7 filter
@@ -52,7 +44,7 @@ Amazon's :ref:`DynamoDB <arch_overview_dynamo>`, etc.
 HTTP/1.1 to HTTP/2 proxy in both directions. This means that any combination of HTTP/1.1 and HTTP/2
 clients and target servers can be bridged. The recommended service to service configuration uses
 HTTP/2 between all Envoys to create a mesh of persistent connections that requests and responses can
-be multiplexed over. Envoy does not support SPDY as the protocol is being phased out.
+be multiplexed over.
 
 **HTTP L7 routing:** When operating in HTTP mode, Envoy supports a
 :ref:`routing <arch_overview_http_routing>` subsystem that is capable of routing and redirecting
@@ -64,14 +56,6 @@ building a service to service mesh.
 as the underlying multiplexed transport. Envoy :ref:`supports <arch_overview_grpc>` all of the
 HTTP/2 features required to be used as the routing and load balancing substrate for gRPC requests
 and responses. The two systems are very complementary.
-
-**MongoDB L7 support:** `MongoDB <https://www.mongodb.com/>`_ is a popular database used in modern
-web applications. Envoy :ref:`supports <arch_overview_mongo>` L7 sniffing, statistics production,
-and logging for MongoDB connections.
-
-**DynamoDB L7 support**: `DynamoDB <https://aws.amazon.com/dynamodb/>`_ is Amazon’s hosted key/value
-NOSQL datastore. Envoy :ref:`supports <arch_overview_dynamo>` L7 sniffing and statistics production
-for DynamoDB connections.
 
 **Service discovery and dynamic configuration:** Envoy optionally consumes a layered set of
 :ref:`dynamic configuration APIs <arch_overview_dynamic_config>` for centralized management.
@@ -101,11 +85,10 @@ retries <arch_overview_http_routing_retry>`, :ref:`circuit breaking <arch_overvi
 :ref:`outlier detection <arch_overview_outlier_detection>`. Future support is planned for request
 racing.
 
-**Front/edge proxy support:** Although Envoy is primarily designed as a service to service
-communication system, there is benefit in using the same software at the edge (observability,
-management, identical service discovery and load balancing algorithms, etc.). Envoy includes enough
-features to make it usable as an edge proxy for most modern web application use cases. This includes
-:ref:`TLS <arch_overview_ssl>` termination, HTTP/1.1 and HTTP/2 :ref:`support
+**Front/edge proxy support:** There is substantial benefit in using the same software at the edge
+(observability, management, identical service discovery and load balancing algorithms, etc.). Envoy
+has a feature set that makes it well suited as an edge proxy for most modern web application use
+cases. This includes :ref:`TLS <arch_overview_ssl>` termination, HTTP/1.1 and HTTP/2 :ref:`support
 <arch_overview_http_protocols>`, as well as HTTP L7 :ref:`routing <arch_overview_http_routing>`.
 
 **Best in class observability:** As stated above, the primary goal of Envoy is to make the network
@@ -115,12 +98,3 @@ includes robust :ref:`statistics <arch_overview_statistics>` support for all sub
 sink, though plugging in a different one would not be difficult. Statistics are also viewable via
 the :ref:`administration <operations_admin_interface>` port. Envoy also supports distributed
 :ref:`tracing <arch_overview_tracing>` via thirdparty providers.
-
-Design goals
-^^^^^^^^^^^^
-
-A short note on the design goals of the code itself: Although Envoy is by no means slow (we have
-spent considerable time optimizing certain fast paths), the code has been written to be modular and
-easy to test versus aiming for the greatest possible absolute performance. It's our view that this
-is a more efficient use of time given that typical deployments will be alongside languages and
-runtimes many times slower and with many times greater memory usage.

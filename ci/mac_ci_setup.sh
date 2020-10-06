@@ -7,6 +7,9 @@
 # a list of pre-installed tools in the macOS image.
 
 export HOMEBREW_NO_AUTO_UPDATE=1
+HOMEBREW_RETRY_ATTEMPTS=10
+HOMEBREW_RETRY_INTERVAL=1
+
 
 function is_installed {
     brew ls --versions "$1" >/dev/null
@@ -20,7 +23,21 @@ function install {
     fi
 }
 
-if ! brew update; then
+function retry () {
+    local returns=1 i=1
+    while ((i<=HOMEBREW_RETRY_ATTEMPTS)); do
+	if "$@"; then
+	    returns=0
+	    break
+	else
+	    sleep "$HOMEBREW_RETRY_INTERVAL";
+	    ((i++))
+	fi
+    done
+    return "$returns"
+}
+
+if ! retry brew update; then
     echo "Failed to update homebrew"
     exit 1
 fi

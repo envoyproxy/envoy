@@ -169,6 +169,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   local_end_stream_ = end_stream;
   submitHeaders(final_headers, end_stream ? nullptr : &provider);
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
@@ -470,6 +471,8 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   }
 
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
+
   if (local_end_stream_ && pending_send_data_.length() > 0) {
     createPendingFlushTimer();
   }
@@ -526,6 +529,7 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
+                               Random::RandomGenerator& random,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
     : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
@@ -536,13 +540,65 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       flood_detected_(false), protocol_constraints_(stats, http2_options),
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
-      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
+      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false), random_(random) {
+  if (http2_options.has_connection_keepalive()) {
+    keepalive_interval_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), interval));
+    keepalive_timeout_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), timeout));
+    keepalive_interval_jitter_percent_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        http2_options.connection_keepalive(), interval_jitter, 15.0);
+
+    keepalive_send_timer_ = connection.dispatcher().createTimer([this]() { sendKeepalive(); });
+    keepalive_timeout_timer_ =
+        connection.dispatcher().createTimer([this]() { onKeepaliveResponseTimeout(); });
+
+    // This call schedules the initial interval, with jitter.
+    onKeepaliveResponse();
+  }
+}
 
 ConnectionImpl::~ConnectionImpl() {
   for (const auto& stream : active_streams_) {
     stream->destroy();
   }
   nghttp2_session_del(session_);
+}
+
+void ConnectionImpl::sendKeepalive() {
+  // Include the current time as the payload to help with debugging.
+  SystemTime now = connection_.dispatcher().timeSource().systemTime();
+  uint64_t ms_since_epoch =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+  ENVOY_CONN_LOG(trace, "Sending keepalive PING {}", connection_, ms_since_epoch);
+
+  // The last parameter is an opaque 8-byte buffer, so this cast is safe.
+  int rc = nghttp2_submit_ping(session_, 0 /*flags*/, reinterpret_cast<uint8_t*>(&ms_since_epoch));
+  ASSERT(rc == 0);
+  sendPendingFrames();
+
+  keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
+}
+
+void ConnectionImpl::onKeepaliveResponse() {
+  // Check the timers for nullptr in case the peer sent an unsolicited PING ACK.
+  if (keepalive_timeout_timer_ != nullptr) {
+    keepalive_timeout_timer_->disableTimer();
+  }
+  if (keepalive_send_timer_ != nullptr) {
+    uint64_t interval_ms = keepalive_interval_.count();
+    const uint64_t jitter_percent_mod = keepalive_interval_jitter_percent_ * interval_ms / 100;
+    if (jitter_percent_mod > 0) {
+      interval_ms += random_.random() % jitter_percent_mod;
+    }
+    keepalive_send_timer_->enableTimer(std::chrono::milliseconds(interval_ms));
+  }
+}
+
+void ConnectionImpl::onKeepaliveResponseTimeout() {
+  ENVOY_CONN_LOG(debug, "Closing connection due to keepalive timeout", connection_);
+  stats_.keepalive_timeout_.inc();
+  connection_.close(Network::ConnectionCloseType::NoFlush);
 }
 
 Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
@@ -650,6 +706,19 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   // and CONTINUATION frames, but we track them separately: HEADERS frames in onBeginHeaders()
   // and CONTINUATION frames in onBeforeFrameReceived().
   ASSERT(frame->hd.type != NGHTTP2_CONTINUATION);
+
+  if ((frame->hd.type == NGHTTP2_PING) && (frame->ping.hd.flags & NGHTTP2_FLAG_ACK)) {
+    // The ``opaque_data`` should be exactly what was sent in the ping, which is
+    // was the current time when the ping was sent. This can be useful while debugging
+    // to match the ping and ack.
+    uint64_t data;
+    static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
+    memcpy(&data, frame->ping.opaque_data, sizeof(data));
+    ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
+
+    onKeepaliveResponse();
+    return 0;
+  }
 
   if (frame->hd.type == NGHTTP2_DATA) {
     if (!trackInboundFrames(&frame->hd, frame->data.padlen)) {
@@ -828,16 +897,13 @@ bool ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const u
   // onBeforeFrameSend callback is not called for DATA frames.
   bool is_outbound_flood_monitored_control_frame = false;
   std::swap(is_outbound_flood_monitored_control_frame, is_outbound_flood_monitored_control_frame_);
-  auto releasor =
-      protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
   try {
-    checkOutboundFrameLimits();
+    auto releasor = trackOutboundFrames(is_outbound_flood_monitored_control_frame);
+    output.add(data, length);
+    output.addDrainTracker(releasor);
   } catch (const FrameFloodException&) {
     return false;
   }
-
-  output.add(data, length);
-  output.addDrainTracker(releasor);
   return true;
 }
 
@@ -1079,6 +1145,20 @@ void ConnectionImpl::sendSettings(
   }
 }
 
+void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
+  if (!protocol_constraint_violation_callback_) {
+    protocol_constraint_violation_callback_ = connection_.dispatcher().createSchedulableCallback(
+        [this]() { onProtocolConstraintViolation(); });
+    protocol_constraint_violation_callback_->scheduleCallbackCurrentIteration();
+  }
+}
+
+void ConnectionImpl::onProtocolConstraintViolation() {
+  // Flooded outbound queue implies that peer is not reading and it does not
+  // make sense to try to flush pending bytes.
+  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
+}
+
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_new(&callbacks_);
   nghttp2_session_callbacks_set_send_callback(
@@ -1241,10 +1321,11 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
 
 ClientConnectionImpl::ClientConnectionImpl(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks, CodecStats& stats,
+    Random::RandomGenerator& random,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
     Nghttp2SessionFactory& http2_session_factory)
-    : ConnectionImpl(connection, stats, http2_options, max_response_headers_kb,
+    : ConnectionImpl(connection, stats, random, http2_options, max_response_headers_kb,
                      max_response_headers_count),
       callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options);
@@ -1291,11 +1372,12 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
+    Random::RandomGenerator& random,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : ConnectionImpl(connection, stats, http2_options, max_request_headers_kb,
+    : ConnectionImpl(connection, stats, random, http2_options, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
   Http2Options h2_options(http2_options);
@@ -1366,9 +1448,19 @@ bool ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32
   return true;
 }
 
-void ServerConnectionImpl::checkOutboundFrameLimits() {
+Envoy::Http::Http2::ProtocolConstraints::ReleasorProc
+ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) {
+  auto releasor =
+      protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
   if (dispatching_downstream_data_ && !protocol_constraints_.checkOutboundFrameLimits().ok()) {
     throw FrameFloodException(std::string(protocol_constraints_.status().message()));
+  }
+  return releasor;
+}
+
+void ServerConnectionImpl::checkProtocolConstraintViolation() {
+  if (!protocol_constraints_.checkOutboundFrameLimits().ok()) {
+    scheduleProtocolConstraintViolationCallback();
   }
 }
 
@@ -1389,7 +1481,9 @@ Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   Cleanup cleanup([this]() { dispatching_downstream_data_ = false; });
 
   // Make sure downstream outbound queue was not flooded by the upstream frames.
-  checkOutboundFrameLimits();
+  if (!protocol_constraints_.checkOutboundFrameLimits().ok()) {
+    throw FrameFloodException(std::string(protocol_constraints_.status().message()));
+  }
 
   return ConnectionImpl::innerDispatch(data);
 }

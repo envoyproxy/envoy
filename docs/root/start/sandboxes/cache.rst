@@ -27,7 +27,8 @@ Running the Sandbox
 
 .. include:: _include/docker-env-setup.rst
 
-**Step 3: Start all of our containers**
+Step 3: Start all of our containers
+***********************************
 
 .. code-block:: console
 
@@ -43,7 +44,8 @@ Running the Sandbox
     cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     cache_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
-**Step 4: Test Envoy's HTTP caching capabilities**
+Step 4: Test Envoy's HTTP caching capabilities
+**********************************************
 
 You can now send a request to both services via the ``front-envoy``. Note that since the two services have different routes,
 identical requests to different services have different cache entries (i.e. a request sent to service 2 will not be served by a cached
