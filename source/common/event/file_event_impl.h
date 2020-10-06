@@ -22,7 +22,7 @@ public:
   // Event::FileEvent
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
-  uint32_t getEnabled() override {return events_;}
+  uint32_t getEnabled() override { return events_; }
 
 private:
   void assignEvents(uint32_t events, event_base* base);
