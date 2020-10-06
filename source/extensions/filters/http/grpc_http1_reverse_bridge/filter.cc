@@ -136,17 +136,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     // If the response from upstream does not have the correct content-type,
     // perform an early return with a useful error message in grpc-message.
     if (content_type != upstream_content_type_) {
-      headers.setGrpcMessage(badContentTypeMessage(headers));
-      headers.setGrpcStatus(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown);
-      headers.setStatus(enumToInt(Http::Code::OK));
+      decoder_callbacks_->sendLocalReply(Http::Code::OK, badContentTypeMessage(headers), nullptr,
+                                         Grpc::Status::WellKnownGrpcStatus::Unknown,
+                                         RcDetails::get().GrpcBridgeFailedContentType);
 
-      if (!content_type.empty()) {
-        headers.setContentType(content_type_);
-      }
-
-      decoder_callbacks_->streamInfo().setResponseCodeDetails(
-          RcDetails::get().GrpcBridgeFailedContentType);
-      return Http::FilterHeadersStatus::ContinueAndEndStream;
+      return Http::FilterHeadersStatus::StopIteration;
     }
 
     // Restore the content-type to match what the downstream sent.
