@@ -176,6 +176,9 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
+    # TODO(sunjayBhatia): Diagnose openssl DLL load issue on Windows
+    # See: https://github.com/envoyproxy/envoy/pull/13276
+    tags = ["flaky_on_windows"],
     deps = [
         ":ssl_socket_test",
         ":ssl_test_utils",
