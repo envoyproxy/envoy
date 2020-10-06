@@ -56,6 +56,8 @@ public:
   Http::Code status() const { return status_; }
 
 private:
+  friend class FilterTest;
+
   static LocalRateLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
   void onFillTimer();
 

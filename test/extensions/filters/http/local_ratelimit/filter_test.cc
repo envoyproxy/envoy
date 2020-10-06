@@ -71,6 +71,9 @@ public:
     return counter != nullptr ? counter->value() : 0;
   }
 
+  Http::Code toErrorCode(const uint64_t code) { return config_->toErrorCode(code); }
+  void onFillTimer() { config_->onFillTimer(); }
+
   Stats::IsolatedStoreImpl stats_;
   TestStreamInfo stream_info_;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -82,6 +85,34 @@ public:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
 };
+
+TEST_F(FilterTest, Runtime) {
+  setup(fmt::format(config_yaml, "1"), false, false);
+  EXPECT_EQ(&runtime_, &(config_->runtime()));
+}
+
+TEST_F(FilterTest, ToErrorCode) {
+  setup(fmt::format(config_yaml, "1"), false, false);
+  EXPECT_EQ(Http::Code::BadRequest, toErrorCode(400));
+}
+
+// TODO(rgs1): we should share code with the network local rate limiter and drop
+//             this test.
+TEST_F(FilterTest, OnFillTimer) {
+  Event::MockTimer* timer = nullptr;
+  Event::TimerCb timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    EXPECT_EQ(nullptr, timer);
+    timer = new Event::MockTimer();
+    EXPECT_CALL(*timer, enableTimer(_, _)).Times(2);
+    EXPECT_CALL(*timer, disableTimer()).Times(1);
+    return timer;
+  }));
+
+  setup(fmt::format(config_yaml, "1"), false, false);
+  onFillTimer();
+}
 
 TEST_F(FilterTest, Disabled) {
   setup(fmt::format(config_yaml, "1"), false, false);
