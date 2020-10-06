@@ -87,6 +87,27 @@ token_bucket:
   EXPECT_FALSE(config->enforced());
 }
 
+TEST(Factory, FillTimerTooLow) {
+  const std::string config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval: 0.040s
+  )";
+
+  LocalRateLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                       ProtobufMessage::getNullValidationVisitor()),
+               EnvoyException);
+}
+
 } // namespace LocalRateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions
