@@ -14,6 +14,8 @@ public:
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     TestEnvironment::exec({TestEnvironment::runfilesPath(
         "test/extensions/transport_sockets/tls/gen_unittest_certs.sh")});
+    TestEnvironment::exec({TestEnvironment::runfilesPath(
+        "test/extensions/transport_sockets/tls/ocsp/gen_unittest_ocsp_data.sh")});
   }
 
 protected:

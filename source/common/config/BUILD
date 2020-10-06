@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["api_type_oracle.h"],
     deps = [
         "//source/common/protobuf",
+        "//source/common/protobuf:type_util_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
     ],
 )
@@ -66,6 +67,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/protobuf:utility_lib",
+        "@com_github_cncf_udpa//udpa/core/v1:pkg_cc_proto",
     ],
 )
 
@@ -303,11 +305,13 @@ envoy_cc_library(
         ":http_subscription_lib",
         ":new_grpc_mux_lib",
         ":type_to_endpoint_lib",
+        ":udpa_resource_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

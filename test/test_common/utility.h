@@ -937,6 +937,9 @@ public:
   const HeaderEntry* get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }
+  HeaderMap::GetResult getAll(const LowerCaseString& key) const override {
+    return header_map_->getAll(key);
+  }
   void iterate(HeaderMap::ConstIterateCb cb) const override { header_map_->iterate(cb); }
   void iterateReverse(HeaderMap::ConstIterateCb cb) const override {
     header_map_->iterateReverse(cb);
@@ -1040,7 +1043,9 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 
 namespace Api {
 ApiPtr createApiForTest();
+ApiPtr createApiForTest(Random::RandomGenerator& random);
 ApiPtr createApiForTest(Stats::Store& stat_store);
+ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& random);
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api

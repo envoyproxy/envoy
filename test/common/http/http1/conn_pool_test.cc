@@ -53,9 +53,8 @@ public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb)
-      : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr,
-                     std::chrono::milliseconds::max()),
+      : ConnPoolImpl(dispatcher, random_, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
+                     Upstream::ResourcePriority::Default, nullptr, nullptr, absl::nullopt),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_cb_(upstream_ready_cb) {}
 
@@ -126,6 +125,7 @@ public:
 
   Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
   std::vector<TestCodecClient> test_clients_;
 };

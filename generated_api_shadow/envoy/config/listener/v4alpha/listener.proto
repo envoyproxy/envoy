@@ -36,7 +36,7 @@ message ListenerCollection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.ListenerCollection";
 
-  udpa.core.v1.CollectionEntry entries = 1;
+  repeated udpa.core.v1.CollectionEntry entries = 1;
 }
 
 // [#next-free-field: 25]

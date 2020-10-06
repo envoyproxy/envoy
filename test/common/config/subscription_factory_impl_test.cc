@@ -9,6 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/subscription_factory_impl.h"
+#include "common/config/udpa_resource.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -46,6 +47,13 @@ public:
     return subscription_factory_.subscriptionFromConfigSource(
         config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
         resource_decoder_);
+  }
+
+  SubscriptionPtr collectionSubscriptionFromUrl(const std::string& udpa_url) {
+    const auto resource_locator = UdpaResourceIdentifier::decodeUrl(udpa_url);
+    return subscription_factory_.collectionSubscriptionFromUrl(
+        resource_locator, {}, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+        callbacks_, resource_decoder_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -197,6 +205,23 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
                             "'/blahblah' does not exist")
 }
 
+TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
+  std::string test_path = TestEnvironment::temporaryDirectory();
+  auto* watcher = new Filesystem::MockWatcher();
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+  EXPECT_CALL(*watcher, addWatch(test_path, _, _));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // Unix paths start with /, Windows with c:/.
+  const std::string file_path = test_path[0] == '/' ? test_path.substr(1) : test_path;
+  collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path))->start({});
+}
+
+TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile){
+    EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah")->start({}),
+                              EnvoyException,
+                              "envoy::api::v2::Path must refer to an existing path in the system: "
+                              "'/blahblah' does not exist")}
+
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
@@ -301,7 +326,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
   NiceMock<Runtime::MockSnapshot> snapshot;
   EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
   EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
-  EXPECT_CALL(snapshot, countDeprecatedFeatureUse());
+  EXPECT_CALL(runtime_, countDeprecatedFeatureUse());
 
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");

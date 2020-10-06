@@ -25,6 +25,7 @@
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -475,7 +476,8 @@ TEST_P(ServerInstanceImplTest, Stats) {
   options_.concurrency_ = 2;
   options_.hot_restart_epoch_ = 3;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "main_thread.watchdog_miss"));
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "workers.watchdog_miss"));
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 
@@ -526,11 +528,12 @@ protected:
   void flushStats() {
     if (manual_flush_) {
       server_->flushStats();
+      server_->dispatcher().run(Event::Dispatcher::RunType::Block);
     } else {
       // Default flush interval is 5 seconds.
-      simTime().advanceTimeAsync(std::chrono::seconds(6));
+      simTime().advanceTimeAndRun(std::chrono::seconds(6), server_->dispatcher(),
+                                  Event::Dispatcher::RunType::Block);
     }
-    server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
 
   bool manual_flush_;
@@ -663,13 +666,24 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
 
 // Validate that bootstrap pb_text loads.
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
-  initialize("test/server/test_data/server/node_bootstrap.pb_text");
+  EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
+                          initialize("test/server/test_data/server/node_bootstrap.pb_text"));
   EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
 }
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads.
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromPbText)) {
-  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
+  EXPECT_LOG_CONTAINS(
+      "trace", "Configuration does not parse cleanly as v3",
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"));
+  EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
+}
+
+// Validate that bootstrap v2 YAML with deprecated fields loads.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromYaml)) {
+  EXPECT_LOG_CONTAINS(
+      "trace", "Configuration does not parse cleanly as v3",
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"));
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
 }
 
@@ -682,19 +696,65 @@ TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
       EnvoyException, "Unable to parse file");
 }
 
-// Validate that we correctly parse a V2 file when configured to do so.
+// Validate that bootstrap v3 YAML with new fields loads fails if V2 config is specified.
+TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromYaml) {
+  options_.bootstrap_version_ = 2;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.yaml"),
+      EnvoyException, "has unknown fields");
+}
+
+// Validate that we correctly parse a V2 pb_text file when configured to do so.
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromPbText)) {
   options_.bootstrap_version_ = 2;
 
-  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
+  EXPECT_LOG_CONTAINS(
+      "trace", "Configuration does not parse cleanly as v3",
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"));
   EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
 }
 
-// Validate that we correctly parse a V3 file when configured to do so.
-TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV2SelectedFromPbText) {
+// Validate that we correctly parse a V2 YAML file when configured to do so.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromYaml)) {
+  options_.bootstrap_version_ = 2;
+
+  EXPECT_LOG_CONTAINS(
+      "trace", "Configuration does not parse cleanly as v3",
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"));
+  EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
+}
+
+// Validate that we correctly parse a V3 pb_text file without explicit version configuration.
+TEST_P(ServerInstanceImplTest, LoadsV3ConfigFromPbText) {
+  EXPECT_LOG_NOT_CONTAINS(
+      "trace", "Configuration does not parse cleanly as v3",
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"));
+}
+
+// Validate that we correctly parse a V3 YAML file without explicit version configuration.
+TEST_P(ServerInstanceImplTest, LoadsV3ConfigFromYaml) {
+  EXPECT_LOG_NOT_CONTAINS(
+      "trace", "Configuration does not parse cleanly as v3",
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.yaml"));
+}
+
+// Validate that we correctly parse a V3 pb_text file when configured to do so.
+TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV3SelectedFromPbText) {
   options_.bootstrap_version_ = 3;
 
-  initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text");
+  EXPECT_LOG_NOT_CONTAINS(
+      "trace", "Configuration does not parse cleanly as v3",
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"));
+}
+
+// Validate that we correctly parse a V3 YAML file when configured to do so.
+TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV3SelectedFromYaml) {
+  options_.bootstrap_version_ = 3;
+
+  EXPECT_LOG_NOT_CONTAINS(
+      "trace", "Configuration does not parse cleanly as v3",
+      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.yaml"));
 }
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
@@ -704,6 +764,15 @@ TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
       EnvoyException, "Unable to parse file");
+}
+
+// Validate that bootstrap v2 YAML with deprecated fields loads fails if V3 config is specified.
+TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromYaml) {
+  options_.bootstrap_version_ = 3;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
+      EnvoyException, "has unknown fields");
 }
 
 // Validate that we blow up on invalid version number.

@@ -77,7 +77,7 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
                                 Http::Utility::PercentEncoding::encode("invalid request body")));
     }));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
-    EXPECT_EQ(decoder_callbacks_.details_, "grpc_bridge_data_too_small");
+    EXPECT_EQ(decoder_callbacks_.details(), "grpc_bridge_data_too_small");
   }
 }
 

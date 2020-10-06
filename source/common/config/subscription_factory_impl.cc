@@ -8,7 +8,9 @@
 #include "common/config/http_subscription_impl.h"
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/type_to_endpoint.h"
+#include "common/config/udpa_resource.h"
 #include "common/config/utility.h"
+#include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -28,12 +30,13 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
+  auto& runtime_snapshot = runtime_.snapshot();
 
   const auto transport_api_version = config.api_config_source().transport_api_version();
   if (transport_api_version == envoy::config::core::v3::ApiVersion::V2 &&
-      runtime_.snapshot().runtimeFeatureEnabled(
+      runtime_snapshot.runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_deprecated_v2_api_warning")) {
-    runtime_.snapshot().countDeprecatedFeatureUse();
+    runtime_.countDeprecatedFeatureUse();
     ENVOY_LOG(warn,
               "xDS of version v2 has been deprecated and will be removed in subsequent versions");
   }
@@ -101,6 +104,29 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   default:
     throw EnvoyException(
         "Missing config source specifier in envoy::config::core::v3::ConfigSource");
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
+    const udpa::core::v1::ResourceLocator& collection_locator,
+    const envoy::config::core::v3::ConfigSource& /*config*/, absl::string_view /*type_url*/,
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoder& resource_decoder) {
+  std::unique_ptr<Subscription> result;
+  SubscriptionStats stats = Utility::generateStats(scope);
+
+  switch (collection_locator.scheme()) {
+  case udpa::core::v1::ResourceLocator::FILE: {
+    const std::string path =
+        Http::Utility::localPathFromFilePath(absl::StrJoin(collection_locator.id(), "/"));
+    Utility::checkFilesystemSubscriptionBackingPath(path, api_);
+    return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
+        dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
+  }
+  default:
+    throw EnvoyException(fmt::format("Unsupported collection resource locator: {}",
+                                     UdpaResourceIdentifier::encodeUrl(collection_locator)));
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

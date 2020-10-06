@@ -142,7 +142,6 @@ envoy_cc_library(
         "abseil_node_hash_map",
         "abseil_node_hash_set",
         "abseil_optional",
-        "googletest",
     ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
@@ -188,7 +187,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
-        "//source/common/http:url_utility_lib",
+        "//source/common/http:utility_lib",
     ],
 )
 

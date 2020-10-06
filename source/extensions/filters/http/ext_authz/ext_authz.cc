@@ -61,7 +61,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      check_request_, config_->maxRequestBytes(), config_->includePeerCertificate());
+      check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
+      config_->includePeerCertificate());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *callbacks_);
   state_ = State::Calling;
@@ -69,7 +70,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
                                                // going to invoke check call.
   cluster_ = callbacks_->clusterInfo();
   initiating_call_ = true;
-  client_->check(*this, check_request_, callbacks_->activeSpan(), callbacks_->streamInfo());
+  client_->check(*this, callbacks_->dispatcher(), check_request_, callbacks_->activeSpan(),
+                 callbacks_->streamInfo());
   initiating_call_ = false;
 }
 
@@ -164,8 +166,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   switch (response->status) {
   case CheckStatus::OK: {
+    // Any changes to request headers can affect how the request is going to be
+    // routed. If we are changing the headers we also need to clear the route
+    // cache.
     if (config_->clearRouteCache() &&
-        (!response->headers_to_set.empty() || !response->headers_to_append.empty())) {
+        (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
+         !response->headers_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *callbacks_);
       callbacks_->clearRouteCache();
     }
@@ -196,6 +202,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         // TODO(dio): Consider to use addCopy instead.
         request_headers_->appendCopy(header.first, header.second);
       }
+    }
+
+    ENVOY_STREAM_LOG(trace, "ext_authz filter removed header(s) from the request:", *callbacks_);
+    for (const auto& header : response->headers_to_remove) {
+      // We don't allow removing any :-prefixed headers, nor Host, as removing
+      // them would make the request malformed.
+      if (absl::StartsWithIgnoreCase(absl::string_view(header.get()), ":") ||
+          header == Http::Headers::get().HostLegacy) {
+        continue;
+      }
+      ENVOY_STREAM_LOG(trace, "'{}'", *callbacks_, header.get());
+      request_headers_->remove(header);
     }
 
     if (!response->dynamic_metadata.fields().empty()) {
@@ -258,8 +276,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Error: {
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
+      if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
+        config_->incCounter(cluster_->statsScope(), config_->ext_authz_timeout_);
+      }
     }
     stats_.error_.inc();
+    if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
+      stats_.timeout_.inc();
+    }
     if (config_->failureModeAllow()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error", *callbacks_);
       stats_.failure_mode_allowed_.inc();

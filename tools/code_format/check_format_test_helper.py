@@ -243,14 +243,24 @@ def runChecks():
       "std_unordered_set.cc", "Don't use std::unordered_set; use absl::flat_hash_set instead " +
       "or absl::node_hash_set if pointer stability of keys/values is required")
   errors += checkUnfixableError("std_any.cc", "Don't use std::any; use absl::any instead")
+  errors += checkUnfixableError("std_get_if.cc", "Don't use std::get_if; use absl::get_if instead")
+  errors += checkUnfixableError(
+      "std_holds_alternative.cc",
+      "Don't use std::holds_alternative; use absl::holds_alternative instead")
   errors += checkUnfixableError("std_make_optional.cc",
                                 "Don't use std::make_optional; use absl::make_optional instead")
+  errors += checkUnfixableError("std_monostate.cc",
+                                "Don't use std::monostate; use absl::monostate instead")
   errors += checkUnfixableError("std_optional.cc",
                                 "Don't use std::optional; use absl::optional instead")
+  errors += checkUnfixableError("std_string_view.cc",
+                                "Don't use std::string_view; use absl::string_view instead")
   errors += checkUnfixableError("std_variant.cc",
                                 "Don't use std::variant; use absl::variant instead")
+  errors += checkUnfixableError("std_visit.cc", "Don't use std::visit; use absl::visit instead")
   errors += checkUnfixableError(
       "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
+  errors += checkUnfixableError("pgv_string.proto", "min_bytes is DEPRECATED, Use min_len.")
   errors += checkFileExpectingOK("commented_throw.cc")
 
   # The following files have errors that can be automatically fixed.

@@ -23,10 +23,12 @@ public:
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config)
       : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config)),
         content_type_(
-            config.format_case() ==
-                    envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
-                ? Http::Headers::get().ContentTypeValues.Json
-                : Http::Headers::get().ContentTypeValues.Text) {}
+            !config.content_type().empty()
+                ? config.content_type()
+                : config.format_case() ==
+                          envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
+                      ? Http::Headers::get().ContentTypeValues.Json
+                      : Http::Headers::get().ContentTypeValues.Text) {}
 
   void format(const Http::RequestHeaderMap& request_headers,
               const Http::ResponseHeaderMap& response_headers,
@@ -40,7 +42,7 @@ public:
 
 private:
   const Formatter::FormatterPtr formatter_;
-  const absl::string_view content_type_;
+  const std::string content_type_;
 };
 
 using BodyFormatterPtr = std::unique_ptr<BodyFormatter>;

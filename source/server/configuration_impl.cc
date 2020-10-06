@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
@@ -131,8 +132,19 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstra
 
 void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                    Instance& server) {
-  // TODO(kbaichoo): modify this to handle additional watchdogs
-  watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+  if (bootstrap.has_watchdog() && bootstrap.has_watchdogs()) {
+    throw EnvoyException("Only one of watchdog or watchdogs should be set!");
+  }
+
+  if (bootstrap.has_watchdog()) {
+    main_thread_watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+    worker_watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+  } else {
+    main_thread_watchdog_ =
+        std::make_unique<WatchdogImpl>(bootstrap.watchdogs().main_thread_watchdog(), server);
+    worker_watchdog_ =
+        std::make_unique<WatchdogImpl>(bootstrap.watchdogs().worker_watchdog(), server);
+  }
 }
 
 WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdog,

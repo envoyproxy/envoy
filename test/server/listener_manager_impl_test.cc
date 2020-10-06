@@ -536,6 +536,18 @@ filter_chains:
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
 }
 
+TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
+  const std::string yaml = R"EOF(
+address:
+  envoy_internal_address:
+    server_listener_name: a_listener_name  
+filter_chains:
+- filters: []
+  )EOF";
+
+  ASSERT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), "");
+}
+
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
   const std::string yaml = R"EOF(
     name: "foo"
@@ -751,9 +763,9 @@ TEST_F(ListenerManagerImplTest, ListenerTeardownNotifiesServerInitManager) {
   InSequence s;
 
   auto* lds_api = new MockLdsApi();
-  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
+  EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
   envoy::config::core::v3::ConfigSource lds_config;
-  manager_->createLdsApi(lds_config);
+  manager_->createLdsApi(lds_config, nullptr);
 
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
   checkConfigDump(R"EOF(
@@ -883,9 +895,9 @@ TEST_F(ListenerManagerImplTest, OverrideListener) {
 
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   auto* lds_api = new MockLdsApi();
-  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
+  EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
   envoy::config::core::v3::ConfigSource lds_config;
-  manager_->createLdsApi(lds_config);
+  manager_->createLdsApi(lds_config, nullptr);
 
   // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -957,9 +969,9 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   InSequence s;
 
   auto* lds_api = new MockLdsApi();
-  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
+  EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
   envoy::config::core::v3::ConfigSource lds_config;
-  manager_->createLdsApi(lds_config);
+  manager_->createLdsApi(lds_config, nullptr);
 
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
   checkConfigDump(R"EOF(

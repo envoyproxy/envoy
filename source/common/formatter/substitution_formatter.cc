@@ -45,7 +45,7 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
 
 // Matches newline pattern in a StartTimeFormatter format string.
 const std::regex& getStartTimeNewlinePattern() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
+  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
@@ -684,6 +684,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamDirectRemoteAddress();
+        });
+  } else if (field_name == "CONNECTION_ID") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.connectionID().value_or(0);
         });
   } else if (field_name == "REQUESTED_SERVER_NAME") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(

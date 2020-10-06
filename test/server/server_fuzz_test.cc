@@ -57,7 +57,10 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
     for (auto& health_check : *cluster.mutable_health_checks()) {
       // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
       // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
-      health_check.mutable_http_health_check()->clear_codec_client_type();
+      if (health_check.http_health_check().codec_client_type() ==
+          envoy::type::v3::CodecClientType::HTTP3) {
+        health_check.mutable_http_health_check()->clear_codec_client_type();
+      }
     }
     // We may have both deprecated hosts() or load_assignment().
     for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {

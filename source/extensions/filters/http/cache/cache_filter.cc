@@ -30,11 +30,11 @@ struct CacheResponseCodeDetailValues {
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
-CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&,
-                         const std::string&, Stats::Scope&, TimeSource& time_source,
-                         HttpCache& http_cache)
+CacheFilter::CacheFilter(
+    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config, const std::string&,
+    Stats::Scope&, TimeSource& time_source, HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache),
-      allowed_vary_headers_(VaryHeader::parseAllowlist()) {}
+      vary_allow_list_(config.allowed_vary_headers()) {}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
@@ -63,7 +63,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ASSERT(decoder_callbacks_);
 
-  LookupRequest lookup_request(headers, time_source_.systemTime(), allowed_vary_headers_);
+  LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   lookup_ = cache_.makeLookupContext(std::move(lookup_request));
 
@@ -97,7 +97,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   // Either a cache miss or a cache entry that is no longer valid.
   // Check if the new response can be cached.
   if (request_allows_inserts_ &&
-      CacheabilityUtils::isCacheableResponse(headers, allowed_vary_headers_)) {
+      CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     // Add metadata associated with the cached response. Right now this is only response_time;
@@ -458,7 +458,8 @@ void CacheFilter::encodeCachedResponse() {
   // If the filter is encoding, 304 response headers and cached headers are merged in encodeHeaders.
   // If the filter is decoding, we need to serve response headers from cache directly.
   if (filter_state_ == FilterState::DecodeServingFromCache) {
-    decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream);
+    decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
+                                      CacheResponseCodeDetails::get().ResponseFromCacheFilter);
   }
 
   if (lookup_result_->content_length_ > 0) {

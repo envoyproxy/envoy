@@ -35,6 +35,8 @@ public:
   void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) override;
   void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
+  // The old pool does not implement prefetching.
+  bool maybePrefetch(float) override { return false; }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 
 protected:

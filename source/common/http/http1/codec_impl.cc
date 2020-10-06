@@ -18,7 +18,6 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -30,6 +29,8 @@ namespace Http {
 namespace Http1 {
 namespace {
 
+// Changes or additions to details should be reflected in
+// docs/root/configuration/http/http_conn_man/response_code_details_details.rst
 struct Http1ResponseCodeDetailValues {
   const absl::string_view TooManyHeaders = "http1.too_many_headers";
   const absl::string_view HeadersTooLarge = "http1.headers_too_large";

@@ -30,25 +30,10 @@ enforcement. The CSRF enforcement choices are:
 Running the Sandboxes
 ~~~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of both services.
+.. include:: _include/docker-env-setup.rst
 
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Start all of our containers**
+Step 3: Start all of our containers
+***********************************
 
 Switch to the ``samesite`` directory in the ``csrf`` example, and start the containers:
 
@@ -79,7 +64,8 @@ Now, switch to the ``crosssite`` directory in the ``csrf`` example, and start th
   crosssite_front-envoy_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp, 0.0.0.0:8003->8001/tcp
   crosssite_service_1          /docker-entrypoint.sh /bin ... Up      10000/tcp, 8000/tcp
 
-**Step 4: Test Envoy's CSRF capabilities**
+Step 4: Test Envoy's CSRF capabilities
+**************************************
 
 You can now open a browser at http://localhost:8002 to view your ``crosssite`` frontend service.
 
@@ -103,7 +89,8 @@ For example:
 If you change the destination to be the same as one displaying the website and
 set the ``CSRF`` enforcement to enabled the request will go through successfully.
 
-**Step 5: Check stats of backend via admin**
+Step 5: Check stats of backend via admin
+****************************************
 
 When Envoy runs, it can listen to ``admin`` requests if a port is configured. In
 the example configs, the backend admin is bound to port ``8001``.

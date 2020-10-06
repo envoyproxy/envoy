@@ -7,13 +7,15 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
-HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch)
+HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
+                                       const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
   initDomainSocketAddress(&parent_address_);
   if (restart_epoch_ != 0) {
-    parent_address_ = createDomainSocketAddress(restart_epoch_ + -1, "parent");
+    parent_address_ =
+        createDomainSocketAddress(restart_epoch_ + -1, "parent", socket_path, socket_mode);
   }
-  bindDomainSocket(restart_epoch_, "child");
+  bindDomainSocket(restart_epoch_, "child", socket_path, socket_mode);
 }
 
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address) {

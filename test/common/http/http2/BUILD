@@ -165,6 +165,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "protocol_constraints_test",
+    srcs = ["protocol_constraints_test.cc"],
+    deps = [
+        "//source/common/http/http2:protocol_constraints_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "response_header_fuzz_test",
     srcs = ["response_header_fuzz_test.cc"],

@@ -90,12 +90,16 @@ void Cluster::startPreInit() {
 
 void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predicate) {
   // Post the priority set to worker threads.
-  tls_->runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()]() {
+  // TODO(mattklein123): Remove "this" capture.
+  tls_->runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()](
+                            ThreadLocal::ThreadLocalObjectSharedPtr object)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
     PriorityContextPtr priority_context = linearizePrioritySet(skip_predicate);
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
     ASSERT(cluster != nullptr);
     dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer())
         .refresh(std::move(priority_context));
+    return object;
   });
 }
 

@@ -35,9 +35,6 @@ build --action_env=CXX
 build --action_env=LLVM_CONFIG
 build --action_env=PATH
 
-# Skip system ICU linking.
-build --@com_googlesource_googleurl//build_config:system_icu=0
-
 # Common flags for sanitizers
 build:sanitizer --define tcmalloc=disabled
 build:sanitizer --linkopt -ldl
@@ -141,7 +138,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
+build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
 coverage:test-coverage --test_arg="-l trace"
 coverage:fuzz-coverage --config=plain-fuzzer
 coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
@@ -275,6 +272,8 @@ build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
+build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
 
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb

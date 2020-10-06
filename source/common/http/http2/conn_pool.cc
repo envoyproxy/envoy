@@ -12,13 +12,14 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                           Upstream::ResourcePriority priority,
+ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                           Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                            absl::optional<std::chrono::milliseconds> pool_idle_timeout)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http2, pool_idle_timeout) {}
+                           transport_socket_options, Protocol::Http2, pool_idle_timeout),
+      random_generator_(random_generator) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
@@ -85,18 +86,19 @@ RequestEncoder& ConnPoolImpl::ActiveClient::newStreamEncoder(ResponseDecoder& re
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
-                                           data.host_description_, dispatcher_)};
+                                           data.host_description_, dispatcher_, random_generator_)};
   return codec;
 }
 
 ConnectionPool::InstancePtr
-allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                 Upstream::ResourcePriority priority,
+allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                 Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                  absl::optional<std::chrono::milliseconds> pool_idle_timeout) {
   return std::make_unique<Http::Http2::ProdConnPoolImpl>(
-      dispatcher, host, priority, options, transport_socket_options, pool_idle_timeout);
+      dispatcher, random_generator, host, priority, options, transport_socket_options,
+      pool_idle_timeout);
 }
 
 } // namespace Http2

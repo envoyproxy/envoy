@@ -15,7 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
-static constexpr std::chrono::seconds defaultSamplingWindow{120};
+static constexpr std::chrono::seconds defaultSamplingWindow{30};
 
 Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl& config,
@@ -43,9 +43,9 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
   }
 
   AdmissionControlFilterConfigSharedPtr filter_config =
-      std::make_shared<AdmissionControlFilterConfig>(config, context.runtime(), context.random(),
-                                                     context.scope(), std::move(tls),
-                                                     std::move(response_evaluator));
+      std::make_shared<AdmissionControlFilterConfig>(
+          config, context.runtime(), context.api().randomGenerator(), context.scope(),
+          std::move(tls), std::move(response_evaluator));
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));

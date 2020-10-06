@@ -205,6 +205,7 @@ features. The following sandboxes are available:
 .. toctree::
     :maxdepth: 2
 
+    sandboxes/cache
     sandboxes/cors
     sandboxes/csrf
     sandboxes/ext_authz

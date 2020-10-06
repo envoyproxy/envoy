@@ -59,17 +59,15 @@ const std::string& getHostname(const HostSharedPtr& host,
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
 public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
-                                  Envoy::Random::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher,
                                   HealthCheckEventLoggerPtr&& event_logger,
                                   ProtobufMessage::ValidationVisitor& validation_visitor,
                                   Api::Api& api)
-      : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+      : cluster_(cluster), runtime_(runtime), dispatcher_(dispatcher),
         event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor), api_(api) {
   }
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
-  Envoy::Random::RandomGenerator& random() override { return random_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -80,7 +78,6 @@ public:
 private:
   Upstream::Cluster& cluster_;
   Envoy::Runtime::Loader& runtime_;
-  Envoy::Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   HealthCheckEventLoggerPtr event_logger_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
@@ -89,7 +86,7 @@ private:
 
 HealthCheckerSharedPtr HealthCheckerFactory::create(
     const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
-    Runtime::Loader& runtime, Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+    Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   HealthCheckEventLoggerPtr event_logger;
@@ -100,24 +97,26 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
   switch (health_check_config.health_checker_case()) {
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, health_check_config, dispatcher,
-                                                       runtime, random, std::move(event_logger));
+                                                       runtime, api.randomGenerator(),
+                                                       std::move(event_logger));
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
     return std::make_shared<TcpHealthCheckerImpl>(cluster, health_check_config, dispatcher, runtime,
-                                                  random, std::move(event_logger));
+                                                  api.randomGenerator(), std::move(event_logger));
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
       throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
                                        cluster.info()->name()));
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, health_check_config, dispatcher,
-                                                       runtime, random, std::move(event_logger));
+                                                       runtime, api.randomGenerator(),
+                                                       std::move(event_logger));
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
             health_check_config.custom_health_check());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
-        new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
-                                            std::move(event_logger), validation_visitor, api));
+        new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, std::move(event_logger),
+                                            validation_visitor, api));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   default:
@@ -142,7 +141,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       codec_client_type_(
           codecClientType(config.http_health_check().hidden_envoy_deprecated_use_http2()
                               ? envoy::type::v3::HTTP2
-                              : config.http_health_check().codec_client_type())) {
+                              : config.http_health_check().codec_client_type())),
+      random_generator_(random) {
   // The deprecated service_name field was previously being used to compare with the health checked
   // cluster name using a StartsWith comparison. Since StartsWith is essentially a prefix
   // comparison, representing the intent by using a StringMatcher prefix is a more natural way.
@@ -404,7 +404,7 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& t
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
-                                   data.host_description_, dispatcher_);
+                                   data.host_description_, dispatcher_, random_generator_);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -547,6 +547,7 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+      random_generator_(random),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")) {
   if (!config.grpc_health_check().service_name().empty()) {
@@ -849,9 +850,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
-                                                 std::move(data.connection_),
-                                                 data.host_description_, dispatcher_);
+  return std::make_unique<Http::CodecClientProd>(
+      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_,
+      dispatcher_, random_generator_);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {

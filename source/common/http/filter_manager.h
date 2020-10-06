@@ -173,7 +173,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                     absl::string_view details) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
@@ -540,6 +541,19 @@ public:
     }
   }
 
+  void onStreamComplete() {
+    for (auto& filter : decoder_filters_) {
+      filter->handle_->onStreamComplete();
+    }
+
+    for (auto& filter : encoder_filters_) {
+      // Do not call onStreamComplete twice for dual registered filters.
+      if (!filter->dual_filter_) {
+        filter->handle_->onStreamComplete();
+      }
+    }
+  }
+
   void destroyFilters() {
     state_.destroyed_ = true;
 
@@ -643,6 +657,8 @@ public:
         filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
       state_.is_head_request_ = true;
     }
+    state_.is_grpc_request_ =
+        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders()->get());
   }
 
   /**
@@ -796,7 +812,7 @@ private:
   struct State {
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
-          created_filter_chain_(false), is_head_request_(false),
+          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
           non_100_response_headers_encoded_(false) {}
 
     uint32_t filter_call_state_{0};
@@ -809,7 +825,10 @@ private:
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_ : 1;
     bool created_filter_chain_ : 1;
+    // These two are latched on initial header read, to determine if the original headers
+    // constituted a HEAD or gRPC request, respectively.
     bool is_head_request_ : 1;
+    bool is_grpc_request_ : 1;
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_ : 1;
 

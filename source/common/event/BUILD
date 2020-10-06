@@ -30,11 +30,14 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:watcher_lib",
-        "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",
+        "//source/common/network:connection_lib",
         "//source/common/network:listener_lib",
         "//source/common/runtime:runtime_features_lib",
-    ],
+    ] + select({
+        "//bazel:apple": ["//source/common/network:apple_dns_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(

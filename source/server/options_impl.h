@@ -104,6 +104,10 @@ public:
     fake_symbol_table_enabled_ = fake_symbol_table_enabled;
   }
 
+  void setSocketPath(const std::string& socket_path) { socket_path_ = socket_path; }
+
+  void setSocketMode(mode_t socket_mode) { socket_mode_ = socket_mode; }
+
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
@@ -154,6 +158,8 @@ public:
     return disabled_extensions_;
   }
   uint32_t count() const;
+  const std::string& socketPath() const override { return socket_path_; }
+  mode_t socketMode() const override { return socket_mode_; }
 
   /**
    * disableExtensions parses the given set of extension names of
@@ -206,6 +212,8 @@ private:
   // Initialization added here to avoid integration_admin_test failure caused by uninitialized
   // enable_fine_grain_logging_.
   bool enable_fine_grain_logging_ = false;
+  std::string socket_path_;
+  mode_t socket_mode_;
 };
 
 /**

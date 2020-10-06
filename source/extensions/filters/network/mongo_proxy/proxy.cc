@@ -59,10 +59,9 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
                          const Network::DrainDecision& drain_decision, TimeSource& time_source,
                          bool emit_dynamic_metadata, const MongoStatsSharedPtr& mongo_stats)
-    : stat_prefix_(stat_prefix), stats_(generateStats(stat_prefix, scope)), runtime_(runtime),
-      drain_decision_(drain_decision), access_log_(access_log), fault_config_(fault_config),
-      time_source_(time_source), emit_dynamic_metadata_(emit_dynamic_metadata),
-      mongo_stats_(mongo_stats) {
+    : stats_(generateStats(stat_prefix, scope)), runtime_(runtime), drain_decision_(drain_decision),
+      access_log_(access_log), fault_config_(fault_config), time_source_(time_source),
+      emit_dynamic_metadata_(emit_dynamic_metadata), mongo_stats_(mongo_stats) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
