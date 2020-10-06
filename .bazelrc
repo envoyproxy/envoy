@@ -19,7 +19,8 @@ build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
 
-# Enable position independent code, this option is not supported on Windows and default on on macOS.
+# Enable position independent code (this is the default on macOS and Windows)
+# (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
 build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
@@ -296,7 +297,7 @@ build:windows --copt="-DCURL_STATICLIB"
 # Drop the determinism feature (-DDATE etc are a no-op in msvc-cl)
 build:msvc-cl --action_env=USE_CLANG_CL=""
 build:msvc-cl --define clang_cl=0
-build:msvc-cl --feature=-determinism
+build:msvc-cl --features=-determinism
 
 # Windows build behaviors when using clang-cl
 build:clang-cl --action_env=USE_CLANG_CL=1
