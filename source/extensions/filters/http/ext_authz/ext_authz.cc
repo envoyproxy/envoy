@@ -79,15 +79,12 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   Router::RouteConstSharedPtr route = callbacks_->route();
   skip_check_ = skipCheckForRoute(route);
-
-  bool disabled = !config_->filterEnabled(callbacks_->streamInfo().dynamicMetadata());
-  if (disabled) {
-    stats_.disabled_.inc();
+  if (skip_check_) {
+    return Http::FilterHeadersStatus::Continue;
   }
-  if (disabled || skip_check_) {
-    if (skip_check_) {
-      return Http::FilterHeadersStatus::Continue;
-    }
+
+  if (!config_->filterEnabled(callbacks_->streamInfo().dynamicMetadata())) {
+    stats_.disabled_.inc();
     if (config_->denyAtDisable()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(
