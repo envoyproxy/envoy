@@ -47,10 +47,9 @@ def _repository_locations():
 
         if "project_url" not in location:
             _fail_missing_attribute("project_url", key)
-        s = location["project_url"]
-        if not s.startswith("https://") and not s.startswith("http://"):
-            fail("project_url must start with https:// or http://: " + s)
-        mutable_location.pop("project_url")
+        project_url = mutable_location.pop("project_url")
+        if not project_url.startswith("https://") and not project_url.startswith("http://"):
+            fail("project_url must start with https:// or http://: " + project_url)
 
         if "version" not in location:
             _fail_missing_attribute("version", key)
@@ -58,24 +57,28 @@ def _repository_locations():
 
         if "use_category" not in location:
             _fail_missing_attribute("use_category", key)
-        mutable_location.pop("use_category")
+        use_category = mutable_location.pop("use_category")
+
+        if "dataplane_ext" in use_category or "observability_ext" in use_category:
+            if "extensions" not in location:
+                _fail_missing_attribute("extensions", key)
+            mutable_location.pop("extensions")
 
         if "last_updated" not in location:
             _fail_missing_attribute("last_updated", key)
-        s = location["last_updated"]
+        last_updated = mutable_location.pop("last_updated")
 
         # Starlark doesn't have regexes.
-        if len(s) != 10 or s[4] != "-" or s[7] != "-":
-            fail("last_updated must match YYYY-DD-MM: " + s)
-        mutable_location.pop("last_updated")
+        if len(last_updated) != 10 or last_updated[4] != "-" or last_updated[7] != "-":
+            fail("last_updated must match YYYY-DD-MM: " + last_updated)
 
         if "cpe" in location:
-            s = location["cpe"]
+            cpe = mutable_location.pop("cpe")
 
             # Starlark doesn't have regexes.
-            if s != "N/A" and (not s.startswith("cpe:2.3:a:") or not s.endswith(":*") and len(s.split(":")) != 6):
-                fail("CPE must match cpe:2.3:a:<facet>:<facet>:*: " + s)
-            mutable_location.pop("cpe")
+            cpe_matches = (cpe != "N/A" and (not cpe.startswith("cpe:2.3:a:") or not cpe.endswith(":*") and len(cpe.split(":")) != 6))
+            if cpe_matches:
+                fail("CPE must match cpe:2.3:a:<facet>:<facet>:*: " + cpe)
         elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
             _fail_missing_attribute("cpe", key)
 
@@ -227,7 +230,6 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
     _repository_impl("rules_cc")
-    _org_unicode_icuuc()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -750,8 +752,6 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     _repository_impl(
         name = "com_googlesource_googleurl",
-        patches = ["@envoy//bazel/external:googleurl.patch"],
-        patch_args = ["-p1"],
     )
     native.bind(
         name = "googleurl",
@@ -924,12 +924,6 @@ filegroup(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
         **_get_location("kafka_python_client")
-    )
-
-def _org_unicode_icuuc():
-    _repository_impl(
-        name = "org_unicode_icuuc",
-        build_file = "@envoy//bazel/external:icuuc.BUILD",
     )
 
 def _foreign_cc_dependencies():

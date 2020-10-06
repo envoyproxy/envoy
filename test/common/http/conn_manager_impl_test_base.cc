@@ -205,13 +205,24 @@ HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& respon
 
 void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
   for (auto filter : decoder_filters_) {
-    EXPECT_CALL(*filter, onDestroy());
+    EXPECT_CALL(*filter, onStreamComplete());
+  }
+  {
+    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+      EXPECT_CALL(*filter, onStreamComplete());
+    };
+    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
   }
 
-  auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+  for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onDestroy());
-  };
-  std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  }
+  {
+    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+      EXPECT_CALL(*filter, onDestroy());
+    };
+    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  }
 
   if (deferred) {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));

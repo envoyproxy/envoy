@@ -541,6 +541,19 @@ public:
     }
   }
 
+  void onStreamComplete() {
+    for (auto& filter : decoder_filters_) {
+      filter->handle_->onStreamComplete();
+    }
+
+    for (auto& filter : encoder_filters_) {
+      // Do not call onStreamComplete twice for dual registered filters.
+      if (!filter->dual_filter_) {
+        filter->handle_->onStreamComplete();
+      }
+    }
+  }
+
   void destroyFilters() {
     state_.destroyed_ = true;
 

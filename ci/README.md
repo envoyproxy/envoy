@@ -50,20 +50,26 @@ run `./ci/do_ci.sh` as described below.
 
 # Building and running tests as a developer
 
+The `./ci/run_envoy_docker.sh` script can be used to set up a Docker container on Linux and Windows
+to build an Envoy static binary and run tests.
+
+The build image defaults to `envoyproxy/envoy-build-ubuntu` on Linux and
+`envoyproxy/envoy-build-windows2019` on Windows, but you can choose build image by setting
+`IMAGE_NAME` in the environment.
+
+In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before
+invoking the build.
+
+```bash
+IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>'
+```
+
 ## On Linux
 
 An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
 
 ```bash
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
-```
-
-The build image defaults to `envoyproxy/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment.
-
-In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before invoking the build.
-
-```bash
-IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
@@ -139,15 +145,27 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 An example basic invocation to build the Envoy static binary and run tests is:
 
 ```bash
-./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
+./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
-You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc.
+You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc. as well
+as set environment variables to adjust your container build environment as described above.
+
+The Envoy binary can be found in `C:\Windows\Temp\envoy-docker-build\envoy\source\exe` on the Docker host. You
+can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
+generate the binary in `C:\Users\foo\build\envoy\source\exe` you can run:
+
+```bash
+ENVOY_DOCKER_BUILD_DIR="C:\Users\foo\build" ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+```
+
+Note the quotations around the `ENVOY_DOCKER_BUILD_DIR` value to preserve the backslashes in the
+path.
 
 If you would like to run an interactive session to keep the build container running (to persist your local build environment), run:
 
 ```bash
-./ci/run_envoy_docker_windows.sh 'bash'
+./ci/run_envoy_docker.sh 'bash'
 ```
 
 From an interactive session, you can invoke `bazel` manually or use the `./ci/windows_ci_steps.sh` script to build and run tests.

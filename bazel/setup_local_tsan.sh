@@ -15,5 +15,4 @@ build:local-tsan --config=libc++
 build:local-tsan --config=clang-tsan
 build:local-tsan --linkopt=-L${LIBCXX_PREFIX}/lib
 build:local-tsan --linkopt=-Wl,-rpath,${LIBCXX_PREFIX}/lib
-" > ${BAZELRC_FILE}
-
+" > "${BAZELRC_FILE}"
