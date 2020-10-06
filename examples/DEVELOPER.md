@@ -214,18 +214,17 @@ The sandbox tests are run with a `umask` setting of `027` to ensure they will ru
 where this is the case.
 
 As the Envoy containers run as non-root, it is essential that any configurations required
-by the daemon are included in the example `Dockerfile` rather than mounted in
+by the daemon are included in the relevant example `Dockerfile` rather than mounted in
 any `docker-compose.yaml` files.
 
-The Docker recipe should also ensure that any added configurations are world-readable, by adding,
-for example:
+The Docker recipe should also ensure that added configurations are world-readable.
+
+For example, with an added configuration file named `front-envoy.yaml`, you should add
+the following in the Docker recipe:
 
 ```
 RUN chmod go+r /etc/front-envoy.yaml
 ```
-
-...an added configuration named `front-envoy.yaml`.
-
 
 ## Sandbox configuration tests
 
