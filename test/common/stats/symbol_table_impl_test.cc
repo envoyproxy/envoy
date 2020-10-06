@@ -20,7 +20,7 @@ namespace Stats {
 class StatNameTest : public testing::Test {
 protected:
   StatNameTest() : pool_(table_) {}
-  ~StatNameTest() { clearStorage(); }
+  ~StatNameTest() override { clearStorage(); }
 
   void clearStorage() {
     pool_.clear();
