@@ -228,5 +228,48 @@ The `exclude` patterns are evaluated as `globs` in the context of the `examples`
 
 ## Verifying your sandbox
 
+Once you have built your sandbox, and added the `verify.sh` script you can run it directly in the
+sandbox folder.
+
+For example:
+
+```
+cd examples/example-sandbox
+./verify.sh
+
+```
+
+You should see the docker composition brought up, your tests run, and the composition brought down again.
+
+The script should exit with `0` for the tests to pass.
+
+The tests are run with a `umask` setting of `027`. It is therefore essential that any configurations required
+by the `envoy` user inside the container are included in the example `Dockerfile` rather than mounted in
+any `docker-compose.yaml` files. The configuration files will also need `chmod +r envoy ...` inside the
+Docker recipe. See existing sandboxes for examples.
 
 ## Verifying multiple/all sandboxes
+
+In continuous integration, all of the sandboxes are checked using the `ci/verify-examples.sh`.
+
+This can be called with a filter argument, which is a `glob` evaluated in the context of the `examples` folder.
+
+For example:
+
+```
+./ci/verify-examples.sh jaeger*
+```
+
+...will run all sandboxes with names beginning `jaeger`.
+
+---
+
+**NOTE**
+
+You can use this script locally to test the sandboxes on your platform, but you should be aware that it requires
+a lot of resources as it downloads and builds many Docker images, and then runs them in turn.
+
+---
+
+One way to run the tests in an isolated environment is to mount the `envoy` source into a `docker-in-docker` container
+or similar, and then run the script from inside that container.
