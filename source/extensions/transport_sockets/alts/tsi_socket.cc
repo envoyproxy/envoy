@@ -161,7 +161,7 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
 }
 
 Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
-  Network::IoResult result = {Network::PostIoAction::KeepOpen, 0, false};
+  Network::IoResult result = {Network::PostIoAction::KeepOpen, 0, false, false};
   if (!end_stream_read_ && !read_error_) {
     result = raw_buffer_socket_->doRead(raw_read_buffer_);
     ENVOY_CONN_LOG(debug, "TSI: raw read result action {} bytes {} end_stream {}",
@@ -172,7 +172,8 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
     }
 
     if (!handshake_complete_ && result.end_stream_read_ && result.bytes_processed_ == 0) {
-      return {Network::PostIoAction::Close, result.bytes_processed_, result.end_stream_read_};
+      return {Network::PostIoAction::Close, result.bytes_processed_, result.end_stream_read_,
+              false};
     }
 
     end_stream_read_ = result.end_stream_read_;
@@ -182,7 +183,7 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
   if (!handshake_complete_) {
     Network::PostIoAction action = doHandshake();
     if (action == Network::PostIoAction::Close || !handshake_complete_) {
-      return {action, 0, false};
+      return {action, 0, false, false};
     }
   }
 
@@ -225,7 +226,7 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
                    raw_write_buffer_.length(), end_stream);
     return raw_buffer_socket_->doWrite(raw_write_buffer_, end_stream && (buffer.length() == 0));
   }
-  return {Network::PostIoAction::KeepOpen, 0, false};
+  return {Network::PostIoAction::KeepOpen, 0, false, false};
 }
 
 void TsiSocket::closeSocket(Network::ConnectionEvent) {

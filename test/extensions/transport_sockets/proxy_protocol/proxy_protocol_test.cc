@@ -97,9 +97,11 @@ TEST_F(ProxyProtocolTest, BytesProcessedIncludesProxyProtocolHeader) {
   {
     InSequence s;
     EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false))
-        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
+        .WillOnce(
+            Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false, false}));
     EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg2), false))
-        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg2.length(), false}));
+        .WillOnce(Return(
+            Network::IoResult{Network::PostIoAction::KeepOpen, msg2.length(), false, false}));
   }
 
   auto resp = proxy_protocol_socket_->doWrite(msg, false);
@@ -131,7 +133,8 @@ TEST_F(ProxyProtocolTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
         .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
             expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
     EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false))
-        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
+        .WillOnce(
+            Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false, false}));
   }
 
   auto resp = proxy_protocol_socket_->doWrite(msg, false);
