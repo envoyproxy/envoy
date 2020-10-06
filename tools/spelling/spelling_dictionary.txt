@@ -876,6 +876,7 @@ pkey
 plaintext
 pluggable
 pointee
+poller
 popen
 pos
 posix
