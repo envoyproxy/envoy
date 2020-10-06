@@ -7,7 +7,6 @@
 
 #include "common/config/well_known_names.h"
 #include "common/memory/stats.h"
-#include "common/stats/symbol_table_creator.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/utility.h"

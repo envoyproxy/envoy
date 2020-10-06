@@ -17,7 +17,6 @@
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/store_impl.h"
-#include "common/stats/symbol_table_creator.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/timespan_impl.h"
 
@@ -31,12 +30,11 @@ namespace Stats {
 
 class TestSymbolTableHelper {
 public:
-  TestSymbolTableHelper() : symbol_table_(SymbolTableCreator::makeSymbolTable()) {}
-  SymbolTable& symbolTable() { return *symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return *symbol_table_; }
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
 private:
-  SymbolTablePtr symbol_table_;
+  SymbolTableImpl symbol_table_;
 };
 
 class TestSymbolTable {

@@ -574,7 +574,7 @@ private:
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
-  Stats::SymbolTablePtr symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
 };
 

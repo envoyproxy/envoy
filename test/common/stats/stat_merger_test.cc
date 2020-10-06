@@ -2,7 +2,6 @@
 
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/stat_merger.h"
-#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/test_common/utility.h"
@@ -305,8 +304,8 @@ TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
 
 class StatMergerThreadLocalTest : public testing::Test {
 protected:
-  SymbolTablePtr symbol_table_{SymbolTableCreator::makeSymbolTable()};
-  AllocatorImpl alloc_{*symbol_table_};
+  SymbolTableImpl symbol_table_;
+  AllocatorImpl alloc_{symbol_table_};
   ThreadLocalStoreImpl store_{alloc_};
 };
 

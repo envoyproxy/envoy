@@ -2,7 +2,6 @@
 #include <vector>
 
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/symbol_table_creator.h"
 #include "common/stats/utility.h"
 
 #include "test/fuzz/fuzz_runner.h"

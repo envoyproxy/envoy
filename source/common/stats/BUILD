@@ -53,7 +53,6 @@ envoy_cc_library(
         ":scope_prefixer_lib",
         ":stats_lib",
         ":store_impl_lib",
-        ":symbol_table_creator_lib",
         ":tag_utility_lib",
         "//include/envoy/stats:stats_macros",
         "//source/common/stats:allocator_lib",
@@ -187,16 +186,6 @@ envoy_cc_library(
         "//source/common/common:mem_block_builder_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "symbol_table_creator_lib",
-    srcs = ["symbol_table_creator.cc"],
-    hdrs = ["symbol_table_creator.h"],
-    external_deps = ["abseil_base"],
-    deps = [
-        ":symbol_table_lib",
     ],
 )
 

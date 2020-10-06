@@ -5,7 +5,6 @@
 #include "common/common/logger.h"
 #include "common/memory/stats.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/symbol_table_creator.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"

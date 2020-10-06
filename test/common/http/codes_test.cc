@@ -8,7 +8,6 @@
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
-#include "common/stats/symbol_table_creator.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
