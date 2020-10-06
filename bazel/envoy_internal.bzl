@@ -60,7 +60,7 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:clang_cl_fastbuild_build": ["-fno-standalone-debug"],
                repository + "//bazel:clang_cl_dbg_build": ["-fstandalone-debug"],
            }) + select({
-               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions"],
+               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions", "-Wrange-loop-analysis"],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
                "//conditions:default": [],
            }) + select({
