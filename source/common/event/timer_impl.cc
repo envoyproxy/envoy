@@ -39,13 +39,13 @@ TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispat
 
 void TimerImpl::disableTimer() { event_del(&raw_event_); }
 
-void TimerImpl::enableTimer(const std::chrono::milliseconds& d, const ScopeTrackedObject* object) {
+void TimerImpl::enableTimer(const std::chrono::milliseconds d, const ScopeTrackedObject* object) {
   timeval tv;
   TimerUtils::durationToTimeval(d, tv);
   internalEnableTimer(tv, object);
 }
 
-void TimerImpl::enableHRTimer(const std::chrono::microseconds& d,
+void TimerImpl::enableHRTimer(const std::chrono::microseconds d,
                               const ScopeTrackedObject* object = nullptr) {
   timeval tv;
   TimerUtils::durationToTimeval(d, tv);

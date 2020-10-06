@@ -7,6 +7,7 @@ Services
 
   accesslog/v2/*
   load_stats/v2/*
+  auth/v2/*
   discovery/v2/*
   metrics/v2/*
   ratelimit/v2/*

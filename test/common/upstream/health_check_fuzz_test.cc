@@ -17,15 +17,6 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
 
   HealthCheckFuzz health_check_fuzz;
 
-  if (input.health_check_config().health_checker_case() !=
-      envoy::config::core::v3::HealthCheck::kHttpHealthCheck) { // Temporary because HTTP is only
-                                                                // one implemented
-    ENVOY_LOG_MISC(trace, "Fuzz engine created non HTTP Health Checker");
-    return;
-  }
-
-  health_check_fuzz.type_ = HealthCheckFuzz::Type::HTTP;
-
   health_check_fuzz.initializeAndReplay(input);
 }
 

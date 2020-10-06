@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^examples|^bin|^source|^bazel|^.github"}
+EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^.github|.rst$|.md$"}
 
 
 find_shell_files () {
@@ -19,8 +19,7 @@ run_shellcheck_on () {
     local file
     file="$1"
     echo "Shellcheck: ${file}"
-    # TODO: add -f diff when shellcheck version allows (ubuntu > bionic)
-    shellcheck -x "$file"
+    shellcheck -f diff -x "$file"
 }
 
 run_shellchecks () {

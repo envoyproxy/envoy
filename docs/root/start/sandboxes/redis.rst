@@ -9,25 +9,10 @@ In this example, we show how a :ref:`Redis filter <config_network_filters_redis_
 Running the Sandboxes
 ~~~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of the services.
+.. include:: _include/docker-env-setup.rst
 
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Build the sandbox**
+Step 3: Build the sandbox
+*************************
 
 Terminal 1
 
@@ -44,7 +29,8 @@ Terminal 1
   redis_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
   redis_redis_1   docker-entrypoint.sh redis       Up      0.0.0.0:6379->6379/tcp
 
-**Step 4: Issue Redis commands**
+Step 4: Issue Redis commands
+****************************
 
 Issue Redis commands using your favourite Redis client, such as ``redis-cli``, and verify they are routed via Envoy.
 
@@ -61,7 +47,8 @@ Terminal 1
   $ redis-cli -h localhost -p 1999 get bar
   "bar"
 
-**Step 5: Verify egress stats**
+Step 5: Verify egress stats
+***************************
 
 Go to ``http://localhost:8001/stats?usedonly&filter=redis.egress_redis.command`` and verify the following stats:
 

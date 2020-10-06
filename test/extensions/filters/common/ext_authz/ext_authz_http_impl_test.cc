@@ -398,6 +398,32 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   client_->onSuccess(async_request_, std::move(message_response));
 }
 
+// Verify headers present in x-envoy-auth-headers-to-remove make it into the
+// Response correctly.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
+
+  // When we call onSuccess() at the bottom of the test we expect that all the
+  // headers-to-remove in that http response to have been correctly extracted
+  // and inserted into the authz Response just below.
+  Response authz_response;
+  authz_response.status = CheckStatus::OK;
+  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me"});
+  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-too"});
+  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-also"});
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+
+  const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
+      {":status", "200", false},
+      {"x-envoy-auth-headers-to-remove", " ,remove-me,, ,  remove-me-too , ", false},
+      {"x-envoy-auth-headers-to-remove", " remove-me-also ", false},
+  });
+  Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
+  client_->onSuccess(async_request_, std::move(http_response));
+}
+
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});

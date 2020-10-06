@@ -44,7 +44,7 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
 
 ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
-    ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
+    ServerConnectionCallbacks& callbacks, Stats::Scope& scope, Random::RandomGenerator& random,
     Http1::CodecStats::AtomicPtr& http1_codec_stats,
     Http2::CodecStats::AtomicPtr& http2_codec_stats, const Http1Settings& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
@@ -55,11 +55,11 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
       return std::make_unique<Http2::ServerConnectionImpl>(
-          connection, callbacks, stats, http2_options, max_request_headers_kb,
+          connection, callbacks, stats, random, http2_options, max_request_headers_kb,
           max_request_headers_count, headers_with_underscores_action);
     } else {
       return std::make_unique<Legacy::Http2::ServerConnectionImpl>(
-          connection, callbacks, stats, http2_options, max_request_headers_kb,
+          connection, callbacks, stats, random, http2_options, max_request_headers_kb,
           max_request_headers_count, headers_with_underscores_action);
     }
   } else {
