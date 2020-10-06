@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/matchers.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 
@@ -79,7 +80,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   Router::RouteConstSharedPtr route = callbacks_->route();
   skip_check_ = skipCheckForRoute(route);
 
-  if (!config_->filterEnabled() || skip_check_) {
+  bool disabled = !config_->filterEnabled(callbacks_->streamInfo().dynamicMetadata());
+  if (disabled) {
+    stats_.disabled_.inc();
+  }
+  if (disabled || skip_check_) {
     if (skip_check_) {
       return Http::FilterHeadersStatus::Continue;
     }

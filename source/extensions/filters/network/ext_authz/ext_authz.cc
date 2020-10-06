@@ -37,6 +37,11 @@ void Filter::callCheck() {
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
+  if (!filterEnabled(filter_callbacks_->connection().streamInfo().dynamicMetadata())) {
+    config_->stats().disabled_.inc();
+    return Network::FilterStatus::Continue;
+  }
+
   if (status_ == Status::NotStarted) {
     // By waiting to invoke the check at onData() the call to authorization service will have
     // sufficient information to fill out the checkRequest_.
