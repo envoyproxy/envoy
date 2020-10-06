@@ -135,7 +135,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   }
 
   if (body != nullptr) {
-    message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
+    message->body().add(body, body_size);
     message->headers().setContentLength(body_size);
   }
 
@@ -348,9 +348,9 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
   });
 
   // TODO(mattklein123): Avoid double copy here.
-  if (response->body() != nullptr) {
+  if (response->body().length() > 0) {
     lua_pushlstring(coroutine_.luaState(), response->bodyAsString().data(),
-                    response->body()->length());
+                    response->body().length());
   } else {
     lua_pushnil(coroutine_.luaState());
   }
@@ -385,7 +385,7 @@ void StreamHandleWrapper::onFailure(const Http::AsyncClient::Request& request,
       new Http::ResponseMessageImpl(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
           {{Http::Headers::get().Status,
             std::to_string(enumToInt(Http::Code::ServiceUnavailable))}})));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("upstream failure");
+  response_message->body().add("upstream failure");
   onSuccess(request, std::move(response_message));
 }
 

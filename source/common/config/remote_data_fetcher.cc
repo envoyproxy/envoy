@@ -44,15 +44,15 @@ void RemoteDataFetcher::onSuccess(const Http::AsyncClient::Request&,
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: success", uri_.uri());
-    if (response->body()) {
+    if (response->body().length() > 0) {
       auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-      const auto content_hash = Hex::encode(crypto_util.getSha256Digest(*response->body()));
+      const auto content_hash = Hex::encode(crypto_util.getSha256Digest(response->body()));
 
       if (content_hash_ != content_hash) {
         ENVOY_LOG(debug, "fetch remote data [uri = {}]: data is invalid", uri_.uri());
         callback_.onFailure(FailureReason::InvalidData);
       } else {
-        callback_.onSuccess(response->body()->toString());
+        callback_.onSuccess(response->bodyAsString());
       }
     } else {
       ENVOY_LOG(debug, "fetch remote data [uri = {}]: body is empty", uri_.uri());
