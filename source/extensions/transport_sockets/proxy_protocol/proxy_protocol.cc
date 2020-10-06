@@ -94,6 +94,7 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
                      result.err_->getErrorDetails());
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
         action = Network::PostIoAction::Close;
+      } else {
         didBlock = true;
       }
       break;

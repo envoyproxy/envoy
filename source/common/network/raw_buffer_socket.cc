@@ -16,7 +16,7 @@ void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks& call
 IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
-  bool didBlock = true;
+  bool didBlock = false;
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
