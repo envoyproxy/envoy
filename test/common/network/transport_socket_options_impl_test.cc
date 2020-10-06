@@ -44,6 +44,8 @@ TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
   EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
+  EXPECT_EQ("202.168.0.13:52000",
+            transport_socket_options->proxyProtocolOptions()->src_addr_->asStringView());
   EXPECT_TRUE(transport_socket_options->applicationProtocolListOverride().empty());
 }
 
