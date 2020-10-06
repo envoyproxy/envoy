@@ -267,6 +267,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
       parent_.sendPendingFrames();
+      parent_.checkProtocolConstraintViolation();
     }
   }
 }

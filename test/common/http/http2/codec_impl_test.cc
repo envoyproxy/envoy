@@ -1365,6 +1365,72 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
 }
 
+// Verify detection of downstream outbound frame queue by the WINDOW_UPDATE frames
+// sent when codec resumes reading.
+TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  // Force the server stream to be read disabled. This will cause it to stop sending window
+  // updates to the client.
+  server_->getStream(1)->readDisable(true);
+
+  uint32_t initial_stream_window =
+      nghttp2_session_get_stream_effective_local_window_size(client_->session(), 1);
+  // If this limit is changed, this test will fail due to the initial large writes being divided
+  // into more than 4 frames. Fast fail here with this explanatory comment.
+  ASSERT_EQ(65535, initial_stream_window);
+  // Make sure the limits were configured properly in test set up.
+  EXPECT_EQ(initial_stream_window, server_->getStream(1)->bufferLimit());
+  EXPECT_EQ(initial_stream_window, client_->getStream(1)->bufferLimit());
+
+  // One large write gets broken into smaller frames.
+  EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
+  Buffer::OwnedImpl long_data(std::string(initial_stream_window / 2, 'a'));
+  request_encoder_->encodeData(long_data, false);
+
+  EXPECT_EQ(initial_stream_window / 2, server_->getStreamUnconsumedBytes(1));
+
+  // pre-fill downstream outbound frame queue
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above and pre-fill outbound queue with 1 byte DATA frames
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 2; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_FALSE(violation_callback->enabled_);
+
+  // Now unblock the server's stream. This will cause the bytes to be consumed, 2 flow control
+  // updates to be sent, and overflow outbound frame queue.
+  server_->getStream(1)->readDisable(false);
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
 TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   initialize();
   MockStreamCallbacks callbacks;
