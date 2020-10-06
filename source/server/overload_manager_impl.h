@@ -72,7 +72,7 @@ public:
 
   private:
     friend class NamedOverloadActionSymbolTable;
-    // Only the symbol table class can create Symbol instances from indicies.
+    // Only the symbol table class can create Symbol instances from indices.
     explicit Symbol(size_t index) : index_(index) {}
 
     size_t index_;
