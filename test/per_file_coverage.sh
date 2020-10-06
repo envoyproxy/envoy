@@ -41,7 +41,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/dynamic_forward_proxy:94.9"
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/grpc_json_transcoder:93.3"
-"source/extensions/filters/http/oauth2:96.5"
+"source/extensions/filters/http/oauth2:96.4"
 "source/extensions/filters/listener:96.0"
 "source/extensions/filters/listener/tls_inspector:92.4"
 "source/extensions/filters/listener/http_inspector:93.3"
