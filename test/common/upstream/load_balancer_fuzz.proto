@@ -13,19 +13,12 @@ message UpdateHealthFlags {
   uint32 num_excluded_hosts = 4;
 }
 
-//Left as message in case specific load balancers need something generated for these actions
-message ChooseHost {
-}
-
-message Prefetch {
-}
-
 message LbAction {
   oneof action_selector {
     option (validate.required) = true;
     UpdateHealthFlags update_health_flags = 1;
-    Prefetch prefetch = 2;
-    ChooseHost choose_host = 3;
+    google.protobuf.Empty prefetch = 2;
+    google.protobuf.Empty choose_host = 3;
   }
 }
 
@@ -42,4 +35,3 @@ message LoadBalancerTestCase {
   repeated uint64 bytestring_for_random_calls = 5
       [(validate.rules).repeated = {min_items: 1, max_items: 50}];
 }
-//TODO: make this modular in only setting up static hosts, and running through action stream

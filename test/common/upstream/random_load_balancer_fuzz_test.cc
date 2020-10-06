@@ -1,10 +1,9 @@
-// Mod it across host sets to determine which one to use
+#include <memory>
 
 #include "test/common/upstream/load_balancer_fuzz_base.h"
 #include "test/common/upstream/random_load_balancer_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
-#include <memory>
 
 namespace Envoy {
 namespace Upstream {
@@ -17,7 +16,8 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RandomLoadBalancerTestCase inp
     return;
   }
 
-  std::unique_ptr<LoadBalancerFuzzBase> load_balancer_fuzz = std::make_unique<LoadBalancerFuzzBase>();
+  std::unique_ptr<LoadBalancerFuzzBase> load_balancer_fuzz =
+      std::make_unique<LoadBalancerFuzzBase>();
   load_balancer_fuzz->initializeLbComponents(input.load_balancer_test_case());
 
   try {
