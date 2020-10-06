@@ -53,6 +53,11 @@ public:
    * registered events and fire callbacks when they are active.
    */
   virtual void setEnabled(uint32_t events) PURE;
+
+  /**
+   * Gets the currently enabled events.
+   */
+  virtual uint32_t getEnabled() PURE;
 };
 
 using FileEventPtr = std::unique_ptr<FileEvent>;

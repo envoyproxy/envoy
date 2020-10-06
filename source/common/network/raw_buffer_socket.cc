@@ -16,6 +16,7 @@ void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks& call
 IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
+  bool didBlock = true;
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
@@ -38,18 +39,20 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
       ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+        didBlock = true;
         action = PostIoAction::Close;
       }
       break;
     }
   } while (true);
 
-  return {action, bytes_read, end_stream};
+  return {action, bytes_read, end_stream, didBlock};
 }
 
 IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   PostIoAction action;
   uint64_t bytes_written = 0;
+  bool didBlock = false;
   ASSERT(!shutdown_ || buffer.length() == 0);
   do {
     if (buffer.length() == 0) {
@@ -71,6 +74,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());
       if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+        didBlock = true;
         action = PostIoAction::KeepOpen;
       } else {
         action = PostIoAction::Close;
@@ -79,7 +83,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
     }
   } while (true);
 
-  return {action, bytes_written, false};
+  return {action, bytes_written, false, didBlock};
 }
 
 std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }

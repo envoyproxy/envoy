@@ -33,6 +33,11 @@ struct IoResult {
    * can only be true for read operations.
    */
   bool end_stream_read_;
+
+  /**
+   * True if the I/O call blocked.
+   */
+  bool didBlock_;
 };
 
 /**

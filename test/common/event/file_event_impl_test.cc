@@ -322,15 +322,19 @@ TEST_F(FileEventImplTest, SetEnabled) {
       trigger, FileReadyType::Read | FileReadyType::Write);
 
   file_event->setEnabled(FileReadyType::Read);
+  EXPECT_EQUAL(file_event->getEnabled(), FileReadyType::Read);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   file_event->setEnabled(FileReadyType::Write);
+  EXPECT_EQUAL(file_event->getEnabled(), FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   file_event->setEnabled(0);
+  EXPECT_EQUAL(file_event->getEnabled(), 0);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
+  EXPECT_EQUAL(file_event->getEnabled(), FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
