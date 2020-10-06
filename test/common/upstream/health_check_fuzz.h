@@ -45,7 +45,7 @@ public:
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
-  ~HttpHealthCheckFuzz() = default;
+  ~HttpHealthCheckFuzz() override = default;
 
   // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
@@ -59,7 +59,7 @@ public:
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
-  ~TcpHealthCheckFuzz() = default;
+  ~TcpHealthCheckFuzz() override = default;
 
   // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
@@ -79,7 +79,7 @@ public:
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
   void raiseGoAway(bool no_error);
-  ~GrpcHealthCheckFuzz() = default;
+  ~GrpcHealthCheckFuzz() override = default;
 
   // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
