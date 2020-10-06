@@ -255,6 +255,10 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void continueEncoding() override;
   const Buffer::Instance* encodingBuffer() override;
   void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override;
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override;
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   void responseDataTooLarge();
