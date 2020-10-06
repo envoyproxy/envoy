@@ -39,7 +39,7 @@ message TcpProxy {
           "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight";
 
       // Name of the upstream cluster.
-      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string name = 1 [(validate.rules).string = {min_len: 1}];
 
       // When a request matches the route, the choice of an upstream cluster is
       // determined by its weight. The sum of weights across all entries in the
@@ -67,7 +67,7 @@ message TcpProxy {
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
 
     // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
-    string hostname = 1 [(validate.rules).string = {min_bytes: 1}];
+    string hostname = 1 [(validate.rules).string = {min_len: 1}];
   }
 
   reserved 6;
@@ -76,7 +76,7 @@ message TcpProxy {
 
   // The prefix to use when emitting :ref:`statistics
   // <config_network_filters_tcp_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof cluster_specifier {
     option (validate.required) = true;

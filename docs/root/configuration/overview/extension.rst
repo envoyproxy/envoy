@@ -61,10 +61,12 @@ follows:
           "@type": type.googleapis.com/udpa.type.v1.TypedStruct
           type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3Router
 
+.. _config_overview_extension_discovery:
+
 Discovery service
 ^^^^^^^^^^^^^^^^^
 
-Extension configuration can be supplied dynamically from a :ref:`an xDS
+Extension configuration can be supplied dynamically from an :ref:`xDS
 management server<xds_protocol>` using :ref:`ExtensionConfiguration discovery
 service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
 The name field in the extension configuration acts as the resource identifier.
@@ -74,7 +76,7 @@ for HTTP filters.
 
 Extension config discovery service has a :ref:`statistics
 <subscription_statistics>` tree rooted at
-*<stat_prefix>.extension_config_discovery.<extension_config_name>.*. In addition
+*<stat_prefix>.extension_config_discovery.<extension_config_name>*. In addition
 to the common subscription statistics, it also provides the following:
 
 .. csv-table::

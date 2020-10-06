@@ -27,6 +27,7 @@ requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
   performed asynchronously from :ref:`an extension <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.PrivateKeyProvider>`. This allows extending Envoy to support various key
   management schemes (such as TPM) and TLS acceleration. This mechanism uses
   `BoringSSL private key method interface <https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
+* **OCSP Stapling**: Online Certificate Stapling Protocol responses may be stapled to certificates.
 
 Underlying implementation
 -------------------------
@@ -70,51 +71,8 @@ validation context specifies one or more trusted authority certificates.
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: yaml
-
-  static_resources:
-    listeners:
-    - name: listener_0
-      address: { socket_address: { address: 127.0.0.1, port_value: 10000 } }
-      filter_chains:
-      - filters:
-        - name: envoy.filters.network.http_connection_manager
-          # ...
-        transport_socket:
-          name: envoy.transport_sockets.tls
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-            common_tls_context:
-              validation_context:
-                trusted_ca:
-                  filename: /usr/local/my-client-ca.crt
-    clusters:
-    - name: some_service
-      connect_timeout: 0.25s
-      type: STATIC
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: some_service
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.2
-                  port_value: 1234
-      transport_socket:
-        name: envoy.transport_sockets.tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-          common_tls_context:
-            tls_certificates:
-              certificate_chain: { "filename": "/cert.crt" }
-              private_key: { "filename": "/cert.key" }
-            validation_context:
-              match_subject_alt_names:
-                exact: "foo"
-              trusted_ca:
-                filename: /etc/ssl/certs/ca-certificates.crt
+.. literalinclude:: _include/ssl.yaml
+    :language: yaml
 
 */etc/ssl/certs/ca-certificates.crt* is the default path for the system CA bundle on Debian systems.
 :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` along with
@@ -149,14 +107,17 @@ certificates. These may be a mix of RSA and P-256 ECDSA certificates. The follow
 
 * Only one certificate of a particular type (RSA or ECDSA) may be specified.
 * Non-P-256 server ECDSA certificates are rejected.
-* If the client supports P-256 ECDSA, a P-256 ECDSA certificate will be selected if present in the
-  :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
+* If the client supports P-256 ECDSA, a P-256 ECDSA certificate will be selected if one is present in the
+  :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`
+  and it is in compliance with the OCSP policy.
 * If the client only supports RSA certificates, a RSA certificate will be selected if present in the
   :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
 * Otherwise, the first certificate listed is used. This will result in a failed handshake if the
   client only supports RSA certificates and the server only has ECDSA certificates.
 * Static and SDS certificates may not be mixed in a given :ref:`DownstreamTlsContext
   <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
+* The selected certificate must adhere to the OCSP policy. If no
+  such certificate is found, the connection is refused.
 
 Only a single TLS certificate is supported today for :ref:`UpstreamTlsContexts
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
@@ -167,6 +128,41 @@ Secret discovery service (SDS)
 TLS certificates can be specified in the static resource or can be fetched remotely.
 Certificate rotation is supported for static resources by sourcing :ref:`SDS configuration from the filesystem <xds_certificate_rotation>` or by pushing updates from the SDS server.
 Please see :ref:`SDS <config_secret_discovery_service>` for details.
+
+.. _arch_overview_ssl_ocsp_stapling:
+
+OCSP Stapling
+-------------
+
+:ref:`DownstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` support
+stapling an Online Certificate Status Protocol (OCSP) response to a TLS certificate during the handshake. The
+``ocsp_staple`` field allows the operator to supply a pre-computed OCSP response per-certificate in the context.
+A single response may not pertain to multiple certificates. If provided, OCSP responses must be valid and
+affirm the certificate has not been revoked. Expired OCSP responses are accepted, but may cause downstream
+connection errors depending on the OCSP staple policy.
+
+:ref:`DownstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`
+support an ``ocsp_staple_policy`` field to control whether Envoy should stop using a certificate or
+continue without stapling when its associated OCSP response is missing or expired.
+Certificates marked as `must-staple <https://tools.ietf.org/html/rfc7633>`_ require a
+valid OCSP response regardless of the OCSP staple policy. In practice, a must-staple certificate causes
+cEnvoy to behave as if the OCSP staple policy is :ref:`MUST_STAPLE<envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy.MUST_STAPLE>`.
+Envoy will not use a must-staple certificate for new connections after its OCSP response expires.
+
+OCSP responses are never stapled to TLS requests that do not indicate support for OCSP stapling
+via the ``status_request`` extension.
+
+The following runtime flags are provided to adjust the requirements of OCSP responses and override
+the OCSP policy. These flags default to ``true``.
+
+* ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs``: Disabling this allows
+  the operator to omit an OCSP response for must-staple certs in the config.
+* ``envoy.reloadable_features.check_ocsp_policy``: Disabling this will disable OCSP policy
+  checking. OCSP responses are stapled when available if the client supports it, even if the
+  response is expired. Stapling is skipped if no response is present.
+
+OCSP responses are ignored for :ref:`UpstreamTlsContexts
+<envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
 
 .. _arch_overview_ssl_auth_filter:
 

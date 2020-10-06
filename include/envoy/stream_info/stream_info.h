@@ -237,6 +237,13 @@ public:
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
   /**
+   * @param connection_termination_details the termination details string to set for this
+   * connection.
+   */
+  virtual void
+  setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
+
+  /**
    * @param response_flags the response_flags to intersect with.
    * @return true if the intersection of the response_flags argument and the currently set response
    * flags is non-empty.
@@ -286,6 +293,11 @@ public:
    * @return the response code details.
    */
   virtual const absl::optional<std::string>& responseCodeDetails() const PURE;
+
+  /**
+   * @return the termination details of the connection.
+   */
+  virtual const absl::optional<std::string>& connectionTerminationDetails() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.
@@ -581,6 +593,16 @@ public:
    * @return A shared pointer to the request ID utils for this stream
    */
   virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
+
+  /**
+   * @return Connection ID of the downstream connection, or unset if not available.
+   **/
+  virtual absl::optional<uint64_t> connectionID() const PURE;
+
+  /**
+   * @param id Connection ID of the downstream connection.
+   **/
+  virtual void setConnectionID(uint64_t id) PURE;
 };
 
 } // namespace StreamInfo

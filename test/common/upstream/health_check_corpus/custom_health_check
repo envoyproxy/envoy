@@ -1,0 +1,62 @@
+health_check_config {
+  timeout {
+    seconds: 26624
+  }
+  interval {
+    seconds: 8960
+    nanos: 65530
+  }
+  interval_jitter {
+    seconds: 8960
+    nanos: 7
+  }
+  unhealthy_threshold {
+    value: 641007614
+  }
+  healthy_threshold {
+    value: 1024
+  }
+  alt_port {
+    value: 16777216
+  }
+  reuse_connection {
+    value: true
+  }
+  no_traffic_interval {
+    nanos: 2097152
+  }
+  custom_health_check {
+    name: "ssssssssssssssssssssssssssssssssssssssssss"
+  }
+  unhealthy_edge_interval {
+    seconds: 131072
+    nanos: 4104
+  }
+  healthy_edge_interval {
+    seconds: 131072
+    nanos: 128
+  }
+  event_log_path: "A("
+  interval_jitter_percent: 641007544
+  initial_jitter {
+    seconds: 8960
+    nanos: 7
+  }
+  tls_options {
+  }
+}
+actions {
+  raise_event: REMOTE_CLOSE
+}
+actions {
+  raise_event: REMOTE_CLOSE
+}
+actions {
+  trigger_interval_timer {
+  }
+}
+actions {
+  raise_event: CONNECTED
+}
+http_verify_cluster: true
+start_failed: true

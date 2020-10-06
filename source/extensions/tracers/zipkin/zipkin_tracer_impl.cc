@@ -186,9 +186,7 @@ void ReporterImpl::flushSpans() {
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
 
-    Buffer::InstancePtr body = std::make_unique<Buffer::OwnedImpl>();
-    body->add(request_body);
-    message->body() = std::move(body);
+    message->body().add(request_body);
 
     const uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.zipkin.request_timeout", 5000U);

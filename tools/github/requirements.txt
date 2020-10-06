@@ -1,1 +1,3 @@
-PyGithub==1.43.8
+PyGithub==1.53 \
+    --hash=sha256:776befaddab9d8fddd525d52a6ca1ac228cf62b5b1e271836d766f4925e1452e \
+    --hash=sha256:8ad656bf79958e775ec59f7f5a3dbcbadac12147ae3dc42708b951064096af15
