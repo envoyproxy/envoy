@@ -18,6 +18,7 @@
 #include "common/common/matchers.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -60,6 +61,8 @@ public:
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
         pack_as_bytes_(config.with_request_body().pack_as_bytes()),
+        skip_buffering_matchers_(Http::HeaderUtility::buildHeaderMatchers(
+            config.with_request_body().skip_buffering_matchers())),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -93,6 +96,10 @@ public:
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   bool packAsBytes() const { return pack_as_bytes_; }
+
+  const std::vector<Http::HeaderUtility::HeaderData>& skipBufferingMatchers() const {
+    return skip_buffering_matchers_;
+  }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -148,6 +155,7 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
+  const std::vector<Http::HeaderUtility::HeaderData> skip_buffering_matchers_;
   const Http::Code status_on_error_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
@@ -246,6 +254,8 @@ private:
                     const Router::RouteConstSharedPtr& route);
   void continueDecoding();
   bool isBufferFull() const;
+  bool shouldBufferRequestBody(Http::RequestHeaderMap& headers, bool end_stream,
+                               bool per_route_skip_request_body_buffering) const;
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {

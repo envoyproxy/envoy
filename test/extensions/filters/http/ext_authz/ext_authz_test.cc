@@ -489,6 +489,38 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 }
 
+// Checks that the filter skips buffering request body when a matching request is received.
+TEST_F(HttpFilterTest, BypassBufferingRequestBody) {
+  InSequence s;
+
+  initialize(R"EOF(
+   grpc_service:
+     envoy_grpc:
+       cluster_name: "ext_authz_server"
+   failure_mode_allow: false
+   with_request_body:
+     max_request_bytes: 10
+     allow_partial_message: true
+     skip_buffering_matchers:
+     - name: "content-type"
+       exact_match: "multipart/form-data"
+   )EOF");
+
+  request_headers_.addCopy(Http::Headers::get().ContentType, "multipart/form-data");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(1);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+}
+
 // Checks that the filter initiates the authorization process only when the filter decode trailers
 // is called.
 TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {

@@ -61,18 +61,6 @@ constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
 constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
 constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
 
-template <class T>
-std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
-  std::vector<Http::HeaderUtility::HeaderData> matchers;
-  matchers.reserve(matcher_protos.size());
-
-  for (const auto& proto : matcher_protos) {
-    matchers.emplace_back(proto);
-  }
-
-  return matchers;
-}
-
 // Sets the auth token as the Bearer token in the authorization header.
 void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
   headers.setInline(authorization_handle.handle(), absl::StrCat("Bearer ", token));
@@ -91,7 +79,8 @@ FilterConfig::FilterConfig(
       signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
-      pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
+      pass_through_header_matchers_(
+          Http::HeaderUtility::buildHeaderMatchers(proto_config.pass_through_matcher())) {
   if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",

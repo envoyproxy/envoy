@@ -97,9 +97,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   request_headers_ = &headers;
-  buffer_data_ = config_->withRequestBody() && !per_route_flags.skip_request_body_buffering_ &&
-                 !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
-                   Http::Utility::isH2UpgradeRequest(headers));
+  buffer_data_ =
+      shouldBufferRequestBody(headers, end_stream, per_route_flags.skip_request_body_buffering_);
 
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *callbacks_);
@@ -318,6 +317,19 @@ bool Filter::isBufferFull() const {
     return buffer->length() >= config_->maxRequestBytes();
   }
   return false;
+}
+
+bool Filter::shouldBufferRequestBody(Http::RequestHeaderMap& headers, bool end_stream,
+                                     bool per_route_skip_request_body_buffering) const {
+  for (const auto& matcher : config_->skipBufferingMatchers()) {
+    if (matcher.matchesHeaders(headers)) {
+      return false;
+    }
+  }
+
+  return config_->withRequestBody() && !per_route_skip_request_body_buffering &&
+         !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
+           Http::Utility::isH2UpgradeRequest(headers));
 }
 
 void Filter::continueDecoding() {

@@ -6,6 +6,7 @@ import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/grpc_service.proto";
 import "envoy/config/core/v4alpha/http_uri.proto";
+import "envoy/config/route/v4alpha/route_components.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
 import "envoy/type/v3/http_status.proto";
 
@@ -158,6 +159,9 @@ message BufferSettings {
   // body<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` will be filled
   // with UTF-8 string request body.
   bool pack_as_bytes = 3;
+
+  // Any request that matches any of the provided matchers will skip request body buffering.
+  repeated config.route.v4alpha.HeaderMatcher skip_buffering_matchers = 4;
 }
 
 // HttpService is used for raw HTTP communication between the filter and the authorization service.

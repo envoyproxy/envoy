@@ -185,6 +185,21 @@ public:
    * @brief Remove the port part from host/authority header if it is equal to provided port
    */
   static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
+
+  /**
+   * Builds a list of header matchers from matcher protos.
+   * @param matcher_protos the matcher protos.
+   * @return std::vector<Http::HeaderUtility::HeaderData> a list of header matchers.
+   */
+  template <class T>
+  static std::vector<Http::HeaderUtility::HeaderData> buildHeaderMatchers(const T& matcher_protos) {
+    std::vector<Http::HeaderUtility::HeaderData> matchers;
+    matchers.reserve(matcher_protos.size());
+    for (const auto& proto : matcher_protos) {
+      matchers.emplace_back(proto);
+    }
+    return matchers;
+  }
 };
 } // namespace Http
 } // namespace Envoy
