@@ -267,17 +267,19 @@ message ExtAuthzPerRoute {
   }
 }
 
-// Extra settings for the check request. You can use this to provide extra context for the
-// external authorization server on specific virtual hosts \ routes. For example, adding a context
-// extension on the virtual host level can give the ext-authz server information on what virtual
-// host is used without needing to parse the host header. If CheckSettings is specified in multiple
-// per-filter-configs, they will be merged in order, and the result will be used.
+// Extra settings for the check request.
 message CheckSettings {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.CheckSettings";
 
   // Context extensions to set on the CheckRequest's
   // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v3.AttributeContext.context_extensions>`
+  //
+  // You can use this to provide extra context for the external authorization server on specific
+  // virtual hosts/routes. For example, adding a context extension on the virtual host level can
+  // give the ext-authz server information on what virtual host is used without needing to parse the
+  // host header. If CheckSettings is specified in multiple per-filter-configs, they will be merged
+  // in order, and the result will be used.
   //
   // Merge semantics for this field are such that keys from more specific configs override.
   //
@@ -286,4 +288,8 @@ message CheckSettings {
   //   These settings are only applied to a filter configured with a
   //   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1;
+
+  // When set to true, disable the configured :ref:`with_request_body
+  // <envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a route.
+  bool disable_request_body_buffering = 2;
 }
