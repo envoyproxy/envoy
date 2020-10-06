@@ -87,6 +87,21 @@ token_bucket:
   EXPECT_FALSE(config->enforced());
 }
 
+TEST(Factory, PerRouteConfigNoTokenBucket) {
+  const std::string config_yaml = R"(
+stat_prefix: test
+  )";
+
+  LocalRateLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                       ProtobufMessage::getNullValidationVisitor()),
+               EnvoyException);
+}
+
 TEST(Factory, FillTimerTooLow) {
   const std::string config_yaml = R"(
 stat_prefix: test

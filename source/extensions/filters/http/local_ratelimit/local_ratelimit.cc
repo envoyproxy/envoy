@@ -7,8 +7,6 @@
 
 #include "common/http/utility.h"
 
-#include "extensions/filters/http/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -16,7 +14,8 @@ namespace LocalRateLimitFilter {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-    Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime)
+    Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
+    const bool per_route)
     : status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
       max_tokens_(config.token_bucket().max_tokens()),
@@ -42,6 +41,14 @@ FilterConfig::FilterConfig(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {
   if (fill_timer_ && fill_interval_ < std::chrono::milliseconds(50)) {
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
+  }
+
+  // Note: no tocket bucket is fine for the global config, which would be the case for enabling
+  //       the filter globally but disabled and then applying limits at the virtual host or
+  //       route level. At the virtual or route level, it makes no sense to have an no token
+  //       bucket so we throw an error.
+  if (per_route && !config.has_token_bucket()) {
+    throw EnvoyException("local rate limit token bucket must be set for per filter configs");
   }
 
   tokens_ = max_tokens_;
@@ -146,7 +153,7 @@ const FilterConfig* Filter::getConfig() const {
   }
 
   effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
-      HttpFilterNames::get().LocalRateLimit, decoder_callbacks_->route());
+      "envoy.filters.http.local_ratelimit", decoder_callbacks_->route());
   if (effective_config_) {
     return effective_config_;
   }

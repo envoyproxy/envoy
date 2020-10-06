@@ -45,7 +45,8 @@ struct LocalRateLimitStats {
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime);
+               Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
+               bool per_route = false);
   ~FilterConfig() override;
   Runtime::Loader& runtime() { return runtime_; }
   bool requestAllowed() const;

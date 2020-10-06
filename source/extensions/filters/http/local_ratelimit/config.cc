@@ -28,7 +28,7 @@ LocalRateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const FilterConfig>(proto_config, context.dispatcher(), context.scope(),
-                                              context.runtime());
+                                              context.runtime(), true);
 }
 
 /**

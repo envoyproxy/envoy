@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ class LocalRateLimitFilterConfig
     : public Common::FactoryBase<
           envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit> {
 public:
-  LocalRateLimitFilterConfig() : FactoryBase(HttpFilterNames::get().LocalRateLimit) {}
+  LocalRateLimitFilterConfig() : FactoryBase("envoy.filters.http.local_ratelimit") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
