@@ -61,6 +61,8 @@ follows:
           "@type": type.googleapis.com/udpa.type.v1.TypedStruct
           type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3Router
 
+.. _config_overview_extension_discovery:
+
 Discovery service
 ^^^^^^^^^^^^^^^^^
 

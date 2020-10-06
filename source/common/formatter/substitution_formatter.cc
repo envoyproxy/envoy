@@ -617,6 +617,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.responseCodeDetails();
         });
+  } else if (field_name == "CONNECTION_TERMINATION_DETAILS") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.connectionTerminationDetails();
+        });
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });

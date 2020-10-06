@@ -202,6 +202,13 @@ The following command operators are supported:
   TCP
     Not implemented ("-")
 
+.. _config_access_log_format_connection_termination_details:
+
+%CONNECTION_TERMINATION_DETAILS%
+  HTTP and TCP
+    Connection termination details may provide additional information about why the connection was
+    terminated by Envoy for L4 reasons.
+
 %BYTES_SENT%
   HTTP
     Body bytes sent. For WebSocket connection it will also include response header bytes.
