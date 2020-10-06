@@ -208,8 +208,26 @@ If your example asks the user to run commands inside containers, you can
 mimick this using `docker-compose exec -T`. The `-T` flag is necessary as the
 tests do not have access to a `tty` in the CI pipeline.
 
+### Note on permissions and configuration
 
-## Add sandbox configs to configuration tests
+The sandbox tests are run with a `umask` setting of `027` to ensure they will run in environments
+where this is the case.
+
+As the Envoy containers run as non-root, it is essential that any configurations required
+by the daemon are included in the example `Dockerfile` rather than mounted in
+any `docker-compose.yaml` files.
+
+The Docker recipe should also ensure that any added configurations are world-readable, by adding,
+for example:
+
+```
+RUN chmod go+r /etc/front-envoy.yaml
+```
+
+...an added configuration named `front-envoy.yaml`.
+
+
+## Sandbox configuration tests
 
 Example configuration files are tested to ensure they are valid and well-formed, and do
 not contain deprecated features.
@@ -225,6 +243,7 @@ cannot be tested in this way, you should add the files to the `exclude` list in 
 section of the `examples/BUILD` file.
 
 The `exclude` patterns are evaluated as `globs` in the context of the `examples` folder.
+
 
 ## Verifying your sandbox
 
@@ -243,16 +262,12 @@ You should see the docker composition brought up, your tests run, and the compos
 
 The script should exit with `0` for the tests to pass.
 
-The tests are run with a `umask` setting of `027`. It is therefore essential that any configurations required
-by the `envoy` user inside the container are included in the example `Dockerfile` rather than mounted in
-any `docker-compose.yaml` files. The configuration files will also need `chmod +r envoy ...` inside the
-Docker recipe. See existing sandboxes for examples.
 
 ## Verifying multiple/all sandboxes
 
 In continuous integration, all of the sandboxes are checked using the `ci/verify-examples.sh`.
 
-This can be called with a filter argument, which is a `glob` evaluated in the context of the `examples` folder.
+This can also be called with a filter argument, which is a `glob` evaluated in the context of the `examples` folder.
 
 For example:
 
