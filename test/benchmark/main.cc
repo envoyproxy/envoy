@@ -51,7 +51,6 @@ int main(int argc, char** argv) {
   Thread::MutexBasicLockable lock;
   Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFancyLogFormat(), lock,
                                   false};
-  UNREFERENCED_PARAMETER(logging_context);
 
   skip_expensive_benchmarks = skip_switch.getValue();
 
