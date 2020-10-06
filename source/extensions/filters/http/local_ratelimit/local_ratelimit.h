@@ -97,6 +97,8 @@ public:
                                           bool end_stream) override;
 
 private:
+  friend class FilterTest;
+
   const FilterConfig* getConfig() const;
 
   FilterConfigSharedPtr config_;

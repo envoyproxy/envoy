@@ -73,6 +73,8 @@ public:
 
   Http::Code toErrorCode(const uint64_t code) { return config_->toErrorCode(code); }
   void onFillTimer() { config_->onFillTimer(); }
+  const FilterConfig* getConfig() { return filter_->getConfig(); }
+  const FilterConfig* getEffectiveConfig() { return filter_->effective_config_; }
 
   Stats::IsolatedStoreImpl stats_;
   TestStreamInfo stream_info_;
@@ -94,6 +96,14 @@ TEST_F(FilterTest, Runtime) {
 TEST_F(FilterTest, ToErrorCode) {
   setup(fmt::format(config_yaml, "1"), false, false);
   EXPECT_EQ(Http::Code::BadRequest, toErrorCode(400));
+}
+
+TEST_F(FilterTest, CachedConfig) {
+  setup(fmt::format(config_yaml, "1"), false, false);
+  EXPECT_EQ(nullptr, getEffectiveConfig());
+  EXPECT_EQ(config_.get(), getConfig());
+  EXPECT_NE(nullptr, getEffectiveConfig());
+  EXPECT_EQ(getEffectiveConfig(), getConfig());
 }
 
 // TODO(rgs1): we should share code with the network local rate limiter and drop
