@@ -23,7 +23,8 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
-  disabled_ = other.disabled_;
+  // We only merge context extensions here, and leave boolean flags untouched since those flags are
+  // not used from the merged config.
   auto begin_it = other.context_extensions_.begin();
   auto end_it = other.context_extensions_.end();
   for (auto it = begin_it; it != end_it; ++it) {
@@ -77,9 +78,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   Router::RouteConstSharedPtr route = callbacks_->route();
-
   const auto per_route_flags = getPerRouteFlags(route);
-
   skip_check_ = per_route_flags.skip_check_;
 
   if (!config_->filterEnabled() || skip_check_) {

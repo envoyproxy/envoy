@@ -155,7 +155,6 @@ TEST_F(HttpFilterTest, MergeConfig) {
   base_config.merge(disabled_config);
 
   // Make sure all values were merged:
-  EXPECT_TRUE(base_config.disabled());
   auto&& merged_extensions = base_config.contextExtensions();
   EXPECT_EQ("base_value", merged_extensions.at("base_key"));
   EXPECT_EQ("value", merged_extensions.at("merged_key"));
