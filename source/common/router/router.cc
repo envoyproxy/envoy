@@ -117,7 +117,9 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   TimeoutData timeout;
   if (grpc_request && route.maxGrpcTimeout()) {
     const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
-    std::chrono::milliseconds grpc_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    auto header_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    std::chrono::milliseconds grpc_timeout =
+        header_timeout ? header_timeout.value() : std::chrono::milliseconds(0);
     if (route.grpcTimeoutOffset()) {
       // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
       // setting it to 0 means infinity and a negative timeout makes no sense.
@@ -739,7 +741,7 @@ void Filter::maybeDoShadowing() {
     Http::RequestMessagePtr request(new Http::RequestMessageImpl(
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_)));
     if (callbacks_->decodingBuffer()) {
-      request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
+      request->body().add(*callbacks_->decodingBuffer());
     }
     if (downstream_trailers_) {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*downstream_trailers_));

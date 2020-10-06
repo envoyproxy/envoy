@@ -152,3 +152,14 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "scaled_range_timer_manager",
+    srcs = ["scaled_range_timer_manager.cc"],
+    hdrs = ["scaled_range_timer_manager.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:range_timer_interface",
+        "//source/common/common:scope_tracker",
+    ],
+)

@@ -330,6 +330,8 @@ envoy_cc_test(
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
+        "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_response_code_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/integration/filters:test_socket_interface_lib",
         "//test/mocks/http:http_mocks",
@@ -1542,5 +1544,16 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "health_check_integration_test",
+    srcs = ["health_check_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/common/http/http2:http2_frame",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
