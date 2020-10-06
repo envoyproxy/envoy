@@ -27,7 +27,9 @@ void makePortHermetic(Fuzz::PerTestEnvironment& test_env,
                       envoy::config::core::v3::Address& address) {
   if (address.has_socket_address()) {
     address.mutable_socket_address()->set_port_value(0);
-  } else if (address.has_pipe()) {
+  } else if (address.has_pipe() || address.has_envoy_internal_address()) {
+    // TODO(asraa): Remove this work-around to replace EnvoyInternalAddress when implemented and
+    // remove condition at line 74.
     address.mutable_pipe()->set_path("@" + test_env.testId() + address.pipe().path());
   }
 }
@@ -70,7 +72,8 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
       auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
         auto* lb_endpoint = locality_lb->mutable_lb_endpoints(k);
-        if (lb_endpoint->endpoint().address().has_socket_address()) {
+        if (lb_endpoint->endpoint().address().has_socket_address() ||
+            lb_endpoint->endpoint().address().has_envoy_internal_address()) {
           makePortHermetic(test_env, *lb_endpoint->mutable_endpoint()->mutable_address());
         }
       }

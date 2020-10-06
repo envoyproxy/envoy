@@ -170,7 +170,7 @@ TEST(ResolverTest, NonStandardResolver) {
 
 TEST(ResolverTest, UninitializedAddress) {
   envoy::config::core::v3::Address address;
-  EXPECT_DEATH(resolveProtoAddress(address), "panic");
+  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException, "Address must be set: ");
 }
 
 TEST(ResolverTest, NoSuchResolver) {
