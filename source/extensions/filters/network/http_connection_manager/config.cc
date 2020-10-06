@@ -583,14 +583,14 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
       return std::make_unique<Http::Http2::ServerConnectionImpl>(
           connection, callbacks,
           Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
-          context_.random(), http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-          headersWithUnderscoresAction());
+          context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
+          maxRequestHeadersCount(), headersWithUnderscoresAction());
     } else {
       return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
           connection, callbacks,
           Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
-          context_.random(), http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-          headersWithUnderscoresAction());
+          context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
+          maxRequestHeadersCount(), headersWithUnderscoresAction());
     }
   }
   case CodecType::HTTP3:
@@ -604,9 +604,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), context_.random(), http1_codec_stats_,
-        http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+        connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
+        http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
