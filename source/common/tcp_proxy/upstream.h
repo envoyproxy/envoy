@@ -21,8 +21,6 @@ public:
   // is then responsible for calling either onPoolReady or onPoolFailure on the
   // supplied GenericConnectionPoolCallbacks.
   virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
-  //// Returns the host for this conn pool.
-  // virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
   virtual bool valid() const PURE;
 };
 
