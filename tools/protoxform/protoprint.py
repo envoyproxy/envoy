@@ -211,6 +211,7 @@ def FormatHeaderFromFile(source_code_info, file_proto, empty_file):
       # This is a workaround for Java outer class names that would otherwise
       # conflict with types defined within the same proto file, see
       # https://github.com/envoyproxy/envoy/pull/13378.
+      # TODO: in next major version, make this consistent.
       options.java_outer_classname += "OuterClass"
 
   options.java_multiple_files = True
