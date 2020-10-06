@@ -9,6 +9,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/signal.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
@@ -173,6 +174,34 @@ public:
 
   // If not nullptr, will be set on dtor. This can help to verify that the timer was destroyed.
   bool* timer_destroyed_{};
+};
+
+class MockScaledRangeTimerManager : public ScaledRangeTimerManager {
+public:
+  RangeTimerPtr createTimer(TimerCb callback) override {
+    return RangeTimerPtr{createTimer_(std::move(callback))};
+  }
+  MOCK_METHOD(RangeTimer*, createTimer_, (TimerCb));
+  MOCK_METHOD(void, setScaleFactor, (double), (override));
+};
+
+class MockRangeTimer : public RangeTimer {
+public:
+  MockRangeTimer() {}
+  MockRangeTimer(MockScaledRangeTimerManager* manager);
+
+  // Timer
+  MOCK_METHOD(void, disableTimer, (), (override));
+  MOCK_METHOD(void, enableTimer,
+              (std::chrono::milliseconds, std::chrono::milliseconds,
+               const ScopeTrackedObject* scope),
+              (override));
+  MOCK_METHOD(bool, enabled, (), (override));
+
+  const ScopeTrackedObject* scope_{};
+  bool enabled_{};
+
+  Event::TimerCb callback_;
 };
 
 class MockSchedulableCallback : public SchedulableCallback {

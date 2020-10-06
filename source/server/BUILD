@@ -251,11 +251,13 @@ envoy_cc_library(
     srcs = ["overload_manager_impl.cc"],
     hdrs = ["overload_manager_impl.h"],
     deps = [
+        "//include/envoy/event:range_timer_interface",
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/event:scaled_range_timer_manager_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",

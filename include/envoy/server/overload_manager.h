@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/macros.h"
@@ -39,6 +40,11 @@ private:
  */
 using OverloadActionCb = std::function<void(OverloadActionState)>;
 
+enum class OverloadTimerType {
+  // Timers created with this type will never be scaled. This should only be used for testing.
+  UnscaledRealTimer,
+};
+
 /**
  * Thread-local copy of the state of each configured overload action.
  */
@@ -46,6 +52,9 @@ class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
+
+  virtual Event::TimerPtr createScaledTimer(OverloadTimerType timer_type,
+                                            Event::TimerCb callback) PURE;
 };
 
 /**
@@ -64,6 +73,9 @@ public:
 
   // Overload action to try to shrink the heap by releasing free memory.
   const std::string ShrinkHeap = "envoy.overload_actions.shrink_heap";
+
+  // Overload action to reduce some subset of configured timeouts.
+  const std::string ReduceTimeouts = "envoy.overload_actions.reduce_timeouts";
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;

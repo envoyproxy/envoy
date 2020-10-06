@@ -6,6 +6,7 @@
 #include "envoy/api/api.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
@@ -99,6 +100,30 @@ private:
   std::vector<std::string> names_;
 };
 
+class ScaledTimerMinimum {
+public:
+  explicit ScaledTimerMinimum(double scale_factor);
+  explicit ScaledTimerMinimum(std::chrono::milliseconds absolute_duration);
+
+  std::chrono::milliseconds compute(std::chrono::milliseconds ms) const;
+
+  struct ScaleFactor {
+    explicit ScaleFactor(double scale_factor) : scale_factor_(scale_factor) {}
+    std::chrono::milliseconds compute(std::chrono::milliseconds duration) {
+      return std::chrono::duration_cast<std::chrono::milliseconds>(duration * scale_factor_);
+    }
+    const double scale_factor_;
+  };
+  struct AbsoluteValue {
+    explicit AbsoluteValue(std::chrono::milliseconds value) : value_(value) {}
+    std::chrono::milliseconds compute(std::chrono::milliseconds) { return value_; }
+    const std::chrono::milliseconds value_;
+  };
+
+private:
+  const absl::variant<ScaleFactor, AbsoluteValue> value_;
+};
+
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
@@ -116,6 +141,11 @@ public:
   // After this returns, overload manager clients should not receive any more callbacks
   // about overload state changes.
   void stop();
+
+protected:
+  // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
+  virtual Event::ScaledRangeTimerManagerPtr
+  createScaledRangeTimerManager(Event::Dispatcher& dispatcher) const;
 
 private:
   using FlushEpochId = uint64_t;
@@ -161,6 +191,8 @@ private:
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
+
+  absl::flat_hash_map<OverloadTimerType, ScaledTimerMinimum> timer_minimums_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;

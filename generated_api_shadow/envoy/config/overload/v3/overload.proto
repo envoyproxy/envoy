@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.overload.v3;
 
+import "envoy/type/v3/percent.proto";
+
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -78,6 +80,28 @@ message Trigger {
   }
 }
 
+message ScaleTimersOverloadActionConfig {
+  enum TimerType { UNSPECIFIED = 0; }
+
+  message ScaleTimer {
+    // The type of timer this minimum applies to.
+    TimerType timer = 1;
+
+    oneof overload_adjust {
+      option (validate.required) = true;
+
+      // Sets the minimum duration as an absolute value.
+      google.protobuf.Duration min_timeout = 2;
+
+      // Sets the minimum duration as a percentage of the maximum value.
+      type.v3.Percent min_scale = 3;
+    }
+  }
+
+  // A set of timer scaling rules to be applied.
+  repeated ScaleTimer timer_scale_factors = 1;
+}
+
 message OverloadAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";
@@ -86,6 +110,9 @@ message OverloadAction {
   // use for registering callbacks. Custom overload actions should be named using reverse
   // DNS to ensure uniqueness.
   string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Configuration for the action being instantiated.
+  google.protobuf.Any typed_config = 3;
 
   // A set of triggers for this action. The state of the action is the maximum
   // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
