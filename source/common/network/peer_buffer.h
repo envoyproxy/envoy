@@ -1,15 +1,7 @@
-#include <vector>
+#pragma once
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/io_handle.h"
-#include "envoy/network/proxy_protocol.h"
-#include "envoy/ssl/connection.h"
-
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
@@ -52,10 +44,6 @@ public:
    * Raised by the peer when the peer switch from high water mark to low.
    */
   virtual void onPeerBufferWritable() PURE;
-
-  //   virtual bool triggeredHighToLowWatermark() const PURE;
-  //   virtual void clearTriggeredHighToLowWatermark() PURE;
-  //   virtual void setTriggeredHighToLowWatermark() PURE;
 };
 
 /**
