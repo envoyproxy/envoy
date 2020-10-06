@@ -34,7 +34,8 @@ Network::IoResult UpstreamProxyProtocolSocket::doWrite(Buffer::Instance& buffer,
     auto header_res = writeHeader();
     if (header_buffer_.length() == 0 && header_res.action_ == Network::PostIoAction::KeepOpen) {
       auto inner_res = transport_socket_->doWrite(buffer, end_stream);
-      return {inner_res.action_, header_res.bytes_processed_ + inner_res.bytes_processed_, false, false};
+      return {inner_res.action_, header_res.bytes_processed_ + inner_res.bytes_processed_, false,
+              false};
     }
     return header_res;
   } else {
