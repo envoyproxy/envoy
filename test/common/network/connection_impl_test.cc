@@ -176,13 +176,12 @@ protected:
               Invoke([&](uint64_t size) -> void { client_write_buffer_->baseDrain(size); }));
     }
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+    client_connection_->close(ConnectionCloseType::NoFlush);
     if (wait_for_remote_close) {
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
           .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-      client_connection_->close(ConnectionCloseType::NoFlush);
       dispatcher_->run(Event::Dispatcher::RunType::Block);
     } else {
-      client_connection_->close(ConnectionCloseType::NoFlush);
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
   }
