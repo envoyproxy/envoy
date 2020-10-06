@@ -246,8 +246,13 @@ private:
                     const Router::RouteConstSharedPtr& route);
   void continueDecoding();
   bool isBufferFull() const;
-  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
-  bool shouldBufferRequestBody(Http::RequestHeaderMap& headers, bool end_stream) const;
+
+  // This holds a set of flags defined in per-route configuration.
+  struct PerRouteFlags {
+    const bool skip_check_;
+    const bool skip_request_body_buffering_;
+  };
+  PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
@@ -275,7 +280,6 @@ private:
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_{};
-  mutable const FilterConfigPerRoute* per_route_config_{nullptr};
 };
 
 } // namespace ExtAuthz

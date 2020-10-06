@@ -77,7 +77,10 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   Router::RouteConstSharedPtr route = callbacks_->route();
-  skip_check_ = skipCheckForRoute(route);
+
+  const auto per_route_flags = getPerRouteFlags(route);
+
+  skip_check_ = per_route_flags.skip_check_;
 
   if (!config_->filterEnabled() || skip_check_) {
     if (skip_check_) {
@@ -95,7 +98,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   request_headers_ = &headers;
-  buffer_data_ = shouldBufferRequestBody(headers, end_stream);
+  buffer_data_ = config_->withRequestBody() && !per_route_flags.skip_request_body_buffering_ &&
+                 !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
+                   Http::Utility::isH2UpgradeRequest(headers));
+
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *callbacks_);
     if (!config_->allowPartialMessage()) {
@@ -322,25 +328,20 @@ void Filter::continueDecoding() {
   }
 }
 
-bool Filter::skipCheckForRoute(const Router::RouteConstSharedPtr& route) const {
+Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
   if (route == nullptr || route->routeEntry() == nullptr) {
-    return true;
+    return Filter::PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
   }
 
-  per_route_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-      HttpFilterNames::get().ExtAuthorization, route);
-  if (per_route_config_ != nullptr) {
-    return per_route_config_->disabled();
+  const auto* specific_per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+          HttpFilterNames::get().ExtAuthorization, route);
+  if (specific_per_route_config != nullptr) {
+    return Filter::PerRouteFlags{specific_per_route_config->disabled(),
+                                 specific_per_route_config->disableRequestBodyBuffering()};
   }
 
-  return false;
-}
-
-bool Filter::shouldBufferRequestBody(Http::RequestHeaderMap& headers, bool end_stream) const {
-  return config_->withRequestBody() &&
-         !(per_route_config_ && per_route_config_->disableRequestBodyBuffering()) &&
-         !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
-           Http::Utility::isH2UpgradeRequest(headers));
+  return Filter::PerRouteFlags{false /*skip_check_*/, false /*skip_request_body_buffering_*/};
 }
 
 } // namespace ExtAuthz
