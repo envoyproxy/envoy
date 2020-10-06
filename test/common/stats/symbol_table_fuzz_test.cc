@@ -15,19 +15,14 @@ namespace Fuzz {
 // Fuzzer for symbol tables.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FuzzedDataProvider provider(buf, len);
-  FakeSymbolTableImpl fake_symbol_table;
   SymbolTableImpl symbol_table;
   StatNamePool pool(symbol_table);
-  StatNamePool fake_pool(fake_symbol_table);
   StatNameDynamicPool dynamic_pool(symbol_table);
-  StatNameDynamicPool fake_dynamic_pool(fake_symbol_table);
 
   while (provider.remaining_bytes() != 0) {
     std::string next_data = provider.ConsumeRandomLengthString(provider.remaining_bytes());
     StatName stat_name = pool.add(next_data);
-    StatName fake_stat_name = fake_pool.add(next_data);
     StatName dynamic_stat_name = dynamic_pool.add(next_data);
-    StatName fake_dynamic_stat_name = fake_dynamic_pool.add(next_data);
 
     // Encode the string directly first.
     TestUtil::serializeDeserializeString(next_data);
@@ -49,9 +44,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // string before comparing.
     absl::string_view trimmed_fuzz_data = StringUtil::removeTrailingCharacters(next_data, '.');
     FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(stat_name));
-    FUZZ_ASSERT(trimmed_fuzz_data == fake_symbol_table.toString(fake_stat_name));
     FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(dynamic_stat_name));
-    FUZZ_ASSERT(trimmed_fuzz_data == fake_symbol_table.toString(fake_dynamic_stat_name));
 
     // The 'join' tests only work if the trimmed fuzz data is not empty.
     if (trimmed_fuzz_data.empty()) {
@@ -84,10 +77,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     FUZZ_ASSERT(join(symbol_table, stat_name, dynamic_stat_name));
     FUZZ_ASSERT(join(symbol_table, dynamic_stat_name, dynamic_stat_name));
     FUZZ_ASSERT(join(symbol_table, dynamic_stat_name, stat_name));
-    FUZZ_ASSERT(join(fake_symbol_table, fake_stat_name, fake_stat_name));
-    FUZZ_ASSERT(join(fake_symbol_table, fake_stat_name, fake_dynamic_stat_name));
-    FUZZ_ASSERT(join(fake_symbol_table, fake_dynamic_stat_name, fake_dynamic_stat_name));
-    FUZZ_ASSERT(join(fake_symbol_table, fake_dynamic_stat_name, fake_stat_name));
   }
 }
 

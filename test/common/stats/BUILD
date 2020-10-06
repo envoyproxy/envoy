@@ -18,7 +18,6 @@ envoy_cc_test(
     srcs = ["allocator_impl_test.cc"],
     deps = [
         "//source/common/stats:allocator_lib",
-        "//source/common/stats:symbol_table_creator_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:thread_factory_for_test_lib",
     ],
@@ -29,7 +28,6 @@ envoy_cc_test(
     srcs = ["isolated_store_impl_test.cc"],
     deps = [
         "//source/common/stats:isolated_store_lib",
-        "//source/common/stats:symbol_table_creator_lib",
     ],
 )
 
@@ -47,7 +45,6 @@ envoy_cc_test(
     srcs = ["metric_impl_test.cc"],
     deps = [
         "//source/common/stats:allocator_lib",
-        "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:utility_lib",
         "//test/test_common:logging_lib",
     ],
@@ -85,7 +82,6 @@ envoy_cc_test(
         ":stat_test_utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stat_merger_lib",
-        "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
         "//test/test_common:utility_lib",
     ],
@@ -103,7 +99,6 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/common/stats:symbol_table_creator_lib",
     ],
 )
 
@@ -142,7 +137,6 @@ envoy_cc_test(
         ":stat_test_utility_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/memory:stats_lib",
-        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:symbol_table_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",

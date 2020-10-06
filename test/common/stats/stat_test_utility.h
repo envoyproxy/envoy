@@ -5,7 +5,6 @@
 #include "common/common/logger.h"
 #include "common/memory/stats.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/symbol_table_creator.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -163,18 +162,6 @@ private:
           upper_bound);                                                                            \
     }                                                                                              \
   } while (false)
-
-class SymbolTableCreatorTestPeer {
-public:
-  ~SymbolTableCreatorTestPeer() { SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
-
-  void setUseFakeSymbolTables(bool use_fakes) {
-    SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
-  }
-
-private:
-  const bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
-};
 
 // Serializes a number into a uint8_t array, and check that it de-serializes to
 // the same number. The serialized number is also returned, which can be

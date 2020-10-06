@@ -9,7 +9,6 @@
 #include "common/common/thread.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -190,11 +189,10 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
 IntegrationTestServerImpl::IntegrationTestServerImpl(Event::TestTimeSystem& time_system,
                                                      Api::Api& api, const std::string& config_path,
                                                      bool use_real_stats)
-    : IntegrationTestServer(time_system, api, config_path),
-      symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()) {
+    : IntegrationTestServer(time_system, api, config_path) {
   stats_allocator_ =
-      (use_real_stats ? std::make_unique<Stats::AllocatorImpl>(*symbol_table_)
-                      : std::make_unique<Stats::NotifyingAllocatorImpl>(*symbol_table_));
+      (use_real_stats ? std::make_unique<Stats::AllocatorImpl>(symbol_table_)
+                      : std::make_unique<Stats::NotifyingAllocatorImpl>(symbol_table_));
 }
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(

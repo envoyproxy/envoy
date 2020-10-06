@@ -5,16 +5,14 @@
 #include <string>
 
 #include "common/common/utility.h"
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/scope_prefixer.h"
-#include "common/stats/symbol_table_creator.h"
 #include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Stats {
 
-IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(SymbolTableCreator::makeSymbolTable()) {}
+IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(std::make_unique<SymbolTableImpl>()) {}
 
 IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table)
     : IsolatedStoreImpl(*symbol_table) {

@@ -129,6 +129,13 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
 }
 
+// TODO(#13399): remove this test once we remove the option.
+TEST_F(OptionsImplTest, FakeSymtabWarning) {
+  EXPECT_LOG_CONTAINS("warning", "Fake symbol tables have been removed",
+                      createOptionsImpl("envoy --use-fake-symbol-table 1"));
+  EXPECT_NO_LOGS(createOptionsImpl("envoy --use-fake-symbol-table 0"));
+}
+
 // Either variants of allow-unknown-[static-]-fields works.
 TEST_F(OptionsImplTest, AllowUnknownFields) {
   {

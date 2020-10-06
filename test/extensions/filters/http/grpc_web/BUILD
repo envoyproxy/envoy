@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     srcs = ["grpc_web_filter_test.cc"],
     extension_name = "envoy.filters.http.grpc_web",
     deps = [
-        "//source/common/stats:fake_symbol_table_lib",
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:global_lib",

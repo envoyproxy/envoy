@@ -187,6 +187,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
+  if (fake_symbol_table_enabled_) {
+    ENVOY_LOG(warn, "Fake symbol tables have been removed. Please remove references to "
+                    "--use-fake-symbol-table");
+  }
+
   cpuset_threads_ = cpuset_threads.getValue();
 
   if (log_level.isSet()) {

@@ -11,13 +11,9 @@ namespace {
 class StatTestUtilityTest : public testing::Test {
 protected:
   StatTestUtilityTest()
-      : symbol_table_(SymbolTableCreator::makeSymbolTable()), test_store_(*symbol_table_),
-        dynamic_(*symbol_table_), symbolic_(*symbol_table_) {
-    symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
-  }
+      : test_store_(symbol_table_), dynamic_(symbol_table_), symbolic_(symbol_table_) {}
 
-  TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
-  SymbolTablePtr symbol_table_;
+  SymbolTableImpl symbol_table_;
   TestUtil::TestStore test_store_;
   StatNameDynamicPool dynamic_;
   StatNamePool symbolic_;

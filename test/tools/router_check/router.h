@@ -12,7 +12,7 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/server/instance.h"

@@ -11,7 +11,6 @@
 #include "common/common/logger.h"
 #include "common/common/perf_annotation.h"
 #include "common/network/utility.h"
-#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/config_validation/server.h"
@@ -51,9 +50,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                Filesystem::Instance& file_system,
                                std::unique_ptr<ProcessContext> process_context)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
-      file_system_(file_system), symbol_table_(Stats::SymbolTableCreator::initAndMakeSymbolTable(
-                                     options_.fakeSymbolTableEnabled())),
-      stats_allocator_(*symbol_table_) {
+      file_system_(file_system), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
   OptionsImpl::disableExtensions(options.disabledExtensions());
