@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/matchers.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 
@@ -80,11 +81,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   Router::RouteConstSharedPtr route = callbacks_->route();
   const auto per_route_flags = getPerRouteFlags(route);
   skip_check_ = per_route_flags.skip_check_;
+  if (skip_check_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
-  if (!config_->filterEnabled() || skip_check_) {
-    if (skip_check_) {
-      return Http::FilterHeadersStatus::Continue;
-    }
+  if (!config_->filterEnabled(callbacks_->streamInfo().dynamicMetadata())) {
+    stats_.disabled_.inc();
     if (config_->denyAtDisable()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(

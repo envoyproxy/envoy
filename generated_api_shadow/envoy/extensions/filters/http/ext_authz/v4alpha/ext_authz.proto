@@ -6,6 +6,7 @@ import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/grpc_service.proto";
 import "envoy/config/core/v4alpha/http_uri.proto";
+import "envoy/type/matcher/v4alpha/metadata.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
 import "envoy/type/v3/http_status.proto";
 
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.ext_authz.v3.ExtAuthz";
@@ -102,6 +103,10 @@ message ExtAuthz {
   //
   // If this field is not specified, the filter will be enabled for all requests.
   config.core.v4alpha.RuntimeFractionalPercent filter_enabled = 9;
+
+  // Specifies if the filter is enabled with metadata matcher.
+  // If this field is not specified, the filter will be enabled for all requests.
+  type.matcher.v4alpha.MetadataMatcher filter_enabled_metadata = 14;
 
   // Specifies whether to deny the requests, when the filter is disabled.
   // If :ref:`runtime_key <envoy_api_field_config.core.v4alpha.RuntimeFeatureFlag.runtime_key>` is specified,

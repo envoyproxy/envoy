@@ -14,6 +14,8 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/matchers.h"
+
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
@@ -33,6 +35,7 @@ namespace ExtAuthz {
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(ok)                                                                                      \
   COUNTER(total)                                                                                   \
+  COUNTER(disabled)                                                                                \
   GAUGE(active, Accumulate)
 
 /**
@@ -51,18 +54,26 @@ public:
          Stats::Scope& scope)
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
-        include_peer_certificate_(config.include_peer_certificate()) {}
+        include_peer_certificate_(config.include_peer_certificate()),
+        filter_enabled_metadata_(
+            config.has_filter_enabled_metadata()
+                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                : absl::nullopt) {}
 
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
+    return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
+  }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   const InstanceStats stats_;
   bool failure_mode_allow_;
   const bool include_peer_certificate_;
+  const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -107,6 +118,10 @@ private:
   // then the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { Stop, Continue };
   void callCheck();
+
+  bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
+    return config_->filterEnabledMetadata(metadata);
+  }
 
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
