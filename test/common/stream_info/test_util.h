@@ -41,6 +41,12 @@ public:
   void setResponseCodeDetails(absl::string_view rc_details) override {
     response_code_details_.emplace(rc_details);
   }
+  const absl::optional<std::string>& connectionTerminationDetails() const override {
+    return connection_termination_details_;
+  }
+  void setConnectionTerminationDetails(absl::string_view details) override {
+    connection_termination_details_.emplace(details);
+  }
   void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesSent() const override { return 2; }
   bool intersectResponseFlags(uint64_t response_flags) const override {
@@ -247,6 +253,7 @@ public:
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
