@@ -149,6 +149,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         case SSL_ERROR_WANT_WRITE:
           // Renegotiation has started. We don't handle renegotiation so just fall through.
           wouldBlock = true;
+          break;
         default:
           drainErrorQueue();
           action = PostIoAction::Close;
@@ -268,9 +269,10 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       case SSL_ERROR_WANT_READ:
         // Renegotiation has started. We don't handle renegotiation so just fall through.
         wouldBlock = true;
+        break;
       default:
         drainErrorQueue();
-        return {PostIoAction::Close, total_bytes_written, false, false};
+        return {PostIoAction::Close, total_bytes_written, false, wouldBlock};
       }
 
       break;
