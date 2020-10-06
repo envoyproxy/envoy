@@ -330,18 +330,18 @@ void Filter::continueDecoding() {
 
 Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
   if (route == nullptr || route->routeEntry() == nullptr) {
-    return Filter::PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
+    return PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
   }
 
   const auto* specific_per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route);
   if (specific_per_route_config != nullptr) {
-    return Filter::PerRouteFlags{specific_per_route_config->disabled(),
-                                 specific_per_route_config->disableRequestBodyBuffering()};
+    return PerRouteFlags{specific_per_route_config->disabled(),
+                         specific_per_route_config->disableRequestBodyBuffering()};
   }
 
-  return Filter::PerRouteFlags{false /*skip_check_*/, false /*skip_request_body_buffering_*/};
+  return PerRouteFlags{false /*skip_check_*/, false /*skip_request_body_buffering_*/};
 }
 
 } // namespace ExtAuthz
