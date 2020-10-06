@@ -1168,7 +1168,6 @@ protected:
   ThreadLocalStoreImplPtr store_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
   bool threading_enabled_{false};
 };
 

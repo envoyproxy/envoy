@@ -5,27 +5,14 @@
 namespace Envoy {
 namespace Stats {
 
-namespace TestUtil {
-class SymbolTableCreatorTestPeer;
-}
-
 class SymbolTableCreator {
 public:
   /**
-   * Initializes the symbol-table creation system. Once this is called, it is a
-   * runtime assertion to call this again in production code, changing the
-   * use_fakes setting. However, tests can change the setting via
-   * TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(use_fakes).
+   * Factory method to create SymbolTables. This was originally needed to help
+   * make it possible to flag-flip use of real symbol tables.
    *
-   * @param use_fakes Whether to use fake symbol tables; typically from a command-line option.
-   * @return a SymbolTable.
-   */
-  static SymbolTablePtr initAndMakeSymbolTable(bool use_fakes);
-
-  /**
-   * Factory method to create SymbolTables. This is needed to help make it
-   * possible to flag-flip use of real symbol tables, and ultimately should be
-   * removed.
+   * TODO(jmarantz): replace this method and calls to it with direct
+   * instantiations of SymbolTableImpl.
    *
    * @return a SymbolTable.
    */

@@ -164,11 +164,6 @@ private:
     }                                                                                              \
   } while (false)
 
-class SymbolTableCreatorTestPeer {
-public:
-  void setUseFakeSymbolTables(bool /*use_fakes*/) {}
-};
-
 // Serializes a number into a uint8_t array, and check that it de-serializes to
 // the same number. The serialized number is also returned, which can be
 // checked in unit tests, but ignored in fuzz tests.
