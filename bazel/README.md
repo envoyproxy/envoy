@@ -236,7 +236,7 @@ From a Windows host with Docker installed, the Windows containers feature enable
 MSYS2 or Git bash), run:
 
 ```
-./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
+./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the

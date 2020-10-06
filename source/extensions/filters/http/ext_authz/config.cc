@@ -23,9 +23,8 @@ namespace ExtAuthz {
 Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, context.localInfo(), context.scope(),
-                                     context.runtime(), context.httpContext(), stats_prefix);
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, context.scope(), context.runtime(), context.httpContext(), stats_prefix);
   Http::FilterFactoryCb callback;
 
   if (proto_config.has_http_service()) {

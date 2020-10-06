@@ -48,11 +48,11 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Server::MockAdmin> admin_;
-  Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+  NiceMock<Upstream::TestClusterManagerFactory> factory_;
+  Api::ApiPtr api_{Api::createApiForTest(stats_store_, factory_.random_)};
   Upstream::ThreadLocalCluster* cluster_;
 
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Upstream::TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::unique_ptr<Upstream::TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;

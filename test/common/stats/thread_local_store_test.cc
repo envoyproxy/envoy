@@ -55,10 +55,11 @@ public:
                                const std::function<void(uint32_t)>& num_tls_hist_cb) {
     auto num_tls_histograms = std::make_shared<std::atomic<uint32_t>>(0);
     thread_local_store_impl.tls_->runOnAllThreads(
-        [&thread_local_store_impl, num_tls_histograms]() {
-          auto& tls_cache =
-              thread_local_store_impl.tls_->getTyped<ThreadLocalStoreImpl::TlsCache>();
+        [num_tls_histograms](ThreadLocal::ThreadLocalObjectSharedPtr object)
+            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+          auto& tls_cache = object->asType<ThreadLocalStoreImpl::TlsCache>();
           *num_tls_histograms += tls_cache.tls_histogram_cache_.size();
+          return object;
         },
         [num_tls_hist_cb, num_tls_histograms]() { num_tls_hist_cb(*num_tls_histograms); });
   }

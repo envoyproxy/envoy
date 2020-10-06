@@ -84,6 +84,24 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint64_t max_length) {
+  if (max_length == 0) {
+    return Api::ioCallUint64ResultNoError();
+  }
+  constexpr uint64_t MaxSlices = 2;
+  Buffer::RawSlice slices[MaxSlices];
+  const uint64_t num_slices = buffer.reserve(max_length, slices, MaxSlices);
+  Api::IoCallUint64Result result = readv(max_length, slices, num_slices);
+  uint64_t bytes_to_commit = result.ok() ? result.rc_ : 0;
+  ASSERT(bytes_to_commit <= max_length);
+  for (uint64_t i = 0; i < num_slices; i++) {
+    slices[i].len_ = std::min(slices[i].len_, static_cast<size_t>(bytes_to_commit));
+    bytes_to_commit -= slices[i].len_;
+  }
+  buffer.commit(slices, num_slices);
+  return result;
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                    uint64_t num_slice) {
   absl::FixedArray<iovec> iov(num_slice);
@@ -499,5 +517,19 @@ Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispa
 Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
 }
+
+absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
+#ifdef TCP_INFO
+  struct tcp_info ti;
+  socklen_t len = sizeof(ti);
+  if (!SOCKET_FAILURE(
+          Api::OsSysCallsSingleton::get().getsockopt(fd_, IPPROTO_TCP, TCP_INFO, &ti, &len).rc_)) {
+    return std::chrono::milliseconds(ti.tcpi_rtt);
+  }
+#endif
+
+  return {};
+}
+
 } // namespace Network
 } // namespace Envoy

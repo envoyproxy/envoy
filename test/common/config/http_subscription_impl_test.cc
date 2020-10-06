@@ -32,7 +32,7 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   Http::ResponseHeaderMapPtr response_headers{
       new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
   Http::ResponseMessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
-  message->body() = std::make_unique<Buffer::OwnedImpl>(";!@#badjso n");
+  message->body().add(";!@#badjso n");
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_, _));
   EXPECT_CALL(callbacks_,

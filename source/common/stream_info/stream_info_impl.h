@@ -121,6 +121,14 @@ struct StreamInfoImpl : public StreamInfo {
     response_code_details_.emplace(rc_details);
   }
 
+  const absl::optional<std::string>& connectionTerminationDetails() const override {
+    return connection_termination_details_;
+  }
+
+  void setConnectionTerminationDetails(absl::string_view connection_termination_details) override {
+    connection_termination_details_.emplace(connection_termination_details);
+  }
+
   void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }
 
   uint64_t bytesSent() const override { return bytes_sent_; }
@@ -268,6 +276,10 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
+
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -280,6 +292,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
@@ -311,6 +324,7 @@ private:
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
+  absl::optional<uint64_t> connection_id_;
 };
 
 } // namespace StreamInfo

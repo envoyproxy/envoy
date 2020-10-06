@@ -227,8 +227,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), http1_codec_stats_, http2_codec_stats_,
-      Http::Http1Settings(),
+      connection, data, callbacks, server_.stats(), server_.random(), http1_codec_stats_,
+      http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),
       maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
