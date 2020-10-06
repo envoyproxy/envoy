@@ -547,7 +547,7 @@ void HeaderMapImpl::clear() {
 
 size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate) {
   const size_t old_size = headers_.size();
-  headers_.remove_if([&predicate, this](const HeaderEntryImpl& entry) {
+  headers_.removeIf([&predicate, this](const HeaderEntryImpl& entry) {
     const bool to_remove = predicate(entry);
     if (to_remove) {
       // If this header should be removed, make sure any references in the

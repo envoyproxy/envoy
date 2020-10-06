@@ -222,7 +222,7 @@ protected:
       return headers_.erase(i);
     }
 
-    template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
+    template <class UnaryPredicate> void removeIf(UnaryPredicate p) {
       if (!lazy_map_.empty()) {
         // Lazy map is used, iterate over its elements and remove those that satisfy the predicate
         // from the map and from the list.
