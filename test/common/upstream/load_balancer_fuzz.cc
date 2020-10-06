@@ -3,6 +3,16 @@
 #include "test/common/upstream/utility.h"
 
 namespace Envoy {
+
+namespace Random {
+uint64_t FakeRandomGenerator::random() {
+  uint8_t index_of_data = counter % bytestring_.size();
+  ++counter;
+  ENVOY_LOG_MISC(trace, "random() returned: {}", bytestring_.at(index_of_data));
+  return bytestring_.at(index_of_data);
+}
+} // namespace Random
+
 namespace Upstream {
 
 // Anonymous namespace for helper functions
@@ -17,12 +27,8 @@ constructByteVectorForRandom(test::common::upstream::LoadBalancerTestCase input)
 }
 } // namespace
 
-// Required because super class constructor has logic
-LoadBalancerFuzzBase::LoadBalancerFuzzBase() : LoadBalancerFuzzTestBase() {}
-
 void LoadBalancerFuzzBase::initializeFixedHostSets(uint32_t num_hosts_in_priority_set,
                                                    uint32_t num_hosts_in_failover_set) {
-  // TODO: Cap on ports?
   int port = 80;
   for (uint32_t i = 0; i < num_hosts_in_priority_set; ++i) {
     host_set_.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port)));

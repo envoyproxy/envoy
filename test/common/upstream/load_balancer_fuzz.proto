@@ -29,13 +29,17 @@ message LbAction {
   }
 }
 
+//This message represents what LoadBalancerFuzzBase will interact with, performing setup of host sets and calling into load balancers.
+//The logic that this message represents and the base class for load balancing fuzzing will be logic that maps to all types of load balancing
+//and can be modularly used at the highest level for each load balancer.
 message LoadBalancerTestCase {
   envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
       [(validate.rules).message.required = true];
   repeated LbAction actions = 2;
   //This is capped at the max port value on an ip address - 80
-  int64 num_hosts_in_priority_set = 3 [(validate.rules).int64.lt = 65455];
-  int64 num_hosts_in_failover_set = 4 [(validate.rules).int64.lt = 65455];
-  repeated int64 bytestring_for_random_calls = 5
+  uint32 num_hosts_in_priority_set = 3 [(validate.rules).uint32.lt = 65455];
+  uint32 num_hosts_in_failover_set = 4 [(validate.rules).uint32.lt = 65455];
+  repeated uint64 bytestring_for_random_calls = 5
       [(validate.rules).repeated = {min_items: 1, max_items: 50}];
 }
+//TODO: make this modular in only setting up static hosts, and running through action stream

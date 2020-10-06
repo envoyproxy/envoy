@@ -243,15 +243,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
-    name = "load_balancer_impl_test_lib",
-    srcs = [
-        "load_balancer_fuzz_test_utils.cc",
-    ],
-    hdrs = [
-        "load_balancer_fuzz_test_utils.h",
-    ],
+    name = "load_balancer_fuzz_lib",
+    srcs = ["load_balancer_fuzz.cc"],
+    hdrs = ["load_balancer_fuzz.h"],
     deps = [
         ":utility_lib",
+        ":load_balancer_fuzz_proto_cc_proto",
         "//source/common/upstream:load_balancer_lib",
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -260,17 +257,6 @@ envoy_cc_test_library(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "load_balancer_fuzz_lib",
-    srcs = ["load_balancer_fuzz.cc"],
-    hdrs = ["load_balancer_fuzz.h"],
-    deps = [
-        ":load_balancer_fuzz_proto_cc_proto",
-        ":load_balancer_impl_test_lib",
-        "//source/common/upstream:load_balancer_lib",
     ],
 )
 
