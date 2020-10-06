@@ -34,6 +34,12 @@ Observability
 
 Once Envoy is emitting the right data, what do you do with it?
 
+.. toctree::
+  :maxdepth: 2
+
+  log-parsing
+  metrics-aggregation
+  change-logging
 
 Deployment models
 ~~~~~~~~~~~~~~~~~
@@ -45,6 +51,7 @@ Envoy’s small footprint allows for a variety of models. Most companies end up 
 
   front-proxy
   service-mesh
+  hosted-where-you-are
 
 Resilience
 ~~~~~~~~~~
@@ -69,3 +76,5 @@ Tools are good. Solutions are better. The best companies use Envoy’s capabilit
   :maxdepth: 2
 
   incremental-deploys
+  verifying-in-production
+  migrations
