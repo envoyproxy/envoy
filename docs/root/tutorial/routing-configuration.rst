@@ -73,7 +73,7 @@ key principles to follow:
 3. Design for changes with audit logs and rollbacks
 
 #1: Treat routes as data
-~~~~~~~~~~~~~~~~~~~~~~~~
+************************
 
 Treating routes as data in a shared service **prevents conflicts**, provides the
 right starting point for **managing convergence times**, and **ensures
@@ -95,7 +95,7 @@ of the system. Moving the source of truth behind an API allows concurrent
 updates and prevents many nonsensical updates to routing definitions.
 
 #2: Distribute control to teams
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*******************************
 
 Traffic management unlocks powerful workflows like **blue-green releases** and
 **incremental migrations**. This makes it practical (and safe) for service teams
@@ -106,7 +106,7 @@ routes. Most of the time, this process should mirror the permissions for your
 deployment process, as it’s a similar set of responsibilities.
 
 #3: Design for change
-~~~~~~~~~~~~~~~~~~~~~
+*********************
 
 Like infrastructure changes and code deploys, it’s vital to understand **when
 routes changed** and **who changed them**. Many teams have found that when they
