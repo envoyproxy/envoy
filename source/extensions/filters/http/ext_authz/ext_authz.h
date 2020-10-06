@@ -191,6 +191,8 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
+        disable_request_body_buffering_(config.has_check_settings() &&
+                                        config.check_settings().disable_request_body_buffering()),
         disabled_(config.disabled()) {}
 
   void merge(const FilterConfigPerRoute& other);
@@ -204,10 +206,13 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool disableRequestBodyBuffering() const { return disable_request_body_buffering_; }
+
 private:
   // We save the context extensions as a protobuf map instead of an std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
+  bool disable_request_body_buffering_;
   bool disabled_;
 };
 
@@ -241,7 +246,13 @@ private:
                     const Router::RouteConstSharedPtr& route);
   void continueDecoding();
   bool isBufferFull() const;
-  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
+
+  // This holds a set of flags defined in per-route configuration.
+  struct PerRouteFlags {
+    const bool skip_check_;
+    const bool skip_request_body_buffering_;
+  };
+  PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
