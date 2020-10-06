@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/network/proxy_protocol.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -20,8 +21,10 @@ using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnNull;
 using testing::ReturnRef;
 
+using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 
 namespace Envoy {
@@ -42,6 +45,7 @@ public:
     proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket),
                                                                            socket_options, version);
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
+    proxy_protocol_socket_->onConnected();
   }
 
   NiceMock<Network::MockTransportSocket>* inner_socket_;
@@ -389,6 +393,54 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
   proxy_protocol_socket_->doWrite(msg, false);
+}
+
+// Test onConnected calls inner onConnected
+TEST_F(ProxyProtocolTest, OnConnectedCallsInnerOnConnected) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  Network::TransportSocketOptionsSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, absl::nullopt,
+          absl::optional<Network::ProxyProtocolData>(
+              Network::ProxyProtocolData{src_addr, dst_addr}));
+  transport_callbacks_.connection_.local_address_ =
+      Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000");
+  transport_callbacks_.connection_.remote_address_ =
+      Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080");
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
+
+  EXPECT_CALL(*inner_socket_, onConnected()).Times(1);
+  proxy_protocol_socket_->onConnected();
+}
+
+class ProxyProtocolSocketFactoryTest : public testing::Test {
+public:
+  void initialize() {
+    auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+    inner_factory_ = inner_factory.get();
+    factory_ = std::make_unique<UpstreamProxyProtocolSocketFactory>(std::move(inner_factory),
+                                                                    ProxyProtocolConfig());
+  }
+
+  NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
+  std::unique_ptr<UpstreamProxyProtocolSocketFactory> factory_;
+};
+
+// Test createTransportSocket returns nullptr if inner call returns nullptr
+TEST_F(ProxyProtocolSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
+  initialize();
+  EXPECT_CALL(*inner_factory_, createTransportSocket(_)).WillOnce(ReturnNull());
+  ASSERT_EQ(nullptr, factory_->createTransportSocket(nullptr));
+}
+
+// Test implementsSecureTransport calls inner factory
+TEST_F(ProxyProtocolSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
+  initialize();
+  EXPECT_CALL(*inner_factory_, implementsSecureTransport()).WillOnce(Return(true));
+  ASSERT_TRUE(factory_->implementsSecureTransport());
 }
 
 } // namespace
