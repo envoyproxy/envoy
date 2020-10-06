@@ -31,7 +31,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-using Params = std::tuple<envoy::config::core::v3::ApiVersion, bool>;
+using Params = std::tuple<envoy::config::core::v3::ApiVersion>;
 
 class ExtAuthzGrpcClientTest : public testing::TestWithParam<Params> {
 public:
@@ -76,9 +76,9 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(Parameterized, ExtAuthzGrpcClientTest,
-                         Values(Params(envoy::config::core::v3::ApiVersion::AUTO, false),
-                                Params(envoy::config::core::v3::ApiVersion::V2, false),
-                                Params(envoy::config::core::v3::ApiVersion::V3, false)));
+                         Values(Params(envoy::config::core::v3::ApiVersion::AUTO),
+                                Params(envoy::config::core::v3::ApiVersion::V2),
+                                Params(envoy::config::core::v3::ApiVersion::V3)));
 
 // Test the client when an ok response is received.
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
