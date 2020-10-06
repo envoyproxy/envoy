@@ -1135,34 +1135,32 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 
 class StatsThreadLocalStoreTestNoFixture : public testing::Test {
 protected:
-  StatsThreadLocalStoreTestNoFixture() {
-    alloc_ = std::make_unique<AllocatorImpl>(symbol_table_);
-    store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);
-    store_->addSink(sink_);
+  StatsThreadLocalStoreTestNoFixture() : alloc_(symbol_table_), store_(alloc_) {
+    store_.addSink(sink_);
 
     // Use a tag producer that will produce tags.
     envoy::config::metrics::v3::StatsConfig stats_config;
-    store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+    store_.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
   }
 
   ~StatsThreadLocalStoreTestNoFixture() override {
     if (threading_enabled_) {
-      store_->shutdownThreading();
+      store_.shutdownThreading();
       tls_.shutdownThread();
     }
   }
 
   void initThreading() {
     threading_enabled_ = true;
-    store_->initializeThreading(main_thread_dispatcher_, tls_);
+    store_.initializeThreading(main_thread_dispatcher_, tls_);
   }
 
   static constexpr size_t million_ = 1000 * 1000;
 
   MockSink sink_;
   SymbolTableImpl symbol_table_;
-  std::unique_ptr<AllocatorImpl> alloc_;
-  ThreadLocalStoreImplPtr store_;
+  AllocatorImpl alloc_;
+  ThreadLocalStoreImpl store_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   bool threading_enabled_{false};
@@ -1172,7 +1170,7 @@ protected:
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      100, [this](absl::string_view name) { store_->counterFromString(std::string(name)); });
+      100, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.75 * million_);
 }
@@ -1181,7 +1179,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      100, [this](absl::string_view name) { store_->counterFromString(std::string(name)); });
+      100, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827632); // July 20, 2020
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.9 * million_);
 }
