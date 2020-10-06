@@ -76,6 +76,7 @@ public:
 } // namespace Http
 } // namespace Envoy
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AddResponsesRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
 
@@ -85,6 +86,7 @@ static void BM_AddResponsesRealSymtab(benchmark::State& state) {
 }
 BENCHMARK(BM_AddResponsesRealSymtab);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_ResponseTimingRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
 
