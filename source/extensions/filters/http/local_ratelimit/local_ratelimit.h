@@ -16,6 +16,7 @@
 #include "common/router/header_parser.h"
 #include "common/runtime/runtime_protos.h"
 
+#include "extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -47,7 +48,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
                bool per_route = false);
-  ~FilterConfig() override;
+  ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
   bool requestAllowed() const;
   bool enabled() const;
@@ -60,7 +61,6 @@ private:
   friend class FilterTest;
 
   static LocalRateLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
-  void onFillTimer();
 
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -72,15 +72,11 @@ private:
 
   const Http::Code status_;
   mutable LocalRateLimitStats stats_;
-  const uint32_t max_tokens_;
-  const uint32_t tokens_per_fill_;
-  const std::chrono::milliseconds fill_interval_;
-  const Event::TimerPtr fill_timer_;
+  std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
   Runtime::Loader& runtime_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   Router::HeaderParserPtr response_headers_parser_;
-  mutable std::atomic<uint32_t> tokens_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

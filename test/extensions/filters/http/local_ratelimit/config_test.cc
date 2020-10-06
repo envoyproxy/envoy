@@ -12,7 +12,9 @@ namespace HttpFilters {
 namespace LocalRateLimitFilter {
 
 TEST(Factory, GlobalEmptyConfig) {
-  const std::string yaml = "{}";
+  const std::string yaml = R"(
+stat_prefix: test
+  )";
 
   LocalRateLimitFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();

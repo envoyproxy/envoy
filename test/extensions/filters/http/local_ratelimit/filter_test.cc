@@ -72,7 +72,6 @@ public:
   }
 
   Http::Code toErrorCode(const uint64_t code) { return config_->toErrorCode(code); }
-  void onFillTimer() { config_->onFillTimer(); }
   const FilterConfig* getConfig() { return filter_->getConfig(); }
   const FilterConfig* getEffectiveConfig() { return filter_->effective_config_; }
 
@@ -104,24 +103,6 @@ TEST_F(FilterTest, CachedConfig) {
   EXPECT_EQ(config_.get(), getConfig());
   EXPECT_NE(nullptr, getEffectiveConfig());
   EXPECT_EQ(getEffectiveConfig(), getConfig());
-}
-
-// TODO(rgs1): we should share code with the network local rate limiter and drop
-//             this test.
-TEST_F(FilterTest, OnFillTimer) {
-  Event::MockTimer* timer = nullptr;
-  Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-    timer_cb = cb;
-    EXPECT_EQ(nullptr, timer);
-    timer = new Event::MockTimer();
-    EXPECT_CALL(*timer, enableTimer(_, _)).Times(2);
-    EXPECT_CALL(*timer, disableTimer()).Times(1);
-    return timer;
-  }));
-
-  setup(fmt::format(config_yaml, "1"), false, false);
-  onFillTimer();
 }
 
 TEST_F(FilterTest, Disabled) {

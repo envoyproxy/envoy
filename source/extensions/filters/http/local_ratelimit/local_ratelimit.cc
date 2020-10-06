@@ -18,14 +18,11 @@ FilterConfig::FilterConfig(
     const bool per_route)
     : status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
-      max_tokens_(config.token_bucket().max_tokens()),
-      tokens_per_fill_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1)),
-      fill_interval_(config.has_token_bucket()
-                         ? PROTOBUF_GET_MS_REQUIRED(config.token_bucket(), fill_interval)
-                         : 0),
-      fill_timer_(fill_interval_ > std::chrono::milliseconds(0)
-                      ? dispatcher.createTimer([this] { onFillTimer(); })
-                      : nullptr),
+      rate_limiter_(std::make_shared<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
+          std::chrono::milliseconds(
+              PROTOBUF_GET_MS_OR_DEFAULT(config.token_bucket(), fill_interval, 0)),
+          config.token_bucket().max_tokens(),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1), dispatcher)),
       runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()
@@ -39,70 +36,20 @@ FilterConfig::FilterConfig(
               : absl::nullopt),
       response_headers_parser_(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {
-  if (fill_timer_ && fill_interval_ < std::chrono::milliseconds(50)) {
-    throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
-  }
-
-  // Note: no tocket bucket is fine for the global config, which would be the case for enabling
+  // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
   //       bucket so we throw an error.
   if (per_route && !config.has_token_bucket()) {
     throw EnvoyException("local rate limit token bucket must be set for per filter configs");
   }
-
-  tokens_ = max_tokens_;
-
-  if (fill_timer_) {
-    fill_timer_->enableTimer(fill_interval_);
-  }
 }
 
-FilterConfig::~FilterConfig() {
-  if (fill_timer_ != nullptr) {
-    fill_timer_->disableTimer();
-  }
-}
+bool FilterConfig::requestAllowed() const { return rate_limiter_->requestAllowed(); }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + ".http_local_rate_limit";
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
-}
-
-// Snitched from the local rate limit network filter.
-// TODO(rgs1): reuse the code from above.
-void FilterConfig::onFillTimer() {
-  // Relaxed consistency is used for all operations because we don't care about ordering, just the
-  // final atomic correctness.
-  uint32_t expected_tokens = tokens_.load(std::memory_order_relaxed);
-  uint32_t new_tokens_value;
-  do {
-    // expected_tokens is either initialized above or reloaded during the CAS failure below.
-    new_tokens_value = std::min(max_tokens_, expected_tokens + tokens_per_fill_);
-    // Loop while the weak CAS fails trying to update the tokens value.
-  } while (
-      !tokens_.compare_exchange_weak(expected_tokens, new_tokens_value, std::memory_order_relaxed));
-
-  fill_timer_->enableTimer(fill_interval_);
-}
-
-// Snitched from the local rate limit network filter.
-// TODO(rgs1): reuse the code from above.
-bool FilterConfig::requestAllowed() const {
-  // Relaxed consistency is used for all operations because we don't care about ordering, just the
-  // final atomic correctness.
-  uint32_t expected_tokens = tokens_.load(std::memory_order_relaxed);
-  do {
-    // expected_tokens is either initialized above or reloaded during the CAS failure below.
-    if (expected_tokens == 0) {
-      return false;
-    }
-    // Loop while the weak CAS fails trying to subtract 1 from expected.
-  } while (!tokens_.compare_exchange_weak(expected_tokens, expected_tokens - 1,
-                                          std::memory_order_relaxed));
-
-  // We successfully decremented the counter by 1.
-  return true;
 }
 
 bool FilterConfig::enabled() const {
