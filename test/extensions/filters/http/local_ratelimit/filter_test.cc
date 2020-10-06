@@ -42,7 +42,7 @@ response_headers_to_add:
 
 class FilterTest : public testing::Test {
 public:
-  FilterTest() {}
+  FilterTest() = default;
 
   void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {
     fractional_percent_.set_numerator(100);

@@ -46,7 +46,7 @@ class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime);
-  ~FilterConfig();
+  ~FilterConfig() override;
   Runtime::Loader& runtime() { return runtime_; }
   bool requestAllowed() const;
   bool enabled() const;
