@@ -1,18 +1,20 @@
 #include <openssl/evp.h>
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/quic_dispatcher.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/common/platform/api/quiche_text_utils.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include <memory>
 
@@ -76,7 +78,7 @@ public:
         per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
-        connection_handler_(*dispatcher_),
+        connection_handler_(*dispatcher_, absl::nullopt),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),

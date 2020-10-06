@@ -62,7 +62,7 @@ message CommonGrpcAccessLogConfig {
   // The friendly name of the access log to be returned in :ref:`StreamAccessLogsMessage.Identifier
   // <envoy_api_msg_service.accesslog.v3.StreamAccessLogsMessage.Identifier>`. This allows the
   // access log server to differentiate between different access logs coming from the same Envoy.
-  string log_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string log_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The gRPC service for the access log service.
   config.core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];

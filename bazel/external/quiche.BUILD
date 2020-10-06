@@ -61,7 +61,8 @@ quiche_common_copts = [
 ]
 
 quiche_copts = select({
-    "@envoy//bazel:windows_x86_64": [],
+    # Ignore unguarded #pragma GCC statements in QUICHE sources
+    "@envoy//bazel:windows_x86_64": ["-wd4068"],
     # Remove these after upstream fix.
     "@envoy//bazel:gcc_build": [
         "-Wno-sign-compare",
@@ -2244,6 +2245,12 @@ envoy_cc_library(
         "quiche/quic/core/frames/quic_window_update_frame.h",
     ],
     copts = quiche_copts,
+    # TODO: Work around initializer in anonymous union in fastbuild build.
+    # Remove this after upstream fix.
+    defines = select({
+        "@envoy//bazel:windows_x86_64": ["QUIC_FRAME_DEBUG=0"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],

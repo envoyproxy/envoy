@@ -29,7 +29,7 @@ message VmConfig {
   string vm_id = 1;
 
   // The Wasm runtime type (either "v8" or "null" for code compiled into Envoy).
-  string runtime = 2 [(validate.rules).string = {min_bytes: 1}];
+  string runtime = 2 [(validate.rules).string = {min_len: 1}];
 
   // The Wasm code that Envoy will execute.
   config.core.v3.AsyncDataSource code = 3;

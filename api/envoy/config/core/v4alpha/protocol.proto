@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.core.v4alpha;
 
+import "envoy/type/v3/percent.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -177,7 +179,30 @@ message Http1ProtocolOptions {
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 7;
 }
 
-// [#next-free-field: 15]
+message KeepaliveSettings {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.KeepaliveSettings";
+
+  // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
+  google.protobuf.Duration interval = 1 [(validate.rules).duration = {
+    required: true
+    gte {nanos: 1000000}
+  }];
+
+  // How long to wait for a response to a keepalive PING. If a response is not received within this
+  // time period, the connection will be aborted.
+  google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
+    required: true
+    gte {nanos: 1000000}
+  }];
+
+  // A random jitter amount as a percentage of interval that will be added to each interval.
+  // A value of zero means there will be no jitter.
+  // The default value is 15%.
+  type.v3.Percent interval_jitter = 3;
+}
+
+// [#next-free-field: 16]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http2ProtocolOptions";
@@ -335,6 +360,10 @@ message Http2ProtocolOptions {
   // <https://www.iana.org/assignments/http2-parameters/http2-parameters.xhtml#settings>`_ for
   // standardized identifiers.
   repeated SettingsParameter custom_settings_parameters = 13;
+
+  // Send HTTP/2 PING frames to verify that the connection is still healthy. If the remote peer
+  // does not respond within the configured timeout, the connection will be aborted.
+  KeepaliveSettings connection_keepalive = 15;
 }
 
 // [#not-implemented-hide:]

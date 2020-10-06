@@ -37,7 +37,6 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, localInfo()).Times(1);
   EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(2);
@@ -61,6 +60,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   std::string yaml = R"EOF(
+  stat_prefix: "wall"
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -97,6 +97,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   failure_mode_allow: true
   with_request_body:
     max_request_bytes: 100
+    pack_as_bytes: true
   )EOF";
 
   ExtAuthzFilterConfig factory;
@@ -104,7 +105,6 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   TestUtility::loadFromYaml(yaml, *proto_config);
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, localInfo()).Times(1);
   EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(1);
