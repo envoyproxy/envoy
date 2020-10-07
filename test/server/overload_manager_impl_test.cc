@@ -25,7 +25,6 @@ using testing::AllOf;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
-using testing::Return;
 
 namespace Envoy {
 namespace Server {
