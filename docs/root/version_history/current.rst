@@ -25,7 +25,7 @@ Minor Behavior Changes
 * ext_authz filter: request timeout will now count from the time the check request is created, instead of when it becomes active. This makes sure that the timeout is enforced even if the ext_authz cluster's circuit breaker is engaged.
   This behavior can be reverted by setting runtime feature ``envoy.reloadable_features.ext_authz_measure_timeout_on_check_created`` to false. When enabled, a new `ext_authz.timeout` stat is counted when timeout occurs. See :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
-* ext_authz_filter: added :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>` to disable request data buffering per-route.
+* grpc reverse bridge: upstream headers will no longer be propagated when the response is missing or contains an unexpected content-type.
 * http: added :ref:`contains <envoy_api_msg_type.matcher.StringMatcher>` a new string matcher type which matches if the value of the string has the substring mentioned in contains matcher.
 * http: added :ref:`contains <envoy_api_msg_route.HeaderMatcher>` a new header matcher type which matches if the value of the header has the substring mentioned in contains matcher.
 * http: added :ref:`headers_to_add <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.headers_to_add>` to :ref:`local reply mapper <config_http_conn_man_local_reply>` to allow its users to add/append/override response HTTP headers to local replies.
@@ -46,9 +46,11 @@ Minor Behavior Changes
 * logging: nghttp2 log messages no longer appear at trace level unless `ENVOY_NGHTTP2_TRACE` is set
   in the environment.
 * lua: changed the response body returned by `httpCall()` API to raw data. Previously, the returned data was string.
+* memory: switched to the `new tcmalloc <https://github.com/google/tcmalloc>`_ for linux_x86_64 builds. The `old tcmalloc <https://github.com/gperftools/gperftools>`_ can still be enabled with the `--define tcmalloc=gperftools` option.
 * postgres: changed log format to tokenize fields of Postgres messages.
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
+* stats: the fake symbol table implemention has been removed from the binary, and the option "--use-fake-symbol-table" is now a no-op with a warning.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
 * watchdog: replaced single watchdog with separate watchdog configuration for worker threads and for the main thread :ref:`Watchdogs<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`. It works with :ref:`watchdog<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` by having the worker thread and main thread watchdogs have same config.
 
@@ -100,8 +102,10 @@ New Features
 * ext_authz filter: added support for emitting dynamic metadata for both :ref:`HTTP <config_http_filters_ext_authz_dynamic_metadata>` and :ref:`network <config_network_filters_ext_authz_dynamic_metadata>` filters.
   The emitted dynamic metadata is set by :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in a returned :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
 * ext_authz filter: added :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>` as an optional additional prefix for the statistics emitted from `ext_authz` HTTP filter.
+* ext_authz filter: added support for enabling the filter based on :ref:`dynamic metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled_metadata>`.
 * ext_authz filter: added support for letting the authorization server instruct Envoy to remove headers from the original request by setting the new field :ref:`headers_to_remove <envoy_v3_api_field_service.auth.v3.OkHttpResponse.headers_to_remove>` before forwarding it to the upstream.
 * ext_authz filter: added support for sending :ref:`raw bytes as request body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>` of a gRPC check request by setting :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` to true.
+* ext_authz_filter: added :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>` to disable request data buffering per-route.
 * grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
 * hds: added :ref:`cluster_endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health>` to HDS responses, keeping endpoints in the same groupings as they were configured in the HDS specifier by cluster and locality instead of as a flat list.
 * hds: added :ref:`transport_socket_matches <envoy_v3_api_field_service.health.v3.ClusterHealthCheck.transport_socket_matches>` to HDS cluster health check specifier, so the existing match filter :ref:`transport_socket_match_criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>` in the repeated field :ref:`health_checks <envoy_v3_api_field_service.health.v3.ClusterHealthCheck.health_checks>` has context to match against. This unblocks support for health checks over HTTPS and HTTP/2.
@@ -124,6 +128,7 @@ New Features
 * lua: added new :ref:`source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` field to support the dispatching of inline Lua code in per route configuration of Lua filter.
 * overload management: add :ref:`scaling <envoy_v3_api_field_config.overload.v3.Trigger.scaled>` trigger for OverloadManager actions.
 * postgres network filter: :ref:`metadata <config_network_filters_postgres_proxy_dynamic_metadata>` is produced based on SQL query.
+* proxy protocol: added support for generating the header upstream using :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>`.
 * ratelimit: added :ref:`enable_x_ratelimit_headers <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>` option to enable `X-RateLimit-*` headers as defined in `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
 * ratelimit: added :ref:`per route config <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimitPerRoute>` for rate limit filter.
 * ratelimit: added support for optional :ref:`descriptor_key <envoy_v3_api_field_config.route.v3.RateLimit.Action.generic_key>` to Generic Key action.

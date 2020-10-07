@@ -44,8 +44,8 @@ public:
     addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
-  void initializeConfig(bool with_timeout = false) {
-    config_helper_.addConfigModifier([this, with_timeout](
+  void initializeConfig(bool with_timeout = false, bool disable_with_metadata = false) {
+    config_helper_.addConfigModifier([this, with_timeout, disable_with_metadata](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -63,6 +63,13 @@ public:
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
+      if (disable_with_metadata) {
+        // Disable the ext_authz filter with metadata matcher that never matches.
+        auto* metadata = proto_config_.mutable_filter_enabled_metadata();
+        metadata->set_filter("xyz.abc");
+        metadata->add_path()->set_key("k1");
+        metadata->mutable_value()->mutable_string_match()->set_exact("never_matched");
+      }
       proto_config_.mutable_deny_at_disable()->set_runtime_key("envoy.ext_authz.deny_at_disable");
       proto_config_.mutable_deny_at_disable()->mutable_default_value()->set_value(false);
       proto_config_.set_transport_api_version(apiVersion());
@@ -74,8 +81,10 @@ public:
     });
   }
 
-  void setDenyAtDisableRuntimeConfig(bool deny_at_disable) {
-    config_helper_.addRuntimeOverride("envoy.ext_authz.enable", "numerator: 0");
+  void setDenyAtDisableRuntimeConfig(bool deny_at_disable, bool disable_with_metadata) {
+    if (!disable_with_metadata) {
+      config_helper_.addRuntimeOverride("envoy.ext_authz.enable", "numerator: 0");
+    }
     if (deny_at_disable) {
       config_helper_.addRuntimeOverride("envoy.ext_authz.deny_at_disable", "true");
     } else {
@@ -391,9 +400,10 @@ attributes:
     cleanup();
   }
 
-  void expectFilterDisableCheck(bool deny_at_disable, const std::string& expected_status) {
-    initializeConfig();
-    setDenyAtDisableRuntimeConfig(deny_at_disable);
+  void expectFilterDisableCheck(bool deny_at_disable, bool disable_with_metadata,
+                                const std::string& expected_status) {
+    initializeConfig(false, disable_with_metadata);
+    setDenyAtDisableRuntimeConfig(deny_at_disable, disable_with_metadata);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     HttpIntegrationTest::initialize();
     initiateClientConnection(4);
@@ -663,9 +673,21 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckTimesOutFromCheckCreation) {
   expectCheckRequestTimedout(true);
 }
 
-TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) { expectFilterDisableCheck(false, "200"); }
+TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) {
+  expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/false, "200");
+}
 
-TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) { expectFilterDisableCheck(true, "403"); }
+TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisableWithMetadata) {
+  expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/true, "200");
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) {
+  expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/false, "403");
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
+  expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/true, "403");
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
                          ValuesIn(TestEnvironment::getIpVersionsForTest()),
