@@ -664,6 +664,7 @@ void ConnectionImpl::goAway() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::shutdownNotice() {
