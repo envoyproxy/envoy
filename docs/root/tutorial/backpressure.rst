@@ -24,11 +24,9 @@ Two quick definitions, used by Envoy:
   Envoy.
 
 These terms take their origin from traditional computer networking; information
-flows like water through Envoy from
-[upstream](https://en.wikipedia.org/wiki/Upstream_(networking)) (the service
-that eventually responds to the request) to
-[downstream](https://en.wikipedia.org/wiki/Downstream_(networking)) (the caller
-making the request). In a service mesh, all services are often co-located in the
+flows like water through Envoy from `upstream <https://en.wikipedia.org/wiki/Upstream_(networking)>`_
+(the service that eventually responds to the request) to `downstream <https://en.wikipedia.org/wiki/Downstream_(networking)>`_
+(the caller making the request). In a service mesh, all services are often co-located in the
 same cloud, but there's still utility in thinking in terms of traffic flow.
 
 Envoy Failure Modes
@@ -40,12 +38,11 @@ response to the downstream client.
 Rate Limiting Failure
 *********************
 
-**What it is:** The [Rate
-Limiting](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/global_rate_limiting)
+**What it is:** The :ref:`rate limiting <arch_overview_global_rate_limit>`
 service determined that this request exceeds the quotas it sets and should be
 tried again later.
 
-**Result:** The client receives an [HTTP 429](https://httpstatuses.com/429)
+**Result:** The client receives an `HTTP 429 <https://httpstatuses.com/429>`_
 response.
 
 Timeout Failure
@@ -54,7 +51,7 @@ Timeout Failure
 **What it is:** The upstream connection took longer to respond than the timeout
 set on the route.
 
-**Result:** The client receives an [HTTP 504](https://httpstatuses.com/504)
+**Result:** The client receives an `HTTP 504 <https://httpstatuses.com/504>`_
 (Read More)
 
 Empty Cluster
@@ -65,7 +62,7 @@ what happens when all hosts fail either health checks or outlier detection. In
 either of those situations, Envoy will notice the number of hosts is below the
 panic threshold and balance across all known hosts.
 
-**Result:** Returns an [HTTP 503](https://httpstatuses.com/503) with the body
+**Result:** Returns an `HTTP 503 <https://httpstatuses.com/503>`_ with the body
 text “no healthy upstream”.
 
 Unresponsive Upstream
@@ -73,7 +70,7 @@ Unresponsive Upstream
 
 **What it is:** The upstream host is unresponsive.
 
-**Result:** Returns an [HTTP 503](https://httpstatuses.com/503) with the body
+**Result:** Returns an `HTTP 503 <https://httpstatuses.com/503>`_ with the body
 text “upstream connect error or disconnect/reset before headers”.
 
 ### Circuit Breaker Failed Open
@@ -81,7 +78,7 @@ text “upstream connect error or disconnect/reset before headers”.
 **What it is:** Due to too many unsuccessful or outstanding requests to this
 upstream, Envoy has tripped the circuit breaker and is failing the request.
 
-**Result:** The client receives an [HTTP 503](https://httpstatuses.com/503) with
+**Result:** The client receives an `HTTP 503 <https://httpstatuses.com/503>`_ with
 the ``x-envoy-overloaded: true`` header set. (Read More)
 
 Maintenance mode
@@ -91,7 +88,7 @@ Maintenance mode
 ``upstream.maintenance_mode.<cluster_name>``, and this request is in the fraction
 of requests that is unsuccessful
 
-**Result:** Returns an [HTTP 503](https://httpstatuses.com/503) with the
+**Result:** Returns an `HTTP 503 <https://httpstatuses.com/503>`_ with the
 ``x-envoy-overloaded: true`` header set. (Read More)
 
 Domain or Route not found
@@ -99,7 +96,7 @@ Domain or Route not found
 
 **What it is:** Envoy is not configured to serve this URL.
 
-**Result:** The client receives an [HTTP 404](https://httpstatuses.com/404).
+**Result:** The client receives an `HTTP 404 <https://httpstatuses.com/404>`_.
 
 Note: Envoy only supports HTTP/1.1 and newer, which requires the presence of a
 ``Host`` header. In particular, this means that requests to ``127.0.0.1`` or the IP
@@ -116,9 +113,8 @@ finished sending, Envoy cannot send a complete response to the downstream.
 
  - If it has not (i.e. the upstream disconnects quickly), the downstream
    connection is reset.
- - If it has, the downstream receives an [HTTP
-   503](https://httpstatuses.com/503) and the body text “upstream connect error
-   or disconnect/reset before headers”
+ - If it has, the downstream receives an `HTTP 503 <https://httpstatuses.com/503>`_
+   and the body text “upstream connect error or disconnect/reset before headers”
 
 Envoy is Overloaded
 *******************
@@ -145,6 +141,6 @@ Next Steps
 Once your client libraries can handle it, go implement some of Envoy's
 resilience features, such as:
 
- - [Automatic retries](automatic-retries)
- - [Circuit breaking](circuit-breaking)
- - [Health checks](health-check)
+- :ref:`Automatic retries <automatic_retries>`
+- :ref:`Circuit breaking <circuit_breaking>`
+- :ref:`Health checks <health_check>`

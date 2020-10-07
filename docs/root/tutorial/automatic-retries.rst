@@ -40,17 +40,17 @@ Here's what a simple retry configuration looks like for a single route:
    num_retries: 3
    per_try_timeout_ms: 2000
 
-The `retry_on` parameter specifies **which types of responses to retry** this
+The ``retry_on`` parameter specifies **which types of responses to retry** this
 request on. 5xx is a good place to start, as it will retry all server errors.
 There are more specific subsets that Envoy supports (e.g. gateway-error,
 connect-failure, and refused-stream), but all of these are caught with 5xx.
 
 By default, Envoy will set the **number of retries** to one with
-`num_retries`. There’s little downside to increasing this to three, especially
+``num_retries``. There’s little downside to increasing this to three, especially
 for relatively short requests, as Envoy will limit the total time spent to the
 overall request timeout, including the initial request and all retries.
 
-The `per_try_timeout_ms` field sets a **timeout for each retry** in
+The ``per_try_timeout_ms`` field sets a **timeout for each retry** in
 milliseconds. Without this parameter, any request that times out will not be
 retried, since the default is the same as the calling request’s timeout. While
 it’s not a big deal to leave this out, setting it to the 99th percentile of
@@ -95,14 +95,11 @@ For internal service calls, it’s important to consider the restrictions impose
 on the caller as well.
 
 Since Envoy will limit the total duration of retries, consider the relationship
-between the route's global timeout
-([`timeout_ms`](https://www.envoyproxy.io/docs/envoy/latest/api-v1/route_config/route.html#config-http-conn-man-route-table-route-timeout)),
-the upstream routes' timeout (also
-([`timeout_ms`](https://www.envoyproxy.io/docs/envoy/latest/api-v1/route_config/route.html#config-http-conn-man-route-table-route-timeout)),
-the per-retry timeout
-([`per_try_timeout_ms`](https://www.envoyproxy.io/docs/envoy/latest/api-v1/route_config/route.html#config-http-conn-man-route-table-route-retry)),
-and the number of retries
-([`num_retries`](https://www.envoyproxy.io/docs/envoy/latest/api-v1/route_config/route.html#config-http-conn-man-route-table-route-retry)).
+between the route's global timeout (:ref:`timeout <envoy_v3_api_field_config.route.v3.RouteAction.timeout>`)
+the upstream routes' timeout (also :ref:`timeout <envoy_v3_api_field_config.route.v3.RouteAction.timeout>`),
+the per-retry timeout (:ref:`per-try-timeout <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_timeout>`),
+and the number of retries (:ref:`number of retries <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`).
+
 In general, it's better to fail quickly and retry than to let long requests
 attempt to finish. This will, perhaps counterintuitively, increase success rates
 and decrease most latency.
@@ -140,4 +137,4 @@ service. Global circuit breaking helps selectively shed load when this sort of
 failure occurs, preventing it from cascading to multiple services.
 
 For more detail, and advanced configuration information, read about them in the
-[Envoy docs](https://www.envoyproxy.io/docs/envoy/v1.8.0/api-v1/route_config/route.html#config-http-conn-man-route-table-route-retry).
+:ref:`Envoy docs <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`.
