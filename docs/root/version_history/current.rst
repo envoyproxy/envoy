@@ -46,6 +46,7 @@ Minor Behavior Changes
 * logging: nghttp2 log messages no longer appear at trace level unless `ENVOY_NGHTTP2_TRACE` is set
   in the environment.
 * lua: changed the response body returned by `httpCall()` API to raw data. Previously, the returned data was string.
+* memory: switched to the `new tcmalloc <https://github.com/google/tcmalloc>`_ for linux_x86_64 builds. The `old tcmalloc <https://github.com/gperftools/gperftools>`_ can still be enabled with the `--define tcmalloc=gperftools` option.
 * postgres: changed log format to tokenize fields of Postgres messages.
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.

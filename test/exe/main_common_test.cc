@@ -31,6 +31,23 @@ using testing::Return;
 
 namespace Envoy {
 
+namespace {
+
+#if !(defined(__clang_analyzer__) ||                                                               \
+      (defined(__has_feature) &&                                                                   \
+       (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer) ||                     \
+        __has_feature(memory_sanitizer))))
+const std::string& outOfMemoryPattern() {
+#if defined(TCMALLOC)
+  CONSTRUCT_ON_FIRST_USE(std::string, ".*Unable to allocate.*");
+#else
+  CONSTRUCT_ON_FIRST_USE(std::string, ".*panic: out of memory.*");
+#endif
+}
+#endif
+
+} // namespace
+
 /**
  * Captures common functions needed for invoking MainCommon.Maintains
  * an argv array that is terminated with nullptr. Identifies the config
@@ -177,7 +194,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
           ENVOY_LOG_MISC(debug, "p={}", reinterpret_cast<intptr_t>(p));
         }
       }(),
-      ".*panic: out of memory.*");
+      outOfMemoryPattern());
 #endif
 }
 

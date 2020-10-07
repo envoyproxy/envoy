@@ -156,6 +156,37 @@ config_setting(
 )
 
 config_setting(
+    name = "gperftools_tcmalloc",
+    values = {"define": "tcmalloc=gperftools"},
+)
+
+# As select() can't be nested we need these specialized settings to avoid ambiguity when choosing
+# tcmalloc's flavor for x86_64 builds.
+config_setting(
+    name = "disable_tcmalloc_on_linux_x86_64",
+    values = {
+        "define": "tcmalloc=disabled",
+        "cpu": "k8",
+    },
+)
+
+config_setting(
+    name = "gperftools_tcmalloc_on_linux_x86_64",
+    values = {
+        "define": "tcmalloc=gperftools",
+        "cpu": "k8",
+    },
+)
+
+config_setting(
+    name = "debug_tcmalloc_on_linux_x86_64",
+    values = {
+        "define": "tcmalloc=debug",
+        "cpu": "k8",
+    },
+)
+
+config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )

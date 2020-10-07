@@ -101,7 +101,7 @@ void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> 
 }
 
 MemoryTest::Mode MemoryTest::mode() {
-#if !defined(TCMALLOC) || defined(ENVOY_MEMORY_DEBUG_ENABLED)
+#if !(defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)) || defined(ENVOY_MEMORY_DEBUG_ENABLED)
   // We can only test absolute memory usage if the malloc library is a known
   // quantity. This decision is centralized here. As the preferred malloc
   // library for Envoy is TCMALLOC that's what we test for here. If we switch

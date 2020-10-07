@@ -197,6 +197,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
+    _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
     _com_github_jbeder_yaml_cpp()
@@ -873,6 +874,16 @@ def _com_github_moonjit_moonjit():
     native.bind(
         name = "moonjit",
         actual = "@envoy//bazel/foreign_cc:moonjit",
+    )
+
+def _com_github_google_tcmalloc():
+    _repository_impl(
+        name = "com_github_google_tcmalloc",
+    )
+
+    native.bind(
+        name = "tcmalloc",
+        actual = "@com_github_google_tcmalloc//tcmalloc",
     )
 
 def _com_github_gperftools_gperftools():
