@@ -253,7 +253,7 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   int bytes_written_total = 0;
   Network::IoSocketHandleImpl io_handle1(pipe_fds[1]);
   while (bytes_written_total < 20) {
-    Api::IoCallUint64Result result = buffer_.write(io_handle1);
+    Api::IoCallUint64Result result = io_handle1.write(buffer_);
     if (!result.ok()) {
       ASSERT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
     } else {
