@@ -1,4 +1,4 @@
-#include "common/event/scaled_range_timer_manager.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 
 #include <chrono>
 #include <cmath>
@@ -31,9 +31,9 @@ namespace Event {
  * [scaling-max -> inactive -> waiting-for-min -> scaling-max] in a single
  * method call. The waiting-for-min transitions are elided for efficiency.
  */
-class ScaledRangeTimerManager::RangeTimerImpl final : public RangeTimer {
+class ScaledRangeTimerManagerImpl::RangeTimerImpl final : public RangeTimer {
 public:
-  RangeTimerImpl(TimerCb callback, ScaledRangeTimerManager& manager)
+  RangeTimerImpl(TimerCb callback, ScaledRangeTimerManagerImpl& manager)
       : manager_(manager), callback_(std::move(callback)),
         min_duration_timer_(manager.dispatcher_.createTimer([this] { onMinTimerComplete(); })) {}
 
@@ -98,10 +98,10 @@ private:
   };
 
   struct ScalingMax {
-    ScalingMax(ScaledRangeTimerManager::ScalingTimerHandle handle) : handle_(handle) {}
+    ScalingMax(ScaledRangeTimerManagerImpl::ScalingTimerHandle handle) : handle_(handle) {}
 
     // A handle that can be used to disable the timer.
-    ScaledRangeTimerManager::ScalingTimerHandle handle_;
+    ScaledRangeTimerManagerImpl::ScalingTimerHandle handle_;
   };
 
   /**
@@ -123,7 +123,7 @@ private:
     }
   }
 
-  ScaledRangeTimerManager& manager_;
+  ScaledRangeTimerManagerImpl& manager_;
   const TimerCb callback_;
   const TimerPtr min_duration_timer_;
 
@@ -131,20 +131,20 @@ private:
   const ScopeTrackedObject* scope_;
 };
 
-ScaledRangeTimerManager::ScaledRangeTimerManager(Dispatcher& dispatcher)
+ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(Dispatcher& dispatcher)
     : dispatcher_(dispatcher), scale_factor_(1.0) {}
 
-ScaledRangeTimerManager::~ScaledRangeTimerManager() {
+ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   // Scaled timers created by the manager shouldn't outlive it. This is
   // necessary but not sufficient to guarantee that.
   ASSERT(queues_.empty());
 }
 
-RangeTimerPtr ScaledRangeTimerManager::createTimer(TimerCb callback) {
+RangeTimerPtr ScaledRangeTimerManagerImpl::createTimer(TimerCb callback) {
   return std::make_unique<RangeTimerImpl>(callback, *this);
 }
 
-void ScaledRangeTimerManager::setScaleFactor(double scale_factor) {
+void ScaledRangeTimerManagerImpl::setScaleFactor(double scale_factor) {
   const MonotonicTime now = dispatcher_.approximateMonotonicTime();
   scale_factor_ = DurationScaleFactor(scale_factor);
   for (auto& queue : queues_) {
@@ -152,31 +152,32 @@ void ScaledRangeTimerManager::setScaleFactor(double scale_factor) {
   }
 }
 
-ScaledRangeTimerManager::Queue::Item::Item(RangeTimerImpl& timer, MonotonicTime active_time)
+ScaledRangeTimerManagerImpl::Queue::Item::Item(RangeTimerImpl& timer, MonotonicTime active_time)
     : timer_(timer), active_time_(active_time) {}
 
-ScaledRangeTimerManager::Queue::Queue(std::chrono::milliseconds duration,
-                                      ScaledRangeTimerManager& manager, Dispatcher& dispatcher)
+ScaledRangeTimerManagerImpl::Queue::Queue(std::chrono::milliseconds duration,
+                                          ScaledRangeTimerManagerImpl& manager,
+                                          Dispatcher& dispatcher)
     : duration_(duration),
       timer_(dispatcher.createTimer([this, &manager] { manager.onQueueTimerFired(*this); })) {}
 
-ScaledRangeTimerManager::ScalingTimerHandle::ScalingTimerHandle(Queue& queue,
-                                                                Queue::Iterator iterator)
+ScaledRangeTimerManagerImpl::ScalingTimerHandle::ScalingTimerHandle(Queue& queue,
+                                                                    Queue::Iterator iterator)
     : queue_(queue), iterator_(iterator) {}
 
-ScaledRangeTimerManager::DurationScaleFactor::DurationScaleFactor(double value)
+ScaledRangeTimerManagerImpl::DurationScaleFactor::DurationScaleFactor(double value)
     : value_(std::max(0.0, std::min(value, 1.0))) {}
 
-MonotonicTime ScaledRangeTimerManager::computeTriggerTime(const Queue::Item& item,
-                                                          std::chrono::milliseconds duration,
-                                                          DurationScaleFactor scale_factor) {
+MonotonicTime ScaledRangeTimerManagerImpl::computeTriggerTime(const Queue::Item& item,
+                                                              std::chrono::milliseconds duration,
+                                                              DurationScaleFactor scale_factor) {
   return item.active_time_ +
          std::chrono::duration_cast<MonotonicTime::duration>(duration * scale_factor.value());
 }
 
-ScaledRangeTimerManager::ScalingTimerHandle
-ScaledRangeTimerManager::activateTimer(std::chrono::milliseconds duration,
-                                       RangeTimerImpl& range_timer) {
+ScaledRangeTimerManagerImpl::ScalingTimerHandle
+ScaledRangeTimerManagerImpl::activateTimer(std::chrono::milliseconds duration,
+                                           RangeTimerImpl& range_timer) {
   // Ensure this is being called on the same dispatcher.
   ASSERT(dispatcher_.isThreadSafe());
 
@@ -200,7 +201,7 @@ ScaledRangeTimerManager::activateTimer(std::chrono::milliseconds duration,
   return ScalingTimerHandle(queue, --queue.range_timers_.end());
 }
 
-void ScaledRangeTimerManager::removeTimer(ScalingTimerHandle handle) {
+void ScaledRangeTimerManagerImpl::removeTimer(ScalingTimerHandle handle) {
   // Ensure this is being called on the same dispatcher.
   ASSERT(dispatcher_.isThreadSafe());
 
@@ -219,7 +220,7 @@ void ScaledRangeTimerManager::removeTimer(ScalingTimerHandle handle) {
   }
 }
 
-void ScaledRangeTimerManager::resetQueueTimer(Queue& queue, MonotonicTime now) {
+void ScaledRangeTimerManagerImpl::resetQueueTimer(Queue& queue, MonotonicTime now) {
   ASSERT(!queue.range_timers_.empty());
   const MonotonicTime trigger_time =
       computeTriggerTime(queue.range_timers_.front(), queue.duration_, scale_factor_);
@@ -231,7 +232,7 @@ void ScaledRangeTimerManager::resetQueueTimer(Queue& queue, MonotonicTime now) {
   }
 }
 
-void ScaledRangeTimerManager::onQueueTimerFired(Queue& queue) {
+void ScaledRangeTimerManagerImpl::onQueueTimerFired(Queue& queue) {
   auto& timers = queue.range_timers_;
   ASSERT(!timers.empty());
   const MonotonicTime now = dispatcher_.approximateMonotonicTime();
