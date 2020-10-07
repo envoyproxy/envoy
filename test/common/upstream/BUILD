@@ -325,9 +325,9 @@ envoy_cc_fuzz_test(
     srcs = ["least_request_load_balancer_fuzz_test.cc"],
     corpus = "//test/common/upstream:least_request_load_balancer_corpus",
     deps = [
+        ":least_request_load_balancer_fuzz_proto_cc_proto",
         ":load_balancer_fuzz_lib",
         ":load_balancer_fuzz_proto_cc_proto",
-        ":least_request_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         "//test/fuzz:utility_lib",
     ],
