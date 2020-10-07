@@ -5,6 +5,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
+#include "common/common/thread_synchronizer.h"
+
 #include "extensions/filters/common/local_ratelimit/local_ratelimit.h"
 
 namespace Envoy {
@@ -33,6 +35,9 @@ private:
   const uint32_t tokens_per_fill_;
   const Event::TimerPtr fill_timer_;
   mutable std::atomic<uint32_t> tokens_;
+  mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
+
+  friend class LocalRateLimiterImplTest;
 };
 
 } // namespace LocalRateLimit

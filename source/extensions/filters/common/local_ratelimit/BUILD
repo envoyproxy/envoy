@@ -16,6 +16,7 @@ envoy_cc_library(
         ":local_ratelimit_client_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_synchronizer_lib",
     ],
 )
 

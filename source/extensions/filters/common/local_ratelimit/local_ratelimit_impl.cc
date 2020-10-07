@@ -39,6 +39,10 @@ void LocalRateLimiterImpl::onFillTimer() {
   do {
     // expected_tokens is either initialized above or reloaded during the CAS failure below.
     new_tokens_value = std::min(max_tokens_, expected_tokens + tokens_per_fill_);
+
+    // Testing hook.
+    synchronizer_.syncPoint("on_fill_timer_pre_cas");
+
     // Loop while the weak CAS fails trying to update the tokens value.
   } while (
       !tokens_.compare_exchange_weak(expected_tokens, new_tokens_value, std::memory_order_relaxed));
@@ -55,6 +59,10 @@ bool LocalRateLimiterImpl::requestAllowed() const {
     if (expected_tokens == 0) {
       return false;
     }
+
+    // Testing hook.
+    synchronizer_.syncPoint("allowed_pre_cas");
+
     // Loop while the weak CAS fails trying to subtract 1 from expected.
   } while (!tokens_.compare_exchange_weak(expected_tokens, expected_tokens - 1,
                                           std::memory_order_relaxed));
