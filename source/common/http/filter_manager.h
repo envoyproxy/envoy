@@ -547,7 +547,6 @@ public:
   // Http::FilterChainFactoryCallbacks
   std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
   createMatchTree(const envoy::config::common::matcher::v3::MatchTree&) override {
-    // This should be implemented by the decorated veresion.
     return {nullptr, nullptr};
   }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
