@@ -138,10 +138,6 @@ envoy_cmake_external(
         "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
-        # Note we use Bazel's flags (not _RELEASE/_DEBUG CMake flags), but this toggle
-        # also works around a bug in CMP0091 logic which re-injected a badly placed -M flag.
-        # See https://github.com/bazelbuild/rules_foreign_cc/issues/426
-        "CURL_STATIC_CRT": "on",
     },
     defines = ["CURL_STATICLIB"],
     generate_crosstool_file = True,
