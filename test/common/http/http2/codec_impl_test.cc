@@ -2041,15 +2041,16 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
         buffer.move(frame);
       }));
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1; ++i) {
     EXPECT_NO_THROW(response_encoder_->encodeHeaders(response_headers, false));
   }
-  // Presently flood mitigation is done only when processing downstream data
-  // So we need to send stream from downstream client to trigger mitigation
-  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many frames in the outbound queue.");
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());

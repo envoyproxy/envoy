@@ -496,8 +496,9 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
       grpc_fuzz_test_->initialize(input);
       break;
     }
-    default:
-      break;
+    default: // Handles custom health checkers
+      ENVOY_LOG_MISC(trace, "Custom Health Checker currently unsupported, skipping");
+      return;
     }
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
