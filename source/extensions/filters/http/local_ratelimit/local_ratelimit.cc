@@ -39,7 +39,8 @@ FilterConfig::FilterConfig(
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
-  //       bucket so we throw an error.
+  //       bucket so we throw an error. If there's no token bucket configured globally or
+  //       at the vhost/route level, no rate limiting is applied.
   if (per_route && !config.has_token_bucket()) {
     throw EnvoyException("local rate limit token bucket must be set for per filter configs");
   }

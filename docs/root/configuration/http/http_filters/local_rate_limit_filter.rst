@@ -97,6 +97,9 @@ The route specific configuration:
         route: { cluster: default_service }
 
 
+Note that if this filter is configured as globally disabled and there are no virtual host or route level
+token buckets, no rate limiting will be applied.
+
 Statistics
 ----------
 
