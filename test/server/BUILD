@@ -271,7 +271,8 @@ envoy_cc_test(
     srcs = ["listener_manager_impl_quic_only_test.cc"],
     tags = [
         "nofips",
-        # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows
+        # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
+        # required by quic_stream_send_buffer.cc
         "skip_on_windows",
     ],
     deps = [
@@ -379,6 +380,7 @@ envoy_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",

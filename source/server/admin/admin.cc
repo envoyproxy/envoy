@@ -146,8 +146,8 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
 }
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
-    : server_(server),
-      request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(server_.random())),
+    : server_(server), request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(
+                           server_.api().randomGenerator())),
       profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       null_overload_manager_(server_.threadLocal()),
@@ -227,8 +227,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), http1_codec_stats_, http2_codec_stats_,
-      Http::Http1Settings(),
+      connection, data, callbacks, server_.stats(), server_.api().randomGenerator(),
+      http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),
       maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
@@ -239,8 +239,8 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // Pass in the null overload manager so that the admin interface is accessible even when Envoy is
   // overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-      *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager(), null_overload_manager_,
+      *this, server_.drainManager(), server_.api().randomGenerator(), server_.httpContext(),
+      server_.runtime(), server_.localInfo(), server_.clusterManager(), null_overload_manager_,
       server_.timeSource())});
   return true;
 }

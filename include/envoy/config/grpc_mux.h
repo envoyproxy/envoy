@@ -107,6 +107,9 @@ public:
 
   virtual void requestOnDemandUpdate(const std::string& type_url,
                                      const std::set<std::string>& for_update) PURE;
+
+  using TypeUrlMap = absl::flat_hash_map<std::string, std::string>;
+  static TypeUrlMap& typeUrlMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(TypeUrlMap, {}); }
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

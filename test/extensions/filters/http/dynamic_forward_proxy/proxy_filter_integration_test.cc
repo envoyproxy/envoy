@@ -92,10 +92,9 @@ typed_config:
 
   void createUpstreams() override {
     if (upstream_tls_) {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
-                                                             factory_context_),
-                           0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+      addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
+                                                        factory_context_),
+                      FakeHttpConnection::Type::HTTP1);
     } else {
       HttpIntegrationTest::createUpstreams();
     }

@@ -33,26 +33,10 @@ the trace headers while making an outbound call to service2.
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of an Envoy cluster organized
-as is described above.
+.. include:: _include/docker-env-setup.rst
 
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Build the sandbox**
+Step 3: Build the sandbox
+*************************
 
 To build this sandbox example, and start the example apps run the following commands:
 
@@ -71,7 +55,8 @@ To build this sandbox example, and start the example apps run the following comm
     jaeger-tracing_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     jaeger-tracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
-**Step 4: Generate some load**
+Step 4: Generate some load
+**************************
 
 You can now send a request to service1 via the front-envoy as follows:
 
@@ -95,7 +80,8 @@ You can now send a request to service1 via the front-envoy as follows:
     Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
     * Connection #0 to host 192.168.99.100 left intact
 
-**Step 5: View the traces in Jaeger UI**
+Step 5: View the traces in Jaeger UI
+************************************
 
 Point your browser to http://localhost:16686 . You should see the Jaeger dashboard.
 Set the service to "front-proxy" and hit 'Find Traces'. You should see traces from the front-proxy.

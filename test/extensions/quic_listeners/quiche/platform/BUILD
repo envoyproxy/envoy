@@ -37,7 +37,10 @@ envoy_cc_test(
         "//bazel:linux": ["quic_platform_test.cc"],
         "//conditions:default": [],
     }),
-    copts = ["-Wno-unused-parameter"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": ["-Wno-unused-parameter"],
+    }),
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],

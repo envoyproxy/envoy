@@ -1,58 +1,123 @@
+#include <unordered_map>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/server/resource_monitor.h"
+#include "envoy/server/resource_monitor_config.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
 
+class FakeResourceMonitorFactory;
+
+class FakeResourceMonitor : public Server::ResourceMonitor {
+public:
+  FakeResourceMonitor(Event::Dispatcher& dispatcher, FakeResourceMonitorFactory& factory)
+      : dispatcher_(dispatcher), factory_(factory), pressure_(0.0) {}
+  ~FakeResourceMonitor() override;
+  void updateResourceUsage(Callbacks& callbacks) override;
+
+  void setResourcePressure(double pressure) {
+    dispatcher_.post([this, pressure] { pressure_ = pressure; });
+  }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  FakeResourceMonitorFactory& factory_;
+  double pressure_;
+};
+
+class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
+public:
+  FakeResourceMonitor* monitor() const { return monitor_; }
+  Server::ResourceMonitorPtr
+  createResourceMonitor(const Protobuf::Message& config,
+                        Server::Configuration::ResourceMonitorFactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::common::config::DummyConfig>();
+  }
+
+  std::string name() const override {
+    return "envoy.resource_monitors.testonly.fake_resource_monitor";
+  }
+
+  void onMonitorDestroyed(FakeResourceMonitor* monitor);
+
+private:
+  FakeResourceMonitor* monitor_{nullptr};
+};
+
+FakeResourceMonitor::~FakeResourceMonitor() { factory_.onMonitorDestroyed(this); }
+
+void FakeResourceMonitor::updateResourceUsage(Callbacks& callbacks) {
+  Server::ResourceUsage usage;
+  usage.resource_pressure_ = pressure_;
+  callbacks.onSuccess(usage);
+}
+
+void FakeResourceMonitorFactory::onMonitorDestroyed(FakeResourceMonitor* monitor) {
+  ASSERT(monitor_ == monitor);
+  monitor_ = nullptr;
+}
+
+Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
+    const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext& context) {
+  auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher(), *this);
+  monitor_ = monitor.get();
+  return monitor;
+}
+
 class OverloadIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
-  OverloadIntegrationTest()
-      : injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
-        file_updater_(injected_resource_filename_) {}
-
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      const std::string overload_config = fmt::format(R"EOF(
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      const std::string overload_config = R"EOF(
         refresh_interval:
           seconds: 0
           nanos: 1000000
         resource_monitors:
-          - name: "envoy.resource_monitors.injected_resource"
+          - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
             typed_config:
-              "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
-              filename: "{}"
+              "@type": type.googleapis.com/google.protobuf.Empty
         actions:
           - name: "envoy.overload_actions.stop_accepting_requests"
             triggers:
-              - name: "envoy.resource_monitors.injected_resource"
+              - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
                 threshold:
                   value: 0.9
           - name: "envoy.overload_actions.disable_http_keepalive"
             triggers:
-              - name: "envoy.resource_monitors.injected_resource"
+              - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
                 threshold:
                   value: 0.8
           - name: "envoy.overload_actions.stop_accepting_connections"
             triggers:
-              - name: "envoy.resource_monitors.injected_resource"
+              - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
                 threshold:
                   value: 0.95
-      )EOF",
-                                                      injected_resource_filename_);
+      )EOF";
       *bootstrap.mutable_overload_manager() =
           TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
     });
-    updateResource(0);
     HttpIntegrationTest::initialize();
+    updateResource(0);
   }
 
-  void updateResource(double pressure) { file_updater_.update(absl::StrCat(pressure)); }
+  void updateResource(double pressure) {
+    auto* monitor = fake_resource_monitor_factory_.monitor();
+    ASSERT(monitor != nullptr);
+    monitor->setResourcePressure(pressure);
+  }
 
-  const std::string injected_resource_filename_;
-  AtomicFileUpdater file_updater_;
+  FakeResourceMonitorFactory fake_resource_monitor_factory_;
+  Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory> inject_factory_{
+      fake_resource_monitor_factory_};
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,

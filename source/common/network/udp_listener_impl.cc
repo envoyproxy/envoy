@@ -93,7 +93,7 @@ void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_addres
   ASSERT(local_address != nullptr);
   UdpRecvData recvData{
       {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
-  cb_.onData(recvData);
+  cb_.onData(std::move(recvData));
 }
 
 void UdpListenerImpl::handleWriteCallback() {
@@ -123,6 +123,40 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
 Api::IoCallUint64Result UdpListenerImpl::flush() {
   ENVOY_UDP_LOG(trace, "flush");
   return cb_.udpPacketWriter().flush();
+}
+
+void UdpListenerImpl::activateRead() { file_event_->activate(Event::FileReadyType::Read); }
+
+UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
+    : workers_(concurrency) {}
+
+void UdpListenerWorkerRouterImpl::registerWorkerForListener(UdpListenerCallbacks& listener) {
+  absl::WriterMutexLock lock(&mutex_);
+
+  ASSERT(listener.workerIndex() < workers_.size());
+  ASSERT(workers_.at(listener.workerIndex()) == nullptr);
+  workers_.at(listener.workerIndex()) = &listener;
+}
+
+void UdpListenerWorkerRouterImpl::unregisterWorkerForListener(UdpListenerCallbacks& listener) {
+  absl::WriterMutexLock lock(&mutex_);
+
+  ASSERT(workers_.at(listener.workerIndex()) == &listener);
+  workers_.at(listener.workerIndex()) = nullptr;
+}
+
+void UdpListenerWorkerRouterImpl::deliver(uint32_t dest_worker_index, UdpRecvData&& data) {
+  absl::ReaderMutexLock lock(&mutex_);
+
+  ASSERT(dest_worker_index < workers_.size(),
+         "UdpListenerCallbacks::destination returned out-of-range value");
+  auto* worker = workers_[dest_worker_index];
+
+  // When a listener is being removed, packets could be processed on some workers after the
+  // listener is removed from other workers, which could result in a nullptr for that worker.
+  if (worker != nullptr) {
+    worker->post(std::move(data));
+  }
 }
 
 } // namespace Network

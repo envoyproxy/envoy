@@ -11,7 +11,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
@@ -55,7 +55,7 @@ static Http::ResponseMessagePtr makeSuccessResponse() {
   std::unique_ptr<Protobuf::Message> collector_response =
       lightstep::Transporter::MakeCollectorResponse();
   EXPECT_NE(collector_response, nullptr);
-  msg->body() = Grpc::Common::serializeToGrpcFrame(*collector_response);
+  msg->body().add(*Grpc::Common::serializeToGrpcFrame(*collector_response));
   return msg;
 }
 
