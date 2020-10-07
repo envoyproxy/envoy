@@ -109,7 +109,7 @@ TEST_F(FilterTest, RequestRateLimited) {
                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                           absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
-        EXPECT_EQ("", body);
+        EXPECT_EQ("request_rate_limited", body);
 
         Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
         modify_headers(response_headers);

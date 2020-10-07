@@ -84,7 +84,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   config->stats().enforced_.inc();
 
   decoder_callbacks_->sendLocalReply(
-      config->status(), "",
+      config->status(), "request_rate_limited",
       [this, config](Http::HeaderMap& headers) {
         config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
       },
