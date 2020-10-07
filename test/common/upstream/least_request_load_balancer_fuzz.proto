@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "test/common/upstream/load_balancer_fuzz.proto";
+import "envoy/config/cluster/v3/cluster.proto";
+
+//Least request load balancing takes in a more specific least request proto config, TODO: and also stats config in terms of weights
+message LeastRequestLoadBalancerTestCase {
+  LoadBalancerTestCase load_balancer_test_case = 1 [(validate.rules).message.required = true];
+  //Specific least_request_config isn't required, can even be a nullptr in constructor
+  envoy.config.cluster.v3.Cluster.LeastRequestLbConfig = 2;
+}
