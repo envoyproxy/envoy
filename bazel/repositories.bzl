@@ -703,6 +703,7 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
         # ruleset to 3.16 breaks the Envoy windows fastbuild target.
         # Also cure a fatal assumption creating a static library using LLVM `lld-link.exe`
         # adding dynamic link flags, which breaks the Envoy clang-cl library archive step.
+        # Upstream path submitted: https://github.com/curl/curl/pull/6050
         # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
         # by elimination of the curl dependency.
         patches = ["@envoy//bazel/foreign_cc:curl.patch"],
