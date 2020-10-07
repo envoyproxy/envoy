@@ -26,12 +26,17 @@ public:
 Http::FilterFactoryCb TapFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  FilterConfigSharedPtr filter_config(new FilterConfigImpl(
+  std::shared_ptr<FilterConfigImpl> filter_config(new FilterConfigImpl(
       proto_config, stats_prefix, std::make_unique<HttpTapConfigFactoryImpl>(), context.scope(),
       context.admin(), context.singletonManager(), context.threadLocal(), context.dispatcher()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
+    if (filter_config->currentConfig()) {
+    auto match_tree_and_data = callbacks.createMatchTree(filter_config->currentConfig()->matchTreeConfig());
+    callbacks.addStreamFilter(filter, match_tree_and_data.first, std::move(match_tree_and_data.second));
+    } else {
     callbacks.addStreamFilter(filter);
+    }
     callbacks.addAccessLogHandler(filter);
   };
 }

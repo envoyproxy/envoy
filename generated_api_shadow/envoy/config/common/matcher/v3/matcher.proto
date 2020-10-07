@@ -91,6 +91,8 @@ message MatchTree {
   }
 
   oneof kind {
+    option (validate.required) = true;
+
     // The children of this node is defined by the matching rules of this matcher.
     SublinearMatcher matcher = 1;
 

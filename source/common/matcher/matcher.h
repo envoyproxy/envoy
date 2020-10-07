@@ -62,10 +62,47 @@ public:
     }
   }
 
+  void onRequestData(const Buffer::Instance& buffer) {
+    for (const auto& matcher : matchers_) {
+      matcher->rootMatcher().onRequestBody(buffer, matcher->status_);
+    }
+  }
+
+
+  void onRequestTrailers(Http::RequestTrailerMap& request_trailers) {
+    request_trailers_ = &request_trailers;
+    for (const auto& matcher : matchers_) {
+      matcher->rootMatcher().onHttpRequestTrailers(request_trailers, matcher->status_);
+    }
+  }
+  
+  void onResponseHeaders(Http::ResponseHeaderMap& response_headers) {
+    response_headers_ = &response_headers;
+    for (const auto& matcher : matchers_) {
+      matcher->rootMatcher().onHttpResponseHeaders(response_headers, matcher->status_);
+    }
+  }
+  
+  void onResponseData(const Buffer::Instance& buffer) {
+    for (const auto& matcher : matchers_) {
+      matcher->rootMatcher().onResponseBody(buffer, matcher->status_);
+    }
+  }
+
+  void onResponseTrailers(Http::ResponseTrailerMap& response_trailers) {
+    response_trailers_ = &response_trailers;
+    for (const auto& matcher : matchers_) {
+      matcher->rootMatcher().onHttpResponseTrailers(response_trailers, matcher->status_);
+    }
+  }
+
   std::vector<MatchWrapperSharedPtr> matchers_;
   Http::RequestHeaderMap* request_headers_;
+  Http::RequestTrailerMap* request_trailers_;
+  Http::ResponseHeaderMap* response_headers_;
+  Http::ResponseTrailerMap* response_trailers_;
 };
-using HttpMatchingDataPtr = std::unique_ptr<HttpMatchingData>;
+using HttpMatchingDataSharedPtr = std::unique_ptr<HttpMatchingData>;
 
 class KeyNamespaceMapper {
 public:
@@ -99,7 +136,7 @@ public:
       : key_(key), namespace_(ns), key_namespace_mapper_(std::move(namespace_mapper)),
         no_match_tree_(std::move(no_match_tree)) {}
 
-  absl::optional<MatchAction> match(const MatchingData& data) override {
+  MatchResult match(const MatchingData& data) override {
     bool first_value_evaluated = false;
     absl::optional<std::reference_wrapper<MatchTree>> selected_subtree = absl::nullopt;
     key_namespace_mapper_->forEachValue(namespace_, key_, data, [&](auto value) {
@@ -123,7 +160,7 @@ public:
       return no_match_tree_->match(data);
     }
 
-    return absl::nullopt;
+    return {true, absl::nullopt};
   }
 
   void addChild(std::string value, MatchTreeSharedPtr&& subtree) {
@@ -140,15 +177,15 @@ private:
 
 class AlwaysSkipMatcher : public MatchTree {
 public:
-  absl::optional<MatchAction> match(const MatchingData&) override { return MatchAction::skip(); }
+  MatchResult match(const MatchingData&) override { return {true, MatchAction::skip()}; }
 };
 
 class AlwaysCallbackMatcher : public MatchTree {
 public:
   explicit AlwaysCallbackMatcher(std::string callback) : callback_(callback) {}
 
-  absl::optional<MatchAction> match(const MatchingData&) override {
-    return MatchAction::callback(callback_);
+  MatchResult match(const MatchingData&) override {
+    return {true, MatchAction::callback(callback_)};
   }
 
 private:
@@ -159,7 +196,7 @@ class Matcher {
 public:
   virtual ~Matcher() = default;
 
-  virtual bool match(const MatchingData& data) PURE;
+  virtual absl::optional<bool> match(const MatchingData& data) PURE;
 };
 
 using MatcherPtr = std::unique_ptr<Matcher>;
@@ -168,12 +205,15 @@ class HttpPredicateMatcher : public Matcher {
 public:
   explicit HttpPredicateMatcher(MatchWrapperSharedPtr matcher) : matcher_(std::move(matcher)) {}
 
-  bool match(const MatchingData&) override {
+  absl::optional<bool> match(const MatchingData&) override {
     const auto& status = matcher_->rootMatcher().matchStatus(matcher_->status_);
 
-    // TODO(snowp): For now we only support things we can know just by looking at the the request
-    // headers.
-    ASSERT(!status.might_change_status_);
+    if (status.might_change_status_) {
+      std::cout << "attempted to match but skipping due to missing data" << std::endl;
+      return absl::nullopt;
+    }
+
+    std::cout << "matches: " << status.matches_ << std::endl;
 
     return status.matches_;
   }
@@ -185,14 +225,20 @@ class LeafNode : public MatchTree {
 public:
   LeafNode(absl::optional<MatchAction> no_match_action) : no_match_action_(no_match_action) {}
 
-  absl::optional<MatchAction> match(const MatchingData& matching_data) override {
+  MatchResult match(const MatchingData& matching_data) override {
     for (const auto& matcher : matchers_) {
-      if (matcher.first->match(matching_data)) {
-        return matcher.second;
+      const auto maybe_match = matcher.first->match(matching_data);
+      // One of the matchers don't have enough information, delay.
+      if (!maybe_match) {
+        return {false, {}};
+      }
+
+      if (*maybe_match) {
+        return {true, matcher.second};
       }
     }
 
-    return no_match_action_;
+    return {true, no_match_action_};
   }
 
   void addMatcher(MatcherPtr&& matcher, MatchAction action) {
@@ -206,7 +252,7 @@ private:
 
 class MatchTreeFactory {
 public:
-  static MatchTreeSharedPtr create(envoy::config::common::matcher::v3::MatchTree config,
+  static MatchTreeSharedPtr create(const envoy::config::common::matcher::v3::MatchTree& config,
                                    KeyNamespaceMapperSharedPtr key_namespace_mapper,
                                    MatchTreeFactoryCallbacks& callbacks) {
     if (config.has_matcher()) {

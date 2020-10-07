@@ -96,9 +96,9 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  using MatchTreeFactoryCb = std::function<MatchTreeSharedPtr(absl::optional<envoy::config::common::matcher::v3::MatchTree>, HttpMatchingData&)>;
   using FilterFactoriesList =
-      std::list<std::pair<Filter::Http::FilterConfigProviderPtr,
-                          std::function<MatchTreeSharedPtr(HttpMatchingData&)>>>;
+      std::list<std::pair<Filter::Http::FilterConfigProviderPtr, MatchTreeFactoryCb>>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;

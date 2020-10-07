@@ -34,7 +34,7 @@ public:
     return absl::nullopt;
   }
 
-  bool isSkip() { return std::get<bool>(action_); }
+  bool isSkip() { return absl::holds_alternative<bool>(action_); }
 
 private:
   explicit MatchAction(absl::variant<bool, std::string> action) : action_(action) {}
@@ -47,15 +47,16 @@ class MatchingData {
 public:
   virtual ~MatchingData() = default;
 };
-using MatchingDataPtr = std::unique_ptr<MatchingData>;
+using MatchingDataSharedPtr = std::shared_ptr<MatchingData>;
 
 class MatchTree {
 public:
   virtual ~MatchTree() = default;
 
+  using MatchResult = std::pair<bool, absl::optional<MatchAction>>;
   // Attempts to match against the matching data (which should contain all the data requested via
   // matching requirements). If no match is found, absl::nullopt will be returned.
-  virtual absl::optional<MatchAction> match(const MatchingData& data) PURE;
+  virtual MatchResult match(const MatchingData& data) PURE;
 };
 
 using MatchTreeSharedPtr = std::shared_ptr<MatchTree>;

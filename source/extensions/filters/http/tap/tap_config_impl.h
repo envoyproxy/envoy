@@ -4,6 +4,7 @@
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/http.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 
 #include "common/common/logger.h"
 
@@ -24,6 +25,12 @@ public:
 
   // TapFilter::HttpTapConfig
   HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) override;
+  const envoy::config::common::matcher::v3::MatchTree& matchTreeConfig() override {
+    return match_tree_config_;
+  }
+
+  private:
+  envoy::config::common::matcher::v3::MatchTree match_tree_config_;
 };
 
 class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<Logger::Id::tap> {
@@ -32,10 +39,15 @@ public:
       : config_(std::move(config)), stream_id_(stream_id),
         sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
         statuses_(config_->createMatchStatusVector()) {
-    config_->rootMatcher().onNewStream(statuses_);
   }
 
   // TapFilter::HttpPerRequestTapper
+  void onMatch() override {
+    tap_match_ = true;
+  }
+  void onFailedToMatch() override {
+    tap_match_failed_ = true;
+  }
   void onRequestHeaders(const Http::RequestHeaderMap& headers) override;
   void onRequestBody(const Buffer::Instance& data) override;
   void onRequestTrailers(const Http::RequestTrailerMap& headers) override;
@@ -77,6 +89,8 @@ private:
   const uint64_t stream_id_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;
+  bool tap_match_{};
+  bool tap_match_failed_{};
   bool started_streaming_trace_{};
   const Http::RequestHeaderMap* request_headers_{};
   const Http::HeaderMap* request_trailers_{};

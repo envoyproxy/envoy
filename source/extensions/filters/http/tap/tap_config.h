@@ -19,6 +19,16 @@ class HttpPerRequestTapper {
 public:
   virtual ~HttpPerRequestTapper() = default;
 
+/**
+ * Called if the match condition has been met.
+ */
+virtual void onMatch() PURE;
+
+  /**
+  * Called if the match condition was not met. Specifically, this means that all the information necessary to perform a match was handled, and the conclusion is that the stream does not match.
+  */
+  virtual void onFailedToMatch() PURE;
+
   /**
    * Called when request headers are received.
    */
@@ -68,6 +78,8 @@ public:
    * @param stream_id supplies the owning HTTP stream ID.
    */
   virtual HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) PURE;
+
+  virtual const envoy::config::common::matcher::v3::MatchTree& matchTreeConfig() PURE;
 };
 
 using HttpTapConfigSharedPtr = std::shared_ptr<HttpTapConfig>;

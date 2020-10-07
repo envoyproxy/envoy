@@ -23,7 +23,7 @@ class FilterManager;
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
   ActiveStreamFilterBase(FilterManager& parent, bool dual_filter, MatchTreeSharedPtr&& match_tree,
-                         MatchingDataPtr&& matching_data)
+                         MatchingDataSharedPtr&& matching_data)
       : parent_(parent), iteration_state_(IterationState::Continue),
         iterate_from_current_filter_(false), headers_continued_(false),
         continue_headers_continued_(false), end_stream_(false), skip_(false),
@@ -146,7 +146,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool encode_headers_called_ : 1;
 
   MatchTreeSharedPtr match_tree_;
-  MatchingDataPtr match_data_;
+  MatchingDataSharedPtr match_data_;
 };
 
 /**
@@ -157,7 +157,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
                             bool dual_filter, MatchTreeSharedPtr&& match_tree,
-                            MatchingDataPtr&& matching_data)
+                            MatchingDataSharedPtr&& matching_data)
       : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree),
                                std::move(matching_data)),
         handle_(filter) {}
@@ -182,12 +182,9 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
-  void invokeMatchCallback(absl::string_view value, bool dual_filter) override {
-    // For dual filters we arbitrarily choose not to trigger the callback here to avoid calling it
-    // twice.
-    if (!dual_filter) {
-      handle_->onMatchCallback(value);
-    }
+  void invokeMatchCallback(absl::string_view value, bool) override {
+    // TODO(snowp): Track whether we've fired the callback.
+    handle_->onMatchCallback(value);
   }
 
   // Http::StreamDecoderFilterCallbacks
@@ -252,7 +249,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            MatchTreeSharedPtr&& match_tree, MatchingDataPtr&& matching_data,
+                            MatchTreeSharedPtr&& match_tree, MatchingDataSharedPtr&& matching_data,
                             bool dual_filter)
       : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree),
                                std::move(matching_data)),
@@ -548,18 +545,22 @@ public:
   }
 
   // Http::FilterChainFactoryCallbacks
+  std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr> createMatchTree(const envoy::config::common::matcher::v3::MatchTree& ) override {
+    // This should be implemented by the decorated veresion.
+    return {nullptr, nullptr};
+  }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
     addStreamDecoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
-                              MatchingDataPtr matching_data) override {
+                              MatchingDataSharedPtr matching_data) override {
     addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
     addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
-                              MatchingDataPtr matching_data) override {
+                              MatchingDataSharedPtr matching_data) override {
     addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
   }
   void addStreamFilter(StreamFilterSharedPtr filter) override {
@@ -567,9 +568,9 @@ public:
     addStreamEncoderFilterWorker(filter, nullptr, nullptr, true);
   }
   void addStreamFilter(StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
-                       MatchingDataPtr matching_data) override {
-    addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
-    addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
+                       MatchingDataSharedPtr matching_data) override {
+    addStreamDecoderFilterWorker(filter, match_tree, matching_data, true);
+    addStreamEncoderFilterWorker(filter, match_tree, matching_data, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
@@ -652,10 +653,10 @@ public:
 
   // TODO(snowp): Make private as filter chain construction is moved into FM.
   void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                    MatchTreeSharedPtr match_tree, MatchingDataPtr&& matching_data,
+                                    MatchTreeSharedPtr match_tree, MatchingDataSharedPtr matching_data,
                                     bool dual_filter);
   void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                    MatchTreeSharedPtr match_tree, MatchingDataPtr&& matching_data,
+                                    MatchTreeSharedPtr match_tree, MatchingDataSharedPtr matching_data,
                                     bool dual_filter);
 
   void disarmRequestTimeout();
@@ -752,6 +753,8 @@ public:
   uint64_t streamId() const { return stream_id_; }
 
 private:
+  bool applyDataAndAttemptMatch(ActiveStreamFilterBase& filter, std::function<void(HttpMatchingData&)> data_update);
+
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
@@ -868,7 +871,7 @@ private:
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false) {}
+          non_100_response_headers_encoded_(false), match_tree_completed_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -886,6 +889,7 @@ private:
     bool is_grpc_request_ : 1;
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_ : 1;
+    bool match_tree_completed_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

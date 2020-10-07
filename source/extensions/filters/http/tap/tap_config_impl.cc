@@ -5,7 +5,9 @@
 #include "envoy/data/tap/v3/http.pb.h"
 
 #include "common/common/assert.h"
+#include "common/matcher/matcher.h"
 #include "common/protobuf/protobuf.h"
+#include "common/config/version_converter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +30,22 @@ fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*
 
 HttpTapConfigImpl::HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_config,
                                      Common::Tap::Sink* admin_streamer)
-    : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer) {}
+    : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer) {
+  auto* leaf = match_tree_config_.mutable_leaf();
+  leaf->mutable_no_match_action()->set_callback("no_match");
+
+  auto* matcher = leaf->add_matchers();
+  if (proto_config.has_match())  {
+    matcher->mutable_predicate()->MergeFrom(proto_config.match());
+  } else {
+    envoy::config::common::matcher::v3::MatchPredicate match;
+      Config::VersionConverter::upgrade(proto_config.match_config(), match);
+    matcher->mutable_predicate()->MergeFrom(match);
+
+  }
+  matcher->mutable_action()->set_callback("match");
+
+    }
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t stream_id) {
   return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), stream_id);
@@ -43,8 +60,7 @@ void HttpPerRequestTapperImpl::streamRequestHeaders() {
 
 void HttpPerRequestTapperImpl::onRequestHeaders(const Http::RequestHeaderMap& headers) {
   request_headers_ = &headers;
-  config_->rootMatcher().onHttpRequestHeaders(headers, statuses_);
-  if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
+  if (config_->streaming() && tap_match_) {
     ASSERT(!started_streaming_trace_);
     started_streaming_trace_ = true;
     streamRequestHeaders();
@@ -76,8 +92,7 @@ void HttpPerRequestTapperImpl::streamRequestTrailers() {
 
 void HttpPerRequestTapperImpl::onRequestTrailers(const Http::RequestTrailerMap& trailers) {
   request_trailers_ = &trailers;
-  config_->rootMatcher().onHttpRequestTrailers(trailers, statuses_);
-  if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
+  if (config_->streaming() && tap_match_) {
     if (!started_streaming_trace_) {
       started_streaming_trace_ = true;
       // Flush anything that we already buffered.
@@ -98,8 +113,7 @@ void HttpPerRequestTapperImpl::streamResponseHeaders() {
 
 void HttpPerRequestTapperImpl::onResponseHeaders(const Http::ResponseHeaderMap& headers) {
   response_headers_ = &headers;
-  config_->rootMatcher().onHttpResponseHeaders(headers, statuses_);
-  if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
+  if (config_->streaming() && tap_match_) {
     if (!started_streaming_trace_) {
       started_streaming_trace_ = true;
       // Flush anything that we already buffered.
@@ -127,8 +141,7 @@ void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
 
 void HttpPerRequestTapperImpl::onResponseTrailers(const Http::ResponseTrailerMap& trailers) {
   response_trailers_ = &trailers;
-  config_->rootMatcher().onHttpResponseTrailers(trailers, statuses_);
-  if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
+  if (config_->streaming() && tap_match_) {
     if (!started_streaming_trace_) {
       started_streaming_trace_ = true;
       // Flush anything that we already buffered.
@@ -148,8 +161,8 @@ void HttpPerRequestTapperImpl::onResponseTrailers(const Http::ResponseTrailerMap
 }
 
 bool HttpPerRequestTapperImpl::onDestroyLog() {
-  if (config_->streaming() || !config_->rootMatcher().matchStatus(statuses_).matches_) {
-    return config_->rootMatcher().matchStatus(statuses_).matches_;
+  if (config_->streaming() || !tap_match_) {
+    return tap_match_;
   }
 
   makeBufferedFullTraceIfNeeded();
@@ -176,14 +189,11 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
 void HttpPerRequestTapperImpl::onBody(
     const Buffer::Instance& data, Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
     uint32_t max_buffered_bytes, MutableBodyChunk mutable_body_chunk,
-    MutableMessage mutable_message, bool request) {
+    MutableMessage mutable_message, bool) {
   // Invoke body matcher.
-  request ? config_->rootMatcher().onRequestBody(data, statuses_)
-          : config_->rootMatcher().onResponseBody(data, statuses_);
   if (config_->streaming()) {
-    const auto& match_status = config_->rootMatcher().matchStatus(statuses_);
     // Without body matching, we must have already started tracing or have not yet matched.
-    ASSERT(started_streaming_trace_ || !match_status.matches_);
+    ASSERT(started_streaming_trace_ || !tap_match_);
 
     if (started_streaming_trace_) {
       // If we have already started streaming, flush a body segment now.
@@ -192,7 +202,7 @@ void HttpPerRequestTapperImpl::onBody(
           *(trace->mutable_http_streamed_trace_segment()->*mutable_body_chunk)(),
           max_buffered_bytes, data, 0, data.length());
       sink_handle_->submitTrace(std::move(trace));
-    } else if (match_status.might_change_status_) {
+    } else if (!tap_match_failed_) {
       // If we might still match, start buffering the body up to our limit.
       if (buffered_streamed_body == nullptr) {
         buffered_streamed_body = makeTraceSegment();

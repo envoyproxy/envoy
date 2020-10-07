@@ -851,6 +851,8 @@ class FilterChainFactoryCallbacks {
 public:
   virtual ~FilterChainFactoryCallbacks() = default;
 
+  virtual std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr> createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) PURE;
+
   /**
    * Add a decoder filter that is used when reading stream data.
    * @param filter supplies the filter to add.
@@ -859,7 +861,7 @@ public:
 
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
                                       MatchTreeSharedPtr match_tree,
-                                      MatchingDataPtr matching_data) PURE;
+                                      MatchingDataSharedPtr matching_data) PURE;
 
   /**
    * Add an encoder filter that is used when writing stream data.
@@ -869,7 +871,7 @@ public:
 
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
                                       MatchTreeSharedPtr match_tree,
-                                      MatchingDataPtr matching_data) PURE;
+                                      MatchingDataSharedPtr matching_data) PURE;
 
   /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
@@ -878,7 +880,7 @@ public:
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
 
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
-                               MatchingDataPtr matching_data) PURE;
+                               MatchingDataSharedPtr matching_data) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.
