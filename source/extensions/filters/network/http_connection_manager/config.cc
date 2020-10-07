@@ -492,28 +492,15 @@ void HttpConnectionManagerConfig::processFilter(
 
   auto config_copy = proto_config;
 
-  // By default we'll construct a match tree from the provided config.
-  MatchTreeFactoryCb match_tree =
-      [](absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override,
-         Http::HttpMatchingData& matching_data) -> MatchTreeSharedPtr {
-    if (!config_override) {
-      return nullptr;
-    }
-
-    return MatchTreeFactory::create(
-        *config_override, std::make_unique<Http::HttpKeyNamespaceMapper>(), matching_data);
-  };
-
-  // See if the config is wrapped in a match tree proto. In this case, we'll fall back to the
-  // configured match tree if the filter doesn't explicitly add one.
+  MatchTreeFactoryCb match_tree = [](Http::HttpMatchingData&) { return nullptr; };
+  // Attempt to extract a match config from the configuration. If so, we unwrap the config to get
+  // the actual filter config.
   if (proto_config.typed_config().Is<envoy::config::common::matcher::v3::MatchingFilterConfig>()) {
     envoy::config::common::matcher::v3::MatchingFilterConfig matching_filter;
     MessageUtil::unpackTo(proto_config.typed_config(), matching_filter);
 
-    match_tree = [matching_filter](
-                     absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override,
-                     Http::HttpMatchingData& matching_data) {
-      return MatchTreeFactory::create(config_override.value_or(matching_filter.match_tree()),
+    match_tree = [matching_filter](Http::HttpMatchingData& matching_data) {
+      return MatchTreeFactory::create(matching_filter.match_tree(),
                                       std::make_unique<Http::HttpKeyNamespaceMapper>(),
                                       matching_data);
     };
@@ -661,10 +648,10 @@ public:
 
   std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
   createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) override {
-    auto data = std::make_unique<Http::HttpMatchingData>();
-    auto matcher = match_tree_(config, *data);
-
-    return {matcher, std::move(data)};
+    auto matching_data = std::make_shared<Http::HttpMatchingData>();
+    return {MatchTreeFactory::create(config, std::make_unique<Http::HttpKeyNamespaceMapper>(),
+                                     *matching_data),
+            matching_data};
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
@@ -716,7 +703,7 @@ private:
 
     // Otherwise we allocate a new data object for this tree and pass it to the factory function.
     auto data = std::make_unique<Http::HttpMatchingData>();
-    auto matcher = match_tree_(absl::nullopt, *data);
+    auto matcher = match_tree_(*data);
     factory_func(filter, matcher, matcher ? std::move(data) : nullptr);
   }
 
