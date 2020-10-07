@@ -480,6 +480,9 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
     - name: envoy.overload_actions.reduce_timeouts
       typed_config:
         "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 2s
       triggers:
         - name: "envoy.resource_monitors.fake_resource1"
           scaled:
@@ -525,6 +528,33 @@ TEST_F(OverloadManagerImplTest, CreateUnscaledScaledTimer) {
   EXPECT_CALL(*mock_range_timer, enableTimer(std::chrono::milliseconds(5 * 1000),
                                              std::chrono::milliseconds(5 * 1000), _));
   timer->enableTimer(std::chrono::seconds(5));
+
+}
+
+TEST_F(OverloadManagerImplTest, CreateScaledTimerWithAbsoluteMinimum) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+  manager->start();
+
+  auto* mock_range_timer = new Event::MockRangeTimer(scaled_timer_manager);
+  MockFunction<Event::TimerCb> mock_callback;
+
+  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
+      OverloadTimerType::HttpDownstreamIdleConnectionTimeout, mock_callback.AsStdFunction());
+
+  // The max should be respected, and the min should be an absolute value from the config.
+  // the min and max.
+  EXPECT_CALL(*mock_range_timer, enableTimer(std::chrono::milliseconds(2 * 1000),
+                                             std::chrono::milliseconds(5 * 1000), _));
+  timer->enableTimer(std::chrono::seconds(5));
+
+  EXPECT_CALL(*mock_range_timer, enableTimer(std::chrono::milliseconds(2 * 1000),
+                                             std::chrono::milliseconds(10 * 1000), _));
+  timer->enableTimer(std::chrono::seconds(10));
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
@@ -581,6 +611,18 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithWrongTypedConfigMessage) {
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          ".* constraint validation failed.*");
 }
 
 // A scaled trigger action's thresholds must conform to scaling < saturation.

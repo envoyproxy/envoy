@@ -109,8 +109,7 @@ public:
       Event::ScaledRangeTimerManagerPtr scaled_timer_manager_,
       const NamedOverloadActionSymbolTable& action_symbol_table,
       const absl::flat_hash_map<OverloadTimerType, ScaledTimerMinimum>& timer_minimums)
-      : action_symbol_table_(action_symbol_table),
-        timer_minimums_(timer_minimums),
+      : action_symbol_table_(action_symbol_table), timer_minimums_(timer_minimums),
         actions_(action_symbol_table.size(), OverloadActionState(0)),
         scaled_timer_action_(action_symbol_table.lookup(OverloadActionNames::get().ReduceTimeouts)),
         scaled_timer_manager_(std::move(scaled_timer_manager_)) {}
@@ -164,7 +163,11 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
 
 OverloadTimerType parseTimerType(
     envoy::config::overload::v3::ScaleTimersOverloadActionConfig::TimerType config_timer_type) {
+  using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
+
   switch (config_timer_type) {
+  case Config::HTTP_DOWNSTREAM_CONNECTION_IDLE:
+    return OverloadTimerType::HttpDownstreamIdleConnectionTimeout;
   default:
     throw EnvoyException(fmt::format("Unknown timer type {}", config_timer_type));
   }
@@ -184,7 +187,8 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
 
     const ScaledTimerMinimum minimum =
         scale_timer.has_min_timeout()
-            ? ScaledTimerMinimum(DurationUtil::durationToMilliseconds(scale_timer.min_timeout()))
+            ? ScaledTimerMinimum(std::chrono::milliseconds(
+                  DurationUtil::durationToMilliseconds(scale_timer.min_timeout())))
             : ScaledTimerMinimum(scale_timer.min_scale().value() / 100);
 
     auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));

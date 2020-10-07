@@ -43,6 +43,8 @@ using OverloadActionCb = std::function<void(OverloadActionState)>;
 enum class OverloadTimerType {
   // Timers created with this type will never be scaled. This should only be used for testing.
   UnscaledRealTimer,
+  // The amount of time an HTTP connection to a downstream client can remain idle (no streams).
+  HttpDownstreamIdleConnectionTimeout,
 };
 
 /**
