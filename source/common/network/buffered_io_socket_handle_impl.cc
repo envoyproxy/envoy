@@ -38,7 +38,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
                                                           uint64_t num_slice) {
   if (owned_buffer_.length() == 0) {
     if (read_end_stream_) {
-      return Api::ioCallUint64ResultNoError();
+      return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
     } else {
       return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                  IoSocketError::deleteIoError)};
@@ -57,6 +57,23 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
     owned_buffer_.drain(num_bytes_to_read);
     ENVOY_LOG(trace, "socket {} readv {} bytes", static_cast<void*>(this), num_bytes_to_read);
     return {num_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  }
+}
+
+Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffer,
+                                                         uint64_t max_length) {
+  if (owned_buffer_.length() == 0) {
+    if (read_end_stream_) {
+      return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
+    } else {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    }
+  } else {
+    // TODO(lambdai): Move at slice boundary to move to reduce the copy.
+    uint64_t min_len = std::min(max_length, owned_buffer_.length());
+    buffer.move(owned_buffer_, min_len);
+    return {min_len, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
   }
 }
 

@@ -67,6 +67,35 @@ TEST_F(BufferedIoSocketHandleTest, TestBasicRecv) {
 }
 
 // Test recv side effects.
+TEST_F(BufferedIoSocketHandleTest, TestReadEmpty) {
+  Buffer::OwnedImpl buf;
+  auto res = io_handle_->read(buf, 10);
+  EXPECT_FALSE(res.ok());
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+  io_handle_->setWriteEnd();
+  res = io_handle_->read(buf, 10);
+  EXPECT_FALSE(res.ok());
+  EXPECT_NE(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+}
+
+// Test recv side effects.
+TEST_F(BufferedIoSocketHandleTest, TestReadContent) {
+  Buffer::OwnedImpl buf;
+  auto& internal_buffer = io_handle_->getBufferForTest();
+  internal_buffer.add("abcdefg");
+  auto res = io_handle_->read(buf, 3);
+  EXPECT_TRUE(res.ok());
+  EXPECT_EQ(3, res.rc_);
+  ASSERT_EQ(3, buf.length());
+  ASSERT_EQ(4, internal_buffer.length());
+  res = io_handle_->read(buf, 10);
+  EXPECT_TRUE(res.ok());
+  EXPECT_EQ(4, res.rc_);
+  ASSERT_EQ(7, buf.length());
+  ASSERT_EQ(0, internal_buffer.length());
+}
+
+// Test recv side effects.
 TEST_F(BufferedIoSocketHandleTest, TestBasicPeek) {
   auto res = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
   // EAGAIN.
@@ -401,8 +430,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
 
 TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
-  ENVOY_LOG_MISC(debug, "lambdai: after {} shutdown write ",
-                 static_cast<void*>(io_handle_peer_.get()));
+  ENVOY_LOG_MISC(debug, "after {} shutdown write ", static_cast<void*>(io_handle_peer_.get()));
   std::string accumulator;
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
@@ -452,8 +480,7 @@ TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
   EXPECT_FALSE(io_handle_peer_->isWritable());
 
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
-  ENVOY_LOG_MISC(debug, "lambdai: after {} shutdown write ",
-                 static_cast<void*>(io_handle_peer_.get()));
+  ENVOY_LOG_MISC(debug, "after {} shutdown write", static_cast<void*>(io_handle_peer_.get()));
 
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
