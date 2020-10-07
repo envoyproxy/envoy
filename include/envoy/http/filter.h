@@ -851,7 +851,8 @@ class FilterChainFactoryCallbacks {
 public:
   virtual ~FilterChainFactoryCallbacks() = default;
 
-  virtual std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr> createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) PURE;
+  virtual std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
+  createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) PURE;
 
   /**
    * Add a decoder filter that is used when reading stream data.

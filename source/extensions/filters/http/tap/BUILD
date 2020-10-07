@@ -28,10 +28,10 @@ envoy_cc_library(
     hdrs = ["tap_config_impl.h"],
     deps = [
         ":tap_config_interface",
-        "//source/extensions/common/tap:tap_config_base",
-        "//source/common/matcher:matcher_lib",
-        "//source/common/config:version_converter_lib",
         "//include/envoy/matcher:matcher_interface",
+        "//source/common/config:version_converter_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/extensions/common/tap:tap_config_base",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",

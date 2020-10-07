@@ -29,7 +29,7 @@ public:
     return match_tree_config_;
   }
 
-  private:
+private:
   envoy::config::common::matcher::v3::MatchTree match_tree_config_;
 };
 
@@ -38,16 +38,11 @@ public:
   HttpPerRequestTapperImpl(HttpTapConfigSharedPtr config, uint64_t stream_id)
       : config_(std::move(config)), stream_id_(stream_id),
         sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
-        statuses_(config_->createMatchStatusVector()) {
-  }
+        statuses_(config_->createMatchStatusVector()) {}
 
   // TapFilter::HttpPerRequestTapper
-  void onMatch() override {
-    tap_match_ = true;
-  }
-  void onFailedToMatch() override {
-    tap_match_failed_ = true;
-  }
+  void onMatch() override { tap_match_ = true; }
+  void onFailedToMatch() override { tap_match_failed_ = true; }
   void onRequestHeaders(const Http::RequestHeaderMap& headers) override;
   void onRequestBody(const Buffer::Instance& data) override;
   void onRequestTrailers(const Http::RequestTrailerMap& headers) override;

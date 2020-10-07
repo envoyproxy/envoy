@@ -32,10 +32,12 @@ Http::FilterFactoryCb TapFilterFactory::createFilterFactoryFromProtoTyped(
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
     if (filter_config->currentConfig()) {
-    auto match_tree_and_data = callbacks.createMatchTree(filter_config->currentConfig()->matchTreeConfig());
-    callbacks.addStreamFilter(filter, match_tree_and_data.first, std::move(match_tree_and_data.second));
+      auto match_tree_and_data =
+          callbacks.createMatchTree(filter_config->currentConfig()->matchTreeConfig());
+      callbacks.addStreamFilter(filter, match_tree_and_data.first,
+                                std::move(match_tree_and_data.second));
     } else {
-    callbacks.addStreamFilter(filter);
+      callbacks.addStreamFilter(filter);
     }
     callbacks.addAccessLogHandler(filter);
   };

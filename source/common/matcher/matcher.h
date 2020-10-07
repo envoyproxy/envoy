@@ -68,21 +68,20 @@ public:
     }
   }
 
-
   void onRequestTrailers(Http::RequestTrailerMap& request_trailers) {
     request_trailers_ = &request_trailers;
     for (const auto& matcher : matchers_) {
       matcher->rootMatcher().onHttpRequestTrailers(request_trailers, matcher->status_);
     }
   }
-  
+
   void onResponseHeaders(Http::ResponseHeaderMap& response_headers) {
     response_headers_ = &response_headers;
     for (const auto& matcher : matchers_) {
       matcher->rootMatcher().onHttpResponseHeaders(response_headers, matcher->status_);
     }
   }
-  
+
   void onResponseData(const Buffer::Instance& buffer) {
     for (const auto& matcher : matchers_) {
       matcher->rootMatcher().onResponseBody(buffer, matcher->status_);

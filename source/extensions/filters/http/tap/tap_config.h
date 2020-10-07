@@ -19,14 +19,15 @@ class HttpPerRequestTapper {
 public:
   virtual ~HttpPerRequestTapper() = default;
 
-/**
- * Called if the match condition has been met.
- */
-virtual void onMatch() PURE;
+  /**
+   * Called if the match condition has been met.
+   */
+  virtual void onMatch() PURE;
 
   /**
-  * Called if the match condition was not met. Specifically, this means that all the information necessary to perform a match was handled, and the conclusion is that the stream does not match.
-  */
+   * Called if the match condition was not met. Specifically, this means that all the information
+   * necessary to perform a match was handled, and the conclusion is that the stream does not match.
+   */
   virtual void onFailedToMatch() PURE;
 
   /**

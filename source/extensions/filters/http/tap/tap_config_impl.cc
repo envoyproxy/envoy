@@ -5,9 +5,9 @@
 #include "envoy/data/tap/v3/http.pb.h"
 
 #include "common/common/assert.h"
+#include "common/config/version_converter.h"
 #include "common/matcher/matcher.h"
 #include "common/protobuf/protobuf.h"
-#include "common/config/version_converter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,17 +35,15 @@ HttpTapConfigImpl::HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_c
   leaf->mutable_no_match_action()->set_callback("no_match");
 
   auto* matcher = leaf->add_matchers();
-  if (proto_config.has_match())  {
+  if (proto_config.has_match()) {
     matcher->mutable_predicate()->MergeFrom(proto_config.match());
   } else {
     envoy::config::common::matcher::v3::MatchPredicate match;
-      Config::VersionConverter::upgrade(proto_config.match_config(), match);
+    Config::VersionConverter::upgrade(proto_config.match_config(), match);
     matcher->mutable_predicate()->MergeFrom(match);
-
   }
   matcher->mutable_action()->set_callback("match");
-
-    }
+}
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t stream_id) {
   return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), stream_id);

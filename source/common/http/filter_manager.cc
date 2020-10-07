@@ -445,26 +445,27 @@ void FilterManager::maybeContinueDecoding(
   }
 }
 
-bool FilterManager::applyDataAndAttemptMatch(ActiveStreamFilterBase& filter, std::function<void(HttpMatchingData&)> data_update) {
+bool FilterManager::applyDataAndAttemptMatch(ActiveStreamFilterBase& filter,
+                                             std::function<void(HttpMatchingData&)> data_update) {
   std::cout << "about to match" << std::endl;
-    if (!state_.match_tree_completed_ && filter.matchingData()) {
-      data_update(filter.matchingData()->get());
-      auto match = filter.match_tree_->match(*filter.match_data_);
-      if (match.first && match.second) {
-        state_.match_tree_completed_ = true;
-        if (match.second->isSkip()) {
-  std::cout << "is skip" << std::endl;
-          filter.skip_ = true;
-          return true;
-        } 
-
-  std::cout << "is callback " << *match.second->callback() << std::endl;
-
-        filter.doMatchCallback(*match.second->callback());
+  if (!state_.match_tree_completed_ && filter.matchingData()) {
+    data_update(filter.matchingData()->get());
+    auto match = filter.match_tree_->match(*filter.match_data_);
+    if (match.first && match.second) {
+      state_.match_tree_completed_ = true;
+      if (match.second->isSkip()) {
+        std::cout << "is skip" << std::endl;
+        filter.skip_ = true;
+        return true;
       }
-    }
 
-    return false;
+      std::cout << "is callback " << *match.second->callback() << std::endl;
+
+      filter.doMatchCallback(*match.second->callback());
+    }
+  }
+
+  return false;
 }
 
 void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
@@ -566,7 +567,8 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if (applyDataAndAttemptMatch(**entry, [&](auto& matching_data) { matching_data.onRequestData(data); })) {
+    if (applyDataAndAttemptMatch(**entry,
+                                 [&](auto& matching_data) { matching_data.onRequestData(data); })) {
       continue;
     }
 
@@ -713,7 +715,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     if ((*entry)->stoppedAll()) {
       return;
     }
-    
+
     if (applyDataAndAttemptMatch(**entry, [&](auto& data) { data.onRequestTrailers(trailers); })) {
       continue;
     }
@@ -1141,7 +1143,8 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
   for (; entry != encoder_filters_.end(); entry++) {
-    if (applyDataAndAttemptMatch(**entry, [&](auto& matching_data) { matching_data.onResponseData(data); })) {
+    if (applyDataAndAttemptMatch(
+            **entry, [&](auto& matching_data) { matching_data.onResponseData(data); })) {
       continue;
     }
     // If the filter pointed by entry has stopped for all frame type, return now.

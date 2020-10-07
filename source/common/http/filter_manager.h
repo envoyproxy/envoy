@@ -545,7 +545,8 @@ public:
   }
 
   // Http::FilterChainFactoryCallbacks
-  std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr> createMatchTree(const envoy::config::common::matcher::v3::MatchTree& ) override {
+  std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
+  createMatchTree(const envoy::config::common::matcher::v3::MatchTree&) override {
     // This should be implemented by the decorated veresion.
     return {nullptr, nullptr};
   }
@@ -653,11 +654,11 @@ public:
 
   // TODO(snowp): Make private as filter chain construction is moved into FM.
   void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                    MatchTreeSharedPtr match_tree, MatchingDataSharedPtr matching_data,
-                                    bool dual_filter);
+                                    MatchTreeSharedPtr match_tree,
+                                    MatchingDataSharedPtr matching_data, bool dual_filter);
   void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                    MatchTreeSharedPtr match_tree, MatchingDataSharedPtr matching_data,
-                                    bool dual_filter);
+                                    MatchTreeSharedPtr match_tree,
+                                    MatchingDataSharedPtr matching_data, bool dual_filter);
 
   void disarmRequestTimeout();
 
@@ -753,7 +754,8 @@ public:
   uint64_t streamId() const { return stream_id_; }
 
 private:
-  bool applyDataAndAttemptMatch(ActiveStreamFilterBase& filter, std::function<void(HttpMatchingData&)> data_update);
+  bool applyDataAndAttemptMatch(ActiveStreamFilterBase& filter,
+                                std::function<void(HttpMatchingData&)> data_update);
 
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };

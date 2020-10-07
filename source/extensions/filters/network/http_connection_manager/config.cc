@@ -492,24 +492,27 @@ void HttpConnectionManagerConfig::processFilter(
 
   auto config_copy = proto_config;
 
-// By default we'll construct a match tree from the provided config.
+  // By default we'll construct a match tree from the provided config.
   MatchTreeFactoryCb match_tree =
-   [](absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override, HttpMatchingData& matching_data) -> MatchTreeSharedPtr {
-     if (!config_override) {
-       return nullptr;
-     }
+      [](absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override,
+         HttpMatchingData& matching_data) -> MatchTreeSharedPtr {
+    if (!config_override) {
+      return nullptr;
+    }
 
-      return MatchTreeFactory::create(*config_override,
-                                      std::make_unique<HttpKeyNamespaceMapper>(), matching_data);
-    };
+    return MatchTreeFactory::create(*config_override, std::make_unique<HttpKeyNamespaceMapper>(),
+                                    matching_data);
+  };
 
-  // See if the config is wrapped in a match tree proto. In this case, we'll fall back to the configured match tree if the filter
-  // doesn't explicitly add one.
+  // See if the config is wrapped in a match tree proto. In this case, we'll fall back to the
+  // configured match tree if the filter doesn't explicitly add one.
   if (proto_config.typed_config().Is<envoy::config::common::matcher::v3::MatchingFilterConfig>()) {
     envoy::config::common::matcher::v3::MatchingFilterConfig matching_filter;
     MessageUtil::unpackTo(proto_config.typed_config(), matching_filter);
 
-    match_tree = [matching_filter](absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override, HttpMatchingData& matching_data) {
+    match_tree = [matching_filter](
+                     absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override,
+                     HttpMatchingData& matching_data) {
       return MatchTreeFactory::create(config_override.value_or(matching_filter.match_tree()),
                                       std::make_unique<HttpKeyNamespaceMapper>(), matching_data);
     };
@@ -642,12 +645,12 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 }
 
 struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
-  MatchTreeDecoratingFactoryCallbacks(
-      Http::FilterChainFactoryCallbacks& delegated_callbacks,
-      HttpConnectionManagerConfig::MatchTreeFactoryCb match_tree)
+  MatchTreeDecoratingFactoryCallbacks(Http::FilterChainFactoryCallbacks& delegated_callbacks,
+                                      HttpConnectionManagerConfig::MatchTreeFactoryCb match_tree)
       : callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
 
-  std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr> createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) override {
+  std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
+  createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) override {
     auto data = std::make_unique<HttpMatchingData>();
     auto matcher = match_tree_(config, *data);
 
