@@ -172,9 +172,6 @@ Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.ht
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
-Envoy::Random::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
-  return server_.random();
-}
 Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
 Stats::Scope& ListenerFactoryContextBaseImpl::scope() { return *global_scope_; }
 Singleton::Manager& ListenerFactoryContextBaseImpl::singletonManager() {
@@ -481,8 +478,8 @@ void ListenerImpl::buildFilterChains() {
   Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
+      parent_.server_.stats(), parent_.server_.singletonManager(), parent_.server_.threadLocal(),
+      validation_visitor_, parent_.server_.api());
   transport_factory_context.setInitManager(*dynamic_init_manager_);
   // The init manager is a little messy. Will refactor when filter chain manager could accept
   // network filter chain update.
@@ -582,9 +579,6 @@ Http::Context& PerListenerFactoryContextImpl::httpContext() {
 }
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
-}
-Envoy::Random::RandomGenerator& PerListenerFactoryContextImpl::random() {
-  return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {
   return listener_factory_context_base_->runtime();
