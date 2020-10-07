@@ -121,9 +121,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
   }
 
   // Create Deflater and Inflater
-  nghttp2_hd_deflater* deflater;
+  nghttp2_hd_deflater* deflater = nullptr;
   ASSERT(nghttp2_hd_deflate_new(&deflater, kHeaderTableSize) == 0);
-  nghttp2_hd_inflater* inflater;
+  nghttp2_hd_inflater* inflater = nullptr;
   ASSERT(nghttp2_hd_inflate_new(&inflater) == 0);
 
   // Encode headers with nghttp2.
