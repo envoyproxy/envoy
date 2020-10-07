@@ -50,7 +50,7 @@ public:
   /**
    * @return a random boolean value, with probability `p` equaling true.
    */
-  bool bernoulli(double p) {
+  bool bernoulli(float p) {
     if (p <= 0) {
       return false;
     } else if (p >= 1) {
