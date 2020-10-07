@@ -30,23 +30,6 @@ public:
 
   float value() const { return action_value_; }
   bool isSaturated() const { return action_value_ == 1; }
-  bool isInactive() const { return action_value_ == 0; }
-
-  /**
-   * Converts the overload action state to a boolean. The return value will be true with probability
-   * of the level of saturation.
-   */
-  bool isRandomizedActive(Random::RandomGenerator& random_generator) const {
-    if (isInactive()) {
-      return false;
-    } else if (isSaturated()) {
-      return true;
-    }
-
-    return random_generator.random() <
-           static_cast<Random::RandomGenerator::result_type>(
-               action_value_ * static_cast<float>(Random::RandomGenerator::max()));
-  }
 
 private:
   float action_value_;

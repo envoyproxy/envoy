@@ -590,18 +590,6 @@ TEST_F(OverloadManagerImplTest, Shutdown) {
   manager->stop();
 }
 
-TEST(OverloadActionState, RandomizedActive) {
-  Random::MockRandomGenerator random_gen;
-  EXPECT_CALL(random_gen, random())
-      .Times(2)
-      .WillRepeatedly(Return(Random::RandomGenerator::max() / 2));
-
-  EXPECT_FALSE(OverloadActionState::inactive().isRandomizedActive(random_gen));
-  EXPECT_TRUE(OverloadActionState::saturated().isRandomizedActive(random_gen));
-  EXPECT_FALSE(OverloadActionState(0.49).isRandomizedActive(random_gen));
-  EXPECT_TRUE(OverloadActionState(0.51).isRandomizedActive(random_gen));
-}
-
 } // namespace
 } // namespace Server
 } // namespace Envoy
