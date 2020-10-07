@@ -62,7 +62,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    Api::IoCallUint64Result result = buffer.write(callbacks_->ioHandle());
+    Api::IoCallUint64Result result = callbacks_->ioHandle().write(buffer);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
