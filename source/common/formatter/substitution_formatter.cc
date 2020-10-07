@@ -867,6 +867,7 @@ const Http::HeaderEntry* HeaderFormatter::findHeader(const Http::HeaderMap& head
 
   if (header.empty() && !alternative_header_.get().empty()) {
     const auto alternate_header = headers.get(alternative_header_);
+    // TODO(mattklein123): Potentially log all header values.
     return alternate_header.empty() ? nullptr : alternate_header[0];
   }
 

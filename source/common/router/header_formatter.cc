@@ -188,6 +188,7 @@ parseRequestHeader(absl::string_view param) {
     if (const auto* request_headers = stream_info.getRequestHeaders()) {
       const auto entry = request_headers->get(header_name);
       if (!entry.empty()) {
+        // TODO(mattklein123): Potentially use all header values.
         return std::string(entry[0]->value().getStringView());
       }
     }

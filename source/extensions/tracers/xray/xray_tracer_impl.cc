@@ -81,6 +81,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
   if (!header.empty()) {
+    // Client controlled. Using the first value is fine.
     Http::LowerCaseString lowered_header_value{std::string(header[0]->value().getStringView())};
     xray_header = parseXRayHeader(lowered_header_value);
     // if the sample_decision in the x-ray header is unknown then we try to make a decision based

@@ -75,6 +75,7 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
   if (header_value.empty()) {
     return skip_if_absent_;
   }
+  // TODO(mattklein123): Potentially populate all header values.
   descriptor.entries_.push_back(
       {descriptor_key_, std::string(header_value[0]->value().getStringView())});
   return true;

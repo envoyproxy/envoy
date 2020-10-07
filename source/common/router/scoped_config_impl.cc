@@ -46,6 +46,7 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
     return nullptr;
   }
 
+  // This is a client controlled header so using the first value is fine.
   std::vector<absl::string_view> elements{header_entry[0]->value().getStringView()};
   if (header_value_extractor_config_.element_separator().length() > 0) {
     elements = absl::StrSplit(header_entry[0]->value().getStringView(),

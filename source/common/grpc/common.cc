@@ -109,6 +109,7 @@ Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
   }
 
   // Some implementations use non-padded base64 encoding for grpc-status-details-bin.
+  // This is effectively a trusted header so using the first value is fine.
   auto decoded_value = Base64::decodeWithoutPadding(details_header[0]->value().getStringView());
   if (decoded_value.empty()) {
     return absl::nullopt;

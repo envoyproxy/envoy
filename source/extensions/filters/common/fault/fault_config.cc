@@ -23,6 +23,7 @@ HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_heade
   }
 
   uint32_t header_numerator;
+  // Client controlled. Using the first value is fine.
   if (!absl::SimpleAtoi(header[0]->value().getStringView(), &header_numerator)) {
     return percentage_;
   }
@@ -63,6 +64,7 @@ absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode
   }
 
   uint64_t code;
+  // Client controlled. Using the first value is fine.
   if (!absl::SimpleAtoi(header[0]->value().getStringView(), &code)) {
     return ret;
   }
@@ -82,6 +84,7 @@ absl::optional<Grpc::Status::GrpcStatus> FaultAbortConfig::HeaderAbortProvider::
   }
 
   uint64_t code;
+  // Client controlled. Using the first value is fine.
   if (!absl::SimpleAtoi(header[0]->value().getStringView(), &code)) {
     return absl::nullopt;
   }
@@ -116,6 +119,7 @@ absl::optional<std::chrono::milliseconds> FaultDelayConfig::HeaderDelayProvider:
   }
 
   uint64_t value;
+  // Client controlled. Using the first value is fine.
   if (!absl::SimpleAtoi(header[0]->value().getStringView(), &value)) {
     return absl::nullopt;
   }
@@ -147,6 +151,7 @@ absl::optional<uint64_t> FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps
   }
 
   uint64_t value;
+  // Client controlled. Using the first value is fine.
   if (!absl::SimpleAtoi(header[0]->value().getStringView(), &value)) {
     return absl::nullopt;
   }

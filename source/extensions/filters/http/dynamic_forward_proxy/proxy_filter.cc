@@ -110,6 +110,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     if (!host_rewrite_header.get().empty()) {
       const auto header = headers.get(host_rewrite_header);
       if (!header.empty()) {
+        // Client controlled. Using the first value is fine.
         const auto& header_value = header[0]->value().getStringView();
         headers.setHost(header_value);
       }

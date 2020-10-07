@@ -50,6 +50,7 @@ public:
   LookupKey(opentracing::string_view key) const override {
     const auto entry = request_headers_.get(Http::LowerCaseString{key});
     if (!entry.empty()) {
+      // Client controlled. Using the first value is fine.
       return opentracing::string_view{entry[0]->value().getStringView().data(),
                                       entry[0]->value().getStringView().length()};
     } else {

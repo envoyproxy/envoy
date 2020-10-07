@@ -322,6 +322,7 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   if (!ctx.request_headers) {
     return default_value_;
   }
+  // TODO(mattklein123): Potentially populate all header values.
   const auto entry = ctx.request_headers->get(name_);
   return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
 }

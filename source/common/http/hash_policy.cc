@@ -39,6 +39,7 @@ public:
                                     const StreamInfo::FilterStateSharedPtr) const override {
     absl::optional<uint64_t> hash;
 
+    // TODO(mattklein123): Potentially hash on all headers.
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
       if (regex_rewrite_ != nullptr) {

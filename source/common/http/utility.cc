@@ -673,6 +673,8 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
     }
 
     if (!nominated_header.empty()) {
+      // NOTE: The TE header is an inline header, so by definition if we operate on it there can
+      // only be a single value. In all other cases we remove the nominated header.
       auto nominated_header_value_sv = nominated_header[0]->value().getStringView();
 
       const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
@@ -684,6 +686,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       }
 
       if (is_te_header) {
+        ASSERT(nominated_header.size() == 1);
         for (const auto& header_value :
              StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
 
