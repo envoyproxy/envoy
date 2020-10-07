@@ -500,8 +500,8 @@ void HttpConnectionManagerConfig::processFilter(
       return nullptr;
     }
 
-    return MatchTreeFactory::create(*config_override, std::make_unique<Http::HttpKeyNamespaceMapper>(),
-                                    matching_data);
+    return MatchTreeFactory::create(
+        *config_override, std::make_unique<Http::HttpKeyNamespaceMapper>(), matching_data);
   };
 
   // See if the config is wrapped in a match tree proto. In this case, we'll fall back to the
@@ -514,7 +514,8 @@ void HttpConnectionManagerConfig::processFilter(
                      absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override,
                      Http::HttpMatchingData& matching_data) {
       return MatchTreeFactory::create(config_override.value_or(matching_filter.match_tree()),
-                                      std::make_unique<Http::HttpKeyNamespaceMapper>(), matching_data);
+                                      std::make_unique<Http::HttpKeyNamespaceMapper>(),
+                                      matching_data);
     };
     config_copy.clear_typed_config();
     config_copy.mutable_typed_config()->MergeFrom(matching_filter.typed_config());
@@ -644,8 +645,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-// This wraps the provided factory callbacks to allow for optionally injecting the MatchTree that was
-// provided as part of the static config. This pattern allows existing filter factories to start
+// This wraps the provided factory callbacks to allow for optionally injecting the MatchTree that
+// was provided as part of the static config. This pattern allows existing filter factories to start
 // using the match tree configuration without having to be updated to call the
 // factory callback method that allows specifying a match tree.
 //
@@ -667,7 +668,8 @@ public:
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr matcher, MatchingDataSharedPtr data) {
+    wrapFilter(filter, [this](Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr matcher,
+                              MatchingDataSharedPtr data) {
       callbacks_.addStreamDecoderFilter(filter, matcher, data);
     });
   }
@@ -678,7 +680,8 @@ public:
     callbacks_.addStreamDecoderFilter(filter, std::move(match_tree), std::move(matching_data));
   }
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr matcher, MatchingDataSharedPtr data) {
+    wrapFilter(filter, [this](Http::StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr matcher,
+                              MatchingDataSharedPtr data) {
       callbacks_.addStreamEncoderFilter(filter, matcher, data);
     });
   }
@@ -690,7 +693,8 @@ public:
   }
 
   void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr matcher, MatchingDataSharedPtr data) {
+    wrapFilter(filter, [this](Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr matcher,
+                              MatchingDataSharedPtr data) {
       callbacks_.addStreamFilter(filter, matcher, data);
     });
   }
@@ -704,7 +708,7 @@ public:
   }
 
 private:
-  template<class T, class S> void wrapFilter(T filter, S factory_func) {
+  template <class T, class S> void wrapFilter(T filter, S factory_func) {
     // If there is no configured match tree, just invoke the factory callback as normal.
     if (!match_tree_) {
       factory_func(filter, nullptr, nullptr);

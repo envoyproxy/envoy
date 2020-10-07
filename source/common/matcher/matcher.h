@@ -203,10 +203,9 @@ private:
     return leaf;
   }
 
-  static MatchTreeSharedPtr
-  createSublinerMatcher(const envoy::config::common::matcher::v3::MatchTree::SublinearMatcher& matcher,
-                        KeyNamespaceMapperSharedPtr key_namespace_mapper,
-                        MatchTreeFactoryCallbacks& callbacks) {
+  static MatchTreeSharedPtr createSublinerMatcher(
+      const envoy::config::common::matcher::v3::MatchTree::SublinearMatcher& matcher,
+      KeyNamespaceMapperSharedPtr key_namespace_mapper, MatchTreeFactoryCallbacks& callbacks) {
     auto multimap_matcher = std::make_shared<MultimapMatcher>(
         matcher.multimap_matcher().key(), matcher.multimap_matcher().key_namespace(),
         key_namespace_mapper,
