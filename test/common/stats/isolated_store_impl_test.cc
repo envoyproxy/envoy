@@ -5,7 +5,6 @@
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
-#include "common/stats/symbol_table_creator.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -17,17 +16,16 @@ namespace Stats {
 class StatsIsolatedStoreImplTest : public testing::Test {
 protected:
   StatsIsolatedStoreImplTest()
-      : symbol_table_(SymbolTableCreator::makeSymbolTable()),
-        store_(std::make_unique<IsolatedStoreImpl>(*symbol_table_)), pool_(*symbol_table_) {}
+      : store_(std::make_unique<IsolatedStoreImpl>(symbol_table_)), pool_(symbol_table_) {}
   ~StatsIsolatedStoreImplTest() override {
     pool_.clear();
     store_.reset();
-    EXPECT_EQ(0, symbol_table_->numSymbols());
+    EXPECT_EQ(0, symbol_table_.numSymbols());
   }
 
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
-  SymbolTablePtr symbol_table_;
+  SymbolTableImpl symbol_table_;
   std::unique_ptr<IsolatedStoreImpl> store_;
   StatNamePool pool_;
 };
