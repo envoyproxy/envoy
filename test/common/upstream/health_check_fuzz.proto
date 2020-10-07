@@ -9,7 +9,7 @@ import "google/protobuf/empty.proto";
 
 message HttpRespond {
   test.fuzz.Headers headers = 1;
-  uint64 status = 2;
+  uint64 status = 2 [(validate.rules).uint64.lt = 1000];
 }
 
 message TcpRespond {
@@ -25,7 +25,7 @@ enum ServingStatus {
 
 message GrpcRespondHeaders {
   test.fuzz.Headers headers = 1;
-  uint64 status = 2;
+  uint64 status = 2 [(validate.rules).uint64.lt = 1000];
 }
 
 message GrpcRespondUnstructuredBytes {
