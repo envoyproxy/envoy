@@ -127,9 +127,9 @@ TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupp
   proto_config.set_hidden_envoy_deprecated_use_alpha(true);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, runtime()).Times(1);
-  EXPECT_CALL(context, scope()).Times(1);
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, runtime());
+  EXPECT_CALL(context, scope());
 
   ExtAuthzFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
