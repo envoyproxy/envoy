@@ -121,7 +121,7 @@ struct tcp_info {
 
   /* Times. */
   uint32_t tcpi_last_data_sent;
-  uint32_t tcpi_last_ack_sent; /* Not remembered, sorry. */
+  uint32_t tcpi_last_ack_sent;
   uint32_t tcpi_last_data_recv;
   uint32_t tcpi_last_ack_recv;
 
@@ -142,15 +142,15 @@ struct tcp_info {
 
   uint64_t tcpi_pacing_rate;
   uint64_t tcpi_max_pacing_rate;
-  uint64_t tcpi_bytes_acked;    /* RFC4898 tcpEStatsAppHCThruOctetsAcked */
-  uint64_t tcpi_bytes_received; /* RFC4898 tcpEStatsAppHCThruOctetsReceived */
-  uint32_t tcpi_segs_out;       /* RFC4898 tcpEStatsPerfSegsOut */
-  uint32_t tcpi_segs_in;        /* RFC4898 tcpEStatsPerfSegsIn */
+  uint64_t tcpi_bytes_acked;
+  uint64_t tcpi_bytes_received;
+  uint32_t tcpi_segs_out;
+  uint32_t tcpi_segs_in;
 
   uint32_t tcpi_notsent_bytes;
   uint32_t tcpi_min_rtt;
-  uint32_t tcpi_data_segs_in;  /* RFC4898 tcpEStatsDataSegsIn */
-  uint32_t tcpi_data_segs_out; /* RFC4898 tcpEStatsDataSegsOut */
+  uint32_t tcpi_data_segs_in;
+  uint32_t tcpi_data_segs_out;
 
   uint64_t tcpi_delivery_rate;
 
@@ -161,10 +161,10 @@ struct tcp_info {
   uint32_t tcpi_delivered;
   uint32_t tcpi_delivered_ce;
 
-  uint64_t tcpi_bytes_sent;    /* RFC4898 tcpEStatsPerfHCDataOctetsOut */
-  uint64_t tcpi_bytes_retrans; /* RFC4898 tcpEStatsPerfOctetsRetrans */
-  uint32_t tcpi_dsack_dups;    /* RFC4898 tcpEStatsStackDSACKDups */
-  uint32_t tcpi_reord_seen;    /* reordering events seen */
+  uint64_t tcpi_bytes_sent;
+  uint64_t tcpi_bytes_retrans;
+  uint32_t tcpi_dsack_dups;
+  uint32_t tcpi_reord_seen;
 
   uint32_t tcpi_rcv_ooopack; /* Out-of-order packets received */
 
