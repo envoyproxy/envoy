@@ -2164,12 +2164,15 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
-  Server::OverloadActionState stop_accepting_requests = Server::OverloadActionState::saturated();
+  Server::OverloadActionState stop_accepting_requests = Server::OverloadActionState(0.8);
   ON_CALL(overload_manager_.overload_state_,
           getState(Server::OverloadActionNames::get().StopAcceptingRequests))
       .WillByDefault(ReturnRef(stop_accepting_requests));
 
   setup(false, "");
+
+  EXPECT_CALL(random_, random())
+      .WillRepeatedly(Return(static_cast<float>(Random::RandomGenerator::max()) * 0.5));
 
   // 503 direct response when overloaded.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
@@ -2186,13 +2189,16 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
-  Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::saturated();
+  Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState(0.8);
   ON_CALL(overload_manager_.overload_state_,
           getState(Server::OverloadActionNames::get().DisableHttpKeepAlive))
       .WillByDefault(ReturnRef(disable_http_keep_alive));
 
   codec_->protocol_ = Protocol::Http11;
   setup(false, "");
+
+  EXPECT_CALL(random_, random())
+      .WillRepeatedly(Return(static_cast<float>(Random::RandomGenerator::max()) * 0.5));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))

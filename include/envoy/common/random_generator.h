@@ -46,6 +46,18 @@ public:
    * for example, 7c25513b-0466-4558-a64c-12c6704f37ed
    */
   virtual std::string uuid() PURE;
+
+  /**
+   * @return a random boolean value, with probability `p` equaling true.
+   */
+  bool bernoulli(float p) {
+    if (p <= 0) {
+      return false;
+    } else if (p >= 1) {
+      return true;
+    }
+    return random() < static_cast<result_type>(p * static_cast<float>(max()));
+  }
 };
 
 using RandomGeneratorPtr = std::unique_ptr<RandomGenerator>;
