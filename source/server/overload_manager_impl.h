@@ -88,12 +88,13 @@ public:
   absl::optional<Symbol> lookup(absl::string_view string) const;
 
   // Translates a symbol back into a name.
-  const std::string& name(Symbol symbol) const;
+  const absl::string_view name(Symbol symbol) const;
 
   // Returns the number of symbols in the table. All symbols are guaranteed to have an index less
   // than size().
   size_t size() const { return table_.size(); }
 
+private:
   absl::flat_hash_map<std::string, size_t> table_;
   std::vector<std::string> names_;
 };

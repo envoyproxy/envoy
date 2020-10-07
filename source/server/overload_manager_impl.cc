@@ -135,7 +135,7 @@ NamedOverloadActionSymbolTable::lookup(absl::string_view string) const {
   return absl::nullopt;
 }
 
-const std::string& NamedOverloadActionSymbolTable::name(Symbol symbol) const {
+const absl::string_view NamedOverloadActionSymbolTable::name(Symbol symbol) const {
   return names_.at(symbol.index());
 }
 
