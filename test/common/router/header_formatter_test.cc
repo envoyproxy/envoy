@@ -1015,12 +1015,14 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
 
   auto& first_entry = *headers_values.Add();
   first_entry.set_key("key");
-  first_entry.set_value("ok");
+
+  // This tests when we have "StreamInfoHeaderFormatter", but stream info is null.
+  first_entry.set_value("%DOWNSTREAM_REMOTE_ADDRESS%");
 
   HeaderParserPtr req_header_parser_add = HeaderParser::configure(headers_values, /*append=*/true);
   req_header_parser_add->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
-  EXPECT_EQ("ok", header_map.get_("key"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
 
   headers_values.Clear();
   auto& set_entry = *headers_values.Add();
