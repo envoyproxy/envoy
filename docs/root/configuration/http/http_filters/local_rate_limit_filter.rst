@@ -123,9 +123,9 @@ The HTTP rate limit filter supports the following runtime fractional settings:
 http_filter_enabled
   % of requests that will check the local rate limit decision, but not enforce, for a given *route_key* specified
   in the :ref:`local rate limit configuration <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`.
-  Defaults to 100.
+  Defaults to 0.
 
 http_filter_enforcing
   % of requests that will enforce the local rate limit decision for a given *route_key* specified in the
   :ref:`local rate limit configuration <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`.
-  Defaults to 100. This can be used to test what would happen before fully enforcing the outcome.
+  Defaults to 0. This can be used to test what would happen before fully enforcing the outcome.
