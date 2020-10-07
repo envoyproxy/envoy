@@ -66,7 +66,10 @@ public:
 
     // Support use as a map key.
     bool operator==(const Symbol other) { return other.index_ == index_; }
-    template <typename H> friend H AbslHashValue(H h, const Symbol& s) {
+
+    // Support absl::Hash.
+    template <typename H>
+    friend H AbslHashValue(H h, const Symbol& s) { // NOLINT(readability-identifier-naming)
       return H::combine(std::move(h), s.index_);
     }
 
