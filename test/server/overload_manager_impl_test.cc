@@ -119,62 +119,12 @@ protected:
 
   envoy::config::overload::v3::OverloadManager parseConfig(const std::string& config) {
     envoy::config::overload::v3::OverloadManager proto;
-    bool success = Protobuf::TextFormat::ParseFromString(config, &proto);
-    ASSERT(success);
+    TestUtility::loadFromYaml(config, proto);
     return proto;
   }
 
-  std::string getConfig() {
-    return R"EOF(
-      refresh_interval {
-        seconds: 1
-      }
-      resource_monitors {
-        name: "envoy.resource_monitors.fake_resource1"
-      }
-      resource_monitors {
-        name: "envoy.resource_monitors.fake_resource2"
-      }
-      resource_monitors {
-        name: "envoy.resource_monitors.fake_resource3"
-      }
-      resource_monitors {
-        name: "envoy.resource_monitors.fake_resource4"
-      }
-      actions {
-        name: "envoy.overload_actions.dummy_action"
-        triggers {
-          name: "envoy.resource_monitors.fake_resource1"
-          threshold {
-            value: 0.9
-          }
-        }
-        triggers {
-          name: "envoy.resource_monitors.fake_resource2"
-          threshold {
-            value: 0.8
-          }
-        }
-        triggers {
-          name: "envoy.resource_monitors.fake_resource3"
-          scaled {
-            scaling_threshold: 0.5
-            saturation_threshold: 0.8
-          }
-        }
-        triggers {
-          name: "envoy.resource_monitors.fake_resource4"
-          scaled {
-            scaling_threshold: 0.5
-            saturation_threshold: 0.8
-          }
-        }
-      }
-    )EOF";
-  }
-
-  std::unique_ptr<OverloadManagerImpl> createOverloadManager(const std::string& config) {
-    return std::make_unique<OverloadManagerImpl>(dispatcher_, stats_, thread_local_,
+  std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
+    return std::make_unique<TestOverloadManager>(dispatcher_, stats_, thread_local_,
                                                  parseConfig(config), validation_visitor_, *api_);
   }
 
@@ -195,10 +145,37 @@ protected:
   Api::ApiPtr api_;
 };
 
+constexpr char kRegularStateConfig[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+    - name: envoy.resource_monitors.fake_resource2
+    - name: envoy.resource_monitors.fake_resource3
+    - name: envoy.resource_monitors.fake_resource4
+  actions:
+    - name: envoy.overload_actions.dummy_action
+      triggers:
+        - name: envoy.resource_monitors.fake_resource1
+          threshold:
+            value: 0.9
+        - name: envoy.resource_monitors.fake_resource2
+          threshold:
+            value: 0.8
+        - name: envoy.resource_monitors.fake_resource3
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 0.8
+        - name: envoy.resource_monitors.fake_resource4
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 0.8
+)YAML";
+
 TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   setDispatcherExpectation();
 
-  auto manager(createOverloadManager(getConfig()));
+  auto manager(createOverloadManager(kRegularStateConfig));
   bool is_active = false;
   int cb_count = 0;
   manager->registerForAction("envoy.overload_actions.dummy_action", dispatcher_,
@@ -306,7 +283,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
 TEST_F(OverloadManagerImplTest, ScaledTrigger) {
   setDispatcherExpectation();
 
-  auto manager(createOverloadManager(getConfig()));
+  auto manager(createOverloadManager(kRegularStateConfig));
   manager->start();
   const auto& action_state =
       manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
@@ -350,7 +327,7 @@ TEST_F(OverloadManagerImplTest, ScaledTrigger) {
 
 TEST_F(OverloadManagerImplTest, FailedUpdates) {
   setDispatcherExpectation();
-  auto manager(createOverloadManager(getConfig()));
+  auto manager(createOverloadManager(kRegularStateConfig));
   manager->start();
   Stats::Counter& failed_updates =
       stats_.counter("overload.envoy.resource_monitors.fake_resource1.failed_updates");
@@ -366,7 +343,7 @@ TEST_F(OverloadManagerImplTest, FailedUpdates) {
 
 TEST_F(OverloadManagerImplTest, AggregatesMultipleResourceUpdates) {
   setDispatcherExpectation();
-  auto manager(createOverloadManager(getConfig()));
+  auto manager(createOverloadManager(kRegularStateConfig));
   manager->start();
 
   const OverloadActionState& action_state =
@@ -388,7 +365,7 @@ TEST_F(OverloadManagerImplTest, AggregatesMultipleResourceUpdates) {
 
 TEST_F(OverloadManagerImplTest, DelayedUpdatesAreCoalesced) {
   setDispatcherExpectation();
-  auto manager(createOverloadManager(getConfig()));
+  auto manager(createOverloadManager(kRegularStateConfig));
   manager->start();
 
   const OverloadActionState& action_state =
@@ -412,7 +389,7 @@ TEST_F(OverloadManagerImplTest, DelayedUpdatesAreCoalesced) {
 
 TEST_F(OverloadManagerImplTest, FlushesUpdatesEvenWithOneUnresponsive) {
   setDispatcherExpectation();
-  auto manager(createOverloadManager(getConfig()));
+  auto manager(createOverloadManager(kRegularStateConfig));
   manager->start();
 
   const OverloadActionState& action_state =
@@ -436,7 +413,7 @@ TEST_F(OverloadManagerImplTest, FlushesUpdatesEvenWithOneUnresponsive) {
 TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   setDispatcherExpectation();
 
-  auto manager(createOverloadManager(getConfig()));
+  auto manager(createOverloadManager(kRegularStateConfig));
   manager->start();
   Stats::Counter& skipped_updates =
       stats_.counter("overload.envoy.resource_monitors.fake_resource1.skipped_updates");
@@ -466,12 +443,9 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
   const std::string config = R"EOF(
-    resource_monitors {
-      name: "envoy.resource_monitors.fake_resource1"
-    }
-    resource_monitors {
-      name: "envoy.resource_monitors.fake_resource1"
-    }
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+      - name: "envoy.resource_monitors.fake_resource1"
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
@@ -480,34 +454,73 @@ TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
 
 TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
   const std::string config = R"EOF(
-    actions {
-      name: "envoy.overload_actions.dummy_action"
-    }
-    actions {
-      name: "envoy.overload_actions.dummy_action"
-    }
+    actions:
+      - name: "envoy.overload_actions.dummy_action"
+      - name: "envoy.overload_actions.dummy_action"
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           "Duplicate overload action .*");
 }
 
+TEST_F(OverloadManagerImplTest, ActionWithUnexpectedTypedConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.dummy_action"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          ".* unexpected .* typed_config .*");
+}
+
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutAction) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithWrongTypedConfigMessage) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          ".* constraint validation failed.*");
+}
+
 // A scaled trigger action's thresholds must conform to scaling < saturation.
 TEST_F(OverloadManagerImplTest, ScaledTriggerSaturationLessThanScalingThreshold) {
   const std::string config = R"EOF(
-    resource_monitors {
-      name: "envoy.resource_monitors.fake_resource1"
-    }
-    actions {
-      name: "envoy.overload_actions.dummy_action"
-      triggers {
-        name: "envoy.resource_monitors.fake_resource1"
-        scaled {
-          scaling_threshold: 0.9
-          saturation_threshold: 0.8
-        }
-      }
-    }
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+    actions:
+      - name: "envoy.overload_actions.dummy_action"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            scaled:
+              scaling_threshold: 0.9
+              saturation_threshold: 0.8
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
@@ -517,19 +530,15 @@ TEST_F(OverloadManagerImplTest, ScaledTriggerSaturationLessThanScalingThreshold)
 // A scaled trigger action can't have threshold values that are equal.
 TEST_F(OverloadManagerImplTest, ScaledTriggerThresholdsEqual) {
   const std::string config = R"EOF(
-    resource_monitors {
-      name: "envoy.resource_monitors.fake_resource1"
-    }
-    actions {
-      name: "envoy.overload_actions.dummy_action"
-      triggers {
-        name: "envoy.resource_monitors.fake_resource1"
-        scaled {
-          scaling_threshold: 0.9
-          saturation_threshold: 0.9
-        }
-      }
-    }
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+    actions:
+      - name: "envoy.overload_actions.dummy_action"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            scaled:
+              scaling_threshold: 0.9
+              saturation_threshold: 0.9
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
@@ -538,15 +547,12 @@ TEST_F(OverloadManagerImplTest, ScaledTriggerThresholdsEqual) {
 
 TEST_F(OverloadManagerImplTest, UnknownTrigger) {
   const std::string config = R"EOF(
-    actions {
-      name: "envoy.overload_actions.dummy_action"
-      triggers {
-        name: "envoy.resource_monitors.fake_resource1"
-        threshold {
-          value: 0.9
-        }
-      }
-    }
+    actions:
+      - name: "envoy.overload_actions.dummy_action"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
@@ -555,24 +561,17 @@ TEST_F(OverloadManagerImplTest, UnknownTrigger) {
 
 TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
   const std::string config = R"EOF(
-    resource_monitors {
-      name: "envoy.resource_monitors.fake_resource1"
-    }
-    actions {
-      name: "envoy.overload_actions.dummy_action"
-      triggers {
-        name: "envoy.resource_monitors.fake_resource1"
-        threshold {
-          value: 0.9
-        }
-      }
-      triggers {
-        name: "envoy.resource_monitors.fake_resource1"
-        threshold {
-          value: 0.8
-        }
-      }
-    }
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+    actions:
+      - name: "envoy.overload_actions.dummy_action"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.8
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "Duplicate trigger .*");
@@ -581,7 +580,7 @@ TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
 TEST_F(OverloadManagerImplTest, Shutdown) {
   setDispatcherExpectation();
 
-  auto manager(createOverloadManager(getConfig()));
+  auto manager(createOverloadManager(kRegularStateConfig));
   manager->start();
 
   EXPECT_CALL(*timer_, disableTimer());
