@@ -42,88 +42,12 @@ public:
   virtual void addPredicateMatcher(MatchWrapperSharedPtr matcher) PURE;
 };
 
-struct HttpMatchingData : public MatchingData, public MatchTreeFactoryCallbacks {
-public:
-  // MatchTreeFactoryCallbacks
-  void addPredicateMatcher(MatchWrapperSharedPtr matcher) {
-    matchers_.push_back(std::move(matcher));
-  }
-
-  void onNewStream() {
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onNewStream(matcher->status_);
-    }
-  }
-
-  void onRequestHeaders(Http::RequestHeaderMap& request_headers) {
-    request_headers_ = &request_headers;
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onHttpRequestHeaders(request_headers, matcher->status_);
-    }
-  }
-
-  void onRequestData(const Buffer::Instance& buffer) {
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onRequestBody(buffer, matcher->status_);
-    }
-  }
-
-  void onRequestTrailers(Http::RequestTrailerMap& request_trailers) {
-    request_trailers_ = &request_trailers;
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onHttpRequestTrailers(request_trailers, matcher->status_);
-    }
-  }
-
-  void onResponseHeaders(Http::ResponseHeaderMap& response_headers) {
-    response_headers_ = &response_headers;
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onHttpResponseHeaders(response_headers, matcher->status_);
-    }
-  }
-
-  void onResponseData(const Buffer::Instance& buffer) {
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onResponseBody(buffer, matcher->status_);
-    }
-  }
-
-  void onResponseTrailers(Http::ResponseTrailerMap& response_trailers) {
-    response_trailers_ = &response_trailers;
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onHttpResponseTrailers(response_trailers, matcher->status_);
-    }
-  }
-
-  std::vector<MatchWrapperSharedPtr> matchers_;
-  Http::RequestHeaderMap* request_headers_;
-  Http::RequestTrailerMap* request_trailers_;
-  Http::ResponseHeaderMap* response_headers_;
-  Http::ResponseTrailerMap* response_trailers_;
-};
-using HttpMatchingDataSharedPtr = std::unique_ptr<HttpMatchingData>;
-
 class KeyNamespaceMapper {
 public:
   virtual ~KeyNamespaceMapper() = default;
   virtual void forEachValue(absl::string_view ns, absl::string_view key,
                             const MatchingData& matching_data,
                             std::function<void(absl::string_view)> value_cb) PURE;
-};
-
-class HttpKeyNamespaceMapper : public KeyNamespaceMapper {
-public:
-  void forEachValue(absl::string_view ns, absl::string_view key, const MatchingData& matching_data,
-                    std::function<void(absl::string_view)> value_cb) override {
-    const HttpMatchingData& http_data = dynamic_cast<const HttpMatchingData&>(matching_data);
-    if (ns == "request_headers") {
-      Http::LowerCaseString lcs((std::string(key)));
-      auto* header = http_data.request_headers_->get(lcs);
-      if (header) {
-        value_cb(header->value().getStringView());
-      }
-    }
-  }
 };
 
 using KeyNamespaceMapperSharedPtr = std::shared_ptr<KeyNamespaceMapper>;

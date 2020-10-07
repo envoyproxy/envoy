@@ -495,12 +495,12 @@ void HttpConnectionManagerConfig::processFilter(
   // By default we'll construct a match tree from the provided config.
   MatchTreeFactoryCb match_tree =
       [](absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override,
-         HttpMatchingData& matching_data) -> MatchTreeSharedPtr {
+         Http::HttpMatchingData& matching_data) -> MatchTreeSharedPtr {
     if (!config_override) {
       return nullptr;
     }
 
-    return MatchTreeFactory::create(*config_override, std::make_unique<HttpKeyNamespaceMapper>(),
+    return MatchTreeFactory::create(*config_override, std::make_unique<Http::HttpKeyNamespaceMapper>(),
                                     matching_data);
   };
 
@@ -512,9 +512,9 @@ void HttpConnectionManagerConfig::processFilter(
 
     match_tree = [matching_filter](
                      absl::optional<envoy::config::common::matcher::v3::MatchTree> config_override,
-                     HttpMatchingData& matching_data) {
+                     Http::HttpMatchingData& matching_data) {
       return MatchTreeFactory::create(config_override.value_or(matching_filter.match_tree()),
-                                      std::make_unique<HttpKeyNamespaceMapper>(), matching_data);
+                                      std::make_unique<Http::HttpKeyNamespaceMapper>(), matching_data);
     };
     config_copy.clear_typed_config();
     config_copy.mutable_typed_config()->MergeFrom(matching_filter.typed_config());
@@ -651,7 +651,7 @@ struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCall
 
   std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
   createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) override {
-    auto data = std::make_unique<HttpMatchingData>();
+    auto data = std::make_unique<Http::HttpMatchingData>();
     auto matcher = match_tree_(config, *data);
 
     return {matcher, std::move(data)};
@@ -661,7 +661,7 @@ struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCall
     if (!match_tree_) {
       callbacks_.addStreamDecoderFilter(filter);
     }
-    auto data = std::make_unique<HttpMatchingData>();
+    auto data = std::make_unique<Http::HttpMatchingData>();
     auto matcher = match_tree_(absl::nullopt, *data);
     callbacks_.addStreamDecoderFilter(filter, matcher, matcher ? std::move(data) : nullptr);
   }
@@ -675,7 +675,7 @@ struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCall
     if (!match_tree_) {
       callbacks_.addStreamEncoderFilter(filter);
     }
-    auto data = std::make_unique<HttpMatchingData>();
+    auto data = std::make_unique<Http::HttpMatchingData>();
     auto matcher = match_tree_(absl::nullopt, *data);
     callbacks_.addStreamEncoderFilter(filter, matcher, matcher ? std::move(data) : nullptr);
   }
@@ -690,7 +690,7 @@ struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCall
       callbacks_.addStreamFilter(filter);
     }
 
-    auto data = std::make_unique<HttpMatchingData>();
+    auto data = std::make_unique<Http::HttpMatchingData>();
     auto matcher = match_tree_(absl::nullopt, *data);
     callbacks_.addStreamFilter(filter, matcher, matcher ? std::move(data) : nullptr);
   }
