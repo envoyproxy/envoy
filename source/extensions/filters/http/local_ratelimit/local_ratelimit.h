@@ -99,7 +99,6 @@ private:
   const FilterConfig* getConfig() const;
 
   FilterConfigSharedPtr config_;
-  mutable const FilterConfig* effective_config_{nullptr};
 };
 
 } // namespace LocalRateLimitFilter

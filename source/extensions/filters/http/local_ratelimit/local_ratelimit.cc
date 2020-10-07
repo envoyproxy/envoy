@@ -95,19 +95,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap&, bool) {
 }
 
 const FilterConfig* Filter::getConfig() const {
-  // Cached config pointer.
-  if (effective_config_) {
-    return effective_config_;
-  }
-
-  effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
+  const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
       "envoy.filters.http.local_ratelimit", decoder_callbacks_->route());
-  if (effective_config_) {
-    return effective_config_;
+  if (config) {
+    return config;
   }
 
-  effective_config_ = config_.get();
-  return effective_config_;
+  return config_.get();
 }
 
 } // namespace LocalRateLimitFilter
