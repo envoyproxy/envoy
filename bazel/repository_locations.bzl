@@ -407,7 +407,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         sha256 = "93810780e60304b51f2c9645fe313a6e4640711063ed0b860cfa60999dd256c5",
         strip_prefix = "brotli-{version}",
         urls = ["https://github.com/google/brotli/archive/{version}.tar.gz"],
-        use_category = ["dataplane"],
+        use_category = ["dataplane_core"],
         last_updated = "2020-09-17",
         cpe = "cpe:2.3:a:google:brotli:*",
     ),
