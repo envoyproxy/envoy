@@ -10,15 +10,28 @@
 
 namespace Envoy {
 
+/**
+ * MatchAction specifies the action to perform in response to matching a match tree.
+ */
 class MatchAction {
 public:
-  static MatchAction skip() { return MatchAction(absl::variant<bool, std::string>(true)); }
+  /**
+   * Creates a Skip MatchAction.
+   */
+  static MatchAction skip() { return MatchAction(SkipOrCallback(Skip())); }
 
+  /**
+   * Creates a callback MatchAction that should invoke a match callback with the provided string.
+   */
   static MatchAction callback(std::string callback) {
-    return MatchAction(absl::variant<bool, std::string>(std::move(callback)));
+    return MatchAction(SkipOrCallback((std::move(callback))));
   }
 
-  static MatchAction fromProto(envoy::config::common::matcher::v3::MatchTree::MatchAction proto) {
+  /**
+   * Creates a MatchAction from the associated protobuf.
+   */
+  static MatchAction
+  fromProto(const envoy::config::common::matcher::v3::MatchTree::MatchAction& proto) {
     if (proto.skip()) {
       return skip();
     } else {
@@ -34,11 +47,15 @@ public:
     return absl::nullopt;
   }
 
-  bool isSkip() { return absl::holds_alternative<bool>(action_); }
+  bool isSkip() { return absl::holds_alternative<Skip>(action_); }
 
 private:
-  explicit MatchAction(absl::variant<bool, std::string> action) : action_(action) {}
-  absl::variant<bool, std::string> action_;
+  struct Skip {};
+  using SkipOrCallback = absl::variant<Skip, std::string>;
+
+  explicit MatchAction(SkipOrCallback action) : action_(std::move(action)) {}
+
+  const SkipOrCallback action_;
 };
 
 // Protocol specific matching data. For example, this can be used to present the buffered request
@@ -49,13 +66,18 @@ public:
 };
 using MatchingDataSharedPtr = std::shared_ptr<MatchingData>;
 
+/**
+ * MatchTree provides an extensible interface for matching on some input data.
+ */
 class MatchTree {
 public:
   virtual ~MatchTree() = default;
 
   using MatchResult = std::pair<bool, absl::optional<MatchAction>>;
+
   // Attempts to match against the matching data (which should contain all the data requested via
-  // matching requirements). If no match is found, absl::nullopt will be returned.
+  // matching requirements). If the match couldn't be completed, {false, {}} will be returned.
+  // If a match result was determined, {true, action} will be returned.
   virtual MatchResult match(const MatchingData& data) PURE;
 };
 
