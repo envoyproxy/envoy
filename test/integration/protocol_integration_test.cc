@@ -1415,6 +1415,30 @@ name: decode-headers-only
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, LocalReplyDuringEncoding) {
+  config_helper_.addFilter(R"EOF(
+name: local-reply-during-encode
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+
+  // Wait for the upstream request and begin sending a response with end_stream = false.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ(0, upstream_request_->body().length());
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
   // Send one 95 kB URL with limit 60 kB headers.
   testLargeRequestUrl(95, 60);
@@ -1861,6 +1885,7 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
 
 // Resets the downstream stream immediately and verifies that we clean up everything.
 TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
 
   initialize();
@@ -1889,6 +1914,7 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
   }
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), Not(HasSubstr("DPE")));
 }
 
 // Test connection is closed after single request processed.

@@ -94,7 +94,7 @@ Http::ResponseMessagePtr TestCommon::makeMessageResponse(const HeaderValueOption
     response->headers().addCopy(Http::LowerCaseString(header.header().key()),
                                 header.header().value());
   }
-  response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+  response->body().add(body);
   return response;
 };
 

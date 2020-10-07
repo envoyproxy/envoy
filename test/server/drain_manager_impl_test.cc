@@ -80,13 +80,13 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
   // Ensure drainClose() behaviour is determined by the deadline.
   drain_manager.startDrainSequence([] {});
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
-  ON_CALL(server_.random_, random()).WillByDefault(Return(DrainTimeSeconds * 2 - 1));
+  ON_CALL(server_.api_.random_, random()).WillByDefault(Return(DrainTimeSeconds * 2 - 1));
   ON_CALL(server_.options_, drainTime())
       .WillByDefault(Return(std::chrono::seconds(DrainTimeSeconds)));
 
   if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout
-    EXPECT_CALL(server_.random_, random()).Times(2);
+    EXPECT_CALL(server_.api_.random_, random()).Times(2);
     EXPECT_FALSE(drain_manager.drainClose());
     simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
     EXPECT_FALSE(drain_manager.drainClose());
@@ -99,7 +99,7 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
     simTime().advanceTimeWait(std::chrono::seconds(500));
     EXPECT_TRUE(drain_manager.drainClose());
   } else {
-    EXPECT_CALL(server_.random_, random()).Times(0);
+    EXPECT_CALL(server_.api_.random_, random()).Times(0);
     EXPECT_TRUE(drain_manager.drainClose());
     simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
     EXPECT_TRUE(drain_manager.drainClose());
@@ -117,7 +117,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   ON_CALL(server_.options_, drainStrategy())
       .WillByDefault(Return(drain_gradually ? Server::DrainStrategy::Gradual
                                             : Server::DrainStrategy::Immediate));
-  ON_CALL(server_.random_, random()).WillByDefault(Return(4));
+  ON_CALL(server_.api_.random_, random()).WillByDefault(Return(4));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(3)));
 
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
@@ -133,7 +133,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
 
   if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout
-    EXPECT_CALL(server_.random_, random()).Times(2);
+    EXPECT_CALL(server_.api_.random_, random()).Times(2);
     // Current elapsed time is 0
     // drainClose() will return true when elapsed time > (4 % 3 == 1).
     EXPECT_FALSE(drain_manager.drainClose());
@@ -142,7 +142,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
     simTime().advanceTimeWait(std::chrono::seconds(1));
     EXPECT_TRUE(drain_manager.drainClose());
   } else {
-    EXPECT_CALL(server_.random_, random()).Times(0);
+    EXPECT_CALL(server_.api_.random_, random()).Times(0);
     EXPECT_TRUE(drain_manager.drainClose());
     simTime().advanceTimeWait(std::chrono::seconds(2));
     EXPECT_TRUE(drain_manager.drainClose());

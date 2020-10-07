@@ -155,11 +155,61 @@ TEST_F(HttpFilterTest, MergeConfig) {
   base_config.merge(disabled_config);
 
   // Make sure all values were merged:
-  EXPECT_TRUE(base_config.disabled());
   auto&& merged_extensions = base_config.contextExtensions();
   EXPECT_EQ("base_value", merged_extensions.at("base_key"));
   EXPECT_EQ("value", merged_extensions.at("merged_key"));
   EXPECT_EQ("value", merged_extensions.at("key"));
+}
+
+// Test that defining stat_prefix appends an additional prefix to the emitted statistics names.
+TEST_F(HttpFilterTest, StatsWithPrefix) {
+  const std::string stat_prefix = "with_stat_prefix";
+  const std::string error_counter_name_with_prefix =
+      absl::StrCat("ext_authz.", stat_prefix, ".error");
+  const std::string error_counter_name_without_prefix = "ext_authz.error";
+
+  InSequence s;
+
+  initialize(fmt::format(R"EOF(
+  stat_prefix: "{}"
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF",
+                         stat_prefix));
+
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(error_counter_name_with_prefix)
+                    .value());
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(error_counter_name_without_prefix)
+                    .value());
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(1);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(error_counter_name_with_prefix)
+                    .value());
+  // The one without an additional prefix is not incremented, since it is not "defined".
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(error_counter_name_without_prefix)
+                    .value());
 }
 
 // Test when failure_mode_allow is NOT set and the response from the authorization service is Error
@@ -1107,6 +1157,203 @@ TEST_F(HttpFilterTest, FilterEnabled) {
             filter_->decodeHeaders(request_headers_, false));
 }
 
+// Test that filter can be disabled via the filter_enabled_metadata field.
+TEST_F(HttpFilterTest, MetadataDisabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled_metadata:
+    filter: "abc.xyz"
+    path:
+    - key: "k1"
+    value:
+      string_match:
+        exact: "check"
+  )EOF");
+
+  // Disable in filter_enabled.
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    abc.xyz:
+      k1: skip
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that filter can be enabled via the filter_enabled_metadata field.
+TEST_F(HttpFilterTest, MetadataEnabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled_metadata:
+    filter: "abc.xyz"
+    path:
+    - key: "k1"
+    value:
+      string_match:
+        exact: "check"
+  )EOF");
+
+  // Enable in filter_enabled.
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    abc.xyz:
+      k1: check
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+
+  prepareCheck();
+
+  // Make sure check is called once.
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(1);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that the filter is disabled if one of the filter_enabled and filter_enabled_metadata field
+// is disabled.
+TEST_F(HttpFilterTest, FilterEnabledButMetadataDisabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enabled_metadata:
+    filter: "abc.xyz"
+    path:
+    - key: "k1"
+    value:
+      string_match:
+        exact: "check"
+  )EOF");
+
+  // Enable in filter_enabled.
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillByDefault(Return(true));
+
+  // Disable in filter_enabled_metadata.
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    abc.xyz:
+      k1: skip
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that the filter is disabled if one of the filter_enabled and filter_enabled_metadata field
+// is disabled.
+TEST_F(HttpFilterTest, FilterDisabledButMetadataEnabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  filter_enabled_metadata:
+    filter: "abc.xyz"
+    path:
+    - key: "k1"
+    value:
+      string_match:
+        exact: "check"
+  )EOF");
+
+  // Disable in filter_enabled.
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  // Enable in filter_enabled_metadata.
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    abc.xyz:
+      k1: check
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that the filter is enabled if both the filter_enabled and filter_enabled_metadata field
+// is enabled.
+TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enabled_metadata:
+    filter: "abc.xyz"
+    path:
+    - key: "k1"
+    value:
+      string_match:
+        exact: "check"
+  )EOF");
+
+  // Enable in filter_enabled.
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillByDefault(Return(true));
+
+  // Enable in filter_enabled_metadata.
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    abc.xyz:
+      k1: check
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+
+  prepareCheck();
+
+  // Make sure check is called once.
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(1);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
 // Test that filter can deny for protected path when filter is disabled via filter_enabled field.
 TEST_F(HttpFilterTest, FilterDenyAtDisable) {
   initialize(R"EOF(
@@ -1747,6 +1994,53 @@ TEST_P(HttpFilterTestParam, NoCluster) {
 
   // Engage the filter so that check is called.
   filter_->decodeHeaders(request_headers_, false);
+}
+
+// Verify that request body buffering can be skipped per route.
+TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
+  FilterConfigPerRoute auth_per_route(settings);
+
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  auto test_disable_request_body_buffering = [&](bool bypass) {
+    initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 1
+    allow_partial_message: false
+  )EOF");
+
+    // Set bypass request body buffering for this route.
+    settings.mutable_check_settings()->set_disable_request_body_buffering(bypass);
+    // Initialize the route's per filter config.
+    auth_per_route = FilterConfigPerRoute(settings);
+  };
+
+  test_disable_request_body_buffering(false);
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  // When request body buffering is not skipped, setDecoderBufferLimit is called.
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
+  EXPECT_CALL(connection_, remoteAddress()).Times(0);
+  EXPECT_CALL(connection_, localAddress()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  test_disable_request_body_buffering(true);
+  // When request body buffering is skipped, setDecoderBufferLimit is not called.
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(1);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
 }
 
 } // namespace

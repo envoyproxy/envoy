@@ -22,10 +22,9 @@ public:
   virtual HeaderType& headers() PURE;
 
   /**
-   * @return Buffer::InstancePtr& the message body, if any. Callers are free to reallocate, remove,
-   *         etc. the body.
+   * @return Buffer::Instance the message body, if any. Callers are free to modify the body.
    */
-  virtual Buffer::InstancePtr& body() PURE;
+  virtual Buffer::Instance& body() PURE;
 
   /**
    * @return TrailerType* the message trailers, if any.
