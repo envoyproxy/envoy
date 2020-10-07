@@ -170,6 +170,11 @@ public:
    * @see man 2 accept. The fds returned are configured to be non-blocking.
    */
   virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see man TCP_INFO. Get the tcp info for the socket.
+   */
+  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, tcp_info* tcpInfo) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

@@ -519,16 +519,15 @@ Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
 }
 
 absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
-#ifdef TCP_INFO
-  struct tcp_info ti;
-  socklen_t len = sizeof(ti);
-  if (!SOCKET_FAILURE(
-          Api::OsSysCallsSingleton::get().getsockopt(fd_, IPPROTO_TCP, TCP_INFO, &ti, &len).rc_)) {
-    return std::chrono::milliseconds(ti.tcpi_rtt);
+  struct tcp_info info;
+  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
+  if (!result.rc_) {
+    ENVOY_LOG_MISC(warn,
+                   "Failed to calculate the last round trip time for tcp connection, error: {}",
+                   errorDetails(result.errno_));
+    return {};
   }
-#endif
-
-  return {};
+  return std::chrono::milliseconds(info.tcpi_rtt);
 }
 
 } // namespace Network

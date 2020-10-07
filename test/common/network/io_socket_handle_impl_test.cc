@@ -1,8 +1,12 @@
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/network/io_socket_handle_impl.h"
+#include "common/network/listen_socket_impl.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -14,7 +18,6 @@ using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Network {
@@ -61,14 +64,14 @@ TEST(IoSocketHandleImplTest, TestIoSocketError) {
   EXPECT_EQ(errorDetails(123), error9.getErrorDetails());
 }
 
-#ifdef TCP_INFO
-
 TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) {
   NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
   auto os_calls =
       std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
           &os_sys_calls);
-  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .WillOnce(Return(Api::SysCallBoolResult{false, -1}));
 
   IoSocketHandleImpl io_handle;
   EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
@@ -79,25 +82,34 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
   auto os_calls =
       std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
           &os_sys_calls);
-  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
-      .WillOnce(DoAll(WithArg<3>(Invoke([](void* optval) {
-                        static_cast<struct tcp_info*>(optval)->tcpi_rtt = 35;
-                      })),
-                      Return(0)));
+
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .WillOnce(Invoke([this](os_fd_t sockfd, tcp_info* tcpInfo) -> Api::SysCallBoolResult {
+        tcpInfo->tcpi_rtt = 35;
+        return {true, 0};
+      }));
 
   IoSocketHandleImpl io_handle;
   EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{35}));
 }
 
-#endif
+// Only do the integration tests in supported platforms.
+#if defined(TCP_INFO) || defined(SIO_TCP_INFO)
+TEST(IoSocketHandleImpl, LastRoundTripIntegrationTest) {
+  struct sockaddr_in server;
+  // TCP info can not be calculated on loopback.
+  // For that reason we use Cloudflare public dns server.
+  server.sin_addr.s_addr = inet_addr("1.1.1.1");
+  server.sin_family = AF_INET;
+  server.sin_port = htons(80);
 
-#ifndef TCP_INFO
+  Address::InstanceConstSharedPtr addr(new Address::Ipv4Instance(&server));
+  auto socket_ = std::make_shared<Envoy::Network::ClientSocketImpl>(addr, nullptr);
+  socket_->setBlockingForTest(true);
+  EXPECT_TRUE(socket_->connect(addr).rc_ == 0);
 
-TEST(IoSocketHandleImpl, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
-  IoSocketHandleImpl io_handle;
-  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
+  EXPECT_TRUE(socket_->ioHandle().lastRoundTripTime() != absl::nullopt);
 }
-
 #endif
 
 } // namespace

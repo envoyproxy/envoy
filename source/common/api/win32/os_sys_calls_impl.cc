@@ -364,5 +364,31 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
   return {rc, 0};
 }
 
+SysCallBoolResult OsSysCallsImpl::socketTcpInfo(os_fd_t sockfd, tcp_info* tcpInfo) {
+  TCP_INFO_v0 win_tcpinfo;
+  DWORD infoVersion = 0;
+  DWORD bytesReturned = 0;
+  int rc = ::WSAIoctl(sockfd, SIO_TCP_INFO, &infoVersion, sizeof(infoVersion), &win_tcpinfo,
+                      sizeof(win_tcpinfo), &bytesReturned, nullptr, nullptr);
+  if (rc == SOCKET_ERROR) {
+    return {false, ::WSAGetLastError()};
+  } else {
+    tcpInfo->tcpi_state = win_tcpinfo.State;
+    tcpInfo->tcpi_rcv_mss = win_tcpinfo.Mss;
+    tcpInfo->tcpi_snd_mss = win_tcpinfo.Mss;
+    tcpInfo->tcpi_rtt = win_tcpinfo.RttUs;
+    tcpInfo->tcpi_min_rtt = win_tcpinfo.MinRttUs;
+    tcpInfo->tcpi_snd_wnd = win_tcpinfo.SndWnd;
+    tcpInfo->tcpi_rwnd_limited = win_tcpinfo.RcvWnd;
+    tcpInfo->tcpi_bytes_sent = win_tcpinfo.BytesOut;
+    tcpInfo->tcpi_bytes_received = win_tcpinfo.BytesIn;
+    tcpInfo->tcpi_bytes_retrans = win_tcpinfo.BytesRetrans;
+    tcpInfo->tcpi_reordering = win_tcpinfo.BytesReordered;
+    tcpInfo->tcpi_fackets = win_tcpinfo.FastRetrans;
+    tcpInfo->tcpi_dsack_dups = win_tcpinfo.DupAcksIn;
+    return {true, 0};
+  }
+}
+
 } // namespace Api
 } // namespace Envoy

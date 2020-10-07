@@ -19,6 +19,16 @@
 #include <mswsock.h>
 #include <ws2tcpip.h>
 
+#undef NTDDI_VERSION
+#define NTDDI_VERSION WDK_NTDDI_VERSION
+
+#include <mstcpip.h>
+
+#ifndef SIO_TCP_INFO
+  static_assert(false, "SIO_TCP_INFO not defined");
+#endif
+
+
 // This is introduced in Windows SDK 10.0.17063.0 which is required
 // to build Envoy on Windows (we will reevaluate whether earlier builds
 // of Windows can be detected and PipeInstance marked unsupported at runtime.)
@@ -26,6 +36,7 @@
 
 // <windows.h> defines some frequently used symbols, so we need to undef these
 // interfering symbols.
+#undef ASSERT
 #undef DELETE
 #undef ERROR
 #undef GetMessage
@@ -83,6 +94,86 @@ struct msghdr {
   size_t msg_controllen;
   int msg_flags;
 };
+
+// Posix structure for tcp info.
+// See https://github.com/torvalds/linux/blob/master/include/uapi/linux/tcp.h
+// Some of them may remain uninitialized. If you are using this struct please refer to
+// the implementation of Windows to see that the metric you are querying for is supported.
+struct tcp_info {
+	uint8_t	tcpi_state;
+	uint8_t	tcpi_ca_state;
+	uint8_t	tcpi_retransmits;
+	uint8_t	tcpi_probes;
+	uint8_t	tcpi_backoff;
+	uint8_t	tcpi_options;
+	uint8_t	tcpi_snd_wscale : 4, tcpi_rcv_wscale : 4;
+	uint8_t	tcpi_delivery_rate_app_limited : 1, tcpi_fastopen_client_fail : 2;
+
+	uint32_t	tcpi_rto;
+	uint32_t	tcpi_ato;
+	uint32_t	tcpi_snd_mss;
+	uint32_t	tcpi_rcv_mss;
+
+	uint32_t	tcpi_unacked;
+	uint32_t	tcpi_sacked;
+	uint32_t	tcpi_lost;
+	uint32_t	tcpi_retrans;
+	uint32_t	tcpi_fackets;
+
+	/* Times. */
+	uint32_t	tcpi_last_data_sent;
+	uint32_t	tcpi_last_ack_sent;     /* Not remembered, sorry. */
+	uint32_t	tcpi_last_data_recv;
+	uint32_t	tcpi_last_ack_recv;
+
+	/* Metrics. */
+	uint32_t	tcpi_pmtu;
+	uint32_t	tcpi_rcv_ssthresh;
+	uint32_t	tcpi_rtt;
+	uint32_t	tcpi_rttvar;
+	uint32_t	tcpi_snd_ssthresh;
+	uint32_t	tcpi_snd_cwnd;
+	uint32_t	tcpi_advmss;
+	uint32_t	tcpi_reordering;
+
+	uint32_t	tcpi_rcv_rtt;
+	uint32_t	tcpi_rcv_space;
+
+	uint32_t	tcpi_total_retrans;
+
+	uint64_t	tcpi_pacing_rate;
+	uint64_t	tcpi_max_pacing_rate;
+	uint64_t	tcpi_bytes_acked;    /* RFC4898 tcpEStatsAppHCThruOctetsAcked */
+	uint64_t	tcpi_bytes_received; /* RFC4898 tcpEStatsAppHCThruOctetsReceived */
+	uint32_t	tcpi_segs_out;	     /* RFC4898 tcpEStatsPerfSegsOut */
+	uint32_t	tcpi_segs_in;	     /* RFC4898 tcpEStatsPerfSegsIn */
+
+	uint32_t	tcpi_notsent_bytes;
+	uint32_t	tcpi_min_rtt;
+	uint32_t	tcpi_data_segs_in;	/* RFC4898 tcpEStatsDataSegsIn */
+	uint32_t	tcpi_data_segs_out;	/* RFC4898 tcpEStatsDataSegsOut */
+
+	uint64_t   tcpi_delivery_rate;
+
+	uint64_t	tcpi_busy_time;      /* Time (usec) busy sending data */
+	uint64_t	tcpi_rwnd_limited;   /* Time (usec) limited by receive window */
+	uint64_t	tcpi_sndbuf_limited; /* Time (usec) limited by send buffer */
+
+	uint32_t	tcpi_delivered;
+	uint32_t	tcpi_delivered_ce;
+
+	uint64_t	tcpi_bytes_sent;     /* RFC4898 tcpEStatsPerfHCDataOctetsOut */
+	uint64_t	tcpi_bytes_retrans;  /* RFC4898 tcpEStatsPerfOctetsRetrans */
+	uint32_t	tcpi_dsack_dups;     /* RFC4898 tcpEStatsStackDSACKDups */
+	uint32_t	tcpi_reord_seen;     /* reordering events seen */
+
+	uint32_t	tcpi_rcv_ooopack;    /* Out-of-order packets received */
+
+	uint32_t	tcpi_snd_wnd;	     /* peer's advertised receive window after
+								 * scaling (bytes)
+								 */
+};
+
 
 // Windows cmsghdr elements are just slightly different than Posix,
 // they are defined with the cmsg_len as a 32 bit uint, not size_t
