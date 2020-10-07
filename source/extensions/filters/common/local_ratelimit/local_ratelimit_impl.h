@@ -7,22 +7,19 @@
 
 #include "common/common/thread_synchronizer.h"
 
-#include "extensions/filters/common/local_ratelimit/local_ratelimit.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace LocalRateLimit {
 
-class LocalRateLimiterImpl : public LocalRateLimiter {
+class LocalRateLimiterImpl {
 public:
   LocalRateLimiterImpl(const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
                        const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher);
-  ~LocalRateLimiterImpl() override;
+  ~LocalRateLimiterImpl();
 
-  // Filters::Common::LocalRateLimit::LocalRateLimiter
-  bool requestAllowed() const override;
+  bool requestAllowed() const;
 
 private:
   void onFillTimer();

@@ -13,16 +13,8 @@ envoy_cc_library(
     srcs = ["local_ratelimit_impl.cc"],
     hdrs = ["local_ratelimit_impl.h"],
     deps = [
-        ":local_ratelimit_client_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_synchronizer_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "local_ratelimit_client_interface",
-    hdrs = ["local_ratelimit.h"],
-    deps = [
     ],
 )
