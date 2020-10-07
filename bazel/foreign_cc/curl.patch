@@ -1,29 +1,26 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index ec1cfa782..6fe4b1bc2 100644
+index 68842ee3e..957e0b470 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -39,6 +39,9 @@
- # (From Daniel Stenberg) The gcc command line use neither -g nor any -O options. As a developer, I also treasure our configure scripts's --enable-debug option that sets a long range of "picky" compiler options.
- cmake_minimum_required(VERSION 3.2...3.16 FATAL_ERROR)
- 
-+# Work around new assumptions of inappropriate /MT flag injection since 3.15
-+cmake_policy(SET CMP0091 OLD)
-+
- set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
- include(Utilities)
- include(Macros)
+@@ -40 +40 @@
+-cmake_minimum_required(VERSION 3.2...3.16 FATAL_ERROR)
++cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
+@@ -247,3 +247,6 @@ if(CURL_STATIC_CRT)
+-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+-  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+-  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
++  foreach (build_suffix "" _DEBUG _RELEASE _MINSIZEREL _RELWITHDEBINFO)
++    set (flags_var CMAKE_C_FLAGS_${build_suffix})
++    if ("${${flags_var}}" MATCHES "/MD")
++      string(REGEX REPLACE "/MD" "/MT" ${flags_var} "${${flags_var}}")
++    endif()
++  endforeach()
 diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
-index 911c9096d..ed37775b2 100644
+index 1d71e1490..b85fcdcd6 100644
 --- a/lib/CMakeLists.txt
 +++ b/lib/CMakeLists.txt
-@@ -88,10 +88,6 @@ add_library(
-   ALIAS ${LIB_NAME}
-   )
- 
+@@ -100,4 +99,0 @@ add_library(
 -if(MSVC AND NOT BUILD_SHARED_LIBS)
 -  set_target_properties(${LIB_NAME} PROPERTIES STATIC_LIBRARY_FLAGS ${CMAKE_EXE_LINKER_FLAGS})
 -endif()
 -
- if(NOT BUILD_SHARED_LIBS)
-     set_target_properties(${LIB_NAME} PROPERTIES INTERFACE_COMPILE_DEFINITIONS CURL_STATICLIB)
- endif()
