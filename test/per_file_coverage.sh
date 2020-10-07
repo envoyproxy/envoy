@@ -3,6 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
+"source/common/network:95.6"
 "source/common/http/http3:50.0"
 "source/common/tracing:94.9"
 "source/common/protobuf:94.3"
