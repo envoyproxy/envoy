@@ -101,6 +101,8 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
   EXPECT_TRUE(grpc_stream == nullptr);
 }
 
+// Validate that the metadata header is the initial metadata in gRPC service config and the value is
+// interpolated.
 TEST_F(EnvoyGoogleAsyncClientImplTest, MetadataIsInitialized) {
   initialize();
 

@@ -27,7 +27,6 @@ Minor Behavior Changes
   This behavior can be reverted by setting runtime feature ``envoy.reloadable_features.ext_authz_measure_timeout_on_check_created`` to false. When enabled, a new `ext_authz.timeout` stat is counted when timeout occurs. See :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
 * grpc: implemented header value syntax support when defining :ref:`initial metadata <envoy_v3_api_field_config.core.v3.GrpcService.initial_metadata>` for gRPC-based `ext_authz` :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>` and :ref:`network <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.grpc_service>` filters, and :ref:`ratelimit <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.grpc_service>` filters.
-* ext_authz_filter: added :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>` to disable request data buffering per-route.
 * grpc reverse bridge: upstream headers will no longer be propagated when the response is missing or contains an unexpected content-type.
 * http: added :ref:`contains <envoy_api_msg_type.matcher.StringMatcher>` a new string matcher type which matches if the value of the string has the substring mentioned in contains matcher.
 * http: added :ref:`contains <envoy_api_msg_route.HeaderMatcher>` a new header matcher type which matches if the value of the header has the substring mentioned in contains matcher.
