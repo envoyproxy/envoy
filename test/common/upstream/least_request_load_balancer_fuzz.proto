@@ -10,5 +10,5 @@ import "envoy/config/cluster/v3/cluster.proto";
 message LeastRequestLoadBalancerTestCase {
   LoadBalancerTestCase load_balancer_test_case = 1 [(validate.rules).message.required = true];
   //Specific least_request_config isn't required, can even be a nullptr in constructor
-  envoy.config.cluster.v3.Cluster.LeastRequestLbConfig = 2;
+  envoy.config.cluster.v3.Cluster.LeastRequestLbConfig least_request_lb_config = 2;
 }
