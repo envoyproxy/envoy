@@ -29,7 +29,7 @@ message LocalRateLimit {
   // Defaults to 429 (TooManyRequests).
   //
   // .. note::
-  //   This must be >= 400.
+  //   If this is set to < 400, 429 will be used instead.
   type.v3.HttpStatus status = 2;
 
   // The token bucket configuration to use for rate limiting requests that are processed by this
