@@ -32,10 +32,7 @@ namespace Upstream {
 // the subsequent updates to those sets.
 class LoadBalancerFuzzBase {
 public:
-  LoadBalancerFuzzBase()
-      : stats_(ClusterInfoImpl::generateStats(stats_store_)){
-
-        };
+  LoadBalancerFuzzBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)){};
 
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
@@ -44,10 +41,9 @@ public:
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
-  void initializeLbComponents(test::common::upstream::LoadBalancerTestCase input);
+  void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
   void updateHealthFlagsForAHostSet(bool failover_host_set, uint32_t num_healthy_hosts,
-                                    uint32_t num_degraded_hosts = 0,
-                                    uint32_t num_excluded_hosts = 0);
+                                    uint32_t num_degraded_hosts, uint32_t num_excluded_hosts);
   // These two actions have a lot of logic attached to them. However, all the logic that the load
   // balancer needs to run its algorithm is already encapsulated within the load balancer. Thus,
   // once the load balancer is constructed, all this class has to do is call lb_->peekAnotherHost()

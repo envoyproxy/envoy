@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Upstream {
 
-DEFINE_PROTO_FUZZER(const test::common::upstream::RandomLoadBalancerTestCase input) {
+DEFINE_PROTO_FUZZER(const test::common::upstream::RandomLoadBalancerTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {

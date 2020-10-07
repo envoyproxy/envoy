@@ -286,7 +286,6 @@ envoy_cc_fuzz_test(
         ":load_balancer_fuzz_proto_cc_proto",
         ":random_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
-        "//test/fuzz:utility_lib",
     ],
 )
 
