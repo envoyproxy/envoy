@@ -120,6 +120,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
+  constexpr uint64_t MaxSlices = 16;
+  Buffer::RawSliceVector slices = buffer.getRawSlices(MaxSlices);
+  Api::IoCallUint64Result result = writev(slices.begin(), slices.size());
+  if (result.ok() && result.rc_ > 0) {
+    buffer.drain(static_cast<uint64_t>(result.rc_));
+  }
+  return result;
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
                                                     const Address::Ip* self_ip,

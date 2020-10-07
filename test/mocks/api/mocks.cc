@@ -31,8 +31,20 @@ Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name,
 
 MockOsSysCalls::MockOsSysCalls() {
   ON_CALL(*this, close(_)).WillByDefault(Invoke([](os_fd_t fd) {
+#ifdef WIN32
+    int rc = ::closesocket(fd);
+    int last_error = ::GetLastError();
+    // It might be the case that the fd is not actually a socket. In that case Winsock api is
+    // failing with error `WSAENOTSOCK`. In that case we fall back to a regular close.
+    if (last_error == WSAENOTSOCK) {
+      rc = ::close(fd);
+      last_error = ::GetLastError();
+    }
+    return SysCallIntResult{rc, last_error};
+#else
     const int rc = ::close(fd);
     return SysCallIntResult{rc, errno};
+#endif
   }));
 }
 

@@ -163,15 +163,6 @@ public:
 
   std::string toString() const override { return std::string(data_.data() + start_, size_); }
 
-  Api::IoCallUint64Result write(Network::IoHandle& io_handle) override {
-    const Buffer::RawSlice slice{const_cast<char*>(start()), size_};
-    Api::IoCallUint64Result result = io_handle.writev(&slice, 1);
-    FUZZ_ASSERT(result.ok());
-    start_ += result.rc_;
-    size_ -= result.rc_;
-    return result;
-  }
-
   absl::string_view asStringView() const { return {start(), size_}; }
 
   char* mutableStart() { return data_.data() + start_; }
@@ -361,7 +352,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     do {
       const bool empty = target_buffer.length() == 0;
       const std::string previous_data = target_buffer.toString();
-      const auto result = target_buffer.write(io_handle);
+      const auto result = io_handle.write(target_buffer);
       FUZZ_ASSERT(result.ok());
       rc = result.rc_;
       ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,

@@ -498,16 +498,6 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Api::IoCallUint64Result OwnedImpl::write(Network::IoHandle& io_handle) {
-  constexpr uint64_t MaxSlices = 16;
-  RawSliceVector slices = getRawSlices(MaxSlices);
-  Api::IoCallUint64Result result = io_handle.writev(slices.begin(), slices.size());
-  if (result.ok() && result.rc_ > 0) {
-    drain(static_cast<uint64_t>(result.rc_));
-  }
-  return result;
-}
-
 OwnedImpl::OwnedImpl() = default;
 
 OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
