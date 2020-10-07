@@ -548,7 +548,7 @@ TEST_F(PostgresProxyDecoderTest, Linearize) {
   // Message header is 5 bytes and body will contain string "test\0".
   EXPECT_CALL(fake_buf, length).WillRepeatedly(testing::Return(10));
   // The decoder will first ask for 1-byte message type
-  // Them for length and finally for message body.
+  // Then for length and finally for message body.
   EXPECT_CALL(fake_buf, copyOut)
       .WillOnce([](size_t start, uint64_t size, void* data) {
         ASSERT_THAT(start, 0);
@@ -566,12 +566,11 @@ TEST_F(PostgresProxyDecoderTest, Linearize) {
 
   decoder_->onData(fake_buf, false);
 
-  // Simulate that decoder reads message which do not need processing.
+  // Simulate that decoder reads message which does not need processing.
   // BindComplete message has type '2' and empty body.
   // Total message length is equal to length of header (5 bytes).
   EXPECT_CALL(fake_buf, length).WillRepeatedly(testing::Return(5));
-  // The decoder will first ask for 1-byte message type
-  // Them for length.
+  // The decoder will first ask for 1-byte message type and next for length.
   EXPECT_CALL(fake_buf, copyOut)
       .WillOnce([](size_t start, uint64_t size, void* data) {
         ASSERT_THAT(start, 0);
