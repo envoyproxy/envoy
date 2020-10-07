@@ -104,6 +104,7 @@ private:
     ThreadLocalCache() = default;
     // The client cache stored with key as hash of
     // envoy::config::core::v3::GrpcService::GoogleGrpc config.
+    // TODO(fpliu233): Remove when the cleaner and generic solution for gRPC is live.
     absl::flat_hash_map<std::size_t, Grpc::RawAsyncClientSharedPtr> async_clients_;
   };
 
