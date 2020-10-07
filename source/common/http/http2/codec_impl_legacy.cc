@@ -251,6 +251,7 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
     submitMetadata(flags);
   }
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
