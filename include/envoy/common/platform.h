@@ -154,9 +154,9 @@ struct tcp_info {
 
   uint64_t tcpi_delivery_rate;
 
-  uint64_t tcpi_busy_time;      /* Time (usec) busy sending data */
-  uint64_t tcpi_rwnd_limited;   /* Time (usec) limited by receive window */
-  uint64_t tcpi_sndbuf_limited; /* Time (usec) limited by send buffer */
+  uint64_t tcpi_busy_time;      /* Time (microsecond) busy sending data */
+  uint64_t tcpi_rwnd_limited;   /* Time (microsecond) limited by receive window */
+  uint64_t tcpi_sndbuf_limited; /* Time (microsecond) limited by send buffer */
 
   uint32_t tcpi_delivered;
   uint32_t tcpi_delivered_ce;
