@@ -1,13 +1,8 @@
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
-#include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.validate.h"
-
-#include "common/http/header_utility.h"
 
 #include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
-#include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
-#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -45,9 +40,6 @@ public:
   FilterTest() = default;
 
   void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {
-    fractional_percent_.set_numerator(100);
-    fractional_percent_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-
     EXPECT_CALL(
         runtime_.snapshot_,
         featureEnabled(absl::string_view("test_enabled"),
@@ -76,13 +68,9 @@ public:
   const FilterConfig* getEffectiveConfig() { return filter_->effective_config_; }
 
   Stats::IsolatedStoreImpl stats_;
-  TestStreamInfo stream_info_;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockSnapshot> snapshot_;
-  envoy::type::v3::FractionalPercent fractional_percent_;
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
 };
