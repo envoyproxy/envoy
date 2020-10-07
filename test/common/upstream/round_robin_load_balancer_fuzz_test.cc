@@ -22,14 +22,14 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase
 
   try {
     if (!input.need_local_cluster()) { // construct the load balancer without a local priority set
-      load_balancer_fuzz->lb_ = std::make_unique<RandomLoadBalancer>(
+      load_balancer_fuzz->lb_ = std::make_unique<RoundRobinLoadBalancer>(
           load_balancer_fuzz->priority_set_, nullptr, load_balancer_fuzz->stats_,
           load_balancer_fuzz->runtime_, load_balancer_fuzz->random_,
           input.load_balancer_test_case().common_lb_config());
     } else { // construct the load balancer with a local priority set
       std::shared_ptr<PrioritySetImpl> local_priority_set = std::make_shared<PrioritySetImpl>();
       local_priority_set->getOrCreateHostSet(0);
-      load_balancer_fuzz->lb_ = std::make_unique<RandomLoadBalancer>(
+      load_balancer_fuzz->lb_ = std::make_unique<RoundRobinLoadBalancer>(
           load_balancer_fuzz->priority_set_, local_priority_set.get(), load_balancer_fuzz->stats_,
           load_balancer_fuzz->runtime_, load_balancer_fuzz->random_,
           input.load_balancer_test_case().common_lb_config());
