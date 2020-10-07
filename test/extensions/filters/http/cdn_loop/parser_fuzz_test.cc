@@ -21,7 +21,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // If we successfully parse input, we should make sure that cdn_ids we find appear in the input
     // string in order.
     size_t start = 0;
-    for (const absl::string_view cdn_id : list->cdnIds()) {
+    for (const absl::string_view& cdn_id : list->cdnIds()) {
       size_t pos = input.find(cdn_id, start);
       FUZZ_ASSERT(pos != absl::string_view::npos);
       FUZZ_ASSERT(pos >= start);
