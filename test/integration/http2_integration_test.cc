@@ -1992,6 +1992,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
+// Verify detection of frame flood when sending second GOAWAY frame on drain timeout
 TEST_P(Http2FloodMitigationTest, GoAwayOverflowOnDrainTimeout) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -2003,7 +2004,7 @@ TEST_P(Http2FloodMitigationTest, GoAwayOverflowOnDrainTimeout) {
 
         auto* http_protocol_options = hcm.mutable_common_http_protocol_options();
         auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
-        idle_time_out->set_seconds(seconds.count());      
+        idle_time_out->set_seconds(seconds.count());
       });
   // pre-fill two away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 2);
