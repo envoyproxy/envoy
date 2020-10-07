@@ -2023,10 +2023,10 @@ TEST_P(Http2FloodMitigationTest, DownstreamConnectionDurationTimeoutTriggersFloo
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* http_protocol_options = hcm.mutable_common_http_protocol_options();
-        auto* idle_time_out = http_protocol_options->mutable_max_connection_duration();
+        auto* max_connection_duration = http_protocol_options->mutable_max_connection_duration();
         std::chrono::milliseconds timeout(1000);
         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
-        idle_time_out->set_seconds(seconds.count());
+        max_connection_duration->set_seconds(seconds.count());
       });
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
   tcp_client_->waitForDisconnect();
