@@ -264,8 +264,7 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 SysCallBoolResult socketTcpInfo(os_fd_t sockfd, tcp_info* tcpInfo) {
 #ifdef TCP_INFO
   socklen_t len = sizeof(tcpInfo);
-  auto result =
-      Api::OsSysCallsSingleton::get().getsockopt(fd_, IPPROTO_TCP, TCP_INFO, &tcpInfo, &len);
+  auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &tcpInfo, &len);
   return { true, !SOCKET_FAILURE(result) ? 0 : errno }
 #endif
 
