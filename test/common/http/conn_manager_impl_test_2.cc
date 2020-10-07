@@ -2171,7 +2171,8 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
 
   setup(false, "");
 
-  EXPECT_CALL(random_, random()).WillRepeatedly(Return(Random::RandomGenerator::max() * 0.5));
+  EXPECT_CALL(random_, random())
+      .WillRepeatedly(Return(static_cast<float>(Random::RandomGenerator::max()) * 0.5));
 
   // 503 direct response when overloaded.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
@@ -2196,7 +2197,8 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
   codec_->protocol_ = Protocol::Http11;
   setup(false, "");
 
-  EXPECT_CALL(random_, random()).WillRepeatedly(Return(Random::RandomGenerator::max() * 0.5));
+  EXPECT_CALL(random_, random())
+      .WillRepeatedly(Return(static_cast<float>(Random::RandomGenerator::max()) * 0.5));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
