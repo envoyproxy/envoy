@@ -25,7 +25,6 @@ Minor Behavior Changes
 * ext_authz filter: request timeout will now count from the time the check request is created, instead of when it becomes active. This makes sure that the timeout is enforced even if the ext_authz cluster's circuit breaker is engaged.
   This behavior can be reverted by setting runtime feature ``envoy.reloadable_features.ext_authz_measure_timeout_on_check_created`` to false. When enabled, a new `ext_authz.timeout` stat is counted when timeout occurs. See :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
-* ext_authz_filter: added :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>` to disable request data buffering per-route.
 * grpc reverse bridge: upstream headers will no longer be propagated when the response is missing or contains an unexpected content-type.
 * http: added :ref:`contains <envoy_api_msg_type.matcher.StringMatcher>` a new string matcher type which matches if the value of the string has the substring mentioned in contains matcher.
 * http: added :ref:`contains <envoy_api_msg_route.HeaderMatcher>` a new header matcher type which matches if the value of the header has the substring mentioned in contains matcher.
@@ -99,9 +98,10 @@ New Features
 * dns: added support for doing DNS resolution using Apple's DnsService APIs in Apple platforms (macOS, iOS). This feature is ON by default, and is only configurable via the ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime key. Note that this value is latched during server startup and changing the runtime key is a no-op during the lifetime of the process.
 * dns_filter: added support for answering :ref:`service record<envoy_v3_api_msg_data.dns.v3.DnsTable.DnsService>` queries.
 * dynamic_forward_proxy: added :ref:`use_tcp_for_dns_lookups<envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` option to use TCP for DNS lookups in order to match the DNS options for :ref:`Clusters<envoy_v3_api_msg_config.cluster.v3.Cluster>`.
+* ext_authz_filter: added :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>` to disable request data buffering per-route.
+* ext_authz filter: added :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>` as an optional additional prefix for the statistics emitted from `ext_authz` HTTP filter.
 * ext_authz filter: added support for emitting dynamic metadata for both :ref:`HTTP <config_http_filters_ext_authz_dynamic_metadata>` and :ref:`network <config_network_filters_ext_authz_dynamic_metadata>` filters.
   The emitted dynamic metadata is set by :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in a returned :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
-* ext_authz filter: added :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>` as an optional additional prefix for the statistics emitted from `ext_authz` HTTP filter.
 * ext_authz filter: added support for letting the authorization server instruct Envoy to remove headers from the original request by setting the new field :ref:`headers_to_remove <envoy_v3_api_field_service.auth.v3.OkHttpResponse.headers_to_remove>` before forwarding it to the upstream.
 * ext_authz filter: added support for sending :ref:`raw bytes as request body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>` of a gRPC check request by setting :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` to true.
 * ext_authz filter: added support for enabling the filter based on :ref:`dynamic metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled_metadata>`.
