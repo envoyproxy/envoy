@@ -137,7 +137,6 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -256,6 +255,7 @@ envoy_cc_test_library(
     deps = [
         ":global_lib",
         ":only_one_thread_lib",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_lib",
     ],
@@ -272,6 +272,11 @@ envoy_cc_test_library(
         "//source/common/event:real_time_system_lib",
         "//source/common/event:timer_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "status_utility_lib",
+    hdrs = ["status_utility.h"],
 )
 
 envoy_cc_test(

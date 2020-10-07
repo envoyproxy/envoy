@@ -1,10 +1,5 @@
 ---
 tasks:
-  gcc:
-    name: "GCC"
-    platform: ubuntu1804
-    build_targets:
-      - "//source/exe:envoy-static"
   rbe:
     name: "RBE"
     platform: ubuntu1804

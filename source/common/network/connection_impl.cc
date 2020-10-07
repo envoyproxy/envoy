@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/socket.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -257,7 +258,8 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 #endif
 
-  RELEASE_ASSERT(result.rc_ == 0, "");
+  RELEASE_ASSERT(result.rc_ == 0, fmt::format("Failed to set TCP_NODELAY with error {}, {}",
+                                              result.errno_, errorDetails(result.errno_)));
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
@@ -693,6 +695,10 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
+
+absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
+  return socket_->lastRoundTripTime();
+};
 
 void ConnectionImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {

@@ -21,12 +21,14 @@ An example entry for the `nghttp2` dependency is:
 ```python
 com_github_nghttp2_nghttp2 = dict(
     project_name = "Nghttp2",
+    project_desc = "Implementation of HTTP/2 and its header compression ...",
     project_url = "https://nghttp2.org",
     version = "1.41.0",
     sha256 = "eacc6f0f8543583ecd659faf0a3f906ed03826f1d4157b536b4b385fe47c5bb8",
     strip_prefix = "nghttp2-{version}",
     urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
     use_category = ["dataplane"],
+    last_updated = "2020-06-02",
     cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
 ),
 ```
@@ -40,9 +42,11 @@ Dependency declarations must:
   `{dash_version}`.
 * Versions should prefer release versions over master branch GitHub SHA tarballs. A comment is
   necessary if the latter is used. This comment should contain the reason that a non-release
-  version is being used and the YYYY-MM-DD when the last update was performed.
+  version is being used.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
   or control plane implications of the dependency.
+* Reflect the date (YYYY-MM-DD) at which they were last updated in the `last_updated` field. This
+  date is preferably the date at which the PR is created.
 * CPEs are compulsory for all dependencies that are not purely build/test.
   [CPEs](https://en.wikipedia.org/wiki/Common_Platform_Enumeration) provide metadata that allow us
   to correlate with related CVEs in dashboards and other tooling, and also provide a machine
@@ -92,6 +96,25 @@ basis:
 
 Where possible, we prefer the latest release version for external dependencies, rather than master
 branch GitHub SHA tarballs.
+
+## Dependency patches
+
+Occasionally it is necessary to introduce an Envoy-side patch to a dependency in a `.patch` file.
+These are typically applied in [bazel/repositories.bzl](bazel/repositories.bzl). Our policy on this
+is as follows:
+
+* Patch files impede dependency updates. They are expedient at creation time but are a maintenance
+  penalty. They reduce the velocity and increase the effort of upgrades in response to security
+  vulnerabilities in external dependencies.
+
+* No patch will be accepted without a sincere and sustained effort to upstream the patch to the
+  dependency's canonical repository.
+
+* There should exist a plan-of-record, filed as an issue in Envoy or the upstream GitHub tracking
+  elimination of the patch.
+
+* Every patch must have comments at its point-of-use in [bazel/repositories.bzl](bazel/repositories.bzl)
+  providing a rationale and detailing the tracking issue.
 
 ## Policy exceptions
 

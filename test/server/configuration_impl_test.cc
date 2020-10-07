@@ -60,10 +60,10 @@ protected:
       : api_(Api::createApiForTest()),
         cluster_manager_factory_(
             server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
-            server_.dispatcher(), server_.localInfo(), server_.secretManager(),
-            server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
-            server_.accessLogManager(), server_.singletonManager()) {}
+            server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
+            server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
+            server_.httpContext(), server_.grpcContext(), server_.accessLogManager(),
+            server_.singletonManager()) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -754,7 +754,8 @@ TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.watchdogConfig().killTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
 }
 
 TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
@@ -772,8 +773,10 @@ TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_LT(std::chrono::milliseconds(1000), config.watchdogConfig().killTimeout());
-  EXPECT_GE(std::chrono::milliseconds(1500), config.watchdogConfig().killTimeout());
+  EXPECT_LT(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_LT(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
+  EXPECT_GE(std::chrono::milliseconds(1500), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_GE(std::chrono::milliseconds(1500), config.workerWatchdogConfig().killTimeout());
 }
 
 TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
@@ -790,9 +793,41 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.watchdogConfig().killTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0), config.workerWatchdogConfig().killTimeout());
 }
 
+TEST_F(ConfigurationImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {
+  const std::string json = R"EOF( { "watchdogs": {}, "watchdog": {}})EOF";
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json, bootstrap);
+
+  MainImpl config;
+
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException, "Only one of watchdog or watchdogs should be set!");
+}
+
+TEST_F(ConfigurationImplTest, CanSetMultiWatchdogConfigs) {
+  const std::string json = R"EOF( { "watchdogs": {
+    "main_thread_watchdog" : {
+      miss_timeout : "2s"
+    },
+    "worker_watchdog" : {
+      miss_timeout : "0.5s"
+    }
+  }})EOF";
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json, bootstrap);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_EQ(config.mainThreadWatchdogConfig().missTimeout(), std::chrono::milliseconds(2000));
+  EXPECT_EQ(config.workerWatchdogConfig().missTimeout(), std::chrono::milliseconds(500));
+}
 } // namespace
 } // namespace Configuration
 } // namespace Server

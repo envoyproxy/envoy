@@ -67,9 +67,10 @@ public:
    * See the configuration documentation for details on the timeout settings.
    */
   GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
-               Api::Api& api, std::unique_ptr<TestInterlockHook>&& test_interlock);
+               Api::Api& api, absl::string_view name,
+               std::unique_ptr<TestInterlockHook>&& test_interlock);
   GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
-               Api::Api& api);
+               Api::Api& api, absl::string_view name);
   ~GuardDogImpl() override;
 
   /**
@@ -105,10 +106,10 @@ private:
 
   using WatchDogAction = envoy::config::bootstrap::v3::Watchdog::WatchdogAction;
   // Helper function to invoke all the GuardDogActions registered for an Event.
-  void
-  invokeGuardDogActions(WatchDogAction::WatchdogEvent event,
-                        std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
-                        MonotonicTime now);
+  void invokeGuardDogActions(
+      WatchDogAction::WatchdogEvent event,
+      std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_last_checkin_pairs,
+      MonotonicTime now);
 
   struct WatchedDog {
     WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,

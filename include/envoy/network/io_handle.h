@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "envoy/api/io_error.h"
@@ -14,6 +15,7 @@
 namespace Envoy {
 namespace Buffer {
 struct RawSlice;
+class Instance;
 } // namespace Buffer
 
 namespace Event {
@@ -64,6 +66,15 @@ public:
    */
   virtual Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                         uint64_t num_slice) PURE;
+
+  /**
+   * Read from a io handle directly into buffer.
+   * @param buffer supplies the buffer to read into.
+   * @param max_length supplies the maximum length to read.
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
+   * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
+   */
+  virtual Api::IoCallUint64Result read(Buffer::Instance& buffer, uint64_t max_length) PURE;
 
   /**
    * Write the data in slices out.
@@ -223,10 +234,7 @@ public:
   virtual Api::SysCallIntResult setBlocking(bool blocking) PURE;
 
   /**
-   * Get domain used by underlying socket (see man 2 socket)
-   * @param domain updated to the underlying socket's domain if call is successful
-   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
-   * is successful, errno_ shouldn't be used.
+   * @return the domain used by underlying socket (see man 2 socket)
    */
   virtual absl::optional<int> domain() PURE;
 
@@ -258,6 +266,13 @@ public:
    * Shut down part of a full-duplex connection (see man 2 shutdown)
    */
   virtual Api::SysCallIntResult shutdown(int how) PURE;
+
+  /**
+   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  time of the connection. If the platform does not support this, then an empty optional is
+   *  returned.
+   */
+  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

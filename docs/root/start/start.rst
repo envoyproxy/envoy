@@ -205,6 +205,7 @@ features. The following sandboxes are available:
 .. toctree::
     :maxdepth: 2
 
+    sandboxes/cache
     sandboxes/cors
     sandboxes/csrf
     sandboxes/ext_authz
@@ -218,15 +219,3 @@ features. The following sandboxes are available:
     sandboxes/mysql
     sandboxes/redis
     sandboxes/zipkin_tracing
-
-Other use cases
----------------
-
-In addition to the proxy itself, Envoy is also bundled as part of several open
-source distributions that target specific use cases.
-
-.. toctree::
-    :maxdepth: 2
-
-    distro/ambassador
-    distro/gloo

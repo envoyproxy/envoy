@@ -458,7 +458,8 @@ void CacheFilter::encodeCachedResponse() {
   // If the filter is encoding, 304 response headers and cached headers are merged in encodeHeaders.
   // If the filter is decoding, we need to serve response headers from cache directly.
   if (filter_state_ == FilterState::DecodeServingFromCache) {
-    decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream);
+    decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
+                                      CacheResponseCodeDetails::get().ResponseFromCacheFilter);
   }
 
   if (lookup_result_->content_length_ > 0) {

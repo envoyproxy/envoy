@@ -37,12 +37,13 @@ routing PRs, questions, etc. to the right place.
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
+* Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
+  * Event management, security, performance, data plane.
 
 # Envoy security team
 
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
-* Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tallen@lyft.com)
 
 # Emeritus maintainers

@@ -31,6 +31,7 @@
 #undef GetMessage
 #undef interface
 #undef TRUE
+#undef IGNORE
 
 #include <io.h>
 #include <stdint.h>
@@ -61,6 +62,7 @@ typedef ptrdiff_t ssize_t;
 typedef uint32_t mode_t;
 
 typedef SOCKET os_fd_t;
+typedef HANDLE filesystem_os_id_t; // NOLINT(modernize-use-using)
 
 typedef unsigned int sa_family_t;
 
@@ -116,6 +118,7 @@ struct msghdr {
 #define IPV6_RECVPKTINFO IPV6_PKTINFO
 #endif
 
+#define INVALID_HANDLE INVALID_HANDLE_VALUE
 #define SOCKET_VALID(sock) ((sock) != INVALID_SOCKET)
 #define SOCKET_INVALID(sock) ((sock) == INVALID_SOCKET)
 #define SOCKET_FAILURE(rc) ((rc) == SOCKET_ERROR)
@@ -142,6 +145,9 @@ struct msghdr {
 #define SOCKET_ERROR_ADDR_NOT_AVAIL WSAEADDRNOTAVAIL
 #define SOCKET_ERROR_INVAL WSAEINVAL
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
+
+#define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
+#define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"NUL"};
@@ -206,7 +212,9 @@ constexpr absl::string_view null_device_path{"NUL"};
 #endif
 
 typedef int os_fd_t;
+typedef int filesystem_os_id_t; // NOLINT(modernize-use-using)
 
+#define INVALID_HANDLE -1
 #define INVALID_SOCKET -1
 #define SOCKET_VALID(sock) ((sock) >= 0)
 #define SOCKET_INVALID(sock) ((sock) == -1)
@@ -230,6 +238,10 @@ typedef int os_fd_t;
 #define SOCKET_ERROR_ADDR_NOT_AVAIL EADDRNOTAVAIL
 #define SOCKET_ERROR_INVAL EINVAL
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
+
+// Mapping POSIX file errors to common error names
+#define HANDLE_ERROR_PERM EACCES
+#define HANDLE_ERROR_INVALID EBADF
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"/dev/null"};
