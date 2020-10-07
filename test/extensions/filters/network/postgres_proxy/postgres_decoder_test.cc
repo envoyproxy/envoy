@@ -559,6 +559,11 @@ TEST_F(PostgresProxyDecoderTest, Linearize) {
         ASSERT_THAT(start, 1);
         ASSERT_THAT(size, 4);
         *(static_cast<uint32_t*>(data)) = htonl(9);
+      })
+      .WillRepeatedly([=](size_t start, uint64_t size, void* data) {
+        ASSERT_THAT(start, 0);
+        ASSERT_THAT(size, 5);
+        memcpy(data, body, 5);
       });
 
   // It should call "Buffer::linearize".
