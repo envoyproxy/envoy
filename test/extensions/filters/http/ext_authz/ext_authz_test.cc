@@ -441,7 +441,7 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
 
 // Checks that the filter initiates an authorization request when the buffer reaches maximum
 // request bytes and allow_partial_message is set to true. In addition to that, after the filter
-// sending the check request, data decoding continues.
+// sends the check request, data decoding continues.
 TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   InSequence s;
 
