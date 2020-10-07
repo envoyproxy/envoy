@@ -132,11 +132,8 @@ public:
     const auto& status = matcher_->rootMatcher().matchStatus(matcher_->status_);
 
     if (status.might_change_status_) {
-      std::cout << "attempted to match but skipping due to missing data" << std::endl;
       return absl::nullopt;
     }
-
-    std::cout << "matches: " << status.matches_ << std::endl;
 
     return status.matches_;
   }
@@ -189,14 +186,14 @@ public:
 
 private:
   static MatchTreeSharedPtr
-  createLinearMatcher(envoy::config::common::matcher::v3::MatchTree::MatchLeaf config,
+  createLinearMatcher(const envoy::config::common::matcher::v3::MatchTree::MatchLeaf& config,
                       KeyNamespaceMapperSharedPtr, MatchTreeFactoryCallbacks& callbacks) {
     auto leaf = std::make_shared<LeafNode>(
         config.has_no_match_action()
             ? absl::make_optional(MatchAction::fromProto(config.no_match_action()))
             : absl::nullopt);
 
-    for (const auto matcher : config.matchers()) {
+    for (const auto& matcher : config.matchers()) {
       auto predicate_matcher = std::make_shared<MatchWrapper>(matcher.predicate());
       callbacks.addPredicateMatcher(predicate_matcher);
       leaf->addMatcher(std::make_unique<HttpPredicateMatcher>(predicate_matcher),
@@ -207,7 +204,7 @@ private:
   }
 
   static MatchTreeSharedPtr
-  createSublinerMatcher(envoy::config::common::matcher::v3::MatchTree::SublinearMatcher matcher,
+  createSublinerMatcher(const envoy::config::common::matcher::v3::MatchTree::SublinearMatcher& matcher,
                         KeyNamespaceMapperSharedPtr key_namespace_mapper,
                         MatchTreeFactoryCallbacks& callbacks) {
     auto multimap_matcher = std::make_shared<MultimapMatcher>(
