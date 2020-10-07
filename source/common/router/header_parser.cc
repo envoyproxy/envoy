@@ -276,41 +276,37 @@ HeaderParserPtr HeaderParser::configure(
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
                                    const StreamInfo::StreamInfo& stream_info) const {
+  evaluateHeaders(headers, &stream_info);
+}
+
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
+                                   const StreamInfo::StreamInfo* stream_info) const {
   // Removing headers in the headers_to_remove_ list first makes
   // remove-before-add the default behavior as expected by users.
   for (const auto& header : headers_to_remove_) {
     headers.remove(header);
   }
 
-  for (const auto& formatter : headers_to_add_) {
-    const std::string value = formatter.second->format(stream_info);
-    if (!value.empty()) {
-      if (formatter.second->append()) {
-        headers.addReferenceKey(formatter.first, value);
-      } else {
-        headers.setReferenceKey(formatter.first, value);
+  if (stream_info != nullptr) {
+    for (const auto& formatter : headers_to_add_) {
+      const std::string value = formatter.second->format(*stream_info);
+      if (!value.empty()) {
+        if (formatter.second->append()) {
+          headers.addReferenceKey(formatter.first, value);
+        } else {
+          headers.setReferenceKey(formatter.first, value);
+        }
       }
     }
-  }
-}
-
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const StreamInfo::StreamInfo* stream_info) const {
-  if (stream_info != nullptr) {
-    return evaluateHeaders(headers, *stream_info);
-  }
-
-  for (const auto& header : headers_to_remove_) {
-    headers.remove(header);
-  }
-
-  for (const auto& header_entry : headers_to_add_copy_) {
-    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_entry, append, false)) {
-      headers.addCopy(Http::LowerCaseString(header_entry.header().key()),
-                      header_entry.header().value());
-    } else {
-      headers.setCopy(Http::LowerCaseString(header_entry.header().key()),
-                      header_entry.header().value());
+  } else {
+    for (const auto& header_entry : headers_to_add_copy_) {
+      if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_entry, append, false)) {
+        headers.addCopy(Http::LowerCaseString(header_entry.header().key()),
+                        header_entry.header().value());
+      } else {
+        headers.setCopy(Http::LowerCaseString(header_entry.header().key()),
+                        header_entry.header().value());
+      }
     }
   }
 }
