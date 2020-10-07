@@ -1033,6 +1033,16 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   req_header_parser_set->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("great", header_map.get_("key"));
+
+  headers_values.Clear();
+  auto& empty_entry = *headers_values.Add();
+  empty_entry.set_key("empty");
+  empty_entry.set_value("");
+
+  HeaderParserPtr req_header_parser_empty =
+      HeaderParser::configure(headers_values, /*append=*/false);
+  req_header_parser_empty->evaluateHeaders(header_map, nullptr);
+  EXPECT_FALSE(header_map.has("empty"));
 }
 
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {

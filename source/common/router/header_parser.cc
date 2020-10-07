@@ -226,12 +226,10 @@ HeaderParserPtr HeaderParser::configure(
   for (const auto& header_value_option : headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
     HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
-
     header_parser->headers_to_add_.emplace_back(
-        Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
+        Http::LowerCaseString(header_value_option.header().key()),
+        HeaderParserEntry{std::move(header_formatter), header_value_option.header().value()});
   }
-
-  header_parser->headers_to_add_copy_.CopyFrom(headers_to_add);
 
   return header_parser;
 }
@@ -243,14 +241,9 @@ HeaderParserPtr HeaderParser::configure(
 
   for (const auto& header_value : headers_to_add) {
     HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
-
-    header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
-                                                std::move(header_formatter));
-
-    auto& header_entry = *header_parser->headers_to_add_copy_.Add();
-    header_entry.mutable_append()->set_value(append);
-    header_entry.mutable_header()->set_key(header_value.key());
-    header_entry.mutable_header()->set_value(header_value.value());
+    header_parser->headers_to_add_.emplace_back(
+        Http::LowerCaseString(header_value.key()),
+        HeaderParserEntry{std::move(header_formatter), header_value.value()});
   }
 
   return header_parser;
@@ -287,25 +280,14 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
     headers.remove(header);
   }
 
-  if (stream_info != nullptr) {
-    for (const auto& formatter : headers_to_add_) {
-      const std::string value = formatter.second->format(*stream_info);
-      if (!value.empty()) {
-        if (formatter.second->append()) {
-          headers.addReferenceKey(formatter.first, value);
-        } else {
-          headers.setReferenceKey(formatter.first, value);
-        }
-      }
-    }
-  } else {
-    for (const auto& header_entry : headers_to_add_copy_) {
-      if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_entry, append, false)) {
-        headers.addCopy(Http::LowerCaseString(header_entry.header().key()),
-                        header_entry.header().value());
+  for (const auto& [key, entry] : headers_to_add_) {
+    const std::string value =
+        stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
+    if (!value.empty()) {
+      if (entry.formatter_->append()) {
+        headers.addReferenceKey(key, value);
       } else {
-        headers.setCopy(Http::LowerCaseString(header_entry.header().key()),
-                        header_entry.header().value());
+        headers.setReferenceKey(key, value);
       }
     }
   }

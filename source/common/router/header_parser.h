@@ -55,9 +55,13 @@ protected:
   HeaderParser() = default;
 
 private:
-  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;
+  struct HeaderParserEntry {
+    HeaderFormatterPtr formatter_;
+    const std::string original_value_;
+  };
+
+  std::vector<std::pair<Http::LowerCaseString, HeaderParserEntry>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
-  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add_copy_;
 };
 
 } // namespace Router
