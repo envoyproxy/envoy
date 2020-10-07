@@ -72,7 +72,7 @@ private:
 
   const Http::Code status_;
   mutable LocalRateLimitStats stats_;
-  std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
   Runtime::Loader& runtime_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;

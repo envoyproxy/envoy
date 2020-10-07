@@ -18,7 +18,7 @@ FilterConfig::FilterConfig(
     const bool per_route)
     : status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
-      rate_limiter_(std::make_shared<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
+      rate_limiter_(Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
           std::chrono::milliseconds(
               PROTOBUF_GET_MS_OR_DEFAULT(config.token_bucket(), fill_interval, 0)),
           config.token_bucket().max_tokens(),
@@ -45,7 +45,7 @@ FilterConfig::FilterConfig(
   }
 }
 
-bool FilterConfig::requestAllowed() const { return rate_limiter_->requestAllowed(); }
+bool FilterConfig::requestAllowed() const { return rate_limiter_.requestAllowed(); }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + ".http_local_rate_limit";
