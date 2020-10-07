@@ -10,7 +10,6 @@
 #include "extensions/resource_monitors/common/factory_base.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"

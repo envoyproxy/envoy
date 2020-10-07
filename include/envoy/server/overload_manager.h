@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-#include "envoy/common/random_generator.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/macros.h"
