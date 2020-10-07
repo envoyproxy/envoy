@@ -6,7 +6,7 @@
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
 #include "common/grpc/google_grpc_context.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -75,7 +75,7 @@ protected:
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
   Filesystem::Instance& file_system_;
-  Stats::SymbolTablePtr symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   Stats::AllocatorImpl stats_allocator_;
 
   ThreadLocal::InstanceImplPtr tls_;

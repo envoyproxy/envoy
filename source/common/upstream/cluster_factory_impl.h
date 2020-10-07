@@ -73,7 +73,6 @@ public:
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
   Runtime::Loader& runtime() override { return runtime_; }
-  Random::RandomGenerator& random() override { return api_.randomGenerator(); }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   AccessLog::AccessLogManager& logManager() override { return log_manager_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
@@ -118,7 +117,7 @@ public:
   create(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
          Stats::Store& stats, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
-         Runtime::Loader& runtime, Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
          Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,

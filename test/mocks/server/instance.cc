@@ -33,7 +33,6 @@ MockInstance::MockInstance()
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, hotRestart()).WillByDefault(ReturnRef(hot_restart_));
-  ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
@@ -60,7 +59,6 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
-  ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));

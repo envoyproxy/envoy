@@ -462,7 +462,7 @@ protected:
    * implementation in the ServerConnectionImpl schedules callback to terminate connection if the
    * protocol constraint was violated.
    */
-  virtual void checkProtocolConstrainViolation() PURE;
+  virtual void checkProtocolConstraintViolation() PURE;
 
   /**
    * Callback for terminating connection when protocol constrain has been violated
@@ -578,7 +578,7 @@ private:
     return ProtocolConstraints::ReleasorProc([]() {});
   }
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return okStatus(); }
-  void checkProtocolConstrainViolation() override {}
+  void checkProtocolConstraintViolation() override {}
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -610,7 +610,7 @@ private:
    * Check protocol constraint violations outside of the dispatching context.
    * This method ASSERTs if it is called in the dispatching context.
    */
-  void checkProtocolConstrainViolation() override;
+  void checkProtocolConstraintViolation() override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when
