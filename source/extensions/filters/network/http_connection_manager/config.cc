@@ -644,7 +644,16 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
+// This wraps the provided factory callbacks to allow for optionally injecting the MatchTree that was
+// provided as part of the static config. This pattern allows existing filter factories to start
+// using the match tree configuration without having to be updated to call the
+// factory callback method that allows specifying a match tree.
+//
+// When a match tree is specified by the caller, we prefer that over the match tree generated
+// from the static config. This allows filters to make adjustments to the match tree during
+// filter creation.
+class MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
+public:
   MatchTreeDecoratingFactoryCallbacks(Http::FilterChainFactoryCallbacks& delegated_callbacks,
                                       HttpConnectionManagerConfig::MatchTreeFactoryCb match_tree)
       : callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
@@ -658,12 +667,9 @@ struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCall
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-    if (!match_tree_) {
-      callbacks_.addStreamDecoderFilter(filter);
-    }
-    auto data = std::make_unique<Http::HttpMatchingData>();
-    auto matcher = match_tree_(absl::nullopt, *data);
-    callbacks_.addStreamDecoderFilter(filter, matcher, matcher ? std::move(data) : nullptr);
+    wrapFilter(filter, [this](Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr matcher, MatchingDataSharedPtr data) {
+      callbacks_.addStreamDecoderFilter(filter, matcher, data);
+    });
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
@@ -672,12 +678,9 @@ struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCall
     callbacks_.addStreamDecoderFilter(filter, std::move(match_tree), std::move(matching_data));
   }
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-    if (!match_tree_) {
-      callbacks_.addStreamEncoderFilter(filter);
-    }
-    auto data = std::make_unique<Http::HttpMatchingData>();
-    auto matcher = match_tree_(absl::nullopt, *data);
-    callbacks_.addStreamEncoderFilter(filter, matcher, matcher ? std::move(data) : nullptr);
+    wrapFilter(filter, [this](Http::StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr matcher, MatchingDataSharedPtr data) {
+      callbacks_.addStreamEncoderFilter(filter, matcher, data);
+    });
   }
 
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
@@ -685,14 +688,11 @@ struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCall
                               MatchingDataSharedPtr matching_data) override {
     callbacks_.addStreamEncoderFilter(filter, std::move(match_tree), std::move(matching_data));
   }
-  void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
-    if (!match_tree_) {
-      callbacks_.addStreamFilter(filter);
-    }
 
-    auto data = std::make_unique<Http::HttpMatchingData>();
-    auto matcher = match_tree_(absl::nullopt, *data);
-    callbacks_.addStreamFilter(filter, matcher, matcher ? std::move(data) : nullptr);
+  void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
+    wrapFilter(filter, [this](Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr matcher, MatchingDataSharedPtr data) {
+      callbacks_.addStreamFilter(filter, matcher, data);
+    });
   }
 
   void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
@@ -701,6 +701,19 @@ struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCall
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
     callbacks_.addAccessLogHandler(handler);
+  }
+
+private:
+  template<class T, class S> void wrapFilter(T filter, S factory_func) {
+    // If there is no configured match tree, just invoke the factory callback as normal.
+    if (!match_tree_) {
+      factory_func(filter, nullptr, nullptr);
+    }
+
+    // Otherwise we allocate a new data object for this tree and pass it to the factory function.
+    auto data = std::make_unique<Http::HttpMatchingData>();
+    auto matcher = match_tree_(absl::nullopt, *data);
+    factory_func(filter, matcher, matcher ? std::move(data) : nullptr);
   }
 
   Http::FilterChainFactoryCallbacks& callbacks_;
