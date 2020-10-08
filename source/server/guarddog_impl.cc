@@ -30,7 +30,8 @@ namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
-                           Api::Api& api, std::unique_ptr<TestInterlockHook>&& test_interlock)
+                           Api::Api& api, absl::string_view name,
+                           std::unique_ptr<TestInterlockHook>&& test_interlock)
     : test_interlock_hook_(std::move(test_interlock)), stats_scope_(stats_scope),
       time_source_(api.timeSource()), miss_timeout_(config.missTimeout()),
       megamiss_timeout_(config.megaMissTimeout()), kill_timeout_(config.killTimeout()),
@@ -46,19 +47,22 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
                          min_of_nonfatal});
       }()),
       watchdog_miss_counter_(stats_scope.counterFromStatName(
-          Stats::StatNameManagedStorage("server.watchdog_miss", stats_scope.symbolTable())
+          Stats::StatNameManagedStorage(absl::StrCat(name, ".watchdog_miss"),
+                                        stats_scope.symbolTable())
               .statName())),
       watchdog_megamiss_counter_(stats_scope.counterFromStatName(
-          Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
+          Stats::StatNameManagedStorage(absl::StrCat(name, ".watchdog_mega_miss"),
+                                        stats_scope.symbolTable())
               .statName())),
-      dispatcher_(api.allocateDispatcher("guarddog_thread")),
+      dispatcher_(api.allocateDispatcher(absl::StrCat(name, "_guarddog_thread"))),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })),
       events_to_actions_([&](const Server::Configuration::Watchdog& config) -> EventToActionsMap {
         EventToActionsMap map;
 
         // We should be able to share the dispatcher since guard dog's lifetime
         // should eclipse those of actions.
-        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_};
+        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_, stats_scope,
+                                                               name};
 
         const auto& actions = config.actions();
         for (const auto& action : actions) {
@@ -75,8 +79,8 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 }
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
-                           Api::Api& api)
-    : GuardDogImpl(stats_scope, config, api, std::make_unique<TestInterlockHook>()) {}
+                           Api::Api& api, absl::string_view name)
+    : GuardDogImpl(stats_scope, config, api, name, std::make_unique<TestInterlockHook>()) {}
 
 GuardDogImpl::~GuardDogImpl() { stop(); }
 

@@ -290,6 +290,7 @@ private:
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
     void refreshCachedTracingCustomTags();
+    void refreshDurationTimeout();
 
     // All state for the stream. Put here for readability.
     struct State {

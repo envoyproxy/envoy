@@ -17,11 +17,11 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version,
                                bool use_alpha)
-    : async_client_(std::move(async_client)), timeout_(timeout),
+    : async_client_(async_client), timeout_(timeout),
       service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
                                              "envoy.service.auth.v2.Authorization.Check",
                                              "envoy.service.auth.v2alpha.Authorization.Check")
@@ -34,17 +34,31 @@ void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
   request_->cancel();
   callbacks_ = nullptr;
+  timeout_timer_.reset();
 }
 
-void GrpcClientImpl::check(RequestCallbacks& callbacks,
+void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
                            const envoy::service::auth::v3::CheckRequest& request,
                            Tracing::Span& parent_span, const StreamInfo::StreamInfo&) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
+  Http::AsyncClient::RequestOptions options;
+  if (timeout_.has_value()) {
+    if (timeoutStartsAtCheckCreation()) {
+      // TODO(yuval-k): We currently use dispatcher based timeout even if the underlying client is
+      // google gRPC client, which has it's own timeout mechanism. We may want to change that in
+      // the future if the implementations converge.
+      timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
+      timeout_timer_->enableTimer(timeout_.value());
+    } else {
+      // not starting timer on check creation, set the timeout on the request.
+      options.setTimeout(timeout_);
+    }
+  }
+
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
-  request_ = async_client_->send(service_method_, request, *this, parent_span,
-                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_),
+  request_ = async_client_->send(service_method_, request, *this, parent_span, options,
                                  transport_api_version_);
 }
 
@@ -57,6 +71,11 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
       toAuthzResponseHeader(authz_response, response->ok_response().headers());
+      if (response->ok_response().headers_to_remove_size() > 0) {
+        for (const auto& header : response->ok_response().headers_to_remove()) {
+          authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
+        }
+      }
     }
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
@@ -81,6 +100,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
 
   callbacks_->onComplete(std::move(authz_response));
   callbacks_ = nullptr;
+  timeout_timer_.reset();
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
@@ -88,9 +108,23 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   ENVOY_LOG(trace, "CheckRequest call failed with status: {}",
             Grpc::Utility::grpcStatusToString(status));
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
+  timeout_timer_.reset();
+  respondFailure(ErrorKind::Other);
+}
+
+void GrpcClientImpl::onTimeout() {
+  ENVOY_LOG(trace, "CheckRequest timed-out");
+  ASSERT(request_ != nullptr);
+  request_->cancel();
+  // let the client know of failure:
+  respondFailure(ErrorKind::Timedout);
+}
+
+void GrpcClientImpl::respondFailure(ErrorKind kind) {
   Response response{};
   response.status = CheckStatus::Error;
   response.status_code = Http::Code::Forbidden;
+  response.error_kind = kind;
   callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }
@@ -107,6 +141,23 @@ void GrpcClientImpl::toAuthzResponseHeader(
                                             header.header().value());
     }
   }
+}
+
+const Grpc::RawAsyncClientSharedPtr AsyncClientCache::getOrCreateAsyncClient(
+    const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
+  // The cache stores Google gRPC client, so channel is not created for each request.
+  ASSERT(proto_config.has_grpc_service() && proto_config.grpc_service().has_google_grpc());
+  auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
+  const std::size_t cache_key = MessageUtil::hash(proto_config.grpc_service().google_grpc());
+  const auto it = cache.async_clients_.find(cache_key);
+  if (it != cache.async_clients_.end()) {
+    return it->second;
+  }
+  const Grpc::AsyncClientFactoryPtr factory =
+      async_client_manager_.factoryForGrpcService(proto_config.grpc_service(), scope_, true);
+  const Grpc::RawAsyncClientSharedPtr async_client = factory->create();
+  cache.async_clients_.emplace(cache_key, async_client);
+  return async_client;
 }
 
 } // namespace ExtAuthz

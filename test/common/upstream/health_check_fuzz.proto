@@ -7,14 +7,63 @@ import "test/fuzz/common.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "google/protobuf/empty.proto";
 
-message HttpRespond { //TODO: Split this across headers, body, and trailers?
+message HttpRespond {
   test.fuzz.Headers headers = 1;
-  //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
-  string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
+  uint64 status = 2 [(validate.rules).uint64.lt = 1000];
 }
 
+message TcpRespond {
+  bytes data = 1;
+}
+
+enum ServingStatus {
+  UNKNOWN = 0;
+  SERVING = 1;
+  NOT_SERVING = 2;
+  SERVICE_UNKNOWN = 3; // Used only by the Watch method.
+}
+
+message GrpcRespondHeaders {
+  test.fuzz.Headers headers = 1;
+  uint64 status = 2 [(validate.rules).uint64.lt = 1000];
+}
+
+message GrpcRespondUnstructuredBytes {
+  repeated bytes data = 1;
+}
+
+message GrpcRespondBytes {
+  oneof grpc_respond_bytes_selector {
+    option (validate.required) = true;
+    //Structured response, which will get converted to raw bytes
+    ServingStatus status = 1 [(validate.rules).enum.defined_only = true];
+    GrpcRespondUnstructuredBytes grpc_respond_unstructured_bytes = 2;
+  }
+  //This value will determine how many fixed bytes will make up a structured response
+  //It will be moded against the byte size of the serialized response.
+  uint64 chunk_size_for_structured_response = 3;
+}
+
+message GrpcRespondTrailers {
+  test.fuzz.Headers trailers = 1 [(validate.rules).message.required = true];
+}
+
+message GrpcRespond {
+  GrpcRespondHeaders grpc_respond_headers = 1 [(validate.rules).message.required = true];
+  GrpcRespondBytes grpc_respond_bytes = 2;
+  //Having this as a message allows the scenario with no trailers
+  GrpcRespondTrailers grpc_respond_trailers = 3;
+}
+
+/*
+The three types of health checkers (HTTP, TCP, and gRPC) share a lot of logic, thus allowing the fuzzer to use a single action
+stream across all three. However, the main difference comes from the type of data parsed as a response. Switching across the
+health checker type allows the fuzzer to choose the correct action sequence.
+*/
 message Respond {
   HttpRespond http_respond = 1 [(validate.rules).message.required = true];
+  TcpRespond tcp_respond = 2 [(validate.rules).message.required = true];
+  GrpcRespond grpc_respond = 3 [(validate.rules).message.required = true];
 }
 
 enum RaiseEvent {
@@ -30,15 +79,14 @@ message Action {
     google.protobuf.Empty trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers
     google.protobuf.Empty trigger_timeout_timer = 3;
-    RaiseEvent raise_event = 4;
+    RaiseEvent raise_event = 4 [(validate.rules).enum.defined_only = true];
   }
 }
 
 message HealthCheckTestCase {
   envoy.config.core.v3.HealthCheck health_check_config = 1
       [(validate.rules).message.required = true];
-  repeated Action actions =
-      2; //TODO: Timeouts might eventually come up from this becoming too big. If so, can simply add a check in replay loop.
+  repeated Action actions = 2;
   bool http_verify_cluster = 3; //Determines if verify cluster setting is on
   bool start_failed = 4;
 }

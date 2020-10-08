@@ -88,6 +88,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // new connection implied.
   std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
   stub_ = stub_factory.createStub(channel);
+  scope_->counterFromStatName(stat_names.google_grpc_client_creation_).inc();
   // Initialize client stats.
   // TODO(jmarantz): Capture these names in async_client_manager_impl.cc and
   // pass in a struct of StatName objects so we don't have to take locks here.

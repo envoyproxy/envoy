@@ -498,6 +498,15 @@ public:
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return max_stream_duration_;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+    return grpc_timeout_header_max_;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+    return grpc_timeout_header_offset_;
+  }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
     return max_grpc_timeout_;
   }
@@ -603,6 +612,15 @@ private:
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override {
       return parent_->idleTimeout();
+    }
+    absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+      return parent_->max_stream_duration_;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+      return parent_->grpc_timeout_header_max_;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+      return parent_->grpc_timeout_header_offset_;
     }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return parent_->maxGrpcTimeout();
@@ -758,6 +776,9 @@ private:
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const absl::optional<std::chrono::milliseconds> max_stream_duration_;
+  const absl::optional<std::chrono::milliseconds> grpc_timeout_header_max_;
+  const absl::optional<std::chrono::milliseconds> grpc_timeout_header_offset_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
   Runtime::Loader& loader_;

@@ -2,7 +2,7 @@
 
 set -e
 
-if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY:0:1}" ]]; then
+if [[ -n "${GCP_SERVICE_ACCOUNT_KEY:0:1}" ]]; then
   # mktemp will create a tempfile with u+rw permission minus umask, it will not be readable by all
   # users by default.
   GCP_SERVICE_ACCOUNT_KEY_FILE=$(mktemp -t gcp_service_account.XXXXXX.json)
@@ -20,11 +20,11 @@ if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY:0:1}" ]]; then
 fi
 
 
-if [[ ! -z "${BAZEL_REMOTE_CACHE}" ]]; then
+if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_cache=${BAZEL_REMOTE_CACHE}"
   echo "Set up bazel remote read/write cache at ${BAZEL_REMOTE_CACHE}."
 
-  if [[ ! -z "${BAZEL_REMOTE_INSTANCE}" ]]; then
+  if [[ -n "${BAZEL_REMOTE_INSTANCE}" ]]; then
     export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_instance_name=${BAZEL_REMOTE_INSTANCE}"
     echo "instance_name: ${BAZEL_REMOTE_INSTANCE}."
   elif [[ -z "${ENVOY_RBE}" ]]; then
