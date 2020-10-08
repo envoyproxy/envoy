@@ -402,16 +402,24 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
     const auto port_match = destination_ports_map_.find(address->ip()->port());
     if (port_match != destination_ports_map_.end()) {
       best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
-    }
-  } else {
-    // Match on catch-all port 0.
-    const auto port_match = destination_ports_map_.find(0);
-    if (port_match != destination_ports_map_.end()) {
-      best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
+      if (best_match_filter_chain != nullptr) {
+        return best_match_filter_chain;
+      } else {
+        // There is entry for specific port but none of the filter chain matches. Instead of
+        // matching catch-all port 0, the fallback filter chain is returned.
+        return match_all_filter_chain_.get();
+      }
     }
   }
-  return best_match_filter_chain != nullptr ? best_match_filter_chain
-                                            : match_all_filter_chain_.get();
+  // Match on catch-all port 0 if there is no specific port sub tree.
+  const auto port_match = destination_ports_map_.find(0);
+  if (port_match != destination_ports_map_.end()) {
+    best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
+  }
+  return best_match_filter_chain != nullptr
+             ? best_match_filter_chain
+             // Neither exact port nor catch-all port matches. Use fallback filter chain.
+             : match_all_filter_chain_.get();
 }
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
