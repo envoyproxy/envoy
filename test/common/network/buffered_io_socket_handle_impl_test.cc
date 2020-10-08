@@ -1,5 +1,3 @@
-#include <sys/socket.h>
-
 #include "envoy/event/file_event.h"
 
 #include "common/buffer/buffer_impl.h"
