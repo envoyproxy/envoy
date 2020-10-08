@@ -55,12 +55,12 @@ protected:
   HeaderParser() = default;
 
 private:
-  struct HeaderParserEntry {
+  struct HeaderToAddEntry {
     HeaderFormatterPtr formatter_;
     const std::string original_value_;
   };
 
-  std::vector<std::pair<Http::LowerCaseString, HeaderParserEntry>> headers_to_add_;
+  std::vector<std::pair<Http::LowerCaseString, HeaderToAddEntry>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
 };
 
