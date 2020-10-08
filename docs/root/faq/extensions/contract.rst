@@ -16,7 +16,7 @@ Is there a contract my HTTP filter must adhere to?
     ``continueEncoding()``/``continueDecoding()``.
 
   * A filter's ``decodeHeaders()`` implementation must not return
-    ``FilterHeadersStatus::ContinueAndEndStream`` when called with ``end_stream`` set to *true*. In this case
+    ``FilterHeadersStatus::ContinueAndDontEndStream`` when called with ``end_stream`` set to *false*. In this case
     ``FilterHeadersStatus::Continue`` should be returned.
 
   * A filter's ``encode100ContinueHeaders()`` must return ``FilterHeadersStatus::Continue`` or
