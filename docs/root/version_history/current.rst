@@ -1,5 +1,5 @@
-1.16.0 (Pending)
-================
+1.16.0 (October 8, 2020)
+========================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -23,18 +23,17 @@ Minor Behavior Changes
 * compressor: always insert `Vary` headers for compressible resources even if it's decided not to compress a response due to incompatible `Accept-Encoding` value. The `Vary` header needs to be inserted to let a caching proxy in front of Envoy know that the requested resource still can be served with compression applied.
 * decompressor: headers-only requests were incorrectly not advertising accept-encoding when configured to do so. This is now fixed.
 * ext_authz filter: request timeout will now count from the time the check request is created, instead of when it becomes active. This makes sure that the timeout is enforced even if the ext_authz cluster's circuit breaker is engaged.
-  This behavior can be reverted by setting runtime feature ``envoy.reloadable_features.ext_authz_measure_timeout_on_check_created`` to false. When enabled, a new `ext_authz.timeout` stat is counted when timeout occurs. See :ref:`stats
-  // <config_http_filters_ext_authz_stats>`.
+  This behavior can be reverted by setting runtime feature ``envoy.reloadable_features.ext_authz_measure_timeout_on_check_created`` to false. When enabled, a new `ext_authz.timeout` stat is counted when timeout occurs. See :ref:`stats <config_http_filters_ext_authz_stats>`.
 * grpc reverse bridge: upstream headers will no longer be propagated when the response is missing or contains an unexpected content-type.
-* http: added :ref:`contains <envoy_api_msg_type.matcher.StringMatcher>` a new string matcher type which matches if the value of the string has the substring mentioned in contains matcher.
-* http: added :ref:`contains <envoy_api_msg_route.HeaderMatcher>` a new header matcher type which matches if the value of the header has the substring mentioned in contains matcher.
+* http: added :ref:`contains <envoy_api_msg_type.matcher.StringMatcher>`, a new string matcher type which matches if the value of the string has the substring mentioned in contains matcher.
+* http: added :ref:`contains <envoy_api_msg_route.HeaderMatcher>`, a new header matcher type which matches if the value of the header has the substring mentioned in contains matcher.
 * http: added :ref:`headers_to_add <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.headers_to_add>` to :ref:`local reply mapper <config_http_conn_man_local_reply>` to allow its users to add/append/override response HTTP headers to local replies.
 * http: added HCM level configuration of :ref:`error handling on invalid messaging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` which substantially changes Envoy's behavior when encountering invalid HTTP/1.1 defaulting to closing the connection instead of allowing reuse. This can temporarily be reverted by setting `envoy.reloadable_features.hcm_stream_error_on_invalid_message` to false, or permanently reverted by setting the HTTP/1 configuration :ref:`override_stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>` to true to restore prior HTTP/1.1 behavior (i.e. connection isn't terminated) and to retain prior HTTP/2 behavior (i.e. connection is terminated).
 * http: added HCM level configuration of :ref:`error handling on invalid messaging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` which substantially changes Envoy's behavior when encountering invalid HTTP/1.1 defaulting to closing the connection instead of allowing reuse. This can temporarily be reverted by setting `envoy.reloadable_features.hcm_stream_error_on_invalid_message` to false, or permanently reverted by setting the :ref:`HCM option <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` to true to restore prior HTTP/1.1 beavior and setting the *new* HTTP/2 configuration :ref:`override_stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>` to false to retain prior HTTP/2 behavior.
 * http: applying route level header modifications to local replies sent on that route. This behavior may be temporarily reverted by setting `envoy.reloadable_features.always_apply_route_header_rules` to false.
 * http: changed Envoy to send GOAWAY to HTTP2 downstreams when the :ref:`disable_keepalive <config_overload_manager_overload_actions>` overload action is active. This behavior may be temporarily reverted by setting `envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2` to false.
 * http: changed Envoy to send error headers and body when possible. This behavior may be temporarily reverted by setting `envoy.reloadable_features.allow_response_for_timeout` to false.
-* http: changed empty trailers encoding behavior by sending empty data with ``end_stream`` true (instead of sending empty trailers) for HTTP/2. This behavior can be reverted temporarily by setting runtime feature ``envoy.reloadable_features.http2_skip_encoding_empty_trailers`` to false.
+* http: changed empty trailers encoding behavior by sending empty data with ``end_stream`` true (instead of sending empty trailers) for HTTP/2. This behavior can be reverted temporarily by setting runtime feature `envoy.reloadable_features.http2_skip_encoding_empty_trailers` to false.
 * http: changed how local replies are processed for requests which transform from grpc to not-grpc, or not-grpc to grpc. Previously the initial generated reply depended on which filter sent the reply, but now the reply is consistently generated the way the downstream expects. This behavior can be temporarily reverted by setting `envoy.reloadable_features.unify_grpc_handling` to false.
 * http: clarified and enforced 1xx handling. Multiple 100-continue headers are coalesced when proxying. 1xx headers other than {100, 101} are dropped.
 * http: fixed a bug in access logs where early stream termination could be incorrectly tagged as a downstream disconnect, and disconnects after partial response were not flagged.
@@ -51,7 +50,7 @@ Minor Behavior Changes
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
 * stats: the fake symbol table implemention has been removed from the binary, and the option "--use-fake-symbol-table" is now a no-op with a warning.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
-* watchdog: replaced single watchdog with separate watchdog configuration for worker threads and for the main thread :ref:`Watchdogs<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`. It works with :ref:`watchdog<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` by having the worker thread and main thread watchdogs have same config.
+* watchdog: replaced single watchdog with separate watchdog configuration for worker threads and for the main thread configured via :ref:`Watchdogs<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`. It works with :ref:`watchdog<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` by having the worker thread and main thread watchdogs have same config.
 
 Bug Fixes
 ---------
@@ -147,7 +146,6 @@ New Features
   that track headers and body sizes of requests and responses.
 * stats: allow configuring histogram buckets for stats sinks and admin endpoints that support it.
 * tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
-* tcp: switched the TCP connection pool to the new "shared" connection pool, sharing a common code base with HTTP and HTTP/2. Any unexpected behavioral changes can be temporarily reverted by setting `envoy.reloadable_features.new_tcp_connection_pool` to false.
 * tcp_proxy: added :ref:`max_downstream_connection_duration<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>` for downstream connection. When max duration is reached the connection will be closed.
 * tcp_proxy: allow earlier network filters to set metadataMatchCriteria on the connection StreamInfo to influence load balancing.
 * tls: added OCSP stapling support through the :ref:`ocsp_staple <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>` and :ref:`ocsp_staple_policy <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` configuration options. See :ref:`OCSP Stapling <arch_overview_ssl_ocsp_stapling>` for usage and runtime flags.
@@ -157,9 +155,9 @@ New Features
 * udp_proxy: added :ref:`hash_policies <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>` to support hash based routing.
 * udp_proxy: added :ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>` option to replicate the downstream remote address of the packets on the upstream side of Envoy. It is similar to :ref:`original source filter <envoy_v3_api_msg_extensions.filters.listener.original_src.v3.OriginalSrc>`.
 * watchdog: support randomizing the watchdog's kill timeout to prevent synchronized kills via a maximium jitter parameter :ref:`max_kill_timeout_jitter<envoy_v3_api_field_config.bootstrap.v3.Watchdog.max_kill_timeout_jitter>`.
-* watchdog: supports an extension point where actions can be registered to fire on watchdog events such as miss, megamiss, kill and multikill. See ref:`watchdog actions<envoy_v3_api_field_config.bootstrap.v3.Watchdog.actions>`.
-* watchdog: watchdog action extension that does cpu profiling. See ref:`Profile Action <envoy_v3_api_file_envoy/extensions/watchdog/profile_action/v3alpha/profile_action.proto>`.
-* watchdog: watchdog action extension that sends SIGABRT to the stuck thread to terminate the process. See ref:`Abort Action <envoy_v3_api_file_envoy/extensions/watchdog/abort_action/v3alpha/abort_action.proto>`.
+* watchdog: supports an extension point where actions can be registered to fire on watchdog events such as miss, megamiss, kill and multikill. See :ref:`watchdog actions<envoy_v3_api_field_config.bootstrap.v3.Watchdog.actions>`.
+* watchdog: watchdog action extension that does cpu profiling. See :ref:`Profile Action <envoy_v3_api_file_envoy/extensions/watchdog/profile_action/v3alpha/profile_action.proto>`.
+* watchdog: watchdog action extension that sends SIGABRT to the stuck thread to terminate the process. See :ref:`Abort Action <envoy_v3_api_file_envoy/extensions/watchdog/abort_action/v3alpha/abort_action.proto>`.
 * xds: added :ref:`extension config discovery<envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>` support for HTTP filters.
 * xds: added support for mixed v2/v3 discovery response, which enable type url downgrade and upgrade. This feature is disabled by default and is controlled by runtime guard `envoy.reloadable_features.enable_type_url_downgrade_and_upgrade`.
 * zlib: added option to use `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ as zlib library.
@@ -167,9 +165,10 @@ New Features
 Deprecated
 ----------
 
-* build: Alpine based debug image is deprecated in favor of :ref:`Ubuntu based debug image <install_binaries>`.
-* The :ref:`track_timeout_budgets <envoy_v3_api_field_config.cluster.v3.Cluster.track_timeout_budgets>`
+* build: alpine based debug image is deprecated in favor of :ref:`Ubuntu based debug image <install_binaries>`.
+* cluster: the :ref:`track_timeout_budgets <envoy_v3_api_field_config.cluster.v3.Cluster.track_timeout_budgets>`
   field has been deprecated in favor of `timeout_budgets` part of an :ref:`Optional Configuration <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
+* ext_authz: the :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field in :ref:`OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>` has been deprecated in favor of :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
 * hds: the :ref:`endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.endpoints_health>`
   field has been deprecated in favor of :ref:`cluster_endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health>` to maintain
   grouping by cluster and locality.
@@ -178,7 +177,5 @@ Deprecated
 * router: the :ref:`grpc_timeout_offset <envoy_v3_api_field_config.route.v3.RouteAction.grpc_timeout_offset>` field has been deprecated in favor of :ref:`grpc_timeout_header_offset <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_offset>`.
 * tap: the :ref:`match_config <envoy_v3_api_field_config.tap.v3.TapConfig.match_config>` field has been deprecated in favor of
   :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` field.
-* ext_authz: the :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field in :ref:`OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>`
-  has been deprecated in favor of :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
 * router_check_tool: `request_header_fields`, `response_header_fields` config deprecated in favor of `request_header_matches`, `response_header_matches`.
 * watchdog: :ref:`watchdog <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` deprecated in favor of :ref:`watchdogs <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`.
