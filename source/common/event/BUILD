@@ -33,9 +33,13 @@ envoy_cc_library(
         "//source/common/network:buffered_io_socket_handle_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",
+        "//source/common/network:connection_lib",
         "//source/common/network:listener_lib",
         "//source/common/runtime:runtime_features_lib",
-    ],
+    ] + select({
+        "//bazel:apple": ["//source/common/network:apple_dns_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
@@ -148,5 +152,16 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "scaled_range_timer_manager",
+    srcs = ["scaled_range_timer_manager.cc"],
+    hdrs = ["scaled_range_timer_manager.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:range_timer_interface",
+        "//source/common/common:scope_tracker",
     ],
 )

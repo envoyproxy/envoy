@@ -13,10 +13,9 @@ envoy_cc_test(
     size = "medium",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
-    # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows
     tags = [
+        "fails_on_windows",
         "nofips",
-        "skip_on_windows",
     ],
     deps = [
         "//source/extensions/filters/http/dynamo:config",

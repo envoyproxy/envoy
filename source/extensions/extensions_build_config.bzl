@@ -46,6 +46,7 @@ EXTENSIONS = {
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
+    "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
     "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
@@ -64,6 +65,7 @@ EXTENSIONS = {
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
+    "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
     "envoy.filters.http.oauth2":                         "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
@@ -161,7 +163,7 @@ EXTENSIONS = {
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
-    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_proxy_protocol",
+    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_factory_lib",

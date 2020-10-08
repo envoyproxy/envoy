@@ -267,6 +267,26 @@ TEST(RoleBasedAccessControlEngineImpl, MistypedCondition) {
   checkEngine(engine, false, LogResult::Undecided);
 }
 
+TEST(RoleBasedAccessControlEngineImpl, EvaluationFailure) {
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+  policy.mutable_condition()->MergeFrom(
+      TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(R"EOF(
+    select_expr:
+      operand:
+        const_expr:
+          string_value: request
+      field: undefined
+  )EOF"));
+
+  envoy::config::rbac::v3::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+  (*rbac.mutable_policies())["foo"] = policy;
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
+  checkEngine(engine, false, LogResult::Undecided);
+}
+
 TEST(RoleBasedAccessControlEngineImpl, ErrorCondition) {
   envoy::config::rbac::v3::Policy policy;
   policy.add_permissions()->set_any(true);

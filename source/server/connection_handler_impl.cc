@@ -566,6 +566,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
+  stream_info_->setConnectionID(connection_->id());
   active_connections_.listener_.onNewConnection();
 }
 

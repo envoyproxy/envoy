@@ -38,7 +38,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
                                                           uint64_t num_slice) {
   if (owned_buffer_.length() == 0) {
     if (read_end_stream_) {
-      return Api::ioCallUint64ResultNoError();
+      return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
     } else {
       return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                  IoSocketError::deleteIoError)};
@@ -55,8 +55,25 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
     }
     ASSERT(num_bytes_to_read <= max_length);
     owned_buffer_.drain(num_bytes_to_read);
-    ENVOY_LOG_MISC(debug, "lambdai: readv {} on {}", num_bytes_to_read, static_cast<void*>(this));
+    ENVOY_LOG(trace, "socket {} readv {} bytes", static_cast<void*>(this), num_bytes_to_read);
     return {num_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  }
+}
+
+Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffer,
+                                                         uint64_t max_length) {
+  if (owned_buffer_.length() == 0) {
+    if (read_end_stream_) {
+      return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
+    } else {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    }
+  } else {
+    // TODO(lambdai): Move at slice boundary to move to reduce the copy.
+    uint64_t min_len = std::min(max_length, owned_buffer_.length());
+    buffer.move(owned_buffer_, min_len);
+    return {min_len, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
   }
 }
 
@@ -78,7 +95,22 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
     }
   }
   writable_peer_->maybeSetNewData();
-  ENVOY_LOG_MISC(debug, "lambdai: writev {} on {}", num_bytes_to_write, static_cast<void*>(this));
+  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), num_bytes_to_write);
+  return {num_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+}
+
+Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buffer) {
+  if (!writable_peer_) {
+    return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
+  }
+  if (writable_peer_->isWriteEndSet() || !writable_peer_->isWritable()) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+  uint64_t num_bytes_to_write = buffer.length();
+  writable_peer_->getWriteBuffer()->move(buffer);
+  writable_peer_->maybeSetNewData();
+  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), num_bytes_to_write);
   return {num_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
@@ -132,7 +164,6 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::bind(Address::InstanceConstSha
 Api::SysCallIntResult BufferedIoSocketHandleImpl::listen(int) { return makeInvalidSyscall(); }
 
 IoHandlePtr BufferedIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
-
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
@@ -179,6 +210,7 @@ Event::FileEventPtr BufferedIoSocketHandleImpl::createFileEvent(Event::Dispatche
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
+  // Support shutdown write.
   if ((how == ENVOY_SHUT_WR) || (how == ENVOY_SHUT_RDWR)) {
     ASSERT(!closed_);
     if (!write_shutdown_) {

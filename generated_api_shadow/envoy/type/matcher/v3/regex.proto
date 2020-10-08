@@ -54,7 +54,7 @@ message RegexMatcher {
   }
 
   // The regex match string. The string must be supported by the configured engine.
-  string regex = 2 [(validate.rules).string = {min_bytes: 1}];
+  string regex = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // Describes how to match a string and then produce a new string using a regular

@@ -164,7 +164,7 @@ message RuntimeFilter {
   // Runtime key to get an optional overridden numerator for use in the
   // *percent_sampled* field. If found in runtime, this value will replace the
   // default numerator.
-  string runtime_key = 1 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 1 [(validate.rules).string = {min_len: 1}];
 
   // The default sampling percentage. If not specified, defaults to 0% with
   // denominator of 100.

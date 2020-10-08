@@ -168,6 +168,10 @@ public:
   }
   absl::string_view requestedServerName() const override { return server_name_; }
 
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
+    return ioHandle().lastRoundTripTime();
+  }
+
 protected:
   SocketImpl socket_;
   Address::InstanceConstSharedPtr remote_address_;

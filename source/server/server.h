@@ -163,7 +163,6 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
-  Envoy::Random::RandomGenerator& random() override { return server_.random(); }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
@@ -239,7 +238,6 @@ public:
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
-  Random::RandomGenerator& random() override { return *random_generator_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
@@ -325,12 +323,12 @@ private:
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
+  Random::RandomGeneratorPtr random_generator_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  Random::RandomGeneratorPtr random_generator_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;

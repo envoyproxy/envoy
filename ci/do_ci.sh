@@ -222,15 +222,17 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
     popd
   fi
 
-  if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
+  # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
+  # due to sandboxing issue. Debug and enable it again.
+  # if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
     # Also validate that integration test traffic tapping (useful when debugging etc.)
     # works. This requires that we set TAP_PATH. We do this under bazel.asan to
     # ensure a debug build in CI.
-    echo "Validating integration test traffic tapping..."
-    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" \
-      --run_under=@envoy//bazel/test:verify_tap_test.sh \
-      //test/extensions/transport_sockets/tls/integration:ssl_integration_test
-  fi
+    # echo "Validating integration test traffic tapping..."
+    # bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" \
+    #   --run_under=@envoy//bazel/test:verify_tap_test.sh \
+    #   //test/extensions/transport_sockets/tls/integration:ssl_integration_test
+  # fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
@@ -280,6 +282,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
     "--define" "use_new_codecs_in_integration_tests=true"
+    "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng")
 
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
@@ -328,7 +331,8 @@ elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage
 
   [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
 
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
+  # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
@@ -402,6 +406,10 @@ elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
+  # Validate dependency relationships between core/extensions and external deps.
+  tools/dependency/validate_test.py
+  tools/dependency/validate.py
+  # Build docs.
   docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then

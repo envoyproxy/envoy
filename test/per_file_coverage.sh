@@ -35,7 +35,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/common:96.1"
 "source/extensions/filters/network/common/redis:96.2"
-"source/extensions/filters/network/http_connection_manager:95.4"
+"source/extensions/filters/network/http_connection_manager:95.2"
 "source/extensions/filters/http/cache:80.7"
 "source/extensions/filters/http/cache/simple_http_cache:84.5"
 "source/extensions/filters/http/dynamic_forward_proxy:94.9"
@@ -46,7 +46,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/listener/tls_inspector:92.4"
 "source/extensions/filters/listener/http_inspector:93.3"
 "source/extensions/filters/udp:91.1"
-"source/extensions/filters/udp/dns_filter:89.2"
+"source/extensions/filters/udp/dns_filter:96.9"
 "source/extensions/filters/common:94.7"
 "source/extensions/filters/common/expr:92.2"
 "source/extensions/filters/common/rbac:87.1"
@@ -69,7 +69,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:84.9"
 "source/extensions/watchdog/abort_action:42.9" # Death tests don't report LCOV
 "source/server:94.6"
-"source/server/config_validation:76.8"
+"source/server/config_validation:76.6"
 "source/server/admin:95.3"
 )
 

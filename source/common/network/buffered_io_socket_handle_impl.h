@@ -18,7 +18,13 @@ namespace Envoy {
 namespace Network {
 
 /**
- * IoHandle implementation which provides a buffer as data source.
+ * IoHandle implementation which provides a buffer as data source. It is designed to used by
+ * Network::ConnectionImpl. Some known limitations include
+ * 1. It doesn't not include a file descriptor. Do not use "fdDoNotUse".
+ * 2. It doesn't suppose socket options. Wrap this in ConnectionSocket and implement the socket
+ * getter/setter options.
+ * 3. It doesn't suppose UDP interface.
+ * 4. The peer BufferedIoSocket must be scheduled by the same scheduler to avoid data race.
  */
 class BufferedIoSocketHandleImpl : public IoHandle,
                                    public WritablePeer,
@@ -26,20 +32,18 @@ class BufferedIoSocketHandleImpl : public IoHandle,
                                    protected Logger::Loggable<Logger::Id::io> {
 public:
   BufferedIoSocketHandleImpl()
-      : closed_{false},
-        owned_buffer_(
+      : owned_buffer_(
             [this]() -> void {
               over_high_watermark_ = false;
-              triggered_high_to_low_watermark_ = true;
               if (writable_peer_) {
-                ENVOY_LOG_MISC(debug, "lambdai: {} switch to low water mark {}",
-                               static_cast<void*>(this), static_cast<void*>(writable_peer_));
+                ENVOY_LOG(debug, "Socket {} switches to low watermark. Notify {}.",
+                          static_cast<void*>(this), static_cast<void*>(writable_peer_));
                 writable_peer_->onPeerBufferWritable();
               }
             },
             [this]() -> void {
               over_high_watermark_ = true;
-              // low to high is checked by peer after peer writes data.
+              // Low to high is checked by peer after peer writes data.
             },
             []() -> void {}) {}
 
@@ -55,7 +59,11 @@ public:
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
 
+  Api::IoCallUint64Result read(Buffer::Instance& buffer, uint64_t max_length) override;
+
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+
+  Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
@@ -93,11 +101,9 @@ public:
   void scheduleNextEvent() {
     // It's possible there is no pending file event so as no io_callback.
     if (io_callback_) {
-      ENVOY_LOG_MISC(debug, "lambdai: has io_callback {} on {}", __FUNCTION__, static_cast<void*>(this));
+      ENVOY_LOG(trace, "Schedule IO callback on {}", static_cast<void*>(this));
       io_callback_->scheduleCallbackNextIteration();
-      return;
-    } 
-    ENVOY_LOG_MISC(debug, "lambdai: no io_callback {} on {}", __FUNCTION__, static_cast<void*>(this));
+    }
   }
 
   void setWritablePeer(WritablePeer* writable_peer) {
@@ -111,7 +117,7 @@ public:
   void setWriteEnd() override { read_end_stream_ = true; }
   bool isWriteEndSet() override { return read_end_stream_; }
   void maybeSetNewData() override {
-    ENVOY_LOG_MISC(debug, "lambdai: {} on {}", __FUNCTION__, static_cast<void*>(this));
+    ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     scheduleReadEvent();
     scheduleNextEvent();
   }
@@ -125,6 +131,7 @@ public:
   }
   bool isWritable() const override { return !isOverHighWatermark(); }
   Buffer::Instance* getWriteBuffer() override { return &owned_buffer_; }
+
   // ReadableSource
   bool isPeerShutDownWrite() const override { return read_end_stream_; }
   bool isOverHighWatermark() const override { return over_high_watermark_; }
@@ -133,26 +140,28 @@ public:
 private:
   // Support isOpen() and close(). IoHandle owner must invoke close() to avoid potential resource
   // leak.
-  bool closed_;
+  bool closed_{false};
 
+  // The attached file event with this socket. The event is not owned by the socket.
   Event::UserSpaceFileEventImpl* user_file_event_;
+
+  // Envoy never schedule two independent IO event on the same socket. Use this counter to verify.
   int event_counter_{0};
-  // Trigger of the io event.
+
+  // The schedulable handle of the above event.
   Event::SchedulableCallbackPtr io_callback_;
 
   // True if owned_buffer_ is not addable. Note that owned_buffer_ may have pending data to drain.
   bool read_end_stream_{false};
   Buffer::WatermarkBuffer owned_buffer_;
 
-  // bool shutdown_{false};
   // Destination of the write().
   WritablePeer* writable_peer_{nullptr};
 
-  // The flag whether the peer is valid. Any write attempt should check flag.
+  // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};
 
   bool over_high_watermark_{false};
-  bool triggered_high_to_low_watermark_{true};
 };
 
 } // namespace Network
