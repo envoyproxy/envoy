@@ -32,8 +32,7 @@ class BufferedIoSocketHandleImpl : public IoHandle,
                                    protected Logger::Loggable<Logger::Id::io> {
 public:
   BufferedIoSocketHandleImpl()
-      : closed_{false},
-        owned_buffer_(
+      : owned_buffer_(
             [this]() -> void {
               over_high_watermark_ = false;
               if (writable_peer_) {
@@ -134,7 +133,7 @@ public:
 private:
   // Support isOpen() and close(). IoHandle owner must invoke close() to avoid potential resource
   // leak.
-  bool closed_;
+  bool closed_{false};
 
   // The attached file event with this socket. The event is not owned by the socket.
   Event::UserSpaceFileEventImpl* user_file_event_;
