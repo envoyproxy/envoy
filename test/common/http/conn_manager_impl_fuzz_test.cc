@@ -23,7 +23,6 @@
 #include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/symbol_table_creator.h"
 
 #include "test/common/http/conn_manager_impl_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -560,8 +559,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config(input.forward_client_cert());
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Random::MockRandomGenerator> random;
-  Stats::SymbolTablePtr symbol_table(Stats::SymbolTableCreator::makeSymbolTable());
-  Http::ContextImpl http_context(*symbol_table);
+  Stats::SymbolTableImpl symbol_table;
+  Http::ContextImpl http_context(symbol_table);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;

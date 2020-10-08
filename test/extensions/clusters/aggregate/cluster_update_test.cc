@@ -38,9 +38,13 @@ public:
   void initialize(const std::string& yaml_config) {
     auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
     cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
+<<<<<<< HEAD
         *api_, http_context_, grpc_context_, secret_manager_);
+=======
+        *factory_.api_, http_context_, grpc_context_);
+>>>>>>> 8888ee7e24999354c320bd5062fe500077fa142e
     cluster_manager_->initializeSecondaryClusters(bootstrap);
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->get("aggregate_cluster");
@@ -49,8 +53,11 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Server::MockAdmin> admin_;
   NiceMock<Upstream::TestClusterManagerFactory> factory_;
+<<<<<<< HEAD
   NiceMock<Secret::MockSecretManager> secret_manager_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_, factory_.random_)};
+=======
+>>>>>>> 8888ee7e24999354c320bd5062fe500077fa142e
   Upstream::ThreadLocalCluster* cluster_;
 
   Event::SimulatedTimeSystem time_system_;
@@ -263,9 +270,15 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
 
   auto bootstrap = parseBootstrapFromV2Yaml(config);
   cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
+<<<<<<< HEAD
       bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
       factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_, *api_,
       http_context_, grpc_context_, secret_manager_);
+=======
+      bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.local_info_,
+      log_manager_, factory_.dispatcher_, admin_, validation_context_, *factory_.api_,
+      http_context_, grpc_context_);
+>>>>>>> 8888ee7e24999354c320bd5062fe500077fa142e
   cluster_manager_->initializeSecondaryClusters(bootstrap);
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->get("aggregate_cluster");

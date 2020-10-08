@@ -69,7 +69,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:84.9"
 "source/extensions/watchdog/abort_action:42.9" # Death tests don't report LCOV
 "source/server:94.6"
-"source/server/config_validation:76.8"
+"source/server/config_validation:76.6"
 "source/server/admin:95.3"
 )
 

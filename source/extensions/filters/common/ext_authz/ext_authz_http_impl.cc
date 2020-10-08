@@ -258,8 +258,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& di
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   if (request_length > 0) {
-    message->body() =
-        std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
+    message->body().add(request.attributes().request().http().body());
   }
 
   const std::string& cluster = config_->cluster();
@@ -351,7 +350,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
         std::vector<absl::string_view> header_names = StringUtil::splitToken(
             storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
         headers_to_remove.reserve(headers_to_remove.size() + header_names.size());
-        for (const auto header_name : header_names) {
+        for (const auto& header_name : header_names) {
           headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
         }
       }

@@ -45,14 +45,18 @@ std::string clustersJson(const std::vector<std::string>& clusters) {
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
-      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()),
-        grpc_context_(factory_.stats_.symbolTable()) {}
+      : http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()) {
+  }
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
+<<<<<<< HEAD
         *api_, http_context_, grpc_context_, secret_manager_);
+=======
+        *factory_.api_, http_context_, grpc_context_);
+>>>>>>> 8888ee7e24999354c320bd5062fe500077fa142e
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
@@ -94,10 +98,14 @@ public:
     const auto& bootstrap = parseBootstrapFromV3Yaml(yaml);
 
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
+<<<<<<< HEAD
         *api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
         secret_manager_);
+=======
+        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
+>>>>>>> 8888ee7e24999354c320bd5062fe500077fa142e
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -138,7 +146,6 @@ public:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
