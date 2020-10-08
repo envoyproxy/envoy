@@ -179,7 +179,10 @@ def woof_circle_artifacts(config, repo_owner, sha, comment_id):
 def _hello_pr(action, issue_number):
   github.issue_create_comment("auth assoc: %s" % issue_number)
 
-handlers.command(name='woof', func=woof_circle_artifacts)
+def _woof_woof():
+  github.issue_create_comment("/assign phlax")
+
+handlers.command(name='woof', func=woof_woof)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
 # handlers.status(func=_status)
 # handlers.pull_request(func=_hello_pr)
