@@ -370,7 +370,15 @@ TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
   ev.reset();
 }
 
-TEST_F(BufferedIoSocketHandleTest, TestWriteToPeer) {
+TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
+  Buffer::OwnedImpl buf("0123456789");
+  io_handle_peer_->write(buf);
+  auto& internal_buffer = io_handle_->getBufferForTest();
+  EXPECT_EQ("0123456789", internal_buffer.toString());
+  EXPECT_EQ(0, buf.length());
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
   std::string raw_data("0123456789");
   absl::InlinedVector<Buffer::RawSlice, 4> slices{
       // Contains 1 byte.
@@ -389,6 +397,46 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteToPeer) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
+  std::string accumulator;
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  bool should_close = false;
+  auto ev = io_handle_->createFileEvent(
+      dispatcher_,
+      [&should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
+        if (events & Event::FileReadyType::Read) {
+          Buffer::OwnedImpl buf;
+          Buffer::RawSlice slice;
+          buf.reserve(1024, &slice, 1);
+          auto res = handle->readv(1024, &slice, 1);
+          if (res.ok()) {
+            accumulator += absl::string_view(static_cast<char*>(slice.mem_), res.rc_);
+          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+            ENVOY_LOG_MISC(debug, "read returns EAGAIN");
+          } else {
+            ENVOY_LOG_MISC(debug, "will close");
+            should_close = true;
+          }
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  scheduable_cb_->invokeCallback();
+  EXPECT_FALSE(scheduable_cb_->enabled());
+
+  Buffer::OwnedImpl data_to_write("0123456789");
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  io_handle_peer_->write(data_to_write);
+  EXPECT_EQ(0, data_to_write.length());
+
+  EXPECT_TRUE(scheduable_cb_->enabled());
+  scheduable_cb_->invokeCallback();
+  EXPECT_EQ("0123456789", accumulator);
+  EXPECT_FALSE(should_close);
+
+  io_handle_->close();
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWritevScheduleWritableEvent) {
   std::string accumulator;
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());

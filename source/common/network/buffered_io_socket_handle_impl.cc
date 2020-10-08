@@ -99,6 +99,21 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
   return {num_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
+Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buffer) {
+  if (!writable_peer_) {
+    return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
+  }
+  if (writable_peer_->isWriteEndSet() || !writable_peer_->isWritable()) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+  uint64_t num_bytes_to_write = buffer.length();
+  writable_peer_->getWriteBuffer()->move(buffer);
+  writable_peer_->maybeSetNewData();
+  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), num_bytes_to_write);
+  return {num_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+}
+
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
                                                             const Address::Ip*,
                                                             const Address::Instance&) {
