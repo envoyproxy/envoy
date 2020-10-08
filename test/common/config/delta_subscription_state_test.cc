@@ -181,7 +181,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
   {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
         populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
-    EXPECT_CALL(*timer_, disableTimer()).Times(2);
+    EXPECT_CALL(*timer_, disableTimer());
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug1", "nonce1");
     EXPECT_EQ("nonce1", ack.nonce_);
     EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
@@ -191,7 +191,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
         populateRepeatedResource(
             {{"name1", "version1B"}, {"name2", "version2B"}, {"name3", "version3A"}});
-    EXPECT_CALL(*timer_, disableTimer()).Times(3);
+    EXPECT_CALL(*timer_, disableTimer());
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug2", "nonce2");
     EXPECT_EQ("nonce2", ack.nonce_);
     EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
@@ -210,7 +210,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
         populateRepeatedResource(
             {{"name1", "version1D"}, {"name2", "version2D"}, {"name3", "version3C"}});
-    EXPECT_CALL(*timer_, disableTimer()).Times(3);
+    EXPECT_CALL(*timer_, disableTimer());
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug4", "nonce4");
     EXPECT_EQ("nonce4", ack.nonce_);
     EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
@@ -240,7 +240,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     // The xDS server's first update includes items for name1 and 2, but not 3.
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
         populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
-    EXPECT_CALL(*timer_, disableTimer()).Times(2);
+    EXPECT_CALL(*timer_, disableTimer());
     deliverDiscoveryResponse(add1_2, {}, "debugversion1");
     state_.markStreamFresh(); // simulate a stream reconnection
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
@@ -302,7 +302,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
-    EXPECT_CALL(*timer_, disableTimer()).Times(2);
+  EXPECT_CALL(*timer_, disableTimer());
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
   state_.updateSubscriptionInterest({"name4"}, {"name1"});
@@ -328,7 +328,7 @@ TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add_all =
         populateRepeatedResource(
             {{"name1", "version1A"}, {"name2", "version2A"}, {"name3", "version3A"}});
-    EXPECT_CALL(*timer_, disableTimer()).Times(3);
+    EXPECT_CALL(*timer_, disableTimer());
     deliverDiscoveryResponse(add_all, {}, "debugversion1");
     state_.markStreamFresh(); // simulate a stream reconnection
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
@@ -347,7 +347,7 @@ TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
                                   {"name2", "version2B"},
                                   {"name3", "version3B"},
                                   {"name4", "version4A"}});
-    EXPECT_CALL(*timer_, disableTimer()).Times(4);
+    EXPECT_CALL(*timer_, disableTimer());
     deliverDiscoveryResponse(add_all, {}, "debugversion2");
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
         state_.getNextRequestAckless();
@@ -436,8 +436,8 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
   deliverDiscoveryResponse(create_resource_with_ttl(absl::nullopt), {}, "debug1", "nonce1");
 
   // Add back the TTL.
-    EXPECT_CALL(*timer_, enabled());
-    EXPECT_CALL(*timer_, enableTimer(_, _));
+  EXPECT_CALL(*timer_, enabled());
+  EXPECT_CALL(*timer_, enableTimer(_, _));
   deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(2)), {}, "debug1",
                            "nonce1");
 

@@ -95,8 +95,11 @@ void DeltaSubscriptionState::handleGoodResponse(
   }
   watch_map_.onConfigUpdate(message.resources(), message.removed_resources(),
                             message.system_version_info());
-  for (const auto& resource : message.resources()) {
-    addResourceState(resource);
+  {
+    const auto scoped_update = ttl_.scopedTtlUpdate();
+    for (const auto& resource : message.resources()) {
+      addResourceState(resource);
+    }
   }
 
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to

@@ -120,17 +120,16 @@ private:
   struct ApiState {
     bool paused() const { return pauses_ > 0; }
 
-    Ttl& ttl(Event::Dispatcher& dispatcher, std::function<void(const std::vector<std::string>&)> callback) {
-      // TODO(snowp): This pattern is a bit gross, but it keeps ApiState default allocatable which makes
-      // the call sites much nicer by allowing operator[]. Ideally we should properly allocate ApiState
-      // with the Ttl object created in its ctor.
+    void ensureTtlManagerCreated(Event::Dispatcher& dispatcher,
+                                 std::function<void(const std::vector<std::string>&)> callback) {
+      // TODO(snowp): This pattern is a bit gross, but it keeps ApiState default allocatable which
+      // makes the call sites much nicer by allowing operator[]. Ideally we should properly allocate
+      // ApiState with the Ttl object created in its ctor.
       if (ttl_) {
-        return *ttl_;
+        return;
       }
 
-      ttl_ = std::make_unique<Ttl>(callback, dispatcher, dispatcher.timeSource());
-
-      return *ttl_;
+      ttl_ = std::make_unique<TtlManager>(callback, dispatcher, dispatcher.timeSource());
     }
 
     // Watches on the returned resources for the API;
@@ -143,7 +142,7 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
-    std::unique_ptr<Ttl> ttl_;
+    std::unique_ptr<TtlManager> ttl_;
   };
 
   // Request queue management logic.

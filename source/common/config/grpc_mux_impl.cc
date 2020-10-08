@@ -157,14 +157,6 @@ void GrpcMuxImpl::onDiscoveryResponse(
     return;
   }
 
-  // If the server responded with the same version that was requested, this is a TTL heartbeat and
-  // we should not attempt to process the actual resources.
-  if (message->version_info() == api_state_[type_url].request_.version_info()) {
-    api_state_[type_url].request_.set_response_nonce(message->nonce());
-    queueDiscoveryRequest(type_url);
-    return;
-  }
-
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
     api_state_[type_url].request_.set_response_nonce(message->nonce());
@@ -200,8 +192,30 @@ void GrpcMuxImpl::onDiscoveryResponse(
     std::vector<DecodedResourceRef> all_resource_refs;
     OpaqueResourceDecoder& resource_decoder =
         api_state_[type_url].watches_.front()->resource_decoder_;
+
+    auto ttl_expiry_callback = [this, type_url](const auto& expired) {
+      absl::flat_hash_set<std::string> all_expired;
+      all_expired.insert(expired.begin(), expired.end());
+
+      for (auto watch : api_state_[type_url].watches_) {
+        std::vector<std::string> found_resources;
+
+        for (const auto& resource : expired) {
+          if (all_expired.find(resource) != all_expired.end()) {
+            found_resources.push_back(resource);
+          }
+        }
+
+        watch->callbacks_.onConfigExpired(found_resources);
+      }
+    };
+
+    api_state_[type_url].ensureTtlManagerCreated(dispatcher_, ttl_expiry_callback);
+    const auto scoped_ttl_update = api_state_[type_url].ttl_->scopedTtlUpdate();
     for (const auto& resource : message->resources()) {
-      if (message->type_url() != resource.type_url()) {
+      // TODO(snowp): Check the underlying type when the resource is a Resource.
+      if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
+          message->type_url() != resource.type_url()) {
         throw EnvoyException(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                         resource.type_url(), message->type_url(), message->DebugString()));
@@ -209,29 +223,13 @@ void GrpcMuxImpl::onDiscoveryResponse(
       resources.emplace_back(
           DecodedResourceImpl::maybeUnwrapPtr(resource_decoder, resource, message->version_info()));
       all_resource_refs.emplace_back(*resources.back());
+      ENVOY_LOG_MISC(info, "SEEING RESOURCE WITH NAME " + resources.back()->name());
       resource_ref_map.emplace(resources.back()->name(), *resources.back());
 
-      auto expiry_callback = [this, type_url](const auto& expired) {
-        absl::flat_hash_set<std::string> all_expired;
-        all_expired.insert(expired.begin(), expired.end());
-
-        for (auto watch : api_state_[type_url].watches_) {
-          std::vector<std::string> found_resources;
-
-          for (const auto& resource : expired) {
-            if (all_expired.find(resource) != all_expired.end()) {
-              found_resources.push_back(resource);
-            }
-          }
-
-          watch->callbacks_.onConfigExpired(found_resources);
-        }
-      };
-
       if (resources.back()->ttl()) {
-        api_state_[type_url].ttl(dispatcher_, expiry_callback).add(*resources.back()->ttl(), resources.back()->name());
+        api_state_[type_url].ttl_->add(*resources.back()->ttl(), resources.back()->name());
       } else {
-        api_state_[type_url].ttl(dispatcher_, expiry_callback).clear(resources.back()->name());
+        api_state_[type_url].ttl_->clear(resources.back()->name());
       }
     }
 
@@ -250,6 +248,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
           found_resources.emplace_back(it->second);
         }
       }
+      ENVOY_LOG_MISC(info, "found resource ct {}", found_resources.size());
       // onConfigUpdate should be called only on watches(clusters/routes) that have
       // updates in the message for EDS/RDS.
       if (!found_resources.empty()) {

@@ -285,6 +285,17 @@ TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
   expectSendMessage("foo", {}, "");
 }
 
+envoy::service::discovery::v3::Resource
+resourceWithTtl(std::chrono::milliseconds ttl,
+                envoy::config::endpoint::v3::ClusterLoadAssignment& cla) {
+  envoy::service::discovery::v3::Resource resource;
+  resource.mutable_resource()->PackFrom(cla);
+  resource.mutable_ttl()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(ttl.count()));
+
+  resource.set_name(cla.cluster_name());
+
+  return resource;
+}
 // Validates the behavior when the TTL timer expires.
 TEST_F(GrpcMuxImplTest, ResourceTTL) {
   setup();
@@ -299,21 +310,25 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
   expectSendMessage(type_url, {"x"}, "", true);
   grpc_mux_->start();
 
-  auto ttl_timer = new Event::MockTimer(&dispatcher_);
+  Event::MockTimer* ttl_timer;
   {
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("1");
-    response->mutable_ttl()->set_seconds(1);
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
 
-    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1000), _));
+    auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(1000), load_assignment);
+    response->add_resources()->PackFrom(wrapped_resource);
+
+    ttl_timer = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&)
+        {
           EXPECT_EQ(1, resources.size());
         }));
+    EXPECT_CALL(*ttl_timer, enabled());
+    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1000), _));
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
@@ -323,25 +338,17 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("1");
-    response->mutable_ttl()->set_seconds(10);
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
+    auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(10000), load_assignment);
+    response->add_resources()->PackFrom(wrapped_resource);
 
-    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
-    // No update, just a change in TTL.
-    expectSendMessage(type_url, {"x"}, "1");
-    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
-  }
-
-  // Refresh the TTL with a response that doesn't contain the previous resources, but the same
-  // version. This should not trigger a onConfigUpdate call.
-  {
-    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
-    response->set_type_url(type_url);
-    response->set_version_info("1");
-    response->mutable_ttl()->set_seconds(10);
-
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&)
+        {
+          EXPECT_EQ(1, resources.size());
+        }));
+    EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
@@ -357,8 +364,12 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
 
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&)
+        {
+          EXPECT_EQ(1, resources.size());
+        }));
     EXPECT_CALL(*ttl_timer, disableTimer());
-    // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
@@ -368,26 +379,30 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("1");
-    response->mutable_ttl()->set_seconds(10);
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
+    auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(10000), load_assignment);
+    response->add_resources()->PackFrom(wrapped_resource);
 
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&)
+        {
+          EXPECT_EQ(1, resources.size());
+        }));
+    EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
 
-  EXPECT_CALL(callbacks_, onConfigUpdate(_, ""))
-      .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
-        EXPECT_EQ(0, resources.size());
-      }));
+  dispatcher_.time_system_.advanceTimeAsyncImpl(std::chrono::seconds(11));
+  EXPECT_CALL(callbacks_, onConfigExpired(std::vector<std::string>({"x"})));
   // Fire the TTL timer.
-  expectSendMessage(type_url, {"x"}, "");
+  EXPECT_CALL(*ttl_timer, disableTimer());
   ttl_timer->invokeCallback();
 
-  expectSendMessage(type_url, {}, "");
+  expectSendMessage(type_url, {}, "1");
 }
 
 // Validate behavior when watches has an unknown resource name.
@@ -563,15 +578,13 @@ public:
 
 //  Verifies that rate limiting is not enforced with defaults.
 TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
-  // Validate that only connection retry timer is enabled.
-  Event::MockTimer* timer = nullptr;
-  Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-    timer_cb = cb;
-    EXPECT_EQ(nullptr, timer);
-    timer = new Event::MockTimer();
-    return timer;
-  }));
+  // Validate that connection retry timer and TTL timer are both crated.
+  auto retry_timer = new Event::MockTimer(&dispatcher_);
+
+  // TTL timer.
+  new Event::MockTimer(&dispatcher_);
+
+  EXPECT_CALL(*retry_timer, disableTimer());
 
   // Validate that rate limiter is not created.
   EXPECT_CALL(*mock_time_system_, monotonicTime()).Times(0);
@@ -606,24 +619,10 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
 //  Verifies that default rate limiting is enforced with empty RateLimitSettings.
 TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
   // Validate that request drain timer is created.
-  Event::MockTimer* timer = nullptr;
-  Event::MockTimer* drain_request_timer = nullptr;
 
-  Event::TimerCb timer_cb;
-  Event::TimerCb drain_timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_))
-      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-        timer_cb = cb;
-        EXPECT_EQ(nullptr, timer);
-        timer = new Event::MockTimer();
-        return timer;
-      }))
-      .WillOnce(Invoke([&drain_request_timer, &drain_timer_cb](Event::TimerCb cb) {
-        drain_timer_cb = cb;
-        EXPECT_EQ(nullptr, drain_request_timer);
-        drain_request_timer = new Event::MockTimer();
-        return drain_request_timer;
-      }));
+  auto ttl_timer = new Event::MockTimer(&dispatcher_);
+  Event::MockTimer* drain_request_timer = new Event::MockTimer(&dispatcher_);
+  Event::MockTimer* retry_timer = new Event::MockTimer(&dispatcher_);
 
   RateLimitSettings custom_rate_limit_settings;
   custom_rate_limit_settings.enabled_ = true;
@@ -651,6 +650,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100), _));
   // The drain timer enable is checked twice, once when we limit, again when the watch is destroyed.
   EXPECT_CALL(*drain_request_timer, enabled()).Times(11);
+  EXPECT_CALL(*ttl_timer, disableTimer());
   onReceiveMessage(110);
   EXPECT_EQ(11, stats_.counter("control_plane.rate_limit_enforced").value());
   EXPECT_EQ(11, control_plane_pending_requests_.value());
@@ -660,15 +660,14 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   EXPECT_CALL(random_, random());
-  ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
-  EXPECT_CALL(*timer, enableTimer(_, _));
+  EXPECT_CALL(*retry_timer, enableTimer(_, _));
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_EQ(11, control_plane_pending_requests_.value());
   EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   time_system_.setMonotonicTime(std::chrono::seconds(30));
-  timer_cb();
+  retry_timer->invokeCallback();
   EXPECT_EQ(0, control_plane_pending_requests_.value());
   // One more message on the way out when the watch is destroyed.
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
@@ -677,25 +676,12 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
 //  Verifies that rate limiting is enforced with custom RateLimitSettings.
 TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   // Validate that request drain timer is created.
-  Event::MockTimer* timer = nullptr;
-  Event::MockTimer* drain_request_timer = nullptr;
 
-  Event::TimerCb timer_cb;
-  Event::TimerCb drain_timer_cb;
-
-  EXPECT_CALL(dispatcher_, createTimer_(_))
-      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-        timer_cb = cb;
-        EXPECT_EQ(nullptr, timer);
-        timer = new Event::MockTimer();
-        return timer;
-      }))
-      .WillOnce(Invoke([&drain_request_timer, &drain_timer_cb](Event::TimerCb cb) {
-        drain_timer_cb = cb;
-        EXPECT_EQ(nullptr, drain_request_timer);
-        drain_request_timer = new Event::MockTimer();
-        return drain_request_timer;
-      }));
+  // TTL timer.
+  auto ttl_timer = new Event::MockTimer(&dispatcher_);
+  Event::MockTimer* drain_request_timer = new Event::MockTimer(&dispatcher_);
+  // Retry timer.
+  new Event::MockTimer(&dispatcher_);
 
   RateLimitSettings custom_rate_limit_settings;
   custom_rate_limit_settings.enabled_ = true;
@@ -721,6 +707,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   grpc_mux_->start();
 
   // Validate that rate limit is not enforced for 100 requests.
+  EXPECT_CALL(*ttl_timer, disableTimer());
   onReceiveMessage(100);
   EXPECT_EQ(0, stats_.counter("control_plane.rate_limit_enforced").value());
 
@@ -733,7 +720,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
 
   // Validate that drain requests call when there are multiple requests in queue.
   time_system_.setMonotonicTime(std::chrono::seconds(10));
-  drain_timer_cb();
+  drain_request_timer->invokeCallback();
 
   // Check that the pending_requests stat is updated with the queue drain.
   EXPECT_EQ(0, control_plane_pending_requests_.value());

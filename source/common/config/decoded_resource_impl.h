@@ -1,11 +1,11 @@
 #pragma once
 
-#include "common/config/decoded_resource_impl.h"
 #include "envoy/config/subscription.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/config/decoded_resource_impl.h"
 #include "common/protobuf/utility.h"
 
-#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "udpa/core/v1/collection_entry.pb.h"
 
 namespace Envoy {
@@ -21,7 +21,6 @@ repeatedPtrFieldToVector(const Protobuf::RepeatedPtrField<std::string>& xs) {
 }
 
 } // namespace
-
 
 class DecodedResourceImpl;
 using DecodedResourceImplPtr = std::unique_ptr<DecodedResourceImpl>;
@@ -41,12 +40,12 @@ public:
     }
 
     return DecodedResourceImpl(resource_decoder, {}, Protobuf::RepeatedPtrField<std::string>(),
-                            resource, true, version, absl::nullopt);
+                               resource, true, version, absl::nullopt);
   }
 
   static DecodedResourceImplPtr maybeUnwrapPtr(OpaqueResourceDecoder& resource_decoder,
-                                         const ProtobufWkt::Any& resource,
-                                         const std::string& version) {
+                                               const ProtobufWkt::Any& resource,
+                                               const std::string& version) {
     if (resource.Is<envoy::service::discovery::v3::Resource>()) {
       envoy::service::discovery::v3::Resource r;
       MessageUtil::unpackTo(resource, r);

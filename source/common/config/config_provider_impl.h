@@ -188,9 +188,7 @@ public:
     local_init_target_.ready();
   }
 
-  void onConfigExpired() {
-    setLastUpdated();
-  }
+  void onConfigExpired() { setLastUpdated(); }
 
 protected:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {

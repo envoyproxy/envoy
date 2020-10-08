@@ -10,8 +10,8 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/config/api_version.h"
-#include "common/config/ttl.h"
 #include "common/config/pausable_ack_queue.h"
+#include "common/config/ttl.h"
 #include "common/config/watch_map.h"
 
 #include "absl/container/node_hash_map.h"
@@ -90,7 +90,7 @@ private:
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
   absl::node_hash_map<std::string, ResourceState> resource_state_;
-  Ttl ttl_;
+  TtlManager ttl_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
   // iterator into just its keys, e.g. for use in std::set_difference.
   std::set<std::string> resource_names_;

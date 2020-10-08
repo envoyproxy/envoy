@@ -23,7 +23,8 @@ TEST(DecodedResourceImplTest, All) {
             []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Empty>(); }));
     EXPECT_CALL(resource_decoder, resourceName(ProtoEq(ProtobufWkt::Empty())))
         .WillOnce(Return("some_name"));
-    auto decoded_resource = DecodedResourceImpl::maybeUnwrap(resource_decoder, some_opaque_resource, "foo");
+    auto decoded_resource =
+        DecodedResourceImpl::maybeUnwrap(resource_decoder, some_opaque_resource, "foo");
     EXPECT_EQ("some_name", decoded_resource.name());
     EXPECT_TRUE(decoded_resource.aliases().empty());
     EXPECT_EQ("foo", decoded_resource.version());

@@ -1,9 +1,9 @@
 #include <memory>
 
-#include "common/common/assert.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/common/assert.h"
 #include "common/config/config_provider_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -98,9 +98,9 @@ public:
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {}
-                            void onConfigExpired(const std::vector<std::string>&) override {
-                              NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-                            }
+  void onConfigExpired(const std::vector<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   const absl::optional<test::common::config::DummyConfig>& configProto() const {
     return config_proto_;
