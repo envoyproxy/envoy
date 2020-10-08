@@ -447,6 +447,7 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   // will be run because higher layers think the stream is already finished.
   resetStreamWorker(StreamResetReason::LocalReset);
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
