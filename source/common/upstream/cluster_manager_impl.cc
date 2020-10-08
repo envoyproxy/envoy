@@ -428,6 +428,11 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
           cluster.info()->transportSocket().typed_config());
       const auto& common_tls_context = upstream_tls_context.common_tls_context();
 
+      // If there is no secret entity, currently supports only TLS Certificate and Validation
+      // Context, when it failed to extract them via SDS, it will fail to change cluster status from
+      // warming to active. In current implementation, there is no strategy to activate clusters
+      // which failed to initialize at once.
+      // TODO(shikugawa): Consider retry strategy of clusters which failed to activate at once.
       for (const auto& sds_secret_config :
            common_tls_context.tls_certificate_sds_secret_configs()) {
         auto& config_name = sds_secret_config.name();
