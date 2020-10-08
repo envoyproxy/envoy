@@ -182,7 +182,7 @@ def _hello_pr(action, issue_number):
 def _woof_woof():
   github.issue_create_comment("/assign phlax")
 
-handlers.command(name='woof', func=woof_woof)
+handlers.command(name='woof', func=_woof_woof)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
 # handlers.status(func=_status)
 # handlers.pull_request(func=_hello_pr)
