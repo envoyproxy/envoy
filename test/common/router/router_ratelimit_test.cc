@@ -637,7 +637,7 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataNonStringMatch) {
+TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataNonStringNoMatch) {
   const std::string yaml = R"EOF(
 actions:
 - dynamic_metadata:
@@ -668,7 +668,7 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataMatch) {
+TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataMatch) {
   const std::string yaml = R"EOF(
 actions:
 - route_entry_metadata:
@@ -700,7 +700,7 @@ filter_metadata:
 }
 
 // Tests that the default_value is used in the descriptor when the metadata_key is empty.
-TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataNoMatchWithDefaultValue) {
+TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataNoMatchWithDefaultValue) {
   const std::string yaml = R"EOF(
 actions:
 - route_entry_metadata:
@@ -731,7 +731,7 @@ filter_metadata:
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataNoMatch) {
+TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataNoMatch) {
   const std::string yaml = R"EOF(
 actions:
 - route_entry_metadata:
@@ -760,7 +760,7 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataEmptyValue) {
+TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataEmptyValue) {
   const std::string yaml = R"EOF(
 actions:
 - route_entry_metadata:
@@ -789,7 +789,7 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 // Tests that no descriptor is generated when both the metadata_key and default_value are empty.
-TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataAndDefaultValueEmpty) {
+TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataAndDefaultValueEmpty) {
   const std::string yaml = R"EOF(
 actions:
 - route_entry_metadata:
@@ -819,7 +819,7 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataNonStringMatch) {
+TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataNonStringNoMatch) {
   const std::string yaml = R"EOF(
 actions:
 - route_entry_metadata:
