@@ -1753,6 +1753,15 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
 }
 
+void Http2FloodMitigationTest::triggerListenerDrain() {
+  absl::Notification drain_sequence_started;
+  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
+    test_server_->drainManager().startDrainSequence([] {});
+    drain_sequence_started.Notify();
+  });
+  drain_sequence_started.WaitForNotification();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -2042,12 +2051,7 @@ TEST_P(Http2FloodMitigationTest, GoawayOverflowDuringResponseWhenDraining) {
   // pre-fill one away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
 
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
+  triggerListenerDrain();
 
   // Send second request which should trigger Envoy to send GOAWAY (since it is in the draining
   // state) when processing response headers. Verify that connection was disconnected and
@@ -2089,12 +2093,7 @@ typed_config:
   // pre-fill one away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
 
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
+  triggerListenerDrain();
 
   // At this point the outbound downstream frame queue should be 1 away from overflowing.
   // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply without body which
