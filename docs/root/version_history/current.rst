@@ -5,7 +5,7 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* build: added visibility rules for upstream. If these cause visibility related breakage, see notes in `BUILD <https://github.com/envoyproxy/envoy/blob/master/BUILD>`_.
+* build: added visibility rules for upstream. If these cause visibility related breakage, see notes in :repo:`BUILD <BUILD>`.
 * build: tcmalloc changes require Clang 9. This requirement change can be avoided by building with `--define tcmalloc=gperftools` to use the older tcmalloc code.
 * config: additional warnings have been added for the use of v2 APIs. These appear as log messages
   and are also captured in the :ref:`deprecated_feature_use <runtime_stats>` counter after server
@@ -50,7 +50,7 @@ Minor Behavior Changes
 * postgres: changed log format to tokenize fields of Postgres messages.
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
-* stats: the fake symbol table implemention has been removed from the binary, and the option :option:`--use-fake-symbol-table` is now a no-op with a warning.
+* stats: the fake symbol table implemention has been removed from the binary, and the option `--use-fake-symbol-table` is now a no-op with a warning.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
 * watchdog: replaced single watchdog with separate watchdog configuration for worker threads and for the main thread configured via :ref:`Watchdogs<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`. It works with :ref:`watchdog<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` by having the worker thread and main thread watchdogs have same config.
 
