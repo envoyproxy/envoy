@@ -1,51 +1,5 @@
-# Validation of content in this file is done on the bazel/repositories.bzl file to make it free of bazel
-# constructs. This is to allow this file to be loaded into Python based build and maintenance tools.
-
-# Envoy dependencies may be annotated with the following attributes:
-DEPENDENCY_ANNOTATIONS = [
-    # List of the categories describing how the dependency is being used. This attribute is used
-    # for automatic tracking of security posture of Envoy's dependencies.
-    # Possible values are documented in the USE_CATEGORIES list below.
-    # This attribute is mandatory for each dependecy.
-    "use_category",
-
-    # Attribute specifying CPE (Common Platform Enumeration, see https://nvd.nist.gov/products/cpe) ID
-    # of the dependency. The ID may be in v2.3 or v2.2 format, although v2.3 is prefferred. See
-    # https://nvd.nist.gov/products/cpe for CPE format. Use single wildcard '*' for version and vector elements
-    # i.e. 'cpe:2.3:a:nghttp2:nghttp2:*'. Use "N/A" for dependencies without CPE assigned.
-    # This attribute is optional for components with use categories listed in the
-    # USE_CATEGORIES_WITH_CPE_OPTIONAL
-    "cpe",
-]
-
-# NOTE: If a dependency use case is either dataplane or controlplane, the other uses are not needed
-# to be declared.
-USE_CATEGORIES = [
-    # This dependency is used in API protos.
-    "api",
-    # This dependency is used in build process.
-    "build",
-    # This dependency is used to process xDS requests.
-    "controlplane",
-    # This dependency is used in processing downstream or upstream requests (core).
-    "dataplane_core",
-    # This dependency is used in processing downstream or upstream requests (extensions).
-    "dataplane_ext",
-    # This dependecy is used for logging, metrics or tracing (core). It may process unstrusted input.
-    "observability_core",
-    # This dependecy is used for logging, metrics or tracing (extensions). It may process unstrusted input.
-    "observability_ext",
-    # This dependency does not handle untrusted data and is used for various utility purposes.
-    "other",
-    # This dependency is used only in tests.
-    "test_only",
-]
-
-# Components with these use categories are not required to specify the 'cpe'
-# and 'last_updated' annotation.
-USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "other", "test_only"]
-
-DEPENDENCY_REPOSITORIES_SPEC = dict(
+# This should match the schema defined in external_deps.bzl.
+REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         project_name = "bazel-compilation-database",
         project_desc = "Clang JSON compilation database support for Bazel",
@@ -846,10 +800,6 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         project_url = "https://github.com/emscripten-core/emsdk",
         version = "dec8a63594753fe5f4ad3b47850bf64d66c14a4e",
         sha256 = "2bdbee6947e32ad1e03cd075b48fda493ab16157b2b0225b445222cd528e1843",
-        patch_cmds = [
-            "./emsdk install 1.39.19-upstream",
-            "./emsdk activate --embedded 1.39.19-upstream",
-        ],
         strip_prefix = "emsdk-{version}",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["build"],
@@ -886,23 +836,3 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         cpe = "N/A",
     ),
 )
-
-def _format_version(s, version):
-    return s.format(version = version, dash_version = version.replace(".", "-"), underscore_version = version.replace(".", "_"))
-
-# Interpolate {version} in the above dependency specs. This code should be capable of running in both Python
-# and Starlark.
-def _dependency_repositories():
-    locations = {}
-    for key, location in DEPENDENCY_REPOSITORIES_SPEC.items():
-        mutable_location = dict(location)
-        locations[key] = mutable_location
-
-        # Fixup with version information.
-        if "version" in location:
-            if "strip_prefix" in location:
-                mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
-            mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
-    return locations
-
-DEPENDENCY_REPOSITORIES = _dependency_repositories()
