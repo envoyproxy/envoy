@@ -323,8 +323,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
 
     ttl_timer = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&)
-        {
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
         }));
     EXPECT_CALL(*ttl_timer, enabled());
@@ -344,8 +343,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     response->add_resources()->PackFrom(wrapped_resource);
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&)
-        {
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
         }));
     EXPECT_CALL(*ttl_timer, enabled());
@@ -365,8 +363,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&)
-        {
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
         }));
     EXPECT_CALL(*ttl_timer, disableTimer());
@@ -385,8 +382,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     response->add_resources()->PackFrom(wrapped_resource);
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&)
-        {
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
         }));
     EXPECT_CALL(*ttl_timer, enabled());

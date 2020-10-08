@@ -74,6 +74,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "ttl_lib",
+    srcs = ["ttl.cc"],
     hdrs = ["ttl.h"],
     deps = [
         "//include/envoy/config:subscription_interface",
