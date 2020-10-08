@@ -228,7 +228,7 @@ HeaderParserPtr HeaderParser::configure(
     HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
-        HeaderToAddEntry{std::move(header_formatter), header_value_option.header().value()});
+        HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value()});
   }
 
   return header_parser;
@@ -243,7 +243,7 @@ HeaderParserPtr HeaderParser::configure(
     HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value.key()),
-        HeaderToAddEntry{std::move(header_formatter), header_value.value()});
+        HeadersToAddEntry{std::move(header_formatter), header_value.value()});
   }
 
   return header_parser;
