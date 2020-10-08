@@ -1623,7 +1623,8 @@ message RateLimit {
       repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
     }
 
-    // The following descriptor entry is appended when the dynamic metadata contains a key value:
+    // The following descriptor entry is appended when the
+    // :ref:`dynamic metadata <well_known_dynamic_metadata>` contains a key value:
     //
     // .. code-block:: cpp
     //
@@ -1641,7 +1642,8 @@ message RateLimit {
       string default_value = 3;
     }
 
-    // The following descriptor entry is appended when the route entry metadata contains a key value:
+    // The following descriptor entry is appended when the
+    // :ref:`route entry metadata <envoy_api_field_config.route.v3.Route.metadata>` contains a key value:
     //
     // .. code-block:: cpp
     //
