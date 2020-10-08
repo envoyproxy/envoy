@@ -14,6 +14,8 @@
 #include "common/http/request_id_extension_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace StreamInfo {
 
@@ -118,7 +120,9 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
-    response_code_details_.emplace(rc_details);
+    const absl::flat_hash_map<std::string, std::string> replacement{
+        {" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}};
+    response_code_details_.emplace(absl::StrReplaceAll(rc_details, replacement));
   }
 
   const absl::optional<std::string>& connectionTerminationDetails() const override {
