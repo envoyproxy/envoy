@@ -41,15 +41,23 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
           std::make_shared<Filter>(filter_config, std::move(client))});
     };
+  } else if (proto_config.grpc_service().has_google_grpc()) {
+    // Google gRPC client.
+    const uint32_t timeout_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
+    auto async_client_cache = getAsyncClientCacheSingleton(context);
+    callback = [async_client_cache, filter_config, timeout_ms, proto_config,
+                transport_api_version = proto_config.transport_api_version(),
+                use_alpha = proto_config.hidden_envoy_deprecated_use_alpha()](
+                   Http::FilterChainFactoryCallbacks& callbacks) {
+      auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
+          async_client_cache->getOrCreateAsyncClient(proto_config),
+          std::chrono::milliseconds(timeout_ms), transport_api_version, use_alpha);
+      callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
+          std::make_shared<Filter>(filter_config, std::move(client))});
+    };
   } else {
-    // gRPC client.
-
-    // The use_alpha field was there select the v2alpha api version, which is
-    // long deprecated and should not be used anymore.
-    if (proto_config.hidden_envoy_deprecated_use_alpha()) {
-      throw EnvoyException("The use_alpha field is deprecated and is no longer supported.");
-    }
-
+    // Envoy gRPC client.
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
     callback = [grpc_service = proto_config.grpc_service(), &context, filter_config, timeout_ms,
@@ -67,7 +75,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
   }
 
   return callback;
-};
+}
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
@@ -81,6 +89,18 @@ ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
  */
 REGISTER_FACTORY(ExtAuthzFilterConfig,
                  Server::Configuration::NamedHttpFilterConfigFactory){"envoy.ext_authz"};
+
+SINGLETON_MANAGER_REGISTRATION(google_grpc_async_client_cache);
+
+Filters::Common::ExtAuthz::AsyncClientCacheSharedPtr
+getAsyncClientCacheSingleton(Server::Configuration::FactoryContext& context) {
+  return context.singletonManager().getTyped<Filters::Common::ExtAuthz::AsyncClientCache>(
+      SINGLETON_MANAGER_REGISTERED_NAME(google_grpc_async_client_cache), [&context] {
+        return std::make_shared<Filters::Common::ExtAuthz::AsyncClientCache>(
+            context.clusterManager().grpcAsyncClientManager(), context.scope(),
+            context.threadLocal());
+      });
+}
 
 } // namespace ExtAuthz
 } // namespace HttpFilters
