@@ -456,7 +456,8 @@ class FormatChecker:
       flag_match = RELOADABLE_FLAG_REGEX.match(line)
       if flag_match:
         if not flag_match.groups()[0].startswith(' `'):
-          reportError("Flag `%s` should be enclosed in a single set of back ticks" % flag_match.groups()[1])
+          reportError("Flag `%s` should be enclosed in a single set of back ticks" %
+                      flag_match.groups()[1])
 
       if line.startswith("* "):
         if not endsWithPeriod(prior_line):
