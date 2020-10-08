@@ -851,7 +851,8 @@ class FilterChainFactoryCallbacks {
 public:
   virtual ~FilterChainFactoryCallbacks() = default;
 
-  virtual std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
+  using MatchTreeAndData = std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>;
+  virtual MatchTreeAndData
   createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) PURE;
 
   /**

@@ -28,6 +28,7 @@ public:
               (const));
   MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
   MOCK_METHOD(bool, streaming, (), (const));
+  MOCK_METHOD(const envoy::config::common::matcher::v3::MatchTree&, matchTreeConfig, ());
 };
 
 } // namespace TapFilter
