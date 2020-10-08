@@ -245,7 +245,7 @@ void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   // GOAWAY.
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay,
                     StreamInfo::ResponseFlag::DownstreamProtocolError,
-                    absl::StrCat("codec error: ", error));
+                    absl::StrCat("codec error:", error));
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {

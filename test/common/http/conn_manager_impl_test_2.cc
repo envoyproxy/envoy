@@ -228,7 +228,7 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     conn_manager_->newStream(response_encoder_);
-    return bufferFloodError("too many outbound frames.");
+    return bufferFloodError("too many outbound frames");
   }));
 
   EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
@@ -242,7 +242,7 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
-        EXPECT_EQ("codec error: too many outbound frames.",
+        EXPECT_EQ("codec_error:too_many_outbound_frames",
                   stream_info.responseCodeDetails().value());
       }));
   // Kick off the incoming data.
