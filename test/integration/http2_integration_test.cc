@@ -2049,8 +2049,9 @@ TEST_P(Http2FloodMitigationTest, GoawayOverflowDuringResponseWhenDraining) {
   });
   drain_sequence_started.WaitForNotification();
 
-  // Send second request which should trigger Envoy to respond with 100 continue.
-  // Verify that connection was disconnected and appropriate counters were set.
+  // Send second request which should trigger Envoy to send GOAWAY (since it is in the draining
+  // state) when processing response headers. Verify that connection was disconnected and
+  // appropriate counters were set.
   auto request2 =
       Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/test/long/url");
   sendFrame(request2);
@@ -2096,8 +2097,10 @@ typed_config:
   drain_sequence_started.WaitForNotification();
 
   // At this point the outbound downstream frame queue should be 1 away from overflowing.
-  // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply without body.
-  // Verify that connection was disconnected and appropriate counters were set.
+  // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply without body which
+  // should trigger Envoy to send GOAWAY (since it is in the draining state) when processing
+  // sendLocalReply() headers. Verify that connection was disconnected and appropriate counters were
+  // set.
   auto request2 =
       Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/call_send_local_reply");
   sendFrame(request2);
