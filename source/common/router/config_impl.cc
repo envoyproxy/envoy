@@ -552,7 +552,8 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   } else if (auto_host_rewrite_header_) {
     const auto header = headers.get(*auto_host_rewrite_header_);
     if (!header.empty()) {
-      // This is a client controlled header, so only using the first value is fine.
+      // This is an implicitly untrusted header, so per the API documentation only the first
+      // value is used.
       const absl::string_view header_value = header[0]->value().getStringView();
       if (!header_value.empty()) {
         headers.setHost(header_value);
@@ -885,7 +886,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       const auto entry = headers.get(cluster_header_name_);
       std::string final_cluster_name;
       if (!entry.empty()) {
-        // This is a client controlled header, so only using the first value is fine.
+        // This is an implicitly untrusted header, so per the API documentation only the first
+        // value is used.
         final_cluster_name = std::string(entry[0]->value().getStringView());
       }
 

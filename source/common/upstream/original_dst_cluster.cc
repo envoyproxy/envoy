@@ -90,7 +90,8 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   }
   if (!override_header.empty()) {
     try {
-      // This is client controlled so using the first value is fine.
+      // This is an implicitly untrusted header, so per the API documentation only the first
+      // value is used.
       const std::string request_override_host(override_header[0]->value().getStringView());
       request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);

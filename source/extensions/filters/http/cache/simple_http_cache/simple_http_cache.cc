@@ -183,6 +183,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
   if (iter == map_.end()) {
     Http::ResponseHeaderMapPtr vary_only_map =
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>({});
+    // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
     vary_only_map->setCopy(Http::Headers::get().Vary, vary_header[0]->value().getStringView());
     // TODO(cbdm): In a cache that evicts entries, we could maintain a list of the "varykey"s that
     // we have inserted as the body for this first lookup. This way, we would know which keys we

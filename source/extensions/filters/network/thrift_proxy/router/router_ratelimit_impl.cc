@@ -45,6 +45,7 @@ bool RequestHeadersAction::populateDescriptor(const RouteEntry&, RateLimit::Desc
     return false;
   }
 
+  // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all values.
   descriptor.entries_.push_back(
       {descriptor_key_, std::string(header_value[0]->value().getStringView())});
   return true;

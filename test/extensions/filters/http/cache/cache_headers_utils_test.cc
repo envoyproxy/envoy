@@ -758,10 +758,9 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersOverlap) {
   request_headers_.addCopy("accept", "image/*");
   Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
-  std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
+  const auto values = result->get(Http::LowerCaseString("accept"));
   ASSERT_EQ(values.size(), 1);
-  EXPECT_EQ(values[0], "image/*");
+  EXPECT_EQ(values[0]->value().getStringView(), "image/*");
 
   EXPECT_TRUE(result->get(Http::LowerCaseString("accept-language")).empty());
   EXPECT_TRUE(result->get(Http::LowerCaseString("width")).empty());
@@ -772,11 +771,10 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiValues) {
   request_headers_.addCopy("accept", "text/html");
   Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
-  std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
+  const auto values = result->get(Http::LowerCaseString("accept"));
   ASSERT_EQ(values.size(), 2);
-  EXPECT_EQ(values[0], "image/*");
-  EXPECT_EQ(values[1], "text/html");
+  EXPECT_EQ(values[0]->value().getStringView(), "image/*");
+  EXPECT_EQ(values[1]->value().getStringView(), "text/html");
 
   EXPECT_TRUE(result->get(Http::LowerCaseString("accept-language")).empty());
   EXPECT_TRUE(result->get(Http::LowerCaseString("width")).empty());
@@ -787,14 +785,13 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiHeaders) {
   request_headers_.addCopy("accept-language", "en-US");
   Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
-  std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
+  const auto values = result->get(Http::LowerCaseString("accept"));
   ASSERT_EQ(values.size(), 1);
-  EXPECT_EQ(values[0], "image/*");
+  EXPECT_EQ(values[0]->value().getStringView(), "image/*");
 
-  Http::HeaderUtility::getAllOfHeader(*result, "accept-language", values);
-  ASSERT_EQ(values.size(), 2);
-  EXPECT_EQ(values[1], "en-US");
+  const auto values2 = result->get(Http::LowerCaseString("accept-language"));
+  ASSERT_EQ(values2.size(), 1);
+  EXPECT_EQ(values2[0]->value(), "en-US");
 
   EXPECT_TRUE(result->get(Http::LowerCaseString("width")).empty());
 }

@@ -735,11 +735,10 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
   headers.addReference(set_cookie, bar);
   EXPECT_EQ(2UL, headers.size());
 
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(headers, "set-cookie", out);
-  ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "foo");
-  ASSERT_EQ(out[1], "bar");
+  const auto set_cookie_value = headers.get(LowerCaseString("set-cookie"));
+  ASSERT_EQ(set_cookie_value.size(), 2);
+  ASSERT_EQ(set_cookie_value[0]->value().getStringView(), "foo");
+  ASSERT_EQ(set_cookie_value[1]->value().getStringView(), "bar");
 }
 
 TEST_P(HeaderMapImplTest, DoubleInlineSet) {

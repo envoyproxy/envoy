@@ -33,7 +33,7 @@ ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
     return absl::nullopt;
   }
 
-  // This is effectively a trusted header so only using the first value is fine.
+  // This is effectively a trusted header so per the API only using the first value is used.
   const auto& header_value = header[0]->value().getStringView();
   uint64_t num_seconds{};
 

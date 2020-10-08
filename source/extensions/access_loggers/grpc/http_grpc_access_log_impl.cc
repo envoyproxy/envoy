@@ -117,7 +117,8 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     for (const auto& header : request_headers_to_log_) {
       const auto entry = request_headers.get(header);
       if (!entry.empty()) {
-        // TODO(mattklein123): Potentially log all header values.
+        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
+        // values.
         logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }
@@ -139,7 +140,8 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     for (const auto& header : response_headers_to_log_) {
       const auto entry = response_headers.get(header);
       if (!entry.empty()) {
-        // TODO(mattklein123): Potentially log all header values.
+        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
+        // values.
         logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }
@@ -151,7 +153,8 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     for (const auto& header : response_trailers_to_log_) {
       const auto entry = response_trailers.get(header);
       if (!entry.empty()) {
-        // TODO(mattklein123): Potentially log all header values.
+        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
+        // values.
         logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }

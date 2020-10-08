@@ -65,6 +65,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
     const auto& headers = metadata.headers();
     const auto entry = headers.get(cluster_header);
     if (!entry.empty()) {
+      // This is an implicitly untrusted header, so per the API documentation only the first
+      // value is used.
       return std::make_shared<DynamicRouteEntry>(*this, entry[0]->value().getStringView());
     }
 

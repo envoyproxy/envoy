@@ -1724,11 +1724,10 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(response->headers(), "set-cookie", out);
+  const auto out = response->headers().get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "foo");
-  ASSERT_EQ(out[1], "bar");
+  ASSERT_EQ(out[0]->value().getStringView(), "foo");
+  ASSERT_EQ(out[1]->value().getStringView(), "bar");
 }
 
 // Resets the downstream stream immediately and verifies that we clean up everything.

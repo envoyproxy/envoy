@@ -95,7 +95,7 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
       const auto header = request_headers.get(Constants::get().TRACEPARENT);
       if (!header.empty()) {
         found = true;
-        // Client controlled. Using the first value is fine.
+        // This is an implicitly untrusted header, so only the first value is used.
         parent_ctx = ::opencensus::trace::propagation::FromTraceParentHeader(
             header[0]->value().getStringView());
       }
@@ -106,7 +106,7 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
       const auto header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
       if (!header.empty()) {
         found = true;
-        // Client controlled. Using the first value is fine.
+        // This is an implicitly untrusted header, so only the first value is used.
         parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(
             Base64::decodeWithoutPadding(header[0]->value().getStringView()));
       }
@@ -117,7 +117,7 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
       const auto header = request_headers.get(Constants::get().X_CLOUD_TRACE_CONTEXT);
       if (!header.empty()) {
         found = true;
-        // Client controlled. Using the first value is fine.
+        // This is an implicitly untrusted header, so only the first value is used.
         parent_ctx = ::opencensus::trace::propagation::FromCloudTraceContextHeader(
             header[0]->value().getStringView());
       }
@@ -131,22 +131,22 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
       absl::string_view b3_flags;
       const auto h_b3_trace_id = request_headers.get(Constants::get().X_B3_TRACEID);
       if (!h_b3_trace_id.empty()) {
-        // Client controlled. Using the first value is fine.
+        // This is an implicitly untrusted header, so only the first value is used.
         b3_trace_id = h_b3_trace_id[0]->value().getStringView();
       }
       const auto h_b3_span_id = request_headers.get(Constants::get().X_B3_SPANID);
       if (!h_b3_span_id.empty()) {
-        // Client controlled. Using the first value is fine.
+        // This is an implicitly untrusted header, so only the first value is used.
         b3_span_id = h_b3_span_id[0]->value().getStringView();
       }
       const auto h_b3_sampled = request_headers.get(Constants::get().X_B3_SAMPLED);
       if (!h_b3_sampled.empty()) {
-        // Client controlled. Using the first value is fine.
+        // This is an implicitly untrusted header, so only the first value is used.
         b3_sampled = h_b3_sampled[0]->value().getStringView();
       }
       const auto h_b3_flags = request_headers.get(Constants::get().X_B3_FLAGS);
       if (!h_b3_flags.empty()) {
-        // Client controlled. Using the first value is fine.
+        // This is an implicitly untrusted header, so only the first value is used.
         b3_flags = h_b3_flags[0]->value().getStringView();
       }
       if (!h_b3_trace_id.empty() && !h_b3_span_id.empty()) {

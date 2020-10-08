@@ -1879,10 +1879,11 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
         EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");
         EXPECT_EQ(test_headers.get_("accept-encoding"), "gzip,deflate");
         EXPECT_EQ(data.toString(), "foo");
-
-        std::vector<absl::string_view> setCookieHeaderValues;
-        Http::HeaderUtility::getAllOfHeader(test_headers, "set-cookie", setCookieHeaderValues);
-        EXPECT_THAT(setCookieHeaderValues, UnorderedElementsAre("cookie1=value", "cookie2=value"));
+        EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(test_headers,
+                                                              Http::LowerCaseString("set-cookie"))
+                      .result()
+                      .value(),
+                  "cookie1=value,cookie2=value");
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
