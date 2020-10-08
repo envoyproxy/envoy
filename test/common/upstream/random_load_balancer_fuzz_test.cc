@@ -16,21 +16,20 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RandomLoadBalancerTestCase& in
     return;
   }
 
-  std::unique_ptr<LoadBalancerFuzzBase> load_balancer_fuzz =
-      std::make_unique<LoadBalancerFuzzBase>();
-  load_balancer_fuzz->initializeLbComponents(input.load_balancer_test_case());
+  LoadBalancerFuzzBase load_balancer_fuzz = LoadBalancerFuzzBase();
+  load_balancer_fuzz.initializeLbComponents(input.load_balancer_test_case());
 
   try {
-    load_balancer_fuzz->lb_ = std::make_unique<RandomLoadBalancer>(
-        load_balancer_fuzz->priority_set_, nullptr, load_balancer_fuzz->stats_,
-        load_balancer_fuzz->runtime_, load_balancer_fuzz->random_,
+    load_balancer_fuzz.lb_ = std::make_unique<RandomLoadBalancer>(
+        load_balancer_fuzz.priority_set_, nullptr, load_balancer_fuzz.stats_,
+        load_balancer_fuzz.runtime_, load_balancer_fuzz.random_,
         input.load_balancer_test_case().common_lb_config());
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException; {}", e.what());
     return;
   }
 
-  load_balancer_fuzz->replay(input.load_balancer_test_case().actions());
+  load_balancer_fuzz.replay(input.load_balancer_test_case().actions());
 }
 
 } // namespace Upstream

@@ -28,6 +28,26 @@ actions {
 
     }
 }
+actions {
+    choose_host {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
 num_hosts_in_priority_set: 2
 num_hosts_in_failover_set: 0
 seed_for_prng: 1

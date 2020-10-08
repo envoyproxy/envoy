@@ -30,6 +30,5 @@ actions {
 }
 num_hosts_in_priority_set: 60000
 num_hosts_in_failover_set: 60000
-bytestring_for_random_calls: 2
-bytestring_for_random_calls: 3
+seed_for_prng: 4
 }

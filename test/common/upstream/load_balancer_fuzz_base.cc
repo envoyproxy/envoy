@@ -3,30 +3,7 @@
 #include "test/common/upstream/utility.h"
 
 namespace Envoy {
-
-namespace Random {
-uint64_t FakeRandomGenerator::random() {
-  uint8_t index_of_data = counter % bytestring_.size();
-  ++counter;
-  ENVOY_LOG_MISC(trace, "random() returned: {}", bytestring_.at(index_of_data));
-  return bytestring_.at(index_of_data);
-}
-} // namespace Random
-
 namespace Upstream {
-
-// Anonymous namespace for helper functions
-namespace {
-std::vector<uint64_t>
-constructByteVectorForRandom(const Protobuf::RepeatedField<uint64_t>& byte_string) {
-  std::vector<uint64_t> byteVector;
-  byteVector.reserve(byte_string.size());
-  for (const auto eightBytes : byte_string) {
-    byteVector.push_back(eightBytes);
-  }
-  return byteVector;
-}
-} // namespace
 
 void LoadBalancerFuzzBase::initializeFixedHostSets(uint32_t num_hosts_in_priority_set,
                                                    uint32_t num_hosts_in_failover_set) {
@@ -46,8 +23,49 @@ void LoadBalancerFuzzBase::initializeFixedHostSets(uint32_t num_hosts_in_priorit
 // Initializes random and fixed host sets
 void LoadBalancerFuzzBase::initializeLbComponents(
     const test::common::upstream::LoadBalancerTestCase& input) {
-  random_.bytestring_ = constructByteVectorForRandom(input.bytestring_for_random_calls());
+  random_.initialize(input.seed_for_prng());
   initializeFixedHostSets(input.num_hosts_in_priority_set(), input.num_hosts_in_failover_set());
+}
+
+//TODO: Mod it against the remaining hosts, have two sets where you take index out of one and put it in the other, or even just a set of indexes that you remove from
+void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(bool failover_host_set,
+                                                        uint32_t num_healthy_hosts,
+                                                        uint32_t num_degraded_hosts,
+                                                        uint32_t num_excluded_hosts) {
+  MockHostSet& host_set = *priority_set_.getMockHostSet(int(failover_host_set));
+  // This downcast will not overflow because size is capped by port numbers
+  uint32_t host_set_size = host_set.hosts_.size();
+  host_set.healthy_hosts_.clear();
+  host_set.degraded_hosts_.clear();
+  host_set.excluded_hosts_.clear();
+  uint32_t i = 0;
+  //construct a vector here representing remaining indexes, an index will randomly get chosen from here every time and removed. Thus, this represents the remaining indexes
+  //When this goes to zero, there will be no more indexes left to place into healthy, degraded, and excluded hosts.
+  std::vector<uint8_t> indexVector;
+  byteVector.reserve(host_set_size);
+  for (uint8_t i = 0; i < host_set_size; i++) {
+    indexVector.push_back(i);
+  }
+  
+  //Handle healthy hosts
+  for (uint32_t i = 0; i < num_healthy_hosts && indexVector.size() != 0; i++) {
+    uint64_t index = random_.random() % indexVector.size(); //does this size() return a uint64_t? also, should I add logs here?
+    host_set.healthy_hosts_.push_back(host_set.hosts_[index]);
+  }
+
+  //Handle degraded hosts
+  for (uint32_t i = 0; i < num_degraded_hosts && indexVector.size() != 0; i++) {
+    uint64_t index = random_.random() % indexVector.size(); //does this size() return a uint64_t?
+    host_set.degraded_hosts_.push_back(host_set.hosts_[index]);
+  }
+
+  //Handle excluded hosts
+  for (uint32_t i = 0; i < num_excluded_hosts && indexVector.size() != 0; i++) {
+    uint64_t index = random_.random() % indexVector.size(); //does this size() return a uint64_t?
+    host_set.excluded_hosts_.push_back(host_set.hosts_[index]);
+  }
+
+  host_set.runCallbacks({}, {});
 }
 
 // Updating host sets is shared amongst all the load balancer tests. Since logically, we're just
@@ -60,9 +78,10 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(bool failover_host_set,
   MockHostSet& host_set = *priority_set_.getMockHostSet(int(failover_host_set));
   // Will not overflow because size is capped by port numbers
   uint32_t host_set_size = host_set.hosts_.size();
+  //TODO: Clear vectors?
   uint32_t i = 0;
   for (; i < std::min(num_healthy_hosts, host_set_size); ++i) {
-    host_set.healthy_hosts_.push_back(host_set.hosts_[i]);
+    host_set.healthy_hosts_.push_back(host_set.hosts_[i]); //TODO: Preallocate space in this vector
   }
   for (; i < std::min(num_healthy_hosts + num_degraded_hosts, host_set_size); ++i) {
     host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
@@ -100,14 +119,12 @@ void LoadBalancerFuzzBase::replay(
                                    event.update_health_flags().num_excluded_hosts());
       break;
     }
-    case test::common::upstream::LbAction::kPrefetch: {
+    case test::common::upstream::LbAction::kPrefetch:
       prefetch();
       break;
-    }
-    case test::common::upstream::LbAction::kChooseHost: {
+    case test::common::upstream::LbAction::kChooseHost:
       chooseHost();
       break;
-    }
     default:
       break;
     }

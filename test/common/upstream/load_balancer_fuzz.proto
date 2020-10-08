@@ -7,7 +7,7 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
-  //The boolean corresponds to whether this action updates the failover set or not
+  // The boolean corresponds to whether this action updates the failover set or not
   bool failover_host_set = 1;
   uint32 num_healthy_hosts = 2;
   uint32 num_degraded_hosts = 3;
@@ -34,9 +34,6 @@ message LoadBalancerTestCase {
   //These caps make sure that the port of the hosts constructed does not overflow
   uint32 num_hosts_in_priority_set = 3 [(validate.rules).uint32.lt = 32727];
   uint32 num_hosts_in_failover_set = 4 [(validate.rules).uint32.lt = 32727];
-  //Sequential uint64_t's that will return from random() calls in the random generator.
-  //Generating the data in the proto makes it deterministic and also makes it follow a
-  //true random distribution. Capped at 50 for space efficiency.
-  repeated uint64 bytestring_for_random_calls = 5
-      [(validate.rules).repeated = {min_items: 1, max_items: 50}];
+  //This number is used to instantiate the prng. The prng takes the place of random() calls, allowing a representative random distribution which is also deterministic.
+  uint64 seed_for_prng = 5 [(validate.rules).uint64.gt = 0];
 }
