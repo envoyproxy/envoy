@@ -1753,6 +1753,15 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
 }
 
+void Http2FloodMitigationTest::triggerListenerDrain() {
+  absl::Notification drain_sequence_started;
+  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
+    test_server_->drainManager().startDrainSequence([] {});
+    drain_sequence_started.Notify();
+  });
+  drain_sequence_started.WaitForNotification();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -1990,6 +1999,120 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   EXPECT_EQ(1, test_server_->counter("http2.outbound_control_flood")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+// Verify detection of overflowing outbound frame queue with the GOAWAY frames sent after the
+// downstream idle connection timeout disconnects the connection.
+// The test verifies protocol constraint violation handling in the
+// Http2::ConnectionImpl::shutdownNotice() method.
+TEST_P(Http2FloodMitigationTest, DownstreamIdleTimeoutTriggersFloodProtection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* http_protocol_options = hcm.mutable_common_http_protocol_options();
+        auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        idle_time_out->set_seconds(seconds.count());
+      });
+
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+}
+
+// Verify detection of overflowing outbound frame queue with the GOAWAY frames sent after the
+// downstream connection duration timeout disconnects the connection.
+// The test verifies protocol constraint violation handling in the
+// Http2::ConnectionImpl::shutdownNotice() method.
+TEST_P(Http2FloodMitigationTest, DownstreamConnectionDurationTimeoutTriggersFloodProtection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* http_protocol_options = hcm.mutable_common_http_protocol_options();
+        auto* max_connection_duration = http_protocol_options->mutable_max_connection_duration();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        max_connection_duration->set_seconds(seconds.count());
+      });
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.downstream_cx_max_duration_reached")->value());
+}
+
+// Verify detection of frame flood when sending GOAWAY frame during processing of response headers
+// on a draining listener.
+TEST_P(Http2FloodMitigationTest, GoawayOverflowDuringResponseWhenDraining) {
+  // pre-fill one away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+
+  triggerListenerDrain();
+
+  // Send second request which should trigger Envoy to send GOAWAY (since it is in the draining
+  // state) when processing response headers. Verify that connection was disconnected and
+  // appropriate counters were set.
+  auto request2 =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/test/long/url");
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound GOAWAY frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the upstream connection is still alive.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+}
+
+// Verify detection of frame flood when sending GOAWAY frame during call to sendLocalReply()
+// from decoder filter on a draining listener.
+TEST_P(Http2FloodMitigationTest, GoawayOverflowFromDecoderFilterSendLocalReplyWhenDraining) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        const std::string yaml_string = R"EOF(
+name: send_local_reply_filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+  prefix: "/call_send_local_reply"
+  code: 404
+  )EOF";
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
+        // keep router the last
+        auto size = hcm.http_filters_size();
+        hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
+      });
+
+  // pre-fill one away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+
+  triggerListenerDrain();
+
+  // At this point the outbound downstream frame queue should be 1 away from overflowing.
+  // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply without body which
+  // should trigger Envoy to send GOAWAY (since it is in the draining state) when processing
+  // sendLocalReply() headers. Verify that connection was disconnected and appropriate counters were
+  // set.
+  auto request2 =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/call_send_local_reply");
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound GOAWAY frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the upstream connection is still alive.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
 }
 
 // Verify that the server stop reading downstream connection on protocol error.
