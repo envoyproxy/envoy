@@ -40,7 +40,7 @@ def RstLink(text, url):
 # NIST CPE database search URL for a given CPE.
 def NistCpeUrl(cpe):
   encoded_cpe = urllib.parse.quote(cpe)
-  return 'https://nvd.nist.gov/products/cpe/search/results?keyword=%s&status=FINAL&orderBy=CPEURI&namingFormat=2.3' % encoded_cpe
+  return f'https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query={encoded_cpe}&search_type=all'
 
 
 # Render version strings human readable.
@@ -55,6 +55,44 @@ def RenderVersion(version):
 def RenderTitle(title):
   underline = '~' * len(title)
   return f'\n{title}\n{underline}\n\n'
+
+
+# Determine the version link URL. If it's GitHub, use some heuristics to figure
+# out a release tag link, otherwise point to the GitHub tree at the respective
+# SHA. Otherwise, return the tarball download.
+def GetVersionUrl(metadata):
+  # Figure out if it's a GitHub repo.
+  github_repo = None
+  github_version = None
+  for url in metadata['urls']:
+    if url.startswith('https://github.com/'):
+      components = url.split('/')
+      github_repo = f'https://github.com/{components[3]}/{components[4]}'
+      if components[5] == 'archive':
+        # Only support .tar.gz, .zip today. Figure out the release tag from this
+        # filename.
+        if components[6].endswith('.tar.gz'):
+          github_version = components[6][:-len('.tar.gz')]
+        else:
+          assert (components[6].endswith('.zip'))
+          github_version = components[6][:-len('.zip')]
+      else:
+        # Release tag is a path component.
+        assert (components[5] == 'releases')
+        github_version = components[7]
+      break
+  # If not, direct download link for tarball
+  download_url = metadata['urls'][0]
+  if not github_repo:
+    return download_url
+  # If it's not a GH hash, it's a tagged release.
+  tagged_release = len(metadata['version']) != 40
+  if tagged_release:
+    # The GitHub version should look like the metadata version, but might have
+    # something like a "v" prefix.
+    return f'{github_repo}/releases/tag/{github_version}'
+  assert (metadata['version'] == github_version)
+  return f'{github_repo}/tree/{github_version}'
 
 
 if __name__ == '__main__':
@@ -72,7 +110,7 @@ if __name__ == '__main__':
     project_name = v['project_name']
     project_url = v['project_url']
     name = RstLink(project_name, project_url)
-    version = RstLink(RenderVersion(v['version']), v['urls'][0])
+    version = RstLink(RenderVersion(v['version']), GetVersionUrl(v))
     last_updated = v['last_updated']
     dep = Dep(name, project_name.lower(), version, cpe, last_updated)
     for category in v['use_category']:
