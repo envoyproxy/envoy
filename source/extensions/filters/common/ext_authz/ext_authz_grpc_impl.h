@@ -44,7 +44,6 @@ class GrpcClientImpl : public Client,
                        public ExtAuthzAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
-  // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
   GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout,
                  envoy::config::core::v3::ApiVersion transport_api_version);

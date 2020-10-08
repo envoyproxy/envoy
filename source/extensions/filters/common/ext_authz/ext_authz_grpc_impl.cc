@@ -18,8 +18,7 @@ namespace ExtAuthz {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
-                               envoy::config::core::v3::ApiVersion transport_api_version,
-                               bool use_alpha)
+                               envoy::config::core::v3::ApiVersion transport_api_version)
     : async_client_(async_client), timeout_(timeout),
       service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
                                              "envoy.service.auth.v2.Authorization.Check")

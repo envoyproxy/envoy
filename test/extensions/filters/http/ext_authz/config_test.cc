@@ -128,15 +128,36 @@ TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupp
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
   proto_config.set_hidden_envoy_deprecated_use_alpha(true);
 
-  testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context, runtime());
-  EXPECT_CALL(context, scope());
+  // Trigger the throw in the Envoy gRPC branch.
+  {
+    testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+    EXPECT_CALL(context, messageValidationVisitor());
+    EXPECT_CALL(context, runtime());
+    EXPECT_CALL(context, scope());
 
-  ExtAuthzFilterConfig factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-                            EnvoyException,
-                            "The use_alpha field is deprecated and is no longer supported.")
+    ExtAuthzFilterConfig factory;
+    EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+                              EnvoyException,
+                              "The use_alpha field is deprecated and is no longer supported.")
+  }
+
+  // Trigger the throw in the Google gRPC branch.
+  {
+    auto google_grpc = new envoy::config::core::v3::GrpcService_GoogleGrpc();
+    google_grpc->set_stat_prefix("grpc");
+    google_grpc->set_target_uri("http://example.com");
+    proto_config.mutable_grpc_service()->set_allocated_google_grpc(google_grpc);
+
+    testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+    EXPECT_CALL(context, messageValidationVisitor());
+    EXPECT_CALL(context, runtime());
+    EXPECT_CALL(context, scope());
+
+    ExtAuthzFilterConfig factory;
+    EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+                              EnvoyException,
+                              "The use_alpha field is deprecated and is no longer supported.")
+  }
 }
 
 // Test that the deprecated extension name still functions.
