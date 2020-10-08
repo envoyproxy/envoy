@@ -5,11 +5,12 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* build: added visibility rules for upstream. If these cause visibility related breakage, see notes in //BUILD.
+* build: added visibility rules for upstream. If these cause visibility related breakage, see notes in `BUILD <https://github.com/envoyproxy/envoy/blob/master/BUILD>`_.
+* build: tcmalloc changes require Clang 9. This requirement change can be avoided by building with `--define tcmalloc=gperftools` to use the older tcmalloc code.
 * config: additional warnings have been added for the use of v2 APIs. These appear as log messages
   and are also captured in the :ref:`deprecated_feature_use <runtime_stats>` counter after server
   initialization.
-* dns: ``envoy.restart_features.use_apple_api_for_dns_lookups`` is on by default. This flag only affects Apple platforms (macOS, iOS). It is incompatible to have the runtime flag set to true at the same time as specifying the ``use_tcp_for_dns_lookups`` option or custom dns resolvers. Doing so will cause failure.
+* dns: `envoy.restart_features.use_apple_api_for_dns_lookups` is on by default. This flag only affects Apple platforms (macOS, iOS). It is incompatible to have the runtime flag set to true at the same time as specifying the ``use_tcp_for_dns_lookups`` option or custom dns resolvers. Doing so will cause failure.
 * watchdog: added two guarddogs, breaking the aggregated stats for the single guarddog system. The aggregated stats for the guarddogs will have the following prefixes: `main_thread` and `workers`. Concretely, anything monitoring `server.watchdog_miss` and `server.watchdog_mega_miss` will need to be updated.
 
 Minor Behavior Changes
@@ -23,7 +24,7 @@ Minor Behavior Changes
 * compressor: always insert `Vary` headers for compressible resources even if it's decided not to compress a response due to incompatible `Accept-Encoding` value. The `Vary` header needs to be inserted to let a caching proxy in front of Envoy know that the requested resource still can be served with compression applied.
 * decompressor: headers-only requests were incorrectly not advertising accept-encoding when configured to do so. This is now fixed.
 * ext_authz filter: request timeout will now count from the time the check request is created, instead of when it becomes active. This makes sure that the timeout is enforced even if the ext_authz cluster's circuit breaker is engaged.
-  This behavior can be reverted by setting runtime feature ``envoy.reloadable_features.ext_authz_measure_timeout_on_check_created`` to false. When enabled, a new `ext_authz.timeout` stat is counted when timeout occurs. See :ref:`stats <config_http_filters_ext_authz_stats>`.
+  This behavior can be reverted by setting runtime feature `envoy.reloadable_features.ext_authz_measure_timeout_on_check_created` to false. When enabled, a new `ext_authz.timeout` stat is counted when timeout occurs. See :ref:`stats <config_http_filters_ext_authz_stats>`.
 * grpc reverse bridge: upstream headers will no longer be propagated when the response is missing or contains an unexpected content-type.
 * http: added :ref:`contains <envoy_api_msg_type.matcher.StringMatcher>`, a new string matcher type which matches if the value of the string has the substring mentioned in contains matcher.
 * http: added :ref:`contains <envoy_api_msg_route.HeaderMatcher>`, a new header matcher type which matches if the value of the header has the substring mentioned in contains matcher.
@@ -40,7 +41,7 @@ Minor Behavior Changes
 * http: fixed the 100-continue response path to properly handle upstream failure by sending 5xx responses. This behavior can be temporarily reverted by setting `envoy.reloadable_features.allow_500_after_100` to false.
 * http: the per-stream FilterState maintained by the HTTP connection manager will now provide read/write access to the downstream connection FilterState. As such, code that relies on interacting with this might
   see a change in behavior.
-* logging: added fine-grain logging for file level log control with logger management at administration interface. It can be enabled by option `--enable-fine-grain-logging`.
+* logging: added fine-grain logging for file level log control with logger management at administration interface. It can be enabled by option :option:`--enable-fine-grain-logging`.
 * logging: changed default log format to `"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"` and default value of :option:`--log-format-prefix-with-location` to `0`.
 * logging: nghttp2 log messages no longer appear at trace level unless `ENVOY_NGHTTP2_TRACE` is set
   in the environment.
@@ -49,7 +50,7 @@ Minor Behavior Changes
 * postgres: changed log format to tokenize fields of Postgres messages.
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
-* stats: the fake symbol table implemention has been removed from the binary, and the option "--use-fake-symbol-table" is now a no-op with a warning.
+* stats: the fake symbol table implemention has been removed from the binary, and the option :option:`--use-fake-symbol-table` is now a no-op with a warning.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
 * watchdog: replaced single watchdog with separate watchdog configuration for worker threads and for the main thread configured via :ref:`Watchdogs<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`. It works with :ref:`watchdog<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` by having the worker thread and main thread watchdogs have same config.
 
@@ -67,7 +68,7 @@ Bug Fixes
 * http: made the HeaderValues::prefix() method const.
 * jwt_authn: supports jwt payload without "iss" field.
 * listener: fixed crash at listener inplace update when connetion load balancer is set.
-* rocketmq_proxy network-level filter: fixed an issue involving incorrect header lengths. In debug mode it causes crash and in release mode it causes underflow.
+* rocketmq_proxy: fixed an issue involving incorrect header lengths. In debug mode it causes crash and in release mode it causes underflow.
 * thrift_proxy: fixed crashing bug on request overflow.
 * udp_proxy: fixed a crash due to UDP packets being processed after listener removal.
 
@@ -95,7 +96,7 @@ New Features
 * build: enable building envoy :ref:`arm64 images <arm_binaries>` by buildx tool in x86 CI platform.
 * cluster: added new :ref:`connection_pool_per_downstream_connection <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag, which enable creation of a new connection pool for each downstream connection.
 * decompressor filter: reports compressed and uncompressed bytes in trailers.
-* dns: added support for doing DNS resolution using Apple's DnsService APIs in Apple platforms (macOS, iOS). This feature is ON by default, and is only configurable via the ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime key. Note that this value is latched during server startup and changing the runtime key is a no-op during the lifetime of the process.
+* dns: added support for doing DNS resolution using Apple's DnsService APIs in Apple platforms (macOS, iOS). This feature is ON by default, and is only configurable via the `envoy.restart_features.use_apple_api_for_dns_lookups` runtime key. Note that this value is latched during server startup and changing the runtime key is a no-op during the lifetime of the process.
 * dns_filter: added support for answering :ref:`service record<envoy_v3_api_msg_data.dns.v3.DnsTable.DnsService>` queries.
 * dynamic_forward_proxy: added :ref:`use_tcp_for_dns_lookups<envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` option to use TCP for DNS lookups in order to match the DNS options for :ref:`Clusters<envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 * ext_authz filter: added support for emitting dynamic metadata for both :ref:`HTTP <config_http_filters_ext_authz_dynamic_metadata>` and :ref:`network <config_network_filters_ext_authz_dynamic_metadata>` filters.
