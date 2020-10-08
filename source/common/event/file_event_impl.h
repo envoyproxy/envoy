@@ -98,9 +98,9 @@ private:
 class UserSpaceFileEventImpl : public FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
   ~UserSpaceFileEventImpl() override {
-    // if (schedulable_.enabled()) {
-    schedulable_.cancel();
-    //}
+    if (schedulable_.enabled()) {
+      schedulable_.cancel();
+    }
     ASSERT(event_counter_ == 1);
     --event_counter_;
   }
