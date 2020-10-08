@@ -182,4 +182,4 @@ def _hello_pr(action, issue_number):
 handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
 # handlers.status(func=_status)
-handlers.pull_request(func=_hello_pr)
+# handlers.pull_request(func=_hello_pr)
