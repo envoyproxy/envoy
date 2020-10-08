@@ -21,7 +21,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) {}
 
-Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) {
+Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
   return Http::FilterHeadersStatus::Continue;
 }
 
