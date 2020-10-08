@@ -46,7 +46,7 @@ public:
 private:
   void refreshTimer();
 
-  using TtlSet = absl::btree_set<std::pair<MonotonicTime, std::string>>;
+  using TtlSet = std::set<std::pair<MonotonicTime, std::string>>;
   TtlSet ttls_;
   absl::flat_hash_map<std::string, TtlSet::iterator> ttl_lookup_;
 

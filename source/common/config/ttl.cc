@@ -16,6 +16,7 @@ TtlManager::TtlManager(std::function<void(const std::vector<std::string>&)> call
     auto itr = ttls_.begin();
     while (itr != ttls_.end() && itr->first <= now) {
       expired.push_back(itr->second);
+      ttl_lookup_.erase(itr->second);
       itr++;
     }
 

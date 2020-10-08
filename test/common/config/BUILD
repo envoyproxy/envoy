@@ -37,6 +37,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "ttl_test",
+    srcs = ["ttl_test.cc"],
+    deps = [
+        "//source/common/config:ttl_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "delta_subscription_impl_test",
     srcs = ["delta_subscription_impl_test.cc"],
     deps = [
