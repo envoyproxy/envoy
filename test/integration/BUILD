@@ -321,6 +321,7 @@ envoy_cc_test(
     shard_count = 4,
     tags = ["flaky_on_windows"],
     deps = [
+        ":autonomous_upstream_lib",
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",

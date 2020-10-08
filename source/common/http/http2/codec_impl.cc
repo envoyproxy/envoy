@@ -247,6 +247,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     auto status = parent_.sendPendingFrames();
     // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
     RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+    parent_.checkProtocolConstraintViolation();
   }
 }
 

@@ -238,6 +238,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
+    parent_.checkProtocolConstraintViolation();
   }
 }
 

@@ -12,6 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/socket_option_impl.h"
 
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -1937,6 +1938,43 @@ typed_config:
 
 // TODO(yanavlasov): add the same tests as above for the encoder filters.
 // This is currently blocked by the https://github.com/envoyproxy/envoy/pull/13256
+
+// Verify that the server can detect flood of response trailers.
+TEST_P(Http2FloodMitigationTest, Trailers) {
+  // Set large buffer limits so the test is not affected by the flow control.
+  config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  beginSession();
+
+  // Do not read from the socket and send request that causes autonomous upstream
+  // to respond with 999 DATA frames and trailers. The Http2FloodMitigationTest::beginSession()
+  // sets 1000 flood limit for all frame types. Including 1 HEADERS response frame
+  // 999 DATA frames and trailers should trigger flood protection.
+  // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
+  // to accumulate in the transport socket buffer.
+  writev_matcher_->setWritevReturnsEgain();
+
+  static_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseTrailers(std::make_unique<Http::TestResponseTrailerMapImpl>(
+          Http::TestResponseTrailerMapImpl({{"foo", "bar"}})));
+
+  const auto request =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(0), "host", "/test/long/url",
+                              {Http2Frame::Header("response_data_blocks", "999")});
+  sendFrame(request);
+
+  // Wait for connection to be flooded with outbound trailers and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
+  // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
+  // connections.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
 
 // Verify that the server can detect flood of RST_STREAM frames.
 TEST_P(Http2FloodMitigationTest, RST_STREAM) {
