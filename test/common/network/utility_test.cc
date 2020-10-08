@@ -176,7 +176,9 @@ TEST(NetworkUtility, GetOriginalDst) {
 #endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
 
+#ifdef SOL_IP
   EXPECT_CALL(socket, addressType()).WillOnce(testing::Return(Address::Type::Pipe));
+#endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
 }
 
