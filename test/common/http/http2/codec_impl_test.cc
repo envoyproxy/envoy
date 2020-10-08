@@ -333,7 +333,7 @@ protected:
 
     // HTTP/2 codec does not send empty DATA frames with no END_STREAM flag.
     // To make this work, send raw bytes representing empty DATA frames bypassing client codec.
-    Http2Frame emptyDataFrame = Http2Frame::makeEmptyDataFrame(0);
+    Http2Frame emptyDataFrame = Http2Frame::makeEmptyDataFrame(Http2Frame::makeClientStreamId(0));
     constexpr uint32_t max_allowed =
         CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
@@ -896,6 +896,64 @@ TEST_P(Http2CodecImplTest, EncodeMetadataWhileDispatchingTest) {
   EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
   request_encoder_->encodeHeaders(request_headers, true);
 }
+
+// Validate the keepalive PINGs are sent and received correctly.
+TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
+  constexpr uint32_t interval_ms = 100;
+  constexpr uint32_t timeout_ms = 200;
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
+                                                                                      1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
+                                                                                     1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
+  auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_); /* */
+  auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  initialize();
+
+  // Trigger sending a PING, and validate that an ACK is received based on the timeout timer
+  // being disabled and the interval being re-enabled.
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  send_timer->callback_();
+
+  // Test that a timeout closes the connection.
+  EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush));
+  timeout_timer->callback_();
+}
+
+// Validate that jitter is added as expected based on configuration.
+TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_seconds(1);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_seconds(1);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(10);
+  /*auto timeout_timer = */ new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+
+  constexpr std::chrono::milliseconds min_expected(1000);
+  constexpr std::chrono::milliseconds max_expected(1099); // 1000ms + 10%
+  std::chrono::milliseconds min_observed(5000);
+  std::chrono::milliseconds max_observed(0);
+  EXPECT_CALL(*send_timer, enableTimer(_, _))
+      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds& ms, const ScopeTrackedObject*) {
+        EXPECT_GE(ms, std::chrono::milliseconds(1000));
+        EXPECT_LE(ms, std::chrono::milliseconds(1100));
+        max_observed = std::max(max_observed, ms);
+        min_observed = std::min(min_observed, ms);
+      }));
+  initialize();
+
+  for (uint64_t i = 0; i < 250; i++) {
+    EXPECT_CALL(client_->random_generator_, random()).WillOnce(Return(i));
+    send_timer->callback_();
+  }
+
+  EXPECT_EQ(min_observed.count(), min_expected.count());
+  EXPECT_EQ(max_observed.count(), max_expected.count());
+}
+
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
@@ -1983,15 +2041,16 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
         buffer.move(frame);
       }));
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1; ++i) {
     EXPECT_NO_THROW(response_encoder_->encodeHeaders(response_headers, false));
   }
-  // Presently flood mitigation is done only when processing downstream data
-  // So we need to send stream from downstream client to trigger mitigation
-  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many frames in the outbound queue.");
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
@@ -2014,6 +2073,9 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
         buffer.move(frame);
       }));
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
@@ -2021,11 +2083,10 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
     Buffer::OwnedImpl data("0");
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
   }
-  // Presently flood mitigation is done only when processing downstream data
-  // So we need to send stream from downstream client to trigger mitigation
-  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many frames in the outbound queue.");
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
@@ -2091,16 +2152,17 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   // Drain kMaxOutboundFrames / 2 slices from the send buffer
   buffer.drain(buffer.length() / 2);
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
   for (uint32_t i = 0; i < kMaxOutboundFrames / 2 + 1; ++i) {
     Buffer::OwnedImpl data("0");
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
   }
 
-  // Presently flood mitigation is done only when processing downstream data
-  // So we need to send a frame from downstream client to trigger mitigation
-  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many frames in the outbound queue.");
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
 }
 
 // Verify that control frames are added to the counter of outbound frames of all types.

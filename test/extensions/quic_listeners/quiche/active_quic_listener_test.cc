@@ -1,18 +1,15 @@
 #include <cstdlib>
-
-#pragma GCC diagnostic push
-// QUICHE allows unused parameters.
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-
 #include <memory>
-
-#include "common/runtime/runtime_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/network/exception.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
@@ -20,22 +17,24 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/quic/test_tools/quic_crypto_server_config_peer.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "server/configuration_impl.h"
 #include "common/common/logger.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/udp_packet_writer_handler_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/environment.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/instance.h"
-
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/network_utility.h"
 #include "absl/time/time.h"
@@ -231,7 +230,7 @@ protected:
 
       do {
         Api::IoCallUint64Result result =
-            result_buffer->read(client_socket->ioHandle(), bytes_to_read - bytes_read);
+            client_socket->ioHandle().read(*result_buffer, bytes_to_read - bytes_read);
 
         if (result.ok()) {
           bytes_read += result.rc_;
@@ -316,7 +315,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   options->emplace_back(std::move(option));
   quic_listener_.reset();
   EXPECT_THROW_WITH_REGEX(
-      std::make_unique<ActiveQuicListener>(
+      (void)std::make_unique<ActiveQuicListener>(
           0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
           options, false,
           ActiveQuicListenerFactoryPeer::runtimeEnabled(

@@ -1,8 +1,8 @@
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
@@ -13,7 +13,9 @@
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include <string>
 
@@ -751,9 +753,13 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
 
 TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   installReadFilter();
-  // Not verifying dummy implementation, just to have coverage.
-  EXPECT_DEATH(envoy_quic_session_.enableHalfClose(true), "");
-  EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
+  testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
+  envoy_quic_session_.set_debug_visitor(&debug_visitor);
+  if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
+    EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  } else {
+    // This is a no-op for pre-HTTP3 versions of QUIC.
+  }
   http_connection_->shutdownNotice();
 }
 

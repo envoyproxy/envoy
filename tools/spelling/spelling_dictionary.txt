@@ -71,6 +71,7 @@ DFATAL
 DGRAM
 DLOG
 DNS
+DNSSEC
 DQUOTE
 DRYs
 DS
@@ -82,6 +83,7 @@ EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
+ECDS
 ECDSA
 ECDSAs
 ECMP
@@ -221,6 +223,7 @@ Nilsson
 Nonhashable
 Oauth
 OCSP
+OID
 OK
 OOM
 OOMs
@@ -1017,6 +1020,7 @@ sched
 schedulable
 schemas
 scopekey
+sd
 secp
 sendmsg
 sendmmsg

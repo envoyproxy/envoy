@@ -16,7 +16,6 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 

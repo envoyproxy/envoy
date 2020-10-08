@@ -12,6 +12,7 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/http/headers.h"
 #include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
@@ -32,6 +33,21 @@ struct TracingConstantValues {
 };
 
 using TracingConstants = ConstSingleton<TracingConstantValues>;
+
+/**
+ * Constant auth related HTTP headers. All lower case. This group of headers can
+ * contain prefix override headers.
+ */
+class HeaderValues {
+public:
+  const char* prefix() const { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
+
+  const Http::LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
+  const Http::LowerCaseString EnvoyAuthHeadersToRemove{
+      absl::StrCat(prefix(), "-auth-headers-to-remove")};
+};
+
+using Headers = ConstSingleton<HeaderValues>;
 
 /**
  * Possible async results for a check call.
@@ -75,6 +91,9 @@ struct Response {
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the request to the upstream server.
   Http::HeaderVector headers_to_add;
+  // A set of HTTP headers consumed by the authorization server, will be removed
+  // from the request to the upstream server.
+  std::vector<Envoy::Http::LowerCaseString> headers_to_remove;
   // Optional http body used only on denied response.
   std::string body;
   // Optional http status used only on denied response.

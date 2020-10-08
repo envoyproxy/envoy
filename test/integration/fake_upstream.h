@@ -34,6 +34,7 @@
 
 #include "server/active_raw_udp_listener_config.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -457,6 +458,7 @@ private:
   const Type type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
