@@ -20,11 +20,13 @@ recent Linux including Ubuntu 18.04 LTS.
 
 Building Envoy has the following requirements:
 
-* GCC 7+ or Clang/LLVM 7+ (for C++14 support).
+* GCC 7+ or Clang/LLVM 7+ (for C++14 support). Clang/LLVM 9+ preferred (see below).
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
 
 Please see the linked :repo:`CI <ci/README.md>` and :repo:`Bazel <bazel/README.md>` documentation
 for more information on performing manual builds.
+Please note that for Clang/LLVM 8 and lower, Envoy must be built with `--define tcmalloc=gperftools`
+as the new tcmalloc code only works with Clang/LLVM 9+
 
 .. _install_binaries:
 
