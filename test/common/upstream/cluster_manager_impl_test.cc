@@ -52,11 +52,7 @@ public:
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-<<<<<<< HEAD
-        *api_, http_context_, grpc_context_, secret_manager_);
-=======
-        *factory_.api_, http_context_, grpc_context_);
->>>>>>> 8888ee7e24999354c320bd5062fe500077fa142e
+        *factory_.api_, http_context_, grpc_context_, secret_manager_);
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
@@ -100,12 +96,8 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-<<<<<<< HEAD
-        *api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
+        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
         secret_manager_);
-=======
-        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
->>>>>>> 8888ee7e24999354c320bd5062fe500077fa142e
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,

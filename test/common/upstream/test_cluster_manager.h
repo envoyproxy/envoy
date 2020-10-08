@@ -197,7 +197,7 @@ public:
                                   Secret::SecretManager& secret_manager)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                                main_thread_dispatcher, admin, validation_context, api, http_context,
-                               grpc_context, secret_manager_),
+                               grpc_context, secret_manager),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
