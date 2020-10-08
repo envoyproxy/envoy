@@ -53,7 +53,6 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 // problem of the bugs being found after the old code path has been removed.
 constexpr const char* runtime_features[] = {
     // Enabled
-    "envoy.reloadable_features.http1_flood_protection",
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
