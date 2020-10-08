@@ -34,6 +34,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/grpc_http1_reverse_bridge @snowp @zuercher
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
+# external mutation filter
+/*/extensions/filters/http/mutation @gbrail @htuch
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # tls transport socket extension

@@ -3,9 +3,11 @@ syntax = "proto3";
 package envoy.service.mutation.v3alpha;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/filters/http/mutation/v3alpha/processing_mode.proto";
 import "envoy/service/auth/v3/attribute_context.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
@@ -56,25 +58,38 @@ service Mutation {
 
 // This represents the different types of messages that Envoy can send
 // to a mutation server.
+// [#next-free-field: 8]
 message MutationRequest {
   oneof r {
-    // Information about the HTTP request, sent after the HTTP headers have been
-    // received on the "encoding" path, but before the body is available.
-    // This is the same data sent to an "ext_authz" service.
-    auth.v3.AttributeContext request = 1;
+    // If true, then Envoy requires that the server send one MutationResponse message
+    // back up the stream in response to this message -- otherwise, Envoy will
+    // never resume processing the filter chain. In practice, this will always
+    // be "true" unless the server or the user has configured the filter
+    // to run in "async mode."
+    bool response_required = 1;
 
-    // Information about the HTTP response, sent after the HTTP headers have been
-    // received on the "decoding" path.
-    Response response = 2;
+    // Information about the HTTP request, sent when the decodeHeaders callback
+    // is invoked on the Envoy filter.
+    auth.v3.AttributeContext request = 2;
+
+    // Information about the HTTP response, sent when the encodeHeaders callback
+    // is invoked on the Envoy filter.
+    Response response = 3;
 
     // A chunk of the HTTP request body. This is only sent if the server
     // requested it.
-    Body body = 3;
+    Body request_body = 4;
 
-    // The HTTP trailers, for either the request or response path, depending
-    // on where we are in the filter lifecycle. This is only sent if the
-    // server requested it.
-    config.core.v3.HeaderMap trailers = 4;
+    // A chunk of the HTTP response body, if the server requested it.
+    Body response_body = 5;
+
+    // The HTTP trailers for the request path. These are only sent if
+    // the server requested them.
+    config.core.v3.HeaderMap request_trailers = 6;
+
+    // The HTTP trailers for the response path, sent if the server
+    // requested them.
+    config.core.v3.HeaderMap response_trailers = 7;
   }
 }
 
@@ -82,65 +97,72 @@ message MutationRequest {
 // before closing the stream.
 // [#next-free-field: 7]
 message MutationResponse {
-  enum Disposition {
-    // The server is done with the request or response -- continue processing
-    // and do not consult the server again for this request or response.
-    CONTINUE = 0;
-
+  enum Command {
     // The server is done with the request and response, and no further
     // filters should be invoked. This is typically used with the
-    // "CompleteResponse" field.
-    STOP = 1;
+    // "CompleteResponse" to return an error.
+    STOP = 0;
 
-    // If this is returned, Envoy will next send a Body message downstream
-    // containing either the next chunk of the body available, or an end-of-stream.
+    // The server is done with the request. Continue processing
+    // and do not consult the server again for this request.
+    CONTINUE_REQUEST = 1;
+
+    // The server is done with the response. Do not consult the server
+    // again.
+    CONTINUE_RESPONSE = 2;
+
+    // Request that Envoy next send a Body message downstream
+    // containing either the next chunk of the request body available, or an end-of-stream.
     // Once this is returned, it will no longer be possible to modify the
     // message headers.
-    SEND_BODY_CHUNK = 2;
+    SEND_REQUEST_BODY_CHUNK = 3;
 
-    // If this is returned, Envoy will buffer the entire message body in memory
+    // Send the next chunk of the response body.
+    SEND_RESPONSE_BODY_CHUNK = 4;
+
+    // Request that Envoy will buffer the entire request message body in memory
     // subject to the currently-configured body buffer limit, and send a
     // single Body message downstream containing the entire message body.
     // It is still possible for the server to modify the message headers
     // with the next upstream message.
-    SEND_ENTIRE_BODY = 3;
+    SEND_REQUEST_BODY = 5;
 
-    // If this is returned, Envoy will send each chunk of the message body immediately
-    // without buffering, and without waiting for a response until the end of stream
-    // has been reached. Any additional upstream messages from the service will
-    // be ignored.
-    SEND_BODY_ASYNC = 4;
+    // Request that Envoy buffer and send the response body in a single chunk.
+    SEND_RESPONSE_BODY = 6;
 
-    // If this is returned, Envoy will send the HTTP trailers when they are
+    // Request that Envoy will send the HTTP request trailers when they are
     // available. Once trailers have been requested, no more bodies
     // will be delivered, so this must be sent after all desired body chunks are
     // desired.
-    SEND_TRAILERS = 5;
+    SEND_REQUEST_TRAILERS = 7;
+
+    // Request that Envoy send the response trailers when available.
+    SEND_RESPONSE_TRAILERS = 8;
   }
 
   // This indicates how to handle the next step in the processing chain,
   // as shown by the enum constants above.
-  Disposition disposition = 1 [(validate.rules).enum = {defined_only: true}];
+  Command command = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Replace the entire HTTP response (whether on the request or on the
   // response path) with the contents of the CompleteResponse message.
-  // If a STOP disposition is set, then send this response back immediately
-  // to the client with no additional filter processing
+  // If a STOP command is set, then send this response back immediately
+  // to the client with no additional filter processing.
   CompleteResponse complete_response = 2;
 
-  // Add or replace HTTP headers. This will be ignored after SEND_BODY_CHUNK
-  // or SEND_BODY_ASYNC have been sent. If SEND_TRAILERS was previously sent, then
+  // Add or replace HTTP headers. This will be ignored after SEND_XXX_BODY_CHUNK has
+  // been sent. If SEND_TRAILERS was previously sent, then
   // modify the trailers instead.
   repeated config.core.v3.HeaderValueOption set_headers = 3;
 
-  // Remove these HTTP headers. This will be ignored after SEND_BODY_CHUNK
-  // or SEND_BODY_ASYNC have been sent. If SEND_TRAILERS was previously sent, then
+  // Remove these HTTP headers. This will be ignored after SEND_XXX_BODY_CHUNK
+  // has been sent. If SEND_XXX_TRAILERS was previously sent, then
   // modify the trailers instead.
   repeated string remove_headers = 4;
 
   // Replace some or all of the last message body received with a new
   // set of bytes. This will be ignored unless the previous message sent
-  // by the client is a "*BODY" request.
+  // by the client is a "XXXBODY" request.
   BodyMutation body_mutation = 5;
 
   // Add new metadata to the Envoy context
@@ -149,9 +171,9 @@ message MutationResponse {
 
 // This message is sent downstream to the server when the HTTP response has been
 // received.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Response {
-  // A unique ID that will match the one sent in the "Request" RPC
+  // A unique ID that will match the one sent in the "Request" message
   string id = 1;
 
   // The HTTP status on the response
@@ -166,6 +188,9 @@ message Response {
 
   // Information about the upstream service's connection
   auth.v3.AttributeContext.Peer destination_info = 5;
+
+  // Change how and if the filter waits for responses from the server
+  ProcessingModeChange async_mode_change = 6;
 }
 
 // This message contains the message body that Envoy sends to the mutation service.
@@ -200,4 +225,16 @@ message BodyMutation {
   int32 length = 2;
 
   bytes body = 3;
+}
+
+// Change the processing mode of the filter. If "duration" is set,
+// then the change is a temporary change that will be un-done after the specified
+// timeout. (If multiple requests arrive after a timer has been set, then the results
+// may or may not reflect the last one received.)
+message ProcessingModeChange {
+  envoy.extensions.filters.http.mutation.v3alpha.ProcessingMode async_mode = 1;
+
+  // If set, then the change will be reverted back to the configured async_mode
+  // after this time.
+  google.protobuf.Duration duration = 2;
 }
