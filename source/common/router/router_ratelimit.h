@@ -132,7 +132,7 @@ private:
 };
 
 /**
- * Action for filter metadata rate limiting.
+ * Action for route entry metadata rate limiting.
  */
 class RouteEntryMetaDataAction : public RateLimitAction {
 public:
