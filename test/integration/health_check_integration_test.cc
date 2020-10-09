@@ -155,7 +155,7 @@ public:
     return ret;
   }
 
-  static std::string protocolTestParamsToString(
+  static std::string httpHealthCheckTestParamsToString(
       const ::testing::TestParamInfo<HttpHealthCheckIntegrationTestParams>& params) {
     return absl::StrCat(
         (params.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
@@ -197,9 +197,9 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(
-    IpVersions, HttpHealthCheckIntegrationTest,
+    IpHttpVersions, HttpHealthCheckIntegrationTest,
     testing::ValuesIn(HttpHealthCheckIntegrationTest::getHttpHealthCheckIntegrationTestParams()),
-    HttpHealthCheckIntegrationTest::protocolTestParamsToString);
+    HttpHealthCheckIntegrationTest::httpHealthCheckTestParamsToString);
 
 // Tests that a healthy endpoint returns a valid HTTP health check response.
 TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttp) {
@@ -255,6 +255,89 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 
   // Clean up connections
+  cleanupHostConnections();
+}
+
+class TcpHealthCheckIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                      public HealthCheckIntegrationTestBase {
+public:
+  TcpHealthCheckIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}
+
+  void TearDown() override { cleanUpXdsConnection(); }
+
+  // Adds a TCP active health check specifier to the given cluster, and waits for the first health
+  // check probe to be received.
+  void initTcpHealthCheck(uint32_t cluster_idx) {
+    auto& cluster_data = clusters_[cluster_idx];
+    auto health_check = addHealthCheck(cluster_data.cluster_);
+    health_check->mutable_tcp_health_check()->mutable_send()->set_text("50696E67"); // "Ping"
+    health_check->mutable_tcp_health_check()->add_receive()->set_text("506F6E67");  // "Pong"
+
+    // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+
+    // Wait for upstream to receive TCP HC request.
+    ASSERT_TRUE(
+        cluster_data.host_upstream_->waitForRawConnection(cluster_data.host_fake_raw_connection_));
+    ASSERT_TRUE(cluster_data.host_fake_raw_connection_->waitForData(
+        FakeRawConnection::waitForInexactMatch("Ping")));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpHealthCheckIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Tests that a healthy endpoint returns a valid TCP health check response.
+TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcp) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initTcpHealthCheck(cluster_idx);
+
+  AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  // Clean up connections.
+  cleanupHostConnections();
+}
+
+// Tests that an invalid response fails the health check.
+TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointWrongResponseTcp) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initTcpHealthCheck(cluster_idx);
+
+  AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Poong");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  // Clean up connections.
+  cleanupHostConnections();
+}
+
+// Tests that no TCP health check response results in timeout and unhealthy endpoint.
+TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initTcpHealthCheck(cluster_idx);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  // Clean up connections.
   cleanupHostConnections();
 }
 
