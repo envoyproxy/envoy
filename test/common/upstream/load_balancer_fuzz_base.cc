@@ -50,38 +50,41 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(uint64_t host_index,
   host_set.degraded_hosts_.clear();
   host_set.excluded_hosts_.clear();
   // The vector constructed here represents remaining indexes, an index will randomly get chosen
-  // from here every time and removed. Thus, this represents the remaining indexes When this goes to
-  // zero, there will be no more indexes left to place into healthy, degraded, and excluded hosts.
+  // from here every time and removed. Thus, this represents the remaining indexes. When this goes
+  // to zero, there will be no more indexes left to place into healthy, degraded, and excluded
+  // hosts.
   ENVOY_LOG_MISC(trace, "Host set size: {}", host_set_size);
-  std::vector<uint8_t> indexVector;
-  indexVector.reserve(host_set_size);
+  std::vector<uint8_t> index_vector;
+  index_vector.reserve(host_set_size);
   for (uint8_t i = 0; i < host_set_size; i++) {
-    indexVector.push_back(i);
+    index_vector.push_back(i);
   }
 
-  for (uint32_t i = 0; i < num_healthy_hosts && indexVector.size() != 0; i++) {
-    uint64_t indexOfIndexVector = random_.random() % indexVector.size();
-    uint64_t index = indexVector.at(indexOfIndexVector);
+  for (uint32_t i = 0; i < num_healthy_hosts && index_vector.size() != 0; i++) {
+    uint64_t index_of_index_vector = random_.random() % index_vector.size();
+    uint64_t index = index_vector.at(index_of_index_vector);
     ENVOY_LOG_MISC(trace, "Added host {} to healthy hosts for host set {}", index,
                    index_of_host_set);
     host_set.healthy_hosts_.push_back(host_set.hosts_[index]);
-    indexVector.erase(indexVector.begin() + indexOfIndexVector);
+    index_vector.erase(index_vector.begin() + index_of_index_vector);
   }
 
-  for (uint32_t i = 0; i < num_degraded_hosts && indexVector.size() != 0; i++) {
-    uint64_t indexOfIndexVector = random_.random() % indexVector.size();
-    uint64_t index = indexVector.at(indexOfIndexVector);
+  for (uint32_t i = 0; i < num_degraded_hosts && index_vector.size() != 0; i++) {
+    uint64_t index_of_index_vector = random_.random() % index_vector.size();
+    uint64_t index = index_vector.at(index_of_index_vector);
     ENVOY_LOG_MISC(trace, "Added host {} to degraded hosts for host set {}", index,
                    index_of_host_set);
     host_set.degraded_hosts_.push_back(host_set.hosts_[index]);
+    index_vector.erase(index_vector.begin() + index_of_index_vector);
   }
 
-  for (uint32_t i = 0; i < num_excluded_hosts && indexVector.size() != 0; i++) {
-    uint64_t indexOfIndexVector = random_.random() % indexVector.size();
-    uint64_t index = indexVector.at(indexOfIndexVector);
+  for (uint32_t i = 0; i < num_excluded_hosts && index_vector.size() != 0; i++) {
+    uint64_t index_of_index_vector = random_.random() % index_vector.size();
+    uint64_t index = index_vector.at(index_of_index_vector);
     ENVOY_LOG_MISC(trace, "Added host {} to excluded hosts for host set {}", index,
                    index_of_host_set);
     host_set.excluded_hosts_.push_back(host_set.hosts_[index]);
+    index_vector.erase(index_vector.begin() + index_of_index_vector);
   }
 
   host_set.runCallbacks({}, {});

@@ -7,7 +7,10 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
+  // The host index determines what host set within the priority set which will get updated.
   uint64 host_index = 1;
+  // These will determine how many hosts will get placed into health hosts, degraded hosts, and
+  // excluded hosts from the full host list.
   uint32 num_healthy_hosts = 2;
   uint32 num_degraded_hosts = 3;
   uint32 num_excluded_hosts = 4;
