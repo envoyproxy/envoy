@@ -177,7 +177,7 @@ TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage)
   for (int i = 0; i < 2; i++) {
     envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
     new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
-    // For sanity check
+    // For sanity check.
     new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
