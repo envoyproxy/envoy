@@ -67,9 +67,9 @@ void AutonomousStream::sendResponse() {
   const bool send_trailers = headers.get_(NO_TRAILERS).empty();
   const bool headers_only_response = !send_trailers && response_data_blocks == 0;
 
-  response_metadata_ = upstream_.responseMetadata();
-  if (response_metadata_) {
-    encodeMetadata(*response_metadata_);
+  pre_response_headers_metadata_ = upstream_.preResponseHeadersMetadata();
+  if (pre_response_headers_metadata_) {
+    encodeMetadata(*pre_response_headers_metadata_);
   }
 
   encodeHeaders(upstream_.responseHeaders(), headers_only_response);
@@ -143,10 +143,10 @@ void AutonomousUpstream::setResponseHeaders(
   response_headers_ = std::move(response_headers);
 }
 
-void AutonomousUpstream::setResponseMetadata(
-    std::unique_ptr<Http::MetadataMapVector>&& response_metadata) {
+void AutonomousUpstream::setPreResponseHeadersMetadata(
+    std::unique_ptr<Http::MetadataMapVector>&& metadata) {
   Thread::LockGuard lock(headers_lock_);
-  response_metadata_ = std::move(response_metadata);
+  pre_response_headers_metadata_ = std::move(metadata);
 }
 
 Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
@@ -161,9 +161,9 @@ Http::TestResponseHeaderMapImpl AutonomousUpstream::responseHeaders() {
   return return_headers;
 }
 
-std::unique_ptr<Http::MetadataMapVector> AutonomousUpstream::responseMetadata() {
+std::unique_ptr<Http::MetadataMapVector> AutonomousUpstream::preResponseHeadersMetadata() {
   Thread::LockGuard lock(headers_lock_);
-  return std::move(response_metadata_);
+  return std::move(pre_response_headers_metadata_);
 }
 
 } // namespace Envoy

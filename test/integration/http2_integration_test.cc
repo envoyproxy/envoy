@@ -1981,7 +1981,7 @@ TEST_P(Http2FloodMitigationTest, Metadata) {
   auto metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
   metadata_map_vector_ptr->push_back(std::move(metadata_map_ptr));
   static_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
-      ->setResponseMetadata(std::move(metadata_map_vector_ptr));
+      ->setPreResponseHeadersMetadata(std::move(metadata_map_vector_ptr));
 
   // Verify that connection was disconnected and appropriate counters were set.
   auto request2 = Http2Frame::makeRequest(

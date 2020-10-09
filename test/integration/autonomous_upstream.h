@@ -34,7 +34,7 @@ private:
   AutonomousUpstream& upstream_;
   void sendResponse() EXCLUSIVE_LOCKS_REQUIRED(lock_);
   const bool allow_incomplete_streams_{false};
-  std::unique_ptr<Http::MetadataMapVector> response_metadata_;
+  std::unique_ptr<Http::MetadataMapVector> pre_response_headers_metadata_;
 };
 
 // An upstream which creates AutonomousStreams for new incoming streams.
@@ -86,10 +86,10 @@ public:
   std::unique_ptr<Http::TestRequestHeaderMapImpl> lastRequestHeaders();
   void setResponseTrailers(std::unique_ptr<Http::TestResponseTrailerMapImpl>&& response_trailers);
   void setResponseHeaders(std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers);
-  void setResponseMetadata(std::unique_ptr<Http::MetadataMapVector>&& response_metadata);
+  void setPreResponseHeadersMetadata(std::unique_ptr<Http::MetadataMapVector>&& metadata);
   Http::TestResponseTrailerMapImpl responseTrailers();
   Http::TestResponseHeaderMapImpl responseHeaders();
-  std::unique_ptr<Http::MetadataMapVector> responseMetadata();
+  std::unique_ptr<Http::MetadataMapVector> preResponseHeadersMetadata();
   const bool allow_incomplete_streams_{false};
 
 private:
@@ -97,7 +97,7 @@ private:
   std::unique_ptr<Http::TestRequestHeaderMapImpl> last_request_headers_;
   std::unique_ptr<Http::TestResponseTrailerMapImpl> response_trailers_;
   std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers_;
-  std::unique_ptr<Http::MetadataMapVector> response_metadata_;
+  std::unique_ptr<Http::MetadataMapVector> pre_response_headers_metadata_;
   std::vector<AutonomousHttpConnectionPtr> http_connections_;
   std::vector<SharedConnectionWrapperPtr> shared_connections_;
 };
