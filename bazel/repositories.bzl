@@ -877,13 +877,11 @@ filegroup(
 
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
-    location = _get_location("edenhill_librdkafka")
-    http_archive(
+    external_http_archive(
         name = "edenhill_librdkafka",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
         build_file_content = BUILD_ALL_CONTENT,
-        **location
     )
     native.bind(
         name = "librdkafka",

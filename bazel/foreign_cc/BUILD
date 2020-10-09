@@ -9,7 +9,7 @@ envoy_package()
 configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
-    configure_options = ["--disable-gssapi && cp Makefile.config src/.. && cp config.h src/.."],
+    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext && cp Makefile.config src/.. && cp config.h src/.."],
     lib_source = "@edenhill_librdkafka//:all",
     make_commands = [
         "make",
