@@ -28,7 +28,7 @@ actions {
 
     }
 }
-num_hosts_in_host_set: 2
-num_hosts_in_host_set: 0
-seed_for_prng: 1
+num_hosts_in_host_set: 250
+num_hosts_in_host_set: 250
+seed_for_prng: 4
 }

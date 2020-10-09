@@ -22,7 +22,7 @@ actions {
   choose_host {
   }
 }
-num_hosts_in_priority_set: 65455
-num_hosts_in_failover_set: 65455
+num_hosts_in_host_set: 65455
+num_hosts_in_host_set: 65455
 seed_for_prng: 5
 }

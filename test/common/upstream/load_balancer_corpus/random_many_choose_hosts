@@ -4,7 +4,7 @@ common_lb_config {
 }
 actions {
     update_health_flags {
-        failover_host_set: false
+        host_index: 0
         num_healthy_hosts: 2
     }
 }
@@ -48,7 +48,7 @@ actions {
 
     }
 }
-num_hosts_in_priority_set: 2
-num_hosts_in_failover_set: 0
+num_hosts_in_host_set: 2
+num_hosts_in_host_set: 0
 seed_for_prng: 1
 }

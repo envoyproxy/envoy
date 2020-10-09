@@ -4,7 +4,7 @@ common_lb_config {
 }
 actions {
     update_health_flags {
-        failover_host_set: false
+        host_index: 0
         num_healthy_hosts: 2
     }
 }

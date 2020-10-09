@@ -7,8 +7,7 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
-  // The boolean corresponds to whether this action updates the failover set or not
-  bool failover_host_set = 1;
+  uint64 host_index = 1;
   uint32 num_healthy_hosts = 2;
   uint32 num_degraded_hosts = 3;
   uint32 num_excluded_hosts = 4;
@@ -30,10 +29,11 @@ message LoadBalancerTestCase {
   envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
       [(validate.rules).message.required = true];
   repeated LbAction actions = 2;
-  //Ports of hosts constructed range from 80 - 65455, all on the same Ip Address
-  //These caps make sure that the port of the hosts constructed does not overflow
-  uint32 num_hosts_in_priority_set = 3 [(validate.rules).uint32.lt = 32727];
-  uint32 num_hosts_in_failover_set = 4 [(validate.rules).uint32.lt = 32727];
+
+  //TODO: Localities
+  repeated uint32 num_hosts_in_host_set = 3
+      [(validate.rules).repeated = {min_items: 1, max_items: 20}];
+
   //This number is used to instantiate the prng. The prng takes the place of random() calls, allowing a representative random distribution which is also deterministic.
-  uint64 seed_for_prng = 5 [(validate.rules).uint64.gt = 0];
+  uint64 seed_for_prng = 4 [(validate.rules).uint64.gt = 0];
 }

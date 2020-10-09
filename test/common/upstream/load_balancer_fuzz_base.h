@@ -1,6 +1,6 @@
-#include "envoy/config/cluster/v3/cluster.pb.h"
-
 #include <random>
+
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/upstream/load_balancer_impl.h"
 
@@ -20,18 +20,16 @@ public:
   FakeRandomGenerator() = default;
   ~FakeRandomGenerator() override = default;
 
-  void initialize(uint64_t seed) {
-    prng_ = std::make_unique<std::mt19937_64>(seed);
-  }
+  void initialize(uint64_t seed) { prng_ = std::make_unique<std::mt19937_64>(seed); }
 
   // RandomGenerator
   uint64_t random() override {
-    uint64_t toReturn = (*prng_.get())(); //For logging purposes
+    uint64_t toReturn = (*prng_.get())();
     ENVOY_LOG_MISC(trace, "random() returned: {}", toReturn);
     return toReturn;
   }
   std::string uuid() override { return ""; }
-  std::unique_ptr<std::mt19937_64> prng_; 
+  std::unique_ptr<std::mt19937_64> prng_;
 };
 } // namespace Random
 
@@ -45,13 +43,12 @@ public:
 
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
-  void initializeFixedHostSets(uint32_t num_hosts_in_priority_set,
-                               uint32_t num_hosts_in_failover_set);
+  void initializeASingleHostSet(uint32_t num_hosts_in_host_set, uint8_t index_of_host_set);
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
   void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
-  void updateHealthFlagsForAHostSet(bool failover_host_set, uint32_t num_healthy_hosts,
+  void updateHealthFlagsForAHostSet(uint64_t host_index, uint32_t num_healthy_hosts,
                                     uint32_t num_degraded_hosts, uint32_t num_excluded_hosts);
   // These two actions have a lot of logic attached to them. However, all the logic that the load
   // balancer needs to run its algorithm is already encapsulated within the load balancer. Thus,
@@ -69,10 +66,12 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Random::FakeRandomGenerator random_;
   NiceMock<MockPrioritySet> priority_set_;
-  MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
-  MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::unique_ptr<LoadBalancerBase> lb_;
+
+  // There are used to construct the priority set at the beginning of the fuzz iteration
+  uint16_t port_ = 80;
+  uint8_t num_host_sets_ = 0;
 };
 
 } // namespace Upstream
