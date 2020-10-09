@@ -1,5 +1,7 @@
 #include "server/filter_chain_manager_impl.h"
 
+#include <optional>
+
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
 #include "common/common/cleanup.h"
@@ -141,8 +143,9 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
 
-void FilterChainManagerImpl::addFilterChain(
+void FilterChainManagerImpl::addFilterChains(
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
+    const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
@@ -150,18 +153,8 @@ void FilterChainManagerImpl::addFilterChain(
                       MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
-  bool see_match_all = false;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
-    if (filter_chain_match.match_all()) {
-      if (see_match_all) {
-        throw EnvoyException(
-            fmt::format("error adding listener '{}': has more than 1 match all filter chain '{}'",
-                        address_->asString(), filter_chain->name()));
-      } else {
-        see_match_all = true;
-      }
-    }
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
       throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
                                        "unimplemented fields",
@@ -212,22 +205,44 @@ void FilterChainManagerImpl::addFilterChain(
       ++new_filter_chain_size;
     }
 
-    if (filter_chain_match.match_all()) {
-      ASSERT(match_all_filter_chain_ == nullptr);
-      match_all_filter_chain_ = filter_chain_impl;
-    } else {
-      addFilterChainForDestinationPorts(
-          destination_ports_map_,
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-          filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
-          filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
-          filter_chain_match.source_ports(), filter_chain_impl);
-    }
+    addFilterChainForDestinationPorts(
+        destination_ports_map_,
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+        filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
+        filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
+        filter_chain_match.source_ports(), filter_chain_impl);
+
     fc_contexts_[*filter_chain] = filter_chain_impl;
   }
   convertIPsToTries();
+  copyOrRebuildDefaultFilterChain(default_filter_chain, filter_chain_factory_builder,
+                                  context_creator);
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
             fc_contexts_.size(), new_filter_chain_size);
+}
+
+void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
+    const envoy::config::listener::v3::FilterChain* default_filter_chain,
+    FilterChainFactoryBuilder& filter_chain_factory_builder,
+    FilterChainFactoryContextCreator& context_creator) {
+  if (default_filter_chain == nullptr) {
+    return;
+  }
+  default_filter_chain_message_ = absl::make_optional(*default_filter_chain);
+  const auto* origin = getOriginFilterChainManager();
+  if (origin == nullptr) {
+    default_filter_chain_ =
+        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+    return;
+  }
+  MessageUtil eq;
+  if (origin->default_filter_chain_message_.has_value() &&
+      eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
+    default_filter_chain_ = origin->default_filter_chain_;
+  } else {
+    default_filter_chain_ =
+        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+  }
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
@@ -407,7 +422,7 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
       } else {
         // There is entry for specific port but none of the filter chain matches. Instead of
         // matching catch-all port 0, the fallback filter chain is returned.
-        return match_all_filter_chain_.get();
+        return default_filter_chain_.get();
       }
     }
   }
@@ -419,7 +434,7 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
   return best_match_filter_chain != nullptr
              ? best_match_filter_chain
              // Neither exact port nor catch-all port matches. Use fallback filter chain.
-             : match_all_filter_chain_.get();
+             : default_filter_chain_.get();
 }
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
