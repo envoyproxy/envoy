@@ -33,7 +33,6 @@ envoy_cc_library(
         "//source/common/network:buffered_io_socket_handle_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",
-        "//source/common/network:connection_lib",
         "//source/common/network:listener_lib",
         "//source/common/runtime:runtime_features_lib",
     ] + select({

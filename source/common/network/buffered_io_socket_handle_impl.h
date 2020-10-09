@@ -93,6 +93,7 @@ public:
   Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType trigger, uint32_t events) override;
   Api::SysCallIntResult shutdown(int how) override;
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; };
 
   Buffer::WatermarkBuffer& getBufferForTest() { return owned_buffer_; }
   void scheduleWriteEvent() {}

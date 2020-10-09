@@ -44,6 +44,12 @@ public:
                                         std::move(transport_socket), options);
   }
 
+  Network::ClientConnectionPtr
+  createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
+                           Network::Address::InstanceConstSharedPtr local_address) override {
+    return impl_.createInternalConnection(std::move(internal_address), std::move(local_address));
+  }
+
   Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                     const bool use_tcp_for_dns_lookups) override {

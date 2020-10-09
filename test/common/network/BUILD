@@ -447,17 +447,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "buffered_io_socket_handle_impl_test",
-    srcs = ["buffered_io_socket_handle_impl_test.cc"],
-    deps = [
-        "//source/common/common:utility_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:buffered_io_socket_handle_lib",
-        "//test/mocks/event:event_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "transport_socket_options_impl_test",
     srcs = ["transport_socket_options_impl_test.cc"],
     deps = [

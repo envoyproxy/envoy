@@ -269,6 +269,7 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   absl::string_view transportFailureReason() const override;
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
 
 private:
   void closeSocket();
