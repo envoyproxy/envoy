@@ -1,8 +1,7 @@
 #pragma once
 
-#include "envoy/runtime/runtime.h"
 #include "envoy/common/random_generator.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/runtime/runtime.h"
 
 #include "absl/strings/string_view.h"
 #include "base_listener_impl.h"

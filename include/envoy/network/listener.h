@@ -197,10 +197,14 @@ public:
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 
+  enum class RejectCause {
+    GlobalCxLimit,
+    OverloadAction,
+  };
   /**
    * Called when a new connection is rejected.
    */
-  virtual void onReject() PURE;
+  virtual void onReject(RejectCause cause) PURE;
 };
 
 /**

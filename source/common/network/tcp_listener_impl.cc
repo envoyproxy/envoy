@@ -59,10 +59,14 @@ void TcpListenerImpl::onSocketEvent(short flags) {
       break;
     }
 
-    if (rejectCxOverGlobalLimit() || random_.bernoulli(reject_fraction_)) {
+    if (rejectCxOverGlobalLimit()) {
       // The global connection limit has been reached.
       io_handle->close();
-      cb_.onReject();
+      cb_.onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit);
+      continue;
+    } else if (random_.bernoulli(reject_fraction_)) {
+      io_handle->close();
+      cb_.onReject(TcpListenerCallbacks::RejectCause::OverloadAction);
       continue;
     }
 

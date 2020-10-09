@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 
@@ -15,7 +17,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <limits>
 
 using testing::_;
 using testing::Invoke;
@@ -184,7 +185,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   };
 
   initiate_connections(5);
-  EXPECT_CALL(listener_callbacks, onReject()).Times(3);
+  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
+      .Times(3);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // We expect any server-side connections that get created to populate 'server_connections'.
@@ -194,7 +196,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"overload.global_downstream_max_connections", "3"}});
   initiate_connections(5);
-  EXPECT_CALL(listener_callbacks, onReject()).Times(4);
+  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
+      .Times(4);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(3, server_connections.size());
@@ -386,7 +389,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   // The first connection will be rejected because the random value is too small.
   EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
   EXPECT_CALL(random_generator, random()).WillOnce(Return(0));
-  EXPECT_CALL(listener_callbacks, onReject());
+  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
   EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
     dispatcher_->exit();
   });
@@ -437,7 +440,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
   listener.setRejectFraction(1);
 
   EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
-  EXPECT_CALL(listener_callbacks, onReject());
+  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
   EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
     dispatcher_->exit();
   });

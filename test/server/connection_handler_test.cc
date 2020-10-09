@@ -483,7 +483,6 @@ TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
   handler_->addListener(absl::nullopt, *test_listener);
 }
 
-
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
   InSequence s;
 

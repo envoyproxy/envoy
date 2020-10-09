@@ -158,7 +158,6 @@ void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
   }
 }
 
-
 void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
   ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
   ActiveConnections& active_connections = connection.active_connections_;
@@ -400,6 +399,17 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocke
   }
 
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::onReject(RejectCause cause) {
+  switch (cause) {
+  case RejectCause::GlobalCxLimit:
+    stats_.downstream_global_cx_overflow_.inc();
+    break;
+  case RejectCause::OverloadAction:
+    stats_.downstream_cx_overload_reject_.inc();
+    break;
+  }
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(

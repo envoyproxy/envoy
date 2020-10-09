@@ -30,6 +30,7 @@ namespace Server {
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_overflow)                                                                  \
   COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_overload_reject)                                                           \
   COUNTER(downstream_global_cx_overflow)                                                           \
   COUNTER(downstream_pre_cx_timeout)                                                               \
   COUNTER(no_filter_chain_match)                                                                   \
@@ -134,7 +135,7 @@ private:
 
     // Network::TcpListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
-    void onReject() override { stats_.downstream_global_cx_overflow_.inc(); }
+    void onReject(RejectCause) override;
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }

@@ -131,7 +131,7 @@ public:
   void onAccept(ConnectionSocketPtr&& socket) override { onAccept_(socket); }
 
   MOCK_METHOD(void, onAccept_, (ConnectionSocketPtr & socket));
-  MOCK_METHOD(void, onReject, ());
+  MOCK_METHOD(void, onReject, (RejectCause), (override));
 };
 
 class MockUdpListenerCallbacks : public UdpListenerCallbacks {
