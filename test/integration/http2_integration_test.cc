@@ -1941,6 +1941,49 @@ typed_config:
 // TODO(yanavlasov): add the same tests as above for the encoder filters.
 // This is currently blocked by the https://github.com/envoyproxy/envoy/pull/13256
 
+// Verify that the server can detect flood of response METADATA frames
+TEST_P(Http2FloodMitigationTest, Metadata) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_http2_protocol_options()->set_allow_metadata(true);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  // pre-fill one away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+
+  // Send second request which should trigger response with METADATA frame.
+  auto metadata_map_vector_ptr = std::make_unique<Http::MetadataMapVector>();
+  Http::MetadataMap metadata_map = {
+      {"header_key1", "header_value1"},
+      {"header_key2", "header_value2"},
+  };
+  auto metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  metadata_map_vector_ptr->push_back(std::move(metadata_map_ptr));
+  static_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setPreResponseHeadersMetadata(std::move(metadata_map_vector_ptr));
+
+  // Verify that connection was disconnected and appropriate counters were set.
+  auto request2 = Http2Frame::makeRequest(
+      Http2Frame::makeClientStreamId(1), "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", "0"), Http2Frame::Header("no_trailers", "0")});
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound METADATA frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
+  // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
+  // connections.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
 // Verify that the server can detect flood of response trailers.
 TEST_P(Http2FloodMitigationTest, Trailers) {
   // Set large buffer limits so the test is not affected by the flow control.
@@ -1977,6 +2020,69 @@ TEST_P(Http2FloodMitigationTest, Trailers) {
   // Verify that the flood check was triggered
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
 }
+
+// Verify flood detection by the WINDOW_UPDATE frame when a decoder filter is resuming reading from
+// the downstream via DecoderFilterBelowWriteBufferLowWatermark.
+TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
+  config_helper_.addFilter(R"EOF(
+  name: backpressure-filter
+  )EOF");
+  config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
+  // Set low window sizes in the server codec as nghttp2 sends WINDOW_UPDATE only after it consumes
+  // more than 25% of the window.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* h2_options = hcm.mutable_http2_protocol_options();
+        h2_options->mutable_initial_stream_window_size()->set_value(70000);
+        h2_options->mutable_initial_connection_window_size()->set_value(70000);
+      });
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  beginSession();
+
+  writev_matcher_->setWritevReturnsEgain();
+
+  // pre-fill two away from overflow
+  const auto request = Http2Frame::makePostRequest(
+      Http2Frame::makeClientStreamId(0), "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", "998"), Http2Frame::Header("no_trailers", "0")});
+  sendFrame(request);
+
+  // The backpressure-filter disables reading when it sees request headers, and it should prevent
+  // WINDOW_UPDATE to be sent on the following DATA frames. Send enough DATA to consume more than
+  // 25% of the 70K window so that nghttp2 will send WINDOW_UPDATE on read resumption.
+  auto data_frame =
+      Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(0), std::string(16384, '0'));
+  sendFrame(data_frame);
+  sendFrame(data_frame);
+  data_frame = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(0), std::string(16384, '1'),
+                                         Http2Frame::DataFlags::EndStream);
+  sendFrame(data_frame);
+
+  // Upstream will respond with 998 DATA frames and the backpressure-filter filter will re-enable
+  // reading on the last DATA frame. This will cause nghttp2 to send two WINDOW_UPDATE frames for
+  // stream and connection windows. Together with response DATA frames it should overflow outbound
+  // frame queue. Wait for connection to be flooded with outbound WINDOW_UPDATE frame and
+  // disconnected.
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
+                ->value());
+
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
+  // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
+  // connections.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// TODO(yanavlasov): add tests for WINDOW_UPDATE overflow from the router filter. These tests need
+// missing support for write resumption from test sockets that were forced to return EAGAIN by the
+// test.
 
 // Verify that the server can detect flood of RST_STREAM frames.
 TEST_P(Http2FloodMitigationTest, RST_STREAM) {
