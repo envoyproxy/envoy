@@ -49,7 +49,7 @@ rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
 source_venv "$BUILD_DIR"
-pip3 install -r "${SCRIPT_DIR}"/requirements.txt
+pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
@@ -139,7 +139,12 @@ cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configu
 
 rsync -rav  "${API_DIR}/diagrams" "${GENERATED_RST_DIR}/api-docs"
 
-rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${SCRIPT_DIR}"/_ext "${GENERATED_RST_DIR}"
+rsync -av \
+      "${SCRIPT_DIR}"/root/ \
+      "${SCRIPT_DIR}"/conf.py \
+      "${SCRIPT_DIR}"/redirects.txt \
+      "${SCRIPT_DIR}"/_ext \
+      "${GENERATED_RST_DIR}"
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment

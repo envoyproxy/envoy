@@ -25,7 +25,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
@@ -1043,7 +1043,9 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 
 namespace Api {
 ApiPtr createApiForTest();
+ApiPtr createApiForTest(Random::RandomGenerator& random);
 ApiPtr createApiForTest(Stats::Store& stat_store);
+ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& random);
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
