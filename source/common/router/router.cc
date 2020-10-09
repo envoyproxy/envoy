@@ -1155,7 +1155,9 @@ void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
 
 void Filter::resetAll() {
   while (!upstream_requests_.empty()) {
-    upstream_requests_.back()->removeFromList(upstream_requests_)->resetStream();
+    auto upstream_request = upstream_requests_.back()->removeFromList(upstream_requests_);
+    upstream_request->resetStream();
+    callbacks_->dispatcher().deferredDelete(std::move(upstream_request));
   }
 }
 
@@ -1170,6 +1172,8 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
       upstream_request_tmp->resetStream();
       // TODO: per-host stat for hedge abandoned.
       // TODO: cluster stat for hedge abandoned.
+      upstream_request_tmp->onDeferredDelete();
+      callbacks_->dispatcher().deferredDelete(std::move(upstream_request_tmp));
     } else {
       final_upstream_request = std::move(upstream_request_tmp);
     }
