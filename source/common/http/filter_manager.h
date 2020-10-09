@@ -825,7 +825,7 @@ private:
     bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
     // A filter can still stop the stream from being complete as seen
     // by the codec.
-    bool encoding_complete_;
+    bool encoding_complete_ : 1;
     // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_ : 1;
