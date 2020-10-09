@@ -15,17 +15,35 @@ import traceback
 import shutil
 import paths
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
-                     "./source/extensions/extensions_build_config.bzl",
-                     "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                     "./tools/pyformat/", "./third_party/")
+EXCLUDED_PREFIXES = (
+    "./generated/",
+    "./thirdparty/",
+    "./build",
+    "./.git/",
+    "./bazel-",
+    "./.cache",
+    "./source/extensions/extensions_build_config.bzl",
+    "./bazel/toolchains/configs/",
+    "./tools/testdata/check_format/",
+    "./tools/pyformat/",
+    "./third_party/",
+    "./test/extensions/filters/http/wasm/test_data",
+    "./test/extensions/filters/network/wasm/test_data",
+    "./test/extensions/stats_sinks/wasm/test_data",
+    "./test/extensions/bootstrap/wasm/test_data",
+    "./test/extensions/common/wasm/test_data",
+    "./test/extensions/access_loggers/wasm/test_data",
+    "./source/extensions/common/wasm/ext",
+    "./examples/wasm",
+)
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_ALLOWLIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
+GOOGLE_PROTOBUF_ALLOWLIST = ("ci/prebuilt", "source/common/protobuf", "api/test",
+                             "test/extensions/bootstrap/wasm/test_data")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
 # Files matching these exact names can reference real-world time. These include the class
@@ -58,10 +76,12 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
     "./test/extensions/filters/http/common/fuzz/uber_filter.h",
+    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
-JSON_STRING_TO_MESSAGE_ALLOWLIST = ("./source/common/protobuf/utility.cc")
+JSON_STRING_TO_MESSAGE_ALLOWLIST = ("./source/common/protobuf/utility.cc",
+                                    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc")
 
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
@@ -1045,6 +1065,11 @@ if __name__ == "__main__":
                       nargs="+",
                       default=[],
                       help="exclude paths from envoy_build_fixer check.")
+  parser.add_argument("--bazel_tools_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from bazel_tools check.")
   parser.add_argument("--include_dir_order",
                       type=str,
                       default=",".join(common.includeDirOrder()),

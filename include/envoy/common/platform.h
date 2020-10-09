@@ -255,7 +255,7 @@ constexpr absl::string_view null_device_path{"/dev/null"};
 // Therefore, we decided to remove the Android check introduced here in
 // https://github.com/envoyproxy/envoy/pull/10120. If someone out there encounters problems with
 // this please bring up in Envoy's slack channel #envoy-udp-quic-dev.
-#if defined(__linux__)
+#if defined(__linux__) || defined(__EMSCRIPTEN__)
 #define ENVOY_MMSG_MORE 1
 #else
 #define ENVOY_MMSG_MORE 0

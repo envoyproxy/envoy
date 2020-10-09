@@ -17,6 +17,7 @@ filegroup(
         exclude = [
             "cache/responses.yaml",
             "jaeger-native-tracing/*",
+            "wasm/envoy.yaml",
             "**/*docker-compose*.yaml",
         ],
     ),

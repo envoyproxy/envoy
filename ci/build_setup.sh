@@ -103,6 +103,7 @@ BAZEL_BUILD_OPTIONS=(
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
+  "--define" "wasm=disabled"
 	"--flaky_test_attempts=2"
 	"--test_env=HEAPCHECK=")
 

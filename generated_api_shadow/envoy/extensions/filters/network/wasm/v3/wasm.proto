@@ -13,7 +13,10 @@ option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [[#not-implemented-hide:]
+// [#protodoc-title: Wasm]
+// [#extension: envoy.filters.network.wasm]
+// Wasm :ref:`configuration overview <config_network_filters_wasm>`.
+
 message Wasm {
   // General Plugin configuration.
   envoy.extensions.wasm.v3.PluginConfig config = 1;

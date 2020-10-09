@@ -61,8 +61,28 @@ function exclude_third_party() {
   grep -v third_party/
 }
 
+# Exclude files which are part of the Wasm emscripten environment
+function exclude_wasm_emscripten() {
+  grep -v source/extensions/common/wasm/ext
+}
+
+# Exclude files which are part of the Wasm SDK
+function exclude_wasm_sdk() {
+  grep -v proxy_wasm_cpp_sdk
+}
+
+# Exclude files which are part of the Wasm Host environment
+function exclude_wasm_host() {
+  grep -v proxy_wasm_cpp_host
+}
+
+# Exclude proxy-wasm test_data.
+function exclude_wasm_test_data() {
+  grep -v wasm/test_data
+}
+
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party
+  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data
 }
 
 function run_clang_tidy() {

@@ -109,7 +109,8 @@ build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
+build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.
@@ -191,6 +192,8 @@ build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
+# rules_rust is not remote runnable (yet)
+build:remote --strategy=Rustc=sandboxed,local
 build:remote --remote_timeout=7200
 build:remote --auth_enabled=true
 build:remote --remote_download_toplevel

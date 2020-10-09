@@ -28,4 +28,5 @@ filters.
   thrift_proxy_filter
   sni_cluster_filter
   sni_dynamic_forward_proxy_filter
+  wasm_filter
   zookeeper_proxy_filter

@@ -34,7 +34,7 @@
  #endif
 --- wee8/build/config/sanitizers/sanitizers.gni
 +++ wee8/build/config/sanitizers/sanitizers.gni
-@@ -147,7 +147,7 @@ if (!is_a_target_toolchain) {
+@@ -150,7 +150,7 @@ if (!is_a_target_toolchain) {
  # standard system libraries. We have instrumented system libraries for msan,
  # which requires them to prevent false positives.
  # TODO(thakis): Maybe remove this variable.
@@ -43,7 +43,7 @@
 
  # Whether we are doing a fuzzer build. Normally this should be checked instead
  # of checking "use_libfuzzer || use_afl" because often developers forget to
-@@ -195,8 +195,7 @@ assert(!using_sanitizer || is_clang,
+@@ -198,8 +198,7 @@ assert(!using_sanitizer || is_clang,
  assert(!is_cfi || is_clang,
         "is_cfi requires setting is_clang = true in 'gn args'")
 

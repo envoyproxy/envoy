@@ -4,6 +4,7 @@ load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "DEPENDENCY_ANNOTATIONS", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES", "USE_CATEGORIES_WITH_CPE_OPTIONAL")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load(":crates.bzl", "raze_fetch_remote_crates")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -18,6 +19,9 @@ WINDOWS_SKIP_TARGETS = [
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
+
+def _build_all_content(exclude = []):
+    return """filegroup(name = "all", srcs = glob(["**"], exclude={}), visibility = ["//visibility:public"])""".format(repr(exclude))
 
 def _fail_missing_attribute(attr, key):
     fail("The '%s' attribute must be defined for external dependecy " % attr + key)
@@ -161,6 +165,10 @@ def _go_deps(skip_targets):
         )
         _repository_impl("bazel_gazelle")
 
+def _rust_deps():
+    _repository_impl("io_bazel_rules_rust")
+    raze_fetch_remote_crates()
+
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
     envoy_dev_binding()
@@ -238,7 +246,11 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
+    _rust_deps()
     _kafka_deps()
+
+    _org_llvm_llvm()
+    _com_github_wavm_wavm()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -432,6 +444,34 @@ cc_library(
         # Patches ASAN violation of initialization fiasco
         patches = ["@envoy//bazel:antlr.patch"],
         **location
+    )
+
+    # Parser dependencies
+    # TODO: upgrade this when cel is upgraded to use the latest version
+    http_archive(
+        name = "rules_antlr",
+        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
+        strip_prefix = "rules_antlr-3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
+        urls = ["https://github.com/marcohu/rules_antlr/archive/3cc2f9502a54ceb7b79b37383316b23c4da66f9a.tar.gz"],
+    )
+
+    http_archive(
+        name = "antlr4_runtimes",
+        build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "cpp",
+    srcs = glob(["runtime/Cpp/runtime/src/**/*.cpp"]),
+    hdrs = glob(["runtime/Cpp/runtime/src/**/*.h"]),
+    includes = ["runtime/Cpp/runtime/src"],
+)
+""",
+        sha256 = "46f5e1af5f4bd28ade55cb632f9a069656b31fc8c2408f9aa045f9b5f5caad64",
+        patch_args = ["-p1"],
+        # Patches ASAN violation of initialization fiasco
+        patches = ["@envoy//bazel:antlr.patch"],
+        strip_prefix = "antlr4-4.7.2",
+        urls = ["https://github.com/antlr/antlr4/archive/4.7.2.tar.gz"],
     )
 
 def _com_github_nghttp2_nghttp2():
@@ -832,7 +872,10 @@ def _proxy_wasm_cpp_host():
 def _emscripten_toolchain():
     _repository_impl(
         name = "emscripten_toolchain",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = _build_all_content(exclude = [
+            "upstream/emscripten/cache/is_vanilla.txt",
+            ".emscripten_sanity",
+        ]),
         patch_cmds = REPOSITORY_LOCATIONS["emscripten_toolchain"]["patch_cmds"],
     )
 
@@ -897,6 +940,32 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
+    )
+
+def _org_llvm_llvm():
+    location = _get_location("org_llvm_llvm")
+    http_archive(
+        name = "org_llvm_llvm",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:llvm.patch"],
+        **location
+    )
+    native.bind(
+        name = "llvm",
+        actual = "@envoy//bazel/foreign_cc:llvm",
+    )
+
+def _com_github_wavm_wavm():
+    location = _get_location("com_github_wavm_wavm")
+    http_archive(
+        name = "com_github_wavm_wavm",
+        build_file_content = BUILD_ALL_CONTENT,
+        **location
+    )
+    native.bind(
+        name = "wavm",
+        actual = "@envoy//bazel/foreign_cc:wavm",
     )
 
 def _kafka_deps():
