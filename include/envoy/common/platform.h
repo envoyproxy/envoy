@@ -25,7 +25,8 @@
 #include <mstcpip.h>
 
 #ifndef SIO_TCP_INFO
-static_assert(false, "SIO_TCP_INFO not defined");
+static_assert(false,
+              "SIO_TCP_INFO not defined, Envoy will not compile on Windows on this platform");
 #endif
 
 // This is introduced in Windows SDK 10.0.17063.0 which is required

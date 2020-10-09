@@ -93,7 +93,7 @@ public:
   MOCK_METHOD(SysCallIntResult, socketpair, (int domain, int type, int protocol, os_fd_t sv[2]));
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));
   MOCK_METHOD(SysCallSizeResult, write, (os_fd_t sockfd, const void* buffer, size_t length));
-  MOCK_METHOD(SysCallBoolResult, socketTcpInfo, (os_fd_t sockfd, tcp_info* tcpInfo));
+  MOCK_METHOD(SysCallBoolResult, socketTcpInfo, (os_fd_t sockfd, tcp_info* tcp_info));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(bool, supportsIpTransparent, (), (const));

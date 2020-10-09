@@ -364,7 +364,9 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
   return {rc, 0};
 }
 
-SysCallBoolResult OsSysCallsImpl::socketTcpInfo(os_fd_t sockfd, tcp_info* tcpInfo) {
+SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
+                                                [[maybe_unused]] tcp_info* tcp_info) {
+#ifdef SIO_TCP_INFO
   TCP_INFO_v0 win_tcpinfo;
   DWORD infoVersion = 0;
   DWORD bytesReturned = 0;
@@ -373,21 +375,23 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo(os_fd_t sockfd, tcp_info* tcpInf
   if (rc == SOCKET_ERROR) {
     return {false, ::WSAGetLastError()};
   } else {
-    tcpInfo->tcpi_state = win_tcpinfo.State;
-    tcpInfo->tcpi_rcv_mss = win_tcpinfo.Mss;
-    tcpInfo->tcpi_snd_mss = win_tcpinfo.Mss;
-    tcpInfo->tcpi_rtt = win_tcpinfo.RttUs;
-    tcpInfo->tcpi_min_rtt = win_tcpinfo.MinRttUs;
-    tcpInfo->tcpi_snd_wnd = win_tcpinfo.SndWnd;
-    tcpInfo->tcpi_rwnd_limited = win_tcpinfo.RcvWnd;
-    tcpInfo->tcpi_bytes_sent = win_tcpinfo.BytesOut;
-    tcpInfo->tcpi_bytes_received = win_tcpinfo.BytesIn;
-    tcpInfo->tcpi_bytes_retrans = win_tcpinfo.BytesRetrans;
-    tcpInfo->tcpi_reordering = win_tcpinfo.BytesReordered;
-    tcpInfo->tcpi_fackets = win_tcpinfo.FastRetrans;
-    tcpInfo->tcpi_dsack_dups = win_tcpinfo.DupAcksIn;
+    tcp_info->tcpi_state = win_tcpinfo.State;
+    tcp_info->tcpi_rcv_mss = win_tcpinfo.Mss;
+    tcp_info->tcpi_snd_mss = win_tcpinfo.Mss;
+    tcp_info->tcpi_rtt = win_tcpinfo.RttUs;
+    tcp_info->tcpi_min_rtt = win_tcpinfo.MinRttUs;
+    tcp_info->tcpi_snd_wnd = win_tcpinfo.SndWnd;
+    tcp_info->tcpi_rwnd_limited = win_tcpinfo.RcvWnd;
+    tcp_info->tcpi_bytes_sent = win_tcpinfo.BytesOut;
+    tcp_info->tcpi_bytes_received = win_tcpinfo.BytesIn;
+    tcp_info->tcpi_bytes_retrans = win_tcpinfo.BytesRetrans;
+    tcp_info->tcpi_reordering = win_tcpinfo.BytesReordered;
+    tcp_info->tcpi_fackets = win_tcpinfo.FastRetrans;
+    tcp_info->tcpi_dsack_dups = win_tcpinfo.DupAcksIn;
     return {true, 0};
   }
+#endif
+  return {false, WSAEOPNOTSUPP};
 }
 
 } // namespace Api

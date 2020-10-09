@@ -262,10 +262,10 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 }
 
 SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
-                                                [[maybe_unused]] tcp_info* tcpInfo) {
+                                                [[maybe_unused]] tcp_info* tcp_info) {
 #ifdef TCP_INFO
-  socklen_t len = sizeof(tcpInfo);
-  auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &tcpInfo, &len);
+  socklen_t len = sizeof(tcp_info);
+  auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &tcp_info, &len);
   return {true, !SOCKET_FAILURE(result) ? 0 : errno};
 #endif
 

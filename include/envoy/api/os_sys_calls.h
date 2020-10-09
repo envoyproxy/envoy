@@ -174,7 +174,7 @@ public:
   /**
    * @see man TCP_INFO. Get the tcp info for the socket.
    */
-  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, tcp_info* tcpInfo) PURE;
+  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, tcp_info* tcp_info) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;
