@@ -643,7 +643,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithoutEnvoyRateLimitedHeader) {
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
-  EXPECT_CALL(*client_, limit(_, _, _, _))
+  EXPECT_CALL(*client_, limit(_, _, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
