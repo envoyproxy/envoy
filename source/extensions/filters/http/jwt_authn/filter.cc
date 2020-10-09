@@ -28,7 +28,7 @@ bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
 }
 
 // The prefix used in the response code detail sent from jwt authn filter.
-constexpr char kRcDetailJwtAuthnPrefix[] = "jwt_authn_access_denied";
+constexpr absl::string_view kRcDetailJwtAuthnPrefix = "jwt_authn_access_denied";
 } // namespace
 
 Filter::Filter(FilterConfigSharedPtr config)
