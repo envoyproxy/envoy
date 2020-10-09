@@ -27,7 +27,7 @@ message LbAction {
 
 // This message represents what LoadBalancerFuzzBase will interact with, performing setup of host sets and calling into load balancers.
 // The logic that this message represents and the base class for load balancing fuzzing will be logic that maps to all types of load balancing
-// and can be modularly used at the highest level for each load balancer.
+// and can be used in a modular way at the highest level for each load balancer.
 message LoadBalancerTestCase {
   envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
       [(validate.rules).message.required = true];
