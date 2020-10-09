@@ -26,6 +26,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/filters/trailers_after_buffered_data.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/test_host_predicate_config.h"
@@ -1283,6 +1284,137 @@ name: local-reply-during-encode
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().getStatusValue());
   EXPECT_EQ(0, upstream_request_->body().length());
+}
+// Verifies the behavior when trailers are injected in the same encodeData callback as a reset is
+// triggered due to the request body being too large. Since we haven't responded with headers yet,
+// we expect to see a 418 response and no upstream trailers.
+TEST_P(DownstreamProtocolIntegrationTest, TrailersInjectedWhileDecodingLargeRequest) {
+  TrailersAfterBufferedDataFilterFactory filter_factory(false);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> inject_factory(
+      filter_factory);
+
+  config_helper_.addFilter(R"EOF(
+name: inject_trailers
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                        TestUtility::DefaultTimeout,
+                                                        max_request_headers_kb_));
+  EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  EXPECT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  Buffer::OwnedImpl data(std::string(256 * 1024 * 1024 * 2, 'a'));
+  codec_client_->sendData(*downstream_request, data, true);
+
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("413", response->headers().getStatusValue());
+}
+
+// Verifies the behavior when trailers are injected in the same encodeData callback as a reset is
+// triggered due to the request body being too large. Since we haven't responded with headers yet,
+// we expect to see a 418 response and no upstream trailers.
+TEST_P(DownstreamProtocolIntegrationTest,
+       TrailersInjectedWhileDecodingLargeRequestDownstreamHeadersSent) {
+  TrailersAfterBufferedDataFilterFactory filter_factory(false);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> inject_factory(
+      filter_factory);
+
+  config_helper_.addFilter(R"EOF(
+name: inject_trailers
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                        TestUtility::DefaultTimeout,
+                                                        max_request_headers_kb_));
+  EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  EXPECT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  Buffer::OwnedImpl data(std::string(2 * 256 * 1024 * 1024, 'a'));
+  codec_client_->sendData(*downstream_request, data, true);
+
+  response->waitForReset();
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, TrailersInjectedWhileEncodingLargeResponse) {
+  TrailersAfterBufferedDataFilterFactory filter_factory(true);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> inject_factory(
+      filter_factory);
+
+  config_helper_.addFilter(R"EOF(
+name: inject_trailers
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  Buffer::OwnedImpl data(std::string(256, 'a'));
+  codec_client_->sendData(*downstream_request, data, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
+  response->waitForHeaders();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  upstream_request_->encodeData(2 * 256 * 1024 * 1024, true);
+  response->waitForReset();
+
+  EXPECT_EQ(response->trailers(), nullptr);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest,
+       TrailersInjectedWhileEncodingLargeResponseDownstreamHeadersSent) {
+  TrailersAfterBufferedDataFilterFactory filter_factory(true);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> inject_factory(
+      filter_factory);
+
+  config_helper_.addFilter(R"EOF(
+name: inject_trailers
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  Buffer::OwnedImpl data(std::string(256, 'a'));
+  codec_client_->sendData(*downstream_request, data, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+  upstream_request_->encodeData(2 * 256 * 1024 * 1024, true);
+  response->waitForReset();
+
+  EXPECT_EQ(response->trailers(), nullptr);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {

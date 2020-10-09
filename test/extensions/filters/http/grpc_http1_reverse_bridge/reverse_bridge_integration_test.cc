@@ -202,5 +202,46 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
+
+TEST_P(ReverseBridgeIntegrationTest, LargeResponseBody) {
+  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, "abcdef");
+
+  // Wait for upstream to finish the request.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Ensure that we stripped the length prefix and set the appropriate headers.
+  EXPECT_EQ("f", upstream_request_->body().toString());
+
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
+
+  // Respond to the request.
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-protobuf");
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  std::string data(256 * 1024 * 1024, 'a');
+  Buffer::OwnedImpl response_data{data};
+  upstream_request_->encodeData(response_data, true);
+
+  response->waitForReset();
+}
+
 } // namespace
 } // namespace Envoy

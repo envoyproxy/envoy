@@ -1288,6 +1288,8 @@ absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeCon
   return parent_.filter_manager_callbacks_.routeConfig();
 }
 
+bool ActiveStreamEncoderFilter::canContinue() { return !parent_.state_.encoding_complete_; }
+
 Buffer::WatermarkBufferPtr ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = new Buffer::WatermarkBuffer(
       [this]() -> void { this->responseDataDrained(); },
