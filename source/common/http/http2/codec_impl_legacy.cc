@@ -238,6 +238,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
+    parent_.checkProtocolConstraintViolation();
   }
 }
 
@@ -665,6 +666,7 @@ void ConnectionImpl::goAway() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::shutdownNotice() {
@@ -672,6 +674,7 @@ void ConnectionImpl::shutdownNotice() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
