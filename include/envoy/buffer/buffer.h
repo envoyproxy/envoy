@@ -9,7 +9,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/io_handle.h"
 
 #include "common/common/byte_order.h"
 #include "common/common/utility.h"
@@ -236,15 +235,6 @@ public:
    * @return the flattened string.
    */
   virtual std::string toString() const PURE;
-
-  /**
-   * Write the buffer out to a file descriptor.
-   * @param io_handle supplies the io_handle to write to.
-   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
-   * written if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be
-   * used.
-   */
-  virtual Api::IoCallUint64Result write(Network::IoHandle& io_handle) PURE;
 
   /**
    * Copy an integer out of the buffer.

@@ -169,6 +169,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   local_end_stream_ = end_stream;
   submitHeaders(final_headers, end_stream ? nullptr : &provider);
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
@@ -237,6 +238,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
+    parent_.checkProtocolConstraintViolation();
   }
 }
 
@@ -470,7 +472,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   }
 
   parent_.sendPendingFrames();
-  parent_.checkProtocolConstrainViolation();
+  parent_.checkProtocolConstraintViolation();
 
   if (local_end_stream_ && pending_send_data_.length() > 0) {
     createPendingFlushTimer();
@@ -663,6 +665,7 @@ void ConnectionImpl::goAway() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::shutdownNotice() {
@@ -670,6 +673,7 @@ void ConnectionImpl::shutdownNotice() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
@@ -1457,7 +1461,7 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
   return releasor;
 }
 
-void ServerConnectionImpl::checkProtocolConstrainViolation() {
+void ServerConnectionImpl::checkProtocolConstraintViolation() {
   if (!protocol_constraints_.checkOutboundFrameLimits().ok()) {
     scheduleProtocolConstraintViolationCallback();
   }

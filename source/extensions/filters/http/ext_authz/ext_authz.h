@@ -38,6 +38,7 @@ namespace ExtAuthz {
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
   COUNTER(timeout)                                                                                 \
+  COUNTER(disabled)                                                                                \
   COUNTER(failure_mode_allowed)
 
 /**
@@ -66,6 +67,10 @@ public:
                             ? absl::optional<Runtime::FractionalPercent>(
                                   Runtime::FractionalPercent(config.filter_enabled(), runtime_))
                             : absl::nullopt),
+        filter_enabled_metadata_(
+            config.has_filter_enabled_metadata()
+                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                : absl::nullopt),
         deny_at_disable_(config.has_deny_at_disable()
                              ? absl::optional<Runtime::FeatureFlag>(
                                    Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
@@ -96,7 +101,12 @@ public:
 
   Http::Code statusOnError() const { return status_on_error_; }
 
-  bool filterEnabled() { return filter_enabled_.has_value() ? filter_enabled_->enabled() : true; }
+  bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
+    const bool enabled = filter_enabled_.has_value() ? filter_enabled_->enabled() : true;
+    const bool enabled_metadata =
+        filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
+    return enabled && enabled_metadata;
+  }
 
   bool denyAtDisable() {
     return deny_at_disable_.has_value() ? deny_at_disable_->enabled() : false;
@@ -154,6 +164,7 @@ private:
   Http::Context& http_context_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+  const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
   const absl::optional<Runtime::FeatureFlag> deny_at_disable_;
 
   // TODO(nezdolik): stop using pool as part of deprecating cluster scope stats.
@@ -191,6 +202,8 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
+        disable_request_body_buffering_(config.has_check_settings() &&
+                                        config.check_settings().disable_request_body_buffering()),
         disabled_(config.disabled()) {}
 
   void merge(const FilterConfigPerRoute& other);
@@ -204,10 +217,13 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool disableRequestBodyBuffering() const { return disable_request_body_buffering_; }
+
 private:
   // We save the context extensions as a protobuf map instead of an std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
+  bool disable_request_body_buffering_;
   bool disabled_;
 };
 
@@ -241,7 +257,13 @@ private:
                     const Router::RouteConstSharedPtr& route);
   void continueDecoding();
   bool isBufferFull() const;
-  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
+
+  // This holds a set of flags defined in per-route configuration.
+  struct PerRouteFlags {
+    const bool skip_check_;
+    const bool skip_request_body_buffering_;
+  };
+  PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling

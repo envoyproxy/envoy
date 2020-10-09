@@ -202,6 +202,13 @@ The following command operators are supported:
   TCP
     Not implemented ("-")
 
+.. _config_access_log_format_connection_termination_details:
+
+%CONNECTION_TERMINATION_DETAILS%
+  HTTP and TCP
+    Connection termination details may provide additional information about why the connection was
+    terminated by Envoy for L4 reasons.
+
 %BYTES_SENT%
   HTTP
     Body bytes sent. For WebSocket connection it will also include response header bytes.
@@ -355,6 +362,8 @@ The following command operators are supported:
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+.. _config_access_log_format_connection_id:
 
 %CONNECTION_ID%
   An identifier for the downstream connection. It can be used to

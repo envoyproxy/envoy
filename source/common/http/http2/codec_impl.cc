@@ -176,6 +176,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   // process termination from unhandled exception with the RELEASE_ASSERT.
   // Further work will replace this RELEASE_ASSERT with proper error handling.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
@@ -246,6 +247,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     auto status = parent_.sendPendingFrames();
     // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
     RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+    parent_.checkProtocolConstraintViolation();
   }
 }
 
@@ -488,7 +490,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   auto status = parent_.sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
-  parent_.checkProtocolConstrainViolation();
+  parent_.checkProtocolConstraintViolation();
 
   if (local_end_stream_ && pending_send_data_.length() > 0) {
     createPendingFlushTimer();
@@ -694,6 +696,7 @@ void ConnectionImpl::goAway() {
   auto status = sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::shutdownNotice() {
@@ -703,6 +706,7 @@ void ConnectionImpl::shutdownNotice() {
   auto status = sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  checkProtocolConstraintViolation();
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
@@ -1506,7 +1510,7 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
   return releasor;
 }
 
-void ServerConnectionImpl::checkProtocolConstrainViolation() {
+void ServerConnectionImpl::checkProtocolConstraintViolation() {
   if (!protocol_constraints_.checkOutboundFrameLimits().ok()) {
     scheduleProtocolConstraintViolationCallback();
   }

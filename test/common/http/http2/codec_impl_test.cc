@@ -2041,15 +2041,16 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
         buffer.move(frame);
       }));
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1; ++i) {
     EXPECT_NO_THROW(response_encoder_->encodeHeaders(response_headers, false));
   }
-  // Presently flood mitigation is done only when processing downstream data
-  // So we need to send stream from downstream client to trigger mitigation
-  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many frames in the outbound queue.");
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
@@ -2197,6 +2198,45 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
 
+// Verify that codec detects flood of outbound trailers
+TEST_P(Http2CodecImplTest, ResponseTrailersFlood) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_FALSE(violation_callback->enabled_);
+  EXPECT_NO_THROW(response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"foo", "bar"}}));
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
 TEST_P(Http2CodecImplTest, PriorityFlood) {
   priorityFlood();
   // Legacy codec does not propagate error details and uses generic error message
@@ -2257,6 +2297,86 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
           1);
   auto status = server_wrapper_.dispatch(data, *server_);
   EXPECT_TRUE(status.ok());
+}
+
+// Verify that codec detects flood of outbound frames caused by goAway() method
+TEST_P(Http2CodecImplTest, GoAwayCausesOutboundFlood) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_FALSE(violation_callback->enabled_);
+
+  server_->goAway();
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
+// Verify that codec detects flood of outbound frames caused by shutdownNotice() method
+TEST_P(Http2CodecImplTest, ShudowNoticeCausesOutboundFlood) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_FALSE(violation_callback->enabled_);
+
+  server_->shutdownNotice();
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
 
 // CONNECT without upgrade type gets tagged with "bytestream"

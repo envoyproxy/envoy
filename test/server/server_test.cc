@@ -505,18 +505,8 @@ TEST_P(ServerInstanceImplTest, Stats) {
 #endif
 }
 
-class TestWithSimTimeAndRealSymbolTables : public Event::TestUsingSimulatedTime {
-protected:
-  TestWithSimTimeAndRealSymbolTables() {
-    symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
-  }
-
-private:
-  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
-};
-
 class ServerStatsTest
-    : public TestWithSimTimeAndRealSymbolTables,
+    : public Event::TestUsingSimulatedTime,
       public ServerInstanceImplTestBase,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 protected:
@@ -859,8 +849,8 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
 
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
   EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/invalid_runtime_bootstrap.yaml"), EnvoyException,
-      "Invalid runtime entry value for foo");
+      initialize("test/server/test_data/server/invalid_legacy_runtime_bootstrap.yaml"),
+      EnvoyException, "Invalid runtime entry value for foo");
 }
 
 // Validate invalid runtime in bootstrap is rejected.
