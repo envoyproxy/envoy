@@ -10,7 +10,7 @@ If you plan to contribute to Envoy, you may find it useful to install the Envoy 
 
 Below is a list of additional documentation to aid the development process:
 
-- [General build and installation documentation](https://www.envoyproxy.io/docs/envoy/latest/install/install)
+- [General build and installation documentation](https://www.envoyproxy.io/docs/envoy/latest/start/start)
 
 - [Building and testing Envoy with Bazel](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md)
 
@@ -35,4 +35,3 @@ And some documents on components of Envoy architecture:
 - [Envoy flow control](https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md)
 
 - [Envoy's subset load balancer](https://github.com/envoyproxy/envoy/blob/master/source/docs/subset_load_balancer.md)
-
