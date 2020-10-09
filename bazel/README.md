@@ -29,10 +29,10 @@ to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` en
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
-dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/install/building#requirements) are typically
+dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements) are typically
 independently sourced, the following steps should be followed:
 
-1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/install/building#requirements).
+1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements).
 1. `bazel build -c opt //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
