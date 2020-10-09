@@ -24,15 +24,13 @@ build_platforms() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
 
-if is_windows; then
-  echo "windows/amd64"
-else
-  if [[ -z "${FILE_SUFFIX}" ]]; then
-    echo "linux/arm64,linux/amd64"
+  if is_windows; then
+    echo "windows/amd64"
+  elif [[ -z "${FILE_SUFFIX}" ]]; then
+      echo "linux/arm64,linux/amd64"
   else
-    echo "linux/amd64"
+      echo "linux/amd64"
   fi
-fi
 }
 
 build_args() {
@@ -48,15 +46,15 @@ build_args() {
 }
 
 use_builder() {
-# BuildKit is not available for Windows images, skip this
-if ! is_windows; then
-  TYPE=$1
-  if [[ "${TYPE}" == "-google-vrp" ]]; then
-    docker buildx use default
-  else
-    docker buildx use multi-builder
+  # BuildKit is not available for Windows images, skip this
+  if ! is_windows; then
+    TYPE=$1
+    if [[ "${TYPE}" == "-google-vrp" ]]; then
+      docker buildx use default
+    else
+      docker buildx use multi-builder
+    fi
   fi
-fi
 }
 
 IMAGES_TO_SAVE=()
