@@ -277,6 +277,12 @@ protected:
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
+
+    // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
+    // never called. The watermark value is set to the size of the stream window. As a result this
+    // watermark can never overflow because the peer can never send more bytes than the stream
+    // window without triggering protocol error and this buffer is drained after each DATA frame was
+    // dispatched through the filter chain. See source/docs/flow_control.md for more information.
     Buffer::WatermarkBuffer pending_recv_data_{
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
         [this]() -> void { this->pendingRecvBufferHighWatermark(); },
