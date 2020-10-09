@@ -175,6 +175,11 @@ TEST(NetworkUtility, GetOriginalDst) {
   EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(absl::nullopt));
 #endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+
+#ifdef SOL_IP
+  EXPECT_CALL(socket, addressType()).WillOnce(testing::Return(Address::Type::Pipe));
+#endif
+  EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
 }
 
 TEST(NetworkUtility, LocalConnection) {

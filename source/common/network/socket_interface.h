@@ -17,9 +17,8 @@ namespace Network {
 class SocketInterfaceExtension : public Server::BootstrapExtension {
 public:
   SocketInterfaceExtension(SocketInterface& sock_interface) : sock_interface_(sock_interface) {}
-  SocketInterface& socketInterface() { return sock_interface_; }
 
-private:
+protected:
   SocketInterface& sock_interface_;
 };
 
