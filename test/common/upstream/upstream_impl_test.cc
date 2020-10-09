@@ -1018,8 +1018,8 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
       singleton_manager_, tls_, validation_visitor_, *api_);
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_unique<StrictDnsClusterImpl>(cluster_config, runtime_, dns_resolver_,
-                                             factory_context, std::move(scope), false),
+      (void)std::make_unique<StrictDnsClusterImpl>(cluster_config, runtime_, dns_resolver_,
+                                                   factory_context, std::move(scope), false),
       EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
 }
 

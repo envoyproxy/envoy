@@ -503,8 +503,8 @@ TEST_F(DiskLoaderImplTest, MultipleAdminLayersFail) {
     layer->mutable_admin_layer();
   }
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                   generator_, validation_visitor_, *api_),
+      (void)std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
+                                         generator_, validation_visitor_, *api_),
       EnvoyException,
       "Too many admin layers specified in LayeredRuntime, at most one may be specified");
 }

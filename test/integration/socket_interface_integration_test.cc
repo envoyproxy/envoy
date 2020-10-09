@@ -117,7 +117,8 @@ TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInter
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
 
-  ASSERT_DEATH(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address), "");
+  ASSERT_DEATH(
+      (void)std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address), "");
 }
 
 // Test that send to internal address will return io error.
