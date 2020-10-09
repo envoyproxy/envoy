@@ -73,8 +73,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadEmpty) {
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
   io_handle_->setWriteEnd();
   res = io_handle_->read(buf, 10);
-  EXPECT_FALSE(res.ok());
-  EXPECT_NE(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+  EXPECT_TRUE(res.ok());
 }
 
 // Test recv side effects.
