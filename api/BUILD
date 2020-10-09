@@ -237,6 +237,7 @@ proto_library(
         "//envoy/extensions/network/socket_interface/v3:pkg",
         "//envoy/extensions/retry/host/omit_host_metadata/v3:pkg",
         "//envoy/extensions/retry/priority/previous_priorities/v3:pkg",
+        "//envoy/extensions/stat_sinks/wasm/v3:pkg",
         "//envoy/extensions/transport_sockets/alts/v3:pkg",
         "//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg",
         "//envoy/extensions/transport_sockets/quic/v3:pkg",
