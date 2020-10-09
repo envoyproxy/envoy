@@ -59,7 +59,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
       break;
     }
 
-    if (rejectCxOverGlobalLimit() || reject_fraction_.isRandomizedActive(random_)) {
+    if (rejectCxOverGlobalLimit() || random_.bernoulli(reject_fraction_)) {
       // The global connection limit has been reached.
       io_handle->close();
       cb_.onReject();
@@ -121,7 +121,7 @@ void TcpListenerImpl::enable() { file_event_->setEnabled(Event::FileReadyType::R
 void TcpListenerImpl::disable() { file_event_->setEnabled(0); }
 
 void TcpListenerImpl::setRejectFraction(const float reject_fraction) {
-  reject_fraction_ = Server::OverloadActionState(reject_fraction);
+  reject_fraction_ = reject_fraction;
 }
 
 } // namespace Network

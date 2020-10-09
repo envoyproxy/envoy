@@ -10,7 +10,6 @@
 #include "extensions/resource_monitors/common/factory_base.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -25,7 +24,6 @@ using testing::AllOf;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
-using testing::Return;
 
 namespace Envoy {
 namespace Server {
@@ -588,18 +586,6 @@ TEST_F(OverloadManagerImplTest, Shutdown) {
 
   EXPECT_CALL(*timer_, disableTimer());
   manager->stop();
-}
-
-TEST(OverloadActionState, RandomizedActive) {
-  Random::MockRandomGenerator random_gen;
-  EXPECT_CALL(random_gen, random())
-      .Times(2)
-      .WillRepeatedly(Return(Random::RandomGenerator::max() / 2));
-
-  EXPECT_FALSE(OverloadActionState::inactive().isRandomizedActive(random_gen));
-  EXPECT_TRUE(OverloadActionState::saturated().isRandomizedActive(random_gen));
-  EXPECT_FALSE(OverloadActionState(0.49).isRandomizedActive(random_gen));
-  EXPECT_TRUE(OverloadActionState(0.51).isRandomizedActive(random_gen));
 }
 
 } // namespace

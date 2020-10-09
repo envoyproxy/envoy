@@ -61,16 +61,18 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           Tracing::Span& parent_span) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   envoy::service::ratelimit::v3::RateLimitRequest request;
   createRequest(request, domain, descriptors);
 
-  request_ = async_client_->send(service_method_, request, *this, parent_span,
-                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_),
-                                 transport_api_version_);
+  request_ =
+      async_client_->send(service_method_, request, *this, parent_span,
+                          Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
+                              Http::AsyncClient::ParentContext{&stream_info}),
+                          transport_api_version_);
 }
 
 void GrpcClientImpl::onSuccess(

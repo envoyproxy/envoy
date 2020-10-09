@@ -39,7 +39,7 @@ private:
 
   Random::RandomGenerator& random_;
   Event::FileEventPtr file_event_;
-  Server::OverloadActionState reject_fraction_;
+  float reject_fraction_;
 };
 
 } // namespace Network

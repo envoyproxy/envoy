@@ -61,10 +61,6 @@ absl::string_view getProtoFromName(const absl::string_view name) {
 
 std::string buildServiceName(const std::string& name, const std::string& proto,
                              const std::string& domain) {
-  if (name.empty() || proto.empty() || domain.empty()) {
-    return EMPTY_STRING;
-  }
-
   std::string result{};
   if (name[0] != '_') {
     result += "_";
