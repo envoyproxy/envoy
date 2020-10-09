@@ -43,6 +43,7 @@ public:
   void start() override;
 
   // GrpcMux
+  SotwOrDelta sotwOrDelta() override { return SotwOrDelta::Sotw; }
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
@@ -155,10 +156,15 @@ private:
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;
 using GrpcMuxImplSharedPtr = std::shared_ptr<GrpcMuxImpl>;
 
-class NullGrpcMuxImpl : public GrpcMux,
-                        GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
+template <class ResponseProto>
+class NullGrpcMuxImpl : public GrpcMux, GrpcStreamCallbacks<ResponseProto> {
 public:
+  NullGrpcMuxImpl(const SotwOrDelta sotwOrDelta) : sotwOrDelta_(sotwOrDelta) {}
+
   void start() override {}
+  // GrpcMux
+  SotwOrDelta sotwOrDelta() override { return sotwOrDelta_; }
+
   ScopedResume pause(const std::string&) override {
     return std::make_unique<Cleanup>([] {});
   }
@@ -178,8 +184,10 @@ public:
   void onWriteable() override {}
   void onStreamEstablished() override {}
   void onEstablishmentFailure() override {}
-  void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
-                           ControlPlaneStats&) override {}
+  void onDiscoveryResponse(std::unique_ptr<ResponseProto>&&, ControlPlaneStats&) override {}
+
+private:
+  SotwOrDelta sotwOrDelta_;
 };
 
 } // namespace Config

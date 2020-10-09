@@ -45,7 +45,8 @@ public:
 
   void requestOnDemandUpdate(const std::string& type_url,
                              const std::set<std::string>& for_update) override;
-
+  // GrpcMux
+  SotwOrDelta sotwOrDelta() override { return SotwOrDelta::Delta; }
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 

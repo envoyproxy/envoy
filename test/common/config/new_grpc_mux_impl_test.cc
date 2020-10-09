@@ -169,6 +169,24 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
 }
 
+// DeltaDiscoveryResponse that comes in response to an on-demand request that contain empty resource
+// list will be ignored.
+TEST_F(NewGrpcMuxImplTest, IgnoreEmptyResponse) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().VirtualHost;
+  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, true);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  EXPECT_NO_THROW(grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_));
+}
+
 // Watch v2 resource type_url, receive discovery response with v3 resource type_url.
 TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
   TestScopedRuntime scoped_runtime;

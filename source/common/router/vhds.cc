@@ -7,6 +7,7 @@
 
 #include "envoy/api/v2/route/route_components.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
@@ -36,14 +37,23 @@ VhdsSubscription::VhdsSubscription(
           fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
           [this]() { subscription_->start({config_update_info_->routeConfigName()}, true); }),
       route_config_providers_(route_config_providers) {
-  const auto& config_source = config_update_info_->routeConfiguration()
-                                  .vhds()
-                                  .config_source()
-                                  .api_config_source()
-                                  .api_type();
-  if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+
+  if (config_update_info_->routeConfiguration().vhds().config_source().has_ads()) {
+    if (factory_context.clusterManager().adsMux()->sotwOrDelta() !=
+        Envoy::Config::SotwOrDelta::Delta) {
+      throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+    }
+  } else {
+    const auto& config_source = config_update_info_->routeConfiguration()
+                                    .vhds()
+                                    .config_source()
+                                    .api_config_source()
+                                    .api_type();
+    if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+      throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+    }
   }
+
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(

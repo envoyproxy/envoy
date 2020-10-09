@@ -113,7 +113,10 @@ class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
   void setup() {
     ON_CALL(server_factory_context_.cluster_manager_, adsMux())
-        .WillByDefault(Return(std::make_shared<::Envoy::Config::NullGrpcMuxImpl>()));
+        .WillByDefault(Return(
+            std::make_shared<
+                ::Envoy::Config::NullGrpcMuxImpl<envoy::service::discovery::v3::DiscoveryResponse>>(
+                Envoy::Config::SotwOrDelta::Sotw)));
 
     InSequence s;
     // Since server_factory_context_.cluster_manager_.subscription_factory_.callbacks_ is taken by

@@ -338,7 +338,9 @@ ClusterManagerImpl::ClusterManagerImpl(
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
   } else {
-    ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
+    ads_mux_ =
+        std::make_unique<Config::NullGrpcMuxImpl<envoy::service::discovery::v3::DiscoveryResponse>>(
+            Envoy::Config::SotwOrDelta::Sotw);
   }
 
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.

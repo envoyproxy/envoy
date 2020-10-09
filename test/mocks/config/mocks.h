@@ -102,6 +102,7 @@ public:
   ~MockGrpcMux() override;
 
   MOCK_METHOD(void, start, (), (override));
+  MOCK_METHOD(SotwOrDelta, sotwOrDelta, (), (override));
   MOCK_METHOD(ScopedResume, pause, (const std::string& type_url), (override));
   MOCK_METHOD(ScopedResume, pause, (const std::vector<std::string> type_urls), (override));
 

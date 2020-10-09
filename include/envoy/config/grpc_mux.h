@@ -15,6 +15,10 @@ namespace Config {
 
 using ScopedResume = std::unique_ptr<Cleanup>;
 /**
+ * Support parameterizing over state-of-the-world xDS vs delta xDS.
+ */
+enum class SotwOrDelta { Sotw, Delta };
+/**
  * All control plane related stats. @see stats_macros.h
  */
 #define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE, TEXT_READOUT)                                      \
@@ -59,6 +63,11 @@ public:
    * Initiate stream with management server.
    */
   virtual void start() PURE;
+
+  /**
+   * Indicate this GrpcMux is delta or SotW.
+   */
+  virtual SotwOrDelta sotwOrDelta() PURE;
 
   /**
    * Pause discovery requests for a given API type. This is useful when we're processing an update

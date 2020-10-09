@@ -7,6 +7,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/router/rds_impl.h"
@@ -24,6 +25,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Router {
 namespace {
@@ -31,6 +34,13 @@ namespace {
 class VhdsTest : public testing::Test {
 public:
   void SetUp() override {
+
+    ON_CALL(factory_context_.cluster_manager_, adsMux())
+        .WillByDefault(Return(
+            std::make_shared<
+                Envoy::Config::NullGrpcMuxImpl<envoy::service::discovery::v3::DiscoveryResponse>>(
+                Envoy::Config::SotwOrDelta::Sotw)));
+
     default_vhds_config_ = R"EOF(
 name: my_route
 vhds:
@@ -91,6 +101,30 @@ vhds:
   NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory_;
 };
 
+class VhdsDeltaAdsTest : public VhdsTest {
+public:
+  void SetUp() override {
+    ON_CALL(factory_context_.cluster_manager_, adsMux())
+        .WillByDefault(Return(std::make_shared<::Envoy::Config::NullGrpcMuxImpl<
+                                  envoy::service::discovery::v3::DeltaDiscoveryResponse>>(
+            Envoy::Config::SotwOrDelta::Delta)));
+  }
+};
+
+// verify that ads api_type: DELTA_GRPC passes validation
+TEST_F(VhdsDeltaAdsTest, VhdsInstantiationShouldSucceedWithAdsDELTA_GRPC) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    ads: {}
+  )EOF");
+
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+  EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_));
+}
+
 // verify that api_type: DELTA_GRPC passes validation
 TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
   const auto route_config =
@@ -112,6 +146,22 @@ vhds:
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_),
+               EnvoyException);
+}
+
+// verify that ads api_type: GRPC fails validation
+
+TEST_F(VhdsTest, VhdsInstantiationWithAdsShouldFailWithoutDELTA_GRPC) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    ads: {}
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
