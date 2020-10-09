@@ -45,11 +45,11 @@ public:
         async_client_(new NiceMock<Grpc::MockAsyncClient>()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
+    ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    ttl_timer_ = new Event::MockTimer(&dispatcher_);
 
     mux_ = std::make_shared<Config::GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
@@ -187,7 +187,7 @@ public:
   Random::MockRandomGenerator random_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
-  Event::MockTimer ttl_timer_;
+  Event::MockTimer* ttl_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
