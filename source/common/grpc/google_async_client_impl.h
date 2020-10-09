@@ -19,6 +19,7 @@
 #include "common/grpc/google_grpc_context.h"
 #include "common/grpc/stat_names.h"
 #include "common/grpc/typed_async_client.h"
+#include "common/router/header_parser.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -197,10 +198,10 @@ private:
   GoogleStubSharedPtr stub_;
   std::list<GoogleAsyncStreamImplPtr> active_streams_;
   const std::string stat_prefix_;
-  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
   uint64_t per_stream_buffer_limit_bytes_;
+  Router::HeaderParserPtr metadata_parser_;
 
   friend class GoogleAsyncClientThreadLocal;
   friend class GoogleAsyncRequestImpl;

@@ -2011,6 +2011,32 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
+// Verify detection of frame flood when sending second GOAWAY frame on drain timeout
+TEST_P(Http2FloodMitigationTest, GoAwayOverflowOnDrainTimeout) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* drain_time_out = hcm.mutable_drain_timeout();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        drain_time_out->set_seconds(seconds.count());
+
+        auto* http_protocol_options = hcm.mutable_common_http_protocol_options();
+        auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+        idle_time_out->set_seconds(seconds.count());
+      });
+  // pre-fill two away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 2);
+
+  // connection idle timeout will send first GOAWAY frame and start drain timer
+  // drain timeout will send second GOAWAY frame which should trigger flood protection
+  // Wait for connection to be flooded with outbound GOAWAY frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
 // Verify detection of overflowing outbound frame queue with the GOAWAY frames sent after the
 // downstream idle connection timeout disconnects the connection.
 // The test verifies protocol constraint violation handling in the
