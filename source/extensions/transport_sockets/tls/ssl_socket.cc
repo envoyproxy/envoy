@@ -358,8 +358,24 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+    if (ssl_ctx_) {
+      for (const auto& cb : secrets_ready_callbacks_) {
+        cb();
+      }
+    }
   }
   stats_.ssl_context_update_by_sds_.inc();
+}
+
+void ClientSslSocketFactory::addSecretsReadyCb(std::function<void()> callback) {
+  {
+    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    if (ssl_ctx_) {
+      callback();
+    } else {
+      secrets_ready_callbacks_.push_back(callback);
+    }
+  }
 }
 
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
@@ -399,8 +415,24 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+    if (ssl_ctx_) {
+      for (const auto& cb : secrets_ready_callbacks_) {
+        cb();
+      }
+    }
   }
   stats_.ssl_context_update_by_sds_.inc();
+}
+
+void ServerSslSocketFactory::addSecretsReadyCb(std::function<void()> callback) {
+  {
+    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    if (ssl_ctx_) {
+      callback();
+    } else {
+      secrets_ready_callbacks_.push_back(callback);
+    }
+  }
 }
 
 } // namespace Tls
