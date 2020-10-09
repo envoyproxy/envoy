@@ -43,6 +43,7 @@ private:
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
+  void onConfigExpired(const std::vector<std::string>&) override {}
 
   Config::SubscriptionPtr subscription_;
   std::string system_version_info_;

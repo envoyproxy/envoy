@@ -68,6 +68,7 @@ private:
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
+  void onConfigExpired(const std::vector<std::string>&) override {}
 
   RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopePtr scope_;

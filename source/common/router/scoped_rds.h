@@ -215,6 +215,7 @@ private:
     ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
     DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
   }
+  void onConfigExpired(const std::vector<std::string>&) override {}
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,
                          RdsRouteConfigSubscription& rds_subscription);

@@ -110,6 +110,9 @@ private:
                       const std::string&) override;
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
+  void onConfigExpired(const std::vector<std::string>&) {
+    // TODO(snowp): Implement.
+  }
 
   const std::string filter_config_name_;
   uint64_t last_config_hash_{0ul};
