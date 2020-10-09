@@ -105,7 +105,9 @@ Each codec has the option of adding per-codec statistics. Both http1 and http2 h
 Http1 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~
 
-All http1 statistics are rooted at *http1.*
+On the downstream side all http1 statistics are rooted at *http1.*
+
+On the upstream side all http1 statistics are rooted at *cluster.<name>.http1.*
 
 .. csv-table::
    :header: Name, Type, Description
@@ -119,7 +121,9 @@ All http1 statistics are rooted at *http1.*
 Http2 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~
 
-All http2 statistics are rooted at *http2.*
+On the downstream side all http2 statistics are rooted at *http2.*
+
+On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
 
 .. csv-table::
    :header: Name, Type, Description
