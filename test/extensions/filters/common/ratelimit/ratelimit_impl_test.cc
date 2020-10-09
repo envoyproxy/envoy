@@ -13,6 +13,7 @@
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -60,6 +61,7 @@ public:
   GrpcClientImpl client_;
   MockRequestCallbacks request_callbacks_;
   Tracing::MockSpan span_;
+  StreamInfo::MockStreamInfo stream_info_;
 };
 
 TEST_F(RateLimitGrpcClientTest, Basic) {
@@ -80,7 +82,8 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
               return &async_request_;
             }));
 
-    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());
+    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
+                  stream_info_);
 
     client_.onCreateInitialMetadata(headers);
     EXPECT_EQ(nullptr, headers.RequestId());
@@ -100,7 +103,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
         .WillOnce(Return(&async_request_));
 
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}},
-                  Tracing::NullSpan::instance());
+                  Tracing::NullSpan::instance(), stream_info_);
 
     client_.onCreateInitialMetadata(headers);
 
@@ -121,7 +124,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     client_.limit(request_callbacks_, "foo",
                   {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}},
-                  Tracing::NullSpan::instance());
+                  Tracing::NullSpan::instance(), stream_info_);
 
     response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _, _));
@@ -140,7 +143,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     client_.limit(
         request_callbacks_, "foo",
         {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}},
-        Tracing::NullSpan::instance());
+        Tracing::NullSpan::instance(), stream_info_);
 
     client_.onCreateInitialMetadata(headers);
 
@@ -157,7 +160,8 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
 
   EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
 
-  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());
+  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
+                stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
   client_.cancel();

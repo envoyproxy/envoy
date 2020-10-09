@@ -286,8 +286,10 @@ message GrpcService {
   // request.
   google.protobuf.Duration timeout = 3;
 
-  // Additional metadata to include in streams initiated to the GrpcService.
-  // This can be used for scenarios in which additional ad hoc authorization
-  // headers (e.g. ``x-foo-bar: baz-key``) are to be injected.
+  // Additional metadata to include in streams initiated to the GrpcService. This can be used for
+  // scenarios in which additional ad hoc authorization headers (e.g. ``x-foo-bar: baz-key``) are to
+  // be injected. For more information, including details on header value syntax, see the
+  // documentation on :ref:`custom request headers
+  // <config_http_conn_man_headers_custom_request_headers>`.
   repeated HeaderValue initial_metadata = 5;
 }

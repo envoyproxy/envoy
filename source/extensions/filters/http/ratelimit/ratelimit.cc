@@ -73,7 +73,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan());
+    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan(),
+                   callbacks_->streamInfo());
     initiating_call_ = false;
   }
 }

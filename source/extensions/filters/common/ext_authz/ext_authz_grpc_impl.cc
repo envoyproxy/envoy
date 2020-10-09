@@ -39,7 +39,7 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
                            const envoy::service::auth::v3::CheckRequest& request,
-                           Tracing::Span& parent_span, const StreamInfo::StreamInfo&) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
@@ -47,8 +47,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispa
   if (timeout_.has_value()) {
     if (timeoutStartsAtCheckCreation()) {
       // TODO(yuval-k): We currently use dispatcher based timeout even if the underlying client is
-      // google gRPC client, which has it's own timeout mechanism. We may want to change that in
-      // the future if the implementations converge.
+      // Google gRPC client, which has its own timeout mechanism. We may want to change that in the
+      // future if the implementations converge.
       timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
       timeout_timer_->enableTimer(timeout_.value());
     } else {
@@ -56,6 +56,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispa
       options.setTimeout(timeout_);
     }
   }
+
+  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
   request_ = async_client_->send(service_method_, request, *this, parent_span, options,

@@ -226,9 +226,9 @@ HeaderParserPtr HeaderParser::configure(
   for (const auto& header_value_option : headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
     HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
-
     header_parser->headers_to_add_.emplace_back(
-        Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
+        Http::LowerCaseString(header_value_option.header().key()),
+        HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value()});
   }
 
   return header_parser;
@@ -241,9 +241,9 @@ HeaderParserPtr HeaderParser::configure(
 
   for (const auto& header_value : headers_to_add) {
     HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
-
-    header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
-                                                std::move(header_formatter));
+    header_parser->headers_to_add_.emplace_back(
+        Http::LowerCaseString(header_value.key()),
+        HeadersToAddEntry{std::move(header_formatter), header_value.value()});
   }
 
   return header_parser;
@@ -269,19 +269,25 @@ HeaderParserPtr HeaderParser::configure(
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
                                    const StreamInfo::StreamInfo& stream_info) const {
+  evaluateHeaders(headers, &stream_info);
+}
+
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
+                                   const StreamInfo::StreamInfo* stream_info) const {
   // Removing headers in the headers_to_remove_ list first makes
   // remove-before-add the default behavior as expected by users.
   for (const auto& header : headers_to_remove_) {
     headers.remove(header);
   }
 
-  for (const auto& formatter : headers_to_add_) {
-    const std::string value = formatter.second->format(stream_info);
+  for (const auto& [key, entry] : headers_to_add_) {
+    const std::string value =
+        stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
     if (!value.empty()) {
-      if (formatter.second->append()) {
-        headers.addReferenceKey(formatter.first, value);
+      if (entry.formatter_->append()) {
+        headers.addReferenceKey(key, value);
       } else {
-        headers.setReferenceKey(formatter.first, value);
+        headers.setReferenceKey(key, value);
       }
     }
   }

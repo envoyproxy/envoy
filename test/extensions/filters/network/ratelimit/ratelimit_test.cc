@@ -102,7 +102,7 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                                   {{{"hello", "world"}, {"foo", "bar"}}}, {{{"foo2", "bar2"}}}}),
-                              testing::A<Tracing::Span&>()))
+                              testing::A<Tracing::Span&>(), _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -130,7 +130,7 @@ TEST_F(RateLimitFilterTest, OverLimit) {
   InSequence s;
   SetUpTest(filter_config_);
 
-  EXPECT_CALL(*client_, limit(_, "foo", _, _))
+  EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -156,7 +156,7 @@ TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
   InSequence s;
   SetUpTest(filter_config_);
 
-  EXPECT_CALL(*client_, limit(_, "foo", _, _))
+  EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -185,7 +185,7 @@ TEST_F(RateLimitFilterTest, Error) {
   InSequence s;
   SetUpTest(filter_config_);
 
-  EXPECT_CALL(*client_, limit(_, "foo", _, _))
+  EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -213,7 +213,7 @@ TEST_F(RateLimitFilterTest, Disconnect) {
   InSequence s;
   SetUpTest(filter_config_);
 
-  EXPECT_CALL(*client_, limit(_, "foo", _, _))
+  EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -234,7 +234,7 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
   SetUpTest(filter_config_);
 
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, limit(_, "foo", _, _))
+  EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
@@ -258,7 +258,7 @@ TEST_F(RateLimitFilterTest, ImmediateError) {
   SetUpTest(filter_config_);
 
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, limit(_, "foo", _, _))
+  EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             callbacks.complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
@@ -284,7 +284,7 @@ TEST_F(RateLimitFilterTest, RuntimeDisable) {
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))
       .WillOnce(Return(false));
-  EXPECT_CALL(*client_, limit(_, _, _, _)).Times(0);
+  EXPECT_CALL(*client_, limit(_, _, _, _, _)).Times(0);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -295,7 +295,7 @@ TEST_F(RateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   InSequence s;
   SetUpTest(fail_close_config_);
 
-  EXPECT_CALL(*client_, limit(_, "foo", _, _))
+  EXPECT_CALL(*client_, limit(_, "foo", _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
