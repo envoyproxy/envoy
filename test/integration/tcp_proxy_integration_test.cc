@@ -1102,7 +1102,7 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
   // Ship some data upstream.
   Buffer::OwnedImpl buffer(data_to_send_upstream);
   ssl_client_->write(buffer, false);
-  while (client_write_buffer_->bytes_drained() != data_to_send_upstream.size()) {
+  while (client_write_buffer_->bytesDrained() != data_to_send_upstream.size()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
@@ -1169,7 +1169,7 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   const std::string& val("data");
   Buffer::OwnedImpl buffer(val);
   ssl_client_->write(buffer, false);
-  while (client_write_buffer_->bytes_drained() != val.size()) {
+  while (client_write_buffer_->bytesDrained() != val.size()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_TRUE(fake_upstream_connection_->waitForData(val.size()));

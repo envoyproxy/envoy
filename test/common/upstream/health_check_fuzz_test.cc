@@ -15,15 +15,27 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
     return;
   }
 
-  HealthCheckFuzz health_check_fuzz;
+  std::unique_ptr<HealthCheckFuzz> health_check_fuzz;
 
-  if (input.health_check_config().health_checker_case() ==
-      envoy::config::core::v3::HealthCheck::kGrpcHealthCheck) {
-    ENVOY_LOG_MISC(trace, "Fuzz engine created GRPC Health Checker");
+  switch (input.health_check_config().health_checker_case()) {
+  case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
+    health_check_fuzz = std::make_unique<HttpHealthCheckFuzz>();
+    break;
+  }
+  case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
+    health_check_fuzz = std::make_unique<TcpHealthCheckFuzz>();
+    break;
+  }
+  case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
+    health_check_fuzz = std::make_unique<GrpcHealthCheckFuzz>();
+    break;
+  }
+  default: // Handles custom health checker
+    ENVOY_LOG_MISC(trace, "Custom Health Checker currently unsupported, skipping");
     return;
   }
 
-  health_check_fuzz.initializeAndReplay(input);
+  health_check_fuzz->initializeAndReplay(input);
 }
 
 } // namespace Upstream

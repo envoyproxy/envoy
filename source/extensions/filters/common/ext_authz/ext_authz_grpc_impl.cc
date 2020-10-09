@@ -17,11 +17,11 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version,
                                bool use_alpha)
-    : async_client_(std::move(async_client)), timeout_(timeout),
+    : async_client_(async_client), timeout_(timeout),
       service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
                                              "envoy.service.auth.v2.Authorization.Check",
                                              "envoy.service.auth.v2alpha.Authorization.Check")
@@ -39,7 +39,7 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
                            const envoy::service::auth::v3::CheckRequest& request,
-                           Tracing::Span& parent_span, const StreamInfo::StreamInfo&) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
@@ -47,8 +47,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispa
   if (timeout_.has_value()) {
     if (timeoutStartsAtCheckCreation()) {
       // TODO(yuval-k): We currently use dispatcher based timeout even if the underlying client is
-      // google gRPC client, which has it's own timeout mechanism. We may want to change that in
-      // the future if the implementations converge.
+      // Google gRPC client, which has its own timeout mechanism. We may want to change that in the
+      // future if the implementations converge.
       timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
       timeout_timer_->enableTimer(timeout_.value());
     } else {
@@ -56,6 +56,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispa
       options.setTimeout(timeout_);
     }
   }
+
+  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
   request_ = async_client_->send(service_method_, request, *this, parent_span, options,
@@ -141,6 +143,23 @@ void GrpcClientImpl::toAuthzResponseHeader(
                                             header.header().value());
     }
   }
+}
+
+const Grpc::RawAsyncClientSharedPtr AsyncClientCache::getOrCreateAsyncClient(
+    const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
+  // The cache stores Google gRPC client, so channel is not created for each request.
+  ASSERT(proto_config.has_grpc_service() && proto_config.grpc_service().has_google_grpc());
+  auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
+  const std::size_t cache_key = MessageUtil::hash(proto_config.grpc_service().google_grpc());
+  const auto it = cache.async_clients_.find(cache_key);
+  if (it != cache.async_clients_.end()) {
+    return it->second;
+  }
+  const Grpc::AsyncClientFactoryPtr factory =
+      async_client_manager_.factoryForGrpcService(proto_config.grpc_service(), scope_, true);
+  const Grpc::RawAsyncClientSharedPtr async_client = factory->create();
+  cache.async_clients_.emplace(cache_key, async_client);
+  return async_client;
 }
 
 } // namespace ExtAuthz

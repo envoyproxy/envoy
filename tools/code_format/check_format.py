@@ -31,18 +31,16 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # Files matching these exact names can reference real-world time. These include the class
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
-REAL_TIME_ALLOWLIST = ("./source/common/common/utility.h",
-                       "./source/extensions/common/aws/utility.cc",
-                       "./source/common/event/real_time_system.cc",
-                       "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
-                       "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
-                       "./source/common/common/perf_annotation.h",
-                       "./test/common/common/log_macros_test.cc",
-                       "./test/test_common/simulated_time_system.cc",
-                       "./test/test_common/simulated_time_system.h",
-                       "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
-                       "./test/test_common/utility.cc", "./test/test_common/utility.h",
-                       "./test/integration/integration.h")
+REAL_TIME_ALLOWLIST = (
+    "./source/common/common/utility.h", "./source/extensions/common/aws/utility.cc",
+    "./source/common/event/real_time_system.cc", "./source/common/event/real_time_system.h",
+    "./source/exe/main_common.cc", "./source/exe/main_common.h",
+    "./source/server/config_validation/server.cc", "./source/common/common/perf_annotation.h",
+    "./test/common/common/log_macros_test.cc", "./test/common/protobuf/utility_test.cc",
+    "./test/test_common/simulated_time_system.cc", "./test/test_common/simulated_time_system.h",
+    "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
+    "./test/test_common/utility.cc", "./test/test_common/utility.h",
+    "./test/integration/integration.h")
 
 # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
 # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
