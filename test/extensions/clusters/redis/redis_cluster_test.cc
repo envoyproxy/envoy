@@ -84,7 +84,7 @@ public:
   MOCK_METHOD(Extensions::NetworkFilters::Common::Redis::Client::Client*, create_, (std::string));
 
 protected:
-  RedisClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
+  RedisClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {}
 
   std::list<std::string> hostListToAddresses(const Upstream::HostVector& hosts) {
     std::list<std::string> addresses;
@@ -104,7 +104,7 @@ protected:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
@@ -134,7 +134,7 @@ protected:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
