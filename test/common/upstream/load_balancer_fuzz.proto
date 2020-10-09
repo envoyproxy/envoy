@@ -14,6 +14,8 @@ message UpdateHealthFlags {
   uint32 num_healthy_hosts = 2;
   uint32 num_degraded_hosts = 3;
   uint32 num_excluded_hosts = 4;
+  // This is used to determine which hosts get marked as healthy, degraded, and excluded.
+  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 1, max_len: 256}];
 }
 
 message LbAction {

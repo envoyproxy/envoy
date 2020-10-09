@@ -11,8 +11,8 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(uint32_t num_hosts_in_host_s
                  num_hosts_in_host_set);
   MockHostSet& host_set = *priority_set_.getMockHostSet(index_of_host_set);
   uint32_t hosts_made = 0;
-  // Cap each host set at 250 hosts for efficiency
-  uint32_t max_num_hosts_in_host_set = 250;
+  // Cap each host set at 256 hosts for efficiency
+  uint32_t max_num_hosts_in_host_set = 256;
   // Leave port clause in for future changes
   while (hosts_made < std::min(num_hosts_in_host_set, max_num_hosts_in_host_set) && port_ < 65535) {
     host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port_)));
@@ -25,7 +25,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(uint32_t num_hosts_in_host_s
 // Initializes random and fixed host sets
 void LoadBalancerFuzzBase::initializeLbComponents(
     const test::common::upstream::LoadBalancerTestCase& input) {
-  random_.initialize(input.seed_for_prng());
+  random_.initializeSeed(input.seed_for_prng());
   uint8_t index_of_host_set = 0;
   for (uint16_t num_hosts_in_host_set : input.num_hosts_in_host_set()) {
     initializeASingleHostSet(num_hosts_in_host_set, index_of_host_set);
@@ -40,7 +40,8 @@ void LoadBalancerFuzzBase::initializeLbComponents(
 void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(uint64_t host_index,
                                                         uint32_t num_healthy_hosts,
                                                         uint32_t num_degraded_hosts,
-                                                        uint32_t num_excluded_hosts) {
+                                                        uint32_t num_excluded_hosts,
+                                                        std::string random_bytestring) {
   uint8_t index_of_host_set = host_index % num_host_sets_;
   ENVOY_LOG_MISC(trace, "Updating health flags for host set: {}", index_of_host_set);
   MockHostSet& host_set = *priority_set_.getMockHostSet(index_of_host_set);
@@ -49,42 +50,28 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(uint64_t host_index,
   host_set.healthy_hosts_.clear();
   host_set.degraded_hosts_.clear();
   host_set.excluded_hosts_.clear();
-  // The vector constructed here represents remaining indexes, an index will randomly get chosen
-  // from here every time and removed. Thus, this represents the remaining indexes. When this goes
-  // to zero, there will be no more indexes left to place into healthy, degraded, and excluded
-  // hosts.
-  ENVOY_LOG_MISC(trace, "Host set size: {}", host_set_size);
-  std::vector<uint8_t> index_vector;
-  index_vector.reserve(host_set_size);
-  for (uint8_t i = 0; i < host_set_size; i++) {
-    index_vector.push_back(i);
-  }
 
-  for (uint32_t i = 0; i < num_healthy_hosts && index_vector.size() != 0; i++) {
-    uint64_t index_of_index_vector = random_.random() % index_vector.size();
-    uint64_t index = index_vector.at(index_of_index_vector);
-    ENVOY_LOG_MISC(trace, "Added host {} to healthy hosts for host set {}", index,
-                   index_of_host_set);
+  Fuzz::ProperSubsetSelector subset_selector(random_bytestring);
+
+  std::vector<std::vector<uint8_t>> subsets = subset_selector.constructSubsets(
+      3, {num_healthy_hosts, num_degraded_hosts, num_excluded_hosts}, host_set_size);
+
+  // Healthy hosts are first subset
+  for (uint8_t index : subsets.at(0)) {
     host_set.healthy_hosts_.push_back(host_set.hosts_[index]);
-    index_vector.erase(index_vector.begin() + index_of_index_vector);
+    ENVOY_LOG_MISC(trace, "Index of host made healthy: {}", index);
   }
 
-  for (uint32_t i = 0; i < num_degraded_hosts && index_vector.size() != 0; i++) {
-    uint64_t index_of_index_vector = random_.random() % index_vector.size();
-    uint64_t index = index_vector.at(index_of_index_vector);
-    ENVOY_LOG_MISC(trace, "Added host {} to degraded hosts for host set {}", index,
-                   index_of_host_set);
+  // Degraded hosts are second subset
+  for (uint8_t index : subsets.at(1)) {
     host_set.degraded_hosts_.push_back(host_set.hosts_[index]);
-    index_vector.erase(index_vector.begin() + index_of_index_vector);
+    ENVOY_LOG_MISC(trace, "Index of host made degraded: {}", index);
   }
 
-  for (uint32_t i = 0; i < num_excluded_hosts && index_vector.size() != 0; i++) {
-    uint64_t index_of_index_vector = random_.random() % index_vector.size();
-    uint64_t index = index_vector.at(index_of_index_vector);
-    ENVOY_LOG_MISC(trace, "Added host {} to excluded hosts for host set {}", index,
-                   index_of_host_set);
+  // Excluded hosts are third subset
+  for (uint8_t index : subsets.at(1)) {
     host_set.excluded_hosts_.push_back(host_set.hosts_[index]);
-    index_vector.erase(index_vector.begin() + index_of_index_vector);
+    ENVOY_LOG_MISC(trace, "Index of host made excluded: {}", index);
   }
 
   host_set.runCallbacks({}, {});
@@ -111,7 +98,8 @@ void LoadBalancerFuzzBase::replay(
       updateHealthFlagsForAHostSet(event.update_health_flags().host_index(),
                                    event.update_health_flags().num_healthy_hosts(),
                                    event.update_health_flags().num_degraded_hosts(),
-                                   event.update_health_flags().num_excluded_hosts());
+                                   event.update_health_flags().num_excluded_hosts(),
+                                   event.update_health_flags().random_bytestring());
       break;
     }
     case test::common::upstream::LbAction::kPrefetch:

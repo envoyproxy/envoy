@@ -6,6 +6,7 @@ actions {
     update_health_flags {
         host_index: 0
         num_healthy_hosts: 2
+        random_bytestring: "\x01\x02"
     }
 }
 actions {

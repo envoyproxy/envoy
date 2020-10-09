@@ -20,6 +20,7 @@ load_balancer_test_case {
   actions {
     update_health_flags {
       num_excluded_hosts: 268435456
+      random_bytestring: "\x01\x02"
     }
   }
   num_hosts_in_host_set: 2063625226

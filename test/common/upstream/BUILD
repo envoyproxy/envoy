@@ -250,6 +250,7 @@ envoy_cc_test_library(
         ":load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         "//source/common/upstream:load_balancer_lib",
+        "//test/fuzz:random_lib",
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",

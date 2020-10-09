@@ -5,8 +5,8 @@ common_lb_config {
 actions {
     update_health_flags {
         host_index: 0
-        num_healthy_hosts: 2
-        random_bytestring: "\x01\x02\x03\x04"
+        num_healthy_hosts: 256
+        random_bytestring: "\x01\x02\x03\x04\x45\x80"
     }
 }
 actions {
@@ -29,7 +29,7 @@ actions {
 
     }
 }
-num_hosts_in_priority_set: 32726
-num_hosts_in_failover_set: 32726
-seed_for_prng: 88
+num_hosts_in_host_set: 256
+num_hosts_in_host_set: 256
+seed_for_prng: 4
 }
