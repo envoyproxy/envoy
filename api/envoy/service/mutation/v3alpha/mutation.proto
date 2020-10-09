@@ -70,7 +70,7 @@ message MutationRequest {
 
     // Information about the HTTP request, sent when the decodeHeaders callback
     // is invoked on the Envoy filter.
-    auth.v3.AttributeContext request = 2;
+    Request request = 2;
 
     // Information about the HTTP response, sent when the encodeHeaders callback
     // is invoked on the Envoy filter.
@@ -95,7 +95,7 @@ message MutationRequest {
 
 // The mutation server may respond with zero or more of these responses
 // before closing the stream.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message MutationResponse {
   enum Command {
     // The server is done with the request and response, and no further
@@ -167,11 +167,48 @@ message MutationResponse {
 
   // Add new metadata to the Envoy context
   google.protobuf.Struct new_metadata = 6;
+
+  // Change how and if the filter waits for responses from the server
+  ProcessingModeChange async_mode_change = 7;
 }
 
-// This message is sent downstream to the server when the HTTP response has been
+// This message is sent to the mutation server when the HTTP request is
+// first received.
+// [#next-free-field: 9]
+message Request {
+  // A unique ID that will match the one sent in the "Response" message
+  string id = 1;
+
+  // The HTTP request method, such as `GET`, `POST`.
+  string method = 2;
+
+  // The HTTP request headers. If multiple headers share the same key, they
+  // must be merged according to the HTTP spec. All header keys must be
+  // lower-cased, because HTTP header keys are case-insensitive.
+  config.core.v3.HeaderMap headers = 3;
+
+  // The request target, as it appears in the first line of the HTTP request. This includes
+  // the URL path and query-string. No decoding is performed.
+  string path = 4;
+
+  // The HTTP request `Host` or 'Authority` header value.
+  string host = 5;
+
+  // The HTTP URL scheme, such as `http` and `https`.
+  string scheme = 6;
+
+  // Information about the upstream service's connection
+  auth.v3.AttributeContext.Peer client_info = 7;
+
+  // The values of properties selected by the "request_properties"
+  // list in the configuration. Each entry in the map is the
+  // value of the specified property.
+  map<string, google.protobuf.Struct> properties = 8;
+}
+
+// This message is sent to the mutation server when the HTTP response is first
 // received.
-// [#next-free-field: 7]
+// [#next-free-field: 6]
 message Response {
   // A unique ID that will match the one sent in the "Request" message
   string id = 1;
@@ -182,15 +219,13 @@ message Response {
   // The HTTP headers
   config.core.v3.HeaderMap headers = 3;
 
-  // If the filter was configured to send metadata,
-  // then it's set here.
-  google.protobuf.Struct metadata = 4;
-
   // Information about the upstream service's connection
-  auth.v3.AttributeContext.Peer destination_info = 5;
+  auth.v3.AttributeContext.Peer destination_info = 4;
 
-  // Change how and if the filter waits for responses from the server
-  ProcessingModeChange async_mode_change = 6;
+  // The values of properties selected by the "response_properties"
+  // list in the configuration. Each entry in the map is the
+  // value of the specified property.
+  map<string, google.protobuf.Struct> properties = 5;
 }
 
 // This message contains the message body that Envoy sends to the mutation service.

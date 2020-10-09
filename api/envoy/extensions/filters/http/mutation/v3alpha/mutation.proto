@@ -64,13 +64,14 @@ message Mutation {
   // Otherwise, return a 500 error if the gRPC call fails.
   bool failure_mode_allow = 3;
 
-  // If present, then select namespace keys from the dynamic metadata
-  // to send the server along with the request message.
-  repeated string request_metadata_context_namespaces = 4;
+  // For each property name, select a matching property value to attach to the
+  // request message. Property names are the same ones supported in the WebAssembly
+  // runtime.
+  repeated string request_properties = 4;
 
-  // If present, then select namespace keys from the dynamic metadata
-  // to send the server along with the response message.
-  repeated string response_metadata_context_namespaces = 5;
+  // For each property name, select a matching property value to attach to the
+  // response message.
+  repeated string response_properties = 5;
 
   // Specifies whether the filter waits for a response from the server after
   // sending each part of the HTTP request and response data. By default,
