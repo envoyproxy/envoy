@@ -20,7 +20,7 @@ Building and installation
 .. toctree::
     :maxdepth: 2
 
-    install/building
+    building
     install/ref_configs
     install/tools/tools
 
