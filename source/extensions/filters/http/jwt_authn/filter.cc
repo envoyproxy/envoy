@@ -27,13 +27,9 @@ bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
          !headers.getInlineValue(access_control_request_method_handle.handle()).empty();
 }
 
+// The prefix used in the response code detail sent from jwt authn filter.
+constexpr absl::string_view kRcDetailJwtAuthnPrefix = "jwt_authn_access_denied";
 } // namespace
-
-struct RcDetailsValues {
-  // The jwt_authn filter rejected the request
-  const std::string JwtAuthnAccessDenied = "jwt_authn_access_denied";
-};
-using RcDetails = ConstSingleton<RcDetailsValues>;
 
 Filter::Filter(FilterConfigSharedPtr config)
     : stats_(config->stats()), config_(std::move(config)) {}
@@ -83,7 +79,7 @@ void Filter::setPayload(const ProtobufWkt::Struct& payload) {
 }
 
 void Filter::onComplete(const Status& status) {
-  ENVOY_LOG(debug, "Called Filter : check complete {}",
+  ENVOY_LOG(debug, "Jwt authentication completed with: {}",
             ::google::jwt_verify::getStatusString(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
@@ -96,8 +92,10 @@ void Filter::onComplete(const Status& status) {
     Http::Code code =
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
-    decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
-                                       absl::nullopt, RcDetails::get().JwtAuthnAccessDenied);
+    decoder_callbacks_->sendLocalReply(
+        code, ::google::jwt_verify::getStatusString(status), nullptr, absl::nullopt,
+        absl::StrCat(kRcDetailJwtAuthnPrefix, "{", ::google::jwt_verify::getStatusString(status),
+                     "}"));
     return;
   }
   stats_.allowed_.inc();
