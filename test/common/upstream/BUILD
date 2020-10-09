@@ -280,7 +280,7 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "random_load_balancer_fuzz_test",
     srcs = ["random_load_balancer_fuzz_test.cc"],
-    corpus = "//test/common/upstream:load_balancer_corpus",
+    corpus = "//test/common/upstream:random_load_balancer_corpus",
     deps = [
         ":load_balancer_fuzz_lib",
         ":load_balancer_fuzz_proto_cc_proto",
