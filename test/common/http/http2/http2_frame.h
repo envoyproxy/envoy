@@ -132,6 +132,9 @@ public:
   static Http2Frame makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
                                                           absl::string_view host,
                                                           absl::string_view path);
+  static Http2Frame makeMalformedRequestWithMissingHeaders(uint32_t stream_index, bool method,
+                                                           absl::string_view host,
+                                                           absl::string_view path);
   static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
                                 absl::string_view path);
   static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,

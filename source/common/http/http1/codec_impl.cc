@@ -378,13 +378,11 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   const HeaderEntry* host = headers.Host();
   bool is_connect = HeaderUtility::isConnect(headers);
 
-  // TODO(#10878): Include missing host header for CONNECT.
-  // The RELEASE_ASSERT below does not change the existing behavior of `encodeHeaders`.
-  // The `encodeHeaders` used to throw on errors. Callers of `encodeHeaders()` do not catch
-  // exceptions and this would cause abnormal process termination in error cases. This change
-  // replaces abnormal process termination from unhandled exception with the RELEASE_ASSERT. Further
-  // work will replace this RELEASE_ASSERT with proper error handling.
-  RELEASE_ASSERT(method && (path || is_connect), ":method and :path must be specified");
+  // Headers must be present. This would only happen from downstream traffic (in which case
+  // downstream codecs would reject) or a faulty filter (in which case the router would reject).
+  ASSERT(method, ":method must be specified.");
+  ASSERT(path || is_connect, "path must be specified");
+  ASSERT(host || !is_connect, "host must be specified for a CONNECT request");
 
   if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
@@ -398,7 +396,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
 
   connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
-  if (is_connect) {
+  if (is_connect) { // Maybe add && host?
     connection_.copyToBuffer(host->value().getStringView().data(), host->value().size());
   } else {
     connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());

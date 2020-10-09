@@ -27,6 +27,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/upstream_request.h"
@@ -120,6 +121,12 @@ public:
       return r;
     }
   };
+
+  /* Does a common header check ensuring required headers are present before request headers are
+   * forwarded. This will only fail if configured filters erroneously removes required headers.
+   * @return Status containing the result along with a message if false.
+   */
+  static Http::Status checkHeaderMap(const Http::RequestHeaderMap& headers);
 
   /**
    * Returns response_time / timeout, as a  percentage as [0, 100]. Returns 0

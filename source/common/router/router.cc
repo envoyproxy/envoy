@@ -263,6 +263,23 @@ FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+Http::Status FilterUtility::checkHeaderMap(const Http::RequestHeaderMap& headers) {
+  if (!headers.Method()) {
+    // Must have a method header.
+    return absl::InvalidArgumentError(Envoy::Http::Headers::get().Method.get());
+  }
+  bool is_connect = Http::HeaderUtility::isConnect(headers);
+  if (!headers.Path() && !is_connect) {
+    // Must have a path header unless it is a CONNECT request.
+    return absl::InvalidArgumentError(Envoy::Http::Headers::get().Path.get());
+  }
+  if (!headers.Host() && is_connect) {
+    // Must have a host header with a CONNECT request.
+    return absl::InvalidArgumentError(Envoy::Http::Headers::get().Host.get());
+  }
+  return Http::okStatus();
+}
+
 Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
   return upstream_host ? upstream_host->localityZoneStatName() : config_.empty_stat_name_;
 }
@@ -329,10 +346,19 @@ void Filter::chargeUpstreamCode(Http::Code code,
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
-  // These get stripped by HTTP/1 codec where applicable.
-  ASSERT(headers.Method());
-  ASSERT(headers.Host());
+  // Do a common header check for minimum constraints. We make sure that all outgoing requests have
+  // all HTTP/2 headers.
+  const auto header_status = FilterUtility::checkHeaderMap(headers);
+  if (!header_status.ok()) {
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    ENVOY_LOG_MISC(info, "HEADER STATUS MESSAGE {}", header_status.message());
+    const std::string body = fmt::format("missing required header: {}", header_status.message());
+    const std::string details = absl::StrCat(StreamInfo::ResponseCodeDetails::get().DirectResponse,
+                                             "{", header_status.message(), "}");
+    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, body, nullptr, absl::nullopt,
+                               details);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
 
   downstream_headers_ = &headers;
 

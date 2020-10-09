@@ -333,6 +333,57 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
             response->headers().get(Http::LowerCaseString("host"))->value().getStringView());
 }
 
+// Tests missing headers needed for H/1 codec first line.
+// Missing first line headers can either occur from bad requests, or from a faulty filter.
+TEST_P(ProtocolIntegrationTest, Http1DownstreamRequestWithMissingHeaders) {
+  std::function<void(absl::string_view, absl::string_view, absl::string_view)>
+      sendRequestAndExpectResponse = [this](absl::string_view request,
+                                            absl::string_view expected_response,
+                                            absl::string_view expected_body) {
+        std::string response;
+        sendRawHttpAndWaitForResponse(lookupPort("http"), request.data(), &response, true);
+        EXPECT_THAT(response, HasSubstr(expected_response));
+        if (!expected_body.empty()) {
+          EXPECT_THAT(response, HasSubstr(expected_body));
+        }
+      };
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                             "type.googleapis.com/google.protobuf.Empty } }");
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          // Clone the whole listener.
+          auto static_resources = bootstrap.mutable_static_resources();
+          auto* old_listener = static_resources->mutable_listeners(0);
+          auto* cloned_listener = static_resources->add_listeners();
+          cloned_listener->CopyFrom(*old_listener);
+          old_listener->set_name("http_forward");
+        });
+    initialize();
+    // Faulty downstream traffic.
+    sendRequestAndExpectResponse("/ HTTP/1.1\r\nHost: host\r\n\r\n", "HTTP/1.1 400 Bad Request\r\n",
+                                 "");
+    sendRequestAndExpectResponse("GET   HTTP/1.1\r\nHost: host\r\n\r\n",
+                                 "HTTP/1.1 400 Bad Request\r\n", "");
+    sendRequestAndExpectResponse("CONNECT   HTTP/1.1\r\nHost: host\r\n\r\n",
+                                 "HTTP/1.1 400 Bad Request\r\n", "");
+    // Faulty filter code.
+    sendRequestAndExpectResponse("GET / HTTP/1.1\r\nHost: host\r\nremove-method: yes\r\n\r\n",
+                                 "HTTP/1.1 503 Service Unavailable\r\n",
+                                 "missing required header: :method");
+    sendRequestAndExpectResponse("GET / HTTP/1.1\r\nHost: host\r\nremove-path: yes\r\n\r\n",
+                                 "HTTP/1.1 503 Service Unavailable\r\n",
+                                 "missing required header: :path");
+    sendRequestAndExpectResponse("CONNECT www.host.com:80 HTTP/1.1\r\n\r\n",
+                                 "HTTP/1.1 503 Service Unavailable\r\n",
+                                 "missing required header: :authority");
+  }
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
 TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
   // Header with at least 20kb of spaces surrounded by non-whitespace characters to ensure that
