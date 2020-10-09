@@ -412,6 +412,11 @@ elif [[ "$CI_TARGET" == "docs" ]]; then
   # Build docs.
   docs/build.sh
   exit 0
+elif [[ "$CI_TARGET" == "docs-redirects" ]]; then
+  echo "checking redirects in docs..."
+  export SPHINX_BUILDER=rediraffecheckdiff
+  docs/build.sh
+  exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   echo "verify examples..."
   docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"

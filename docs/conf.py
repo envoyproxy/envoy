@@ -276,7 +276,5 @@ html_style = 'css/envoy.css'
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'envoydoc'
 
-# TODO(phlax): add redirect diff (`rediraffe_branch` setting)
-#  - not sure how diffing will work with master merging in PRs - might need
-#    to be injected dynamically, somehow
 rediraffe_redirects = "redirects.txt"
+rediraffe_branch = "master~1"

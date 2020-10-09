@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+SPHINX_BUILDER="${SPHINX_BUILDER:-html}"
+
 # set SPHINX_SKIP_CONFIG_VALIDATION environment variable to true to skip
 # validation of configuration examples
 
@@ -149,4 +151,4 @@ rsync -av \
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
 
-sphinx-build -W --keep-going -b html "${GENERATED_RST_DIR}" "${DOCS_OUTPUT_DIR}"
+sphinx-build -W --keep-going -b "${SPHINX_BUILDER}" "${GENERATED_RST_DIR}" "${DOCS_OUTPUT_DIR}"
