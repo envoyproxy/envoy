@@ -315,8 +315,13 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointWrongResponseTcp) {
   const uint32_t cluster_idx = 0;
   initTcpHealthCheck(cluster_idx);
 
+  // Send the wrong reply ("Pong" is expected).
   AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Poong");
   RELEASE_ASSERT(result, result.message());
+
+  // Envoy will wait until timeout occurs because no correct reply was received.
+  // Increase time until timeout (30s).
+  timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
@@ -332,6 +337,9 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
 
   const uint32_t cluster_idx = 0;
   initTcpHealthCheck(cluster_idx);
+
+  // Increase time until timeout (30s).
+  timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
