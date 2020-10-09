@@ -179,7 +179,8 @@ TEST_F(FilterTest, InlineUnauthorizedFailure) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
-  EXPECT_EQ("jwt_authn_access_denied", filter_callbacks_.details());
+  EXPECT_EQ(filter_callbacks_.details(), "jwt_authn_access_denied{Jwt is not in the form of "
+                                         "Header.Payload.Signature with two dots and 3 sections}");
 }
 
 // This test verifies Verifier::Callback is called inline with a failure(403 Forbidden) status.
@@ -200,7 +201,8 @@ TEST_F(FilterTest, InlineForbiddenFailure) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
-  EXPECT_EQ("jwt_authn_access_denied", filter_callbacks_.details());
+  EXPECT_EQ(filter_callbacks_.details(),
+            "jwt_authn_access_denied{Audiences in Jwt are not allowed}");
 }
 
 // This test verifies Verifier::Callback is called with OK status after verify().
