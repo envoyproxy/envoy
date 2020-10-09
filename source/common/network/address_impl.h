@@ -255,7 +255,7 @@ public:
   /**
    * Construct from a string name.
    */
-  explicit EnvoyInternalInstance(const std::string& envoy_listener_name,
+  explicit EnvoyInternalInstance(const std::string& address_id,
                                  const SocketInterface* sock_interface = nullptr);
 
   // Network::Address::Instance

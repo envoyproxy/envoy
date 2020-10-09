@@ -18,9 +18,9 @@ namespace Config {
 
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-    Upstream::ClusterManager& cm, Random::RandomGenerator& random,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api, Runtime::Loader& runtime)
-    : local_info_(local_info), dispatcher_(dispatcher), cm_(cm), random_(random),
+    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+    Api::Api& api, Runtime::Loader& runtime)
+    : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), runtime_(runtime) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
@@ -30,12 +30,13 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
+  auto& runtime_snapshot = runtime_.snapshot();
 
   const auto transport_api_version = config.api_config_source().transport_api_version();
   if (transport_api_version == envoy::config::core::v3::ApiVersion::V2 &&
-      runtime_.snapshot().runtimeFeatureEnabled(
+      runtime_snapshot.runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_deprecated_v2_api_warning")) {
-    runtime_.snapshot().countDeprecatedFeatureUse();
+    runtime_.countDeprecatedFeatureUse();
     ENVOY_LOG(warn,
               "xDS of version v2 has been deprecated and will be removed in subsequent versions");
   }
@@ -59,8 +60,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           config.DebugString());
     case envoy::config::core::v3::ApiConfigSource::REST:
       return std::make_unique<HttpSubscriptionImpl>(
-          local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_, random_,
-          Utility::apiConfigSourceRefreshDelay(api_config_source),
+          local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_,
+          api_.randomGenerator(), Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source),
           restMethod(type_url, api_config_source.transport_api_version()), type_url,
           api_config_source.transport_api_version(), callbacks, resource_decoder, stats,
@@ -73,7 +74,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                      api_config_source, scope, true)
                   ->create(),
               dispatcher_, sotwGrpcMethod(type_url, api_config_source.transport_api_version()),
-              api_config_source.transport_api_version(), random_, scope,
+              api_config_source.transport_api_version(), api_.randomGenerator(), scope,
               Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -86,7 +87,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                              api_config_source, scope, true)
                   ->create(),
               dispatcher_, deltaGrpcMethod(type_url, api_config_source.transport_api_version()),
-              api_config_source.transport_api_version(), random_, scope,
+              api_config_source.transport_api_version(), api_.randomGenerator(), scope,
               Utility::parseRateLimitSettings(api_config_source), local_info_),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), false);

@@ -25,6 +25,7 @@ Server related statistics are rooted at *server.* with following statistics:
   total_connections, Gauge, Total connections of both new and old Envoy processes
   version, Gauge, Integer represented version number based on SCM revision or :ref:`stats_server_version_override <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_server_version_override>` if set.
   days_until_first_cert_expiring, Gauge, Number of days until the next certificate being managed will expire
+  seconds_until_first_ocsp_response_expiring, Gauge, Number of seconds until the next OCSP response being managed will expire
   hot_restart_epoch, Gauge, Current hot restart epoch -- an integer passed via command line flag `--restart-epoch` usually indicating generation.
   hot_restart_generation, Gauge, Current hot restart generation -- like hot_restart_epoch but computed automatically by incrementing from parent.
   initialization_time_ms, Histogram, Total time taken for Envoy initialization in milliseconds. This is the time from server start-up until the worker threads are ready to accept new connections

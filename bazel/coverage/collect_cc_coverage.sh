@@ -41,6 +41,8 @@
 # gcda or profraw) and uses either lcov or gcov to get the coverage data.
 # The coverage data is placed in $COVERAGE_OUTPUT_FILE.
 
+read -ra COVERAGE_GCOV_OPTIONS <<< "${COVERAGE_GCOV_OPTIONS:-}"
+
 # Checks if clang llvm coverage should be used instead of lcov.
 function uses_llvm() {
   if stat "${COVERAGE_DIR}"/*.profraw >/dev/null 2>&1; then
@@ -68,24 +70,24 @@ function init_gcov() {
 # $COVERAGE_DIR.
 # Writes the collected coverage into the given output file.
 function llvm_coverage() {
-  local output_file="${1}"; shift
+  local output_file="${1}" object_file object_files object_param=()
+  shift
   export LLVM_PROFILE_FILE="${COVERAGE_DIR}/%h-%p-%m.profraw"
   "${COVERAGE_GCOV_PATH}" merge -output "${output_file}.data" \
       "${COVERAGE_DIR}"/*.profraw
 
 
-  local object_files="$(find -L "${RUNFILES_DIR}" -type f -exec file -L {} \; \
+  object_files="$(find -L "${RUNFILES_DIR}" -type f -exec file -L {} \; \
        | grep ELF | grep -v "LSB core" | sed 's,:.*,,')"
-  
-  local object_param=""
+
   for object_file in ${object_files}; do
-    object_param+=" -object ${object_file}"
+    object_param+=(-object "${object_file}")
   done
 
   llvm-cov export -instr-profile "${output_file}.data" -format=lcov \
       -ignore-filename-regex='.*external/.+' \
       -ignore-filename-regex='/tmp/.+' \
-      ${object_param} | sed 's#/proc/self/cwd/##' > "${output_file}"
+      "${object_param[@]}" | sed 's#/proc/self/cwd/##' > "${output_file}"
 }
 
 # Generates a code coverage report in gcov intermediate text format by invoking
@@ -97,17 +99,15 @@ function llvm_coverage() {
 # - output_file     The location of the file where the generated code coverage
 #                   report is written.
 function gcov_coverage() {
-  local output_file="${1}"; shift
-
-  # We'll save the standard output of each the gcov command in this log.
-  local gcov_log="$output_file.gcov.log"
+  local gcda gcno_path line output_file="${1}"
+  shift
 
   # Copy .gcno files next to their corresponding .gcda files in $COVERAGE_DIR
   # because gcov expects them to be in the same directory.
   while read -r line; do
     if [[ ${line: -4} == "gcno" ]]; then
       gcno_path=${line}
-      local gcda="${COVERAGE_DIR}/$(dirname ${gcno_path})/$(basename ${gcno_path} .gcno).gcda"
+      gcda="${COVERAGE_DIR}/$(dirname "${gcno_path}")/$(basename "${gcno_path}" .gcno).gcda"
       # If the gcda file was not found we skip generating coverage from the gcno
       # file.
       if [[ -f "$gcda" ]]; then
@@ -115,7 +115,7 @@ function gcov_coverage() {
           # We overcome this by copying the gcno to $COVERAGE_DIR where the gcda
           # files are expected to be.
           if [ ! -f "${COVERAGE_DIR}/${gcno_path}" ]; then
-              mkdir -p "${COVERAGE_DIR}/$(dirname ${gcno_path})"
+              mkdir -p "${COVERAGE_DIR}/$(dirname "${gcno_path}")"
               cp "$ROOT/${gcno_path}" "${COVERAGE_DIR}/${gcno_path}"
           fi
           # Invoke gcov to generate a code coverage report with the flags:
@@ -134,12 +134,12 @@ function gcov_coverage() {
           # Don't generate branch coverage (-b) because of a gcov issue that
           # segfaults when both -i and -b are used (see
           # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84879).
-          "${GCOV}" -i $COVERAGE_GCOV_OPTIONS -o "$(dirname ${gcda})" "${gcda}"
+          "${GCOV}" -i "${COVERAGE_GCOV_OPTIONS[@]}" -o "$(dirname "${gcda}")" "${gcda}"
 
           # Append all .gcov files in the current directory to the output file.
-          cat *.gcov >> "$output_file"
+          cat ./*.gcov >> "$output_file"
           # Delete the .gcov files.
-          rm *.gcov
+          rm ./*.gcov
       fi
     fi
   done < "${COVERAGE_MANIFEST}"

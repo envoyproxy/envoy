@@ -28,7 +28,6 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
   }
 
   auto domain = io_handle_->domain();
-
   // This should never happen in practice but too many tests inject fake fds ...
   if (!domain.has_value()) {
     return;

@@ -38,6 +38,7 @@
     "zxh404.vscode-proto3",
     "bazelbuild.vscode-bazel",
     "llvm-vs-code-extensions.vscode-clangd",
+    "vadimcn.vscode-lldb",
     "webfreak.debug",
     "ms-python.python"
   ]

@@ -6,6 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_uri.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 13]
+// [#next-free-field: 15]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -103,6 +104,10 @@ message ExtAuthz {
   // If this field is not specified, the filter will be enabled for all requests.
   config.core.v3.RuntimeFractionalPercent filter_enabled = 9;
 
+  // Specifies if the filter is enabled with metadata matcher.
+  // If this field is not specified, the filter will be enabled for all requests.
+  type.matcher.v3.MetadataMatcher filter_enabled_metadata = 14;
+
   // Specifies whether to deny the requests, when the filter is disabled.
   // If :ref:`runtime_key <envoy_api_field_config.core.v3.RuntimeFeatureFlag.runtime_key>` is specified,
   // Envoy will lookup the runtime key to determine whether to deny request for
@@ -117,6 +122,23 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  // Optional additional prefix to use when emitting statistics. This allows to distinguish
+  // emitted statistics between configured *ext_authz* filters in an HTTP filter chain. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_filters:
+  //     - name: envoy.filters.http.ext_authz
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+  //         stat_prefix: waf # This emits ext_authz.waf.ok, ext_authz.waf.denied, etc.
+  //     - name: envoy.filters.http.ext_authz
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+  //         stat_prefix: blocker # This emits ext_authz.blocker.ok, ext_authz.blocker.denied, etc.
+  //
+  string stat_prefix = 13;
 }
 
 // Configuration for buffering the request data.
@@ -134,6 +156,13 @@ message BufferSettings {
   // The authorization request will be dispatched and no 413 HTTP error will be returned by the
   // filter.
   bool allow_partial_message = 2;
+
+  // If true, the body sent to the external authorization service is set with raw bytes, it sets
+  // the :ref:`raw_body<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>`
+  // field of HTTP request attribute context. Otherwise, :ref:`
+  // body<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` will be filled
+  // with UTF-8 string request body.
+  bool pack_as_bytes = 3;
 }
 
 // HttpService is used for raw HTTP communication between the filter and the authorization service.
@@ -243,17 +272,19 @@ message ExtAuthzPerRoute {
   }
 }
 
-// Extra settings for the check request. You can use this to provide extra context for the
-// external authorization server on specific virtual hosts \ routes. For example, adding a context
-// extension on the virtual host level can give the ext-authz server information on what virtual
-// host is used without needing to parse the host header. If CheckSettings is specified in multiple
-// per-filter-configs, they will be merged in order, and the result will be used.
+// Extra settings for the check request.
 message CheckSettings {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.CheckSettings";
 
   // Context extensions to set on the CheckRequest's
   // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v3.AttributeContext.context_extensions>`
+  //
+  // You can use this to provide extra context for the external authorization server on specific
+  // virtual hosts/routes. For example, adding a context extension on the virtual host level can
+  // give the ext-authz server information on what virtual host is used without needing to parse the
+  // host header. If CheckSettings is specified in multiple per-filter-configs, they will be merged
+  // in order, and the result will be used.
   //
   // Merge semantics for this field are such that keys from more specific configs override.
   //
@@ -262,4 +293,8 @@ message CheckSettings {
   //   These settings are only applied to a filter configured with a
   //   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1;
+
+  // When set to true, disable the configured :ref:`with_request_body
+  // <envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a route.
+  bool disable_request_body_buffering = 2;
 }

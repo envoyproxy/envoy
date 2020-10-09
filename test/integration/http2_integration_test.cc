@@ -12,6 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/socket_option_impl.h"
 
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -120,6 +121,34 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(70000, true);
   test_server_->waitForCounterEq("http2.tx_flush_timeout", 1);
+  response->waitForReset();
+}
+
+TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
+  constexpr uint64_t interval_ms = 1;
+  constexpr uint64_t timeout_ms = 250;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_http2_protocol_options()
+            ->mutable_connection_keepalive()
+            ->mutable_interval()
+            ->set_nanos(interval_ms * 1000 * 1000);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_connection_keepalive()
+            ->mutable_timeout()
+            ->set_nanos(timeout_ms * 1000 * 1000);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // This call is NOT running the event loop of the client, so downstream PINGs will
+  // not receive a response.
+  test_server_->waitForCounterEq("http2.keepalive_timeout", 1,
+                                 std::chrono::milliseconds(timeout_ms * 2));
+
   response->waitForReset();
 }
 
@@ -649,12 +678,6 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   EXPECT_EQ(upstream_request_->duplicatedMetadataKeyCount().find("metadata")->second, 6);
 }
 
-static std::string decode_headers_only = R"EOF(
-name: decode-headers-only
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
-)EOF";
-
 void Http2MetadataIntegrationTest::runHeaderOnlyTest(bool send_request_body, size_t body_size) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -696,28 +719,6 @@ void Http2MetadataIntegrationTest::verifyHeadersOnlyTest() {
   EXPECT_EQ(true, upstream_request_->receivedData());
   EXPECT_EQ(0, upstream_request_->bodyLength());
   EXPECT_EQ(true, upstream_request_->complete());
-}
-
-TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataEmptyData) {
-  addFilters({request_metadata_filter, decode_headers_only});
-
-  // Send a request with body, and body size is 0.
-  runHeaderOnlyTest(true, 0);
-  verifyHeadersOnlyTest();
-}
-
-TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataNoneEmptyData) {
-  addFilters({request_metadata_filter, decode_headers_only});
-  // Send a request with body, and body size is 128.
-  runHeaderOnlyTest(true, 128);
-  verifyHeadersOnlyTest();
-}
-
-TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataDiffFilterOrder) {
-  addFilters({decode_headers_only, request_metadata_filter});
-  // Send a request with body, and body size is 128.
-  runHeaderOnlyTest(true, 128);
-  verifyHeadersOnlyTest();
 }
 
 TEST_P(Http2MetadataIntegrationTest, HeadersOnlyRequestWithRequestMetadata) {
@@ -900,13 +901,14 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0);
-        route->mutable_route()->mutable_max_grpc_timeout()->set_seconds(60 * 60);
+        route->mutable_route()
+            ->mutable_max_stream_duration()
+            ->mutable_grpc_timeout_header_max()
+            ->set_seconds(60 * 60);
       });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  // With upstream request timeout Envoy should send a gRPC-Status "DEADLINE EXCEEDED".
-  // TODO: Properly map request timeout to "DEADLINE EXCEEDED" instead of "SERVICE UNAVAILABLE".
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
@@ -919,8 +921,9 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_NE(response->headers().GrpcStatus(), nullptr);
-  EXPECT_EQ("14", response->headers().getGrpcStatusValue()); // Service Unavailable
-  EXPECT_LT(0, test_server_->counter("cluster.cluster_0.upstream_rq_timeout")->value());
+  EXPECT_EQ("4", response->headers().getGrpcStatusValue()); // Deadline exceeded.
+  EXPECT_LT(0,
+            test_server_->counter("http.config_test.downstream_rq_max_duration_reached")->value());
 }
 
 // Interleave two requests and responses and make sure that idle timeout is handled correctly.
@@ -1295,8 +1298,7 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
 
 void Http2RingHashIntegrationTest::createUpstreams() {
   for (int i = 0; i < num_upstreams_; i++) {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
   }
 }
 
@@ -1592,7 +1594,7 @@ const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
 
-Http2FloodMitigationTest::Http2FloodMitigationTest() {
+SocketInterfaceSwap::SocketInterfaceSwap() {
   Envoy::Network::SocketInterfaceSingleton::clear();
   test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
       std::make_unique<Envoy::Network::TestSocketInterface>(
@@ -1606,14 +1608,17 @@ Http2FloodMitigationTest::Http2FloodMitigationTest() {
             }
             return absl::nullopt;
           }));
+}
+
+SocketInterfaceSwap::~SocketInterfaceSwap() {
+  test_socket_interface_loader_.reset();
+  Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
+}
+
+Http2FloodMitigationTest::Http2FloodMitigationTest() {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
-}
-
-Http2FloodMitigationTest::~Http2FloodMitigationTest() {
-  test_socket_interface_loader_.reset();
-  Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
 }
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
@@ -1675,14 +1680,14 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
                                            Http2Frame::ResponseStatus expected_http_status,
                                            const std::string& flood_stat, uint32_t num_frames) {
   uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(request_idx, host, path);
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx), host, path);
   sendFrame(request);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(expected_http_status, frame.responseStatus());
   writev_matcher_->setWritevReturnsEgain();
   for (uint32_t frame = 0; frame < num_frames; ++frame) {
-    request = Http2Frame::makeRequest(++request_idx, host, path);
+    request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(++request_idx), host, path);
     sendFrame(request);
   }
   tcp_client_->waitForDisconnect();
@@ -1691,6 +1696,43 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
   }
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_frame_count) {
+  // Set large buffer limits so the test is not affected by the flow control.
+  config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  beginSession();
+
+  // Do not read from the socket and send request that causes autonomous upstream to respond
+  // with the specified number of DATA frames. This pre-fills downstream outbound frame queue
+  // such the the next response triggers flood protection.
+  // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames
+  // start to accumulate in the transport socket buffer.
+  writev_matcher_->setWritevReturnsEgain();
+
+  const auto request = Http2Frame::makeRequest(
+      Http2Frame::makeClientStreamId(0), "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", absl::StrCat(data_frame_count)),
+       Http2Frame::Header("no_trailers", "0")});
+  sendFrame(request);
+
+  // Wait for some data to arrive and then wait for the upstream_rq_active to flip to 0 to indicate
+  // that the first request has completed.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 10000);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  // Verify that pre-fill did not trigger flood protection
+  EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
+}
+
+void Http2FloodMitigationTest::triggerListenerDrain() {
+  absl::Notification drain_sequence_started;
+  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
+    test_server_->drainManager().startDrainSequence([] {});
+    drain_sequence_started.Notify();
+  });
+  drain_sequence_started.WaitForNotification();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
@@ -1740,29 +1782,198 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // to accumulate in the transport socket buffer.
   writev_matcher_->setWritevReturnsEgain();
 
-  auto request = Http2Frame::makeRequest(0, "host", "/test/long/url",
-                                         {Http2Frame::Header("response_data_blocks", "1000")});
+  const auto request = Http2Frame::makeRequest(
+      1, "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", "1000"), Http2Frame::Header("no_trailers", "0")});
   sendFrame(request);
 
-  // Wait for 19077 bytes to arrive from upstream (1K DATA frames of size 10 + HEADERS frame)
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 19077);
+  // Wait for connection to be flooded with outbound DATA frames and disconnected.
+  tcp_client_->waitForDisconnect();
 
-  // If the server codec incorrectly thrown an exception on flood detection it would cause
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
   // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
   // connections.
   ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
   ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
-
-  // Server codec should be flooded. However it is not disconnected until client sends it
-  // some bytes. Verify that it is still connected and send 1 byte. Flood detection
-  // happens before data is parsed so it does not matter what is being sent.
-  ASSERT_TRUE(tcp_client_->connected());
-  ASSERT_TRUE(tcp_client_->write(std::string("a"), false, false));
-  // Now wait for client to be disconnected and verify it is due to flood checks.
-  tcp_client_->waitForDisconnect();
+  // Verify that the flood check was triggered
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+// Verify that the server can detect flood triggered by a DATA frame from a decoder filter call
+// to sendLocalReply().
+// This test also verifies that RELEASE_ASSERT in the ConnectionImpl::StreamImpl::encodeDataHelper()
+// is not fired when it is called by the sendLocalReply() in the dispatching context.
+TEST_P(Http2FloodMitigationTest, DataOverflowFromDecoderFilterSendLocalReply) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        const std::string yaml_string = R"EOF(
+name: send_local_reply_filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+  prefix: "/call_send_local_reply"
+  code: 404
+  body: "something"
+  )EOF";
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
+        // keep router the last
+        auto size = hcm.http_filters_size();
+        hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
+      });
+
+  // pre-fill 2 away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 2);
+
+  // At this point the outbound downstream frame queue should be 2 away from overflowing.
+  // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply with body.
+  // HEADERS + DATA frames should overflow the queue.
+  // Verify that connection was disconnected and appropriate counters were set.
+  auto request2 =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/call_send_local_reply");
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound DATA frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the upstream connection is still alive.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// Verify that the server can detect flood of response HEADERS frames
+TEST_P(Http2FloodMitigationTest, Headers) {
+  // pre-fill one away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+
+  // Send second request which should trigger headers only response.
+  // Verify that connection was disconnected and appropriate counters were set.
+  auto request2 = Http2Frame::makeRequest(
+      Http2Frame::makeClientStreamId(1), "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", "0"), Http2Frame::Header("no_trailers", "0")});
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound HEADERS frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
+  // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
+  // connections.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// Verify that the server can detect overflow by 100 continue response sent by Envoy itself
+TEST_P(Http2FloodMitigationTest, Envoy100ContinueHeaders) {
+  // pre-fill one away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+
+  // Send second request which should trigger Envoy to respond with 100 continue.
+  // Verify that connection was disconnected and appropriate counters were set.
+  auto request2 = Http2Frame::makeRequest(
+      Http2Frame::makeClientStreamId(1), "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", "0"), Http2Frame::Header("no_trailers", "0"),
+       Http2Frame::Header("expect", "100-continue")});
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound HEADERS frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
+  // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
+  // connections.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // The second upstream request should be reset since it is disconnected when sending 100 continue
+  // response
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_tx_reset")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// Verify that the server can detect flood triggered by a HEADERS frame from a decoder filter call
+// to sendLocalReply().
+// This test also verifies that RELEASE_ASSERT in the
+// ConnectionImpl::StreamImpl::encodeHeadersBase() is not fired when it is called by the
+// sendLocalReply() in the dispatching context.
+TEST_P(Http2FloodMitigationTest, HeadersOverflowFromDecoderFilterSendLocalReply) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        const std::string yaml_string = R"EOF(
+name: send_local_reply_filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+  prefix: "/call_send_local_reply"
+  code: 404
+  )EOF";
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
+        // keep router the last
+        auto size = hcm.http_filters_size();
+        hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
+      });
+
+  // pre-fill one away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+
+  // At this point the outbound downstream frame queue should be 1 away from overflowing.
+  // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply without body.
+  // Verify that connection was disconnected and appropriate counters were set.
+  auto request2 =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/call_send_local_reply");
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound HEADERS frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the upstream connection is still alive.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// TODO(yanavlasov): add the same tests as above for the encoder filters.
+// This is currently blocked by the https://github.com/envoyproxy/envoy/pull/13256
+
+// Verify that the server can detect flood of response trailers.
+TEST_P(Http2FloodMitigationTest, Trailers) {
+  // Set large buffer limits so the test is not affected by the flow control.
+  config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  beginSession();
+
+  // Do not read from the socket and send request that causes autonomous upstream
+  // to respond with 999 DATA frames and trailers. The Http2FloodMitigationTest::beginSession()
+  // sets 1000 flood limit for all frame types. Including 1 HEADERS response frame
+  // 999 DATA frames and trailers should trigger flood protection.
+  // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
+  // to accumulate in the transport socket buffer.
+  writev_matcher_->setWritevReturnsEgain();
+
+  static_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseTrailers(std::make_unique<Http::TestResponseTrailerMapImpl>(
+          Http::TestResponseTrailerMapImpl({{"foo", "bar"}})));
+
+  const auto request =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(0), "host", "/test/long/url",
+                              {Http2Frame::Header("response_data_blocks", "999")});
+  sendFrame(request);
+
+  // Wait for connection to be flooded with outbound trailers and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
+  // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
+  // connections.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
 }
 
 // Verify that the server can detect flood of RST_STREAM frames.
@@ -1778,7 +1989,8 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   beginSession();
 
   uint32_t stream_index = 0;
-  auto request = Http::Http2::Http2Frame::makeMalformedRequest(stream_index);
+  auto request =
+      Http::Http2::Http2Frame::makeMalformedRequest(Http2Frame::makeClientStreamId(stream_index));
   sendFrame(request);
   auto response = readFrame();
   // Make sure we've got RST_STREAM from the server
@@ -1789,13 +2001,154 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   writev_matcher_->setWritevReturnsEgain();
 
   for (++stream_index; stream_index < ControlFrameFloodLimit + 2; ++stream_index) {
-    request = Http::Http2::Http2Frame::makeMalformedRequest(stream_index);
+    request =
+        Http::Http2::Http2Frame::makeMalformedRequest(Http2Frame::makeClientStreamId(stream_index));
     sendFrame(request);
   }
   tcp_client_->waitForDisconnect();
   EXPECT_EQ(1, test_server_->counter("http2.outbound_control_flood")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+// Verify detection of frame flood when sending second GOAWAY frame on drain timeout
+TEST_P(Http2FloodMitigationTest, GoAwayOverflowOnDrainTimeout) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* drain_time_out = hcm.mutable_drain_timeout();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        drain_time_out->set_seconds(seconds.count());
+
+        auto* http_protocol_options = hcm.mutable_common_http_protocol_options();
+        auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+        idle_time_out->set_seconds(seconds.count());
+      });
+  // pre-fill two away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 2);
+
+  // connection idle timeout will send first GOAWAY frame and start drain timer
+  // drain timeout will send second GOAWAY frame which should trigger flood protection
+  // Wait for connection to be flooded with outbound GOAWAY frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// Verify detection of overflowing outbound frame queue with the GOAWAY frames sent after the
+// downstream idle connection timeout disconnects the connection.
+// The test verifies protocol constraint violation handling in the
+// Http2::ConnectionImpl::shutdownNotice() method.
+TEST_P(Http2FloodMitigationTest, DownstreamIdleTimeoutTriggersFloodProtection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* http_protocol_options = hcm.mutable_common_http_protocol_options();
+        auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        idle_time_out->set_seconds(seconds.count());
+      });
+
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+}
+
+// Verify detection of overflowing outbound frame queue with the GOAWAY frames sent after the
+// downstream connection duration timeout disconnects the connection.
+// The test verifies protocol constraint violation handling in the
+// Http2::ConnectionImpl::shutdownNotice() method.
+TEST_P(Http2FloodMitigationTest, DownstreamConnectionDurationTimeoutTriggersFloodProtection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* http_protocol_options = hcm.mutable_common_http_protocol_options();
+        auto* max_connection_duration = http_protocol_options->mutable_max_connection_duration();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        max_connection_duration->set_seconds(seconds.count());
+      });
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.downstream_cx_max_duration_reached")->value());
+}
+
+// Verify detection of frame flood when sending GOAWAY frame during processing of response headers
+// on a draining listener.
+TEST_P(Http2FloodMitigationTest, GoawayOverflowDuringResponseWhenDraining) {
+  // pre-fill one away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+
+  triggerListenerDrain();
+
+  // Send second request which should trigger Envoy to send GOAWAY (since it is in the draining
+  // state) when processing response headers. Verify that connection was disconnected and
+  // appropriate counters were set.
+  auto request2 =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/test/long/url");
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound GOAWAY frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the upstream connection is still alive.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+}
+
+// Verify detection of frame flood when sending GOAWAY frame during call to sendLocalReply()
+// from decoder filter on a draining listener.
+TEST_P(Http2FloodMitigationTest, GoawayOverflowFromDecoderFilterSendLocalReplyWhenDraining) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        const std::string yaml_string = R"EOF(
+name: send_local_reply_filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+  prefix: "/call_send_local_reply"
+  code: 404
+  )EOF";
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
+        // keep router the last
+        auto size = hcm.http_filters_size();
+        hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
+      });
+
+  // pre-fill one away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+
+  triggerListenerDrain();
+
+  // At this point the outbound downstream frame queue should be 1 away from overflowing.
+  // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply without body which
+  // should trigger Envoy to send GOAWAY (since it is in the draining state) when processing
+  // sendLocalReply() headers. Verify that connection was disconnected and appropriate counters were
+  // set.
+  auto request2 =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/call_send_local_reply");
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound GOAWAY frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the upstream connection is still alive.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
 }
 
 // Verify that the server stop reading downstream connection on protocol error.
@@ -1828,8 +2181,7 @@ TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
       });
   beginSession();
 
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
+  const auto request = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0));
   sendFrame(request);
 
   tcp_client_->waitForDisconnect();
@@ -1843,12 +2195,12 @@ TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
 
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  auto request = Http2Frame::makeEmptyHeadersFrame(request_stream_id);
   sendFrame(request);
 
   for (int i = 0; i < 2; i++) {
-    request = Http2Frame::makeEmptyContinuationFrame(request_idx);
+    request = Http2Frame::makeEmptyContinuationFrame(request_stream_id);
     sendFrame(request);
   }
 
@@ -1864,12 +2216,12 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
 
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makePostRequest(request_idx, "host", "/");
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  auto request = Http2Frame::makePostRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
   for (int i = 0; i < 2; i++) {
-    request = Http2Frame::makeEmptyDataFrame(request_idx);
+    request = Http2Frame::makeEmptyDataFrame(request_stream_id);
     sendFrame(request);
   }
 
@@ -1884,7 +2236,9 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
 TEST_P(Http2FloodMitigationTest, PriorityIdleStream) {
   beginSession();
 
-  floodServer(Http2Frame::makePriorityFrame(0, 1), "http2.inbound_priority_frames_flood",
+  floodServer(Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                            Http2Frame::makeClientStreamId(1)),
+              "http2.inbound_priority_frames_flood",
               Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM + 1);
 }
 
@@ -1892,11 +2246,11 @@ TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
   beginSession();
 
   // Open stream.
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
-  floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
+  floodServer(Http2Frame::makePriorityFrame(request_stream_id, Http2Frame::makeClientStreamId(1)),
               "http2.inbound_priority_frames_flood",
               Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 +
                   1);
@@ -1907,14 +2261,14 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
   beginSession();
 
   // Open stream.
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
   // Reading response marks this stream as closed in nghttp2.
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
 
-  floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
+  floodServer(Http2Frame::makePriorityFrame(request_stream_id, Http2Frame::makeClientStreamId(1)),
               "http2.inbound_priority_frames_flood",
               Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 +
                   1);
@@ -1924,13 +2278,13 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   beginSession();
 
   // Open stream.
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
   // Since we do not send any DATA frames, only 4 sequential WINDOW_UPDATE frames should
   // trigger flood protection.
-  floodServer(Http2Frame::makeWindowUpdateFrame(request_idx, 1),
+  floodServer(Http2Frame::makeWindowUpdateFrame(request_stream_id, 1),
               "http2.inbound_window_update_frames_flood", 4);
 }
 
@@ -1940,8 +2294,8 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
   beginSession();
 
   // Send invalid request.
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
+  const auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(
+      Http2Frame::makeClientStreamId(0), "host", "/");
   sendFrame(request);
 
   tcp_client_->waitForDisconnect();
@@ -1969,7 +2323,8 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
 
   // Send invalid request.
   uint32_t request_idx = 0;
-  auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
+  auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(
+      Http2Frame::makeClientStreamId(request_idx), "host", "/");
   sendFrame(request);
   // Make sure we've got RST_STREAM from the server.
   auto response = readFrame();
@@ -1977,7 +2332,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
 
   // Send valid request using the same connection.
   request_idx++;
-  request = Http2Frame::makeRequest(request_idx, "host", "/");
+  request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx), "host", "/");
   sendFrame(request);
   response = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, response.type());
