@@ -1,3 +1,9 @@
+.. _start_quick_start:
+
+
+Quick start
+===========
+
 
 Quick Start to Run Simple Example
 ---------------------------------
