@@ -1698,7 +1698,8 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
-void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_frame_count) {
+void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_frame_count,
+                                                              uint32_t data_frame_size) {
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
@@ -1715,6 +1716,7 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
   const auto request = Http2Frame::makeRequest(
       Http2Frame::makeClientStreamId(0), "host", "/test/long/url",
       {Http2Frame::Header("response_data_blocks", absl::StrCat(data_frame_count)),
+       Http2Frame::Header("response_size_bytes", absl::StrCat(data_frame_size)),
        Http2Frame::Header("no_trailers", "0")});
   sendFrame(request);
 
@@ -2115,6 +2117,42 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   EXPECT_EQ(1, test_server_->counter("http2.outbound_control_flood")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+// Verify detection of flood by the RST_STREAM frame sent on pending flush timeout
+TEST_P(Http2FloodMitigationTest, RstStreamOverflowOnPendingFlushTimeout) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        constexpr uint64_t IdleTimeoutMs = 400;
+        hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+      });
+
+  // Pending flush timer is started when upstream response has completed but there is no window to
+  // send DATA downstream. The test downstream client does not update WINDOW and as such Envoy will
+  // use the default 65535 bytes. First, pre-fill outbound queue with 65 byte frames, which should
+  // consume 65 * 997 = 64805 bytes of downstream connection window.
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 3, 65);
+
+  // At this point the outbound downstream frame queue should be 3 away from overflowing with 730
+  // byte window. Make response to be 1 DATA frame with 1024 payload. This should overflow the
+  // available downstream window and start pending flush timer. Envoy proxies 2 frames downstream,
+  // HEADERS and partial DATA frame, which makes the frame queue 1 away from overflow.
+  const auto request2 = Http2Frame::makeRequest(
+      Http2Frame::makeClientStreamId(1), "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", "1"),
+       Http2Frame::Header("response_size_bytes", "1024"), Http2Frame::Header("no_trailers", "0")});
+  sendFrame(request2);
+
+  // Pending flush timer sends RST_STREAM frame which should overflow outbound frame queue and
+  // disconnect the connection.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  // Verify that pending flush timeout was hit
+  EXPECT_EQ(1, test_server_->counter("http2.tx_flush_timeout")->value());
 }
 
 // Verify detection of frame flood when sending second GOAWAY frame on drain timeout
