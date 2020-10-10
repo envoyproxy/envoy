@@ -1,0 +1,4 @@
+.. _install:
+
+Installing Envoy
+----------------
