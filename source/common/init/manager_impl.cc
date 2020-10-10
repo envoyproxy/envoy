@@ -70,7 +70,7 @@ const absl::flat_hash_map<std::string, uint32_t>& ManagerImpl::unreadyTargets() 
 void ManagerImpl::dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& unready_targets_dumps) {
   auto& message = *unready_targets_dumps.mutable_unready_targets_dumps()->Add();
   message.set_name(name_);
-  for (const auto& [target_name, count] : target_names_count_) {
+  for (const auto& [target_name, _] : target_names_count_) {
     message.add_target_names(target_name);
   }
 }
