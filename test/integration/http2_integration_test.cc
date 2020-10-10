@@ -2271,7 +2271,7 @@ TEST_P(Http2FloodMitigationTest, RstStreamOnUpstreamRemoteCloseBeforeResponseHea
   // Wait for it to be proxied
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_total", 2);
 
-  // Disconnect upstream connection. Since there no response headers were sent yet the the router
+  // Disconnect upstream connection. Since there no response headers were sent yet the router
   // filter will send 503 with body and then RST_STREAM. With these 3 frames the downstream outbound
   // frame queue should overflow.
   ASSERT_TRUE(static_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->closeConnection(0));
