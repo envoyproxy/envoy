@@ -16,10 +16,10 @@ Health Checking
 
 A healthy host is one that can respond positively to a request. Envoy can be
 configured to actively test hosts with
-[Health Checking](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/health_checking#arch-overview-health-checking),
-and it is defined on a per-[cluster](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cds.proto) (i.e. service)
+:ref:`Health checking <arch_overview_health_checking>`,
+and it is defined on a per-:ref:`cluster <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>` (i.e. service)
 basis. The simplest health check, or L3/L4 check, just ensures each
-[endpoint](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/endpoint/endpoint.proto) (i.e. port on a host or container)
+:ref:`endpoint <envoy_v3_api_file_envoy/config/endpoint/v3/endpoint.proto>` (i.e. port on a host or container)
 is available, and it doesn’t depend on any application logic. Because the IP
 and port are already specified as part of the endpoint, setting up a Health
 Check doesn’t even require service-specific information.
@@ -58,7 +58,7 @@ Outlier Detection
 ~~~~~~~~~~~~~~~~~
 
 Unlike active health checking,
-[Outlier Detection](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/outlier.html?highlight=outlier%20detection)
+:ref:`Outlier Detection <arch_overview_outlier_detection>`
 —sometimes called passive health checking—uses the **responses from real
 requests to determine whether an endpoint is healthy**. Once an endpoint is
 removed, Envoy uses a time-out based approach for re-insertion, where unhealthy
@@ -157,6 +157,6 @@ place and prevent hosts from flapping in and out of the cluster.
 
 For more details, see:
 
-- [Health Checking overview](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/health_checking.html#arch-overview-health-checking) in the Envoy docs
-- [Outlier Detection overview](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cds.proto) in the Envoy docs
-- [Cluster configuration](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cds.proto) in the Envoy docs
+- :ref:`Health checking overview <arch_overview_health_checking>`, in the Envoy docs
+- :ref:`Outlier detection overview <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>` in the Envoy docs
+- :ref:`Cluster configuration <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>` in the Envoy docs

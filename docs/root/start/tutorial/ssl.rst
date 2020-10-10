@@ -22,7 +22,7 @@ Certificate Files
 ~~~~~~~~~~~~~~~~~
 
 To deploy this to production, you’ll need the certificate for the site you own.
-If you don’t already have this, [Let’s Encrypt](https://letsencrypt.org)
+If you don’t already have this, `Let’s Encrypt <https://letsencrypt.org>`_
 provides free and automatable certificates. For testing, you can generate a
 private key file ``example-com.key`` and self-signed certificate ``example-com.crt``
 using OpenSSL. The only important detail it will as you for is the Common
@@ -95,7 +95,7 @@ a wildcard match.
 Note that Envoy supports SNI for multiple domains (e.g. example.com and
 www.example.com) by essentially repeating this configuration across several
 filter chains within the same listener. You can see an example
-[in the Envoy docs](https://www.envoyproxy.io/docs/envoy/latest/faq/sni). At
+:ref:`in the Envoy docs <faq_how_to_setup_sni>`. At
 the moment (Envoy v1.6), these filter chains must be identical across domains.
 Copy/paste away!
 

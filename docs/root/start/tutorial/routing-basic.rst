@@ -5,8 +5,7 @@ Routing basics
 ==============
 
 This article discusses Envoy's routing in more detail. You may have already
-seen how routing works
-[on your laptop](on-your-laptop)
+seen how routing works :ref:`on your laptop <on_your_laptop>`
 but now you can see more of how routes, clusters, and listeners are configured
 with static files.
 
@@ -40,8 +39,7 @@ Defining Routes
 ~~~~~~~~~~~~~~~
 
 Envoy’s routing definitions map a domain + URL to a cluster. In our previous
-tutorial
-[On Your Laptop](on-your-laptop),
+tutorial :ref:`on your laptop <on_your_laptop>`,
 we defined a simple setup with 2 clusters (service1 and service2), each of
 which lived at a separate URL (/service1 and /service2).
 
@@ -63,7 +61,7 @@ which lived at a separate URL (/service1 and /service2).
 
 Clusters pull their membership data from DNS and use a round-robin load
 balancing over all hosts. This cluster definition is from the examples
-[on your laptop](on-your-laptop).
+:ref:`on your laptop <on_your_laptop>`.
 
 .. code-block:: yaml
 
@@ -145,7 +143,7 @@ Further Exploration
 Defining routes and listeners is crucial for using Envoy to connect traffic to
 your services. Now that you understand basic configurations, you can see how
 more complex traffic-shifting works in Envoy during
-[incremental deploys and releases](incremental-deploys),
+:ref:`incremental deploys and releases <incremental_deploys>`,
 or learn how to
-[configure routing with RDS](routing-configuration),
+:ref:`configure routing with RDS <routing_configuration>`,
 the route discovery service.

@@ -11,16 +11,14 @@ laptop, test proxy configurations, and observe results.
 Requirements
 ~~~~~~~~~~~~
 
-While you can
-[build Envoy from source](https://www.envoyproxy.io/docs/envoy/v1.5.0/install/install),
-the easiest way to get started is by using the
-official [Docker images](https://hub.docker.com/u/envoyproxy/). So before
-starting out, you'll need the following software installed and configured:
+While you can :ref:`build Envoy from source <building>`
+the easiest way to get started is by using the `official Docker images <https://hub.docker.com/u/envoyproxy/>`_.
+So before starting out, you'll need the following software installed and configured:
 
-- [Docker](https://docs.docker.com/install/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-- [Git](https://help.github.com/articles/set-up-git/)
-- [curl](https://curl.haxx.se/)
+- `Docker <https://docs.docker.com/install/>`_
+- `Docker Compose <https://docs.docker.com/compose/install/>`_
+- `Git <https://help.github.com/articles/set-up-git/>`_
+- `curl <https://curl.haxx.se/>`_
 
 We use Docker and Docker Compose to set up and run example service topologies
 using Envoy, git to access the Envoy examples, and curl to send traffic to
@@ -32,8 +30,8 @@ Running Envoy
 Running the latest Docker image will technically get you Envoy on your laptop,
 but without a config file it won't do anything very interesting. Let's get a
 simple front proxy topology running, which will send traffic to two service
-backends. The [Envoy source repository](https://github.com/envoyproxy/envoy) has
-a couple of examples, so to start, clone that repository and go to the
+backends. The `Envoy source repository <https://github.com/envoyproxy/envoy>`_
+has a couple of examples, so to start, clone that repository and go to the
 ``examples/front-proxy`` directory. This contains Dockerfiles, config files and a
 Docker Compose manifest for setting up a the topology.
 
@@ -284,12 +282,10 @@ Further Exploration
 ~~~~~~~~~~~~~~~~~~~
 
 If you're interested in exploring more of Envoy's capabilities,
-the [Envoy examples](https://github.com/envoyproxy/envoy/tree/master/examples)
-have more complex topologies that will get you slightly more real-world, but
-still use statically discovered examples. If you'd like to learn more about how
-to operate Envoy in a production setting, the
-[service discovery integration](service-discovery) walks through what it
+the :ref:`Envoy examples <start_sandboxes>` have more complex topologies that will
+get you slightly more real-world, but still use statically discovered examples. If
+you'd like to learn more about how to operate Envoy in a production setting, the
+:ref:`service discovery integration <service_discovery>` walks through what it
 means to integrate Envoy with your existing environment. If you run into issues
-as you begin to test out Envoy, be sure to visit
-[getting help](getting-help) to learn where to report issues, and who to
-message.
+as you begin to test out Envoy, be sure to visit :ref:`getting help <getting_help>`
+to learn where to report issues, and who to message.

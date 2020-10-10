@@ -106,7 +106,7 @@ Break–on–latency
 As mentioned above, one of the most common use cases of circuit breakers is to
 prevent failures that are caused when a service is excessively slow, but not
 fully down. While Envoy doesn’t directly provide an option to trip the breaker
-on latency, you can combine it with [Automatic Retries](automatic-retries)
+on latency, you can combine it with :ref:`automatic retries <automatic_retries>`
 to emulate this behavior.
 
 To break on an unexpected spike in slow requests, reduce the latency threshold
@@ -122,7 +122,7 @@ time.
 Configure breaking based on a long queue of retries
 ***************************************************
 
-Even if you’re only [retrying requests](automatic-retries)
+Even if you’re only :ref:`retrying requests <automatic_retries>`
 on connection errors, it is valuable to set up circuit breaking. Because
 retries have the  potential to increase the number of requests by 2x or more,
 circuit breaking  using the ``max_retries`` parameter protects services from
@@ -137,7 +137,6 @@ Next Steps
 
 With circuit breaking configured, your service is equipped to help selectively
 shed load when failure occurs, preventing it from cascading to multiple
-services. Combining this tool with
-[automatic retries](automatic-retries)
+services. Combining this tool with :ref:`automatic retries <automatic_retries>`
 makes for robust services that are able to handle common issues at the network
 level.

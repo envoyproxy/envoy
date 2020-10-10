@@ -13,7 +13,7 @@ environment with a small number of services, but with tens or hundreds of
 services making calls to one another, it’s combinatorially more complex.
 
 That's where the Envoy service mesh comes in. This is a complementary
-deployment to a [Front Proxy](front-proxy), where Envoy handles traffic
+deployment to a :ref:`front proxy <front_proxy>`, where Envoy handles traffic
 from the outside world (aka north-south traffic).
 
 A basic Service Mesh uses Envoy sidecars to handle outbound traffic for each
@@ -37,11 +37,9 @@ Kubernetes makes adding Envoy sidecars easy. You’ll need to do two things:
 
 How you want to configure Envoy will vary depending on your environment—more on
 that below. If you want to use fully dynamic configuration, you can use a
-container like [envoy-simple](https://github.com/turbinelabs/envoy-simple) and
-set the location of the
-[various](service-discovery)
-[configuration services](routing-configuration) with
-environment variables.
+container like `envoy-simple <https://github.com/turbinelabs/envoy-simple>`_ and
+set the location of the :ref:`various <service_discovery>`
+:ref:`configuration services <routing_configuration>` with environment variables.
 
 .. code-block:: yaml
 
@@ -100,28 +98,28 @@ your internal network does. Practically, this means three things:
 
   - **Serve the full route table in all sidecars**. By exposing all services
     to all other services, you’ll ensure nothing breaks on the first iteration.
-    If you have a [Front Proxy](front-proxy), re-using these routes can save
+    If you have a :ref:`front proxy <front_proxy>`, re-using these routes can save
     time. If not, it’s straightforward to create a
-    [basic set of routes and listeners](routing-basics)  in a static Envoy
+    :ref:`basic set of routes and listeners <routing_basic>` in a static Envoy
     configuration file. Once that’s working in production, it may make sense to
     limit the routes available for each service. The explicit routing between
     services helps service teams understand where their internal traffic is
     coming from, helping them define mutual SLOs.
 
   - **Consider using dynamic configuration for instance discovery in the first iteration**. Specifically, using
-    [EDS to update Envoy’s notion of available hosts](service-discovery)
-    with an EDS server like [Rotor](https://github.com/turbinelabs/rotor) keeps
+    :ref:`EDS to update Envoy's notion of available hosts <service_discovery>`
+    with an EDS server like `Rotor <https://github.com/turbinelabs/rotor>`_ keeps
     Envoy’s routing tables in sync with the underlying infrastructure. Envoy can
     use static configuration for listeners and routes, so it’s simple and
     valuable to set up a control plane to manage instance availability.
 
 If you’ve been following the examples above, you can set up
-[Rotor](https://github.com/turbinelabs/rotor), an Envoy control plane and
+`Rotor <https://github.com/turbinelabs/rotor>`_, an Envoy control plane and
 service discovery bridge, to implement xDS. Remember that Envoy can mix static
 and dynamic configuration, so if you want to statically configure listeners,
 routes, and clusters (LDS / RDS / CDS), you can use your own Envoy container
 with a static config file while still using a dynamic EDS control plane.
-Eventually, there are [good reasons](routing-configuration)
+Eventually, there are :ref:`good reasons <routing_configuration>`
 to move to a fully dynamic system.
 
 Observability
@@ -137,7 +135,7 @@ which metrics to look at:
     can generate request volume, request rate, and latency histograms. Resource
     metrics like number of connections or amount of network traffic can mean
     different things on different services. See how
-    [Lyft does it here](https://blog.envoyproxy.io/lyfts-envoy-dashboards-5c91738816b1).
+    `Lyft does it here <https://blog.envoyproxy.io/lyfts-envoy-dashboards-5c91738816b1>`_.
 
   - **Segmentation of simple metrics, not more types of metrics.**
     Envoy can produce a stunning number of metrics. Teams with lots of services
@@ -155,7 +153,7 @@ _Note: you will have to propagate headers through each service to create full
 Multiple Regions
 ~~~~~~~~~~~~~~~~
 
-As described in [Front Proxy](front-proxy), you should have one front
+As described in :ref:`front proxy <front_proxy>`, you should have one front
 proxy per datacenter. When setting up a mesh, it’s generally safer to send
 intra-data center traffic to the remote front proxy, instead of exposing all of
 the internals to all datacenters. This can simplify incident management as
@@ -177,7 +175,7 @@ Next Steps
 While this article has focused on how to handle traffic between services, it's
 also possible for Envoy to handle traffic from the public internet
 (“North/South” traffic) as a
-[Front Proxy](front-proxy). The service mesh and
+:ref:`front proxy <front_proxy>`. The service mesh and
 front proxy have a lot of overlapping features, so it can be useful to consider
 how to roll them both out.
 

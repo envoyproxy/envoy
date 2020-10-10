@@ -20,19 +20,19 @@ The setup
 
 For this guide, we’ll need:
 
-- [Docker](https://docs.docker.com/install/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-- [Git](https://help.github.com/articles/set-up-git/)
-- [curl](https://curl.haxx.se/)
+- `Docker <https://docs.docker.com/install/>`_
+- `Docker Compose <https://docs.docker.com/compose/install/>`_
+- `Git <https://help.github.com/articles/set-up-git/>`_
+- `curl <https://curl.haxx.se/>`_
 
 Header-based Routing
 ~~~~~~~~~~~~~~~~~~~~
 
 First, we'll create a new version of service1 to illustrate the value of
 header-based routing for our services. Still following along with the
-[front-proxy](https://github.com/envoyproxy/envoy/tree/master/examples/front-proxy)
+:ref:`front-proxy <install_sandboxes_front_proxy>`
 example from the Envoy repo, modify the
-[docker-compose.yml](https://github.com/envoyproxy/envoy/blob/master/examples/front-proxy/docker-compose.yml)
+:download:`docker-compose.yml <../sandboxes/_include/front-proxy/docker-compose.yaml>`
 to spin up a new service, called ``service1a``.
 
 .. code-block:: yaml

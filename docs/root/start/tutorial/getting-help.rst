@@ -27,7 +27,7 @@ How to Get Help
 The Envoy community is active, and lives on Github, as well as
 several mailing lists, and a Slack team. Find out more by
 visiting
-[the contact section](https://github.com/envoyproxy/envoy#contact)
+`the contact section <https://github.com/envoyproxy/envoy#contact>`_.
 
 When talking to other users and maintainers on Slack, be sure to
 clearly identify your issues, the steps you've attempted to

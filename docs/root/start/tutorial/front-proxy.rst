@@ -27,8 +27,8 @@ Deploying a Front Proxy
 Though Envoy is capable enough to be deployed right at the edge of your
 network, most public cloud providers expose layer 3/4 load balancers with more
 capabilities than you need. The typical deployment will use
-[AWS’ NLB](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html),
-[GCP’s Regional NLB](https://cloud.google.com/compute/docs/load-balancing/network/),
+`AWS’ NLB <https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html>`_,
+`GCP’s Regional NLB <https://cloud.google.com/compute/docs/load-balancing/network/>`_,
 or a minimal configuration of a more feature-rich load balancer
 like AWS ALB. These baked-in load balancers can handle regional or global
 traffic balancing, which is impossible for a set of VMs running Envoy (which
@@ -37,23 +37,22 @@ are necessarily constrained to a single availability zone) to handle.
 A simple, robust deployment of an Envoy front proxy uses an autoscaling group
 of Envoys based on network traffic. Based on where your routing rules currently
 live (NGINX config files, AWS ALB configuration, etc.), you will need to port
-these to a set of Envoy routes. See
-[Routing Configuration](routing-configuration) for more details.
+these to a set of Envoy routes. See :ref:`Routing configuration <routing_configuration>`
+for more details.
 
 Most modern apps will want to implement a dynamic control plane, since the
 instances within each service are dynamic. A static configuration can only
 point to a fixed set of instances, while a dynamic control plane can keep Envoy
 up-to-date on the state of your environment, typically by reading from your
-service discovery registry. See
-[Integrating Service Discovery with Envoy](service-discovery)
+service discovery registry. See :ref:`Integrating service discovery with Envoy <routing_configuration>`
 for implementations that will do this for you, like
-[Rotor](https://github.com/turbinelabs/rotor).
+`Rotor <https://github.com/turbinelabs/rotor>`_.
 
 For an example of how this would work in AWS,
-[see this repository, which uses AWS, CloudFormation, and Rotor](https://github.com/turbinelabs/examples/tree/master/rotor-nlb).
+`see this repository, which uses AWS, CloudFormation, and Rotor <https://github.com/turbinelabs/examples/tree/master/rotor-nlb>`_.
 
 If you’re looking to deploy Envoy for internal traffic only, see
-[Basic Service Mesh](service-mesh).
+:ref:`Basic service mesh <service_mesh>`
 
 Deploying Envoy in Kubernetes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,7 +61,7 @@ If you’re in Kubernetes, you can point NLBs directly to a an exposed Kubernete
 service in front of an Envoy deployment.
 
 Here’s what that Deployment might look like. It uses
-[envoy-simple](https://github.com/turbinelabs/envoy-simple), a Docker
+`envoy-simple <https://github.com/turbinelabs/envoy-simple>`_, a Docker
 container that allows Envoy to be fully dynamically configured by specifying a
 control plane implementation via environment variables. Simply change
 ``ENVOY_XDS_HOST`` to the network location of your control plane (typically
@@ -80,14 +79,14 @@ in your cloud provider with ``kubectl``.
    $ kubectl expose deployment --type=LoadBalancer --port=80 envoy-front-proxy
 
 You can also use an ingress controller like
-[Contour](https://projectcontour.io) if you want to manage everything
+`Contour <https://projectcontour.io>`_ if you want to manage everything
 through Kubernetes. These expose Envoy’s configuration as
-[Kubernetes Ingress Resources](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+`Kubernetes Ingress Resources <https://kubernetes.io/docs/concepts/services-networking/ingress/>`_.
 This is simple, but less expressive than configuring Envoy through a
 general-purpose control plane, as the Kubernetes ingress controller spec is
 lowest-common-denominator by design, with support for only a subset of Envoy’s
 capabilities. There are also Kubernetes-native API Gateways like
-[Ambassador](https://github.com/datawire/ambassador) that offer expanded
+`Ambassador <https://github.com/datawire/ambassador>`_ that offer expanded
 functionality by using other, more expressive Kubernetes resources for
 configuration.
 
@@ -104,7 +103,7 @@ SSL and Metrics
 
 Front proxies are a natural place to terminate SSL, to ensure that individual
 services don’t have to. You can either do in your cloud’s load balancer (e.g.
-AWS ELB) or in Envoy itself. To configure SSL, see [this article](ssl).
+AWS ELB) or in Envoy itself. To configure SSL, see :ref:`this article <ssl>`
 
 As a common choke point for all traffic, front proxies are a great place to
 generate high-level metrics for your site. Make sure to at least send request
@@ -193,8 +192,8 @@ trusted without further verification.
 Add protections from bad actors and unexpected traffic spikes.
 **************************************************************
 
-This means [retries](automatic-retries),
-[health checks](health-check), etc. What this looks like depends strongly
+This means :ref:`automatic retries <automatic_retries>`,
+:ref:`health checks <health_check>`, etc. What this looks like depends strongly
 on your infrastructure and the types of issues you’re looking to mitigate.
 
 Next Steps
@@ -206,4 +205,4 @@ your network, it's also possible for Envoy to handle traffic between services
 you can route internal requests through this front proxy (or a similarly
 configured proxy pool specifically for east-west). Beyond that, you can take
 better advantage of Envoy’s unique features as a lightweight sidecar by
-[setting up a Basic Service Mesh](service-mesh).
+:ref:`setting up a basic service mesh <service_mesh>`.

@@ -214,6 +214,8 @@ Envoy tutorial
 
     tutorial/index
 
+.. _start_sandboxes:
+
 Sandboxes
 ---------
 

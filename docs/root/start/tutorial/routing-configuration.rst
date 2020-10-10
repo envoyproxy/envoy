@@ -7,9 +7,8 @@ Routing configuration
 When running a large Envoy fleet in production, it’s important to separate the
 data plane — user traffic — from the control plane, which includes Envoy
 configuration and infrastructure state. Setting up a simple control plane
-generally includes choosing configuration options like [automatic
-retries](automatic-retries.html) and integrating [service
-discovery](service-discovery.html).
+generally includes choosing configuration options like :ref:`Automatic retries <automatic_retries>`
+and integrating :ref:`Service discovery <service_discovery>`.
 
 One of the biggest advantages of creating a distinct, centralized control plane
 is that it provides a source of truth for routing configuration. In legacy
@@ -24,10 +23,9 @@ Serving Routes via RDS
 
 Envoy’s dynamic configuration allows these routing configurations to execute
 rules defined in a control plane with its Route Discovery Service, or
-[RDS](https://www.envoyproxy.io/docs/envoy/latest/configuration/http_conn_man/rds). The
-control plane holds a mapping between a domain + path and an Envoy “cluster.”
-The control plane serves config definitions via RDS, and the Envoy instances
-implement the actual traffic control.
+:ref:`RDS <config_http_conn_man_rds>`. The control plane holds a mapping between a domain +
+path and an Envoy "cluster." The control plane serves config definitions via RDS, and
+the Envoy instances implement the actual traffic control.
 
 Here is a simple example of a route in RDS:
 
@@ -45,11 +43,10 @@ Here is a simple example of a route in RDS:
 	 route: { cluster: some_service }
 
 Both open-source
-([go-control-plane](https://github.com/envoyproxy/go-control-plane), [Istio
-Pilot](https://istio.io/docs/concepts/traffic-management/pilot.html)) and
-commercial ([Houston](http://turbinelabs.io/product)) implementations of RDS are
-available, or the Envoy docs define a
-[full RDS specification](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview.html#v2-grpc-streaming-endpoints)
+(`go-control-plane <https://github.com/envoyproxy/go-control-plane>`_,
+`Istio Pilot <https://istio.io/docs/concepts/traffic-management/pilot.html>`_)
+and commercial (`Houston <http://turbinelabs.io/product>`_) implementations of RDS are
+available, or the Envoy docs define a :ref:`full RDS specification <v2_grpc_streaming_endpoints>`
 for teams that want to roll their own. Keep in mind that the RDS specification
 is only the transport mechanism; how you manage the state is up to you,
 discussed in more detail below.
@@ -89,7 +86,7 @@ Practically, porting web server config files to Envoy bootstrap config files is
 a natural first step to try out Envoy. In order to put this into production,
 it’s recommended to at least centralize these files behind a single service,
 using a reference xDS implementation like
-[go-control-plane](https://github.com/envoyproxy/go-control-plane). Allowing
+`go control plane <https://github.com/envoyproxy/go-control-plane>`_. Allowing
 multiple teams to edit these configs (#2 and #3, below) becomes a fragile part
 of the system. Moving the source of truth behind an API allows concurrent
 updates and prevents many nonsensical updates to routing definitions.

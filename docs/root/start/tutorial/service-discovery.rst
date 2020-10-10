@@ -4,9 +4,9 @@ Service discovery
 =================
 
 One of the core concepts when setting up Envoy in production is separating the
-[data plane](https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc)—
-the Envoy instances that route your traffic—from the
-[control plane](https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc),
+`data plane <https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc>`_ -
+the Envoy instances that route your traffic - from the
+`control plane <https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc>`_,
 which acts as the source of truth for the current state of your infrastructure
 and your desired configuration.
 
@@ -25,29 +25,29 @@ Control Plane Implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Any control plane should implement the
-[Envoy v2 xDS APIs](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api).
+:ref:`Envoy v3 xDS APIs <envoy_v3_api_reference>`
 For the purpose of publishing service discovery data, you’ll need to implement
-the Cluster Discovery Service
-[(CDS)](https://www.envoyproxy.io/docs/envoy/latest/configuration/cluster_manager/cds.html)
+the Cluster Discovery Service :ref:`CDS <config_cluster_manager_cds>`
 and the Endpoint Discovery Service
-[(EDS)](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/eds.proto).
+:ref:`EDS <envoy_v3_api_file_envoy/service/endpoint/v3/eds.proto>`.
+
 Here are several options to avoid starting from scratch:
 
-[Rotor](https://github.com/turbinelabs/rotor) is a **fast, lightweight xDS
+`Rotor <https://github.com/turbinelabs/rotor>`_ is a **fast, lightweight xDS
 implementation with service discovery integration** to Kubernetes, Consul, AWS,
 and more. It provides a set of defaults for routing and listeners (RDS and
 LDS). It’s also part of the commercial solution
-[Houston, by Turbine Labs](https://turbinelabs.io), which adds more
+`Houston, by Turbine Labs <http://turbinelabs.io/product>`_, which adds more
 configuration around routing, resilience, and metrics.
 
 The Envoy repository provides
-[go-control-plane](https://github.com/envoyproxy/go-control-plane), an
+`go-control-plane <https://github.com/envoyproxy/go-control-plane>`_, an
 **open-source stub implementation**. If you want to get your hands dirty with
 exactly how everything is pulled from service discovery, cached locally, and
 served, this is a great starting point.
 
 If you’re running in Kubernetes, the
-[Istio project](https://istio.io/docs/concepts/traffic-management/pilot.html)
+`Istio project <https://istio.io/docs/concepts/traffic-management/pilot.html>`_
 has a **control plane implementation called Pilot**. It takes YAML files and
 turns them into xDS responses. Don’t be scared by the scope of Istio — Pilot
 can be used separately to configure Envoy, without pulling in all the other
@@ -94,7 +94,7 @@ is dynamic, you’ll want to set “type” to EDS, which tells Envoy to poll th
 API for a list of available IP/ports.
 
 For the full specifications, see the
-[Envoy docs](https://www.envoyproxy.io/docs/envoy/latest/api-v1/cluster_manager/cluster.html).
+:ref:`Envoy docs <envoy_v3_api_file_envoy/config/cluster/v3/cluster.proto>`.
 Once this is configured, you can populate the endpoints that serve traffic for
 this cluster.
 
@@ -167,5 +167,4 @@ Next Steps: Set up Routing
 
 Once your control plane knows about all the available services, it’s time to
 configure the routes on top of those services. Learn how to set up the Route
-Discovery Service
-[here](https://www.envoyproxy.io/docs/envoy/latest/configuration/http_conn_man/rds.html#config-http-conn-man-rds).
+Discovery Service :ref:`here <config_http_conn_man_rds>`.
