@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 
 source_venv() {
   VENV_DIR=$1
@@ -22,11 +21,11 @@ python_venv() {
   VENV_DIR="${BUILD_DIR}/${PY_NAME}"
 
   source_venv "${VENV_DIR}"
-  which pip # debug, temporary
+  which pip
   pip install -r "${SCRIPT_DIR}"/requirements.txt
 
-  pip list # debug, temporary
+  pip list
   shift
-  which python3 # debug, temporary
+  which python3
   python3 "${SCRIPT_DIR}/${PY_NAME}.py" "$*"
 }
