@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^.github|.rst$|.md$"}
+EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^.github|.rst$|.md$|shell_utils.sh"}
 
 
 find_shell_files () {

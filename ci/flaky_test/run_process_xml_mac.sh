@@ -1,4 +1,6 @@
 #!/bin/bash
 
-pip3 install slackclient
-./ci/flaky_test/process_xml.py
+# shellcheck source=tools/shell_utils.sh
+. "${ENVOY_SRCDIR}"/tools/shell_utils.sh
+
+python_venv process_xml "$1"
