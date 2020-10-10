@@ -184,7 +184,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
     }
     uint64_t new_val = (val * 10) + (cur - '0');
     if (new_val / 8 < val) {
-      // Overflow occurred.
+      // Overflow occurred
       return absl::nullopt;
     }
     val = new_val;
@@ -192,7 +192,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
   }
 
   if (bytes_consumed) {
-    // Consume some digits.
+    // Consume some digits
     str.remove_prefix(bytes_consumed);
     return val;
   }

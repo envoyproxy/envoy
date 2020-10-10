@@ -247,6 +247,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     auto status = parent_.sendPendingFrames();
     // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
     RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+    parent_.checkProtocolConstraintViolation();
   }
 }
 
@@ -262,6 +263,7 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
   auto status = parent_.sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -279,6 +281,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
       auto status = parent_.sendPendingFrames();
       // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
       RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+      parent_.checkProtocolConstraintViolation();
     }
   }
 }
@@ -695,6 +698,7 @@ void ConnectionImpl::goAway() {
   auto status = sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::shutdownNotice() {
@@ -704,6 +708,7 @@ void ConnectionImpl::shutdownNotice() {
   auto status = sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  checkProtocolConstraintViolation();
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {

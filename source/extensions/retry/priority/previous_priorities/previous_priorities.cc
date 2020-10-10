@@ -51,7 +51,7 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
   // This allows us to fall back to the unmodified priority load when we run out of priorities
   // instead of failing to route requests.
   if (total_availability == 0) {
-    for (auto&& excluded_priority : excluded_priorities_) {
+    for (auto excluded_priority : excluded_priorities_) {
       excluded_priority = false;
     }
     attempted_hosts_.clear();

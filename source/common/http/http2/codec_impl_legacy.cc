@@ -238,6 +238,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
+    parent_.checkProtocolConstraintViolation();
   }
 }
 
@@ -251,6 +252,7 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
     submitMetadata(flags);
   }
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -266,6 +268,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
       parent_.sendPendingFrames();
+      parent_.checkProtocolConstraintViolation();
     }
   }
 }
@@ -664,6 +667,7 @@ void ConnectionImpl::goAway() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::shutdownNotice() {
@@ -671,6 +675,7 @@ void ConnectionImpl::shutdownNotice() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
