@@ -1,7 +1,7 @@
 .. _install_sandboxes_skywalking_tracing:
 
 SkyWalking Tracing
-==============
+==================
 
 The SkyWalking tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `SkyWalking <http://skywalking.apache.org>`_ as the tracing provider. This sandbox
@@ -73,7 +73,7 @@ You can now send a request to service1 via the front-envoy as follows:
     * Connection #0 to host localhost left intact
 
 Step 5: View the traces in SkyWalking UI
-************************************
+****************************************
 
 Point your browser to http://localhost:8080 . You should see the SkyWalking dashboard.
 Set the service to "front-envoy" and set the start time to a few minutes before
