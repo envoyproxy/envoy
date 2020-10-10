@@ -1,7 +1,5 @@
 #include "server/filter_chain_manager_impl.h"
 
-#include <optional>
-
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
 #include "common/common/cleanup.h"

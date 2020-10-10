@@ -24,7 +24,9 @@ The semantics of listener updates are as follows:
   remaining connections are closed. The drain time is set via the :option:`--drain-time-s` option.
 * When a tcp listener is updated, if the new listener contains a subset of filter chains in the old listener,
   the connections owned by these overlapping filter chains remain open. Only the connections owned by the
-  obsoleted filter chains will be drained following the above pattern. 
+  removed filter chains will be drained following the above pattern. Note that if any global listener attributes are
+  changed, the entire listener (and all filter chains) are drained similar to removal above. See
+  :ref:`filter chain only update <filter_chain_only_update>` for detailed rules to reason about the impacted filter chains.
 
   .. note::
 
