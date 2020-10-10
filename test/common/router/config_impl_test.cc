@@ -6090,13 +6090,28 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route, *api_), EnvoyException,
                             "response body file missing_file does not exist");
 
-  std::string body(4097, '*');
-  auto filename = TestEnvironment::writeStringToFileForTest("body", body);
-  route.mutable_direct_response()->mutable_body()->set_filename(filename);
-  std::string expected_message("response body file " + filename +
-                               " size is 4097 bytes; maximum is 4096");
+  // The default max body size in bytes is 4096.
+  const std::string body(4097, '*');
+  std::string expected_message("response body size is 4097 bytes; maximum is 4096");
+  route.mutable_direct_response()->mutable_body()->set_inline_string(body);
   EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route, *api_), EnvoyException,
                             expected_message);
+
+  // Change the max body size to 2048 bytes.
+  route.mutable_direct_response()->mutable_max_body_size_bytes()->set_value(2048);
+  auto filename = TestEnvironment::writeStringToFileForTest("body", body);
+  route.mutable_direct_response()->mutable_body()->set_filename(filename);
+  expected_message = "response body file " + filename + " size is 4097 bytes; maximum is 2048";
+  EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route, *api_), EnvoyException,
+                            expected_message);
+
+  // Update the max body size to 4098 bytes, hence the parsing is successful.
+  route.mutable_direct_response()->mutable_max_body_size_bytes()->set_value(4098);
+  EXPECT_EQ(4097, ConfigUtility::parseDirectResponseBody(route, *api_).size());
+
+  route.mutable_direct_response()->mutable_body()->set_filename(EMPTY_STRING);
+  route.mutable_direct_response()->mutable_body()->set_inline_bytes(body);
+  EXPECT_EQ(4097, ConfigUtility::parseDirectResponseBody(route, *api_).size());
 }
 
 TEST_F(RouteConfigurationV2, RedirectCode) {

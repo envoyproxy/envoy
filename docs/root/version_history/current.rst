@@ -22,6 +22,7 @@ Removed Config or Runtime
 New Features
 ------------
 * grpc: implemented header value syntax support when defining :ref:`initial metadata <envoy_v3_api_field_config.core.v3.GrpcService.initial_metadata>` for gRPC-based `ext_authz` :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>` and :ref:`network <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.grpc_service>` filters, and :ref:`ratelimit <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.grpc_service>` filters.
+* router: added :ref:`max_body_size_bytes <envoy_v3_api_field_config.route.v3.DirectResponseAction.max_body_size_bytes>` to set the maximum bytes of the direct response :ref:`body <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` size.
 
 Deprecated
 ----------

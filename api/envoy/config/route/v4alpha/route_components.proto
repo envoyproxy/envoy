@@ -1333,6 +1333,7 @@ message RedirectAction {
   bool strip_query = 6;
 }
 
+// [#next-free-field: 19]
 message DirectResponseAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.DirectResponseAction";
@@ -1349,6 +1350,17 @@ message DirectResponseAction {
   //   :ref:`envoy_api_msg_config.route.v4alpha.Route`, :ref:`envoy_api_msg_config.route.v4alpha.RouteConfiguration` or
   //   :ref:`envoy_api_msg_config.route.v4alpha.VirtualHost`.
   core.v4alpha.DataSource body = 2;
+
+  // The maximum bytes of the response :ref:`body
+  // <envoy_api_field_config.route.v4alpha.DirectResponseAction.body>` size. If not specified the default
+  // is 4096.
+  //
+  // .. warning::
+  //
+  //   The content of :ref:`body <envoy_api_field_config.route.v4alpha.DirectResponseAction.body>`
+  //   will be held in memory.
+  //
+  google.protobuf.UInt32Value max_body_size_bytes = 18;
 }
 
 message Decorator {
