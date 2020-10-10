@@ -370,6 +370,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
+  # shellcheck disable=SC2178
   export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}"
   echo "fix_format..."
   ./tools/code_format/check_format.py fix
@@ -380,6 +381,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
+  # shellcheck disable=SC2178
   export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}"
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
