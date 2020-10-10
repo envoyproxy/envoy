@@ -206,6 +206,14 @@ is to start the container with the host user's ``uid``, for example:
   $ docker run -d --name envoy -e ENVOY_UID=`id -u` -p 9901:9901 -p 10000:10000 envoy:v1
 
 
+Envoy tutorial
+--------------
+
+.. toctree::
+    :maxdepth: 2
+
+    tutorial/index
+
 Sandboxes
 ---------
 

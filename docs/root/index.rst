@@ -20,4 +20,3 @@ Envoy documentation
   api/api
   faq/overview
   version_history/version_history
-  tutorial/index
