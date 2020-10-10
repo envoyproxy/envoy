@@ -219,3 +219,4 @@ features. The following sandboxes are available:
     sandboxes/mysql
     sandboxes/redis
     sandboxes/zipkin_tracing
+    sandboxes/skywalking_tracing

@@ -1,1 +1,2 @@
-TODO(wbpcode): To add sandbox docs for skywalking.
+To learn about this sandbox and for instructions on how to run it please head over
+to the [envoy docs](https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/skywalking_tracing)
