@@ -615,7 +615,7 @@ WasmResult Context::getProperty(absl::string_view path, std::string* result) {
       }
     } else if (value.IsList()) {
       auto& list = *value.ListOrDie();
-      int64_t idx = 0;
+      int idx = 0;
       if (!absl::SimpleAtoi(part, &idx)) {
         return WasmResult::NotFound;
       }
