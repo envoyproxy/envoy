@@ -116,9 +116,9 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
-  // The default filter chain if none of the filter chain matches. At most 1 filter chain
-  // is allowed here. The filter chain match will be ignored.
-  repeated FilterChain default_filter_chain = 25 [(validate.rules).repeated = {max_items: 1}];
+  // The default filter chain if none of the filter chain matches. If no default filter chain is supplied,
+  // the connection will be closed. The filter chain match is ignored in this field.
+  FilterChain default_filter_chain = 25;
 
   // Soft limit on size of the listener’s new connection read and write buffers.
   // If unspecified, an implementation defined default is applied (1MiB).

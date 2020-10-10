@@ -481,14 +481,11 @@ void ListenerImpl::buildFilterChains() {
       parent_.server_.stats(), parent_.server_.singletonManager(), parent_.server_.threadLocal(),
       validation_visitor_, parent_.server_.api());
   transport_factory_context.setInitManager(*dynamic_init_manager_);
-  // The init manager is a little messy. Will refactor when filter chain manager could accept
-  // network filter chain update.
-  // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
   filter_chain_manager_.addFilterChains(
       config_.filter_chains(),
-      config_.default_filter_chain().empty() ? nullptr : *config_.default_filter_chain().data(),
-      builder, filter_chain_manager_);
+      config_.has_default_filter_chain() ? &config_.default_filter_chain() : nullptr, builder,
+      filter_chain_manager_);
 }
 
 void ListenerImpl::buildSocketOptions() {

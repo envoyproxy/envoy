@@ -156,14 +156,14 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
 }
 
 TEST_F(FilterChainManagerImplTest, FilterChainUseFallbackIfNoFilterChainMatches) {
+  // The build helper will build matchable filter chain and then build the default filter chain.
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _))
       .WillOnce(Return(build_out_fallback_filter_chain_));
-
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _))
       .WillOnce(Return(std::make_shared<Network::MockFilterChain>()))
       .RetiresOnSaturation();
-
   addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
+
   auto filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
   auto fallback_filter_chain =
