@@ -32,10 +32,6 @@ enum class FilterHeadersStatus {
   // FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
   StopIteration,
-  // Continue headers iteration to remaining filters, but ignore any subsequent data or trailers.
-  // This results in creating a header only request/response.
-  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
-  ContinueAndEndStream,
   // Continue headers iteration to remaining filters, but delay ending the stream. This status MUST
   // NOT be returned when end_stream is already set to false.
   //

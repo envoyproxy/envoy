@@ -72,7 +72,7 @@ sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
     'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinx_tabs.tabs',
-    'sphinx_copybutton', 'validating_code_block'
+    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe'
 ]
 extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
@@ -275,3 +275,8 @@ html_style = 'css/envoy.css'
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'envoydoc'
+
+# TODO(phlax): add redirect diff (`rediraffe_branch` setting)
+#  - not sure how diffing will work with master merging in PRs - might need
+#    to be injected dynamically, somehow
+rediraffe_redirects = "redirects.txt"
