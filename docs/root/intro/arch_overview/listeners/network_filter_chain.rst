@@ -10,7 +10,7 @@ The network filters are chained in a ordered list known as :ref:`filter chain <e
 Each listener has multiple filter chains and an optional default filter chain.When a connection is accepted, the
 listener picks the best filter chain according to the :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`
 associated with each filter chain. If the best match filter chain cannot be found, the default filter chain will be
-choosen to serve the request. If the default filter chain is not supplied, the connection will be closed.
+chosen to serve the request. If the default filter chain is not supplied, the connection will be closed.
 
 
 Filter chain only update
