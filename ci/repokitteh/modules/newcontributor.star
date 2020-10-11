@@ -1,6 +1,6 @@
 
 NEW_CONTRIBUTOR_MESSAGE = """
-hi @%s, welcome and thank you for your contribution.
+Hi @%s, welcome and thank you for your contribution.
 
 We will try to review your Pull Request as quickly as possible.
 
