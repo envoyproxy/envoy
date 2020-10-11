@@ -56,11 +56,13 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(false), testing::Values(0)));
 #endif
 
+#ifndef WIN32
 // Test the mode parameter, excluding abstract namespace enabled
 INSTANTIATE_TEST_SUITE_P(
     TestModeParameter, UdsListenerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(false), testing::Values(0662)));
+#endif
 
 void UdsListenerIntegrationTest::initialize() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
