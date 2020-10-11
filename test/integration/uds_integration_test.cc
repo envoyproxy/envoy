@@ -4,6 +4,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
 
@@ -100,10 +101,10 @@ TEST_P(UdsListenerIntegrationTest, TestSocketMode) {
   }
 
   initialize();
+
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat listener_stat;
-  EXPECT_EQ(::stat(getListenerSocketName().c_str(), &listener_stat), 0);
-  ENVOY_LOG_MISC(debug, "expectedmode={} mode={} uid={} gid={}", mode_, listener_stat.st_mode,
-                 listener_stat.st_uid, listener_stat.st_gid);
+  EXPECT_EQ(os_sys_calls.stat(getListenerSocketName().c_str(), &listener_stat).rc_, 0);
   if (mode_ == 0) {
     EXPECT_NE(listener_stat.st_mode & 0777, 0);
   } else {
