@@ -388,11 +388,14 @@ void InstanceImpl::initialize(const Options& options,
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
       options.serviceNodeName());
 
+  std::cerr << "initial_config\n";
   Configuration::InitialImpl initial_config(bootstrap_);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
+
+  std::cerr << "initial_config1\n";
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -416,6 +419,8 @@ void InstanceImpl::initialize(const Options& options,
         factory.createBootstrapExtension(*config, serverFactoryContext()));
   }
 
+  std::cerr << "initial_config2\n";
+
   if (!bootstrap_.default_socket_interface().empty()) {
     auto& sock_name = bootstrap_.default_socket_interface();
     auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
@@ -425,6 +430,7 @@ void InstanceImpl::initialize(const Options& options,
     }
   }
 
+  std::cerr << "initial_config3\n";
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(
       *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
@@ -459,6 +465,8 @@ void InstanceImpl::initialize(const Options& options,
     admin_->addListenerToHandler(handler_.get());
   }
 
+    std::cerr << "initial_config4\n";
+
   // The broad order of initialization from this point on is the following:
   // 1. Statically provisioned configuration (bootstrap) are loaded.
   // 2. Cluster manager is created and all primary clusters (i.e. with endpoint assignments
@@ -492,11 +500,15 @@ void InstanceImpl::initialize(const Options& options,
       messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
       *singleton_manager_);
 
+  std::cerr << "initial_config5\n";
+
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceImpl and then populated once
   // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+
+  std::cerr << "initial_config6\n";
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -507,6 +519,8 @@ void InstanceImpl::initialize(const Options& options,
                                         ? &bootstrap_.dynamic_resources().lds_resources_locator()
                                         : nullptr);
   }
+
+  std::cerr << "initial_config7\n";
 
   // We have to defer RTDS initialization until after the cluster manager is
   // instantiated (which in turn relies on runtime...).
