@@ -19,6 +19,6 @@ feature of the API, which is most useful for simple requirements. For more compl
     docker
     quick-start
     ref_configs
-    install/tools/tools
+    tools/tools
     sandboxes/index
     building

@@ -1,32 +1,38 @@
 .. _start_docker:
 
 Using the Envoy Docker Image
-----------------------------
+============================
 
-Create a simple Dockerfile to execute Envoy, which assumes that envoy.yaml (described above) is in your local directory.
-You can refer to the :ref:`Command line options <operations_cli>`.
+The following examples use the :ref:`official Envoy Docker image <start_install_docker>`.
 
-.. substitution-code-block:: none
+Running Envoy Docker with the default configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  FROM envoyproxy/|envoy_docker_image|
-  COPY envoy.yaml /etc/envoy/envoy.yaml
+The Envoy image contains a demo configuration which has an admin interface listening on port ``9901``,
+and proxies port ``10000`` to https://www.google.com.
 
-Build the Docker image that runs your configuration using::
+You can test it as follows:
 
-  $ docker build -t envoy:v1 .
+.. substitution-code-block:: console
 
-And now you can execute it with::
+   $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoyproxy/|envoy_docker_image|
 
-  $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
+If you now browse to http://localhost:10000 you should see the google website.
 
-And finally, test it using::
+:ref:`Command line options <operations_cli>` passed to the container are passed through to Envoy, for
+example, to get the Envoy version:
 
-  $ curl -v localhost:10000
+.. substitution-code-block:: console
+
+   $ docker run --rm envoyproxy/|envoy_docker_image| --version
+
+Running Envoy with docker-compose
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you would like to use Envoy with docker-compose you can overwrite the provided configuration file
 by using a volume.
 
-.. substitution-code-block: yaml
+.. substitution-code-block:: yaml
 
   version: '3'
   services:
@@ -37,17 +43,68 @@ by using a volume.
       volumes:
         - ./envoy.yaml:/etc/envoy/envoy.yaml
 
-By default the Docker image will run as the ``envoy`` user created at build time.
+If you use this method, you will have to ensure that the ``envoy`` user can read the mounted file
+either by setting the correct permissions on the file, or making it world-readable, as described
+below.
+
+
+Build and run the Docker image
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create a simple Dockerfile to execute Envoy.
+
+If you create a custom ``envoy.yaml`` you can create your own Docker image with it using the following
+Dockerfile recipe:
+
+.. substitution-code-block:: dockerfile
+
+  FROM envoyproxy/|envoy_docker_image|
+  COPY envoy.yaml /etc/envoy/envoy.yaml
+  RUN chmod go+r /etc/envoy/envoy.yaml
+
+Build the Docker image using:
+
+.. code-block:: console
+
+   $ docker build -t envoy:v1 .
+
+Assuming you configured Envoy to listen on ports ``9901`` and ``10000``, you can now start it
+with:
+
+.. code-block:: console
+
+   $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
+
+Permissions for running the Docker Envoy container as a non-root user
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Envoy Docker image should be started as ``root``, but switches when run to the ``envoy`` user
+created at build time.
+
+The user is switched in the Docker ``ENTRYPOINT``.
+
+Changing the ``uid`` and/or ``gid`` of the ``envoy`` user
+*********************************************************
+
+The default ``uid`` and ``gid`` for the ``envoy`` user are ``101``.
 
 The ``uid`` and ``gid`` of this user can be set at runtime using the ``ENVOY_UID`` and ``ENVOY_GID``
-environment variables. This can be done, for example, on the Docker command line::
+environment variables.
 
-  $ docker run -d --name envoy -e ENVOY_UID=777 -e ENVOY_GID=777 -p 9901:9901 -p 10000:10000 envoy:v1
+This can be done, for example, on the Docker command line:
+
+.. substitution-code-block:: console
+
+  $ docker run -d --name envoy -e ENVOY_UID=777 -e ENVOY_GID=777 envoyproxy/|envoy_docker_image|
 
 This can be useful if you wish to restrict or provide access to ``unix`` sockets inside the container, or
-for controlling access to an ``envoy`` socket from outside of the container.
+for controlling access to an Envoy socket from outside of the container.
 
-If you wish to run the container as the ``root`` user you can set ``ENVOY_UID`` to ``0``.
+To run the process inside  the container as the ``root`` user you can set ``ENVOY_UID`` to ``0``,
+but doing so has the potential to weaken the security of your running container.
+
+Logging permissions inside the Envoy container
+**********************************************
 
 The ``envoy`` image sends application logs to ``/dev/stdout`` and ``/dev/stderr`` by default, and these
 can be viewed in the container log.
@@ -58,26 +115,41 @@ by making the file writeable by the envoy user.
 
 For example, to mount a log folder from the host and make it writable, you can:
 
-.. substitution-code-block:: none
+.. substitution-code-block:: console
 
   $ mkdir logs
   $ chown 777 logs
-  $ docker run -d -v `pwd`/logs:/var/log --name envoy -e ENVOY_UID=777 -p 9901:9901 -p 10000:10000 envoy:v1
+  $ docker run -d --name envoy -v $(pwd)/logs:/var/log -e ENVOY_UID=777 envoyproxy/|envoy_docker_image|
 
 You can then configure ``envoy`` to log to files in ``/var/log``
 
-The default ``envoy`` ``uid`` and ``gid`` are ``101``.
+Configuration and binary file permissions inside the Envoy container
+********************************************************************
 
 The ``envoy`` user also needs to have permission to access any required configuration files mounted
 into the container.
 
-If you are running in an environment with a strict ``umask`` setting, you may need to provide envoy with
-access either by setting the ``uid`` or ``gid`` of the file, or by making the configuration file readable
-by the envoy user.
+Any binary files specified in the configuration should also be executable by the ``envoy`` user.
 
-One method of doing this without changing any file permissions or running as root inside the container
-is to start the container with the host user's ``uid``, for example:
+If you are running in an environment with a strict ``umask`` setting, you may need to provide ``envoy``
+with access by setting the ownership and/or permissions of the file.
 
-.. substitution-code-block:: none
+One method of doing this without changing any file permissions is to start the container with the
+host user's ``uid``, for example:
 
-  $ docker run -d --name envoy -e ENVOY_UID=`id -u` -p 9901:9901 -p 10000:10000 envoy:v1
+.. substitution-code-block:: console
+
+  $ docker run -d --name envoy -v $(pwd)/envoy.yaml:/etc/envoy/envoy.yaml -e ENVOY_UID=$(id -u) envoyproxy/|envoy_docker_image|
+
+Listen only on ports > 1024 inside the Docker Envoy container
+*************************************************************
+
+Unix-based systems restrict opening ``well-known`` ports (ie. with a port number < ``1024``) to the ``root`` user.
+
+If you need to listen on a ``well-known`` port you can use Docker to do so.
+
+For example, to create an Envoy server listening on port ``8000``, with forwarding from port ``80``:
+
+.. substitution-code-block:: console
+
+  $ docker run -d --name envoy -p 80:8000 envoyproxy/|envoy_docker_image|
