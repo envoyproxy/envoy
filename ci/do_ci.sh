@@ -370,26 +370,22 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
-  # shellcheck disable=SC2178
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}"
   echo "fix_format..."
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
-  ./tools/proto_format/proto_format.sh fix --test
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
-  # shellcheck disable=SC2178
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}"
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
   ./tools/code_format/check_shellcheck_format.sh
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
-  ./tools/proto_format/proto_format.sh check --test
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
