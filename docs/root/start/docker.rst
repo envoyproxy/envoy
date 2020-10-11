@@ -5,6 +5,8 @@ Using the Envoy Docker Image
 
 The following examples use the :ref:`official Envoy Docker image <start_install_docker>`.
 
+These instructions are known to work for the ``x86_64`` architecture.
+
 Running Envoy Docker with the default configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -44,12 +46,12 @@ by using a volume.
         - ./envoy.yaml:/etc/envoy/envoy.yaml
 
 If you use this method, you will have to ensure that the ``envoy`` user can read the mounted file
-either by setting the correct permissions on the file, or making it world-readable, as described
+either by ensuring the correct permissions on the file, or making it world-readable, as described
 below.
 
 
-Build and run the Docker image
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Build and run a Docker image
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Create a simple Dockerfile to execute Envoy.
 
@@ -75,8 +77,8 @@ with:
 
    $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
 
-Permissions for running the Docker Envoy container as a non-root user
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Permissions for running the Docker Envoy image as a non-root user
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Envoy Docker image should be started as ``root``, but switches when run to the ``envoy`` user
 created at build time.
