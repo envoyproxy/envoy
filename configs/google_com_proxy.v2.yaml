@@ -31,22 +31,6 @@ static_resources:
                   host_rewrite: www.google.com
                   cluster: service_google
           http_filters:
-          - name: envoy.filters.http.oauth2
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3alpha.OAuth2
-              config:
-                token_endpoint:
-                  cluster: auth
-                  uri: authorization-server.com/token
-                  timeout: 3s
-                authorization_endpoint: https://authorization-server.com/authorize
-                redirect_uri: "https://www.oauth.com/playground/oidc.html"
-                redirect_path_matcher:
-                  path:
-                    exact: /callback
-                signout_path:
-                  path:
-                    exact: /signout
           - name: envoy.filters.http.router
   clusters:
   - name: service_google
