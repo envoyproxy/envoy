@@ -358,6 +358,8 @@ envoy_cc_test(
         ":server_test_data",
         ":static_validation_test_data",
     ],
+    # TODO(envoyproxy/windows-dev): diagnose clang-cl build test timeout
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",

@@ -1,0 +1,29 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ec1cfa782..0c5a72f00 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -42,0 +42,5 @@
++# revert CMake bug triggered by curl's defined max CMake policy version, see https://gitlab.kitware.com/cmake/cmake/-/issues/21288
++if(POLICY CMP0091)
++  cmake_policy(SET CMP0091 OLD)
++endif()
++
+@@ -249,3 +254,6 @@
+-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+-  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+-  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
++  foreach(build_suffix "" _DEBUG _RELEASE _MINSIZEREL _RELWITHDEBINFO)
++    set(flags_var CMAKE_C_FLAGS${build_suffix})
++    if("${${flags_var}}" MATCHES "/MD")
++      string(REGEX REPLACE "/MD" "/MT" ${flags_var} "${${flags_var}}")
++    endif()
++  endforeach()
+diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
+index 911c9096d..ba6af1bf1 100644
+--- a/lib/CMakeLists.txt
++++ b/lib/CMakeLists.txt
+@@ -91,4 +91,0 @@ add_library(
+-if(MSVC AND NOT BUILD_SHARED_LIBS)
+-  set_target_properties(${LIB_NAME} PROPERTIES STATIC_LIBRARY_FLAGS ${CMAKE_EXE_LINKER_FLAGS})
+-endif()
+-

@@ -63,6 +63,8 @@ envoy_cc_test(
     name = "main_common_test",
     srcs = ["main_common_test.cc"],
     data = ["//test/config/integration:google_com_proxy_port_0"],
+    # TODO(envoyproxy/windows-dev): diagnose clang-cl fastbuild TIMEOUT flake
+    tags = ["flaky_on_windows"],
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:main_common_lib",
