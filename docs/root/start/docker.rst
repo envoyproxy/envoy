@@ -70,7 +70,7 @@ Build the Docker image using:
 
    $ docker build -t envoy:v1 .
 
-Assuming you configured Envoy to listen on ports ``9901`` and ``10000``, you can now start it
+Assuming Envoy is configured to listen on ports ``9901`` and ``10000``, you can now start it
 with:
 
 .. code-block:: console
