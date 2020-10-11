@@ -11,3 +11,4 @@ install/tools/tools.rst       start/install/tools/tools.rst
 install/install.rst	      start/start.rst
 
 start/install/ref_configs.rst	start/ref_configs.rst
+start/install/sandboxes/local_docker_build.rst start/building/local_docker_build.rst

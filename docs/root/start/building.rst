@@ -95,4 +95,4 @@ Envoy binary, and putting the binary in an Ubuntu container.
 .. toctree::
     :maxdepth: 2
 
-    install/sandboxes/local_docker_build
+    building/local_docker_build
