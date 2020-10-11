@@ -54,7 +54,7 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     TestParameters, UdsListenerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(false, true), testing::Values(0)));
+                     testing::Values(false), testing::Values(0)));
 #endif
 
 // Test the mode parameter, excluding abstract namespace enabled
