@@ -24,8 +24,9 @@ using testing::Return;
 
 namespace {
 
+// This loads one of the secrets in credentials, and fails the other one.
 void expectInvalidSecretConfig(const std::string& correctly_loaded_secret,
-                         const std::string& exception_message) {
+                               const std::string& exception_message) {
   const std::string yaml = R"EOF(
 config:
   token_endpoint:
