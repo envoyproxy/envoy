@@ -67,7 +67,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   http_service:
     server_uri:
       uri: "ext_authz:9000"
-      # cluster: "ext_authz"
+      cluster: "ext_authz"
       timeout: 0.25s
 
     authorization_request:
