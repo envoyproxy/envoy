@@ -2295,6 +2295,24 @@ typed_config:
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
 }
 
+// Verify detection of overflowing outbound frame queue with the PING frames sent by the keep alive
+// timer. The test verifies protocol constraint violation handling in the
+// Http2::ConnectionImpl::sendKeepalive() method.
+TEST_P(Http2FloodMitigationTest, KeepAliveTimeeTriggersFloodProtection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* keep_alive = hcm.mutable_http2_protocol_options()->mutable_connection_keepalive();
+        keep_alive->mutable_interval()->set_nanos(500 * 1000 * 1000);
+        keep_alive->mutable_timeout()->set_seconds(1);
+      });
+
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
 // Verify that the server stop reading downstream connection on protocol error.
 TEST_P(Http2FloodMitigationTest, TooManyStreams) {
   config_helper_.addConfigModifier(
