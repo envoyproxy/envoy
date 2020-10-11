@@ -1,7 +1,5 @@
 #include "uds_integration_test.h"
 
-#include <unistd.h>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
