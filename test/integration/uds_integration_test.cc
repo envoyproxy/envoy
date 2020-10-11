@@ -56,13 +56,11 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(false), testing::Values(0)));
 #endif
 
-#ifndef WIN32
 // Test the mode parameter, excluding abstract namespace enabled
 INSTANTIATE_TEST_SUITE_P(
     TestModeParameter, UdsListenerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(false), testing::Values(0662)));
-#endif
 
 void UdsListenerIntegrationTest::initialize() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -94,6 +92,9 @@ HttpIntegrationTest::ConnectionCreationFunction UdsListenerIntegrationTest::crea
   };
 }
 
+// Excluding Windows; chmod(2) against Windows AF_UNIX socket files succeeds,
+// but stat(2) against those returns ENOENT.
+#ifndef WIN32
 TEST_P(UdsListenerIntegrationTest, TestSocketMode) {
   if (abstract_namespace_) {
     // stat(2) against sockets in abstract namespace is not possible
@@ -111,6 +112,7 @@ TEST_P(UdsListenerIntegrationTest, TestSocketMode) {
     EXPECT_EQ(listener_stat.st_mode & mode_, mode_);
   }
 }
+#endif
 
 TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
   fake_upstreams_count_ = 1;
