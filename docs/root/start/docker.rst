@@ -77,8 +77,8 @@ with:
 
    $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
 
-Permissions for running the Docker Envoy image as a non-root user
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Permissions for running Docker Envoy containers as a non-root user
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Envoy Docker image should be started as ``root``, but switches when run to the ``envoy`` user
 created at build time.

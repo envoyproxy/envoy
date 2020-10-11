@@ -18,7 +18,6 @@ feature of the API, which is most useful for simple requirements. For more compl
     install
     docker
     quick-start
-    ref_configs
     tools/tools
     sandboxes/index
     building
