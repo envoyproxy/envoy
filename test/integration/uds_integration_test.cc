@@ -1,5 +1,7 @@
 #include "uds_integration_test.h"
 
+#include <unistd.h>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "common/event/dispatcher_impl.h"
@@ -47,13 +49,19 @@ TEST_P(UdsUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseCompl
 INSTANTIATE_TEST_SUITE_P(
     TestParameters, UdsListenerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(false, true)));
+                     testing::Values(false, true), testing::Values(0)));
 #else
 INSTANTIATE_TEST_SUITE_P(
     TestParameters, UdsListenerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(false)));
+                     testing::Values(false, true), testing::Values(0)));
 #endif
+
+// Test the mode parameter, excluding abstract namespace enabled
+INSTANTIATE_TEST_SUITE_P(
+    TestModeParameter, UdsListenerIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false), testing::Values(0662)));
 
 void UdsListenerIntegrationTest::initialize() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -68,6 +76,7 @@ void UdsListenerIntegrationTest::initialize() {
     auto* listener = listeners->Add();
     listener->set_name("listener_0");
     listener->mutable_address()->mutable_pipe()->set_path(getListenerSocketName());
+    listener->mutable_address()->mutable_pipe()->set_mode(getMode());
     *(listener->mutable_filter_chains()) = filter_chains;
   });
   HttpIntegrationTest::initialize();
@@ -82,6 +91,24 @@ HttpIntegrationTest::ConnectionCreationFunction UdsListenerIntegrationTest::crea
     conn->enableHalfClose(enable_half_close_);
     return conn;
   };
+}
+
+TEST_P(UdsListenerIntegrationTest, TestSocketMode) {
+  if (abstract_namespace_) {
+    // stat(2) against sockets in abstract namespace is not possible
+    GTEST_SKIP();
+  }
+
+  initialize();
+  struct stat listener_stat;
+  EXPECT_EQ(::stat(getListenerSocketName().c_str(), &listener_stat), 0);
+  ENVOY_LOG_MISC(debug, "expectedmode={} mode={} uid={} gid={}", mode_, listener_stat.st_mode,
+                 listener_stat.st_uid, listener_stat.st_gid);
+  if (mode_ == 0) {
+    EXPECT_NE(listener_stat.st_mode & 0777, 0);
+  } else {
+    EXPECT_EQ(listener_stat.st_mode & mode_, mode_);
+  }
 }
 
 TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
