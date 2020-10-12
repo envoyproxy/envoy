@@ -73,9 +73,9 @@ static const std::string SKYWALKING_CONFIG_NO_CLIENT_CONFIG = R"EOF(
 TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   setupSkyWalkingDriver(SKYWALKING_CONFIG_WITH_CLIENT_CONFIG);
 
-  std::string trace_id = SkyWalkingTestHelper::generateId(context_.server_factory_context_.random_);
+  std::string trace_id = SkyWalkingTestHelper::generateId(context_.server_factory_context_.api_.random_);
   std::string segment_id =
-      SkyWalkingTestHelper::generateId(context_.server_factory_context_.random_);
+      SkyWalkingTestHelper::generateId(context_.server_factory_context_.api_.random_);
 
   // Create new span segment with previous span context.
   std::string previous_header_value =
