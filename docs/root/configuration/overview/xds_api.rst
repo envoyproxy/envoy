@@ -359,14 +359,12 @@ When using xDS, users might find themself wanting to temporarily update certain 
 safely, xDS TTLs can be used to make sure that if the control plane becomes unavailable and is unable to revert
 the xDS change, Envoy will remove the resource after a TTL specified by the server.
 
-Currently the behavior when a TTL expires is that the resource is *removed* (as opposed to reverted to the
+Currently the behavior when a TTL expires is that the resource is *expired* (as opposed to reverted to the
 previous version). As such, this feature should primarily be used for use cases where the absence of the resource
 is preferred instead of the temporary version, e.g. when using RTDS to apply a temporary runtime override.
 
-The TTL is specified in the :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`
-for SotW xDS (and applies to the entire collection of resources) or in the :ref:`Resource <envoy_api_msg_Resource>`
-for Delta xDS (applying to each individual resource).
+The TTL is specifed on the :ref:`Resource <envoy_api_msg_Resource>` proto: for Delta xDS this is specified directly
+within the response, while for SotW xDS the server may wrap individual resources listed in the response within a
+:ref:`Resource <envoy_api_msg_Resource>` in order to specify a TTL value.
 
-The server can refresh or modify the TTL by issuing another response for the same version. For SotW, the resources
-can be omitted when the version hasn't changed in order to refresh the TTL without having to serialize a large
-response.
+The server can refresh or modify the TTL by issuing another response for the same version.

@@ -665,11 +665,9 @@ be used, for example, to terminate a fault injection test when the management se
 be reached.
 
 For clients that support the *envoy.config.supports-resource-ttl* client feature, A TTL field may
-be specified on each :ref:`Resource <envoy_api_msg_Resource>` for Delta xDS or on the entire
-:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` for SotW xDS. A timer is started for each
-:ref:`Resource <envoy_api_msg_Resource>` or :`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
-that has a TTL specified. When the timer expires, the specific resource is removed for Delta, while
-for SotW all the resources are removed.
+be specified on each :ref:`Resource <envoy_api_msg_Resource>`. Each resource will have its own TTL
+expiry time, at which point the resource will be expired. Each xDS type may have different ways of
+handling such an expiry.
 
 To update the TTL associated with a *Resource*, the management server resends the resource with a
 new TTL. To remove the TTL, the management server resends the resource with the TTL field unset.
@@ -677,11 +675,11 @@ new TTL. To remove the TTL, the management server resends the resource with the 
 SotW TTL
 ^^^^^^^^
 
-As SotW xDS does not have notion of a :ref:`Resource <envoy_api_msg_Resource>`, TTLs apply to the
-entire response. The TTL can similarly be reset by sending another response, even if the version
-has not changed. To avoid having to send a large amount of data over the wire, an empty response
-with the same version as the client requested can be sent to update the TTL without causing the
-resources to be removed.
+In order to use TTL with SotW xDS, the relevant resources must be wrapped in a
+:ref:`Resource <envoy_api_msg_Resource>`. This allows setting the same TTL field that is used for
+Delta xDS with SotW, without changing the SotW API.
+
+This feature is gated by the *envoy.config.supports-resource-in-sotw* client feature.
 
 .. _xds_protocol_ads:
 
