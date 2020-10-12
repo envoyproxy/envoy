@@ -163,7 +163,10 @@ public:
                                                                            : "HttpUpstream"));
   }
 
-  void TearDown() override { cleanUpXdsConnection(); }
+  void TearDown() override {
+    cleanupHostConnections();
+    cleanUpXdsConnection();
+  }
 
   // Adds a HTTP active health check specifier to the given cluster, and waits for the first health
   // check probe to be received.
@@ -216,9 +219,6 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttp) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-  // Clean up connections.
-  cleanupHostConnections();
 }
 
 // Tests that an unhealthy endpoint returns a valid HTTP health check response.
@@ -235,9 +235,6 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyHttp) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-  // Clean up connections.
-  cleanupHostConnections();
 }
 
 // Tests that no HTTP health check response results in timeout and unhealthy endpoint.
@@ -253,9 +250,6 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-  // Clean up connections
-  cleanupHostConnections();
 }
 
 class TcpHealthCheckIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -263,7 +257,10 @@ class TcpHealthCheckIntegrationTest : public testing::TestWithParam<Network::Add
 public:
   TcpHealthCheckIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}
 
-  void TearDown() override { cleanUpXdsConnection(); }
+  void TearDown() override {
+    cleanupHostConnections();
+    cleanUpXdsConnection();
+  }
 
   // Adds a TCP active health check specifier to the given cluster, and waits for the first health
   // check probe to be received.
@@ -292,9 +289,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpHealthCheckIntegrationTest,
 
 // Tests that a healthy endpoint returns a valid TCP health check response.
 TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcp) {
-  initialize();
-
   const uint32_t cluster_idx = 0;
+  initialize();
   initTcpHealthCheck(cluster_idx);
 
   AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
@@ -303,16 +299,12 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcp) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-  // Clean up connections.
-  cleanupHostConnections();
 }
 
 // Tests that an invalid response fails the health check.
 TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointWrongResponseTcp) {
-  initialize();
-
   const uint32_t cluster_idx = 0;
+  initialize();
   initTcpHealthCheck(cluster_idx);
 
   // Send the wrong reply ("Pong" is expected).
@@ -326,16 +318,12 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointWrongResponseTcp) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-  // Clean up connections.
-  cleanupHostConnections();
 }
 
 // Tests that no TCP health check response results in timeout and unhealthy endpoint.
 TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
-  initialize();
-
   const uint32_t cluster_idx = 0;
+  initialize();
   initTcpHealthCheck(cluster_idx);
 
   // Increase time until timeout (30s).
@@ -344,9 +332,6 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-  // Clean up connections.
-  cleanupHostConnections();
 }
 
 } // namespace
