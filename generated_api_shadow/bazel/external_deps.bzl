@@ -99,8 +99,12 @@ def load_repository_locations(repository_locations_spec):
             cpe = mutable_location.pop("cpe")
 
             # Starlark doesn't have regexes.
-            cpe_matches = (cpe != "N/A" and (not cpe.startswith("cpe:2.3:a:") or not cpe.endswith(":*") and len(cpe.split(":")) != 6))
-            if cpe_matches:
+            cpe_components = len(cpe.split(":"))
+
+            # We allow cpe:2.3:a:foo:* and cpe:2.3.:a:foo:bar:* only.
+            cpe_components_valid = cpe_components in [5, 6]
+            cpe_matches = (cpe == "N/A" or (cpe.startswith("cpe:2.3:a:") and cpe.endswith(":*") and cpe_components_valid))
+            if not cpe_matches:
                 fail("CPE must match cpe:2.3:a:<facet>:<facet>:*: " + cpe)
         elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
             _fail_missing_attribute("cpe", key)

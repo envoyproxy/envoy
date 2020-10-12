@@ -573,11 +573,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "LLVM",
         project_desc = "LLVM Compiler Infrastructure",
         project_url = "https://llvm.org",
-        version = "10.0",
+        version = "10.0.0",
         sha256 = "df83a44b3a9a71029049ec101fb0077ecbbdf5fe41e395215025779099a98fdf",
-        strip_prefix = "llvm-{version}.0.src",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}.0/llvm-{version}.0.src.tar.xz"],
-        last_updated = "2020-03-24",
+        strip_prefix = "llvm-{version}.src",
+        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-{version}.src.tar.xz"],
+        last_updated = "2020-10-09",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -586,7 +586,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:llvm:*",
     ),
     com_github_wavm_wavm = dict(
         project_name = "WAVM",
@@ -596,7 +596,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "cc3fcaf05d57010c9cf8eb920234679dede6c780137b55001fd34e4d14806f7c",
         strip_prefix = "WAVM-{version}",
         urls = ["https://github.com/WAVM/WAVM/archive/{version}.tar.gz"],
-        last_updated = "2020-07-06",
+        last_updated = "2020-10-09",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -605,7 +605,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:webassembly_virtual_machine_project:webassembly_virtual_machine:*",
     ),
     io_opencensus_cpp = dict(
         project_name = "OpenCensus C++",
@@ -806,7 +806,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "7afb39d868a973caa6216a535c24e37fb666b6f3",
         sha256 = "213d0b441bcc3df2c87933b24a593b5fd482fa8f4db158b707c60005b9e70040",
         strip_prefix = "proxy-wasm-cpp-sdk-{version}",
-        # 2020-09-10
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
@@ -816,14 +815,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
         cpe = "N/A",
     ),
     proxy_wasm_cpp_host = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        # 2020-09-10
         version = "49ed20e895b728aae6b811950a2939ecbaf76f7c",
         sha256 = "fa03293d01450b9164f8f56ef9227301f7d1af4f373f996400f75c93f6ebc822",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
@@ -836,7 +834,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-99",
         cpe = "N/A",
     ),
     # TODO: upgrade to the latest version (1.41 currently fails tests)
@@ -844,15 +842,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        version = "dec8a63594753fe5f4ad3b47850bf64d66c14a4e",
-        sha256 = "2bdbee6947e32ad1e03cd075b48fda493ab16157b2b0225b445222cd528e1843",
+        version = "1.39.6",
+        sha256 = "4ac0f1f3de8b3f1373d435cd7e58bd94de4146e751f099732167749a229b443b",
         patch_cmds = [
             "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 1.39.6-upstream && ./emsdk activate --embedded 1.39.6-upstream || true",
         ],
         strip_prefix = "emsdk-{version}",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["build"],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
     ),
     io_bazel_rules_rust = dict(
         project_name = "Bazel rust rules",
@@ -865,7 +863,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "rules_rust-{version}",
         urls = ["https://github.com/bazelbuild/rules_rust/archive/{version}.tar.gz"],
         use_category = ["build"],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
     ),
     rules_antlr = dict(
         project_name = "ANTLR Rules for Bazel",
@@ -875,7 +873,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
         strip_prefix = "rules_antlr-{version}",
         urls = ["https://github.com/marcohu/rules_antlr/archive/{version}.tar.gz"],
-        # This should be "build", but that trips the verification in the docs.
+        # ANTLR has a runtime component, so is not purely build.
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",

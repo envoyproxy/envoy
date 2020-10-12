@@ -369,14 +369,14 @@ cc_library(
 
     # Parser dependencies
     # TODO: upgrade this when cel is upgraded to use the latest version
-    http_archive(
+    external_http_archive(
         name = "rules_antlr",
         sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
         strip_prefix = "rules_antlr-3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
         urls = ["https://github.com/marcohu/rules_antlr/archive/3cc2f9502a54ceb7b79b37383316b23c4da66f9a.tar.gz"],
     )
 
-    http_archive(
+    external_http_archive(
         name = "antlr4_runtimes",
         build_file_content = """
 package(default_visibility = ["//visibility:public"])
