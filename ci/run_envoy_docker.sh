@@ -64,6 +64,7 @@ docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}" \
        -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}" \
+       -e AZP_BRANCH \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
