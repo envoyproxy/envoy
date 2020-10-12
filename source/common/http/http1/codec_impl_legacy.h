@@ -519,7 +519,6 @@ private:
   // of Envoy wish to enable pipelining (which is dangerous and ill supported)
   // we could make this configurable.
   uint32_t max_outbound_responses_{};
-  bool flood_protection_{};
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
