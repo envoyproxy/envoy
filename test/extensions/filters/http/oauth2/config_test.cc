@@ -25,7 +25,7 @@ using testing::Return;
 namespace {
 
 // This loads one of the secrets in credentials, and fails the other one.
-void expectInvalidSecretConfig(const std::string& correctly_loaded_secret,
+void expectInvalidSecretConfig(const std::string& failed_secret_name,
                                const std::string& exception_message) {
   const std::string yaml = R"EOF(
 config:
@@ -55,7 +55,8 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
-  ON_CALL(secret_manager, findStaticGenericSecretProvider(correctly_loaded_secret))
+  ON_CALL(secret_manager,
+          findStaticGenericSecretProvider(failed_secret_name == "token" ? "hmac" : "token"))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
@@ -89,7 +90,7 @@ config:
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
-  testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+  Server::Configuration::MockFactoryContext context;
 
   // This returns non-nullptr for token_secret and hmac_secret.
   auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
@@ -104,19 +105,17 @@ config:
   EXPECT_CALL(context, api());
   EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
+  Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
 
 TEST(ConfigTest, InvalidTokenSecret) {
-  // The token secret is correctly loaded, hence expecting invalid HMAC config.
-  expectInvalidSecretConfig("token", "invalid HMAC secret configuration");
+  expectInvalidSecretConfig("token", "invalid token secret configuration");
 }
 
 TEST(ConfigTest, InvalidHmacSecret) {
-  // The HMAC secret is correctly loaded, hence expecting invalid token config.
-  expectInvalidSecretConfig("hmac", "invalid token secret configuration");
+  expectInvalidSecretConfig("hmac", "invalid HMAC secret configuration");
 }
 
 TEST(ConfigTest, CreateFilterMissingConfig) {
