@@ -61,6 +61,16 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     }
   }
 
+  // Inject the current span's tracing context into the request headers.
+  ASSERT(parent_.downstreamHeaders());
+  if (!span_) {
+    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders());
+  } else {
+    // If new child span is created for forward upstream request, then use it to inject tracing
+    // context to request headers.
+    span_->injectContext(*parent_.downstreamHeaders());
+  }
+
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   if (conn_pool_->protocol().has_value()) {
     stream_info_.protocol(conn_pool_->protocol().value());
