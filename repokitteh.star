@@ -28,9 +28,11 @@ use(
       "path": "api/envoy/",
     },
     {
-      "owner": "envoyproxy/dependency-watchers",
+      "owner": "envoyproxy/dependency-shepherds!",
       "path":
-      "(bazel/repository_locations\.bzl)|(api/bazel/repository_locations\.bzl)|(.*/requirements\.txt)",
+      "(bazel/.*repos.*\.bzl)|(bazel/dependency_imports\.bzl)|(api/bazel/.*\.bzl)|(.*/requirements\.txt)",
+      "label": "deps",
+      "github_status_label": "any dependency change",
     },
   ],
 )
