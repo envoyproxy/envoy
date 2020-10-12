@@ -78,14 +78,14 @@ decompressor_library:
       if (end_stream && expect_decompression) {
         EXPECT_EQ(
             "30",
-            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                 ->value()
                 .getStringView());
-        EXPECT_EQ(
-            "60",
-            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
-                ->value()
-                .getStringView());
+        EXPECT_EQ("60", trailers
+                            .get(Http::LowerCaseString(
+                                "x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
+                            ->value()
+                            .getStringView());
       }
     } else {
       Http::TestResponseTrailerMapImpl trailers;
@@ -98,14 +98,14 @@ decompressor_library:
       if (end_stream && expect_decompression) {
         EXPECT_EQ(
             "30",
-            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                 ->value()
                 .getStringView());
-        EXPECT_EQ(
-            "60",
-            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
-                ->value()
-                .getStringView());
+        EXPECT_EQ("60", trailers
+                            .get(Http::LowerCaseString(
+                                "x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
+                            ->value()
+                            .getStringView());
       }
     }
   }
@@ -116,27 +116,27 @@ decompressor_library:
       EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
       EXPECT_EQ("30",
                 request_trailers
-                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                     ->value()
                     .getStringView());
-      EXPECT_EQ("60",
-                request_trailers
-                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
-                    ->value()
-                    .getStringView());
+      EXPECT_EQ("60", request_trailers
+                          .get(Http::LowerCaseString(
+                              "x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
+                          ->value()
+                          .getStringView());
     } else {
       Http::TestResponseTrailerMapImpl response_trailers;
       EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
       EXPECT_EQ("30",
                 response_trailers
-                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                     ->value()
                     .getStringView());
-      EXPECT_EQ("60",
-                response_trailers
-                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
-                    ->value()
-                    .getStringView());
+      EXPECT_EQ("60", response_trailers
+                          .get(Http::LowerCaseString(
+                              "x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
+                          ->value()
+                          .getStringView());
     }
   }
 
@@ -186,21 +186,21 @@ decompressor_library:
     // The filter removes the decompressor's content encoding from the Content-Encoding header.
     if (expected_content_encoding.has_value()) {
       EXPECT_EQ(expected_content_encoding.value(),
-                headers_after_filter->get(Http::CustomHeaders::get().ContentEncoding)
+                headers_after_filter->get(Http::CustomHeaders::get().ContentEncoding)[0]
                     ->value()
                     .getStringView());
     } else {
-      EXPECT_EQ(nullptr, headers_after_filter->get(Http::CustomHeaders::get().ContentEncoding));
+      EXPECT_TRUE(headers_after_filter->get(Http::CustomHeaders::get().ContentEncoding).empty());
     }
 
     // The filter adds the decompressor's content encoding to the Accept-Encoding header on the
     // request direction.
-    const auto* accept_encoding =
+    const auto accept_encoding =
         headers_after_filter->get(Http::LowerCaseString{"accept-encoding"});
     if (isRequestDirection() && expected_accept_encoding.has_value()) {
-      EXPECT_EQ(expected_accept_encoding.value(), accept_encoding->value().getStringView());
+      EXPECT_EQ(expected_accept_encoding.value(), accept_encoding[0]->value().getStringView());
     } else {
-      EXPECT_EQ(nullptr, accept_encoding);
+      EXPECT_TRUE(accept_encoding.empty());
     }
 
     expectDecompression(decompressor_ptr, end_with_data);
@@ -399,7 +399,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionHeadersOnly) {
       doHeaders(headers_before_filter, true /* end_stream */);
 
   if (isRequestDirection()) {
-    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))[0]
                   ->value()
                   .getStringView(),
               "mock");
@@ -418,7 +418,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingAbsent) {
       doHeaders(headers_before_filter, false /* end_stream */);
 
   if (isRequestDirection()) {
-    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))[0]
                   ->value()
                   .getStringView(),
               "mock");
@@ -451,7 +451,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingNotCurrent) {
       doHeaders(headers_before_filter, false /* end_stream */);
 
   if (isRequestDirection()) {
-    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))[0]
                   ->value()
                   .getStringView(),
               "mock");
@@ -474,7 +474,7 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresent) {
       doHeaders(headers_before_filter, false /* end_stream */);
 
   if (isRequestDirection()) {
-    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))[0]
                   ->value()
                   .getStringView(),
               "mock");
@@ -498,7 +498,7 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) 
       doHeaders(headers_before_filter, false /* end_stream */);
 
   if (isRequestDirection()) {
-    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))[0]
                   ->value()
                   .getStringView(),
               "mock");

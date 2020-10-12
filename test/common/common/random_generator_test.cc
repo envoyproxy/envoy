@@ -67,6 +67,24 @@ TEST(UUID, SanityCheckOfUniqueness) {
   EXPECT_EQ(num_of_uuids, uuids.size());
 }
 
+TEST(Random, Bernoilli) {
+  Random::RandomGeneratorImpl random;
+
+  EXPECT_FALSE(random.bernoulli(0));
+  EXPECT_FALSE(random.bernoulli(-1));
+  EXPECT_TRUE(random.bernoulli(1));
+  EXPECT_TRUE(random.bernoulli(2));
+
+  int true_count = 0;
+  static const auto num_rolls = 100000;
+  for (size_t i = 0; i < num_rolls; ++i) {
+    if (random.bernoulli(0.4)) {
+      ++true_count;
+    }
+  }
+  EXPECT_NEAR(static_cast<double>(true_count) / num_rolls, 0.4, 0.01);
+}
+
 } // namespace
 } // namespace Random
 } // namespace Envoy
