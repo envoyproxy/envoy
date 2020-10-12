@@ -528,7 +528,6 @@ TEST_F(OverloadManagerImplTest, CreateUnscaledScaledTimer) {
   EXPECT_CALL(*mock_range_timer, enableTimer(std::chrono::milliseconds(5 * 1000),
                                              std::chrono::milliseconds(5 * 1000), _));
   timer->enableTimer(std::chrono::seconds(5));
-
 }
 
 TEST_F(OverloadManagerImplTest, CreateScaledTimerWithAbsoluteMinimum) {
