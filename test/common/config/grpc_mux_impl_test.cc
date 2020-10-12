@@ -574,13 +574,10 @@ public:
 
 //  Verifies that rate limiting is not enforced with defaults.
 TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
-  // Validate that connection retry timer and TTL timer are both crated.
-  auto retry_timer = new Event::MockTimer(&dispatcher_);
 
-  // TTL timer.
+  auto ttl_timer = new Event::MockTimer(&dispatcher_);
+  // Retry timer,
   new Event::MockTimer(&dispatcher_);
-
-  EXPECT_CALL(*retry_timer, disableTimer());
 
   // Validate that rate limiter is not created.
   EXPECT_CALL(*mock_time_system_, monotonicTime()).Times(0);
@@ -596,6 +593,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
+      EXPECT_CALL(*ttl_timer, disableTimer());
       grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
     }
   };
@@ -634,6 +632,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
+      EXPECT_CALL(*ttl_timer, disableTimer());
       grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
     }
   };
@@ -646,7 +645,6 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100), _));
   // The drain timer enable is checked twice, once when we limit, again when the watch is destroyed.
   EXPECT_CALL(*drain_request_timer, enabled()).Times(11);
-  EXPECT_CALL(*ttl_timer, disableTimer());
   onReceiveMessage(110);
   EXPECT_EQ(11, stats_.counter("control_plane.rate_limit_enforced").value());
   EXPECT_EQ(11, control_plane_pending_requests_.value());
@@ -694,6 +692,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
+      EXPECT_CALL(*ttl_timer, disableTimer());
       grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
     }
   };
@@ -703,7 +702,6 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   grpc_mux_->start();
 
   // Validate that rate limit is not enforced for 100 requests.
-  EXPECT_CALL(*ttl_timer, disableTimer());
   onReceiveMessage(100);
   EXPECT_EQ(0, stats_.counter("control_plane.rate_limit_enforced").value());
 

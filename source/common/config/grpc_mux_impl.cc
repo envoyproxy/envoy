@@ -223,7 +223,6 @@ void GrpcMuxImpl::onDiscoveryResponse(
       resources.emplace_back(
           DecodedResourceImpl::maybeUnwrapPtr(resource_decoder, resource, message->version_info()));
       all_resource_refs.emplace_back(*resources.back());
-      ENVOY_LOG_MISC(info, "SEEING RESOURCE WITH NAME " + resources.back()->name());
       resource_ref_map.emplace(resources.back()->name(), *resources.back());
 
       if (resources.back()->ttl()) {
@@ -248,7 +247,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
           found_resources.emplace_back(it->second);
         }
       }
-      ENVOY_LOG_MISC(info, "found resource ct {}", found_resources.size());
+
       // onConfigUpdate should be called only on watches(clusters/routes) that have
       // updates in the message for EDS/RDS.
       if (!found_resources.empty()) {

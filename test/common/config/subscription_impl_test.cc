@@ -71,7 +71,7 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string> cluster_names, const std::string& version,
                            bool accept) {
-    test_harness_->deliverConfigUpdate(cluster_names, version, accept, true);
+    test_harness_->deliverConfigUpdate(cluster_names, version, accept);
   }
 
   void expectConfigUpdateFailed() { test_harness_->expectConfigUpdateFailed(); }

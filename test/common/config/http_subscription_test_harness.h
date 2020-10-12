@@ -119,7 +119,7 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept, bool) override {
+                           const std::string& version, bool accept) override {
     deliverConfigUpdate(cluster_names, version, accept, true, "200");
   }
 
