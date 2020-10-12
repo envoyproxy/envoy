@@ -578,6 +578,20 @@ void TestRootContext::onTick() {
       logDebug("missing node metadata");
     }
     logDebug(std::string("onTick ") + value);
+
+    std::string list_value;
+    if (!getValue({"node", "metadata", "wasm_node_list_key", "0"}, &list_value)) {
+      logDebug("missing node metadata list value");
+    }
+    if (list_value != "wasm_node_get_value") {
+      logWarn("unexpected list value: " + list_value);
+    }
+    if (getValue({"node", "metadata", "wasm_node_list_key", "bad_key"}, &list_value)) {
+      logDebug("unexpected list value for a bad_key");
+    }
+    if (getValue({"node", "metadata", "wasm_node_list_key", "1"}, &list_value)) {
+      logDebug("unexpected list value outside the range");
+    }
   } else if (test_ == "property") {
     uint64_t t;
     if (WasmResult::Ok != proxy_get_current_time_nanoseconds(&t)) {
