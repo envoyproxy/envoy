@@ -228,7 +228,7 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     conn_manager_->newStream(response_encoder_);
-    return bufferFloodError("too many outbound frames.");
+    return bufferFloodError("too many outbound frames");
   }));
 
   EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
@@ -242,7 +242,7 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
-        EXPECT_EQ("codec error: too many outbound frames.",
+        EXPECT_EQ("codec_error:too_many_outbound_frames",
                   stream_info.responseCodeDetails().value());
       }));
   // Kick off the incoming data.
@@ -1485,122 +1485,6 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
   EXPECT_CALL(response_encoder_.stream_, resetStream(_));
   expectOnDestroy();
   encoder_filters_[0]->callbacks_->resetStream();
-}
-
-TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
-  setup(false, "");
-  setupFilterChain(2, 2);
-
-  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
-  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
-  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
-
-  // Kick off the incoming data.
-  startRequest();
-
-  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
-  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
-  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
-
-  expectOnDestroy();
-
-  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[1]->callbacks_->encodeHeaders(
-      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
-
-  Buffer::OwnedImpl response_body("response");
-  decoder_filters_[1]->callbacks_->encodeData(response_body, true);
-}
-
-TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
-  setup(false, "");
-  setupFilterChain(2, 2);
-
-  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
-  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
-  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
-
-  // Kick off the request
-  startRequest(true, "hello");
-
-  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
-  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
-  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
-
-  expectOnDestroy();
-
-  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[1]->callbacks_->encodeHeaders(
-      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
-
-  Buffer::OwnedImpl response_body("response");
-  decoder_filters_[1]->callbacks_->encodeData(response_body, true);
-}
-
-TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
-  InSequence s;
-  setup(false, "");
-
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    auto headers = makeHeaderMap<TestRequestHeaderMapImpl>(
-        {{":authority", "host"}, {":path", "/"}, {":method", "GET"}});
-    decoder_->decodeHeaders(std::move(headers), false);
-
-    Buffer::OwnedImpl fake_data("hello");
-    decoder_->decodeData(fake_data, false);
-
-    auto trailers = makeHeaderMap<TestRequestTrailerMapImpl>({{"foo", "bar"}});
-    decoder_->decodeTrailers(std::move(trailers));
-    return Http::okStatus();
-  }));
-
-  setupFilterChain(2, 2);
-
-  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
-  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
-  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
-
-  // Kick off the incoming data.
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
-  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
-  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
-
-  expectOnDestroy();
-
-  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[1]->callbacks_->encodeHeaders(
-      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
-
-  Buffer::OwnedImpl response_body("response");
-  decoder_filters_[1]->callbacks_->encodeData(response_body, false);
-
-  auto response_trailers = makeHeaderMap<TestResponseTrailerMapImpl>({{"x-trailer", "1"}});
-  decoder_filters_[1]->callbacks_->encodeTrailers(std::move(response_trailers));
 }
 
 // Filter continues headers iteration without ending the stream, then injects a body later.

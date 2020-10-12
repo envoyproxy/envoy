@@ -12,6 +12,18 @@ These examples use the :ref:`v3 Envoy API <envoy_api_reference>`, but use only t
 feature of the API, which is most useful for simple requirements. For more complex requirements
 :ref:`Dynamic Configuration <arch_overview_dynamic_config>` is supported.
 
+.. _install:
+
+Building and installation
+-------------------------
+
+.. toctree::
+    :maxdepth: 2
+
+    building
+    install/ref_configs
+    install/tools/tools
+
 Quick Start to Run Simple Example
 ---------------------------------
 

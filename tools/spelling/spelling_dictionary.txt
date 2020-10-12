@@ -15,6 +15,7 @@ API
 ARN
 ASAN
 ASCII
+ASM
 ASSERTs
 AST
 AWS
@@ -307,6 +308,7 @@ SPIFFE
 SPKI
 SQL
 SR
+SRCDIR
 SRDS
 SRV
 SS
@@ -405,6 +407,7 @@ argv
 artisanal
 ary
 asctime
+asm
 async
 atoi
 atomicity
@@ -429,6 +432,7 @@ backtracing
 balancer
 balancers
 barbaz
+basename
 baz
 bazel
 behaviour
@@ -574,7 +578,9 @@ dgst
 dir
 dirname
 djb
+downcalls
 downcasted
+downcased
 downstreams
 drainable
 dtor
@@ -585,6 +591,7 @@ dynamodb
 emplace
 emplaced
 emscripten
+emsdk
 enablement
 encodings
 endian
@@ -616,9 +623,11 @@ failover
 fallbacks
 fastbuild
 favicon
+fbs
 fcntl
 fd
 fds
+fdstat
 filename
 filenames
 fileno
@@ -626,6 +635,8 @@ filesystem
 firefox
 fixdate
 fixup
+flatbuffer
+flatc
 fmt
 fmtlib
 fn
@@ -731,6 +742,8 @@ kv
 kvs
 lala
 latencies
+ld
+ldd
 len
 lenenc
 lexically
@@ -764,6 +777,7 @@ lua
 lyft
 maglev
 malloc
+marshaller
 matchable
 matcher
 matchers
@@ -808,6 +822,7 @@ mysql
 namelen
 nameserver
 namespace
+namespaced
 namespaces
 namespacing
 nan
@@ -904,6 +919,7 @@ preflight
 preorder
 prepend
 prepended
+prepends
 prev
 probabilistically
 proc
@@ -1061,6 +1077,7 @@ stateful
 statsd
 stderr
 stdev
+stdin
 stdout
 stmt
 str
