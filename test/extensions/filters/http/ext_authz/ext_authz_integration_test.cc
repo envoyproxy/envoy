@@ -311,11 +311,7 @@ public:
 
   void cleanup() {
     if (fake_ext_authz_connection_ != nullptr) {
-      if (clientType() != Grpc::ClientType::GoogleGrpc) {
-        AssertionResult result = fake_ext_authz_connection_->close();
-        RELEASE_ASSERT(result, result.message());
-      }
-      AssertionResult result = fake_ext_authz_connection_->waitForDisconnect();
+      AssertionResult result = fake_ext_authz_connection_->close();
       RELEASE_ASSERT(result, result.message());
     }
     cleanupUpstreamAndDownstream();
@@ -513,12 +509,8 @@ public:
     });
   }
 
-  void setupWithDisabledCaseSensitiveStringMatcher(bool disable_case_sensitive_matcher) {
+  void setup() {
     initializeConfig();
-
-    if (disable_case_sensitive_matcher) {
-      disableCaseSensitiveStringMatcher();
-    }
 
     HttpIntegrationTest::initialize();
 
@@ -695,19 +687,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher.
 TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
-  setupWithDisabledCaseSensitiveStringMatcher(false);
+  setup();
   const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_EQ(header_entry, nullptr);
-}
-
-// Verifies that by setting "false" to
-// envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher, the string
-// matcher used by HTTP service will be case-insensitive.
-TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
-  setupWithDisabledCaseSensitiveStringMatcher(true);
-  const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_NE(header_entry, nullptr);
-  EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, CheckTimesOutLegacy) { expectCheckRequestTimedout(false); }
@@ -823,6 +805,69 @@ body_format:
       "message": ""
 })";
   EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection(4, Headers{}, Headers{});
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Make sure one Google grpc client is created.
+    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+  }
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{});
+
+  waitForSuccessfulUpstreamResponse("200");
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+  TestUtility::feedBufferWithRandomCharacters(request_body_, 4);
+  response_ = codec_client_->makeRequestWithBody(headers, request_body_.toString());
+
+  auto result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+  RELEASE_ASSERT(result, result.message());
+
+  EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
+  EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
+                                                apiVersion()),
+            ext_authz_request_->headers().getPathValue());
+  EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Make sure one Google grpc client is created.
+    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+  }
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{});
+
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(response_size_, true);
+
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+  EXPECT_EQ(response_size_, response_->body().size());
 
   cleanup();
 }
