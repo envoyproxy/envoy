@@ -357,7 +357,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
 }
 
 void HostImpl::addSecretsReadyCb(std::function<void()> callback,
-    const envoy::config::core::v3::Metadata* metadata) const {
+                                 const envoy::config::core::v3::Metadata* metadata) const {
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? cluster_->transportSocketMatcher().resolve(metadata).factory_
                             : socket_factory_;

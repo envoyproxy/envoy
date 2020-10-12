@@ -384,9 +384,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::start() {
   // that health checks will be performed on. If health checks start
   // immediately, they may fail with "network" errors due to TLS credentials
   // not yet being loaded, which can result in long startup times.
-  host_->addSecretsReadyCb([this]{
-      onInitialInterval();
-  }, parent_.transportSocketMatchMetadata().get());
+  host_->addSecretsReadyCb([this] { onInitialInterval(); },
+                           parent_.transportSocketMatchMetadata().get());
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {

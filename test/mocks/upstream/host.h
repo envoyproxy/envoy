@@ -193,7 +193,7 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(void, addSecretsReadyCb,
-      (std::function<void()>, const envoy::config::core::v3::Metadata*), (const));
+              (std::function<void()>, const envoy::config::core::v3::Metadata*), (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::TransportSocketFactoryPtr socket_factory_;
