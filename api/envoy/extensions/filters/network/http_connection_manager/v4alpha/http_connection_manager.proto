@@ -612,7 +612,7 @@ message LocalReplyConfig {
 }
 
 // The configuration to filter and change local response.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ResponseMapper {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.ResponseMapper";
@@ -634,6 +634,11 @@ message ResponseMapper {
   // HTTP headers to add to a local reply. This allows the response mapper to append, to add
   // or to override headers of any local reply before it is sent to a downstream client.
   repeated config.core.v4alpha.HeaderValueOption headers_to_add = 5
+      [(validate.rules).repeated = {max_items: 1000}];
+
+  // Tokenized HTTP headers to add to a local reply. This allows the response mapper to append, to add
+  // or to override headers of any local reply before it is sent to a downstream client.
+  repeated config.core.v4alpha.TokenizedHeaderValueOption tokenized_headers_to_add = 6
       [(validate.rules).repeated = {max_items: 1000}];
 }
 
