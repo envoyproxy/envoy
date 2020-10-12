@@ -3,7 +3,6 @@
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/decoded_resource_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "udpa/core/v1/collection_entry.pb.h"
