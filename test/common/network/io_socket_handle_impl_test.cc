@@ -98,7 +98,7 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
 TEST(IoSocketHandleImpl, LastRoundTripIntegrationTest) {
   struct sockaddr_in server;
   // TCP info can not be calculated on loopback.
-  // For that reason we a public dns server.
+  // For that reason we connect to a public dns server.
   server.sin_addr.s_addr = inet_addr("1.1.1.1");
   server.sin_family = AF_INET;
   server.sin_port = htons(80);

@@ -18,16 +18,7 @@
 // These must follow afterwards
 #include <mswsock.h>
 #include <ws2tcpip.h>
-
-#undef NTDDI_VERSION
-#define NTDDI_VERSION WDK_NTDDI_VERSION
-
 #include <mstcpip.h>
-
-#ifndef SIO_TCP_INFO
-static_assert(false,
-              "SIO_TCP_INFO not defined, Envoy will not compile on Windows on this platform");
-#endif
 
 // This is introduced in Windows SDK 10.0.17063.0 which is required
 // to build Envoy on Windows (we will reevaluate whether earlier builds
