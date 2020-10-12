@@ -35,13 +35,15 @@ TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
-  EXPECT_TRUE(response->headers().get(
-                  Envoy::Http::LowerCaseString{"x-custom-upstream-service-time"}) != nullptr);
+  EXPECT_FALSE(response->headers()
+                   .get(Envoy::Http::LowerCaseString{"x-custom-upstream-service-time"})
+                   .empty());
   EXPECT_EQ("x-custom-upstream-service-time",
             response->headers().EnvoyUpstreamServiceTime()->key().getStringView());
 
-  EXPECT_TRUE(upstream_request_->headers().get(
-                  Envoy::Http::LowerCaseString{"x-custom-expected-rq-timeout-ms"}) != nullptr);
+  EXPECT_FALSE(upstream_request_->headers()
+                   .get(Envoy::Http::LowerCaseString{"x-custom-expected-rq-timeout-ms"})
+                   .empty());
   EXPECT_EQ("x-custom-expected-rq-timeout-ms",
             upstream_request_->headers().EnvoyExpectedRequestTimeoutMs()->key().getStringView());
 }

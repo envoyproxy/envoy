@@ -39,13 +39,14 @@ public:
                                     const StreamInfo::FilterStateSharedPtr) const override {
     absl::optional<uint64_t> hash;
 
-    const HeaderEntry* header = headers.get(header_name_);
-    if (header) {
+    // TODO(mattklein123): Potentially hash on all headers.
+    const auto header = headers.get(header_name_);
+    if (!header.empty()) {
       if (regex_rewrite_ != nullptr) {
-        hash = HashUtil::xxHash64(regex_rewrite_->replaceAll(header->value().getStringView(),
+        hash = HashUtil::xxHash64(regex_rewrite_->replaceAll(header[0]->value().getStringView(),
                                                              regex_rewrite_substitution_));
       } else {
-        hash = HashUtil::xxHash64(header->value().getStringView());
+        hash = HashUtil::xxHash64(header[0]->value().getStringView());
       }
     }
     return hash;

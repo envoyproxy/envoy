@@ -586,6 +586,10 @@ message ScopedRoutes {
         }
 
         // The name of the header field to extract the value from.
+        //
+        // .. note::
+        //
+        //   If the header appears multiple times only the first value is used.
         string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').

@@ -550,9 +550,11 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   if (!host_rewrite_.empty()) {
     headers.setHost(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
-    const Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
-    if (header != nullptr) {
-      absl::string_view header_value = header->value().getStringView();
+    const auto header = headers.get(*auto_host_rewrite_header_);
+    if (!header.empty()) {
+      // This is an implicitly untrusted header, so per the API documentation only the first
+      // value is used.
+      const absl::string_view header_value = header[0]->value().getStringView();
       if (!header_value.empty()) {
         headers.setHost(header_value);
       }
@@ -881,10 +883,12 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
-      const Http::HeaderEntry* entry = headers.get(cluster_header_name_);
+      const auto entry = headers.get(cluster_header_name_);
       std::string final_cluster_name;
-      if (entry) {
-        final_cluster_name = std::string(entry->value().getStringView());
+      if (!entry.empty()) {
+        // This is an implicitly untrusted header, so per the API documentation only the first
+        // value is used.
+        final_cluster_name = std::string(entry[0]->value().getStringView());
       }
 
       // NOTE: Though we return a shared_ptr here, the current ownership model assumes that

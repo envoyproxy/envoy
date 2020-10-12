@@ -80,17 +80,6 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
   }
 }
 
-void HeaderUtility::getAllOfHeader(const HeaderMap& headers, absl::string_view key,
-                                   std::vector<absl::string_view>& out) {
-  headers.iterate([key = LowerCaseString(std::string(key)),
-                   &out](const HeaderEntry& header) -> HeaderMap::Iterate {
-    if (header.key() == key.get().c_str()) {
-      out.emplace_back(header.value().getStringView());
-    }
-    return HeaderMap::Iterate::Continue;
-  });
-}
-
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
   // No headers to match is considered a match.
@@ -106,9 +95,10 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
 }
 
 HeaderUtility::GetAllOfHeaderAsStringResult
-HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::LowerCaseString& key) {
+HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::LowerCaseString& key,
+                                      absl::string_view separator) {
   GetAllOfHeaderAsStringResult result;
-  const auto header_value = headers.getAll(key);
+  const auto header_value = headers.get(key);
 
   if (header_value.empty()) {
     // Empty for clarity. Avoid handling the empty case in the block below if the runtime feature
@@ -118,7 +108,7 @@ HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::Lowe
                  "envoy.reloadable_features.http_match_on_all_headers")) {
     result.result_ = header_value[0]->value().getStringView();
   } else {
-    // In this case we concatenate all found headers using a ',' delimiter before performing the
+    // In this case we concatenate all found headers using a delimiter before performing the
     // final match. We use an InlinedVector of absl::string_view to invoke the optimized join
     // algorithm. This requires a copying phase before we invoke join. The 3 used as the inline
     // size has been arbitrarily chosen.
@@ -128,7 +118,7 @@ HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::Lowe
     for (size_t i = 0; i < header_value.size(); i++) {
       string_view_vector.push_back(header_value[i]->value().getStringView());
     }
-    result.result_backing_string_ = absl::StrJoin(string_view_vector, ",");
+    result.result_backing_string_ = absl::StrJoin(string_view_vector, separator);
   }
 
   return result;

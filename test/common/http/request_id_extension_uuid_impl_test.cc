@@ -48,7 +48,7 @@ TEST(UUIDRequestIDExtensionTest, PreserveRequestIDInResponse) {
   TestResponseHeaderMapImpl response_headers;
 
   uuid_utils.setInResponse(response_headers, request_headers);
-  EXPECT_EQ(nullptr, response_headers.get(Headers::get().RequestId));
+  EXPECT_TRUE(response_headers.get(Headers::get().RequestId).empty());
 
   request_headers.setRequestId("some-request-id");
   uuid_utils.setInResponse(response_headers, request_headers);

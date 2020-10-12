@@ -759,7 +759,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   EXPECT_EQ("/users", request_headers_.get_(Http::Headers::get().Path));
   EXPECT_EQ("websocket", request_headers_.get_(Http::Headers::get().Protocol));
   EXPECT_EQ("https", request_headers_.get_(Http::Headers::get().Scheme));
-  EXPECT_EQ(nullptr, request_headers_.get(Http::LowerCaseString{"remove-me"}));
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString{"remove-me"}).empty());
 }
 
 // Verifies that the filter clears the route cache when an authorization response:
@@ -1879,10 +1879,11 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
         EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");
         EXPECT_EQ(test_headers.get_("accept-encoding"), "gzip,deflate");
         EXPECT_EQ(data.toString(), "foo");
-
-        std::vector<absl::string_view> setCookieHeaderValues;
-        Http::HeaderUtility::getAllOfHeader(test_headers, "set-cookie", setCookieHeaderValues);
-        EXPECT_THAT(setCookieHeaderValues, UnorderedElementsAre("cookie1=value", "cookie2=value"));
+        EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(test_headers,
+                                                              Http::LowerCaseString("set-cookie"))
+                      .result()
+                      .value(),
+                  "cookie1=value,cookie2=value");
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));

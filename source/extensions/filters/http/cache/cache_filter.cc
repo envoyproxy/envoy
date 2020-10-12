@@ -373,7 +373,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     // TODO(yosrym93): Try to avoid copying the header key twice.
     Http::LowerCaseString key(std::string(cached_header.key().getStringView()));
     absl::string_view value = cached_header.value().getStringView();
-    if (!response_headers.get(key)) {
+    if (response_headers.get(key).empty()) {
       response_headers.setCopy(key, value);
     }
     return Http::HeaderMap::Iterate::Continue;

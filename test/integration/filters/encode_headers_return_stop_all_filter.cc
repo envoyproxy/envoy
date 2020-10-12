@@ -27,13 +27,11 @@ public:
   // Http::FilterHeadersStatus::StopAllIterationAndWatermark for headers. Triggers a timer to
   // continue iteration after 5s.
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& header_map, bool) override {
-    const Http::HeaderEntry* entry_content =
-        header_map.get(Envoy::Http::LowerCaseString("content_size"));
-    const Http::HeaderEntry* entry_added =
-        header_map.get(Envoy::Http::LowerCaseString("added_size"));
-    ASSERT(entry_content != nullptr && entry_added != nullptr);
-    content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
-    added_size_ = std::stoul(std::string(entry_added->value().getStringView()));
+    const auto entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    const auto entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
+    ASSERT(!entry_content.empty() && !entry_added.empty());
+    content_size_ = std::stoul(std::string(entry_content[0]->value().getStringView()));
+    added_size_ = std::stoul(std::string(entry_added[0]->value().getStringView()));
 
     createTimerForContinue();
 
@@ -41,14 +39,13 @@ public:
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
 
-    const Http::HeaderEntry* entry_buffer =
-        header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
-    if (entry_buffer == nullptr) {
+    const auto entry_buffer = header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
+    if (entry_buffer.empty()) {
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
     } else {
       watermark_enabled_ = true;
       encoder_callbacks_->setEncoderBufferLimit(
-          std::stoul(std::string(entry_buffer->value().getStringView())));
+          std::stoul(std::string(entry_buffer[0]->value().getStringView())));
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }
   }

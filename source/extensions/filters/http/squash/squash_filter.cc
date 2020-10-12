@@ -138,7 +138,7 @@ void SquashFilter::onDestroy() { cleanup(); }
 
 Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Check for squash header
-  if (!headers.get(Http::Headers::get().XSquashDebug)) {
+  if (headers.get(Http::Headers::get().XSquashDebug).empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
 

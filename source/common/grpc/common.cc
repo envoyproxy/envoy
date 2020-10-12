@@ -103,13 +103,14 @@ std::string Common::getGrpcMessage(const Http::ResponseHeaderOrTrailerMap& trail
 
 absl::optional<google::rpc::Status>
 Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
-  const Http::HeaderEntry* details_header = trailers.get(Http::Headers::get().GrpcStatusDetailsBin);
-  if (!details_header) {
+  const auto details_header = trailers.get(Http::Headers::get().GrpcStatusDetailsBin);
+  if (details_header.empty()) {
     return absl::nullopt;
   }
 
   // Some implementations use non-padded base64 encoding for grpc-status-details-bin.
-  auto decoded_value = Base64::decodeWithoutPadding(details_header->value().getStringView());
+  // This is effectively a trusted header so using the first value is fine.
+  auto decoded_value = Base64::decodeWithoutPadding(details_header[0]->value().getStringView());
   if (decoded_value.empty()) {
     return absl::nullopt;
   }

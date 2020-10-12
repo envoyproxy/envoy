@@ -373,10 +373,10 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
   EXPECT_EQ(response_code, response->headers().getStatusValue());
   expected_headers.iterate([response_headers = &response->headers()](
                                const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    const Http::HeaderEntry* entry =
+    const auto entry =
         response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
-    EXPECT_NE(entry, nullptr);
-    EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
+    EXPECT_FALSE(entry.empty());
+    EXPECT_EQ(header.value().getStringView(), entry[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
 
@@ -849,12 +849,13 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   codec_client_->sendData(*request_encoder_, 10, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Verify the Expect header is stripped.
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Expect));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Expect).empty());
   if (via.empty()) {
-    EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Via));
+    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Via).empty());
   } else {
-    EXPECT_EQ(via,
-              upstream_request_->headers().get(Http::Headers::get().Via)->value().getStringView());
+    EXPECT_EQ(
+        via,
+        upstream_request_->headers().get(Http::Headers::get().Via)[0]->value().getStringView());
   }
 
   if (additional_continue_from_upstream) {
@@ -1186,7 +1187,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   codec_client_->sendData(*request_encoder_, 0, true);
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)->value(), "a=b; c=d");
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(), "a=b; c=d");
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, false);

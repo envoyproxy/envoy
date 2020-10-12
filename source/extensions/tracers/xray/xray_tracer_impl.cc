@@ -77,11 +77,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   UNREFERENCED_PARAMETER(config);
   // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto* header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
+  const auto header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
-  if (header) {
-    Http::LowerCaseString lowered_header_value{std::string(header->value().getStringView())};
+  if (!header.empty()) {
+    // This is an implicitly untrusted header, so only the first value is used.
+    Http::LowerCaseString lowered_header_value{std::string(header[0]->value().getStringView())};
     xray_header = parseXRayHeader(lowered_header_value);
     // if the sample_decision in the x-ray header is unknown then we try to make a decision based
     // on the sampling strategy
@@ -107,7 +108,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
     return tracer->startSpan(operation_name, start_time,
-                             header ? absl::optional<XRayHeader>(xray_header) : absl::nullopt);
+                             !header.empty() ? absl::optional<XRayHeader>(xray_header)
+                                             : absl::nullopt);
   }
 
   // instead of returning nullptr, we return a Span that is marked as not-sampled.

@@ -86,8 +86,7 @@ public:
   void setReferenceKey(const LowerCaseString& key, absl::string_view value);
   void setCopy(const LowerCaseString& key, absl::string_view value);
   uint64_t byteSize() const;
-  const HeaderEntry* get(const LowerCaseString& key) const;
-  HeaderMap::GetResult getAll(const LowerCaseString& key) const;
+  HeaderMap::GetResult get(const LowerCaseString& key) const;
   void iterate(HeaderMap::ConstIterateCb cb) const;
   void iterateReverse(HeaderMap::ConstIterateCb cb) const;
   void clear();
@@ -369,11 +368,8 @@ public:
     HeaderMapImpl::setCopy(key, value);
   }
   uint64_t byteSize() const override { return HeaderMapImpl::byteSize(); }
-  const HeaderEntry* get(const LowerCaseString& key) const override {
+  HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return HeaderMapImpl::get(key);
-  }
-  HeaderMap::GetResult getAll(const LowerCaseString& key) const override {
-    return HeaderMapImpl::getAll(key);
   }
   void iterate(HeaderMap::ConstIterateCb cb) const override { HeaderMapImpl::iterate(cb); }
   void iterateReverse(HeaderMap::ConstIterateCb cb) const override {

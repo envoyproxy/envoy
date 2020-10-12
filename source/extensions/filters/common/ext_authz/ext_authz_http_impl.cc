@@ -301,7 +301,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // headers_to_remove in a variable first.
   std::vector<Http::LowerCaseString> headers_to_remove;
   if (status_code == enumToInt(Http::Code::OK)) {
-    const auto& get_result = message->headers().getAll(storage_header_name);
+    const auto& get_result = message->headers().get(storage_header_name);
     for (size_t i = 0; i < get_result.size(); ++i) {
       const Http::HeaderEntry* entry = get_result[i];
       if (entry != nullptr) {

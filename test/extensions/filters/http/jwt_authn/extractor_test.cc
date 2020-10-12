@@ -167,7 +167,7 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
 
   // Test token remove
   tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.get(Http::LowerCaseString("token-header")));
+  EXPECT_FALSE(headers.has(Http::LowerCaseString("token-header")));
 }
 
 // Make sure a double custom header concatenates the token
@@ -203,7 +203,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
 
   // Test token remove
   tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
+  EXPECT_FALSE(headers.has(Http::LowerCaseString("prefix-header")));
 }
 
 // Test extracting token from the custom header: "prefix-header"

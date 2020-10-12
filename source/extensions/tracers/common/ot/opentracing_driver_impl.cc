@@ -48,10 +48,11 @@ public:
   // opentracing::HTTPHeadersReader
   opentracing::expected<opentracing::string_view>
   LookupKey(opentracing::string_view key) const override {
-    const Http::HeaderEntry* entry = request_headers_.get(Http::LowerCaseString{key});
-    if (entry != nullptr) {
-      return opentracing::string_view{entry->value().getStringView().data(),
-                                      entry->value().getStringView().length()};
+    const auto entry = request_headers_.get(Http::LowerCaseString{key});
+    if (!entry.empty()) {
+      // This is an implicitly untrusted header, so only the first value is used.
+      return opentracing::string_view{entry[0]->value().getStringView().data(),
+                                      entry[0]->value().getStringView().length()};
     } else {
       return opentracing::make_unexpected(opentracing::key_not_found_error);
     }

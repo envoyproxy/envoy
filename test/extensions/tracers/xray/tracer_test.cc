@@ -188,11 +188,11 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
                                absl::nullopt /*headers*/);
   Http::TestRequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
-  auto* header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
-  ASSERT_NE(header, nullptr);
-  ASSERT_NE(header->value().getStringView().find("Root="), absl::string_view::npos);
-  ASSERT_NE(header->value().getStringView().find("Parent="), absl::string_view::npos);
-  ASSERT_NE(header->value().getStringView().find("Sampled=1"), absl::string_view::npos);
+  auto header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
+  ASSERT_FALSE(header.empty());
+  ASSERT_NE(header[0]->value().getStringView().find("Root="), absl::string_view::npos);
+  ASSERT_NE(header[0]->value().getStringView().find("Parent="), absl::string_view::npos);
+  ASSERT_NE(header[0]->value().getStringView().find("Sampled=1"), absl::string_view::npos);
 }
 
 TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
@@ -206,11 +206,11 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
   auto span = tracer.createNonSampledSpan();
   Http::TestRequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
-  auto* header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
-  ASSERT_NE(header, nullptr);
-  ASSERT_NE(header->value().getStringView().find("Root="), absl::string_view::npos);
-  ASSERT_NE(header->value().getStringView().find("Parent="), absl::string_view::npos);
-  ASSERT_NE(header->value().getStringView().find("Sampled=0"), absl::string_view::npos);
+  auto header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
+  ASSERT_FALSE(header.empty());
+  ASSERT_NE(header[0]->value().getStringView().find("Root="), absl::string_view::npos);
+  ASSERT_NE(header[0]->value().getStringView().find("Parent="), absl::string_view::npos);
+  ASSERT_NE(header[0]->value().getStringView().find("Sampled=0"), absl::string_view::npos);
 }
 
 TEST_F(XRayTracerTest, TraceIDFormatTest) {

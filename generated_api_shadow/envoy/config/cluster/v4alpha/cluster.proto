@@ -442,6 +442,10 @@ message Cluster {
     //   This header isn't sanitized by default, so enabling this feature allows HTTP clients to
     //   route traffic to arbitrary hosts and/or ports, which may have serious security
     //   consequences.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     bool use_http_header = 1;
   }
 

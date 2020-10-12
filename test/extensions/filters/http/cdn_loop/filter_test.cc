@@ -23,7 +23,8 @@ TEST(CdnLoopFilterTest, TestNoHeader) {
   Http::TestRequestHeaderMapImpl request_headers{};
 
   EXPECT_EQ(filter.decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))->value().getStringView(), "cdn");
+  EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))[0]->value().getStringView(),
+            "cdn");
 }
 
 TEST(CdnLoopFilterTest, OtherCdnsInHeader) {
@@ -34,7 +35,7 @@ TEST(CdnLoopFilterTest, OtherCdnsInHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{"CDN-Loop", "cdn1,cdn2"}};
 
   EXPECT_EQ(filter.decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))->value().getStringView(),
+  EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))[0]->value().getStringView(),
             "cdn1,cdn2,cdn");
 }
 
@@ -58,25 +59,25 @@ TEST(CdnLoopFilterTest, MultipleTransitsAllowed) {
   {
     Http::TestRequestHeaderMapImpl request_headers{};
     EXPECT_EQ(filter.decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))->value().getStringView(),
+    EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))[0]->value().getStringView(),
               "cdn");
   }
   {
     Http::TestRequestHeaderMapImpl request_headers{{"CDN-Loop", "cdn"}};
     EXPECT_EQ(filter.decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))->value().getStringView(),
+    EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))[0]->value().getStringView(),
               "cdn,cdn");
   }
   {
     Http::TestRequestHeaderMapImpl request_headers{{"CDN-Loop", "cdn,cdn"}};
     EXPECT_EQ(filter.decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))->value().getStringView(),
+    EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))[0]->value().getStringView(),
               "cdn,cdn,cdn");
   }
   {
     Http::TestRequestHeaderMapImpl request_headers{{"CDN-Loop", "cdn,cdn,cdn"}};
     EXPECT_EQ(filter.decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))->value().getStringView(),
+    EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))[0]->value().getStringView(),
               "cdn,cdn,cdn,cdn");
   }
   {
@@ -94,7 +95,7 @@ TEST(CdnLoopFilterTest, MultipleHeadersAllowed) {
   Http::TestRequestHeaderMapImpl request_headers{{"CDN-Loop", "cdn1"}, {"CDN-Loop", "cdn2"}};
 
   EXPECT_EQ(filter.decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))->value().getStringView(),
+  EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))[0]->value().getStringView(),
             "cdn1,cdn2,cdn");
 }
 

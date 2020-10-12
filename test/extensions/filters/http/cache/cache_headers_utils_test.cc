@@ -113,7 +113,7 @@ public:
           {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
         },
         {
-          "max-age=\"", 
+          "max-age=\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
           {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
         },
@@ -169,7 +169,7 @@ public:
     CONSTRUCT_ON_FIRST_USE(std::vector<ResponseCacheControlTestCase>,
         // Empty header
         {
-          "", 
+          "",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {false, false, false, false, false, absl::nullopt}
         },
@@ -211,7 +211,7 @@ public:
           {false, true, false, false, false, Seconds(50)}
         },
         {
-          "s-maxage=\"0\"", 
+          "s-maxage=\"0\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {false, false, false, false, false, Seconds(0)}
         },
@@ -238,12 +238,12 @@ public:
         },
         // Invalid durations are ignored
         {
-          "max-age=five", 
+          "max-age=five",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {false, false, false, false, false, absl::nullopt}
         },
         {
-          "max-age=10s, private", 
+          "max-age=10s, private",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {false, true, false, false, false, absl::nullopt}
         },
@@ -253,18 +253,18 @@ public:
           {true, false, false, false, false, absl::nullopt}
         },
         {
-          "s-maxage=five, max-age=10, no-transform", 
+          "s-maxage=five, max-age=10, no-transform",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {false, false, true, false, false, Seconds(10)}
         },
         {
-          "max-age=\"", 
+          "max-age=\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {false, false, false, false, false, absl::nullopt}
         },
         // Invalid parts of the header are ignored
         {
-          "no-cache, ,,,fjfwioen3298, max-age=20", 
+          "no-cache, ,,,fjfwioen3298, max-age=20",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {true, false, false, false, false, Seconds(20)}
         },
@@ -272,7 +272,7 @@ public:
         // the part before the comma will be interpreted as the argument
         // and the part after it will be ignored
         {
-          "no-cache, max-age=10,0, no-store", 
+          "no-cache, max-age=10,0, no-store",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {true, true, false, false, false, Seconds(10)}
         },
@@ -739,18 +739,18 @@ TEST_F(VaryHeaderTest, NotIsAllowedMixed) {
 TEST_F(VaryHeaderTest, PossibleVariedHeadersEmpty) {
   Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
-  EXPECT_FALSE(result->get(Http::LowerCaseString("accept")));
-  EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
-  EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
+  EXPECT_TRUE(result->get(Http::LowerCaseString("accept")).empty());
+  EXPECT_TRUE(result->get(Http::LowerCaseString("accept-language")).empty());
+  EXPECT_TRUE(result->get(Http::LowerCaseString("width")).empty());
 }
 
 TEST_F(VaryHeaderTest, PossibleVariedHeadersNoOverlap) {
   request_headers_.addCopy("abc", "123");
   Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
-  EXPECT_FALSE(result->get(Http::LowerCaseString("accept")));
-  EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
-  EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
+  EXPECT_TRUE(result->get(Http::LowerCaseString("accept")).empty());
+  EXPECT_TRUE(result->get(Http::LowerCaseString("accept-language")).empty());
+  EXPECT_TRUE(result->get(Http::LowerCaseString("width")).empty());
 }
 
 TEST_F(VaryHeaderTest, PossibleVariedHeadersOverlap) {
@@ -758,13 +758,12 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersOverlap) {
   request_headers_.addCopy("accept", "image/*");
   Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
-  std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
+  const auto values = result->get(Http::LowerCaseString("accept"));
   ASSERT_EQ(values.size(), 1);
-  EXPECT_EQ(values[0], "image/*");
+  EXPECT_EQ(values[0]->value().getStringView(), "image/*");
 
-  EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
-  EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
+  EXPECT_TRUE(result->get(Http::LowerCaseString("accept-language")).empty());
+  EXPECT_TRUE(result->get(Http::LowerCaseString("width")).empty());
 }
 
 TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiValues) {
@@ -772,14 +771,13 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiValues) {
   request_headers_.addCopy("accept", "text/html");
   Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
-  std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
+  const auto values = result->get(Http::LowerCaseString("accept"));
   ASSERT_EQ(values.size(), 2);
-  EXPECT_EQ(values[0], "image/*");
-  EXPECT_EQ(values[1], "text/html");
+  EXPECT_EQ(values[0]->value().getStringView(), "image/*");
+  EXPECT_EQ(values[1]->value().getStringView(), "text/html");
 
-  EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
-  EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
+  EXPECT_TRUE(result->get(Http::LowerCaseString("accept-language")).empty());
+  EXPECT_TRUE(result->get(Http::LowerCaseString("width")).empty());
 }
 
 TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiHeaders) {
@@ -787,16 +785,15 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiHeaders) {
   request_headers_.addCopy("accept-language", "en-US");
   Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
-  std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
+  const auto values = result->get(Http::LowerCaseString("accept"));
   ASSERT_EQ(values.size(), 1);
-  EXPECT_EQ(values[0], "image/*");
+  EXPECT_EQ(values[0]->value().getStringView(), "image/*");
 
-  Http::HeaderUtility::getAllOfHeader(*result, "accept-language", values);
-  ASSERT_EQ(values.size(), 2);
-  EXPECT_EQ(values[1], "en-US");
+  const auto values2 = result->get(Http::LowerCaseString("accept-language"));
+  ASSERT_EQ(values2.size(), 1);
+  EXPECT_EQ(values2[0]->value(), "en-US");
 
-  EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
+  EXPECT_TRUE(result->get(Http::LowerCaseString("width")).empty());
 }
 
 } // namespace

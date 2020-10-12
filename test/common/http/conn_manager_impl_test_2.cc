@@ -499,7 +499,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
   EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
       .WillOnce(Invoke([&](Http::HeaderMap& trailers) -> FilterTrailersStatus {
         Http::LowerCaseString key("foo");
-        EXPECT_EQ(trailers.get(key), nullptr);
+        EXPECT_TRUE(trailers.get(key).empty());
         return FilterTrailersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
@@ -539,7 +539,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
       .WillOnce(Invoke([&](Http::HeaderMap& trailers) -> FilterTrailersStatus {
         // assert that the trailers set in the previous filter was ignored
         Http::LowerCaseString key("foo");
-        EXPECT_EQ(trailers.get(key), nullptr);
+        EXPECT_TRUE(trailers.get(key).empty());
         return FilterTrailersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
@@ -577,8 +577,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
     // ensure that we see the trailers set in decodeData
     Http::LowerCaseString key("foo");
     auto t = trailers.get(key);
-    ASSERT(t);
-    EXPECT_EQ(t->value(), trailers_data.c_str());
+    ASSERT(!t.empty());
+    EXPECT_EQ(t[0]->value(), trailers_data.c_str());
     return FilterTrailersStatus::Continue;
   }));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
@@ -616,7 +616,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
     // ensure that we see the trailers set in decodeData
     Http::LowerCaseString key("foo");
     auto t = trailers.get(key);
-    EXPECT_EQ(t->value(), trailers_data.c_str());
+    EXPECT_EQ(t[0]->value(), trailers_data.c_str());
     return FilterTrailersStatus::Continue;
   }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());

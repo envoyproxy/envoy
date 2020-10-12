@@ -67,16 +67,17 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               const Http::HeaderMap& headers,
                                               const Network::Address::Instance&,
                                               const envoy::config::core::v3::Metadata*) const {
-  const Http::HeaderEntry* header_value = headers.get(header_name_);
+  const auto header_value = headers.get(header_name_);
 
   // If header is not present in the request and if skip_if_absent is true skip this descriptor,
   // while calling rate limiting service. If skip_if_absent is false, do not call rate limiting
   // service.
-  if (!header_value) {
+  if (header_value.empty()) {
     return skip_if_absent_;
   }
+  // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
   descriptor.entries_.push_back(
-      {descriptor_key_, std::string(header_value->value().getStringView())});
+      {descriptor_key_, std::string(header_value[0]->value().getStringView())});
   return true;
 }
 

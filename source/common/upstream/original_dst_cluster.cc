@@ -84,13 +84,15 @@ Network::Address::InstanceConstSharedPtr
 OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
   Network::Address::InstanceConstSharedPtr request_host;
   const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
-  if (downstream_headers &&
-      downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost) != nullptr) {
-    const std::string request_override_host(
-        downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)
-            ->value()
-            .getStringView());
+  Http::HeaderMap::GetResult override_header;
+  if (downstream_headers) {
+    override_header = downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost);
+  }
+  if (!override_header.empty()) {
     try {
+      // This is an implicitly untrusted header, so per the API documentation only the first
+      // value is used.
+      const std::string request_override_host(override_header[0]->value().getStringView());
       request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
     } catch (const Envoy::EnvoyException& e) {
