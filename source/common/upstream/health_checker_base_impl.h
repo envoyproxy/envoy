@@ -148,6 +148,7 @@ private:
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds no_traffic_interval_;
+  const std::chrono::milliseconds no_traffic_healthy_interval_;
   const std::chrono::milliseconds initial_jitter_;
   const std::chrono::milliseconds interval_jitter_;
   const uint32_t interval_jitter_percent_;
