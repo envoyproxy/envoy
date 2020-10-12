@@ -7,7 +7,7 @@ CHECKOUT_DIR=../envoy-filter-example
 MAIN_BRANCH="refs/heads/master"
 FILTER_EXAMPLE_MAIN_BRANCH="master"
 
-if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
+if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
   echo "Cloning..."
   git clone git@github.com:envoyproxy/envoy-filter-example "$CHECKOUT_DIR" -b "${FILTER_EXAMPLE_MAIN_BRANCH}"
 
