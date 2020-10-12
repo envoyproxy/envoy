@@ -38,7 +38,6 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   if (proto_config.commands_size() > 0) {
     commands =
         std::vector<std::string>(proto_config.commands().begin(), proto_config.commands().end());
-    ;
   }
 
   auto stats = std::make_shared<MongoStats>(context.scope(), stat_prefix, commands);
