@@ -25,5 +25,5 @@ Currently Defined Client Features
   field in the LRS response.
 - **envoy.config.supports-resource-ttl**: This feature indicates that xDS client supports
   per-resource or per SotW :ref:`TTL <xds_protocol_TTL>`.
-_ **envoy.config.resource-in-sotw**: This feature indicates that the xDS client is able to unwrap
+- **envoy.config.resource-in-sotw**: This feature indicates that the xDS client is able to unwrap
   *Resource* wrappers within the SotW DiscoveryResponse.
