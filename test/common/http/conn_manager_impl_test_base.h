@@ -80,7 +80,9 @@ public:
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
-  std::chrono::milliseconds requestHeadersTimeout() const override { return request_headers_timeout_; }
+  std::chrono::milliseconds requestHeadersTimeout() const override {
+    return request_headers_timeout_;
+  }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;

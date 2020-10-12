@@ -360,8 +360,8 @@ message HttpConnectionManager {
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // The amount of time that Envoy will wait for the headers to be received. The timer is activated
-  // when the request is initiated, and is disarmed when the last byte of the headers is sent
-  // upstream (i.e. all decoding filters have processed the headers). If not specified or set to 0,
+  // when the request is initiated, and is disarmed when the last byte of the headers has been
+  // received (i.e. all decoding filters have processed the headers). If not specified or set to 0,
   // this timeout is disabled.
   google.protobuf.Duration request_headers_timeout = 41
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];

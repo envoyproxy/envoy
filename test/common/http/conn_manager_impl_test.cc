@@ -2717,7 +2717,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutCallbackDisarmsAndRetu
   EXPECT_EQ("request header timeout", response_body);
 }
 
-TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutIsNotDisarmedOnIncompleteRequestWithHeader) {
+TEST_F(HttpConnectionManagerImplTest,
+       RequestHeaderTimeoutIsNotDisarmedOnIncompleteRequestWithHeader) {
   request_headers_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
