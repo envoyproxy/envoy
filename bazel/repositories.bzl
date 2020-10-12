@@ -796,6 +796,9 @@ def _emscripten_toolchain():
             "upstream/emscripten/cache/is_vanilla.txt",
             ".emscripten_sanity",
         ]),
+        patch_cmds = [
+            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 1.39.6-upstream && ./emsdk activate --embedded 1.39.6-upstream || true",
+        ],
     )
 
 def _com_github_google_jwt_verify():

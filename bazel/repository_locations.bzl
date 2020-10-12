@@ -844,9 +844,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/emscripten-core/emsdk",
         version = "1.39.6",
         sha256 = "4ac0f1f3de8b3f1373d435cd7e58bd94de4146e751f099732167749a229b443b",
-        patch_cmds = [
-            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 1.39.6-upstream && ./emsdk activate --embedded 1.39.6-upstream || true",
-        ],
         strip_prefix = "emsdk-{version}",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["build"],
