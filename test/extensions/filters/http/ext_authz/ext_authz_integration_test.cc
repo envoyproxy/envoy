@@ -509,12 +509,8 @@ public:
     });
   }
 
-  void setupWithDisabledCaseSensitiveStringMatcher(bool disable_case_sensitive_matcher) {
+  void setup() {
     initializeConfig();
-
-    if (disable_case_sensitive_matcher) {
-      disableCaseSensitiveStringMatcher();
-    }
 
     HttpIntegrationTest::initialize();
 
@@ -691,19 +687,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher.
 TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
-  setupWithDisabledCaseSensitiveStringMatcher(false);
+  setup();
   const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_EQ(header_entry, nullptr);
-}
-
-// Verifies that by setting "false" to
-// envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher, the string
-// matcher used by HTTP service will be case-insensitive.
-TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
-  setupWithDisabledCaseSensitiveStringMatcher(true);
-  const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_NE(header_entry, nullptr);
-  EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, CheckTimesOutLegacy) { expectCheckRequestTimedout(false); }
