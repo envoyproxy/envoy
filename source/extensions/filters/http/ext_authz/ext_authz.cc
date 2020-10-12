@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/matchers.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 
@@ -80,11 +81,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   Router::RouteConstSharedPtr route = callbacks_->route();
   const auto per_route_flags = getPerRouteFlags(route);
   skip_check_ = per_route_flags.skip_check_;
+  if (skip_check_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
-  if (!config_->filterEnabled() || skip_check_) {
-    if (skip_check_) {
-      return Http::FilterHeadersStatus::Continue;
-    }
+  if (!config_->filterEnabled(callbacks_->streamInfo().dynamicMetadata())) {
+    stats_.disabled_.inc();
     if (config_->denyAtDisable()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(
@@ -189,7 +191,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->addCopy(header.first, header.second);
     }
     for (const auto& header : response->headers_to_append) {
-      const Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
+      const auto header_to_modify = request_headers_->get(header.first);
       // TODO(dio): Add a flag to allow appending non-existent headers, without setting it first
       // (via `headers_to_add`). For example, given:
       // 1. Original headers {"original": "true"}
@@ -198,7 +200,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
       // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
       // to upstream server by only sets `headers_to_append`.
-      if (header_to_modify != nullptr) {
+      if (!header_to_modify.empty()) {
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
         // The current behavior of appending is by combining entries with the same key, into one
         // entry. The value of that combined entry is separated by ",".

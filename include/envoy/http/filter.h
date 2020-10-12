@@ -32,10 +32,6 @@ enum class FilterHeadersStatus {
   // FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
   StopIteration,
-  // Continue headers iteration to remaining filters, but ignore any subsequent data or trailers.
-  // This results in creating a header only request/response.
-  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
-  ContinueAndEndStream,
   // Continue headers iteration to remaining filters, but delay ending the stream. This status MUST
   // NOT be returned when end_stream is already set to false.
   //
@@ -717,6 +713,27 @@ public:
    */
   virtual ResponseTrailerMap& addEncodedTrailers() PURE;
 
+  /**
+   * Attempts to create a locally generated response using the provided response_code and body_text
+   * parameters. If the request was a gRPC request the local reply will be encoded as a gRPC
+   * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
+   * provided parameters.
+   *
+   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
+   *
+   * @param response_code supplies the HTTP response code.
+   * @param body_text supplies the optional body text which is sent using the text/plain content
+   *                  type, or encoded in the grpc-message header.
+   * @param modify_headers supplies an optional callback function that can modify the
+   *                       response headers.
+   * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+   * @param details a string detailing why this local reply was sent.
+   */
+  virtual void sendLocalReply(Code response_code, absl::string_view body_text,
+                              std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
   /**
    * Adds new metadata to be encoded.
    *

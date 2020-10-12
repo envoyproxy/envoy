@@ -108,9 +108,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
     const auto& host_rewrite_header = config->hostRewriteHeader();
     if (!host_rewrite_header.get().empty()) {
-      const auto* header = headers.get(host_rewrite_header);
-      if (header != nullptr) {
-        const auto& header_value = header->value().getStringView();
+      const auto header = headers.get(host_rewrite_header);
+      if (!header.empty()) {
+        // This is an implicitly untrusted header, so per the API documentation only the first
+        // value is used.
+        const auto& header_value = header[0]->value().getStringView();
         headers.setHost(header_value);
       }
     }

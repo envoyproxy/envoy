@@ -473,12 +473,7 @@ void HeaderMapImpl::verifyByteSizeInternalForTest() const {
   ASSERT(cached_byte_size_ == byte_size);
 }
 
-const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
-  const auto result = getAll(key);
-  return result.empty() ? nullptr : result[0];
-}
-
-HeaderMap::GetResult HeaderMapImpl::getAll(const LowerCaseString& key) const {
+HeaderMap::GetResult HeaderMapImpl::get(const LowerCaseString& key) const {
   return HeaderMap::GetResult(const_cast<HeaderMapImpl*>(this)->getExisting(key));
 }
 
@@ -547,7 +542,7 @@ void HeaderMapImpl::clear() {
 
 size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate) {
   const size_t old_size = headers_.size();
-  headers_.remove_if([&predicate, this](const HeaderEntryImpl& entry) {
+  headers_.removeIf([&predicate, this](const HeaderEntryImpl& entry) {
     const bool to_remove = predicate(entry);
     if (to_remove) {
       // If this header should be removed, make sure any references in the
