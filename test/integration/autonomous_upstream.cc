@@ -171,11 +171,9 @@ std::unique_ptr<Http::MetadataMapVector> AutonomousUpstream::preResponseHeadersM
 
 AssertionResult AutonomousUpstream::closeConnection(uint32_t index,
                                                     std::chrono::milliseconds timeout) {
-  if (!shared_connections_[index]->connected()) {
-    return AssertionSuccess();
-  }
   return shared_connections_[index]->executeOnDispatcher(
       [](Network::Connection& connection) {
+        ASSERT(connection.state() == Network::Connection::State::Open);
         connection.close(Network::ConnectionCloseType::FlushWrite);
       },
       timeout);
