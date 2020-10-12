@@ -1,4 +1,3 @@
-stats_server_version_override: 1160
 admin:
   access_log_path: /tmp/admin_access.log
   address:
