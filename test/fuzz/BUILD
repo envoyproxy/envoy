@@ -73,5 +73,7 @@ envoy_cc_test_library(
     name = "random_lib",
     hdrs = ["random.h"],
     deps = [
+        "//include/envoy/common:random_generator_interface",
+        "//source/common/common:assert_lib",
     ],
 )

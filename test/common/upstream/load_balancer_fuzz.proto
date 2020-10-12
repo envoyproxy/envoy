@@ -7,8 +7,8 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
-  // The host index determines what host set within the priority set which will get updated.
-  uint64 host_index = 1;
+  // The host priority determines what host set within the priority set which will get updated.
+  uint64 host_priority = 1;
   // These will determine how many hosts will get placed into health hosts, degraded hosts, and
   // excluded hosts from the full host list.
   uint32 num_healthy_hosts = 2;
@@ -36,7 +36,9 @@ message LoadBalancerTestCase {
   repeated LbAction actions = 2;
 
   // TODO: Localities
-  repeated uint32 num_hosts_in_host_set = 3
+  // Each generated integer will cause the fuzzer to initialize hosts at a certain priority level, each integer generated adding a priority 
+  // level with integer generated hosts in that new priority level. Capped at 20 for simplicity.
+  repeated uint32 num_hosts_in_priority_level = 3
       [(validate.rules).repeated = {min_items: 1, max_items: 20}];
 
   // This number is used to instantiate the prng. The prng takes the place of random() calls, allowing a representative random distribution which is also deterministic.

@@ -22,14 +22,15 @@ public:
 
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
-  void initializeASingleHostSet(uint32_t num_hosts_in_host_set, uint8_t index_of_host_set);
+  void initializeASingleHostSet(const uint32_t num_hosts_in_host_set, const uint8_t priority_level);
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
   void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
-  void updateHealthFlagsForAHostSet(uint64_t host_index, uint32_t num_healthy_hosts,
-                                    uint32_t num_degraded_hosts, uint32_t num_excluded_hosts,
-                                    std::string random_bytestring);
+  void updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
+                                    const uint32_t num_degraded_hosts,
+                                    const uint32_t num_excluded_hosts,
+                                    const std::string random_bytestring);
   // These two actions have a lot of logic attached to them. However, all the logic that the load
   // balancer needs to run its algorithm is already encapsulated within the load balancer. Thus,
   // once the load balancer is constructed, all this class has to do is call lb_->peekAnotherHost()
@@ -51,7 +52,7 @@ public:
 
   // There are used to construct the priority set at the beginning of the fuzz iteration
   uint16_t port_ = 80;
-  uint8_t num_host_sets_ = 0;
+  uint8_t num_priority_levels_ = 0;
 };
 
 } // namespace Upstream

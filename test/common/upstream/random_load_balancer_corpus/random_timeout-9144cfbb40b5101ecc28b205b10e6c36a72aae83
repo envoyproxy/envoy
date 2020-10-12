@@ -12,11 +12,11 @@ load_balancer_test_case {
   }
   actions {
     update_health_flags {
-      host_index: 270582939648
+      host_priority: 270582939648
       num_degraded_hosts: 4194304
       random_bytestring: "\x01\x02\x03\x04"
     }
   }
-  num_hosts_in_host_set: 1024
+  num_hosts_in_priority_level: 1024
   seed_for_prng: 62208
 }

@@ -4,7 +4,7 @@ common_lb_config {
 }
 actions {
     update_health_flags {
-        host_index: 0
+        host_priority: 0
         num_healthy_hosts: 2
         random_bytestring: "\x01\x02"
     }
@@ -29,7 +29,7 @@ actions {
 
     }
 }
-num_hosts_in_host_set: 60000
-num_hosts_in_host_set: 60000
+num_hosts_in_priority_level: 60000
+num_hosts_in_priority_level: 60000
 seed_for_prng: 4
 }

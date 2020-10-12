@@ -2,19 +2,22 @@
 
 #include "test/common/upstream/utility.h"
 
+#define MAX_NUM_HOSTS_IN_PRIORITY_LEVEL 256
+
 namespace Envoy {
 namespace Upstream {
 
-void LoadBalancerFuzzBase::initializeASingleHostSet(uint32_t num_hosts_in_host_set,
-                                                    uint8_t index_of_host_set) {
-  ENVOY_LOG_MISC(trace, "Will attempt to initialize host set {} with {} hosts.", index_of_host_set,
+void LoadBalancerFuzzBase::initializeASingleHostSet(const uint32_t num_hosts_in_host_set,
+                                                    const uint8_t priority_level) {
+  ENVOY_LOG_MISC(trace, "Will attempt to initialize host set {} with {} hosts.", priority_level,
                  num_hosts_in_host_set);
-  MockHostSet& host_set = *priority_set_.getMockHostSet(index_of_host_set);
+  MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
   uint32_t hosts_made = 0;
   // Cap each host set at 256 hosts for efficiency
-  uint32_t max_num_hosts_in_host_set = 256;
+  const uint32_t max_num_hosts_in_priority_level = MAX_NUM_HOSTS_IN_PRIORITY_LEVEL;
   // Leave port clause in for future changes
-  while (hosts_made < std::min(num_hosts_in_host_set, max_num_hosts_in_host_set) && port_ < 65535) {
+  while (hosts_made < std::min(num_hosts_in_host_set, max_num_hosts_in_priority_level) &&
+         port_ < 65535) {
     host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port_)));
     ++port_;
     ++hosts_made;
@@ -26,25 +29,25 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(uint32_t num_hosts_in_host_s
 void LoadBalancerFuzzBase::initializeLbComponents(
     const test::common::upstream::LoadBalancerTestCase& input) {
   random_.initializeSeed(input.seed_for_prng());
-  uint8_t index_of_host_set = 0;
-  for (uint16_t num_hosts_in_host_set : input.num_hosts_in_host_set()) {
-    initializeASingleHostSet(num_hosts_in_host_set, index_of_host_set);
-    index_of_host_set++;
+  uint8_t priority_of_host_set = 0;
+  for (uint16_t num_hosts_in_priority_level : input.num_hosts_in_priority_level()) {
+    initializeASingleHostSet(num_hosts_in_priority_level, priority_of_host_set);
+    priority_of_host_set++;
   }
-  num_host_sets_ = index_of_host_set;
+  num_priority_levels_ = priority_of_host_set;
 }
 
 // Updating host sets is shared amongst all the load balancer tests. Since logically, we're just
 // setting the mock priority set to have certain values, and all load balancers interface with host
 // sets and their health statuses, this action maps to all load balancers.
-void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(uint64_t host_index,
-                                                        uint32_t num_healthy_hosts,
-                                                        uint32_t num_degraded_hosts,
-                                                        uint32_t num_excluded_hosts,
-                                                        std::string random_bytestring) {
-  uint8_t index_of_host_set = host_index % num_host_sets_;
-  ENVOY_LOG_MISC(trace, "Updating health flags for host set: {}", index_of_host_set);
-  MockHostSet& host_set = *priority_set_.getMockHostSet(index_of_host_set);
+void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_priority,
+                                                        const uint32_t num_healthy_hosts,
+                                                        const uint32_t num_degraded_hosts,
+                                                        const uint32_t num_excluded_hosts,
+                                                        const std::string random_bytestring) {
+  const uint8_t priority_of_host_set = host_priority % num_priority_levels_;
+  ENVOY_LOG_MISC(trace, "Updating health flags for host set at priority: {}", priority_of_host_set);
+  MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
   // This downcast will not overflow because size is capped by port numbers
   uint32_t host_set_size = host_set.hosts_.size();
   host_set.healthy_hosts_.clear();
@@ -54,24 +57,27 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(uint64_t host_index,
   Fuzz::ProperSubsetSelector subset_selector(random_bytestring);
 
   std::vector<std::vector<uint8_t>> subsets = subset_selector.constructSubsets(
-      3, {num_healthy_hosts, num_degraded_hosts, num_excluded_hosts}, host_set_size);
+      {num_healthy_hosts, num_degraded_hosts, num_excluded_hosts}, host_set_size);
 
   // Healthy hosts are first subset
   for (uint8_t index : subsets.at(0)) {
     host_set.healthy_hosts_.push_back(host_set.hosts_[index]);
-    ENVOY_LOG_MISC(trace, "Index of host made healthy: {}", index);
+    ENVOY_LOG_MISC(trace, "Index of host made healthy at priority level {}: {}",
+                   priority_of_host_set, index);
   }
 
   // Degraded hosts are second subset
   for (uint8_t index : subsets.at(1)) {
     host_set.degraded_hosts_.push_back(host_set.hosts_[index]);
-    ENVOY_LOG_MISC(trace, "Index of host made degraded: {}", index);
+    ENVOY_LOG_MISC(trace, "Index of host made degraded at priority level {}: {}",
+                   priority_of_host_set, index);
   }
 
   // Excluded hosts are third subset
-  for (uint8_t index : subsets.at(1)) {
+  for (uint8_t index : subsets.at(2)) {
     host_set.excluded_hosts_.push_back(host_set.hosts_[index]);
-    ENVOY_LOG_MISC(trace, "Index of host made excluded: {}", index);
+    ENVOY_LOG_MISC(trace, "Index of host made excluded at priority level {}: {}",
+                   priority_of_host_set, index);
   }
 
   host_set.runCallbacks({}, {});
@@ -95,7 +101,7 @@ void LoadBalancerFuzzBase::replay(
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) {
     case test::common::upstream::LbAction::kUpdateHealthFlags: {
-      updateHealthFlagsForAHostSet(event.update_health_flags().host_index(),
+      updateHealthFlagsForAHostSet(event.update_health_flags().host_priority(),
                                    event.update_health_flags().num_healthy_hosts(),
                                    event.update_health_flags().num_degraded_hosts(),
                                    event.update_health_flags().num_excluded_hosts(),
