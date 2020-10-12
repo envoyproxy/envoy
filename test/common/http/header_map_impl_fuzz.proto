@@ -88,6 +88,12 @@ message Action {
   }
 }
 
+message Config {
+  uint32 lazy_map_min_size = 1;
+}
+
 message HeaderMapImplFuzzTestCase {
   repeated Action actions = 1;
+  // Optional threshold value configuration for the lazy header-map.
+  Config config = 2;
 }

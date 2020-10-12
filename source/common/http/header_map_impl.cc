@@ -503,7 +503,7 @@ HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& k
     if (iter != headers_.mapEnd()) {
       const HeaderList::HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
-      for (const auto values_it : v) {
+      for (const auto& values_it : v) {
         // Convert the iterated value to a HeaderEntry*.
         ret.push_back(&(*values_it));
       }
@@ -547,7 +547,7 @@ void HeaderMapImpl::clear() {
 
 size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate) {
   const size_t old_size = headers_.size();
-  headers_.remove_if([&predicate, this](const HeaderEntryImpl& entry) {
+  headers_.removeIf([&predicate, this](const HeaderEntryImpl& entry) {
     const bool to_remove = predicate(entry);
     if (to_remove) {
       // If this header should be removed, make sure any references in the

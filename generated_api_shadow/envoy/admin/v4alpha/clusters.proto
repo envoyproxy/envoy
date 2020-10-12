@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.admin.v4alpha;
 
 import "envoy/admin/v4alpha/metrics.proto";
+import "envoy/config/cluster/v4alpha/circuit_breaker.proto";
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/health_check.proto";
@@ -28,7 +29,7 @@ message Clusters {
 }
 
 // Details an individual cluster's current status.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ClusterStatus {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.ClusterStatus";
 
@@ -76,6 +77,9 @@ message ClusterStatus {
   //    threshold for that interval.
   // 3. Outlier detection is not enabled for this cluster.
   type.v3.Percent local_origin_success_rate_ejection_threshold = 5;
+
+  // :ref:`Circuit breaking <arch_overview_circuit_break>` settings of the cluster.
+  config.cluster.v4alpha.CircuitBreakers circuit_breakers = 6;
 }
 
 // Current state of a particular host.

@@ -6,25 +6,35 @@ External dependencies
 Below we enumerate the external dependencies that may be linked into the Envoy binary. We exclude
 dependencies that only are used in CI or developer tooling above.
 
-Data plane
-----------
+Data plane (core)
+-----------------
 
-.. include:: external_dep_dataplane.rst
+.. include:: external_dep_dataplane_core.rst
+
+Data plane (extensions)
+-----------------------
+
+.. include:: external_dep_dataplane_ext.rst
 
 Control plane
 -------------
 
 .. include:: external_dep_controlplane.rst
 
-Observability
--------------
+Observability (core)
+--------------------
 
-.. include:: external_dep_observability.rst
+.. include:: external_dep_observability_core.rst
 
-Test
-----
+Observability (extensions)
+--------------------------
 
-.. include:: external_dep_test.rst
+.. include:: external_dep_observability_ext.rst
+
+Test only
+---------
+
+.. include:: external_dep_test_only.rst
 
 Build
 -----

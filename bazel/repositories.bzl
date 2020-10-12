@@ -4,6 +4,7 @@ load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "DEPENDENCY_ANNOTATIONS", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES", "USE_CATEGORIES_WITH_CPE_OPTIONAL")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load(":crates.bzl", "raze_fetch_remote_crates")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -18,6 +19,9 @@ WINDOWS_SKIP_TARGETS = [
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
+
+def _build_all_content(exclude = []):
+    return """filegroup(name = "all", srcs = glob(["**"], exclude={}), visibility = ["//visibility:public"])""".format(repr(exclude))
 
 def _fail_missing_attribute(attr, key):
     fail("The '%s' attribute must be defined for external dependecy " % attr + key)
@@ -47,10 +51,9 @@ def _repository_locations():
 
         if "project_url" not in location:
             _fail_missing_attribute("project_url", key)
-        s = location["project_url"]
-        if not s.startswith("https://") and not s.startswith("http://"):
-            fail("project_url must start with https:// or http://: " + s)
-        mutable_location.pop("project_url")
+        project_url = mutable_location.pop("project_url")
+        if not project_url.startswith("https://") and not project_url.startswith("http://"):
+            fail("project_url must start with https:// or http://: " + project_url)
 
         if "version" not in location:
             _fail_missing_attribute("version", key)
@@ -58,24 +61,28 @@ def _repository_locations():
 
         if "use_category" not in location:
             _fail_missing_attribute("use_category", key)
-        mutable_location.pop("use_category")
+        use_category = mutable_location.pop("use_category")
+
+        if "dataplane_ext" in use_category or "observability_ext" in use_category:
+            if "extensions" not in location:
+                _fail_missing_attribute("extensions", key)
+            mutable_location.pop("extensions")
 
         if "last_updated" not in location:
             _fail_missing_attribute("last_updated", key)
-        s = location["last_updated"]
+        last_updated = mutable_location.pop("last_updated")
 
         # Starlark doesn't have regexes.
-        if len(s) != 10 or s[4] != "-" or s[7] != "-":
-            fail("last_updated must match YYYY-DD-MM: " + s)
-        mutable_location.pop("last_updated")
+        if len(last_updated) != 10 or last_updated[4] != "-" or last_updated[7] != "-":
+            fail("last_updated must match YYYY-DD-MM: " + last_updated)
 
         if "cpe" in location:
-            s = location["cpe"]
+            cpe = mutable_location.pop("cpe")
 
             # Starlark doesn't have regexes.
-            if s != "N/A" and (not s.startswith("cpe:2.3:a:") or not s.endswith(":*") and len(s.split(":")) != 6):
-                fail("CPE must match cpe:2.3:a:<facet>:<facet>:*: " + s)
-            mutable_location.pop("cpe")
+            cpe_matches = (cpe != "N/A" and (not cpe.startswith("cpe:2.3:a:") or not cpe.endswith(":*") and len(cpe.split(":")) != 6))
+            if cpe_matches:
+                fail("CPE must match cpe:2.3:a:<facet>:<facet>:*: " + cpe)
         elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
             _fail_missing_attribute("cpe", key)
 
@@ -158,6 +165,10 @@ def _go_deps(skip_targets):
         )
         _repository_impl("bazel_gazelle")
 
+def _rust_deps():
+    _repository_impl("io_bazel_rules_rust")
+    raze_fetch_remote_crates()
+
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
     envoy_dev_binding()
@@ -194,6 +205,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
+    _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
     _com_github_jbeder_yaml_cpp()
@@ -234,7 +246,11 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
+    _rust_deps()
     _kafka_deps()
+
+    _org_llvm_llvm()
+    _com_github_wavm_wavm()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -428,6 +444,34 @@ cc_library(
         # Patches ASAN violation of initialization fiasco
         patches = ["@envoy//bazel:antlr.patch"],
         **location
+    )
+
+    # Parser dependencies
+    # TODO: upgrade this when cel is upgraded to use the latest version
+    http_archive(
+        name = "rules_antlr",
+        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
+        strip_prefix = "rules_antlr-3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
+        urls = ["https://github.com/marcohu/rules_antlr/archive/3cc2f9502a54ceb7b79b37383316b23c4da66f9a.tar.gz"],
+    )
+
+    http_archive(
+        name = "antlr4_runtimes",
+        build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "cpp",
+    srcs = glob(["runtime/Cpp/runtime/src/**/*.cpp"]),
+    hdrs = glob(["runtime/Cpp/runtime/src/**/*.h"]),
+    includes = ["runtime/Cpp/runtime/src"],
+)
+""",
+        sha256 = "46f5e1af5f4bd28ade55cb632f9a069656b31fc8c2408f9aa045f9b5f5caad64",
+        patch_args = ["-p1"],
+        # Patches ASAN violation of initialization fiasco
+        patches = ["@envoy//bazel:antlr.patch"],
+        strip_prefix = "antlr4-4.7.2",
+        urls = ["https://github.com/antlr/antlr4/archive/4.7.2.tar.gz"],
     )
 
 def _com_github_nghttp2_nghttp2():
@@ -695,6 +739,16 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
+        # Patch curl 7.72.0 due to CMake's problematic implementation of policy `CMP0091`
+        # introduced in CMake 3.15 and then deprecated in CMake 3.18. Curl forcing the CMake
+        # ruleset to 3.16 breaks the Envoy windows fastbuild target.
+        # Also cure a fatal assumption creating a static library using LLVM `lld-link.exe`
+        # adding dynamic link flags, which breaks the Envoy clang-cl library archive step.
+        # Upstream patch submitted: https://github.com/curl/curl/pull/6050
+        # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
+        # by elimination of the curl dependency.
+        patches = ["@envoy//bazel/foreign_cc:curl.patch"],
+        patch_args = ["-p1"],
         **location
     )
     native.bind(
@@ -828,7 +882,10 @@ def _proxy_wasm_cpp_host():
 def _emscripten_toolchain():
     _repository_impl(
         name = "emscripten_toolchain",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = _build_all_content(exclude = [
+            "upstream/emscripten/cache/is_vanilla.txt",
+            ".emscripten_sanity",
+        ]),
         patch_cmds = REPOSITORY_LOCATIONS["emscripten_toolchain"]["patch_cmds"],
     )
 
@@ -872,6 +929,16 @@ def _com_github_moonjit_moonjit():
         actual = "@envoy//bazel/foreign_cc:moonjit",
     )
 
+def _com_github_google_tcmalloc():
+    _repository_impl(
+        name = "com_github_google_tcmalloc",
+    )
+
+    native.bind(
+        name = "tcmalloc",
+        actual = "@com_github_google_tcmalloc//tcmalloc",
+    )
+
 def _com_github_gperftools_gperftools():
     location = _get_location("com_github_gperftools_gperftools")
     http_archive(
@@ -883,6 +950,32 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
+    )
+
+def _org_llvm_llvm():
+    location = _get_location("org_llvm_llvm")
+    http_archive(
+        name = "org_llvm_llvm",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:llvm.patch"],
+        **location
+    )
+    native.bind(
+        name = "llvm",
+        actual = "@envoy//bazel/foreign_cc:llvm",
+    )
+
+def _com_github_wavm_wavm():
+    location = _get_location("com_github_wavm_wavm")
+    http_archive(
+        name = "com_github_wavm_wavm",
+        build_file_content = BUILD_ALL_CONTENT,
+        **location
+    )
+    native.bind(
+        name = "wavm",
+        actual = "@envoy//bazel/foreign_cc:wavm",
     )
 
 def _kafka_deps():

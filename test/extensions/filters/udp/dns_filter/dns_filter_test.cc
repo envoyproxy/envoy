@@ -40,7 +40,7 @@ class DnsFilterTest : public testing::Test, public Event::TestUsingSimulatedTime
 public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
-        api_(Api::createApiForTest()),
+        api_(Api::createApiForTest(random_)),
         counters_(mock_query_buffer_underflow_, mock_record_name_overflow_,
                   query_parsing_failure_) {
     udp_response_.addresses_.local_ = listener_address_;
@@ -93,6 +93,7 @@ public:
   }
 
   const Network::Address::InstanceConstSharedPtr listener_address_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   DnsFilterEnvoyConfigSharedPtr config_;
   NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
@@ -105,7 +106,6 @@ public:
   Network::UdpRecvData udp_response_;
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Stats::MockHistogram> histogram_;
-  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Server::Configuration::MockListenerFactoryContext> listener_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<Network::MockDnsResolver> resolver_;
@@ -250,6 +250,10 @@ virtual_domains:
       address_list:
         address:
         - "10.0.0.1"
+  - name: "www.external_foo1.com"
+    endpoint:
+      address_list:
+        address:
         - "10.0.0.2"
   - name: "www.external_foo2.com"
     endpoint:
@@ -1826,26 +1830,30 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
     EXPECT_EQ(expected_target, port_entry);
   }
 
-  // Validate additional records from the SRV query
-  const std::map<std::string, std::string> target_map = {
+  // Validate additional records from the SRV query. Remove a matching
+  // entry to ensure that we are getting unique addresses in the additional
+  // records
+  std::map<std::string, std::string> target_map = {
       {"primary.voip.subzero.com", "10.0.3.1"},
       {"secondary.voip.subzero.com", "10.0.3.2"},
       {"backup.voip.subzero.com", "10.0.3.3"},
       {"emergency.voip.subzero.com", "2200:823f::cafe:beef"},
   };
+  const size_t target_size = target_map.size();
 
   EXPECT_EQ(target_map.size(), query_ctx_->additional_.size());
   for (const auto& [hostname, address] : query_ctx_->additional_) {
     const auto& entry = target_map.find(hostname);
     EXPECT_NE(entry, target_map.end());
     Utils::verifyAddress({entry->second}, address);
+    target_map.erase(hostname);
   }
 
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
-  EXPECT_EQ(target_map.size(), config_->stats().local_srv_record_answers_.value());
-  EXPECT_EQ(target_map.size() - 1, config_->stats().local_a_record_answers_.value());
+  EXPECT_EQ(target_size, config_->stats().local_srv_record_answers_.value());
+  EXPECT_EQ(target_size - 1, config_->stats().local_a_record_answers_.value());
   EXPECT_EQ(1, config_->stats().local_aaaa_record_answers_.value());
   EXPECT_EQ(1, config_->stats().srv_record_queries_.value());
 }
