@@ -415,5 +415,138 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   EXPECT_EQ(content_type_, "text/plain");
 }
 
+// Test addition of tokenized headers to local reply
+TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: GE
+            value:
+              default_value: 0
+              runtime_key: key_b
+      tokenized_headers_to_add:
+        - name: tokenized-foo-1
+          tokenized_headers:
+            - key: foo-1
+              value: bar1
+            - key: foo-2
+              value: bar2  
+          append: true
+        - name: tokenized-foo-2
+          tokenized_headers:
+            - key: foo-3
+              value: bar3
+            - key: foo-4
+              value: bar4  
+          append: false
+        - name: tokenized-foo-3
+          tokenized_headers:
+            - key: foo-5
+              value: bar5
+            - key: foo-6
+              value: bar6  
+          append: true    
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+  auto local = Factory::create(config_, context_);
+
+  response_headers_.addCopy("tokenized-foo-2", "original2");
+  response_headers_.addCopy("tokenized-foo-3", "original3");
+  local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, TestInitCode);
+  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
+  EXPECT_EQ(content_type_, "text/plain");
+
+  EXPECT_EQ(response_headers_.get_("tokenized-foo-1"), "foo-1;bar1,foo-2;bar2");
+  EXPECT_EQ(response_headers_.get_("tokenized-foo-2"), "foo-3;bar3,foo-4;bar4");
+
+  std::vector<absl::string_view> out;
+  Http::HeaderUtility::getAllOfHeader(response_headers_, "tokenized-foo-3", out);
+  ASSERT_EQ(out.size(), 2);
+  ASSERT_EQ(out[0], "original3");
+  ASSERT_EQ(out[1], "foo-5;bar5,foo-6;bar6");
+}
+
+// Test addition of headers and tokenized headers to local reply
+TEST_F(LocalReplyTest, TestHeadersAndTokenizedHeadersAddition) {
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: GE
+            value:
+              default_value: 0
+              runtime_key: key_b
+      headers_to_add:
+        - header:
+            key: foo
+            value: bar
+          append: false
+      tokenized_headers_to_add:
+        - name: tokenized-foo
+          tokenized_headers:
+            - key: foo-1
+              value: bar1
+            - key: foo-2
+              value: bar2  
+          append: false   
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+  auto local = Factory::create(config_, context_);
+
+  local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, TestInitCode);
+  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
+  EXPECT_EQ(content_type_, "text/plain");
+
+  EXPECT_EQ(response_headers_.get_("foo"), "bar");
+  EXPECT_EQ(response_headers_.get_("tokenized-foo"), "foo-1;bar1,foo-2;bar2");
+}
+
+// Test tokenized header exceeding max allowed size
+TEST_F(LocalReplyTest, TestPreventTokenizedHeadersThatExceedMaxSize) {
+  std::string long_key(3000, 'k');
+  std::string long_value(5000, 'v');
+
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: GE
+            value:
+              default_value: 0
+              runtime_key: key_b
+      tokenized_headers_to_add:
+        - name: tokenized-foo
+          tokenized_headers:
+            - key: foo-1
+              value: bar1
+            - key: foo-2
+              value: bar2 
+            - key: foo-3
+              value: bar3    
+          append: false   
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+  // change tokens so that max size is exceeded
+  for (int i = 0; i < 3; i++) {
+    config_.mutable_mappers(0)
+        ->mutable_tokenized_headers_to_add(0)
+        ->mutable_tokenized_headers(i)
+        ->set_key(long_key);
+    config_.mutable_mappers(0)
+        ->mutable_tokenized_headers_to_add(0)
+        ->mutable_tokenized_headers(i)
+        ->set_value(long_value);
+  }
+
+  EXPECT_THROW_WITH_MESSAGE(Factory::create(config_, context_), EnvoyException,
+                            "exceeded max allowed size for tokenized header 'tokenized-foo'");
+}
+
 } // namespace LocalReply
 } // namespace Envoy

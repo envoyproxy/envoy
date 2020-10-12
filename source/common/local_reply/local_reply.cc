@@ -57,6 +57,8 @@ public:
       : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context.runtime(),
                                                     context.api().randomGenerator(),
                                                     context.messageValidationVisitor())) {
+    validateTokenizedHeadersConfiguration(config.tokenized_headers_to_add());
+
     if (config.has_status_code()) {
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
@@ -68,7 +70,8 @@ public:
       body_formatter_ = std::make_unique<BodyFormatter>(config.body_format_override());
     }
 
-    header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
+    header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add(),
+                                                            config.tokenized_headers_to_add());
   }
 
   bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
@@ -100,11 +103,29 @@ public:
   }
 
 private:
+  static const int HeaderMaxSize = 16384;
   const AccessLog::FilterPtr filter_;
   absl::optional<Http::Code> status_code_;
   absl::optional<std::string> body_;
   HeaderParserPtr header_parser_;
   BodyFormatterPtr body_formatter_;
+
+  void validateTokenizedHeadersConfiguration(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::TokenizedHeaderValueOption>&
+          tokenized_headers) {
+    if (!tokenized_headers.empty()) {
+      for (const auto& tokenized_header : tokenized_headers) {
+        int total_size = 0;
+        for (const auto& token : tokenized_header.tokenized_headers()) {
+          total_size = total_size + token.key().size() + token.value().size();
+          if (total_size > HeaderMaxSize) {
+            throw EnvoyException(fmt::format("exceeded max allowed size for tokenized header '{}'",
+                                             tokenized_header.name()));
+          }
+        }
+      }
+    }
+  }
 };
 
 using ResponseMapperPtr = std::unique_ptr<ResponseMapper>;
