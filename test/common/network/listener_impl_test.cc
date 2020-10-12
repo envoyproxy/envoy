@@ -344,8 +344,6 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
 }
 
 TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
-  testing::InSequence s1;
-
   auto socket = std::make_shared<TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   MockTcpListenerCallbacks listener_callbacks;
@@ -357,7 +355,11 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
   listener.setRejectFraction(0);
 
   // This connection will be accepted and not rejected.
-  EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+  {
+    testing::InSequence s1;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::LocalClose));
+  }
   EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce([&] { dispatcher_->exit(); });
 
   ClientConnectionPtr client_connection =
@@ -367,15 +369,12 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
   client_connection->connect();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::LocalClose));
   // Now that we've seen that the connection hasn't been closed by the listener, make sure to close
   // it.
   client_connection->close(ConnectionCloseType::NoFlush);
 }
 
 TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
-  testing::InSequence s1;
-
   auto socket = std::make_shared<TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   MockTcpListenerCallbacks listener_callbacks;
@@ -387,12 +386,18 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   listener.setRejectFraction(0.5f);
 
   // The first connection will be rejected because the random value is too small.
-  EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
-  EXPECT_CALL(random_generator, random()).WillOnce(Return(0));
-  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
-  EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
-    dispatcher_->exit();
-  });
+  {
+    testing::InSequence s1;
+    EXPECT_CALL(random_generator, random()).WillOnce(Return(0));
+    EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
+  }
+  {
+    testing::InSequence s2;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
+      dispatcher_->exit();
+    });
+  }
 
   {
     ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
@@ -404,12 +409,18 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   }
 
   // The second connection rolls better on initiative and is accepted.
-  EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected)).WillOnce([&] {
-    dispatcher_->exit();
-  });
-  EXPECT_CALL(random_generator, random()).WillOnce(Return(std::numeric_limits<uint64_t>::max()));
-  EXPECT_CALL(listener_callbacks, onAccept_(_));
-  EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).Times(0);
+  {
+    testing::InSequence s1;
+    EXPECT_CALL(random_generator, random()).WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+    EXPECT_CALL(listener_callbacks, onAccept_(_));
+  }
+  {
+    testing::InSequence s2;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected)).WillOnce([&] {
+      dispatcher_->exit();
+    });
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).Times(0);
+  }
 
   {
     ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
@@ -427,8 +438,6 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
 }
 
 TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
-  testing::InSequence s1;
-
   auto socket = std::make_shared<TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   MockTcpListenerCallbacks listener_callbacks;
@@ -439,11 +448,18 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
 
   listener.setRejectFraction(1);
 
-  EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
-  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
-  EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
-    dispatcher_->exit();
-  });
+  {
+    testing::InSequence s1;
+    EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
+  }
+
+  {
+    testing::InSequence s2;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
+      dispatcher_->exit();
+    });
+  }
 
   ClientConnectionPtr client_connection =
       dispatcher_->createClientConnection(socket->localAddress(), Address::InstanceConstSharedPtr(),
