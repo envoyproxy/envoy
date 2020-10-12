@@ -100,7 +100,6 @@ def load_repository_locations(repository_locations_spec):
 
             # Starlark doesn't have regexes.
             cpe_components = len(cpe.split(":"))
-
             # We allow cpe:2.3:a:foo:* and cpe:2.3.:a:foo:bar:* only.
             cpe_components_valid = cpe_components in [5, 6]
             cpe_matches = (cpe == "N/A" or (cpe.startswith("cpe:2.3:a:") and cpe.endswith(":*") and cpe_components_valid))
