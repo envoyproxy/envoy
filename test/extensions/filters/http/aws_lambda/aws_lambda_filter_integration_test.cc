@@ -122,13 +122,13 @@ public:
     EXPECT_TRUE(response->complete());
 
     // verify headers
-    expected_response_headers.iterate(
-        [actual_headers = &response->headers()](const Http::HeaderEntry& expected_entry) {
-          const auto* actual_entry = actual_headers->get(
-              Http::LowerCaseString(std::string(expected_entry.key().getStringView())));
-          EXPECT_EQ(actual_entry->value().getStringView(), expected_entry.value().getStringView());
-          return Http::HeaderMap::Iterate::Continue;
-        });
+    expected_response_headers.iterate([actual_headers = &response->headers()](
+                                          const Http::HeaderEntry& expected_entry) {
+      const auto actual_entry = actual_headers->get(
+          Http::LowerCaseString(std::string(expected_entry.key().getStringView())));
+      EXPECT_EQ(actual_entry[0]->value().getStringView(), expected_entry.value().getStringView());
+      return Http::HeaderMap::Iterate::Continue;
+    });
 
     // verify cookies if we have any
     if (!expected_response_cookies.empty()) {
