@@ -217,6 +217,34 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
   return std::make_unique<CompoundHeaderFormatter>(std::move(formatters), append);
 }
 
+HeaderFormatterPtr createTokenizedHeaderFormatter(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_tokenize,
+    bool append) {
+  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> formatters;
+
+  for (const auto& header_value : headers_to_tokenize) {
+    // the value for append here is irrelevant
+    HeaderFormatterPtr formatter = parseInternal(header_value, false);
+    formatters.emplace_back(std::make_pair(header_value.key(), std::move(formatter)));
+  }
+
+  return std::make_unique<TokenizedHeaderFormatter>(std::move(formatters), append);
+}
+
+void evaluateHeader(const Http::LowerCaseString& header_key,
+                    const HeaderFormatterPtr& header_formatter, Http::HeaderMap& headers,
+                    const StreamInfo::StreamInfo& stream_info) {
+  const std::string value = stream_info != nullptr ? header_formatter->format(*stream_info)
+                                                   : header_formatter.original_value_;
+  if (!value.empty()) {
+    if (header_formatter->append()) {
+      headers.addReferenceKey(key, value);
+    } else {
+      headers.setReferenceKey(key, value);
+    }
+  }
+}
+
 } // namespace
 
 HeaderParserPtr HeaderParser::configure(
@@ -229,6 +257,24 @@ HeaderParserPtr HeaderParser::configure(
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
         HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value()});
+  }
+
+  return header_parser;
+}
+
+HeaderParserPtr HeaderParser::configure(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::TokenizedHeaderValueOption>&
+        tokenized_headers_to_add) {
+  HeaderParserPtr header_parser = configure(headers_to_add);
+
+  for (const auto& tokenized_header : tokenized_headers_to_add) {
+    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(tokenized_header, append, true);
+    HeaderFormatterPtr header_formatter =
+        createTokenizedHeaderFormatter(tokenized_header.tokenized_headers(), append);
+
+    header_parser->tokenized_headers_to_add_.emplace_back(std::make_pair(
+        Http::LowerCaseString(tokenized_header.name()), std::move(header_formatter)));
   }
 
   return header_parser;
@@ -281,15 +327,11 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   }
 
   for (const auto& [key, entry] : headers_to_add_) {
-    const std::string value =
-        stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
-    if (!value.empty()) {
-      if (entry.formatter_->append()) {
-        headers.addReferenceKey(key, value);
-      } else {
-        headers.setReferenceKey(key, value);
-      }
-    }
+    evaluateHeader(key, entry, headers, stream_info);
+  }
+
+  for (const auto& [key, entry] : tokenized_headers_to_add_) {
+    evaluateHeader(key, entry, headers, stream_info);
   }
 }
 

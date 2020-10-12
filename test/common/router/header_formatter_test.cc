@@ -956,6 +956,101 @@ TEST(HeaderParserTest, TestParseInternal) {
   }
 }
 
+TEST(TokenizedHeaderParserTest, TokenizedHeadersAreCorrectlyEvaluated) {
+  struct TestCase {
+    int number_;
+    std::vector<std::pair<std::string, std::string>> input_;
+    absl::optional<std::string> expected_output_;
+    absl::optional<std::string> expected_exception_;
+  };
+
+  static const TestCase test_cases[] = {
+      // valid inputs
+      {1, {}, {}, {}},
+      {2,
+       {{"token-a", "value-a"}, {"TOKEN-B", "VALUE-B"}, {"token-C", "value-C"}},
+       {"token-a;value-a,token-b;VALUE-B,token-c;value-C"},
+       {}},
+      {3,
+       {{"token-a", "%PROTOCOL%"},
+        {"token-b", "value-b"},
+        {"token-c", "%UPSTREAM_REMOTE_ADDRESS%"}},
+       {"token-a;HTTP/2,token-b;value-b,token-c;10.0.0.1:443"},
+       {}},
+      {4,
+       {{"token-a", "%PROTOCOL%"},
+        {"token-b", "%UPSTREAM_REMOTE_ADDRESS%"},
+        {"token-c", "%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%"}},
+       {"token-a;HTTP/2,token-b;10.0.0.1:443,token-c;127.0.0.2"},
+       {}},
+      {5,
+       {{"token-a", "protocol is %PROTOCOL%"},
+        {"token-b", "%UPSTREAM_REMOTE_ADDRESS% is upstream address"},
+        {"token-c", "this <%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%> is downstream address"}},
+       {"token-a;protocol is HTTP/2,token-b;10.0.0.1:443 is upstream address,token-c;this "
+        "<127.0.0.2> is downstream address"},
+       {}},
+      // invalid inputs (not meant to be exhaustive, we rely on TestParseInternal for that): we just
+      // want to verify that we error out in case any of the headers to tokenize are invalid
+      {6,
+       {{"token-a", "value-a"}, {"token-b", "%INVALID%"}},
+       {},
+       {"field 'INVALID' not supported as custom header"}},
+      {7,
+       {{"token-a", "value-a"},
+        {"token-b", "%PROTOCOL"},
+        {"token-c", "%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%"}},
+       {},
+       {"Invalid header configuration. Un-terminated variable expression 'PROTOCOL'"}}};
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http2;
+  ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+
+  for (const auto& test_case : test_cases) {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> headers_to_tokenize;
+    for (const auto& input : test_case.input_) {
+      envoy::config::core::v3::HeaderValue* header = headers_to_tokenize.Add();
+      header->set_key(input.first);
+      header->set_value(input.second);
+    }
+
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers;
+
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::TokenizedHeaderValueOption>
+        tokenized_headers;
+    envoy::config::core::v3::TokenizedHeaderValueOption* tokenized_header = tokenized_headers.Add();
+    tokenized_header->set_name("x-tokenized-header");
+    tokenized_header->mutable_tokenized_headers()->CopyFrom(headers_to_tokenize);
+
+    std::string hint = fmt::format("for test case with number: {}", test_case.number_);
+
+    if (test_case.expected_exception_) {
+      EXPECT_FALSE(test_case.expected_output_) << hint;
+      EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(headers, tokenized_headers), EnvoyException,
+                                test_case.expected_exception_.value());
+      continue;
+    }
+
+    HeaderParserPtr header_parser = HeaderParser::configure(headers, tokenized_headers);
+
+    Http::TestRequestHeaderMapImpl header_map{};
+    header_parser->evaluateHeaders(header_map, stream_info);
+
+    if (!test_case.expected_output_) {
+      EXPECT_FALSE(header_map.has("x-tokenized-header")) << hint;
+      continue;
+    }
+
+    EXPECT_TRUE(header_map.has("x-tokenized-header")) << hint;
+    EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-tokenized-header")) << hint;
+  }
+}
+
 TEST(HeaderParserTest, EvaluateHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }

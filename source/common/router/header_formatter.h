@@ -92,5 +92,38 @@ private:
   const bool append_;
 };
 
+/**
+ * A formatter that produces a value by concatenating
+ * multiple headers in the format header-A;value-A,header-B;value-B etc.
+ */
+class TokenizedHeaderFormatter : public HeaderFormatter {
+public:
+  TokenizedHeaderFormatter(
+      std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>>&& formatters, bool append)
+      : formatters_(std::move(formatters)), append_(append) {}
+
+  // HeaderFormatter::format
+  const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override {
+    std::string buf;
+    bool first = true;
+    for (const auto& formatter : formatters_) {
+      if (!first) {
+        buf += ",";
+      }
+      buf += formatter.first.get();
+      buf += ";";
+      buf += formatter.second->format(stream_info);
+      first = false;
+    }
+    return buf;
+  };
+
+  bool append() const override { return append_; }
+
+private:
+  const std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> formatters_;
+  const bool append_;
+};
+
 } // namespace Router
 } // namespace Envoy
