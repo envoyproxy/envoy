@@ -806,10 +806,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
   filter_manager_.requestHeadersInitialized();
-  if (request_header_timer_ != nullptr) {
-    request_header_timer_->disableTimer();
-    request_header_timer_ = nullptr;
-  }
+  request_header_timer_.reset();
 
   Upstream::HostDescriptionConstSharedPtr upstream_host =
       connection_manager_.read_callbacks_->upstreamHost();
