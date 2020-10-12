@@ -8,6 +8,24 @@ namespace Envoy {
 namespace Event {
 
 /**
+ * Describes a minimum timer value that is equal to a scale factor applied to the maximum.
+ */
+struct ScaleFactor {
+  explicit ScaleFactor(double scale_factor) : scale_factor_(scale_factor) {}
+  const double scale_factor_;
+};
+
+/**
+ * Describes a minimum timer value that is an absolute duration.
+ */
+struct AbsoluteValue {
+  explicit AbsoluteValue(std::chrono::milliseconds value) : value_(value) {}
+  const std::chrono::milliseconds value_;
+};
+
+using ScaledTimerMinimum = absl::variant<ScaleFactor, AbsoluteValue>;
+
+/**
  * Class for creating RangeTimer objects that can be adjusted towards either the minimum or maximum
  * of their range by the owner of the manager object. Users of this class can call createTimer() to
  * receive a new RangeTimer object that they can then enable or disable at will (but only on the
@@ -24,6 +42,14 @@ public:
    * before the manager.
    */
   virtual RangeTimerPtr createTimer(TimerCb callback) PURE;
+
+  /**
+   * Creates a new range timer backed by the manager that mimicks the Timer interface. Calling
+   * enableTimer on the returned object sets the maximum duration, while the first argument here
+   * controls the minimum. Passing a value of ScaleFactor(x) sets the min to (x * max) when the
+   * timer is enabled, while AbsoluteValue(y) sets the min to the duration y.
+   */
+  virtual TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) PURE;
 
   /**
    * Sets the scale factor for all timers created through this manager. The value should be between

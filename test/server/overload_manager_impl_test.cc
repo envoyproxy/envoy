@@ -464,6 +464,22 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   manager->stop();
 }
 
+constexpr char kReducedTimeoutsConfig[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+  actions:
+    - name: envoy.overload_actions.reduce_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+  )YAML";
+
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
   const std::string config = R"EOF(
     resource_monitors {

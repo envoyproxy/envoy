@@ -316,6 +316,52 @@ TEST_F(ScaledRangeTimerManagerTest, SingleTimerSameMinMax) {
   EXPECT_FALSE(timer->enabled());
 }
 
+TEST_F(ScaledRangeTimerManagerTest, MaxOnlyScaleFactorTimer) {
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+
+  // With the default scale factor of 1, the timer should fire at its maximum timeout.
+  MockFunction<TimerCb> callback;
+  auto timer = manager.createTimer(ScaleFactor(0.5), callback.AsStdFunction());
+  EXPECT_CALL(callback, Call());
+
+  timer->enableTimer(std::chrono::seconds(10));
+  simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
+  simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
+  EXPECT_FALSE(timer->enabled());
+
+  // Setting the scale factor to 0 should result in the timer honoring its minimum timeout, which is
+  // 0.5 * max.
+  manager.setScaleFactor(0);
+  EXPECT_CALL(callback, Call());
+
+  timer->enableTimer(std::chrono::seconds(10));
+  simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
+  EXPECT_FALSE(timer->enabled());
+}
+
+TEST_F(ScaledRangeTimerManagerTest, MaxOnlyAbsoluteValueTimer) {
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+
+  // With the default scale factor of 1, the timer should fire at its maximum timeout.
+  MockFunction<TimerCb> callback;
+  auto timer =
+      manager.createTimer(AbsoluteValue(std::chrono::seconds(3)), callback.AsStdFunction());
+  EXPECT_CALL(callback, Call());
+
+  timer->enableTimer(std::chrono::seconds(10));
+  simTime().advanceTimeAndRun(std::chrono::seconds(3), dispatcher_, Dispatcher::RunType::Block);
+  simTime().advanceTimeAndRun(std::chrono::seconds(7), dispatcher_, Dispatcher::RunType::Block);
+  EXPECT_FALSE(timer->enabled());
+
+  // Setting the scale factor to 0 should result in the timer honoring its minimum timeout.
+  manager.setScaleFactor(0);
+  EXPECT_CALL(callback, Call());
+
+  timer->enableTimer(std::chrono::seconds(10));
+  simTime().advanceTimeAndRun(std::chrono::seconds(3), dispatcher_, Dispatcher::RunType::Block);
+  EXPECT_FALSE(timer->enabled());
+}
+
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersNoScaling) {
   ScaledRangeTimerManagerImpl manager(dispatcher_);
   std::vector<TrackedTimer> timers;
