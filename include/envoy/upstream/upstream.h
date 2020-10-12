@@ -116,7 +116,7 @@ public:
    * Register a callback to be invoked when secrets are ready for the transport socket that
    * corresponds to the provided metadata.
    * @param callback supplies the callback to be invoked.
-   * @param metadata supplises the metadata to be used for resolving transport socket matches.
+   * @param metadata supplies the metadata to be used for resolving transport socket matches.
    */
   virtual void addSecretsReadyCb(std::function<void()> callback,
                                  const envoy::config::core::v3::Metadata* metadata) const PURE;
