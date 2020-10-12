@@ -613,6 +613,16 @@ WasmResult Context::getProperty(absl::string_view path, std::string* result) {
           return WasmResult::InternalFailure;
         }
       }
+    } else if (value.IsList()) {
+      auto& list = *value.ListOrDie();
+      int idx = 0;
+      if (!absl::SimpleAtoi(part, &idx)) {
+        return WasmResult::NotFound;
+      }
+      if (idx < 0 || idx >= list.size()) {
+        return WasmResult::NotFound;
+      }
+      value = list[idx];
     } else {
       return WasmResult::NotFound;
     }

@@ -1216,6 +1216,8 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   ProtobufWkt::Value node_val;
   node_val.set_string_value("wasm_node_get_value");
   (*node_data.mutable_metadata()->mutable_fields())["wasm_node_get_key"] = node_val;
+  (*node_data.mutable_metadata()->mutable_fields())["wasm_node_list_key"] =
+      ValueUtil::listValue({node_val});
   EXPECT_CALL(local_info_, node()).WillRepeatedly(ReturnRef(node_data));
   EXPECT_CALL(rootContext(),
               log_(spdlog::level::debug, Eq(absl::string_view("onTick wasm_node_get_value"))));
