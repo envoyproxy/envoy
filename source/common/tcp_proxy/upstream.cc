@@ -164,7 +164,7 @@ TcpConnPool::TcpConnPool(const std::string& cluster_name, Upstream::ClusterManag
 
 TcpConnPool::~TcpConnPool() {
   if (upstream_handle_ != nullptr) {
-    upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess);
+    upstream_handle_->cancel(ConnectionPool::CancelPolicy::CloseExcess);
   }
 }
 
@@ -212,7 +212,7 @@ HttpConnPool::HttpConnPool(const std::string& cluster_name,
 
 HttpConnPool::~HttpConnPool() {
   if (upstream_handle_ != nullptr) {
-    upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+    upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
   }
 }
 
@@ -221,9 +221,8 @@ bool HttpConnPool::valid() const { return conn_pool_ != nullptr; }
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   callbacks_ = callbacks;
   upstream_ = std::make_unique<HttpUpstream>(upstream_callbacks_, hostname_);
-  HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
   Tcp::ConnectionPool::Cancellable* handle =
-      conn_pool_->newStream(http_upstream->responseDecoder(), *this);
+      conn_pool_->newStream(upstream_->responseDecoder(), *this);
   if (handle != nullptr) {
     upstream_handle_ = handle;
   }
@@ -240,9 +239,8 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                const StreamInfo::StreamInfo& info) {
   upstream_handle_ = nullptr;
   Http::RequestEncoder* latched_encoder = &request_encoder;
-  HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-  http_upstream->setRequestEncoder(request_encoder,
-                                   host->transportSocketFactory().implementsSecureTransport());
+  upstream_->setRequestEncoder(request_encoder,
+                               host->transportSocketFactory().implementsSecureTransport());
   callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
                                  latched_encoder->getStream().connectionLocalAddress(),
                                  info.downstreamSslConnection());

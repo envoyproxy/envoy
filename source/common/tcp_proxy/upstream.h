@@ -21,6 +21,7 @@ public:
   // is then responsible for calling either onPoolReady or onPoolFailure on the
   // supplied GenericConnectionPoolCallbacks.
   virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
+  // Returns true if there was a valid connection pool, false otherwise.
   virtual bool valid() const PURE;
 };
 
@@ -48,6 +49,8 @@ private:
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
 };
 
+class HttpUpstream;
+
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
   HttpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
@@ -73,7 +76,7 @@ private:
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
-  std::unique_ptr<GenericUpstream> upstream_;
+  std::unique_ptr<HttpUpstream> upstream_;
 };
 
 // An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
