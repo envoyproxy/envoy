@@ -1,0 +1,57 @@
+admin:
+  access_log_path: /dev/stdout
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8081
+
+node:
+  cluster: hello-service
+  id: node1
+
+static_resources:
+  listeners:
+    - address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 8000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.redis_proxy  # well_known_names.h 中定义
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy # pb 中定义
+                stat_prefix: redis-stat
+                settings:
+                  # TODO 在 filter config 中添加协议类型
+                  # backend: redis
+                  op_timeout: 3s
+                  enable_redirection: true
+                  max_buffer_size_before_flush: 100000
+                  # enable_hashtagging: true
+                  # buffer_flush_timeout
+                  # max_upstream_unknown_connections
+                prefix_routes:
+                  routes:
+                    - prefix: "a"
+                      cluster: mc_1
+                    - prefix: "b"
+                      cluster: mc_2
+  clusters:
+    - name: mc_1
+      connect_timeout: 0.25s
+      load_assignment:
+        cluster_name: redis_0
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 32000 }
+    - name: mc_2
+      connect_timeout: 0.25s
+      load_assignment:
+        cluster_name: redis_0
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 33000 }

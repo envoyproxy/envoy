@@ -49,6 +49,21 @@ struct SupportedCommands {
   }
 
   /**
+   * @return commands which mc simple cmd
+   */
+  static const absl::flat_hash_set<std::string>& mcSimpleCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "set", "cas", "add", "replace", "append",
+        "prepend", "incr", "decr", "delete", "touch");
+  }
+
+  /**
+ * @return commands which mc get/gets cmd
+ */
+  static const absl::flat_hash_set<std::string>& mcRetrievalCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "gets", "get");
+  }
+
+  /**
    * @return auth command
    */
   static const std::string& auth() { CONSTRUCT_ON_FIRST_USE(std::string, "auth"); }
@@ -67,6 +82,11 @@ struct SupportedCommands {
    * @return ping command
    */
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
+
+  /**
+   * @return quit command
+   */
+  static const std::string& quit() { CONSTRUCT_ON_FIRST_USE(std::string, "quit"); }
 
   /**
    * @return commands which alters the state of redis

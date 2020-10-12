@@ -65,6 +65,7 @@ private:
   const uint32_t max_upstream_unknown_connections_;
   const bool enable_command_stats_;
   ReadPolicy read_policy_;
+  std::string backend{""}; // 表示 redis/memcached 协议
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
@@ -89,7 +90,7 @@ public:
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
-
+  std::string backends() override;
 private:
   friend class RedisClientImplTest;
 
@@ -145,6 +146,7 @@ private:
   Envoy::TimeSource& time_source_;
   const RedisCommandStatsSharedPtr redis_command_stats_;
   Stats::Scope& scope_;
+  std::string backends_{"memcached"};
 };
 
 class ClientFactoryImpl : public ClientFactory {

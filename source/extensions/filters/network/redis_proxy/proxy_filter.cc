@@ -26,7 +26,9 @@ ProxyFilterConfig::ProxyFilterConfig(
       downstream_auth_username_(
           Config::DataSource::read(config.downstream_auth_username(), true, api)),
       downstream_auth_password_(
-          Config::DataSource::read(config.downstream_auth_password(), true, api)) {}
+          Config::DataSource::read(config.downstream_auth_password(), true, api)),backends_("memcached") {
+  // TODO backends_ = config.settings().backends();
+}
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
@@ -133,6 +135,7 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
   // The response we got might not be in order, so flush out what we can. (A new response may
   // unlock several out of order responses).
   while (!pending_requests_.empty() && pending_requests_.front().pending_response_) {
+    // TODO response encode
     encoder_->encode(*pending_requests_.front().pending_response_, encoder_buffer_);
     pending_requests_.pop_front();
   }

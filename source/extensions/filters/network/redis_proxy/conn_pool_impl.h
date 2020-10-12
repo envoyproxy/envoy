@@ -183,6 +183,7 @@ private:
 
   const std::string cluster_name_;
   Upstream::ClusterManager& cm_;
+  std::string backends{""};
   Common::Redis::Client::ClientFactory& client_factory_;
   ThreadLocal::SlotPtr tls_;
   Common::Redis::Client::ConfigSharedPtr config_;

@@ -37,6 +37,9 @@ public:
       : type_(RespType::CompositeArray) {
     new (&composite_array_) CompositeArray(std::move(base_array), command, start, end);
   }
+
+  RespValue(const std::string& s): string_(s), type_(RespType::BulkString) {}
+
   virtual ~RespValue() { cleanup(); }
 
   RespValue(const RespValue& other);                // copy constructor
@@ -163,6 +166,8 @@ public:
    * @param value supplies the decoded value that is now owned by the callee.
    */
   virtual void onRespValue(RespValuePtr&& value) PURE;
+
+  virtual std::string backends() PURE;
 };
 
 /**

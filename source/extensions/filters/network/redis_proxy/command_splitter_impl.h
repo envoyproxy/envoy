@@ -183,6 +183,19 @@ private:
 };
 
 /**
+ * McSimpleRequest 把第一个参数当做 key 做 hash 计算
+ */
+class McSimpleRequest: public SingleServerRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency);
+private:
+  McSimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
+  : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
  * EvalRequest hashes the fourth argument as the key.
  */
 class EvalRequest : public SingleServerRequest {
@@ -253,6 +266,23 @@ public:
 private:
   MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
               bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
+ * Memcached get/gets command
+ */
+class McRetrievalRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency);
+
+private:
+  McRetrievalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
       : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
@@ -362,6 +392,8 @@ private:
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
+  CommandHandlerFactory<McSimpleRequest> mc_simple_command_handler_;
+  CommandHandlerFactory<McRetrievalRequest> mc_retrieval_commands_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;

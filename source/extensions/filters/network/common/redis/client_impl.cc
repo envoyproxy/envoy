@@ -20,6 +20,7 @@ ConfigImpl::ConfigImpl(
     : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
       enable_hashtagging_(config.enable_hashtagging()),
       enable_redirection_(config.enable_redirection()),
+      // TODO backend(""),
       max_buffer_size_before_flush_(
           config.max_buffer_size_before_flush()), // This is a scalar, so default is zero.
       buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
@@ -97,9 +98,11 @@ void ClientImpl::flushBufferAndResetTimer() {
   if (flush_timer_->enabled()) {
     flush_timer_->disableTimer();
   }
+  std::cout << "encode buffer: " << encoder_buffer_.toString() << std::endl;
   connection_->write(encoder_buffer_, false);
 }
 
+// TODO request 是直接decode过来的或者1:n切出来的
 PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
@@ -152,6 +155,7 @@ void ClientImpl::onConnectOrOpTimeout() {
 }
 
 void ClientImpl::onData(Buffer::Instance& data) {
+  std::cout << data.toString() << std::endl;
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
@@ -203,7 +207,9 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   }
 }
 
+// 上游的readfilter有响应之后，回调了onData()函数，然后通过DecoderImpl::decode()再回调这里的onRespValue()
 void ClientImpl::onRespValue(RespValuePtr&& value) {
+  // TODO pending_requests_ 在哪里初始化 哪里修改 ?
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
   const bool canceled = request.canceled_;
@@ -262,6 +268,10 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
 }
 
+std::string ClientImpl::backends() {
+  return backends_;
+}
+
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks,
                                            Stats::StatName command)
     : parent_(parent), callbacks_(callbacks), command_{command},
@@ -314,7 +324,7 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
                                     const std::string& auth_password) {
-  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
+  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new MemcachedEncoder()},
                                         decoder_factory_, config, redis_command_stats, scope);
   client->initialize(auth_username, auth_password);
   return client;

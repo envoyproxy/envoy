@@ -329,8 +329,8 @@ RespValue::CompositeArray::CompositeArrayConstIterator::empty() {
   return *instance;
 }
 
-void DecoderImpl::decode(Buffer::Instance& data) {
-  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+void DecoderImpl::decode(Buffer::Instance &data) {
+  for (const Buffer::RawSlice &slice : data.getRawSlices()) {
     parseSlice(slice);
   }
 
@@ -650,6 +650,559 @@ void EncoderImpl::encodeSimpleString(const std::string& string, Buffer::Instance
   out.add("+", 1);
   out.add(string);
   out.add("\r\n", 2);
+}
+
+void MemcachedDecoder::parseSlice(const Buffer::RawSlice& slice) {
+  const char* buffer = reinterpret_cast<const char*>(slice.mem_);
+  uint64_t remaining = slice.len_;
+  char* token = const_cast<char *>(buffer);
+
+  while(remaining) {
+    char ch = buffer[0];
+    ENVOY_LOG(trace, "parse slice: {} remaining {} state: {}", remaining, ch, state_);
+
+    switch (state_) {
+    case State::SW_START:{
+      if (ch != ' ') {
+        if (isdigit(ch)) {
+          state_ = State::SW_RSP_NUM;
+        } else if (islower(ch)) {
+          state_ = State::SW_REQ_CMD;
+        } else if (isupper(ch)) {
+          state_ = State::SW_RSP_STR;
+        } else {
+          throw ProtocolError("unsopported protocol");
+        }
+
+        pending_value_root_ = std::make_unique<RespValue>();
+        pending_value_root_.get()->type(RespType::Array);
+
+        token = const_cast<char *>(buffer);
+
+        buffer--;
+        remaining++;
+      }
+
+      break;
+    }
+    case State::SW_REQ_CMD: {
+      if (ch == ' ') {
+        ASSERT(token != nullptr);
+        RespValuePtr value = std::make_unique<RespValue>();
+        value.get()->type(RespType::BulkString);
+        value.get()->asString().append(token, buffer - token);
+        std::string cmd = value.get()->asString();
+        pending_value_root_.get()->asArray().push_back(*value.get());
+
+        if (cmd=="set") { type_=MsgType::MSG_REQ_MC_SET; }
+        else if(cmd=="add") { type_=MsgType::MSG_REQ_MC_ADD; }
+        else if(cmd=="replace") { type_=MsgType::MSG_REQ_MC_REPLACE; }
+        else if(cmd=="append") { type_=MsgType::MSG_REQ_MC_APPEND; }
+        else if(cmd=="prepend") { type_=MsgType::MSG_REQ_MC_PREPEND; }
+        else if(cmd=="cas") { type_=MsgType::MSG_REQ_MC_CAS; }
+        else if(cmd=="get") { type_=MsgType::MSG_REQ_MC_GET; }
+        else if(cmd=="gets") { type_=MsgType::MSG_REQ_MC_GETS; }
+        else if(cmd=="incr") { type_=MsgType::MSG_REQ_MC_INCR; }
+        else if(cmd=="decr") { type_=MsgType::MSG_REQ_MC_DECR; }
+        else if(cmd=="delete") { type_=MsgType::MSG_REQ_MC_DELETE; }
+        else if(cmd=="touch") { type_=MsgType::MSG_REQ_MC_TOUCH; }
+        else {
+          throw ProtocolError("un support cmd");
+        }
+        state_ = State::SW_KEY;
+        token = const_cast<char *>(buffer);
+      }
+
+      break;
+    }
+    case State::SW_RSP_STR: {
+      if (ch == ' ' || ch == '\r') {
+        ASSERT(token != nullptr);
+        RespValuePtr value = std::make_unique<RespValue>();
+        value.get()->type(RespType::BulkString);
+        value.get()->asString().append(token, buffer - token);
+        std::string cmd = value.get()->asString();
+        pending_value_root_.get()->asArray().push_back(*value.get());
+        std::cout << "resp cmd: " << cmd << std::endl;
+
+        if (cmd == "END") { type_ = MsgType::MSG_RSP_MC_END; }
+        else if (cmd == "VALUE") { type_ = MsgType::MSG_RSP_MC_VALUE; }
+        else if (cmd == "ERROR") { type_ = MsgType::MSG_RSP_MC_ERROR; }
+        else if (cmd == "STORED") { type_ = MsgType::MSG_RSP_MC_STORED; }
+        else if (cmd == "EXISTS") { type_ = MsgType::MSG_RSP_MC_EXISTS; }
+        else if (cmd == "DELETED") { type_ = MsgType::MSG_RSP_MC_DELETED; }
+        else if (cmd == "TOUCHED") { type_ = MsgType::MSG_RSP_MC_TOUCHED; }
+        else if (cmd == "NOT_FOUND") { type_ = MsgType::MSG_RSP_MC_NOT_FOUND; }
+        else if (cmd == "NOT_STORED") { type_ = MsgType::MSG_RSP_MC_NOT_STORED; }
+        else if (cmd == "CLIENT_ERROR") { type_ = MsgType::MSG_RSP_MC_CLIENT_ERROR; }
+        else if (cmd == "SERVER_ERROR") { type_ = MsgType::MSG_RSP_MC_SERVER_ERROR; }
+        else {
+          throw ProtocolError("error resp msg");
+        }
+
+        if (ch == '\r') {
+          switch (type_) {
+          case MsgType::MSG_RSP_MC_ERROR:
+            std::cout << "MSG_RSP_MC_ERROR" << std::endl;
+          case MsgType::MSG_RSP_MC_STORED:
+          case MsgType::MSG_RSP_MC_NOT_STORED:
+          case MsgType::MSG_RSP_MC_EXISTS:
+          case MsgType::MSG_RSP_MC_END:
+          case MsgType::MSG_RSP_MC_DELETED:
+          case MsgType::MSG_RSP_MC_TOUCHED:
+          case MsgType::MSG_RSP_MC_NOT_FOUND:
+            break;
+          default:
+            throw ProtocolError("");
+          }
+
+          state_ = State::SW_DONE;
+        } else {
+          switch (type_) {
+          case MsgType::MSG_RSP_MC_CLIENT_ERROR:
+          case MsgType::MSG_RSP_MC_SERVER_ERROR:
+            state_ = State::SW_RSP_ERR_MSG;
+            break;
+          case MsgType::MSG_RSP_MC_VALUE:
+            state_ = State::SW_KEY;
+            break;
+          default:
+            throw ProtocolError("");
+          }
+        }
+
+        token = const_cast<char *>(buffer);
+      }
+      break;
+    }
+    case State::SW_RSP_NUM: {
+      if (ch == '\r') {
+        type_ = MsgType::MSG_RSP_MC_NUM;
+        RespValuePtr value = std::make_unique<RespValue>();
+        value.get()->type(RespType::BulkString);
+        value.get()->asString().append(token, buffer - token);
+        pending_value_root_.get()->asArray().push_back(*value.get());
+        state_ = State::SW_DONE;
+      }
+
+      break;
+    }
+    case State::SW_RSP_ERR_MSG: {
+      if (ch == '\r') {
+        RespValuePtr err_msg = std::make_unique<RespValue>();
+        err_msg.get()->type(RespType::BulkString);
+        err_msg.get()->asString().append(token, buffer - token);
+        pending_value_root_.get()->asArray().push_back(*err_msg.get());
+        state_ = State::SW_DONE;
+      }
+
+      break;
+    }
+    case State::SW_KEY: {
+      if (ch == ' ' || ch == '\r') {
+        ASSERT(token != nullptr);
+        RespValuePtr value = std::make_unique<RespValue>();
+        value.get()->type(RespType::BulkString);
+        value.get()->asString().append(token+1, buffer - 1 - token);
+        pending_value_root_.get()->asArray().push_back(*value);
+        std::string key = value.get()->asString();
+        token = const_cast<char *>(buffer);
+
+        if (ch == '\r') {
+          switch (type_) {
+            case MsgType::MSG_REQ_MC_GET:
+            case MsgType::MSG_REQ_MC_GETS:
+            case MsgType::MSG_REQ_MC_DELETE:
+              state_ = State::SW_DONE;
+              break;
+            default:
+              throw ProtocolError("cmd format error");
+          }
+        } else {
+          switch (type_) {
+            case MsgType::MSG_REQ_MC_TOUCH:
+              state_ = State::SW_EXPIRY;
+              break;
+            case MsgType::MSG_REQ_MC_INCR:
+            case MsgType::MSG_REQ_MC_DECR:
+              state_ = State::SW_VAL;
+              break;
+            case MsgType::MSG_REQ_MC_GET:
+            case MsgType::MSG_REQ_MC_GETS:
+              // 如果是get/gets 会一直轮询
+              break;
+            case MsgType::MSG_RSP_MC_VALUE:
+              state_ = State::SW_FLAGS;
+              break;
+            default:
+              state_ = State::SW_FLAGS;
+              break;
+          }
+        }
+      }
+      break;
+    }
+
+    case State::SW_FLAGS: {
+      if (ch == ' ') {
+        RespValuePtr flag = std::make_unique<RespValue>();
+        flag.get()->type(RespType::BulkString);
+        flag.get()->asString().append(token+1, buffer - token -1);
+        pending_value_root_.get()->asArray().push_back(*flag.get());
+
+        if (type_ == MsgType::MSG_RSP_MC_VALUE) {
+          state_ = State::SW_VLEN;
+        } else {
+          state_ = State::SW_EXPIRY;
+        }
+
+        token = const_cast<char *>(buffer);
+      }
+
+      break;
+    }
+
+    case State::SW_EXPIRY: {
+      if (ch == ' '|| ch == '\r') {
+        RespValuePtr expire = std::make_unique<RespValue>();
+        expire.get()->type(RespType::BulkString);
+        expire.get()->asString().append(token+1, buffer - token -1);
+        pending_value_root_.get()->asArray().push_back(*expire.get());
+        token = const_cast<char *>(buffer);
+
+        if (ch == '\r') {
+          // ASSERT
+          state_ = State::SW_NOREPLY;
+        } else {
+          state_ = State::SW_VLEN;
+        }
+      }
+
+      break;
+    }
+
+    case State::SW_VLEN: {
+      if (ch == ' ' || ch=='\r') {
+        RespValuePtr len = std::make_unique<RespValue>();
+        len.get()->type(RespType::BulkString);
+        len.get()->asString().append(token+1, buffer - token);
+        pending_value_root_.get()->asArray().push_back(*len.get());
+        token = const_cast<char *>(buffer);
+
+        if (type_ == MsgType::MSG_REQ_MC_CAS) {
+          state_ = State::SW_CAS;
+        } else if (type_ == MsgType::MSG_RSP_MC_VALUE) {
+          if (ch == ' ') {
+            state_ = State::SW_CAS;
+          } else {
+            state_ = State::SW_CRLF;
+          }
+        } else {
+          state_ = State::SW_NOREPLY;
+        }
+      }
+
+      break;
+    }
+
+    case State::SW_CAS: {
+      if (ch == ' ' || ch == '\r') {
+        RespValuePtr cas = std::make_unique<RespValue>();
+        cas.get()->type(RespType::BulkString);
+        cas.get()->asString().append(token+1, buffer - token);
+        pending_value_root_.get()->asArray().push_back(*cas.get());
+        token = const_cast<char *>(buffer);
+        state_ = State::SW_NOREPLY;
+      }
+
+      break;
+    }
+
+    case State::SW_NOREPLY: {
+      if (ch == '\n') {
+        RespValuePtr value = std::make_unique<RespValue>();
+        value.get()->type(RespType::BulkString);
+        value.get()->asString().append(token, buffer - token);
+
+        std::string noreply = value.get()->asString();
+        // ASSERT
+        if (noreply != "" && noreply != "\r" && noreply!="\n") {
+          pending_value_root_.get()->asArray().push_back(*value.get());
+        }
+
+        switch (type_) {
+          case MsgType::MSG_REQ_MC_INCR:
+          case MsgType::MSG_REQ_MC_DECR:
+          case MsgType::MSG_REQ_MC_TOUCH:
+            buffer--;
+            remaining++;
+            state_ = State::SW_DONE;
+            break;
+          default:
+            token = const_cast<char *>(buffer);
+            state_ = State::SW_VAL;
+            break;
+        }
+      }
+
+      break;
+    }
+
+    case State::SW_VAL: {
+      if (ch=='\r' || ch==' ') {
+        if (ch == '\r') {
+          if (type_ == MsgType::MSG_RSP_MC_VALUE) {
+            state_ = State::SW_RSP_END;
+          } else {
+            state_ = State::SW_DONE;
+          }
+        } else  {
+          if (type_ == MsgType::MSG_RSP_MC_VALUE) {
+            state_ = State::SW_RSP_CAS;
+          } else {
+            // ASSERT[incr decr]
+            state_ = State::SW_NOREPLY;
+          }
+        }
+
+        RespValuePtr value = std::make_unique<RespValue>();
+        value.get()->type(RespType::BulkString);
+        value.get()->asString().append(token, buffer - token);
+
+        std::cout << "decode value: " << value.get()->asString() << std::endl;
+
+        pending_value_root_.get()->asArray().push_back(*value.get());
+        token = const_cast<char *>(buffer);
+      }
+      break;
+    }
+    case State::SW_RSP_CAS: {
+      if (ch == '\r') {
+        RespValuePtr value = std::make_unique<RespValue>();
+        value.get()->type(RespType::BulkString);
+        value.get()->asString().append(token, buffer - token);
+
+        std::cout << "decode value cas: " << value.get()->asString() << std::endl;
+
+        pending_value_root_.get()->asArray().push_back(*value.get());
+        token = const_cast<char *>(buffer);
+        state_ = State::SW_RSP_END;
+      }
+      break;
+    }
+
+    case State::SW_CRLF: {
+      if (ch == '\n') {
+        // 解析结束
+        switch (type_) {
+          case MsgType::MSG_REQ_MC_SET:
+          case MsgType::MSG_REQ_MC_ADD:
+          case MsgType::MSG_REQ_MC_REPLACE:
+          case MsgType::MSG_REQ_MC_APPEND:
+          case MsgType::MSG_REQ_MC_PREPEND:
+          case MsgType::MSG_REQ_MC_CAS:
+          case MsgType::MSG_RSP_MC_VALUE:
+            state_ = State::SW_VAL;
+            token = const_cast<char *>(buffer);
+            break;
+          default:
+            buffer--;
+            remaining++;
+            state_ = State::SW_DONE;
+            break;
+        }
+      }
+
+      break;
+    }
+    case State::SW_RSP_END: {
+      if (ch == '\r') {
+        // ASSERT token == "END"
+        RespValuePtr value = std::make_unique<RespValue>();
+        value.get()->type(RespType::BulkString);
+        value.get()->asString().append(token, buffer - token);
+        pending_value_root_.get()->asArray().push_back(*value.get());
+        state_ = State::SW_DONE;
+      }
+
+      break;
+    }
+    case State::SW_DONE: {
+      // ASSERT(ch == '\n');
+      state_ = State::SW_START;
+      callbacks_.onRespValue(std::move(pending_value_root_));
+      break;
+    }
+    }
+
+    buffer++;
+    remaining--;
+  }
+}
+
+void MemcachedDecoder::decode(Buffer::Instance &data) {
+  for (const Buffer::RawSlice &slice : data.getRawSlices()) {
+    parseSlice(slice);
+  }
+
+  data.drain(data.length());
+}
+
+void MemcachedEncoder::encode(const RespValue& value, Buffer::Instance& out) {
+  ASSERT(value.type() == RespType::Array);
+  auto array = value.asArray();
+  ASSERT(array.size() > 0);
+  RespValue head = array.front();
+  if (head.type() == RespType::BulkString) {
+    std::cout << "array: bulk string" << std::endl;
+    std::string cmd = head.asString();
+    char *buffer=const_cast<char*>(cmd.c_str());
+
+    if (isdigit(buffer[0]) || isupper(buffer[0])) {
+      encodeResponse(cmd, array, out);
+    } else if (islower(buffer[0])) {
+      encodeRequest(cmd, array, out);
+    } else {
+      throw ProtocolError("decode");
+    }
+  }else {
+    std::cout << "array: mc array: mc array" << std::endl;
+    for (auto item : array) {
+      if (item.asArray().size() > 0 ) {
+        head = item.asArray().front();
+        std::string cmd = head.asString();
+        encodeResponse(cmd, item.asArray(), out);
+      }
+    }
+
+    out.add("END", 3);
+    out.add("\r\n", 2);
+  }
+}
+
+void MemcachedEncoder::encodeRequest(const std::string& cmd, const std::vector<RespValue> &array, Envoy::Buffer::Instance &out) {
+  if (cmd == "set"|| cmd == "replace" || cmd == "prepend") {
+    MemcachedEncoder::encode_storage(array, out);
+  } else if (cmd == "cas") {
+    MemcachedEncoder::encode_cas(array, out);
+  } else if (cmd == "get" || cmd == "delete") {
+    MemcachedEncoder::encode_get_delete(array, out);
+  } else if ( cmd == "incr" || cmd == "decr") {
+    MemcachedEncoder::encode_arithmetic(array, out);
+  } else if (cmd == "touch") {
+    MemcachedEncoder::encode_touch(array, out);
+  } else {
+    throw ProtocolError("un supported cmd");
+  }
+}
+
+void MemcachedEncoder::encodeResponse(const std::string& value, const std::vector<RespValue> &array, Envoy::Buffer::Instance &out) {
+  if (value == "VALUE") {
+    MemcachedEncoder::encode_value(array, out);
+  } else if (value == "CLIENT_ERROR" || value == "SERVER_ERROR") {
+    MemcachedEncoder::encode_error(array, out);
+  } else {
+    MemcachedEncoder::encode_result(array, out);
+  }
+}
+
+
+void MemcachedEncoder::encode_storage(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  unsigned long index = 4; // 在index后面加\r\n
+  if (array.size() == 7) {
+    index = 5;
+  }
+
+  for (unsigned long i=0; i<array.size(); i++) {
+    out.add(array[i].asString());
+    if (i == index || i == (array.size()-1)) {
+      out.add("\r\n", 2);
+    } else {
+      out.add(" ", 1);
+    }
+  }
+
+  std::cout << "finish encode storage: " << out.toString() << std::endl;
+}
+
+void MemcachedEncoder::encode_cas(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  unsigned long index = 5;
+  if (array.size() == 8) {
+    index = 6;
+  }
+
+  for (unsigned long i=0; i<array.size(); i++) {
+    out.add(array[i].asString());
+    if (i == index || i == (array.size()-1)) {
+      out.add("\r\n", 2);
+    } else {
+      out.add(" ", 1);
+    }
+  }
+
+  std::cout << "finish encode cas: " << out.toString() << std::endl;
+}
+
+void MemcachedEncoder::encode_get_delete(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  ASSERT(array.size() == 2);
+  out.add(array[0].asString());
+  out.add(" ", 1);
+  out.add(array[1].asString());
+  out.add("\r\n", 2);
+  std::cout << "finish encode get or delete: " << out.toString() << std::endl;
+}
+
+void MemcachedEncoder::encode_arithmetic(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  auto len = array.size();
+
+  for (unsigned long i=0; i<len; i++) {
+    out.add(array[i].asString());
+    if (i != (len-1)) {
+      out.add(" ", 1);
+    }
+  }
+  out.add("\r\n", 2);
+  std::cout << "finish encode arithmetic: " << out.toString() << std::endl;
+}
+
+void MemcachedEncoder::encode_touch(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  auto len = array.size();
+
+  for (unsigned long i=0; i<len; i++) {
+    out.add(array[i].asString());
+    if (i != (len-1)) {
+      out.add(" ", 1);
+    }
+  }
+  out.add("\r\n", 2);
+  std::cout << "finish encode touch: " << out.toString() << std::endl;
+}
+
+void MemcachedEncoder::encode_result(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  ASSERT(array.size() == 1);
+  out.add(array[0].asString());
+  out.add("\r\n", 2);
+}
+
+void MemcachedEncoder::encode_error(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  ASSERT(array.size() == 2);
+  out.add(array[0].asString());
+  out.add(" ", 1);
+  out.add(array[1].asString());
+  out.add("\r\n", 2);
+}
+
+void MemcachedEncoder::encode_value(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  unsigned long size = array.size();
+
+  for (unsigned long i = 0; i<size-1; i++) {
+    out.add(array[i].asString());
+    if (i == size-2 || i == size-3) {
+      out.add("\r\n", 2);
+    } else {
+      out.add(" ", 1);
+    }
+  }
 }
 
 } // namespace Redis
