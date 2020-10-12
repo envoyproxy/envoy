@@ -4,6 +4,7 @@ load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load(":crates.bzl", "raze_fetch_remote_crates")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -17,7 +18,10 @@ WINDOWS_SKIP_TARGETS = [
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
-BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
+def _build_all_content(exclude = []):
+    return """filegroup(name = "all", srcs = glob(["**"], exclude={}), visibility = ["//visibility:public"])""".format(repr(exclude))
+
+BUILD_ALL_CONTENT = _build_all_content()
 
 REPOSITORY_LOCATIONS = load_repository_locations(REPOSITORY_LOCATIONS_SPEC)
 
@@ -92,6 +96,10 @@ def _go_deps(skip_targets):
             patches = ["@envoy//bazel:rules_go.patch"],
         )
         external_http_archive("bazel_gazelle")
+
+def _rust_deps():
+    external_http_archive("io_bazel_rules_rust")
+    raze_fetch_remote_crates()
 
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
@@ -170,7 +178,11 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
+    _rust_deps()
     _kafka_deps()
+
+    _org_llvm_llvm()
+    _com_github_wavm_wavm()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -353,6 +365,34 @@ cc_library(
         patch_args = ["-p1"],
         # Patches ASAN violation of initialization fiasco
         patches = ["@envoy//bazel:antlr.patch"],
+    )
+
+    # Parser dependencies
+    # TODO: upgrade this when cel is upgraded to use the latest version
+    http_archive(
+        name = "rules_antlr",
+        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
+        strip_prefix = "rules_antlr-3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
+        urls = ["https://github.com/marcohu/rules_antlr/archive/3cc2f9502a54ceb7b79b37383316b23c4da66f9a.tar.gz"],
+    )
+
+    http_archive(
+        name = "antlr4_runtimes",
+        build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "cpp",
+    srcs = glob(["runtime/Cpp/runtime/src/**/*.cpp"]),
+    hdrs = glob(["runtime/Cpp/runtime/src/**/*.h"]),
+    includes = ["runtime/Cpp/runtime/src"],
+)
+""",
+        sha256 = "46f5e1af5f4bd28ade55cb632f9a069656b31fc8c2408f9aa045f9b5f5caad64",
+        patch_args = ["-p1"],
+        # Patches ASAN violation of initialization fiasco
+        patches = ["@envoy//bazel:antlr.patch"],
+        strip_prefix = "antlr4-4.7.2",
+        urls = ["https://github.com/antlr/antlr4/archive/4.7.2.tar.gz"],
     )
 
 def _com_github_nghttp2_nghttp2():
@@ -615,6 +655,16 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
+        # Patch curl 7.72.0 due to CMake's problematic implementation of policy `CMP0091`
+        # introduced in CMake 3.15 and then deprecated in CMake 3.18. Curl forcing the CMake
+        # ruleset to 3.16 breaks the Envoy windows fastbuild target.
+        # Also cure a fatal assumption creating a static library using LLVM `lld-link.exe`
+        # adding dynamic link flags, which breaks the Envoy clang-cl library archive step.
+        # Upstream patch submitted: https://github.com/curl/curl/pull/6050
+        # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
+        # by elimination of the curl dependency.
+        patches = ["@envoy//bazel/foreign_cc:curl.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "curl",
@@ -742,11 +792,10 @@ def _proxy_wasm_cpp_host():
 def _emscripten_toolchain():
     external_http_archive(
         name = "emscripten_toolchain",
-        build_file_content = BUILD_ALL_CONTENT,
-        patch_cmds = [
-            "./emsdk install 1.39.19-upstream",
-            "./emsdk activate --embedded 1.39.19-upstream",
-        ],
+        build_file_content = _build_all_content(exclude = [
+            "upstream/emscripten/cache/is_vanilla.txt",
+            ".emscripten_sanity",
+        ]),
     )
 
 def _com_github_google_jwt_verify():
@@ -803,6 +852,28 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
+    )
+
+def _org_llvm_llvm():
+    external_http_archive(
+        name = "org_llvm_llvm",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:llvm.patch"],
+    )
+    native.bind(
+        name = "llvm",
+        actual = "@envoy//bazel/foreign_cc:llvm",
+    )
+
+def _com_github_wavm_wavm():
+    external_http_archive(
+        name = "com_github_wavm_wavm",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "wavm",
+        actual = "@envoy//bazel/foreign_cc:wavm",
     )
 
 def _kafka_deps():

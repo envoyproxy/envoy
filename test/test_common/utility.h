@@ -880,15 +880,16 @@ public:
   }
   std::string get_(const std::string& key) const { return get_(LowerCaseString(key)); }
   std::string get_(const LowerCaseString& key) const {
-    const HeaderEntry* header = get(key);
-    if (!header) {
+    // TODO(mattklein123): Possibly allow getting additional headers beyond the first.
+    auto headers = get(key);
+    if (headers.empty()) {
       return EMPTY_STRING;
     } else {
-      return std::string(header->value().getStringView());
+      return std::string(headers[0]->value().getStringView());
     }
   }
-  bool has(const std::string& key) const { return get(LowerCaseString(key)) != nullptr; }
-  bool has(const LowerCaseString& key) const { return get(key) != nullptr; }
+  bool has(const std::string& key) const { return !get(LowerCaseString(key)).empty(); }
+  bool has(const LowerCaseString& key) const { return !get(key).empty(); }
   size_t remove(const std::string& key) { return remove(LowerCaseString(key)); }
 
   // HeaderMap
@@ -934,11 +935,8 @@ public:
     header_map_->verifyByteSizeInternalForTest();
   }
   uint64_t byteSize() const override { return header_map_->byteSize(); }
-  const HeaderEntry* get(const LowerCaseString& key) const override {
+  HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return header_map_->get(key);
-  }
-  HeaderMap::GetResult getAll(const LowerCaseString& key) const override {
-    return header_map_->getAll(key);
   }
   void iterate(HeaderMap::ConstIterateCb cb) const override { header_map_->iterate(cb); }
   void iterateReverse(HeaderMap::ConstIterateCb cb) const override {

@@ -16,8 +16,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Wasm]
+// [#extension: envoy.bootstrap.wasm]
 
-// [[#not-implemented-hide:]
 // Configuration for a Wasm VM.
 // [#next-free-field: 7]
 message VmConfig {
@@ -51,7 +51,6 @@ message VmConfig {
   bool nack_on_code_cache_miss = 6;
 }
 
-// [[#not-implemented-hide:]
 // Base Configuration for Wasm Plugins e.g. filters and services.
 // [#next-free-field: 6]
 message PluginConfig {
@@ -66,9 +65,9 @@ message PluginConfig {
   string root_id = 2;
 
   // Configuration for finding or starting VM.
-  oneof vm_config {
-    VmConfig inline_vm_config = 3;
-    // In the future add referential VM configurations.
+  oneof vm {
+    VmConfig vm_config = 3;
+    // TODO: add referential VM configurations.
   }
 
   // Filter/service configuration used to configure or reconfigure a plugin
@@ -86,7 +85,6 @@ message PluginConfig {
   bool fail_open = 5;
 }
 
-// [[#not-implemented-hide:]
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`WasmService
 // <config_wasm_service>` This opaque configuration will be used to create a Wasm Service.
 message WasmService {

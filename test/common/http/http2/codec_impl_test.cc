@@ -1365,6 +1365,125 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
 }
 
+// Verify detection of downstream outbound frame queue by the WINDOW_UPDATE frames
+// sent when codec resumes reading.
+TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  // Force the server stream to be read disabled. This will cause it to stop sending window
+  // updates to the client.
+  server_->getStream(1)->readDisable(true);
+
+  uint32_t initial_stream_window =
+      nghttp2_session_get_stream_effective_local_window_size(client_->session(), 1);
+  // If this limit is changed, this test will fail due to the initial large writes being divided
+  // into more than 4 frames. Fast fail here with this explanatory comment.
+  ASSERT_EQ(65535, initial_stream_window);
+  // Make sure the limits were configured properly in test set up.
+  EXPECT_EQ(initial_stream_window, server_->getStream(1)->bufferLimit());
+  EXPECT_EQ(initial_stream_window, client_->getStream(1)->bufferLimit());
+
+  // One large write gets broken into smaller frames.
+  EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
+  Buffer::OwnedImpl long_data(std::string(initial_stream_window / 2, 'a'));
+  request_encoder_->encodeData(long_data, false);
+
+  EXPECT_EQ(initial_stream_window / 2, server_->getStreamUnconsumedBytes(1));
+
+  // pre-fill downstream outbound frame queue
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above and pre-fill outbound queue with 1 byte DATA frames
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 2; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_FALSE(violation_callback->enabled_);
+
+  // Now unblock the server's stream. This will cause the bytes to be consumed, 2 flow control
+  // updates to be sent, and overflow outbound frame queue.
+  server_->getStream(1)->readDisable(false);
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
+// Verify detection of outbound queue flooding by the RST_STREAM frame sent by the pending flush
+// timeout.
+TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
+  // This test sets initial stream window to 65535 bytes.
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above and pre-fill outbound queue with 6 byte DATA frames
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 2; ++i) {
+    Buffer::OwnedImpl data(std::string(6, '0'));
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  // client stream windows should have 5535 bytes left and the next frame should overflow it.
+  // nghttp2 sends 1 DATA frame for the remainder of the client window and it should make
+  // outbound frame queue 1 away from overflow.
+  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+  Buffer::OwnedImpl large_body(std::string(6 * 1024, '1'));
+  response_encoder_->encodeData(large_body, true);
+
+  EXPECT_FALSE(violation_callback->enabled_);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+
+  // Pending flush timeout causes RST_STREAM to be sent and overflow the outbound frame queue.
+  flush_timer->invokeCallback();
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
 TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   initialize();
   MockStreamCallbacks callbacks;
@@ -2237,6 +2356,55 @@ TEST_P(Http2CodecImplTest, ResponseTrailersFlood) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
 
+// Verify that codec detects flood of outbound METADATA frames
+TEST_P(Http2CodecImplTest, MetadataFlood) {
+  allow_metadata_ = true;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_FALSE(violation_callback->enabled_);
+
+  MetadataMapVector metadata_map_vector;
+  MetadataMap metadata_map = {
+      {"header_key1", "header_value1"},
+      {"header_key2", "header_value2"},
+  };
+  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+
+  response_encoder_->encodeMetadata(metadata_map_vector);
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
 TEST_P(Http2CodecImplTest, PriorityFlood) {
   priorityFlood();
   // Legacy codec does not propagate error details and uses generic error message
@@ -2299,6 +2467,46 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
   EXPECT_TRUE(status.ok());
 }
 
+// Verify that codec detects flood of outbound frames caused by goAway() method
+TEST_P(Http2CodecImplTest, GoAwayCausesOutboundFlood) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_FALSE(violation_callback->enabled_);
+
+  server_->goAway();
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
 // Verify that codec detects flood of outbound frames caused by shutdownNotice() method
 TEST_P(Http2CodecImplTest, ShudowNoticeCausesOutboundFlood) {
   initialize();
@@ -2330,6 +2538,62 @@ TEST_P(Http2CodecImplTest, ShudowNoticeCausesOutboundFlood) {
   EXPECT_FALSE(violation_callback->enabled_);
 
   server_->shutdownNotice();
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
+// Verify that codec detects flood of outbound PING frames caused by the keep alive timer
+TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
+  // set-up server to send PING frames
+  constexpr uint32_t interval_ms = 100;
+  constexpr uint32_t timeout_ms = 200;
+  server_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
+                                                                                      1000 * 1000);
+  server_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
+                                                                                     1000 * 1000);
+  server_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
+  auto timeout_timer = new Event::MockTimer(&server_connection_.dispatcher_); /* */
+  auto send_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Pre-fill outbound frame queue 1 away from overflow (account for the single HEADERS frame above)
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_FALSE(violation_callback->enabled_);
+
+  // Trigger sending a PING, which should overflow the outbound frame queue and cause
+  // client to be disconnected
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  send_timer->callback_();
 
   EXPECT_TRUE(violation_callback->enabled_);
   EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));

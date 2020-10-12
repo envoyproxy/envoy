@@ -19,6 +19,18 @@
 namespace Envoy {
 namespace StreamInfo {
 
+namespace {
+
+using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
+
+const ReplacementMap& emptySpaceReplacement() {
+  CONSTRUCT_ON_FIRST_USE(
+      ReplacementMap,
+      ReplacementMap{{" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}});
+}
+
+} // namespace
+
 struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source,
                  FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
@@ -120,9 +132,7 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
-    const absl::flat_hash_map<std::string, std::string> replacement{
-        {" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}};
-    response_code_details_.emplace(absl::StrReplaceAll(rc_details, replacement));
+    response_code_details_.emplace(absl::StrReplaceAll(rc_details, emptySpaceReplacement()));
   }
 
   const absl::optional<std::string>& connectionTerminationDetails() const override {
