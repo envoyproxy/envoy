@@ -212,6 +212,8 @@ HttpConnPool::HttpConnPool(const std::string& cluster_name,
 
 HttpConnPool::~HttpConnPool() {
   if (upstream_handle_ != nullptr) {
+    // Because HTTP connections are generally shorter lived and have a higher probability of use
+    // before going idle, they are closed with Default rather than CloseExcess.
     upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
   }
 }
