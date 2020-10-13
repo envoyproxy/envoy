@@ -30,7 +30,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.fault
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+              "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
               abort:
                 http_status: 503
                 percentage:
