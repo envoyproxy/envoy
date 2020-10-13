@@ -819,6 +819,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote reset";
   case Http::StreamResetReason::RemoteRefusedStreamReset:
     return "remote refused stream reset";
+  case Http::StreamResetReason::ConnectError:
+    return "remote error with CONNECT request";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

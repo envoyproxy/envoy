@@ -208,7 +208,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   // Verify both the data and the disconnect went through.
   response_->waitForBodyData(5);
   EXPECT_EQ("world", response_->body());
-  waitForClientDisconnectOrReset();
+  waitForClientDisconnectOrReset(Http::StreamResetReason::ConnectError);
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {

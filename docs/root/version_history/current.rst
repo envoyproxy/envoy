@@ -15,6 +15,8 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
