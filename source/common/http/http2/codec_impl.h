@@ -189,7 +189,7 @@ protected:
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
-    int onDataSourceSend(const uint8_t* framehd, size_t length);
+    void onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
@@ -433,8 +433,9 @@ protected:
   /**
    * Call the sendPendingFrames() method and schedule disconnect callback when
    * sendPendingFrames() returns an error.
+   * Return true if the disconnect callback has been scheduled.
    */
-  void sendPendingFramesAndHandleError();
+  bool sendPendingFramesAndHandleError();
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.

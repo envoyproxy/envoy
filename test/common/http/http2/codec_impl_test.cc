@@ -2590,7 +2590,10 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
 
   // Trigger sending a PING, which should overflow the outbound frame queue and cause
   // client to be disconnected
-  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+    // new codec does not schedule timeout callback if the PING had triggered flood protection
+    EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  }
   send_timer->callback_();
 
   EXPECT_TRUE(violation_callback->enabled_);

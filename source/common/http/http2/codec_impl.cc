@@ -166,7 +166,10 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
 
   local_end_stream_ = end_stream;
   submitHeaders(final_headers, end_stream ? nullptr : &provider);
-  parent_.sendPendingFramesAndHandleError();
+  if (parent_.sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
@@ -234,7 +237,10 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     }
   } else {
     submitTrailers(trailers);
-    parent_.sendPendingFramesAndHandleError();
+    if (parent_.sendPendingFramesAndHandleError()) {
+      // Intended to check through coverage that this error case is tested
+      return;
+    }
   }
 }
 
@@ -247,7 +253,10 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
   for (uint8_t flags : metadata_encoder.payloadFrameFlagBytes()) {
     submitMetadata(flags);
   }
-  parent_.sendPendingFramesAndHandleError();
+  if (parent_.sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -262,7 +271,10 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     if (!buffersOverrun()) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
-      parent_.sendPendingFramesAndHandleError();
+      if (parent_.sendPendingFramesAndHandleError()) {
+        // Intended to check through coverage that this error case is tested
+        return;
+      }
     }
   }
 }
@@ -388,7 +400,7 @@ ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* 
   }
 }
 
-int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t length) {
+void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t length) {
   // In this callback we are writing out a raw DATA frame without copying. nghttp2 assumes that we
   // "just know" that the frame header is 9 bytes.
   // https://nghttp2.org/documentation/types.html#c.nghttp2_send_data_callback
@@ -407,7 +419,6 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
   parent_.stats_.pending_send_bytes_.sub(length);
   output.move(pending_send_data_, length);
   parent_.connection_.write(output, false);
-  return 0;
 }
 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -443,7 +454,10 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   // This will emit a reset frame for this stream and close the stream locally. No reset callbacks
   // will be run because higher layers think the stream is already finished.
   resetStreamWorker(StreamResetReason::LocalReset);
-  parent_.sendPendingFramesAndHandleError();
+  if (parent_.sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -467,8 +481,10 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
     data_deferred_ = false;
   }
 
-  parent_.sendPendingFramesAndHandleError();
-
+  if (parent_.sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
   if (local_end_stream_ && pending_send_data_.length() > 0) {
     createPendingFlushTimer();
   }
@@ -492,7 +508,10 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // We must still call sendPendingFrames() in both the deferred and not deferred path. This forces
   // the cleanup logic to run which will reset the stream in all cases if all data frames could not
   // be sent.
-  parent_.sendPendingFramesAndHandleError();
+  if (parent_.sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
@@ -573,7 +592,10 @@ void ConnectionImpl::sendKeepalive() {
   int rc = nghttp2_submit_ping(session_, 0 /*flags*/, reinterpret_cast<uint8_t*>(&ms_since_epoch));
   ASSERT(rc == 0);
 
-  sendPendingFramesAndHandleError();
+  if (sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }
 void ConnectionImpl::onKeepaliveResponse() {
@@ -665,14 +687,20 @@ void ConnectionImpl::goAway() {
                                  NGHTTP2_NO_ERROR, nullptr, 0);
   ASSERT(rc == 0);
 
-  sendPendingFramesAndHandleError();
+  if (sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 void ConnectionImpl::shutdownNotice() {
   int rc = nghttp2_submit_shutdown_notice(session_);
   ASSERT(rc == 0);
 
-  sendPendingFramesAndHandleError();
+  if (sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
@@ -1073,10 +1101,12 @@ Status ConnectionImpl::sendPendingFrames() {
   return status;
 }
 
-void ConnectionImpl::sendPendingFramesAndHandleError() {
+bool ConnectionImpl::sendPendingFramesAndHandleError() {
   if (!sendPendingFrames().ok()) {
     scheduleProtocolConstraintViolationCallback();
+    return true;
   }
+  return false;
 }
 
 void ConnectionImpl::sendSettings(
@@ -1176,7 +1206,8 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
          nghttp2_data_source* source, void*) -> int {
         ASSERT(frame->data.padlen == 0);
-        return static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
+        static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
+        return 0;
       });
 
   nghttp2_session_callbacks_set_on_begin_headers_callback(
