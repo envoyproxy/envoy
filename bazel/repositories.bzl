@@ -739,6 +739,16 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
+        # Patch curl 7.72.0 due to CMake's problematic implementation of policy `CMP0091`
+        # introduced in CMake 3.15 and then deprecated in CMake 3.18. Curl forcing the CMake
+        # ruleset to 3.16 breaks the Envoy windows fastbuild target.
+        # Also cure a fatal assumption creating a static library using LLVM `lld-link.exe`
+        # adding dynamic link flags, which breaks the Envoy clang-cl library archive step.
+        # Upstream patch submitted: https://github.com/curl/curl/pull/6050
+        # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
+        # by elimination of the curl dependency.
+        patches = ["@envoy//bazel/foreign_cc:curl.patch"],
+        patch_args = ["-p1"],
         **location
     )
     native.bind(
