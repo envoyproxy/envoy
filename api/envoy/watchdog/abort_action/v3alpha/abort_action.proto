@@ -15,7 +15,6 @@ option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Watchdog Action that kills a stuck thread to kill the process.]
-// [#extension: envoy.watchdog.abort_action]
 
 // A GuardDogAction that will terminate the process by killing the
 // stuck thread. This would allow easier access to the call stack of the stuck

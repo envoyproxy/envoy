@@ -1327,7 +1327,7 @@ TEST_P(ServerInstanceImplTest, UsesAbortActionOnWatchdogKill) {
         // Wait for the sleep to run, we should die by the watchdog by then.
         main_thread_slept.WaitForNotification();
       },
-      "Caught Aborted");
+      "(ABRT|Caught Abort)");
 }
 
 } // namespace

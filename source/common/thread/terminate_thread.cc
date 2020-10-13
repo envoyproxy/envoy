@@ -4,6 +4,8 @@
 
 #include <csignal>
 
+#include "common/common/logger.h"
+
 namespace Envoy {
 namespace Thread {
 namespace {
