@@ -568,6 +568,25 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
   ASSERT_FALSE(response->complete());
 }
 
+TEST_P(Http2MetadataIntegrationTest, RequestMetadataThenTrailers) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  Http::TestRequestTrailerMapImpl request_trailers{{"trailer", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+}
+
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
 typed_config:
