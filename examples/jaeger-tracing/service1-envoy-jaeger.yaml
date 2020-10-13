@@ -1,4 +1,4 @@
-xstatic_resources:
+static_resources:
   listeners:
   - address:
       socket_address:
