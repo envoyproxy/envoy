@@ -23,62 +23,38 @@ namespace Network {
  * 1. It doesn't not include a file descriptor. Do not use "fdDoNotUse".
  * 2. It doesn't suppose socket options. Wrap this in ConnectionSocket and implement the socket
  * getter/setter options.
- * 3. It doesn't suppose UDP interface.
- * 4. The peer BufferedIoSocket must be scheduled by the same scheduler to avoid data race.
+ * 3. It doesn't support UDP interface.
+ * 4. The peer BufferedIoSocket must be scheduled in the same thread to avoid data race because
+ *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
  */
 class BufferedIoSocketHandleImpl : public IoHandle,
                                    public WritablePeer,
                                    public ReadableSource,
                                    protected Logger::Loggable<Logger::Id::io> {
 public:
-  BufferedIoSocketHandleImpl()
-      : owned_buffer_(
-            [this]() -> void {
-              over_high_watermark_ = false;
-              if (writable_peer_) {
-                ENVOY_LOG(debug, "Socket {} switches to low watermark. Notify {}.",
-                          static_cast<void*>(this), static_cast<void*>(writable_peer_));
-                writable_peer_->onPeerBufferWritable();
-              }
-            },
-            [this]() -> void {
-              over_high_watermark_ = true;
-              // Low to high is checked by peer after peer writes data.
-            },
-            []() -> void {}) {}
+  BufferedIoSocketHandleImpl();
 
   ~BufferedIoSocketHandleImpl() override { ASSERT(closed_); }
 
   // IoHandle
   os_fd_t fdDoNotUse() const override { return INVALID_SOCKET; }
-
   Api::IoCallUint64Result close() override;
-
   bool isOpen() const override;
-
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
-
   Api::IoCallUint64Result read(Buffer::Instance& buffer, uint64_t max_length) override;
-
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
-
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
-
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
                                   const Address::Instance& peer_address) override;
-
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override;
-
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
-
   bool supportsMmsg() const override;
   bool supportsUdpGro() const override;
-
   Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult listen(int backlog) override;
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
@@ -141,6 +117,7 @@ private:
   Event::UserSpaceFileEventImpl* user_file_event_;
 
   // Envoy never schedule two independent IO event on the same socket. Use this counter to verify.
+  // TODO(lambdai): Remove this when the entire #13361 is done.
   int event_counter_{0};
 
   // The schedulable handle of the above event.

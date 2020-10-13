@@ -15,6 +15,22 @@
 namespace Envoy {
 namespace Network {
 
+BufferedIoSocketHandleImpl::BufferedIoSocketHandleImpl()
+    : owned_buffer_(
+          [this]() -> void {
+            over_high_watermark_ = false;
+            if (writable_peer_) {
+              ENVOY_LOG(debug, "Socket {} switches to low watermark. Notify {}.",
+                        static_cast<void*>(this), static_cast<void*>(writable_peer_));
+              writable_peer_->onPeerBufferWritable();
+            }
+          },
+          [this]() -> void {
+            over_high_watermark_ = true;
+            // Low to high is checked by peer after peer writes data.
+          },
+          []() -> void {}) {}
+
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
   ASSERT(!closed_);
   if (!write_shutdown_) {
@@ -46,17 +62,18 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
   } else {
     absl::FixedArray<iovec> iov(num_slice);
     uint64_t num_slices_to_read = 0;
-    uint64_t num_bytes_to_read = 0;
-    for (; num_slices_to_read < num_slice && num_bytes_to_read < max_length; num_slices_to_read++) {
-      auto min_len = std::min(std::min(owned_buffer_.length(), max_length) - num_bytes_to_read,
-                              uint64_t(slices[num_slices_to_read].len_));
-      owned_buffer_.copyOut(num_bytes_to_read, min_len, slices[num_slices_to_read].mem_);
-      num_bytes_to_read += min_len;
+    uint64_t bytes_to_read = 0;
+    for (; num_slices_to_read < num_slice && bytes_to_read < max_length; num_slices_to_read++) {
+      auto max_bytes_to_read =
+          std::min(std::min(owned_buffer_.length(), max_length) - bytes_to_read,
+                   uint64_t(slices[num_slices_to_read].len_));
+      owned_buffer_.copyOut(bytes_to_read, max_bytes_to_read, slices[num_slices_to_read].mem_);
+      bytes_to_read += max_bytes_to_read;
     }
-    ASSERT(num_bytes_to_read <= max_length);
-    owned_buffer_.drain(num_bytes_to_read);
-    ENVOY_LOG(trace, "socket {} readv {} bytes", static_cast<void*>(this), num_bytes_to_read);
-    return {num_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+    ASSERT(bytes_to_read <= max_length);
+    owned_buffer_.drain(bytes_to_read);
+    ENVOY_LOG(trace, "socket {} readv {} bytes", static_cast<void*>(this), bytes_to_read);
+    return {bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
   }
 }
 
@@ -71,9 +88,9 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
     }
   } else {
     // TODO(lambdai): Move at slice boundary to move to reduce the copy.
-    uint64_t min_len = std::min(max_length, owned_buffer_.length());
-    buffer.move(owned_buffer_, min_len);
-    return {min_len, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+    uint64_t max_bytes_to_read = std::min(max_length, owned_buffer_.length());
+    buffer.move(owned_buffer_, max_bytes_to_read);
+    return {max_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
   }
 }
 

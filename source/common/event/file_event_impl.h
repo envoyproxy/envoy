@@ -49,18 +49,30 @@ private:
 // Forward declare for friend class.
 class UserSpaceFileEventFactory;
 
-// The interface of populating event watcher and obtaining the active events. The events includes
-// Read, Write and Closed.
+// The interface of populating event watcher and obtaining the active events. The events are the
+// combination of FileReadyType values. The event listener is populated by user event registration
+// and io events passively. Also the owner of this listener query the activated events by calling
+// triggeredEvents and getAndClearEphemeralEvents.
 class EventListener {
 public:
   virtual ~EventListener() = default;
 
-  // Provide the activated events.
+  // Get the events which are enabled and triggered.
   virtual uint32_t triggeredEvents() PURE;
+  // Get the events which are ephemerally activated. Upon returning the ephemeral events are
+  // cleared.
   virtual uint32_t getAndClearEphemeralEvents() PURE;
 
-  // Callbacks of the event operation.
+  /**
+   * FileEvent::setEnabled is invoked.
+   * @param enabled_events supplied the event of setEnabled.
+   */
   virtual void onEventEnabled(uint32_t enabled_events) PURE;
+
+  /**
+   * FileEvent::activate is invoked.
+   * @param enabled_events supplied the event of activate().
+   */
   virtual void onEventActivated(uint32_t activated_events) PURE;
 };
 
@@ -68,6 +80,7 @@ public:
 // epoll supports EV_CLOSED but the entire envoy code base supports another poller. The event owner
 // must assume EV_CLOSED is never activated. Also event owner must tolerate that OS could notify
 // events which are not actually triggered.
+// TODO(lambdai): Add support of delivering EV_CLOSED.
 class DefaultEventListener : public EventListener {
 public:
   ~DefaultEventListener() override = default;
@@ -81,11 +94,7 @@ public:
     ephermal_events_ |= activated_events;
   }
 
-  uint32_t getAndClearEphemeralEvents() override {
-    auto res = ephermal_events_;
-    ephermal_events_ = 0;
-    return res;
-  }
+  uint32_t getAndClearEphemeralEvents() override { return std::exchange(ephermal_events_, 0); }
 
 private:
   // The persisted interested events and ready events.
@@ -94,7 +103,7 @@ private:
   uint32_t ephermal_events_{};
 };
 
-// A FileEvent implementation which is
+// A FileEvent implementation which is used to drive BufferedIoSocketHandle.
 class UserSpaceFileEventImpl : public FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
   ~UserSpaceFileEventImpl() override {
@@ -142,9 +151,20 @@ private:
         event_counter_(event_counter) {
     event_listener_.onEventEnabled(events);
   }
+
+  // Used to populate the event operations of enable and activate.
   DefaultEventListener event_listener_;
+
+  // The handle to registered async callback from dispatcher.
   SchedulableCallback& schedulable_;
+
+  // The registered callback of this event. This callback is usually on top of the frame of
+  // Dispatcher::run().
   std::function<void()> cb_;
+
+  // The counter owned by io handle. This counter is used to track if more than one file event is
+  // attached to the same io handle.
+  // TODO(lambdai): remove this when the full internal connection implementation is landed.
   int& event_counter_;
 };
 
