@@ -17,6 +17,9 @@ If the local rate limit token bucket is checked, and there are no token availabl
 :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header. Additional response
 headers may be configured.
 
+.. note::
+  The token bucket is shared across all workers, thus the rate limits are applied per Envoy process.
+
 Example configuration
 ---------------------
 
