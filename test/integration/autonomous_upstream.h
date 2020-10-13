@@ -23,6 +23,8 @@ public:
   static const char RESET_AFTER_REQUEST[];
   // Prevents upstream from sending trailers.
   static const char NO_TRAILERS[];
+  // Prevents upstream from finishing response.
+  static const char NO_END_STREAM[];
 
   AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                    AutonomousUpstream& upstream, bool allow_incomplete_streams);
@@ -81,6 +83,8 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
+  AssertionResult closeConnection(uint32_t index,
+                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   void setLastRequestHeaders(const Http::HeaderMap& headers);
   std::unique_ptr<Http::TestRequestHeaderMapImpl> lastRequestHeaders();

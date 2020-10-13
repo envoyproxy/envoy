@@ -501,6 +501,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // the cleanup logic to run which will reset the stream in all cases if all data frames could not
   // be sent.
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
@@ -580,6 +581,7 @@ void ConnectionImpl::sendKeepalive() {
   int rc = nghttp2_submit_ping(session_, 0 /*flags*/, reinterpret_cast<uint8_t*>(&ms_since_epoch));
   ASSERT(rc == 0);
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }

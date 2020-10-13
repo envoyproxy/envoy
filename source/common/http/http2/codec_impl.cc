@@ -521,6 +521,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   auto status = parent_.sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
@@ -604,6 +605,7 @@ void ConnectionImpl::sendKeepalive() {
   auto status = sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  checkProtocolConstraintViolation();
 
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }
