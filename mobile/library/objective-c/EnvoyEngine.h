@@ -74,19 +74,81 @@ extern const int kEnvoyFilterTrailersStatusContinue;
 extern const int kEnvoyFilterTrailersStatusStopIteration;
 extern const int kEnvoyFilterTrailersStatusResumeIteration;
 
+/// Return codes for on-resume filter invocations. These are unique to platform filters,
+/// and used exclusively after an asynchronous request to resume iteration via callbacks.
+extern const int kEnvoyFilterResumeStatusStopIteration;
+extern const int kEnvoyFilterResumeStatusResumeIteration;
+
+/// Callbacks for asynchronous interaction with the filter.
+@protocol EnvoyHTTPFilterCallbacks
+
+/// Resume filter iteration asynchronously. This will result in an on-resume invocation of the
+/// filter.
+- (void)resumeIteration;
+
+@end
+
 @interface EnvoyHTTPFilter : NSObject
 
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, forward headers
 @property (nonatomic, copy) NSArray * (^onRequestHeaders)(EnvoyHeaders *headers, BOOL endStream);
 
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - NSData *, forward data
+/// 2 - EnvoyHeaders *, optional pending headers
 @property (nonatomic, copy) NSArray * (^onRequestData)(NSData *data, BOOL endStream);
 
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, forward trailers
+/// 2 - EnvoyHeaders *, optional pending headers
+/// 3 - NSData *, optional pending data
 @property (nonatomic, copy) NSArray * (^onRequestTrailers)(EnvoyHeaders *trailers);
 
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, forward headers
 @property (nonatomic, copy) NSArray * (^onResponseHeaders)(EnvoyHeaders *headers, BOOL endStream);
 
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - NSData *, forward data
+/// 2 - EnvoyHeaders *, optional pending headers
 @property (nonatomic, copy) NSArray * (^onResponseData)(NSData *data, BOOL endStream);
 
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, forward trailers
+/// 2 - EnvoyHeaders *, optional pending headers
+/// 3 - NSData *, optional pending data
 @property (nonatomic, copy) NSArray * (^onResponseTrailers)(EnvoyHeaders *trailers);
+
+@property (nonatomic, copy) void (^setRequestFilterCallbacks)
+    (id<EnvoyHTTPFilterCallbacks> callbacks);
+
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, optional pending headers
+/// 2 - NSData *, optional pending data
+/// 3 - EnvoyHeaders *, optional pending trailers
+@property (nonatomic, copy) NSArray * (^onResumeRequest)
+    (EnvoyHeaders *_Nullable headers, NSData *_Nullable data, EnvoyHeaders *_Nullable trailers,
+     BOOL endStream);
+
+@property (nonatomic, copy) void (^setResponseFilterCallbacks)
+    (id<EnvoyHTTPFilterCallbacks> callbacks);
+
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, optional pending headers
+/// 2 - NSData *, optional pending data
+/// 3 - EnvoyHeaders *, optional pending trailers
+@property (nonatomic, copy) NSArray * (^onResumeResponse)
+    (EnvoyHeaders *_Nullable headers, NSData *_Nullable data, EnvoyHeaders *_Nullable trailers,
+     BOOL endStream);
 
 @end
 
@@ -97,6 +159,13 @@ extern const int kEnvoyFilterTrailersStatusResumeIteration;
 @property (nonatomic, strong) NSString *filterName;
 
 @property (nonatomic, copy) EnvoyHTTPFilter * (^create)();
+
+@end
+
+#pragma mark - EnvoyHTTPFilterCallbacksImpl
+
+// Concrete implementation of the `EnvoyHTTPFilterCallbacks` protocol.
+@interface EnvoyHTTPFilterCallbacksImpl : NSObject <EnvoyHTTPFilterCallbacks>
 
 @end
 

@@ -74,6 +74,27 @@ typedef struct {
   envoy_data* pending_data;
 } envoy_filter_trailers_status;
 
+/**
+ * Return code for on-resume filter invocations. This is an invocation unique to platform
+ * filters that provides an in-thread opportunity to read and modify pending stream state
+ * upon asynchronous resumption of filter iteration.
+ */
+typedef int envoy_filter_resume_status_t;
+extern const envoy_filter_resume_status_t kEnvoyFilterResumeStatusStopIteration;
+extern const envoy_filter_resume_status_t kEnvoyFilterResumeStatusResumeIteration;
+
+/**
+ * Compound return type for on-resume filter invocations. It is a filter state
+ * violation for the entities in the return status to be a different set from those passed as
+ * parameters to the filter invocation.
+ */
+typedef struct {
+  envoy_filter_resume_status_t status;
+  envoy_headers* pending_headers;
+  envoy_data* pending_data;
+  envoy_headers* pending_trailers;
+} envoy_filter_resume_status;
+
 #ifdef __cplusplus
 extern "C" { // function pointers
 #endif
@@ -104,16 +125,41 @@ typedef envoy_filter_trailers_status (*envoy_filter_on_trailers_f)(envoy_headers
                                                                    const void* context);
 
 /**
+ * Function signature for filter invocation after asynchronous resumption. Passes a
+ * snapshot of all HTTP state that has not yet been forwarded along the filter chain.
+ */
+typedef envoy_filter_resume_status (*envoy_filter_on_resume_f)(envoy_headers* headers,
+                                                               envoy_data* data,
+                                                               envoy_headers* trailers,
+                                                               bool end_stream,
+                                                               const void* context);
+
+/**
  * Function signature to release a filter instance once the filter chain is finished with it.
  */
 typedef void (*envoy_filter_release_f)(const void* context);
+
+/**
+ * Function signature for asynchronous filter callback to resume filter iteration.
+ */
+typedef void (*envoy_filter_resume_f)(const void* context);
+
+/**
+ * Raw datatype containing asynchronous callbacks for platform HTTP filters.
+ */
+typedef struct {
+  envoy_filter_resume_f resume_iteration;
+} envoy_http_filter_callbacks;
+
+typedef void (*envoy_filter_set_callbacks_f)(envoy_http_filter_callbacks callbacks,
+                                             const void* context);
 
 #ifdef __cplusplus
 } // function pointers
 #endif
 
 /**
- * Raw datatype containing dispatch functions for a platform-native HTTP filter. Leveraged by the
+ * Raw datatype containing dispatch functions for a platform HTTP filter. Leveraged by the
  * PlatformBridgeFilter.
  */
 typedef struct {
@@ -124,6 +170,10 @@ typedef struct {
   envoy_filter_on_headers_f on_response_headers;
   envoy_filter_on_data_f on_response_data;
   envoy_filter_on_trailers_f on_response_trailers;
+  envoy_filter_set_callbacks_f set_request_callbacks;
+  envoy_filter_on_resume_f on_resume_request;
+  envoy_filter_set_callbacks_f set_response_callbacks;
+  envoy_filter_on_resume_f on_resume_response;
   envoy_filter_release_f release_filter;
   const void* static_context;
   const void* instance_context;

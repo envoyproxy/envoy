@@ -50,6 +50,18 @@ class PlatformBridgeFilter final : public Http::PassThroughFilter,
 public:
   PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr config);
 
+  // Scheduled on the dispatcher when resumeRequest is called from platform
+  // filter callbacks. Provides a snapshot of pending request state to the
+  // platform filter, and consumes invocation results to modify pending HTTP
+  // entities before resuming decoding.
+  void onResumeDecoding();
+
+  // Scheduled on the dispatcher when resumeResponse is called from platform
+  // filter callbacks. Provides a snapshot of pending response state to the
+  // platform filter, and consumes invocation results to modify pending HTTP
+  // entities before resuming encoding.
+  void onResumeEncoding();
+
   // StreamFilterBase
   void onDestroy() override;
 
@@ -83,6 +95,8 @@ private:
   Http::HeaderMap* pending_response_headers_{};
   Http::HeaderMap* pending_request_trailers_{};
   Http::HeaderMap* pending_response_trailers_{};
+  bool request_complete_{};
+  bool response_complete_{};
 };
 
 } // namespace PlatformBridge
