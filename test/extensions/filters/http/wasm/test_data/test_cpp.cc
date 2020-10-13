@@ -343,6 +343,10 @@ void TestContext::onLog() {
       if (getValue({"response", "code"}, &responseCode)) {
         logWarn("response.code: " + std::to_string(responseCode));
       }
+      std::string upstream_host_metadata;
+      if (getValue({"upstream_host_metadata", "filter_metadata", "namespace", "key"}, &upstream_host_metadata)) {
+        logWarn("upstream host metadata: " + upstream_host_metadata);
+      }
       logWarn("state: " + getProperty({"wasm_state"}).value()->toString());
     } else {
       logWarn("onLog " + std::to_string(id()) + " " + std::string(path->view()));
