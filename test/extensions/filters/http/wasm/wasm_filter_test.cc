@@ -1292,7 +1292,8 @@ TEST_P(WasmHttpFilterTest, Property) {
               log_(spdlog::level::warn, Eq(absl::string_view("metadata: wasm_request_get_value"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("response.code: 403"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("state: wasm_value"))));
-  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("upstream host metadata: endpoint"))));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn, Eq(absl::string_view("upstream host metadata: endpoint"))));
 
   root_context_->onTick(0);
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/test_context"}};
@@ -1308,8 +1309,8 @@ TEST_P(WasmHttpFilterTest, Property) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
-    TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
-      R"EOF(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
+          R"EOF(
         filter_metadata:
           namespace:
             key: endpoint
