@@ -138,6 +138,7 @@ jobs:
   - job: api
     displayName: "data-plane-api sync"
     dependsOn: []
+    condition: and(succeeded(), eq(variables['PostSubmit'], true))
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -147,18 +148,17 @@ jobs:
           sshPublicKey: "$(DataPlaneApiPublicKey)"
           sshPassphrase: "$(SshDeployKeyPassphrase)"
           sshKeySecureFile: "$(DataPlaneApiPrivateKey)"
-        condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['PostSubmit'], true))
 
       - bash: ci/api_mirror.sh
         displayName: "Sync data-plane-api"
         workingDirectory: $(Build.SourcesDirectory)
         env:
           AZP_BRANCH: $(Build.SourceBranch)
-        condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['PostSubmit'], true))
 
   - job: go_control_plane
     displayName: "go-control-plane sync"
     dependsOn: []
+    condition: and(succeeded(), eq(variables['PostSubmit'], true))
     steps:
       - task: InstallSSHKey@0
         inputs:
@@ -166,7 +166,6 @@ jobs:
           sshPublicKey: "$(GoControlPlanePublicKey)"
           sshPassphrase: "$(SshDeployKeyPassphrase)"
           sshKeySecureFile: "$(GoControlPlanePrivateKey)"
-        condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['PostSubmit'], true))
 
       - bash: |
           cp -a ~/.ssh $(Build.StagingDirectory)/
@@ -179,7 +178,6 @@ jobs:
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
           AZP_BRANCH: $(Build.SourceBranch)
-        condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['PostSubmit'], true))
 
   - job: bazel
     displayName: "Linux-x64"
