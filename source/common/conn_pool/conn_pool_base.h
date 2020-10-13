@@ -138,14 +138,15 @@ public:
                            absl::string_view failure_reason,
                            ConnectionPool::PoolFailureReason pool_failure_reason);
 
-  // Closes any idle connections.
-  void closeIdleConnections();
+  // Closes any idle connections as this pool is drained.
+  void closeIdleConnectionsForDrainingPool();
 
   // Changes the state_ of an ActiveClient and moves to the appropriate list.
   void transitionActiveClientState(ActiveClient& client, ActiveClient::State new_state);
 
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
+  // See if the drain process has started and/or completed.
   void checkForDrained();
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
