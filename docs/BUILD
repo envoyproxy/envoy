@@ -9,19 +9,18 @@ exports_files(["protodoc_manifest.yaml"])
 
 envoy_package()
 
-# TODO(phlax): fix failing/excluded configs
-# the following config only fails on windows:
-#       dns-cache-circuit-breaker: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
-
 filegroup(
     name = "configs",
     srcs = glob(
         ["root/**/*.yaml"],
         exclude = [
+            # this fails on `some.customer.filter`
             "root/intro/_include/life-of-a-request.yaml",
+            # fails with: "Error: No TLS certificates found for server context"
             "root/intro/arch_overview/security/_include/ssl.yaml",
+            # fails on windows: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
-            "root/configuration/http/http_filters/_include/grpc-reverse-bridge-filter.yaml",
+            # this fails due to missing proto.pb
             "root/configuration/http/http_filters/_include/grpc-transcoder-filter.yaml",
         ],
     ),

@@ -13,7 +13,7 @@ mkdir -p "$OUT_DIR/lib"
 
 for FILE in "$@"; do
   case "$FILE" in
-  *.pem)
+  *.pem|*.der)
     cp "$FILE" "$OUT_DIR/certs"
     ;;
   *.lua)
@@ -29,4 +29,4 @@ for FILE in "$@"; do
 done
 
 # tar is having issues with -C for some reason so just cd into OUT_DIR.
-(cd "$OUT_DIR"; tar -hcvf example_configs.tar -- *.yaml certs/*.pem lib/*.lua)
+(cd "$OUT_DIR"; tar -hcvf example_configs.tar -- *.yaml certs/*.pem certs/*.der lib/*.lua)
