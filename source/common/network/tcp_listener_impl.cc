@@ -125,6 +125,7 @@ void TcpListenerImpl::enable() { file_event_->setEnabled(Event::FileReadyType::R
 void TcpListenerImpl::disable() { file_event_->setEnabled(0); }
 
 void TcpListenerImpl::setRejectFraction(const float reject_fraction) {
+  ASSERT(0 <= reject_fraction && reject_fraction <= 1);
   reject_fraction_ = reject_fraction;
 }
 

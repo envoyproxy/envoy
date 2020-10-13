@@ -1112,6 +1112,36 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   handler_.reset();
 }
 
+TEST_F(ConnectionHandlerTest, TcpListenerGlobalCxLimitReject) {
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  listener_callbacks->onReject(Network::TcpListenerCallbacks::RejectCause::GlobalCxLimit);
+
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_global_cx_overflow")->value());
+  EXPECT_EQ(0UL, TestUtility::findCounter(stats_store_, "downstream_cx_overload_reject")->value());
+  EXPECT_CALL(*listener, onDestroy());
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerOverloadActionReject) {
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  listener_callbacks->onReject(Network::TcpListenerCallbacks::RejectCause::OverloadAction);
+
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_cx_overload_reject")->value());
+  EXPECT_EQ(0UL, TestUtility::findCounter(stats_store_, "downstream_global_cx_overflow")->value());
+  EXPECT_CALL(*listener, onDestroy());
+}
+
 // Listener Filter matchers works.
 TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
   Network::TcpListenerCallbacks* listener_callbacks;
