@@ -324,6 +324,18 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
   return frame;
 }
 
+Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view host,
+                                       absl::string_view path,
+                                       const std::vector<Header> extra_headers) {
+
+  auto frame = makePostRequest(stream_index, host, path);
+  for (const auto& header : extra_headers) {
+    frame.appendHeaderWithoutIndexing(header);
+  }
+  frame.adjustPayloadSize();
+  return frame;
+}
+
 Http2Frame Http2Frame::makeGenericFrame(absl::string_view contents) {
   Http2Frame frame;
   frame.appendData(contents);
@@ -333,6 +345,16 @@ Http2Frame Http2Frame::makeGenericFrame(absl::string_view contents) {
 Http2Frame Http2Frame::makeGenericFrameFromHexDump(absl::string_view contents) {
   Http2Frame frame;
   frame.appendData(Hex::decode(std::string(contents)));
+  return frame;
+}
+
+Http2Frame Http2Frame::makeDataFrame(uint32_t stream_index, absl::string_view data,
+                                     DataFlags flags) {
+  Http2Frame frame;
+  frame.buildHeader(Type::Data, 0, static_cast<uint8_t>(flags),
+                    makeNetworkOrderStreamId(stream_index));
+  frame.appendData(data);
+  frame.adjustPayloadSize();
   return frame;
 }
 

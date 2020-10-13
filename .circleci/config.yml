@@ -35,37 +35,9 @@ jobs:
              - "9d:3b:fe:7c:09:3b:ce:a9:6a:de:de:41:fb:6b:52:62"
        - run: ci/go_mirror.sh
 
-   filter_example_mirror:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - add_ssh_keys:
-           fingerprints:
-             - "f6:f9:df:90:9c:4b:5f:9c:f4:69:fd:42:94:ff:88:24"
-       - run: ci/filter_example_mirror.sh
-
-   docs:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run: ci/do_circle_ci.sh docs
-       - add_ssh_keys:
-           fingerprints:
-             - "44:c7:a1:9e:f4:9e:a5:33:11:f1:0e:79:e1:55:c9:04"
-       - run: docs/publish.sh
-       - store_artifacts:
-           path: generated/docs
-
 workflows:
   version: 2
   all:
     jobs:
       - api
       - go_control_plane_mirror
-      - filter_example_mirror
-      - docs:
-          filters:
-            tags:
-              only: /^v.*/

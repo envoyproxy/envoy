@@ -1346,11 +1346,10 @@ response_headers_to_remove: ["x-nope"]
 
   // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
   // combine set-cookie headers
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(header_map, "set-cookie", out);
+  const auto out = header_map.get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "foo");
-  ASSERT_EQ(out[1], "bar");
+  ASSERT_EQ(out[0]->value().getStringView(), "foo");
+  ASSERT_EQ(out[1]->value().getStringView(), "bar");
 }
 
 TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {

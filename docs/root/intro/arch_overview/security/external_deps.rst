@@ -21,6 +21,11 @@ Control plane
 
 .. include:: external_dep_controlplane.rst
 
+API
+---
+
+.. include:: external_dep_api.rst
+
 Observability (core)
 --------------------
 
