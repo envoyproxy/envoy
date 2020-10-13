@@ -50,8 +50,8 @@ public:
   using DrainedCb = std::function<void()>;
 
   /**
-   * Register a callback that gets called when the connection pool is fully drained. No actual
-   * draining is done. The owner of the connection pool is responsible for not creating any
+   * Register a callback that gets called when the connection pool is fully drained and kicks
+   * off a drain. The owner of the connection pool is responsible for not creating any
    * new streams.
    */
   virtual void addDrainedCallback(DrainedCb cb) PURE;
