@@ -229,21 +229,6 @@ HeaderFormatterPtr createTokenizedHeaderFormatter(
 
   return std::make_unique<TokenizedHeaderFormatter>(std::move(formatters), append);
 }
-
-void evaluateHeader(const Http::LowerCaseString& header_key,
-                    const HeaderFormatterPtr& header_formatter, Http::HeaderMap& headers,
-                    const StreamInfo::StreamInfo& stream_info) {
-  const std::string value = stream_info != nullptr ? header_formatter->format(*stream_info)
-                                                   : header_formatter.original_value_;
-  if (!value.empty()) {
-    if (header_formatter->append()) {
-      headers.addReferenceKey(key, value);
-    } else {
-      headers.setReferenceKey(key, value);
-    }
-  }
-}
-
 } // namespace
 
 HeaderParserPtr HeaderParser::configure(
@@ -272,8 +257,9 @@ HeaderParserPtr HeaderParser::configure(
     HeaderFormatterPtr header_formatter =
         createTokenizedHeaderFormatter(tokenized_header.headers(), append);
 
-    header_parser->tokenized_headers_to_add_.emplace_back(std::make_pair(
-        Http::LowerCaseString(tokenized_header.name()), std::move(header_formatter)));
+    header_parser->tokenized_headers_to_add_.emplace_back(
+        std::make_pair(Http::LowerCaseString(tokenized_header.name()),
+                       HeadersToAddEntry{std::move(header_formatter), ""}));
   }
 
   return header_parser;
@@ -331,6 +317,20 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
 
   for (const auto& [key, entry] : tokenized_headers_to_add_) {
     evaluateHeader(key, entry, headers, stream_info);
+  }
+}
+
+void HeaderParser::evaluateHeader(const Http::LowerCaseString& header_key,
+                                  const HeadersToAddEntry& header_entry, Http::HeaderMap& headers,
+                                  const StreamInfo::StreamInfo* stream_info) const {
+  const std::string value = stream_info != nullptr ? header_entry.formatter_->format(*stream_info)
+                                                   : header_entry.original_value_;
+  if (!value.empty()) {
+    if (header_entry.formatter_->append()) {
+      headers.addReferenceKey(header_key, value);
+    } else {
+      headers.setReferenceKey(header_key, value);
+    }
   }
 }
 

@@ -462,11 +462,10 @@ TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
   EXPECT_EQ(response_headers_.get_("tokenized-foo-1"), "foo-1;bar1,foo-2;bar2");
   EXPECT_EQ(response_headers_.get_("tokenized-foo-2"), "foo-3;bar3,foo-4;bar4");
 
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(response_headers_, "tokenized-foo-3", out);
+  const auto out = response_headers_.get(Http::LowerCaseString("tokenized-foo-3"));
   ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "original3");
-  ASSERT_EQ(out[1], "foo-5;bar5,foo-6;bar6");
+  ASSERT_EQ(out[0]->value().getStringView(), "original3");
+  ASSERT_EQ(out[1]->value().getStringView(), "foo-5;bar5,foo-6;bar6");
 }
 
 // Test addition of headers and tokenized headers to local reply

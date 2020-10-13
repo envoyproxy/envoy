@@ -473,15 +473,16 @@ mappers:
 
   EXPECT_EQ(
       "UC",
-      response->headers().get(Http::LowerCaseString("response-flags"))->value().getStringView());
-  EXPECT_EQ("upstream_reset_before_response_started{connection termination}",
+      response->headers().get(Http::LowerCaseString("response-flags"))[0]->value().getStringView());
+  EXPECT_EQ("upstream_reset_before_response_started{connection_termination}",
             response->headers()
-                .get(Http::LowerCaseString("response-code-details"))
+                .get(Http::LowerCaseString("response-code-details"))[0]
                 ->value()
                 .getStringView());
-  EXPECT_EQ("response-flags;UC,response-code-details;upstream_reset_before_response_started{"
-            "connection termination}",
-            response->headers().get(Http::LowerCaseString("useful-info"))->value().getStringView());
+  EXPECT_EQ(
+      "response-flags;UC,response-code-details;upstream_reset_before_response_started{"
+      "connection_termination}",
+      response->headers().get(Http::LowerCaseString("useful-info"))[0]->value().getStringView());
 }
 
 } // namespace Envoy

@@ -71,9 +71,13 @@ private:
     const std::string original_value_;
   };
 
+  void evaluateHeader(const Http::LowerCaseString& header_key,
+                      const HeadersToAddEntry& header_entry, Http::HeaderMap& headers,
+                      const StreamInfo::StreamInfo* stream_info) const;
+
   std::vector<std::pair<Http::LowerCaseString, HeadersToAddEntry>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
-  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> tokenized_headers_to_add_;
+  std::vector<std::pair<Http::LowerCaseString, HeadersToAddEntry>> tokenized_headers_to_add_;
 };
 
 } // namespace Router
