@@ -330,6 +330,18 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   }
 }
 
+void ConnectionHandlerImpl::ActiveTcpListener::pauseListening() {
+  if (listener_ != nullptr) {
+    listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
+  if (listener_ != nullptr) {
+    listener_->enable();
+  }
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket) {
   // Find matching filter chain.

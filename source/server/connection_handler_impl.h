@@ -130,6 +130,9 @@ private:
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
     void destroy() override { listener_.reset(); }
+    void pauseListening() override;
+    void resumeListening() override;
+    void shutdownListener() override { listener_.reset(); }
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
