@@ -239,11 +239,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://luajit.org",
         # The last release version, 2.1.0-beta3 has a number of CVEs filed
         # against it. These may not impact correct non-malicious Lua code, but for prudence we bump.
-        version = "e9af1abec542e6f9851ff2368e7f196b6382a44c",
-        sha256 = "186cd55c0e321aa2ec3c0f9220e31cc17479ec6222db515ec8b902f9275a9616",
+        version = "1d8b747c161db457e032a023ebbff511f5de5ec2",
+        sha256 = "20a159c38a98ecdb6368e8d655343b6036622a29a1621da9dc303f7ed9bf37f3",
         strip_prefix = "LuaJIT-{version}",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
-        last_updated = "2020-10-09",
+        last_updated = "2020-10-13",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.lua"],
         cpe = "cpe:2.3:a:luajit:luajit:*",
