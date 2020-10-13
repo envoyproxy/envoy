@@ -308,7 +308,7 @@ struct mmsghdr {
 // See https://github.com/torvalds/linux/blob/master/include/uapi/linux/tcp.h
 // Some of them may remain uninitialized. If you are using this struct please refer to
 // the implementation of Windows to see that the metric you are querying for is supported.
-// The corresponding Windows is implementation is documented at:
+// The corresponding Windows API is documented at:
 // https://docs.microsoft.com/en-us/windows/win32/api/mstcpip/ns-mstcpip-tcp_info_v0
 
 struct tcp_info {
