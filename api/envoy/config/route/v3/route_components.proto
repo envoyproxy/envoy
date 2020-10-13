@@ -809,6 +809,10 @@ message RouteAction {
     //
     //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
     //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     string cluster_header = 2
         [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
@@ -917,6 +921,10 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     string host_rewrite_header = 29
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
@@ -1146,9 +1154,15 @@ message RetryPolicy {
   }
 
   message ResetHeader {
+    // The name of the reset header.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     string name = 1
         [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
+    // The format of the reset header.
     ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
   }
 

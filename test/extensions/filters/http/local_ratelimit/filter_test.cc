@@ -113,7 +113,7 @@ TEST_F(FilterTest, RequestRateLimited) {
 
         Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
         modify_headers(response_headers);
-        EXPECT_EQ("true", response_headers.get(Http::LowerCaseString("x-test-rate-limit"))
+        EXPECT_EQ("true", response_headers.get(Http::LowerCaseString("x-test-rate-limit"))[0]
                               ->value()
                               .getStringView());
 
