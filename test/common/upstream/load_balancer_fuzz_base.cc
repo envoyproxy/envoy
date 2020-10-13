@@ -42,21 +42,21 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   for (uint8_t index : localities[0]) {
     ENVOY_LOG_MISC(trace, "Added host at index {} to locality 1", index);
     locality_one.push_back(host_set.hosts_[index]);
-    locality_indexes_[index] = LoadBalancerFuzzBase::Locality::ONE;
+    locality_indexes_[index] = 0;
   }
 
   HostVector locality_two = {};
   for (uint8_t index : localities[1]) {
     ENVOY_LOG_MISC(trace, "Added host at index {} to locality 2", index);
     locality_two.push_back(host_set.hosts_[index]);
-    locality_indexes_[index] = LoadBalancerFuzzBase::Locality::TWO;
+    locality_indexes_[index] = 1;
   }
 
   HostVector locality_three = {};
   for (uint8_t index : localities[2]) {
     ENVOY_LOG_MISC(trace, "Added host at index {} to locality 3", index);
     locality_three.push_back(host_set.hosts_[index]);
-    locality_indexes_[index] = LoadBalancerFuzzBase::Locality::THREE;
+    locality_indexes_[index] = 2;
   }
 
   host_set.hosts_per_locality_ = makeHostsPerLocality({locality_one, locality_two, locality_three});
@@ -118,88 +118,44 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   }
 
   // Handle updating health flags for hosts_per_locality_
-  HostVector healthy_hosts_locality_one = {};
-  HostVector degraded_hosts_locality_one = {};
-  HostVector excluded_hosts_locality_one = {};
 
-  HostVector healthy_hosts_locality_two = {};
-  HostVector degraded_hosts_locality_two = {};
-  HostVector excluded_hosts_locality_two = {};
+  // The index within the array of the vector represents the locality
+  std::array<HostVector, 3> healthy_hosts_per_locality;
+  std::array<HostVector, 3> degraded_hosts_per_locality;
+  std::array<HostVector, 3> excluded_hosts_per_locality;
 
-  HostVector healthy_hosts_locality_three = {};
-  HostVector degraded_hosts_locality_three = {};
-  HostVector excluded_hosts_locality_three = {};
+  // Wrap those three in an array here, where the index represents health flag of
+  // healthy/degraded/excluded, used for indexing during iteration through subsets
+  std::array<std::array<HostVector, 3>, 3> locality_health_flags = {
+      healthy_hosts_per_locality, degraded_hosts_per_locality, excluded_hosts_per_locality};
 
-  for (uint8_t index : subsets.at(0)) {
-    // If the host is in a locality, we have to add it to healthy hosts per locality
-    if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
-      ENVOY_LOG_MISC(trace, "Added healthy host at index {} in locality {}", index,
-                     locality_indexes_[index]);
-      switch (locality_indexes_[index]) {
-      case LoadBalancerFuzzBase::Locality::ONE:
-        healthy_hosts_locality_one.push_back(host_set.hosts_[index]);
-        break;
-      case LoadBalancerFuzzBase::Locality::TWO:
-        healthy_hosts_locality_two.push_back(host_set.hosts_[index]);
-        break;
-      case LoadBalancerFuzzBase::Locality::THREE:
-        healthy_hosts_locality_three.push_back(host_set.hosts_[index]);
-        break;
-      default: // shouldn't hit
-        NOT_REACHED_GCOVR_EXCL_LINE;
+  // Iterate through subsets
+  for (uint8_t health_flag = 0; health_flag < locality_health_flags.size(); health_flag++) {
+    for (uint8_t index : subsets.at(health_flag)) { // Each subset logically represents a health
+                                                    // flag
+      // If the host is in a locality, we have to update the corresponding health flag host vector
+      if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
+        // First dimension of array represents health_flag, second represents locality, which is
+        // pulled from map
+        locality_health_flags[health_flag][locality_indexes_[index]].push_back(
+            host_set.hosts_[index]);
+        ENVOY_LOG_MISC(trace, "Added host at index {} in locality {} to health flag set {}", index,
+                       locality_indexes_[index], health_flag + 1);
       }
     }
   }
 
-  for (uint8_t index : subsets.at(1)) {
-    // If the host is in a locality, we have to add it to degraded hosts per locality
-    if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
-      ENVOY_LOG_MISC(trace, "Added degraded host at index {} in locality {}", index,
-                     locality_indexes_[index]);
-      switch (locality_indexes_[index]) {
-      case LoadBalancerFuzzBase::Locality::ONE:
-        degraded_hosts_locality_one.push_back(host_set.hosts_[index]);
-        break;
-      case LoadBalancerFuzzBase::Locality::TWO:
-        degraded_hosts_locality_two.push_back(host_set.hosts_[index]);
-        break;
-      case LoadBalancerFuzzBase::Locality::THREE:
-        degraded_hosts_locality_three.push_back(host_set.hosts_[index]);
-        break;
-      default: // shouldn't hit
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
-    }
-  }
-
-  for (uint8_t index : subsets.at(2)) {
-    // If the host is in a locality, we have to add it to excluded hosts per locality
-    if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
-      ENVOY_LOG_MISC(trace, "Added excluded host at index {} in locality {}", index,
-                     locality_indexes_[index]);
-      switch (locality_indexes_[index]) {
-      case LoadBalancerFuzzBase::Locality::ONE:
-        excluded_hosts_locality_one.push_back(host_set.hosts_[index]);
-        break;
-      case LoadBalancerFuzzBase::Locality::TWO:
-        excluded_hosts_locality_two.push_back(host_set.hosts_[index]);
-        break;
-      case LoadBalancerFuzzBase::Locality::THREE:
-        excluded_hosts_locality_three.push_back(host_set.hosts_[index]);
-        break;
-      default: // shouldn't hit
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
-    }
-  }
   // This overrides what is currently present in the host set, thus not having to explicitly call
   // vector.clear()
-  host_set.healthy_hosts_per_locality_ = makeHostsPerLocality(
-      {healthy_hosts_locality_one, healthy_hosts_locality_two, healthy_hosts_locality_three});
-  host_set.degraded_hosts_per_locality_ = makeHostsPerLocality(
-      {degraded_hosts_locality_one, degraded_hosts_locality_two, degraded_hosts_locality_three});
-  host_set.excluded_hosts_per_locality_ = makeHostsPerLocality(
-      {excluded_hosts_locality_one, excluded_hosts_locality_two, excluded_hosts_locality_three});
+  host_set.healthy_hosts_per_locality_ =
+      makeHostsPerLocality({healthy_hosts_per_locality[0], healthy_hosts_per_locality[1],
+                            healthy_hosts_per_locality[2]});
+  host_set.degraded_hosts_per_locality_ =
+      makeHostsPerLocality({degraded_hosts_per_locality[0], degraded_hosts_per_locality[1],
+                            degraded_hosts_per_locality[2]});
+  host_set.excluded_hosts_per_locality_ =
+      makeHostsPerLocality({excluded_hosts_per_locality[0], excluded_hosts_per_locality[1],
+                            excluded_hosts_per_locality[2]});
 
   host_set.runCallbacks({}, {});
 }
