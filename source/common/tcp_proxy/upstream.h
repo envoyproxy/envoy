@@ -17,7 +17,7 @@ public:
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~TcpConnPool() override;
 
-  bool valid() const{ return conn_pool_ != nullptr; }
+  bool valid() const { return conn_pool_ != nullptr; }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks* callbacks) override;
@@ -44,7 +44,7 @@ public:
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~HttpConnPool() override;
 
-  bool valid() const{ return conn_pool_ != nullptr; }
+  bool valid() const { return conn_pool_ != nullptr; }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks* callbacks) override;
@@ -103,7 +103,7 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
-  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl);
+  virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl);
 
   Http::ResponseDecoder& responseDecoder() { return response_decoder_; }
 

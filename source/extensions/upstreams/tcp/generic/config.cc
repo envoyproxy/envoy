@@ -1,7 +1,8 @@
 #include "extensions/upstreams/tcp/generic/config.h"
 
-#include "common/tcp_proxy/upstream.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "common/tcp_proxy/upstream.h"
 
 namespace Envoy {
 namespace Extensions {
