@@ -42,6 +42,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:ttl_lib",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
