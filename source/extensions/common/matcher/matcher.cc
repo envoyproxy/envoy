@@ -34,9 +34,9 @@ bool StringHeaderMatcher::matchStringHeaders(
 
 bool StringHeaderMatcher::matchSingleStringHeader(const Http::HeaderMap& response_headers,
                                                   const StringHeaderMatcher& header) {
-  const Http::HeaderEntry* header_entry = response_headers.get(Http::LowerCaseString(header.name_));
-  if (header_entry != nullptr) {
-    bool match_result = header.pattern_.match(header_entry->value().getStringView());
+  Http::HeaderMap::GetResult header_entry = response_headers.get(Http::LowerCaseString(header.name_));
+  if (!header_entry.empty()) {
+    bool match_result = header.pattern_.match(header_entry[0]->value().getStringView());
     return header.invert_match_ ? !match_result : match_result;
   }
   // If header map does not contain header that is

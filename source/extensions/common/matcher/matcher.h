@@ -163,9 +163,6 @@ void buildMatcher(const envoy::type::matcher::v3::MatchPredicate& match_config,
 class StringHeaderMatcher {
 public:
   StringHeaderMatcher(std::string, Matchers::StringMatcherImpl, bool);
-  // std::string& getName() { return name_; }
-  // Matchers::StringMatcherImpl& getPattern() { return pattern_; }
-  // bool isInvertMatch() { return invert_match_; }
   static bool matchStringHeaders(const Http::HeaderMap& response_headers,
                                  const std::vector<StringHeaderMatcher>& config_headers);
 
