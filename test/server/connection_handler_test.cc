@@ -363,6 +363,22 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
   handler_->addListener(*test_listener);
 }
 
+TEST_F(ConnectionHandlerTest, DisableListenerAfterStop) {
+  InSequence s;
+
+  Network::ListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, false, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(*test_listener);
+
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->stopListeners();
+  handler_->disableListeners();
+}
+
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
   InSequence s;
 
