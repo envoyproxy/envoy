@@ -59,7 +59,7 @@ class DependencyInfo(object):
     Returns:
       Set of dependency identifiers that match use_category.
     """
-    return set(name for name, metadata in repository_locations.DEPENDENCY_REPOSITORIES.items()
+    return set(name for name, metadata in repository_locations.REPOSITORY_LOCATIONS_SPEC.items()
                if use_category in metadata['use_category'])
 
   def GetMetadata(self, dependency):
@@ -72,7 +72,7 @@ class DependencyInfo(object):
       A dictionary with the repository metadata as defined in
       bazel/repository_locations.bzl.
     """
-    return repository_locations.DEPENDENCY_REPOSITORIES.get(dependency)
+    return repository_locations.REPOSITORY_LOCATIONS_SPEC.get(dependency)
 
 
 class BuildGraph(object):

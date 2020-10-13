@@ -1,51 +1,5 @@
-# Validation of content in this file is done on the bazel/repositories.bzl file to make it free of bazel
-# constructs. This is to allow this file to be loaded into Python based build and maintenance tools.
-
-# Envoy dependencies may be annotated with the following attributes:
-DEPENDENCY_ANNOTATIONS = [
-    # List of the categories describing how the dependency is being used. This attribute is used
-    # for automatic tracking of security posture of Envoy's dependencies.
-    # Possible values are documented in the USE_CATEGORIES list below.
-    # This attribute is mandatory for each dependecy.
-    "use_category",
-
-    # Attribute specifying CPE (Common Platform Enumeration, see https://nvd.nist.gov/products/cpe) ID
-    # of the dependency. The ID may be in v2.3 or v2.2 format, although v2.3 is prefferred. See
-    # https://nvd.nist.gov/products/cpe for CPE format. Use single wildcard '*' for version and vector elements
-    # i.e. 'cpe:2.3:a:nghttp2:nghttp2:*'. Use "N/A" for dependencies without CPE assigned.
-    # This attribute is optional for components with use categories listed in the
-    # USE_CATEGORIES_WITH_CPE_OPTIONAL
-    "cpe",
-]
-
-# NOTE: If a dependency use case is either dataplane or controlplane, the other uses are not needed
-# to be declared.
-USE_CATEGORIES = [
-    # This dependency is used in API protos.
-    "api",
-    # This dependency is used in build process.
-    "build",
-    # This dependency is used to process xDS requests.
-    "controlplane",
-    # This dependency is used in processing downstream or upstream requests (core).
-    "dataplane_core",
-    # This dependency is used in processing downstream or upstream requests (extensions).
-    "dataplane_ext",
-    # This dependecy is used for logging, metrics or tracing (core). It may process unstrusted input.
-    "observability_core",
-    # This dependecy is used for logging, metrics or tracing (extensions). It may process unstrusted input.
-    "observability_ext",
-    # This dependency does not handle untrusted data and is used for various utility purposes.
-    "other",
-    # This dependency is used only in tests.
-    "test_only",
-]
-
-# Components with these use categories are not required to specify the 'cpe'
-# and 'last_updated' annotation.
-USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "other", "test_only"]
-
-DEPENDENCY_REPOSITORIES_SPEC = dict(
+# This should match the schema defined in external_deps.bzl.
+REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         project_name = "bazel-compilation-database",
         project_desc = "Clang JSON compilation database support for Bazel",
@@ -619,11 +573,11 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         project_name = "LLVM",
         project_desc = "LLVM Compiler Infrastructure",
         project_url = "https://llvm.org",
-        version = "10.0",
+        version = "10.0.0",
         sha256 = "df83a44b3a9a71029049ec101fb0077ecbbdf5fe41e395215025779099a98fdf",
-        strip_prefix = "llvm-{version}.0.src",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}.0/llvm-{version}.0.src.tar.xz"],
-        last_updated = "2020-03-24",
+        strip_prefix = "llvm-{version}.src",
+        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-{version}.src.tar.xz"],
+        last_updated = "2020-10-09",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -632,7 +586,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:llvm:*",
     ),
     com_github_wavm_wavm = dict(
         project_name = "WAVM",
@@ -642,7 +596,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         sha256 = "cc3fcaf05d57010c9cf8eb920234679dede6c780137b55001fd34e4d14806f7c",
         strip_prefix = "WAVM-{version}",
         urls = ["https://github.com/WAVM/WAVM/archive/{version}.tar.gz"],
-        last_updated = "2020-07-06",
+        last_updated = "2020-10-09",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -651,7 +605,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:webassembly_virtual_machine_project:webassembly_virtual_machine:*",
     ),
     io_opencensus_cpp = dict(
         project_name = "OpenCensus C++",
@@ -852,7 +806,6 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         version = "7afb39d868a973caa6216a535c24e37fb666b6f3",
         sha256 = "213d0b441bcc3df2c87933b24a593b5fd482fa8f4db158b707c60005b9e70040",
         strip_prefix = "proxy-wasm-cpp-sdk-{version}",
-        # 2020-09-10
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
@@ -862,14 +815,13 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
         cpe = "N/A",
     ),
     proxy_wasm_cpp_host = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        # 2020-09-10
         version = "49ed20e895b728aae6b811950a2939ecbaf76f7c",
         sha256 = "fa03293d01450b9164f8f56ef9227301f7d1af4f373f996400f75c93f6ebc822",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
@@ -882,7 +834,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
         cpe = "N/A",
     ),
     # TODO: upgrade to the latest version (1.41 currently fails tests)
@@ -890,15 +842,12 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        version = "1.39",
+        version = "1.39.6",
         sha256 = "4ac0f1f3de8b3f1373d435cd7e58bd94de4146e751f099732167749a229b443b",
-        patch_cmds = [
-            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 1.39.6-upstream && ./emsdk activate --embedded 1.39.6-upstream || true",
-        ],
-        strip_prefix = "emsdk-{version}.6",
-        urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.6.tar.gz"],
+        strip_prefix = "emsdk-{version}",
+        urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["build"],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
     ),
     io_bazel_rules_rust = dict(
         project_name = "Bazel rust rules",
@@ -911,7 +860,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         strip_prefix = "rules_rust-{version}",
         urls = ["https://github.com/bazelbuild/rules_rust/archive/{version}.tar.gz"],
         use_category = ["build"],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
     ),
     rules_antlr = dict(
         project_name = "ANTLR Rules for Bazel",
@@ -921,7 +870,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
         strip_prefix = "rules_antlr-{version}",
         urls = ["https://github.com/marcohu/rules_antlr/archive/{version}.tar.gz"],
-        # This should be "build", but that trips the verification in the docs.
+        # ANTLR has a runtime component, so is not purely build.
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -953,23 +902,3 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         cpe = "N/A",
     ),
 )
-
-def _format_version(s, version):
-    return s.format(version = version, dash_version = version.replace(".", "-"), underscore_version = version.replace(".", "_"))
-
-# Interpolate {version} in the above dependency specs. This code should be capable of running in both Python
-# and Starlark.
-def _dependency_repositories():
-    locations = {}
-    for key, location in DEPENDENCY_REPOSITORIES_SPEC.items():
-        mutable_location = dict(location)
-        locations[key] = mutable_location
-
-        # Fixup with version information.
-        if "version" in location:
-            if "strip_prefix" in location:
-                mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
-            mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
-    return locations
-
-DEPENDENCY_REPOSITORIES = _dependency_repositories()
