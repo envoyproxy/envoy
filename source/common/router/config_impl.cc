@@ -515,9 +515,9 @@ bool RouteEntryImplBase::HeaderRewriteLiteral::matches(const absl::string_view h
 
 RouteEntryImplBase::UpstreamHeaderMatchPredicate::UpstreamHeaderMatchPredicate(
     const envoy::type::matcher::v3::MatchPredicate& config) {
-  // if (config.something()) // Requests without MatchPredicate are reaching
-  // NOT_REACHED_GCOVR_EXCL_LINE
-  Envoy::Extensions::Common::Matcher::buildMatcher(config, matchers_);
+  if (config.rule_case() != envoy::type::matcher::v3::MatchPredicate::RuleCase::RULE_NOT_SET) {
+    Envoy::Extensions::Common::Matcher::buildMatcher(config, matchers_);
+  }
 }
 
 RouteEntryImplBase::UpstreamHeaderRewriter::UpstreamHeaderRewriter(
@@ -637,11 +637,15 @@ bool RouteEntryImplBase::shouldRewriteHeader(absl::string_view key, absl::string
     Envoy::Extensions::Common::Matcher::Matcher::MatchStatusVector match_predicates;
     match_predicates.clear();
     match_predicates.reserve((it->second->getHeaderMatchPredicate()->getMatchers()).size());
-    auto& top_matcher = (it->second->getHeaderMatchPredicate()->getMatchers())[0];
-    top_matcher->onHttpResponseHeaders(headers, match_predicates);
-    // Top level match predicate will match if the entire match condition evaluates to true
-    if (!match_predicates[0].matches_) {
-      return false;
+    if (it->second->getHeaderMatchPredicate()->getMatchers().size()) {
+      // If we have header match predicates specified in config for this response header,
+      // check whether the root of the predicates matches given the set of response headers
+      auto& root_matcher = (it->second->getHeaderMatchPredicate()->getMatchers())[0];
+      root_matcher->onHttpResponseHeaders(headers, match_predicates);
+      // Root of the match predicate will match if the entire match condition evaluates to true
+      if (!match_predicates[0].matches_) {
+        return false;
+      }
     }
 
     // Check for header value conditions before substituting
