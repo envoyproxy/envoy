@@ -1012,31 +1012,33 @@ TEST(TokenizedHeaderParserTest, TokenizedHeadersAreCorrectlyEvaluated) {
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
   for (const auto& test_case : test_cases) {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> headers_to_tokenize;
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> headers;
     for (const auto& input : test_case.input_) {
-      envoy::config::core::v3::HeaderValue* header = headers_to_tokenize.Add();
-      header->set_key(input.first);
-      header->set_value(input.second);
+      envoy::config::core::v3::HeaderValue* header_value = headers.Add();
+      header_value->set_key(input.first);
+      header_value->set_value(input.second);
     }
 
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers;
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add;
 
     Protobuf::RepeatedPtrField<envoy::config::core::v3::TokenizedHeaderValueOption>
-        tokenized_headers;
-    envoy::config::core::v3::TokenizedHeaderValueOption* tokenized_header = tokenized_headers.Add();
+        tokenized_headers_to_add;
+    envoy::config::core::v3::TokenizedHeaderValueOption* tokenized_header =
+        tokenized_headers_to_add.Add();
     tokenized_header->set_name("x-tokenized-header");
-    tokenized_header->mutable_tokenized_headers()->CopyFrom(headers_to_tokenize);
+    tokenized_header->mutable_headers()->CopyFrom(headers);
 
     std::string hint = fmt::format("for test case with number: {}", test_case.number_);
 
     if (test_case.expected_exception_) {
       EXPECT_FALSE(test_case.expected_output_) << hint;
-      EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(headers, tokenized_headers), EnvoyException,
-                                test_case.expected_exception_.value());
+      EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(headers_to_add, tokenized_headers_to_add),
+                                EnvoyException, test_case.expected_exception_.value());
       continue;
     }
 
-    HeaderParserPtr header_parser = HeaderParser::configure(headers, tokenized_headers);
+    HeaderParserPtr header_parser =
+        HeaderParser::configure(headers_to_add, tokenized_headers_to_add);
 
     Http::TestRequestHeaderMapImpl header_map{};
     header_parser->evaluateHeaders(header_map, stream_info);

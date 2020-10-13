@@ -428,21 +428,21 @@ TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
               runtime_key: key_b
       tokenized_headers_to_add:
         - name: tokenized-foo-1
-          tokenized_headers:
+          headers:
             - key: foo-1
               value: bar1
             - key: foo-2
               value: bar2  
           append: true
         - name: tokenized-foo-2
-          tokenized_headers:
+          headers:
             - key: foo-3
               value: bar3
             - key: foo-4
               value: bar4  
           append: false
         - name: tokenized-foo-3
-          tokenized_headers:
+          headers:
             - key: foo-5
               value: bar5
             - key: foo-6
@@ -487,7 +487,7 @@ TEST_F(LocalReplyTest, TestHeadersAndTokenizedHeadersAddition) {
           append: false
       tokenized_headers_to_add:
         - name: tokenized-foo
-          tokenized_headers:
+          headers:
             - key: foo-1
               value: bar1
             - key: foo-2
@@ -522,7 +522,7 @@ TEST_F(LocalReplyTest, TestPreventTokenizedHeadersThatExceedMaxSize) {
               runtime_key: key_b
       tokenized_headers_to_add:
         - name: tokenized-foo
-          tokenized_headers:
+          headers:
             - key: foo-1
               value: bar1
             - key: foo-2
@@ -532,16 +532,12 @@ TEST_F(LocalReplyTest, TestPreventTokenizedHeadersThatExceedMaxSize) {
           append: false   
 )";
   TestUtility::loadFromYaml(yaml, config_);
-  // change tokens so that max size is exceeded
+  // change headers so that max size is exceeded
   for (int i = 0; i < 3; i++) {
-    config_.mutable_mappers(0)
-        ->mutable_tokenized_headers_to_add(0)
-        ->mutable_tokenized_headers(i)
-        ->set_key(long_key);
-    config_.mutable_mappers(0)
-        ->mutable_tokenized_headers_to_add(0)
-        ->mutable_tokenized_headers(i)
-        ->set_value(long_value);
+    config_.mutable_mappers(0)->mutable_tokenized_headers_to_add(0)->mutable_headers(i)->set_key(
+        long_key);
+    config_.mutable_mappers(0)->mutable_tokenized_headers_to_add(0)->mutable_headers(i)->set_value(
+        long_value);
   }
 
   EXPECT_THROW_WITH_MESSAGE(Factory::create(config_, context_), EnvoyException,

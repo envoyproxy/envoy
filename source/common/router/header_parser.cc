@@ -218,11 +218,10 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 }
 
 HeaderFormatterPtr createTokenizedHeaderFormatter(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_tokenize,
-    bool append) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers, bool append) {
   std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> formatters;
 
-  for (const auto& header_value : headers_to_tokenize) {
+  for (const auto& header_value : headers) {
     // the value for append here is irrelevant
     HeaderFormatterPtr formatter = parseInternal(header_value, false);
     formatters.emplace_back(std::make_pair(header_value.key(), std::move(formatter)));
@@ -271,7 +270,7 @@ HeaderParserPtr HeaderParser::configure(
   for (const auto& tokenized_header : tokenized_headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(tokenized_header, append, true);
     HeaderFormatterPtr header_formatter =
-        createTokenizedHeaderFormatter(tokenized_header.tokenized_headers(), append);
+        createTokenizedHeaderFormatter(tokenized_header.headers(), append);
 
     header_parser->tokenized_headers_to_add_.emplace_back(std::make_pair(
         Http::LowerCaseString(tokenized_header.name()), std::move(header_formatter)));

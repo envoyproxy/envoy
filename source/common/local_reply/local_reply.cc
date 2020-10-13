@@ -116,8 +116,8 @@ private:
     if (!tokenized_headers.empty()) {
       for (const auto& tokenized_header : tokenized_headers) {
         int total_size = 0;
-        for (const auto& token : tokenized_header.tokenized_headers()) {
-          total_size = total_size + token.key().size() + token.value().size();
+        for (const auto& header_value : tokenized_header.headers()) {
+          total_size += header_value.key().size() + header_value.value().size();
           if (total_size > HeaderMaxSize) {
             throw EnvoyException(fmt::format("exceeded max allowed size for tokenized header '{}'",
                                              tokenized_header.name()));
