@@ -75,5 +75,6 @@ envoy_cc_test_library(
     deps = [
         "//include/envoy/common:random_generator_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )

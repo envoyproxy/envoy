@@ -1,5 +1,8 @@
+#include <memory>
 #include <random>
 #include <vector>
+
+#include "envoy/common/random_generator.h"
 
 namespace Envoy {
 namespace Random {
@@ -49,8 +52,8 @@ public:
       index_vector_.push_back(i);
     }
     std::vector<std::vector<uint8_t>> subsets;
-    for (uint32_t i = 0; i < number_of_elements_in_each_subset.size(); i++) {
-      subsets.push_back(constructSubset(number_of_elements_in_each_subset.at(i)));
+    for (uint32_t i : number_of_elements_in_each_subset) {
+      subsets.push_back(constructSubset(i));
     }
     return subsets;
   }
@@ -59,7 +62,7 @@ private:
   // Builds a single subset by pulling indexes off index_vector_
   std::vector<uint8_t> constructSubset(uint32_t number_of_elements_in_subset) {
     std::vector<uint8_t> subset;
-    for (uint32_t i = 0; i < number_of_elements_in_subset && index_vector_.size() != 0; i++) {
+    for (uint32_t i = 0; i < number_of_elements_in_subset && !index_vector_.empty(); i++) {
       // Index of bytestring will wrap around if it "overflows" past the random bytestring's length.
       uint64_t index_of_index_vector =
           random_bytestring_[index_of_random_bytestring_ % random_bytestring_.length()] %
