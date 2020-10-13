@@ -423,6 +423,18 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   }
 }
 
+void ConnectionHandlerImpl::ActiveTcpListener::pauseListening() {
+  if (listener_ != nullptr) {
+    listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
+  if (listener_ != nullptr) {
+    listener_->enable();
+  }
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   // Find matching filter chain.
