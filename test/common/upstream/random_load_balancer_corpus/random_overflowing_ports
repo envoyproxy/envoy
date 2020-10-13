@@ -29,7 +29,13 @@ actions {
 
     }
 }
-num_hosts_in_priority_level: 60000
-num_hosts_in_priority_level: 60000
+setup_priority_levels {
+    num_hosts_in_priority_level: 60000
+    random_bytestring: "\x01\x02"
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 60000
+    random_bytestring: "\x01\x02"
+}
 seed_for_prng: 4
 }

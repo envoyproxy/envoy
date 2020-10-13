@@ -22,7 +22,13 @@ actions {
   choose_host {
   }
 }
-num_hosts_in_priority_level: 65455
-num_hosts_in_priority_level: 65455
+nsetup_priority_levels {
+    num_hosts_in_priority_level: 65455
+    random_bytestring: "\x01\x02"
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 65455
+    random_bytestring: "\x01\x02"
+}
 seed_for_prng: 5
 }

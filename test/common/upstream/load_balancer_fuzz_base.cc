@@ -7,22 +7,55 @@
 namespace Envoy {
 namespace Upstream {
 
-void LoadBalancerFuzzBase::initializeASingleHostSet(const uint32_t num_hosts_in_host_set,
-                                                    const uint8_t priority_level) {
+void LoadBalancerFuzzBase::initializeASingleHostSet(
+    const test::common::upstream::SetupPriorityLevel& setup_priority_level,
+    const uint8_t priority_level) {
+  uint32_t num_hosts_in_priority_level = setup_priority_level.num_hosts_in_priority_level();
   ENVOY_LOG_MISC(trace, "Will attempt to initialize host set {} with {} hosts.", priority_level,
-                 num_hosts_in_host_set);
+                 num_hosts_in_priority_level);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
   uint32_t hosts_made = 0;
   // Cap each host set at 256 hosts for efficiency
   const uint32_t max_num_hosts_in_priority_level = MAX_NUM_HOSTS_IN_PRIORITY_LEVEL;
   // Leave port clause in for future changes
-  while (hosts_made < std::min(num_hosts_in_host_set, max_num_hosts_in_priority_level) &&
+  while (hosts_made < std::min(num_hosts_in_priority_level, max_num_hosts_in_priority_level) &&
          port_ < 65535) {
     host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port_)));
     ++port_;
     ++hosts_made;
   }
-  // TODO: Random call and mod against host_set size for locality logic
+
+  Fuzz::ProperSubsetSelector subset_selector(setup_priority_level.random_bytestring());
+
+  std::vector<std::vector<uint8_t>> localities = subset_selector.constructSubsets(
+      {setup_priority_level.num_hosts_locality_one(), setup_priority_level.num_hosts_locality_two(),
+       setup_priority_level.num_hosts_locality_three()},
+      num_hosts_in_priority_level);
+
+  // Construct three vectors of hosts each representing a locality level, construct
+  // hosts_per_locality from these three vectors
+  HostVector locality_one = {};
+  for (uint8_t index : localities[0]) {
+    ENVOY_LOG_MISC(trace, "Added host at index {} to locality 1", index);
+    locality_one.push_back(host_set.hosts_[index]);
+    locality_indexes_[index] = 1;
+  }
+
+  HostVector locality_two = {};
+  for (uint8_t index : localities[1]) {
+    ENVOY_LOG_MISC(trace, "Added host at index {} to locality 2", index);
+    locality_two.push_back(host_set.hosts_[index]);
+    locality_indexes_[index] = 2;
+  }
+
+  HostVector locality_three = {};
+  for (uint8_t index : localities[2]) {
+    ENVOY_LOG_MISC(trace, "Added host at index {} to locality 3", index);
+    locality_three.push_back(host_set.hosts_[index]);
+    locality_indexes_[index] = 3;
+  }
+
+  host_set.hosts_per_locality_ = makeHostsPerLocality({locality_one, locality_two, locality_three});
 }
 
 // Initializes random and fixed host sets
@@ -30,8 +63,8 @@ void LoadBalancerFuzzBase::initializeLbComponents(
     const test::common::upstream::LoadBalancerTestCase& input) {
   random_.initializeSeed(input.seed_for_prng());
   uint8_t priority_of_host_set = 0;
-  for (uint16_t num_hosts_in_priority_level : input.num_hosts_in_priority_level()) {
-    initializeASingleHostSet(num_hosts_in_priority_level, priority_of_host_set);
+  for (const auto& setup_priority_level : input.setup_priority_levels()) {
+    initializeASingleHostSet(setup_priority_level, priority_of_host_set);
     priority_of_host_set++;
   }
   num_priority_levels_ = priority_of_host_set;
@@ -79,6 +112,90 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
     ENVOY_LOG_MISC(trace, "Index of host made excluded at priority level {}: {}",
                    priority_of_host_set, index);
   }
+
+  // Handle updating health flags for hosts_per_locality_
+  HostVector healthy_hosts_locality_one = {};
+  HostVector degraded_hosts_locality_one = {};
+  HostVector excluded_hosts_locality_one = {};
+
+  HostVector healthy_hosts_locality_two = {};
+  HostVector degraded_hosts_locality_two = {};
+  HostVector excluded_hosts_locality_two = {};
+
+  HostVector healthy_hosts_locality_three = {};
+  HostVector degraded_hosts_locality_three = {};
+  HostVector excluded_hosts_locality_three = {};
+
+  for (uint8_t index : subsets.at(0)) {
+    // If the host is in a locality, we have to add it to healthy hosts per locality
+    if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
+      ENVOY_LOG_MISC(trace, "Added healthy host at index {} in locality {}", index,
+                     locality_indexes_[index]);
+      switch (locality_indexes_[index]) {
+      case 1:
+        healthy_hosts_locality_one.push_back(host_set.hosts_[index]);
+        break;
+      case 2:
+        healthy_hosts_locality_two.push_back(host_set.hosts_[index]);
+        break;
+      case 3:
+        healthy_hosts_locality_three.push_back(host_set.hosts_[index]);
+        break;
+      default: // shouldn't hit
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+    }
+  }
+
+  for (uint8_t index : subsets.at(1)) {
+    // If the host is in a locality, we have to add it to degraded hosts per locality
+    if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
+      ENVOY_LOG_MISC(trace, "Added degraded host at index {} in locality {}", index,
+                     locality_indexes_[index]);
+      switch (locality_indexes_[index]) {
+      case 1:
+        degraded_hosts_locality_one.push_back(host_set.hosts_[index]);
+        break;
+      case 2:
+        degraded_hosts_locality_two.push_back(host_set.hosts_[index]);
+        break;
+      case 3:
+        degraded_hosts_locality_three.push_back(host_set.hosts_[index]);
+        break;
+      default: // shouldn't hit
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+    }
+  }
+
+  for (uint8_t index : subsets.at(2)) {
+    // If the host is in a locality, we have to add it to excluded hosts per locality
+    if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
+      ENVOY_LOG_MISC(trace, "Added excluded host at index {} in locality {}", index,
+                     locality_indexes_[index]);
+      switch (locality_indexes_[index]) {
+      case 1:
+        excluded_hosts_locality_one.push_back(host_set.hosts_[index]);
+        break;
+      case 2:
+        excluded_hosts_locality_two.push_back(host_set.hosts_[index]);
+        break;
+      case 3:
+        excluded_hosts_locality_three.push_back(host_set.hosts_[index]);
+        break;
+      default: // shouldn't hit
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+    }
+  }
+  // This overrides what is currently present in the host set, thus not having to expliclity call
+  // vector.clear()
+  host_set.healthy_hosts_per_locality_ = makeHostsPerLocality(
+      {healthy_hosts_locality_one, healthy_hosts_locality_two, healthy_hosts_locality_three});
+  host_set.degraded_hosts_per_locality_ = makeHostsPerLocality(
+      {degraded_hosts_locality_one, degraded_hosts_locality_two, degraded_hosts_locality_three});
+  host_set.excluded_hosts_per_locality_ = makeHostsPerLocality(
+      {excluded_hosts_locality_one, excluded_hosts_locality_two, excluded_hosts_locality_three});
 
   host_set.runCallbacks({}, {});
 }

@@ -22,7 +22,9 @@ public:
 
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
-  void initializeASingleHostSet(const uint32_t num_hosts_in_host_set, const uint8_t priority_level);
+  void
+  initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
+                           const uint8_t priority_level);
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
@@ -53,6 +55,11 @@ public:
   // There are used to construct the priority set at the beginning of the fuzz iteration
   uint16_t port_ = 80;
   uint8_t num_priority_levels_ = 0;
+
+  // This map used when updating health flags - making sure the health flags are updated hosts in
+  // localities Key - index of host within full host list, value - locality level host at index is
+  // in
+  absl::node_hash_map<uint8_t, uint8_t> locality_indexes_;
 };
 
 } // namespace Upstream

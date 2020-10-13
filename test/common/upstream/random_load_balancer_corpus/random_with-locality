@@ -6,7 +6,9 @@ actions {
     update_health_flags {
         host_priority: 0
         num_healthy_hosts: 2
-        random_bytestring: "\x01\x02"
+        num_degraded_hosts: 3
+        num_excluded_hosts: 4
+        random_bytestring: "\x01\x02\x03\x04\x05\x06"
     }
 }
 actions {
@@ -30,12 +32,18 @@ actions {
     }
 }
 setup_priority_levels {
-    num_hosts_in_priority_level: 250
+    num_hosts_in_priority_level: 20
+    num_hosts_locality_one: 3
+    num_hosts_locality_two: 4
+    num_hosts_locality_three: 5
     random_bytestring: "\x01\x02"
 }
 setup_priority_levels {
-    num_hosts_in_priority_level: 250
+    num_hosts_in_priority_level: 20
+    num_hosts_locality_one: 3
+    num_hosts_locality_two: 4
+    num_hosts_locality_three: 5
     random_bytestring: "\x01\x02"
 }
-seed_for_prng: 4
+seed_for_prng: 1
 }

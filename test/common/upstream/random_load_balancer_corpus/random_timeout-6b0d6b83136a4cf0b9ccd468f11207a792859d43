@@ -23,6 +23,9 @@ load_balancer_test_case {
       random_bytestring: "\x01\x02"
     }
   }
-  num_hosts_in_priority_level: 2063625226
+  setup_priority_levels {
+    num_hosts_in_priority_level: 13534154135
+    random_bytestring: "\x01\x02"
+  }
   seed_for_prng: 32
 }
