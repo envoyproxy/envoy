@@ -25,9 +25,9 @@ Removed Config or Runtime
 New Features
 ------------
 * grpc: implemented header value syntax support when defining :ref:`initial metadata <envoy_v3_api_field_config.core.v3.GrpcService.initial_metadata>` for gRPC-based `ext_authz` :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>` and :ref:`network <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.grpc_service>` filters, and :ref:`ratelimit <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.grpc_service>` filters.
-* ratelimit: added support for use of :ref:`route entry metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.route_entry_metadata>` as a ratelimit action.
 * health_check: added option to use :ref:`no_traffic_healthy_interval <envoy_v3_api_field_config.core.v3.HealthCheck.no_traffic_healthy_interval>` which allows a different no traffic interval when the host is healthy.
 * mongo_proxy: the list of commands to produce metrics for is now :ref:`configurable <envoy_v3_api_field_extensions.filters.network.mongo_proxy.v3.MongoProxy.commands>`.
+* ratelimit: added support for use of :ref:`route entry metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.route_entry_metadata>` as a ratelimit action.
 
 Deprecated
 ----------
