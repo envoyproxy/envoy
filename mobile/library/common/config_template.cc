@@ -202,10 +202,10 @@ stats_config:
       patterns:
         - safe_regex:
             google_re2: {}
-            regex: '^cluster\.[\w]+?\.upstream_cx_active'
+            regex: '^cluster\.[\w]+?\.upstream_cx_[\w]+'
         - safe_regex:
             google_re2: {}
-            regex: '^cluster\.[\w]+?\.upstream_rq_(?:[12345]xx|active|retry.*|time|total|unknown)'
+            regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
         - safe_regex:
             google_re2: {}
             regex: '^http.dispatcher.*'
