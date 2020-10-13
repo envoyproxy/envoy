@@ -17,6 +17,7 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    downstream_cx_active, Gauge, Total active connections
    downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_overflow, Counter, Total connections rejected due to enforcement of listener connection limit
+   downstream_cx_overload_reject, Counter, Total connections rejected due to configured overload actions
    downstream_pre_cx_timeout, Counter, Sockets that timed out during listener filter processing
    downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
    global_cx_overflow, Counter, Total connections rejected due to enforecement of the global connection limit

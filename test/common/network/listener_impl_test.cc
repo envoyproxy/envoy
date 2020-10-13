@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 
@@ -65,10 +67,11 @@ TEST_P(ListenerImplDeathTest, ErrorCallback) {
 
 class TestTcpListenerImpl : public TcpListenerImpl {
 public:
-  TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                      TcpListenerCallbacks& cb, bool bind_to_port,
+  TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
+                      SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
                       uint32_t tcp_backlog = ENVOY_TCP_BACKLOG_SIZE)
-      : TcpListenerImpl(dispatcher, std::move(socket), cb, bind_to_port, tcp_backlog) {}
+      : TcpListenerImpl(dispatcher, random_generator, std::move(socket), cb, bind_to_port,
+                        tcp_backlog) {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };
@@ -82,6 +85,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpListenerImplTest,
 TEST_P(TcpListenerImplTest, SetListeningSocketOptionsSuccess) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
+  Random::MockRandomGenerator random_generator;
 
   auto socket = std::make_shared<TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
@@ -89,13 +93,15 @@ TEST_P(TcpListenerImplTest, SetListeningSocketOptionsSuccess) {
   socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
-  TestTcpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
+                               true);
 }
 
 // Test that an exception is thrown if there is an error setting socket options.
 TEST_P(TcpListenerImplTest, SetListeningSocketOptionsError) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
+  Random::MockRandomGenerator random_generator;
 
   auto socket = std::make_shared<TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
@@ -103,10 +109,11 @@ TEST_P(TcpListenerImplTest, SetListeningSocketOptionsError) {
   socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(false));
-  EXPECT_THROW_WITH_MESSAGE(TestTcpListenerImpl(dispatcherImpl(), socket, listener_callbacks, true),
-                            CreateListenerException,
-                            fmt::format("cannot set post-listen socket option on socket: {}",
-                                        socket->localAddress()->asString()));
+  EXPECT_THROW_WITH_MESSAGE(
+      TestTcpListenerImpl(dispatcherImpl(), random_generator, socket, listener_callbacks, true),
+      CreateListenerException,
+      fmt::format("cannot set post-listen socket option on socket: {}",
+                  socket->localAddress()->asString()));
 }
 
 TEST_P(TcpListenerImplTest, UseActualDst) {
@@ -115,10 +122,13 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   auto socketDst = std::make_shared<TcpListenSocket>(alt_address_, nullptr, false);
   Network::MockTcpListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
+  Random::MockRandomGenerator random_generator;
   // Do not redirect since use_original_dst is false.
-  Network::TestTcpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks1, true);
+  Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
+                                        listener_callbacks1, true);
   Network::MockTcpListenerCallbacks listener_callbacks2;
-  Network::TestTcpListenerImpl listenerDst(dispatcherImpl(), socketDst, listener_callbacks2, false);
+  Network::TestTcpListenerImpl listenerDst(dispatcherImpl(), random_generator, socketDst,
+                                           listener_callbacks2, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -175,7 +185,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   };
 
   initiate_connections(5);
-  EXPECT_CALL(listener_callbacks, onReject()).Times(3);
+  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
+      .Times(3);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // We expect any server-side connections that get created to populate 'server_connections'.
@@ -185,7 +196,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"overload.global_downstream_max_connections", "3"}});
   initiate_connections(5);
-  EXPECT_CALL(listener_callbacks, onReject()).Times(4);
+  EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
+      .Times(4);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(3, server_connections.size());
@@ -214,8 +226,10 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
+  Random::MockRandomGenerator random_generator;
   // Do not redirect since use_original_dst is false.
-  Network::TestTcpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
+  Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
+                                        listener_callbacks, true);
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket->localAddress()->ip()->port());
@@ -253,11 +267,13 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
                                                   options, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
+  Random::MockRandomGenerator random_generator;
 
   ASSERT_TRUE(socket->localAddress()->ip()->isAnyAddress());
 
   // Do not redirect since use_original_dst is false.
-  Network::TestTcpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
+  Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
+                                        listener_callbacks, true);
 
   auto listener_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket->localAddress()->ip()->port());
@@ -291,7 +307,9 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
-  TestTcpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
+  Random::MockRandomGenerator random_generator;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
+                               true);
 
   // When listener is disabled, the timer should fire before any connection is accepted.
   listener.disable();
@@ -322,6 +340,132 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
         dispatcher_->exit();
       }));
 
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
+  MockTcpListenerCallbacks listener_callbacks;
+  MockConnectionCallbacks connection_callbacks;
+  Random::MockRandomGenerator random_generator;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
+                               true);
+
+  listener.setRejectFraction(0);
+
+  // This connection will be accepted and not rejected.
+  {
+    testing::InSequence s1;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::LocalClose));
+  }
+  EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce([&] { dispatcher_->exit(); });
+
+  ClientConnectionPtr client_connection =
+      dispatcher_->createClientConnection(socket->localAddress(), Address::InstanceConstSharedPtr(),
+                                          Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->addConnectionCallbacks(connection_callbacks);
+  client_connection->connect();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Now that we've seen that the connection hasn't been closed by the listener, make sure to close
+  // it.
+  client_connection->close(ConnectionCloseType::NoFlush);
+}
+
+TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
+  MockTcpListenerCallbacks listener_callbacks;
+  MockConnectionCallbacks connection_callbacks;
+  Random::MockRandomGenerator random_generator;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
+                               true);
+
+  listener.setRejectFraction(0.5f);
+
+  // The first connection will be rejected because the random value is too small.
+  {
+    testing::InSequence s1;
+    EXPECT_CALL(random_generator, random()).WillOnce(Return(0));
+    EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
+  }
+  {
+    testing::InSequence s2;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
+      dispatcher_->exit();
+    });
+  }
+
+  {
+    ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+        socket->localAddress(), Address::InstanceConstSharedPtr(),
+        Network::Test::createRawBufferSocket(), nullptr);
+    client_connection->addConnectionCallbacks(connection_callbacks);
+    client_connection->connect();
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+
+  // The second connection rolls better on initiative and is accepted.
+  {
+    testing::InSequence s1;
+    EXPECT_CALL(random_generator, random()).WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+    EXPECT_CALL(listener_callbacks, onAccept_(_));
+  }
+  {
+    testing::InSequence s2;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected)).WillOnce([&] {
+      dispatcher_->exit();
+    });
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).Times(0);
+  }
+
+  {
+    ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+        socket->localAddress(), Address::InstanceConstSharedPtr(),
+        Network::Test::createRawBufferSocket(), nullptr);
+    client_connection->addConnectionCallbacks(connection_callbacks);
+    client_connection->connect();
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::LocalClose));
+    // Now that we've seen that the connection hasn't been closed by the listener, make sure to
+    // close it.
+    client_connection->close(ConnectionCloseType::NoFlush);
+  }
+}
+
+TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
+  MockTcpListenerCallbacks listener_callbacks;
+  MockConnectionCallbacks connection_callbacks;
+  Random::MockRandomGenerator random_generator;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
+                               true);
+
+  listener.setRejectFraction(1);
+
+  {
+    testing::InSequence s1;
+    EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
+  }
+
+  {
+    testing::InSequence s2;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
+      dispatcher_->exit();
+    });
+  }
+
+  ClientConnectionPtr client_connection =
+      dispatcher_->createClientConnection(socket->localAddress(), Address::InstanceConstSharedPtr(),
+                                          Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->addConnectionCallbacks(connection_callbacks);
+  client_connection->connect();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 

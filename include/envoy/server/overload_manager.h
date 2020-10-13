@@ -62,6 +62,10 @@ public:
   // Overload action to stop accepting new connections.
   const std::string StopAcceptingConnections = "envoy.overload_actions.stop_accepting_connections";
 
+  // Overload action to reject (accept and then close) new connections.
+  const std::string RejectIncomingConnections =
+      "envoy.overload_actions.reject_incoming_connections";
+
   // Overload action to try to shrink the heap by releasing free memory.
   const std::string ShrinkHeap = "envoy.overload_actions.shrink_heap";
 };
