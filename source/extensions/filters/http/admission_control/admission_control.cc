@@ -52,6 +52,11 @@ double AdmissionControlFilterConfig::aggression() const {
 
 double AdmissionControlFilterConfig::successRateThreshold() const {
   const double pct = sr_threshold_ ? sr_threshold_->value() : defaultSuccessRateThreshold;
+  // The threshold value should not be 0. Since you cannot add a validation on a widely used Runtime
+  // percent value, simply map a 0 percent for the field to the default success rate threshold.
+  if (pct == 0) {
+    return defaultSuccessRateThreshold;
+  }
   return std::min<double>(pct, 100.0) / 100.0;
 }
 
