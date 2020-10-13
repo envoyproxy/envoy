@@ -64,6 +64,17 @@ public:
   }
 };
 
+int reasonToReset(StreamResetReason reason) {
+  switch (reason) {
+  case StreamResetReason::LocalRefusedStreamReset:
+    return NGHTTP2_REFUSED_STREAM;
+  case StreamResetReason::ConnectError:
+    return NGHTTP2_CONNECT_ERROR;
+  default:
+    return NGHTTP2_NO_ERROR;
+  }
+}
+
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
 
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
@@ -526,9 +537,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   int rc = nghttp2_submit_rst_stream(parent_.session_, NGHTTP2_FLAG_NONE, stream_id_,
-                                     reason == StreamResetReason::LocalRefusedStreamReset
-                                         ? NGHTTP2_REFUSED_STREAM
-                                         : NGHTTP2_NO_ERROR);
+                                     reasonToReset(reason));
   ASSERT(rc == 0);
 }
 
@@ -986,7 +995,11 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
           reason = StreamResetReason::RemoteRefusedStreamReset;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
         } else {
-          reason = StreamResetReason::RemoteReset;
+          if (error_code == NGHTTP2_CONNECT_ERROR) {
+            reason = StreamResetReason::ConnectError;
+          } else {
+            reason = StreamResetReason::RemoteReset;
+          }
           stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
         }
       }

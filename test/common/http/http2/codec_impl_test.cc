@@ -2662,6 +2662,10 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
   expected_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   request_encoder_->encodeHeaders(request_headers, false);
+
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectError, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ConnectError, _));
+  response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
 }
 
 template <typename, typename> class TestNghttp2SessionFactory;
