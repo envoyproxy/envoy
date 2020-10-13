@@ -30,7 +30,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   std::vector<std::vector<uint8_t>> localities = subset_selector.constructSubsets(
       {setup_priority_level.num_hosts_locality_one(), setup_priority_level.num_hosts_locality_two(),
        setup_priority_level.num_hosts_locality_three()},
-      num_hosts_in_priority_level);
+      std::min(num_hosts_in_priority_level, max_num_hosts_in_priority_level));
 
   // Construct three vectors of hosts each representing a locality level, construct
   // hosts_per_locality from these three vectors
@@ -188,7 +188,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
       }
     }
   }
-  // This overrides what is currently present in the host set, thus not having to expliclity call
+  // This overrides what is currently present in the host set, thus not having to explicitly call
   // vector.clear()
   host_set.healthy_hosts_per_locality_ = makeHostsPerLocality(
       {healthy_hosts_locality_one, healthy_hosts_locality_two, healthy_hosts_locality_three});
