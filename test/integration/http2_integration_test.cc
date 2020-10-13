@@ -2301,6 +2301,62 @@ typed_config:
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
 }
 
+// Verify that the server can detect flooding by the RST_STREAM on when upstream disconnects
+// before sending response headers.
+TEST_P(Http2FloodMitigationTest, RstStreamOnUpstreamRemoteCloseBeforeResponseHeaders) {
+  // pre-fill 3 away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 3);
+
+  // Start second request.
+  auto request2 =
+      Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(1), "host", "/test/long/url");
+  sendFrame(request2);
+
+  // Wait for it to be proxied
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_total", 2);
+
+  // Disconnect upstream connection. Since there no response headers were sent yet the router
+  // filter will send 503 with body and then RST_STREAM. With these 3 frames the downstream outbound
+  // frame queue should overflow.
+  ASSERT_TRUE(static_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->closeConnection(0));
+
+  // Wait for connection to be flooded with outbound RST_STREAM frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  ASSERT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// Verify that the server can detect flooding by the RST_STREAM on stream idle timeout
+// after sending response headers.
+TEST_P(Http2FloodMitigationTest, RstStreamOnStreamIdleTimeoutAfterResponseHeaders) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* stream_idle_timeout = hcm.mutable_stream_idle_timeout();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        stream_idle_timeout->set_seconds(seconds.count());
+      });
+  // pre-fill 2 away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 2);
+
+  // Start second request, which should result in response headers to be sent but the stream kept
+  // open.
+  auto request2 = Http2Frame::makeRequest(
+      Http2Frame::makeClientStreamId(1), "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", "0"), Http2Frame::Header("no_end_stream", "0")});
+  sendFrame(request2);
+
+  // Wait for stream idle timeout to send RST_STREAM. With the response headers frame from the
+  // second response the downstream outbound frame queue should overflow.
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+}
+
 // Verify detection of overflowing outbound frame queue with the PING frames sent by the keep alive
 // timer. The test verifies protocol constraint violation handling in the
 // Http2::ConnectionImpl::sendKeepalive() method.
