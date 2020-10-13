@@ -52,6 +52,10 @@ bool BufferedIoSocketHandleImpl::isOpen() const { return !closed_; }
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
                                                           Buffer::RawSlice* slices,
                                                           uint64_t num_slice) {
+  if (!isOpen()) {
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+  }
   if (owned_buffer_.length() == 0) {
     if (read_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
@@ -79,6 +83,10 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffer,
                                                          uint64_t max_length) {
+  if (!isOpen()) {
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+  }
   if (owned_buffer_.length() == 0) {
     if (read_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
@@ -96,39 +104,48 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                            uint64_t num_slice) {
+  if (!isOpen()) {
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+  }
   if (!writable_peer_) {
-    return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
+    return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL});
   }
   if (writable_peer_->isWriteEndSet() || !writable_peer_->isWritable()) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
   }
   // Write along with iteration. Buffer guarantee the fragment is always append-able.
-  uint64_t num_bytes_to_write = 0;
+  uint64_t total_bytes_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
       writable_peer_->getWriteBuffer()->add(slices[i].mem_, slices[i].len_);
-      num_bytes_to_write += slices[i].len_;
+      total_bytes_to_write += slices[i].len_;
     }
   }
   writable_peer_->maybeSetNewData();
   ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), num_bytes_to_write);
-  return {num_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  return {total_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buffer) {
+  if (!isOpen()) {
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+  }
   if (!writable_peer_) {
-    return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
   if (writable_peer_->isWriteEndSet() || !writable_peer_->isWritable()) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
   }
-  uint64_t num_bytes_to_write = buffer.length();
+  uint64_t total_bytes_to_write = buffer.length();
   writable_peer_->getWriteBuffer()->move(buffer);
   writable_peer_->maybeSetNewData();
-  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), num_bytes_to_write);
-  return {num_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), total_bytes_to_write);
+  return {total_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
@@ -148,21 +165,25 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::recvmmsg(RawSliceArrays&, ui
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
+  if (!isOpen()) {
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+  }
   // No data and the writer closed.
   if (owned_buffer_.length() == 0) {
     if (read_end_stream_) {
-      return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
+      return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
       return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                  IoSocketError::deleteIoError)};
     }
   } else {
-    auto min_len = std::min(owned_buffer_.length(), length);
-    owned_buffer_.copyOut(0, min_len, buffer);
+    auto max_bytes_to_read = std::min(owned_buffer_.length(), length);
+    owned_buffer_.copyOut(0, max_bytes_to_read, buffer);
     if (!(flags & MSG_PEEK)) {
-      owned_buffer_.drain(min_len);
+      owned_buffer_.drain(max_bytes_to_read);
     }
-    return {min_len, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+    return {max_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
   }
 }
 

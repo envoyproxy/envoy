@@ -38,9 +38,9 @@ public:
     }
   }
   void expectAgain() {
-    auto res = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
-    EXPECT_FALSE(res.ok());
-    EXPECT_EQ(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+    auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   }
   NiceMock<Event::MockDispatcher> dispatcher_{};
 
@@ -52,27 +52,54 @@ public:
   absl::FixedArray<char> buf_;
 };
 
+TEST_F(BufferedIoSocketHandleTest, TestErrorOnClosedIoHandle) {
+  io_handle_->close();
+  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+
+  Buffer::OwnedImpl buf("0123456789");
+
+  result = io_handle_->read(buf, 10);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+
+  Buffer::RawSlice slice;
+  buf.reserve(1024, &slice, 1);
+  result = io_handle_->readv(1024, &slice, 1);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+
+  result = io_handle_->write(buf);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+
+  result = io_handle_->writev(&slice, 1);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+}
+
 // Test recv side effects.
 TEST_F(BufferedIoSocketHandleTest, TestBasicRecv) {
-  auto res = io_handle_->recv(buf_.data(), buf_.size(), 0);
+  auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
   // EAGAIN.
-  EXPECT_FALSE(res.ok());
-  EXPECT_EQ(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   io_handle_->setWriteEnd();
-  res = io_handle_->recv(buf_.data(), buf_.size(), 0);
-  EXPECT_FALSE(res.ok());
-  EXPECT_NE(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+  result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+  EXPECT_TRUE(result.ok());
 }
 
 // Test recv side effects.
 TEST_F(BufferedIoSocketHandleTest, TestReadEmpty) {
   Buffer::OwnedImpl buf;
-  auto res = io_handle_->read(buf, 10);
-  EXPECT_FALSE(res.ok());
-  EXPECT_EQ(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+  auto result = io_handle_->read(buf, 10);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   io_handle_->setWriteEnd();
-  res = io_handle_->read(buf, 10);
-  EXPECT_TRUE(res.ok());
+  result = io_handle_->read(buf, 10);
+  EXPECT_TRUE(result.ok());
 }
 
 // Test recv side effects.
@@ -80,36 +107,35 @@ TEST_F(BufferedIoSocketHandleTest, TestReadContent) {
   Buffer::OwnedImpl buf;
   auto& internal_buffer = io_handle_->getBufferForTest();
   internal_buffer.add("abcdefg");
-  auto res = io_handle_->read(buf, 3);
-  EXPECT_TRUE(res.ok());
-  EXPECT_EQ(3, res.rc_);
+  auto result = io_handle_->read(buf, 3);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(3, result.rc_);
   ASSERT_EQ(3, buf.length());
   ASSERT_EQ(4, internal_buffer.length());
-  res = io_handle_->read(buf, 10);
-  EXPECT_TRUE(res.ok());
-  EXPECT_EQ(4, res.rc_);
+  result = io_handle_->read(buf, 10);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(4, result.rc_);
   ASSERT_EQ(7, buf.length());
   ASSERT_EQ(0, internal_buffer.length());
 }
 
 // Test recv side effects.
 TEST_F(BufferedIoSocketHandleTest, TestBasicPeek) {
-  auto res = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
+  auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
   // EAGAIN.
-  EXPECT_FALSE(res.ok());
-  EXPECT_EQ(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   io_handle_->setWriteEnd();
-  res = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
-  EXPECT_FALSE(res.ok());
-  EXPECT_NE(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
+  result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
+  EXPECT_TRUE(result.ok());
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestRecvDrain) {
   auto& internal_buffer = io_handle_->getBufferForTest();
   internal_buffer.add("abcd");
-  auto res = io_handle_->recv(buf_.data(), buf_.size(), 0);
-  EXPECT_TRUE(res.ok());
-  EXPECT_EQ(4, res.rc_);
+  auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(4, result.rc_);
   EXPECT_EQ(absl::string_view(buf_.data(), 4), "abcd");
   EXPECT_EQ(0, internal_buffer.length());
   expectAgain();
@@ -138,9 +164,9 @@ TEST_F(BufferedIoSocketHandleTest, FlowControl) {
     } else {
       ASSERT_FALSE(writable_flipped);
     }
-    auto res = io_handle_->recv(buf_.data(), 32, 0);
-    EXPECT_TRUE(res.ok());
-    EXPECT_EQ(32, res.rc_);
+    auto result = io_handle_->recv(buf_.data(), 32, 0);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(32, result.rc_);
   }
   ASSERT_EQ(0, internal_buffer.length());
   ASSERT_TRUE(writable_flipped);
@@ -213,9 +239,9 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAndWriteAreEdgeTriggered) {
   // Drain 1 bytes.
   auto& internal_buffer = io_handle_->getBufferForTest();
   internal_buffer.add("abcd");
-  auto res = io_handle_->recv(buf_.data(), 1, 0);
-  EXPECT_TRUE(res.ok());
-  EXPECT_EQ(1, res.rc_);
+  auto result = io_handle_->recv(buf_.data(), 1, 0);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(1, result.rc_);
 
   ASSERT_FALSE(scheduable_cb_->enabled());
   ev.reset();
@@ -273,12 +299,12 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
   ASSERT_FALSE(scheduable_cb_->enabled());
 
   {
-    auto res = io_handle_->recv(buf_.data(), 1, 0);
+    auto result = io_handle_->recv(buf_.data(), 1, 0);
     EXPECT_FALSE(handle_as_peer->isWritable());
   }
   {
     EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(1);
-    auto res = io_handle_->recv(buf_.data(), 232, 0);
+    auto result = io_handle_->recv(buf_.data(), 232, 0);
     EXPECT_TRUE(handle_as_peer->isWritable());
   }
 
@@ -297,18 +323,25 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
       dispatcher_,
       [this, &should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
-          auto res = io_handle_->recv(buf_.data(), buf_.size(), 0);
-          if (res.ok()) {
-            accumulator += absl::string_view(buf_.data(), res.rc_);
-          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+          auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+          if (result.ok()) {
+            accumulator += absl::string_view(buf_.data(), result.rc_);
+          } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
             ENVOY_LOG_MISC(debug, "will close");
             should_close = true;
           }
         }
+        if (events & Event::FileReadyType::Write) {
+          Buffer::OwnedImpl buf("");
+          auto result = io_handle_->write(buf);
+          if (!result.ok() && result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+            should_close = true;
+          }
+        }
       },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
   scheduable_cb_->invokeCallback();
 
   // Not closed yet.
@@ -327,7 +360,9 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
   ev.reset();
 }
 
-TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
+// Test that a readable event is raised when peer shutdown write. Also confirm read will return
+// EAGAIN.
+TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
   auto& internal_buffer = io_handle_->getBufferForTest();
   internal_buffer.add("abcd");
 
@@ -339,10 +374,10 @@ TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
       dispatcher_,
       [this, &should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
-          auto res = io_handle_->recv(buf_.data(), buf_.size(), 0);
-          if (res.ok()) {
-            accumulator += absl::string_view(buf_.data(), res.rc_);
-          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+          auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+          if (result.ok()) {
+            accumulator += absl::string_view(buf_.data(), result.rc_);
+          } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
             ENVOY_LOG_MISC(debug, "will close");
@@ -361,7 +396,7 @@ TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
 
   ASSERT_TRUE(scheduable_cb_->enabled());
   scheduable_cb_->invokeCallback();
-  ASSERT_TRUE(should_close);
+  ASSERT_FALSE(should_close);
   EXPECT_EQ(4, accumulator.size());
   io_handle_->close();
   ev.reset();
@@ -405,10 +440,10 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
           Buffer::OwnedImpl buf;
           Buffer::RawSlice slice;
           buf.reserve(1024, &slice, 1);
-          auto res = handle->readv(1024, &slice, 1);
-          if (res.ok()) {
-            accumulator += absl::string_view(static_cast<char*>(slice.mem_), res.rc_);
-          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+          auto result = handle->readv(1024, &slice, 1);
+          if (result.ok()) {
+            accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
+          } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
             ENVOY_LOG_MISC(debug, "will close");
@@ -445,10 +480,10 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevScheduleWritableEvent) {
           Buffer::OwnedImpl buf;
           Buffer::RawSlice slice;
           buf.reserve(1024, &slice, 1);
-          auto res = handle->readv(1024, &slice, 1);
-          if (res.ok()) {
-            accumulator += absl::string_view(static_cast<char*>(slice.mem_), res.rc_);
-          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+          auto result = handle->readv(1024, &slice, 1);
+          if (result.ok()) {
+            accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
+          } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
             ENVOY_LOG_MISC(debug, "will close");
@@ -487,10 +522,10 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
           Buffer::OwnedImpl buf;
           Buffer::RawSlice slice;
           buf.reserve(1024, &slice, 1);
-          auto res = handle->readv(1024, &slice, 1);
-          if (res.ok()) {
-            accumulator += absl::string_view(static_cast<char*>(slice.mem_), res.rc_);
-          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+          auto result = handle->readv(1024, &slice, 1);
+          if (result.ok()) {
+            accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
+          } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
             ENVOY_LOG_MISC(debug, "will close");
