@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryRequest";
 
@@ -46,6 +46,9 @@ message DiscoveryRequest {
   // will then imply a number of resources that need to be fetched via EDS/RDS,
   // which will be explicitly enumerated in resource_names.
   repeated string resource_names = 3;
+
+  // [#not-implemented-hide:]
+  repeated udpa.core.v1.ResourceLocator udpa_resource_names = 7;
 
   // Type of the resource that is being requested, e.g.
   // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit

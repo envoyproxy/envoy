@@ -17,6 +17,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
@@ -549,7 +551,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -799,6 +801,9 @@ message RouteAction {
     // Indicates the upstream cluster to which the request should be routed
     // to.
     string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator cluster_resource_locator = 37;
 
     // Envoy will determine the cluster to route to by reading the value of the
     // HTTP header named by cluster_header from the request headers. If the

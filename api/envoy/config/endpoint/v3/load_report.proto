@@ -8,6 +8,9 @@ import "envoy/config/core/v3/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "udpa/core/v1/resource_name.proto";
+
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -119,8 +122,7 @@ message EndpointLoadMetricStats {
 
 // Per cluster load stats. Envoy reports these stats a management server in a
 // :ref:`LoadStatsRequest<envoy_api_msg_service.load_stats.v3.LoadStatsRequest>`
-// Next ID: 7
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message ClusterStats {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.ClusterStats";
 
@@ -136,12 +138,24 @@ message ClusterStats {
   }
 
   // The name of the cluster.
-  string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
+  string cluster_name = 1 [
+    (validate.rules).string = {min_len: 1},
+    (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+  ];
+
+  // [#not-implemented-hide:]
+  udpa.core.v1.ResourceName cluster_resource_name = 7
+      [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
   // The eds_cluster_config service_name of the cluster.
   // It's possible that two clusters send the same service_name to EDS,
   // in that case, the management server is supposed to do aggregation on the load reports.
-  string cluster_service_name = 6;
+  string cluster_service_name = 6
+      [(udpa.annotations.field_migrate).oneof_promotion = "eds_specifier"];
+
+  // [#not-implemented-hide:]
+  udpa.core.v1.ResourceName eds_resource_name = 8
+      [(udpa.annotations.field_migrate).oneof_promotion = "eds_specifier"];
 
   // Need at least one.
   repeated UpstreamLocalityStats upstream_locality_stats = 2
