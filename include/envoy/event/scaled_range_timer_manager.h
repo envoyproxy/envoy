@@ -4,26 +4,46 @@
 #include "envoy/event/range_timer.h"
 #include "envoy/event/timer.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Event {
 
 /**
  * Describes a minimum timer value that is equal to a scale factor applied to the maximum.
  */
-struct ScaleFactor {
-  explicit ScaleFactor(double scale_factor) : scale_factor_(scale_factor) {}
+struct ScaledMinimum {
+  explicit ScaledMinimum(double scale_factor) : scale_factor_(scale_factor) {}
   const double scale_factor_;
 };
 
 /**
  * Describes a minimum timer value that is an absolute duration.
  */
-struct AbsoluteValue {
-  explicit AbsoluteValue(std::chrono::milliseconds value) : value_(value) {}
+struct AbsoluteMinimum {
+  explicit AbsoluteMinimum(std::chrono::milliseconds value) : value_(value) {}
   const std::chrono::milliseconds value_;
 };
 
-using ScaledTimerMinimum = absl::variant<ScaleFactor, AbsoluteValue>;
+class ScaledTimerMinimum : public absl::variant<ScaledMinimum, AbsoluteMinimum> {
+public:
+  using absl::variant<ScaledMinimum, AbsoluteMinimum>::variant;
+
+  std::chrono::milliseconds computeMinimum(std::chrono::milliseconds maximum) const {
+    struct Visitor {
+      explicit Visitor(std::chrono::milliseconds value) : value_(value) {}
+      std::chrono::milliseconds operator()(ScaledMinimum scale_factor) {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(scale_factor.scale_factor_ *
+                                                                     value_);
+      }
+      std::chrono::milliseconds operator()(AbsoluteMinimum absolute_value) {
+        return absolute_value.value_;
+      }
+      const std::chrono::milliseconds value_;
+    };
+    return absl::visit(Visitor(maximum), *this);
+  }
+};
 
 /**
  * Class for creating RangeTimer objects that can be adjusted towards either the minimum or maximum
@@ -41,10 +61,10 @@ public:
    * current and future scale factor values set on the manager. All returned timers must be deleted
    * before the manager.
    */
-  virtual RangeTimerPtr createTimer(TimerCb callback) PURE;
+  virtual RangeTimerPtr createRangeTimer(TimerCb callback) PURE;
 
   /**
-   * Creates a new range timer backed by the manager that mimicks the Timer interface. Calling
+   * Creates a new range timer backed by the manager that mimics the Timer interface. Calling
    * enableTimer on the returned object sets the maximum duration, while the first argument here
    * controls the minimum. Passing a value of ScaleFactor(x) sets the min to (x * max) when the
    * timer is enabled, while AbsoluteValue(y) sets the min to the duration y.

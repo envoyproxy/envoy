@@ -139,7 +139,7 @@ public:
 
   void enableTimer(std::chrono::milliseconds ms,
                    const ScopeTrackedObject* object = nullptr) override {
-    range_timer_.enableTimer(computeMinimum(minimum_, ms), ms, object);
+    range_timer_.enableTimer(minimum_.computeMinimum(ms), ms, object);
   }
 
   void enableHRTimer(std::chrono::microseconds us,
@@ -152,21 +152,6 @@ public:
   bool enabled() override { return range_timer_.enabled(); }
 
 private:
-  static std::chrono::milliseconds computeMinimum(const ScaledTimerMinimum minimum,
-                                                  std::chrono::milliseconds maximum) {
-    struct Visitor {
-      explicit Visitor(std::chrono::milliseconds value) : value_(value) {}
-      std::chrono::milliseconds operator()(ScaleFactor scale_factor) {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(scale_factor.scale_factor_ *
-                                                                     value_);
-      }
-      std::chrono::milliseconds operator()(AbsoluteValue absolute_value) {
-        return absolute_value.value_;
-      }
-      const std::chrono::milliseconds value_;
-    };
-    return absl::visit(Visitor(maximum), minimum);
-  }
   const ScaledTimerMinimum minimum_;
   RangeTimerImpl range_timer_;
 };
@@ -180,7 +165,7 @@ ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   ASSERT(queues_.empty());
 }
 
-RangeTimerPtr ScaledRangeTimerManagerImpl::createTimer(TimerCb callback) {
+RangeTimerPtr ScaledRangeTimerManagerImpl::createRangeTimer(TimerCb callback) {
   return std::make_unique<RangeTimerImpl>(callback, *this);
 }
 

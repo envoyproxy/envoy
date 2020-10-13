@@ -26,7 +26,7 @@ public:
   ~ScaledRangeTimerManagerImpl() override;
 
   // ScaledRangeTimerManager impl
-  RangeTimerPtr createTimer(TimerCb callback) override;
+  RangeTimerPtr createRangeTimer(TimerCb callback) override;
 
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override;
 
