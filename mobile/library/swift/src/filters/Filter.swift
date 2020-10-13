@@ -105,5 +105,55 @@ extension EnvoyHTTPFilter {
         }
       }
     }
+
+    if let asyncRequestFilter = filter as? AsyncRequestFilter {
+      self.setRequestFilterCallbacks = { envoyCallbacks in
+        asyncRequestFilter.setRequestFilterCallbacks(
+          RequestFilterCallbacksImpl(callbacks: envoyCallbacks)
+        )
+      }
+
+      self.onResumeRequest = { envoyHeaders, data, envoyTrailers, endStream in
+        let result = asyncRequestFilter.onResumeRequest(
+          headers: envoyHeaders.map(RequestHeaders.init),
+          data: data,
+          trailers: envoyTrailers.map(RequestTrailers.init),
+          endStream: endStream)
+        switch result {
+        case .resumeIteration(let headers, let data, let trailers):
+          return [
+            kEnvoyFilterResumeStatusResumeIteration,
+            headers?.headers as Any,
+            data as Any,
+            trailers?.headers as Any,
+          ]
+        }
+      }
+    }
+
+    if let asyncResponseFilter = filter as? AsyncResponseFilter {
+      self.setResponseFilterCallbacks = { envoyCallbacks in
+        asyncResponseFilter.setResponseFilterCallbacks(
+          ResponseFilterCallbacksImpl(callbacks: envoyCallbacks)
+        )
+      }
+
+      self.onResumeResponse = { envoyHeaders, data, envoyTrailers, endStream in
+        let result = asyncResponseFilter.onResumeResponse(
+          headers: envoyHeaders.map(ResponseHeaders.init),
+          data: data,
+          trailers: envoyTrailers.map(ResponseTrailers.init),
+          endStream: endStream)
+        switch result {
+        case .resumeIteration(let headers, let data, let trailers):
+          return [
+            kEnvoyFilterResumeStatusResumeIteration,
+            headers?.headers as Any,
+            data as Any,
+            trailers?.headers as Any,
+          ]
+        }
+      }
+    }
   }
 }
