@@ -51,8 +51,9 @@ toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase speci
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-const std::string toString(const Envoy::Http::HeaderEntry* entry) {
-  return entry == nullptr ? "NULL" : std::string(entry->value().getStringView());
+const std::string toString(const Envoy::Http::HeaderMap::GetResult& entry) {
+  // TODO(mattklein123): Print multiple header values.
+  return entry.empty() ? "NULL" : std::string(entry[0]->value().getStringView());
 }
 
 } // namespace

@@ -613,6 +613,16 @@ WasmResult Context::getProperty(absl::string_view path, std::string* result) {
           return WasmResult::InternalFailure;
         }
       }
+    } else if (value.IsList()) {
+      auto& list = *value.ListOrDie();
+      int idx = 0;
+      if (!absl::SimpleAtoi(part, &idx)) {
+        return WasmResult::NotFound;
+      }
+      if (idx < 0 || idx >= list.size()) {
+        return WasmResult::NotFound;
+      }
+      value = list[idx];
     } else {
       return WasmResult::NotFound;
     }
@@ -696,8 +706,8 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, absl::string_view 
     return WasmResult::BadArgument;
   }
   const Http::LowerCaseString lower_key{std::string(key)};
-  auto entry = map->get(lower_key);
-  if (!entry) {
+  const auto entry = map->get(lower_key);
+  if (entry.empty()) {
     if (wasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
       *value = "";
       return WasmResult::Ok;
@@ -705,7 +715,9 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, absl::string_view 
       return WasmResult::NotFound;
     }
   }
-  *value = entry->value().getStringView();
+  // TODO(kyessenov, PiotrSikora): This needs to either return a concatenated list of values, or
+  // the ABI needs to be changed to return multiple values. This is a potential security issue.
+  *value = entry[0]->value().getStringView();
   return WasmResult::Ok;
 }
 
