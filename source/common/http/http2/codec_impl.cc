@@ -993,11 +993,12 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
         if (error_code == NGHTTP2_REFUSED_STREAM) {
           reason = StreamResetReason::RemoteRefusedStreamReset;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-        } else if (error_code == NGHTTP2_CONNECT_ERROR) {
-          reason = StreamResetReason::ConnectError;
-          stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
         } else {
-          reason = StreamResetReason::RemoteReset;
+          if (error_code == NGHTTP2_CONNECT_ERROR) {
+            reason = StreamResetReason::ConnectError;
+          } else {
+            reason = StreamResetReason::RemoteReset;
+          }
           stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
         }
       }
