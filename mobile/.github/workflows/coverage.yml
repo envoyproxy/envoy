@@ -21,12 +21,15 @@ jobs:
       - name: 'Install dependencies'
         run: ./ci/linux_ci_setup.sh
       - name: 'Run coverage'
+        continue-on-error: true
         run: |
           export PATH=/usr/lib/llvm-10/bin:$PATH
           export CC=clang
           export CXX=clang++
           export COVERAGE_THRESHOLD=95
           ./envoy/test/run_envoy_bazel_coverage.sh //test/...
+      - name: 'package coverage'
+        run: |
           tar -czvf coverage.tar.gz generated/coverage
       - uses: actions/upload-artifact@v1
         with:
