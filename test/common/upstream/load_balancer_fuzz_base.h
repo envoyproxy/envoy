@@ -56,10 +56,16 @@ public:
   uint16_t port_ = 80;
   uint8_t num_priority_levels_ = 0;
 
+  enum class Locality {
+    ONE,
+    TWO,
+    THREE,
+  };
+
   // This map used when updating health flags - making sure the health flags are updated hosts in
   // localities Key - index of host within full host list, value - locality level host at index is
   // in
-  absl::node_hash_map<uint8_t, uint8_t> locality_indexes_;
+  absl::node_hash_map<uint8_t, Locality> locality_indexes_;
 };
 
 } // namespace Upstream

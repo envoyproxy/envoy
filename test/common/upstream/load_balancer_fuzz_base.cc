@@ -2,15 +2,19 @@
 
 #include "test/common/upstream/utility.h"
 
-#define MAX_NUM_HOSTS_IN_PRIORITY_LEVEL 256
-
 namespace Envoy {
 namespace Upstream {
+
+namespace {
+
+constexpr uint32_t MAX_NUM_HOSTS_IN_PRIORITY_LEVEL = 256;
+
+} // namespace
 
 void LoadBalancerFuzzBase::initializeASingleHostSet(
     const test::common::upstream::SetupPriorityLevel& setup_priority_level,
     const uint8_t priority_level) {
-  uint32_t num_hosts_in_priority_level = setup_priority_level.num_hosts_in_priority_level();
+  const uint32_t num_hosts_in_priority_level = setup_priority_level.num_hosts_in_priority_level();
   ENVOY_LOG_MISC(trace, "Will attempt to initialize host set {} with {} hosts.", priority_level,
                  num_hosts_in_priority_level);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
@@ -27,7 +31,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
 
   Fuzz::ProperSubsetSelector subset_selector(setup_priority_level.random_bytestring());
 
-  std::vector<std::vector<uint8_t>> localities = subset_selector.constructSubsets(
+  const std::vector<std::vector<uint8_t>> localities = subset_selector.constructSubsets(
       {setup_priority_level.num_hosts_locality_one(), setup_priority_level.num_hosts_locality_two(),
        setup_priority_level.num_hosts_locality_three()},
       std::min(num_hosts_in_priority_level, max_num_hosts_in_priority_level));
@@ -38,21 +42,21 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   for (uint8_t index : localities[0]) {
     ENVOY_LOG_MISC(trace, "Added host at index {} to locality 1", index);
     locality_one.push_back(host_set.hosts_[index]);
-    locality_indexes_[index] = 1;
+    locality_indexes_[index] = LoadBalancerFuzzBase::Locality::ONE;
   }
 
   HostVector locality_two = {};
   for (uint8_t index : localities[1]) {
     ENVOY_LOG_MISC(trace, "Added host at index {} to locality 2", index);
     locality_two.push_back(host_set.hosts_[index]);
-    locality_indexes_[index] = 2;
+    locality_indexes_[index] = LoadBalancerFuzzBase::Locality::TWO;
   }
 
   HostVector locality_three = {};
   for (uint8_t index : localities[2]) {
     ENVOY_LOG_MISC(trace, "Added host at index {} to locality 3", index);
     locality_three.push_back(host_set.hosts_[index]);
-    locality_indexes_[index] = 3;
+    locality_indexes_[index] = LoadBalancerFuzzBase::Locality::THREE;
   }
 
   host_set.hosts_per_locality_ = makeHostsPerLocality({locality_one, locality_two, locality_three});
@@ -82,14 +86,14 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   ENVOY_LOG_MISC(trace, "Updating health flags for host set at priority: {}", priority_of_host_set);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
   // This downcast will not overflow because size is capped by port numbers
-  uint32_t host_set_size = host_set.hosts_.size();
+  const uint32_t host_set_size = host_set.hosts_.size();
   host_set.healthy_hosts_.clear();
   host_set.degraded_hosts_.clear();
   host_set.excluded_hosts_.clear();
 
   Fuzz::ProperSubsetSelector subset_selector(random_bytestring);
 
-  std::vector<std::vector<uint8_t>> subsets = subset_selector.constructSubsets(
+  const std::vector<std::vector<uint8_t>> subsets = subset_selector.constructSubsets(
       {num_healthy_hosts, num_degraded_hosts, num_excluded_hosts}, host_set_size);
 
   // Healthy hosts are first subset
@@ -132,13 +136,13 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
       ENVOY_LOG_MISC(trace, "Added healthy host at index {} in locality {}", index,
                      locality_indexes_[index]);
       switch (locality_indexes_[index]) {
-      case 1:
+      case LoadBalancerFuzzBase::Locality::ONE:
         healthy_hosts_locality_one.push_back(host_set.hosts_[index]);
         break;
-      case 2:
+      case LoadBalancerFuzzBase::Locality::TWO:
         healthy_hosts_locality_two.push_back(host_set.hosts_[index]);
         break;
-      case 3:
+      case LoadBalancerFuzzBase::Locality::THREE:
         healthy_hosts_locality_three.push_back(host_set.hosts_[index]);
         break;
       default: // shouldn't hit
@@ -153,13 +157,13 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
       ENVOY_LOG_MISC(trace, "Added degraded host at index {} in locality {}", index,
                      locality_indexes_[index]);
       switch (locality_indexes_[index]) {
-      case 1:
+      case LoadBalancerFuzzBase::Locality::ONE:
         degraded_hosts_locality_one.push_back(host_set.hosts_[index]);
         break;
-      case 2:
+      case LoadBalancerFuzzBase::Locality::TWO:
         degraded_hosts_locality_two.push_back(host_set.hosts_[index]);
         break;
-      case 3:
+      case LoadBalancerFuzzBase::Locality::THREE:
         degraded_hosts_locality_three.push_back(host_set.hosts_[index]);
         break;
       default: // shouldn't hit
@@ -174,13 +178,13 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
       ENVOY_LOG_MISC(trace, "Added excluded host at index {} in locality {}", index,
                      locality_indexes_[index]);
       switch (locality_indexes_[index]) {
-      case 1:
+      case LoadBalancerFuzzBase::Locality::ONE:
         excluded_hosts_locality_one.push_back(host_set.hosts_[index]);
         break;
-      case 2:
+      case LoadBalancerFuzzBase::Locality::TWO:
         excluded_hosts_locality_two.push_back(host_set.hosts_[index]);
         break;
-      case 3:
+      case LoadBalancerFuzzBase::Locality::THREE:
         excluded_hosts_locality_three.push_back(host_set.hosts_[index]);
         break;
       default: // shouldn't hit
