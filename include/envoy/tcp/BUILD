@@ -18,3 +18,11 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "upstream_interface",
+    hdrs = ["upstream.h"],
+    deps = [
+        "//include/envoy/upstream:upstream_interface",
+    ],
+)
