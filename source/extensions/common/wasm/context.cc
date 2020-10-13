@@ -531,7 +531,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::UPSTREAM_HOST_METADATA:
-    if (info && info->upstreamHost()) {
+    if (info && info->upstreamHost() && info->upstreamHost()->metadata()) {
       return CelValue::CreateMessage(info->upstreamHost()->metadata().get(), arena);
     }
     break;
