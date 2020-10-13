@@ -355,13 +355,17 @@ bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
+  bool should_run_callbacks = false;
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
     if (ssl_ctx_) {
-      for (const auto& cb : secrets_ready_callbacks_) {
-        cb();
-      }
+      should_run_callbacks = true;
+    }
+  }
+  if (should_run_callbacks) {
+    for (const auto& cb : secrets_ready_callbacks_) {
+      cb();
     }
   }
   stats_.ssl_context_update_by_sds_.inc();
@@ -412,13 +416,18 @@ bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
+  bool should_run_callbacks = false;
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+
     if (ssl_ctx_) {
-      for (const auto& cb : secrets_ready_callbacks_) {
-        cb();
-      }
+      should_run_callbacks = true;
+    }
+  }
+  if (should_run_callbacks) {
+    for (const auto& cb : secrets_ready_callbacks_) {
+      cb();
     }
   }
   stats_.ssl_context_update_by_sds_.inc();
