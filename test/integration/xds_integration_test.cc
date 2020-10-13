@@ -455,6 +455,11 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
   expectConnenctionServed();
 }
 
+// Verify default filter chain update is filter chain only update. The listener is not entirely drained.
+TEST_P(LdsInplaceUpdateHttpIntegrationTest, DefaultFilterChainUpdate) {
+ 
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
