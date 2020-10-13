@@ -26,9 +26,30 @@ The Docker image used will contain the latest version of Envoy
 and a basic Envoy configuration. This basic configuration tells
 Envoy to route incoming requests to \*.google.com.
 
-Override the default configuration
-----------------------------------
 
+Override the default configuration by merging a config file
+-----------------------------------------------------------
+
+.. code-block:: yaml
+
+   listeners:
+     - name: listener_0
+       address:
+         socket_address:
+	   port_value: 20000
+
+.. code-block:: console
+
+  $ docker run --rm -d -v envoy-override.yaml:/envoy-override.yaml -p 20000:20000 envoyproxy/|envoy_docker_image| --config-yaml /envoy-override.yaml
+  $ curl -v localhost:20000
+
+
+Specify a custom configuration file
+-----------------------------------
+
+.. code-block:: console
+
+  $ docker run --rm -d -v envoy-custom.yaml:/envoy-custom.yaml -p 10000:10000 envoyproxy/|envoy_docker_image| -c /envoy-custom.yaml
 
 
 Configuration: static_resources
