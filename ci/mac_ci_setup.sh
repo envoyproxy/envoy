@@ -65,4 +65,4 @@ fi
 
 bazel version
 
-pip3 install slackclient
+pip3 install virtualenv

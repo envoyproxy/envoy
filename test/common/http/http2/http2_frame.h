@@ -138,6 +138,12 @@ public:
                                 absl::string_view path, const std::vector<Header> extra_headers);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
                                     absl::string_view path);
+  static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
+                                    absl::string_view path,
+                                    const std::vector<Header> extra_headers);
+  static Http2Frame makeDataFrame(uint32_t stream_index, absl::string_view data,
+                                  DataFlags flags = DataFlags::None);
+
   /**
    * Creates a frame with the given contents. This frame can be
    * malformed/invalid depending on the given contents.
