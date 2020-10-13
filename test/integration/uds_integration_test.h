@@ -54,12 +54,12 @@ protected:
 };
 
 class UdsListenerIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, mode_t>>,
       public HttpIntegrationTest {
 public:
   UdsListenerIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
-        abstract_namespace_(std::get<1>(GetParam())) {}
+        abstract_namespace_(std::get<1>(GetParam())), mode_(std::get<2>(GetParam())) {}
 
   void initialize() override;
 
@@ -71,10 +71,13 @@ public:
     return TestEnvironment::unixDomainSocketPath("listener_0.sock", abstract_namespace_);
   }
 
+  mode_t getMode() { return mode_; }
+
 protected:
   HttpIntegrationTest::ConnectionCreationFunction createConnectionFn();
 
   const bool abstract_namespace_;
+  const mode_t mode_;
 };
 
 } // namespace Envoy
