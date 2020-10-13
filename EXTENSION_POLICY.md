@@ -59,6 +59,19 @@ In the event that the Extension PR author is a sponsoring maintainer and no othe
 is available, another maintainer may be enlisted to perform a minimal review for style and common C++
 anti-patterns. The Extension PR must still be approved by a non-maintainer reviewer.
 
+## Wasm extensions
+
+Wasm extensions are not allowed in the main envoyproxy/envoy repository unless
+part of the Wasm implementation validation. The rationale for this policy:
+* Wasm extensions should not depend upon Envoy implementation specifics as
+  they exist behind a version independent ABI. Hence, there is little value in
+  qualifying Wasm extensions in the main repository.
+* Wasm extensions introduce extensive dependencies via crates, etc. We would
+  prefer to keep the envoyproxy/envoy repository dependencies minimal, easy
+  to reason about and maintain.
+* We do not implement any core extensions in Wasm and do not plan to in the
+  medium term.
+
 ## Extension stability and security posture
 
 Every extension is expected to be tagged with a `status` and `security_posture` in its
