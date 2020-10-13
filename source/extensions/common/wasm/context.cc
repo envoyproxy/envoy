@@ -534,6 +534,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     if (info && info->upstreamHost()) {
       return CelValue::CreateMessage(info->upstreamHost()->metadata().get(), arena);
     }
+    break;
   case PropertyToken::ROUTE_NAME:
     if (info) {
       return CelValue::CreateString(&info->getRouteName());
