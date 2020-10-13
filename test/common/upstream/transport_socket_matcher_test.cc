@@ -49,7 +49,7 @@ public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsSharedPtr), (const));
-  MOCK_METHOD(void, addSecretsReadyCb, (std::function<void()>), (const));
+  MOCK_METHOD(void, addSecretsReadyCb, (std::function<void()>));
 
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,
