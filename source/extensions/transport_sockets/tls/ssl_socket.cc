@@ -372,13 +372,18 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
 }
 
 void ClientSslSocketFactory::addSecretsReadyCb(std::function<void()> callback) {
+  bool immediately_run_callback = false;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     if (ssl_ctx_) {
-      callback();
-    } else {
-      secrets_ready_callbacks_.push_back(callback);
+      immediately_run_callback = true;
     }
+  }
+
+  if (immediately_run_callback) {
+    callback();
+  } else {
+    secrets_ready_callbacks_.push_back(callback);
   }
 }
 
@@ -434,13 +439,17 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
 }
 
 void ServerSslSocketFactory::addSecretsReadyCb(std::function<void()> callback) {
+  bool immediately_run_callback = false;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     if (ssl_ctx_) {
-      callback();
-    } else {
-      secrets_ready_callbacks_.push_back(callback);
+      immediately_run_callback = true;
     }
+  }
+  if (immediately_run_callback) {
+    callback();
+  } else {
+    secrets_ready_callbacks_.push_back(callback);
   }
 }
 
