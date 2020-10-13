@@ -14,7 +14,7 @@ static_resources:
             provider:
               name: envoy.tracers.dynamic_ot
               typed_config:
-                "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
+                "@type": type.googleapis.com/envoy.config.trace.v3.DynamicOtConfig
                 library: /usr/local/lib/libjaegertracing_plugin.so
                 config:
                   service_name: service2

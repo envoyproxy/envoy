@@ -9,11 +9,11 @@ static_resources:
     - filters:
       - name: envoy.filters.network.mysql_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy
           stat_prefix: egress_mysql
       - name: envoy.filters.network.tcp_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: mysql_tcp
           cluster: mysql_cluster
 
