@@ -26,7 +26,7 @@ public:
   bool implementsSecureTransport() const override { return true; }
 
   // TODO(mpuncel) only invoke callback() once secrets are ready.
-  void addSecretsReadyCb(std::function<void()> callback) override{callback()};
+  void addSecretsReadyCb(std::function<void()> callback) override { callback(); };
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
