@@ -242,9 +242,8 @@ private:
  */
 class Filter : public Network::ReadFilter,
                public Upstream::LoadBalancerContextBase,
-               Tcp::ConnectionPool::Callbacks,
-               public Http::ConnectionPool::Callbacks,
-               protected Logger::Loggable<Logger::Id::filter> {
+               protected Logger::Loggable<Logger::Id::filter>,
+               public GenericConnectionPoolCallbacks {
 public:
   Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~Filter() override;
@@ -254,23 +253,13 @@ public:
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
-  // Tcp::ConnectionPool::Callbacks
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                     Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                   Upstream::HostDescriptionConstSharedPtr host) override;
-
-  // Http::ConnectionPool::Callbacks,
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                     absl::string_view transport_failure_reason,
-                     Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Http::RequestEncoder& request_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo& info) override;
-
-  void onPoolReadyBase(Upstream::HostDescriptionConstSharedPtr& host,
-                       const Network::Address::InstanceConstSharedPtr& local_address,
-                       Ssl::ConnectionInfoConstSharedPtr ssl_info);
+  // GenericConnectionPoolCallbacks
+  void onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<GenericUpstream>&& upstream,
+                          Upstream::HostDescriptionConstSharedPtr& host,
+                          const Network::Address::InstanceConstSharedPtr& local_address,
+                          Ssl::ConnectionInfoConstSharedPtr ssl_info) override;
+  void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                            Upstream::HostDescriptionConstSharedPtr host) override;
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override;
@@ -375,10 +364,15 @@ protected:
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
 
-  std::shared_ptr<ConnectionHandle> upstream_handle_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
+  // The upstream handle (either TCP or HTTP). This is set in onGenericPoolReady and should persist
+  // until either the upstream or downstream connection is terminated.
   std::unique_ptr<GenericUpstream> upstream_;
+  // The connection pool used to set up |upstream_|.
+  // This will be non-null from when an upstream connection is attempted until
+  // it either succeeds or fails.
+  std::unique_ptr<GenericConnPool> generic_conn_pool_;
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
