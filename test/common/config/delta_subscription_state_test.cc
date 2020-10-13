@@ -9,9 +9,11 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <chrono>
 
 using testing::NiceMock;
 using testing::Throw;
@@ -401,6 +403,9 @@ TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
 }
 
 TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+
   auto create_resource_with_ttl = [](absl::optional<std::chrono::seconds> ttl_s) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
     auto* resource = added_resources.Add();
@@ -443,7 +448,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
 
   EXPECT_CALL(callbacks_, onConfigExpired(_)).Times(1);
   EXPECT_CALL(*timer_, disableTimer());
-  dispatcher_.time_system_.timeSystem().advanceTimeAsyncImpl(std::chrono::seconds(2));
+  time_system.setSystemTime(std::chrono::seconds(2));
 
   // Invoke the TTL.
   timer_->invokeCallback();

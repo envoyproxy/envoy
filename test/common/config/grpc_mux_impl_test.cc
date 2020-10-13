@@ -300,6 +300,8 @@ resourceWithTtl(std::chrono::milliseconds ttl,
 TEST_F(GrpcMuxImplTest, ResourceTTL) {
   setup();
 
+  time_system_.setSystemTime(std::chrono::seconds(0));
+
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
@@ -392,7 +394,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
 
-  dispatcher_.time_system_.advanceTimeAsyncImpl(std::chrono::seconds(11));
+  time_system_.setSystemTime(std::chrono::seconds(11));
   EXPECT_CALL(callbacks_, onConfigExpired(std::vector<std::string>({"x"})));
   // Fire the TTL timer.
   EXPECT_CALL(*ttl_timer, disableTimer());
