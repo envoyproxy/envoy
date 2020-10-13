@@ -4,6 +4,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("@envoy_build_config//:extensions_build_config.bzl", "EXTENSIONS")
 
 licenses(["notice"])  # Apache 2
@@ -58,7 +59,11 @@ envoy_cc_test(
         "//source/common/filesystem:filesystem_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-    ] + [v for k, v in EXTENSIONS.items() if k in example_configs_extensions],
+    ] + select({
+        "//bazel:windows_x86_64": [v for k, v in EXTENSIONS.items() if k in example_configs_extensions and k not in WINDOWS_SKIP_TARGETS],
+        "//bazel:linux_ppc": [v for k, v in EXTENSIONS.items() if k in example_configs_extensions and k not in PPC_SKIP_TARGETS],
+        "//conditions:default": [v for k, v in EXTENSIONS.items() if k in example_configs_extensions],
+    }),
 )
 
 envoy_cc_test_library(
