@@ -214,15 +214,13 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
 
   // Multiple instances of range headers are invalid.
   // https://tools.ietf.org/html/rfc7230#section-3.2.2
-  std::vector<absl::string_view> range_headers;
-  Http::HeaderUtility::getAllOfHeader(request_headers, Http::Headers::get().Range.get(),
-                                      range_headers);
+  const auto range_header = request_headers.get(Http::Headers::get().Range);
 
   absl::string_view header_value;
-  if (range_headers.size() == 1) {
-    header_value = range_headers.front();
+  if (range_header.size() == 1) {
+    header_value = range_header[0]->value().getStringView();
   } else {
-    if (range_headers.size() > 1) {
+    if (range_header.size() > 1) {
       ENVOY_LOG(debug, "Multiple range headers provided in request. Ignoring all range headers.");
     }
     return {};

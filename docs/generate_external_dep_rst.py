@@ -10,13 +10,22 @@ import urllib.parse
 from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
 
-# bazel/repository_locations.bzl must have a .bzl suffix for Starlark import, so
+
+# Shared Starlark/Python files must have a .bzl suffix for Starlark import, so
 # we are forced to do this workaround.
-_repository_locations_spec = spec_from_loader(
-    'repository_locations',
-    SourceFileLoader('repository_locations', 'bazel/repository_locations.bzl'))
-repository_locations = module_from_spec(_repository_locations_spec)
-_repository_locations_spec.loader.exec_module(repository_locations)
+def LoadModule(name, path):
+  spec = spec_from_loader(name, SourceFileLoader(name, path))
+  module = module_from_spec(spec)
+  spec.loader.exec_module(module)
+  return module
+
+
+envoy_repository_locations = LoadModule('envoy_repository_locations',
+                                        'bazel/repository_locations.bzl')
+api_repository_locations = LoadModule('api_repository_locations',
+                                      'api/bazel/repository_locations.bzl')
+repository_locations_utils = LoadModule('repository_locations_utils',
+                                        'api/bazel/repository_locations_utils.bzl')
 
 
 # Render a CSV table given a list of table headers, widths and list of rows
@@ -101,7 +110,10 @@ if __name__ == '__main__':
   Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'last_updated'])
   use_categories = defaultdict(lambda: defaultdict(list))
   # Bin rendered dependencies into per-use category lists.
-  for k, v in repository_locations.DEPENDENCY_REPOSITORIES.items():
+  spec_loader = repository_locations_utils.load_repository_locations_spec
+  spec = spec_loader(envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
+  spec.update(spec_loader(api_repository_locations.REPOSITORY_LOCATIONS_SPEC))
+  for k, v in spec.items():
     cpe = v.get('cpe', '')
     if cpe == 'N/A':
       cpe = ''

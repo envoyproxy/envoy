@@ -51,6 +51,10 @@ message PerRouteConfig {
     // :ref:`HCM host rewrite header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>`
     // given that the value set here would be used for DNS lookups whereas the value set in the HCM
     // would be used for host header forwarding which is not the desired outcome.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     string auto_host_rewrite_header = 2
         [(udpa.annotations.field_migrate).rename = "host_rewrite_header"];
   }
