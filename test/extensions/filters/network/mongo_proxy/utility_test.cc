@@ -189,13 +189,18 @@ TEST(QueryMessageInfoTest, Command) {
     EXPECT_THROW((QueryMessageInfo(q)), EnvoyException);
   }
 
-  {
+  std::vector<std::pair<std::string, std::string>> test_cases = {
+      {"collstats", "collStats"},         {"dbstats", "dbStats"},
+      {"findandmodify", "findAndModify"}, {"getlasterror", "getLastError"},
+      {"ismaster", "isMaster"},
+  };
+  for (const auto& test : test_cases) {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.$cmd");
     q.query(Bson::DocumentImpl::create()->addDocument(
-        "$query", Bson::DocumentImpl::create()->addInt32("ismaster", 1)));
+        "$query", Bson::DocumentImpl::create()->addInt32(test.first, 1)));
     QueryMessageInfo info(q);
-    EXPECT_EQ("ismaster", info.command());
+    EXPECT_EQ(test.second, info.command());
   }
 }
 

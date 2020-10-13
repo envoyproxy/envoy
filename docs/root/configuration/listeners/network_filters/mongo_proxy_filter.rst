@@ -95,6 +95,10 @@ namespace.
   reply_size, Histogram, Size of the reply in bytes
   reply_time_ms, Histogram, Command time in milliseconds
 
+The list of commands that these metrics are emitted for can be configured via the
+:ref:`configuration <envoy_v3_api_field_extensions.filters.network.mongo_proxy.v3.MongoProxy.commands>`;
+by default, metrics are emitted for *delete*, *insert*, and *update*.
+
 .. _config_network_filters_mongo_proxy_collection_stats:
 
 Per collection query statistics
