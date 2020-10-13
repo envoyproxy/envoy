@@ -9,6 +9,7 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
+#include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
@@ -1027,6 +1028,29 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(HalfCloseProxy)) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test with an explicitly configured upstream.
+TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ExplicitFactory)) {
+  // Explicitly configure an HTTP upstream, to test factory creation.
+  auto& info = factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
+  info->upstream_config_ = absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
+  info->upstream_config_.value().mutable_typed_config()->PackFrom(generic_config);
+  setup(1);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
 }
 
 // Test that downstream is closed after an upstream LocalClose.

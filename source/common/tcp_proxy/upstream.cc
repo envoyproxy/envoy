@@ -168,8 +168,6 @@ TcpConnPool::~TcpConnPool() {
   }
 }
 
-bool TcpConnPool::valid() const { return conn_pool_ != nullptr; }
-
 void TcpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   callbacks_ = callbacks;
   // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
@@ -217,8 +215,6 @@ HttpConnPool::~HttpConnPool() {
     upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
   }
 }
-
-bool HttpConnPool::valid() const { return conn_pool_ != nullptr; }
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   callbacks_ = callbacks;

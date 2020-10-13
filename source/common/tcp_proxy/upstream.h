@@ -17,8 +17,9 @@ public:
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~TcpConnPool() override;
 
+  bool valid() const{ return conn_pool_ != nullptr; }
+
   // GenericConnPool
-  bool valid() const override;
   void newStream(GenericConnectionPoolCallbacks* callbacks) override;
 
   // Tcp::ConnectionPool::Callbacks
@@ -43,8 +44,9 @@ public:
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~HttpConnPool() override;
 
+  bool valid() const{ return conn_pool_ != nullptr; }
+
   // GenericConnPool
-  bool valid() const override;
   void newStream(GenericConnectionPoolCallbacks* callbacks) override;
 
   // Http::ConnectionPool::Callbacks,

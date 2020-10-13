@@ -6,6 +6,11 @@
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class LoadBalancerContext;
+} // namespace Upstream
+
 namespace TcpProxy {
 
 class GenericConnectionPoolCallbacks;
@@ -17,7 +22,7 @@ public:
   virtual ~GenericConnPool() = default;
 
   /**
-   * Called to create a TCP connection or HTTP stream for "CONNECT streams".
+   * Called to create a TCP connection or HTTP stream for "CONNECT" streams.
    *
    * The implementation is then responsible for calling either onGenericPoolReady or
    * onGenericPoolFailure on the supplied GenericConnectionPoolCallbacks.
@@ -25,11 +30,6 @@ public:
    * @param callbacks callbacks to communicate stream failure or creation on.
    */
   virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
-
-  /**
-   * @return returns true if this connection pool is valid.
-   */
-  virtual bool valid() const PURE;
 };
 
 // An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
@@ -101,6 +101,32 @@ public:
   virtual Tcp::ConnectionPool::ConnectionData*
   onDownstreamEvent(Network::ConnectionEvent event) PURE;
 };
+
+using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
+
+/*
+ * A factory for creating generic connection pools.
+ */
+class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
+public:
+  ~GenericConnPoolFactory() override = default;
+
+  /*
+   * @param cluster_name the name of the cluster to use
+   * @param cm the cluster manager to get the connection pool from
+   * @param hostname the hostname to use if doing connect tunneling, absl::nullopt otherwise.
+   * @param context the load balancing context for this connection.
+   * @param upstream_callbacks the callbacks to provide to the connection if succesfully created.
+   * @return may be null
+   */
+  virtual GenericConnPoolPtr
+  createGenericConnPool(const std::string& cluster_name, Upstream::ClusterManager& cm,
+                        absl::optional<std::string> hostname,
+                        Upstream::LoadBalancerContext* context,
+                        Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;
+};
+
+using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;
 
 } // namespace TcpProxy
 } // namespace Envoy
