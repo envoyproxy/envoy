@@ -137,7 +137,6 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -299,6 +298,27 @@ envoy_cc_test(
         ":simulated_time_system_lib",
         ":test_time_lib",
         ":utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "wasm_lib",
+    hdrs = ["wasm_base.h"],
+    deps = [
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/common/wasm:wasm_interoperation_lib",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
     ],
 )
 

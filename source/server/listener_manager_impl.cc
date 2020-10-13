@@ -359,7 +359,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   if (!config.name().empty()) {
     name = config.name();
   } else {
-    name = server_.random().uuid();
+    name = server_.api().randomGenerator().uuid();
   }
 
   auto it = error_state_tracker_.find(name);

@@ -982,6 +982,69 @@ request_headers_to_add:
   EXPECT_TRUE(header_map.has("x-client-ip-port"));
 }
 
+TEST(HeaderParserTest, EvaluateHeadersWithNullStreamInfo) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "x-client-ip"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    append: true
+  - header:
+      key: "x-client-ip-port"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+    append: true
+)EOF";
+
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  req_header_parser->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-client-ip-port"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", header_map.get_("x-client-ip"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("x-client-ip-port"));
+}
+
+TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> headers_values;
+
+  auto& first_entry = *headers_values.Add();
+  first_entry.set_key("key");
+
+  // This tests when we have "StreamInfoHeaderFormatter", but stream info is null.
+  first_entry.set_value("%DOWNSTREAM_REMOTE_ADDRESS%");
+
+  HeaderParserPtr req_header_parser_add = HeaderParser::configure(headers_values, /*append=*/true);
+  req_header_parser_add->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("key"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
+
+  headers_values.Clear();
+  auto& set_entry = *headers_values.Add();
+  set_entry.set_key("key");
+  set_entry.set_value("great");
+
+  HeaderParserPtr req_header_parser_set = HeaderParser::configure(headers_values, /*append=*/false);
+  req_header_parser_set->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("key"));
+  EXPECT_EQ("great", header_map.get_("key"));
+
+  headers_values.Clear();
+  auto& empty_entry = *headers_values.Add();
+  empty_entry.set_key("empty");
+  empty_entry.set_value("");
+
+  HeaderParserPtr req_header_parser_empty =
+      HeaderParser::configure(headers_values, /*append=*/false);
+  req_header_parser_empty->evaluateHeaders(header_map, nullptr);
+  EXPECT_FALSE(header_map.has("empty"));
+}
+
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
@@ -1283,11 +1346,10 @@ response_headers_to_remove: ["x-nope"]
 
   // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
   // combine set-cookie headers
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(header_map, "set-cookie", out);
+  const auto out = header_map.get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "foo");
-  ASSERT_EQ(out[1], "bar");
+  ASSERT_EQ(out[0]->value().getStringView(), "foo");
+  ASSERT_EQ(out[1]->value().getStringView(), "bar");
 }
 
 TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {

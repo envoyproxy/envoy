@@ -96,6 +96,18 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
+    name = "filter_manager_test",
+    srcs = ["filter_manager_test.cc"],
+    deps = [
+        "//source/common/http:filter_manager_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_reply:local_reply_mocks",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_wrappers_test",
     srcs = ["codec_wrappers_test.cc"],
     deps = [
@@ -173,7 +185,6 @@ envoy_cc_fuzz_test(
         "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:symbol_table_creator_lib",
         "//source/server:drain_manager_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
@@ -297,6 +308,7 @@ envoy_cc_fuzz_test(
         ":header_map_impl_fuzz_proto_cc_proto",
         "//source/common/http:header_map_lib",
         "//test/fuzz:utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
