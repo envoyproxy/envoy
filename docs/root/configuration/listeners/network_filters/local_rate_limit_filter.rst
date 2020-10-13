@@ -25,7 +25,7 @@ processed by the filter utilizes a single token, and if no tokens are available,
 be immediately closed without further filter iteration.
 
 .. note::
-  In the current implementation each filter and filter chain has an independent rate limit.
+  In the current implementation each filter chain has an independent rate limit.
 
 .. _config_network_filters_local_rate_limit_stats:
 
