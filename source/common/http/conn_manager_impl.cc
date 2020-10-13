@@ -193,10 +193,19 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
-  stream.max_stream_duration_timer_.reset();
-  stream.stream_idle_timer_.reset();
+  if (stream.max_stream_duration_timer_) {
+    stream.max_stream_duration_timer_->disableTimer();
+    stream.max_stream_duration_timer_ = nullptr;
+  }
+  if (stream.stream_idle_timer_ != nullptr) {
+    stream.stream_idle_timer_->disableTimer();
+    stream.stream_idle_timer_ = nullptr;
+  }
   stream.filter_manager_.disarmRequestTimeout();
-  stream.request_header_timer_.reset();
+  if (stream.request_header_timer_ != nullptr) {
+    stream.request_header_timer_->disableTimer();
+    stream.request_header_timer_ = nullptr;
+  }
 
   stream.completeRequest();
   stream.filter_manager_.onStreamComplete();
@@ -806,7 +815,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
   filter_manager_.requestHeadersInitialized();
-  request_header_timer_.reset();
+  if (request_header_timer_ != nullptr) {
+    request_header_timer_->disableTimer();
+    request_header_timer_.reset();
+  }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host =
       connection_manager_.read_callbacks_->upstreamHost();
