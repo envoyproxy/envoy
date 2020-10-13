@@ -116,6 +116,9 @@ public:
 
   // Event::FileEvent
   void activate(uint32_t events) override {
+    // Only supported event types are set.
+    ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) ==
+           events);
     event_listener_.onEventActivated(events);
     if (!schedulable_.enabled()) {
       schedulable_.scheduleCallbackNextIteration();
@@ -123,6 +126,9 @@ public:
   }
 
   void setEnabled(uint32_t events) override {
+    // Only supported event types are set.
+    ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) ==
+           events);
     event_listener_.onEventEnabled(events);
     bool was_enabled = schedulable_.enabled();
     if (!was_enabled) {

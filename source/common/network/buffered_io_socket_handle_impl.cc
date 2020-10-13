@@ -124,7 +124,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
     }
   }
   writable_peer_->maybeSetNewData();
-  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), num_bytes_to_write);
+  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), total_bytes_to_write);
   return {total_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
