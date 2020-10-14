@@ -322,7 +322,15 @@ using ConnectionPtr = std::unique_ptr<Connection>;
 /**
  * Connections servicing inbound connects.
  */
-class ServerConnection : public virtual Connection {};
+class ServerConnection : public virtual Connection {
+public:
+  /**
+   * Set the amount of time allowed for the transport socket to report that a connection is
+   * established. The provided timeout is relative to the current time. If the connection is already
+   * established, this has no effect.
+   */
+  virtual void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) PURE;
+};
 
 using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 

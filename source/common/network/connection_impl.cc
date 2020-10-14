@@ -706,6 +706,36 @@ void ConnectionImpl::flushWriteBuffer() {
   }
 }
 
+ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
+                                           ConnectionSocketPtr&& socket,
+                                           TransportSocketPtr&& transport_socket,
+                                           StreamInfo::StreamInfo& stream_info, bool connected)
+    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
+                     connected),
+      transport_socket_connect_timer_{
+          dispatcher.createTimer([this] { onTransportSocketConnectTimeout(); })} {}
+
+void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
+  if (transport_socket_connect_timer_ != nullptr) {
+    transport_socket_connect_timer_->enableTimer(timeout);
+  }
+}
+
+void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
+  ConnectionImpl::raiseEvent(event);
+  switch (event) {
+  case ConnectionEvent::Connected:
+  case ConnectionEvent::RemoteClose:
+  case ConnectionEvent::LocalClose:
+    transport_socket_connect_timer_.reset();
+  }
+}
+
+void ServerConnectionImpl::onTransportSocketConnectTimeout() {
+  closeConnectionImmediately();
+  stream_info_.setConnectionTerminationDetails("transport socket timeout was reached");
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,

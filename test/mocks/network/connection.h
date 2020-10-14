@@ -97,6 +97,9 @@ public:
   ~MockServerConnection() override;
 
   DEFINE_MOCK_CONNECTION_MOCK_METHODS;
+
+  // Network::ServerConnection
+  MOCK_METHOD(void, setTransportSocketConnectTimeout, (std::chrono::milliseconds));
 };
 
 /**
