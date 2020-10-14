@@ -9,8 +9,9 @@ namespace Thread {
  * the ThreadId. The implementation is platform dependent and currently
  * only works on platforms that support SIGABRT.
  *
- * Returns the result from the platform specific function (i.e. kill) to terminate
- * the thread. If the platform is currently unsupported, this will return false.
+ * Returns true if the platform specific function to terminate the thread
+ * succeeded (i.e. kill() == 0). If the platform is currently unsupported, this
+ * will return false.
  */
 bool terminateThread(const ThreadId& tid);
 

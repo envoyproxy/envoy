@@ -68,15 +68,15 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
         auto actions = config.actions();
 
         // Add default abort_action if kill and/or multi-kill is enabled.
-        envoy::watchdog::v3alpha::AbortActionConfig abort_config;
-
         if (config.killTimeout().count() > 0) {
+          envoy::watchdog::v3alpha::AbortActionConfig abort_config;
           WatchDogAction* abort_action_config = actions.Add();
           abort_action_config->set_event(WatchDogAction::KILL);
           abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
         }
 
         if (config.multiKillTimeout().count() > 0) {
+          envoy::watchdog::v3alpha::AbortActionConfig abort_config;
           WatchDogAction* abort_action_config = actions.Add();
           abort_action_config->set_event(WatchDogAction::MULTIKILL);
           abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);

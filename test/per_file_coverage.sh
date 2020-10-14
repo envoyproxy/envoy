@@ -15,12 +15,13 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/json:90.6"
 "source/common/filesystem:96.1"
 "source/common/filesystem/posix:94.5"
+"source/common/thread:0.0" # Functions terminate threads, leading to death.
 "source/common/thread_local:95.7"
 "source/common/crypto:0.0"
 "source/common/common:96.1"
 "source/common/common/posix:94.1"
 "source/common/signal:90.4"
-"source/common/watchdog/abort_action:42.9" # Death tests don't report LCOV
+"source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:93.7"
 "source/extensions:96.3"
 "source/extensions/common:94.4"
