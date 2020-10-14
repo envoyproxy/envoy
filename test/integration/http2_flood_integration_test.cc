@@ -22,7 +22,6 @@
 #include "gtest/gtest.h"
 
 using ::testing::HasSubstr;
-using ::testing::MatchesRegex;
 
 namespace Envoy {
 
