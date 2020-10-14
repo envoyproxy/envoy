@@ -4,6 +4,9 @@
 
 #include "envoy/common/random_generator.h"
 
+#include "common/common/assert.h"
+#include "common/common/logger.h"
+
 namespace Envoy {
 namespace Random {
 
@@ -18,7 +21,7 @@ public:
   uint64_t random() override {
     // Makes sure initializeSeed() was already called
     ASSERT(prng_ != nullptr);
-    uint64_t to_return = (*prng_.get())();
+    uint64_t to_return = (*prng_)();
     ENVOY_LOG_MISC(trace, "random() returned: {}", to_return);
     return to_return;
   }

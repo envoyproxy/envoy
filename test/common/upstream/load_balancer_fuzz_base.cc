@@ -7,7 +7,7 @@ namespace Upstream {
 
 namespace {
 
-constexpr uint32_t MAX_NUM_HOSTS_IN_PRIORITY_LEVEL = 256;
+constexpr uint32_t MaxNumHostsPerPriorityLevel = 256;
 
 } // namespace
 
@@ -20,7 +20,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
   uint32_t hosts_made = 0;
   // Cap each host set at 256 hosts for efficiency
-  const uint32_t max_num_hosts_in_priority_level = MAX_NUM_HOSTS_IN_PRIORITY_LEVEL;
+  const uint32_t max_num_hosts_in_priority_level = MaxNumHostsPerPriorityLevel;
   // Leave port clause in for future changes
   while (hosts_made < std::min(num_hosts_in_priority_level, max_num_hosts_in_priority_level) &&
          port_ < 65535) {
