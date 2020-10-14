@@ -115,7 +115,8 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
   }
   if (writable_peer_->isWriteEndSet()) {
     // EPIPE or ENOTCONN
-    return {0, Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
   if (!writable_peer_->isWritable()) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
@@ -144,10 +145,11 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
-  // Write to a shutdown peer. 
+  // Write to a shutdown peer.
   if (writable_peer_->isWriteEndSet()) {
     // EPIPE or ENOTCONN
-    return {0, Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
   // Buffer is full. Cannot write anymore.
   if (!writable_peer_->isWritable()) {
@@ -214,8 +216,8 @@ IoHandlePtr BufferedIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::connect(Address::InstanceConstSharedPtr) {
-  // Buffered Io handle should always be considered as connected. 
-  // Use write or read to determine if peer is closed. 
+  // Buffered Io handle should always be considered as connected.
+  // Use write or read to determine if peer is closed.
   return {0, 0};
 }
 
