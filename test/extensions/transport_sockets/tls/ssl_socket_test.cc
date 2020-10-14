@@ -4550,7 +4550,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
 }
 
 // Validate that secrets callbacks are invoked when secrets become ready.
-TEST_P(SslSocketTest, AddSecretsReadyCallback) {
+TEST_P(SslSocketTest, ClientAddSecretsReadyCallback) {
   Stats::TestUtil::TestStore stats_store;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
@@ -4579,6 +4579,10 @@ TEST_P(SslSocketTest, AddSecretsReadyCallback) {
   EXPECT_CALL(mock_callback_, Call()).Times(0);
   client_ssl_socket_factory.addSecretsReadyCb(mock_callback_.AsStdFunction());
 
+  // Call onAddOrUpdateSecret, but return a null ssl_ctx. This should not invoke the callback.
+  EXPECT_CALL(context_manager, createSslClientContext(_, _)).WillOnce(Return(nullptr));
+  client_ssl_socket_factory.onAddOrUpdateSecret();
+
   EXPECT_CALL(mock_callback_, Call());
   Ssl::ClientContextSharedPtr mock_context = std::make_shared<Ssl::MockClientContext>();
   EXPECT_CALL(context_manager, createSslClientContext(_, _)).WillOnce(Return(mock_context));
@@ -4588,6 +4592,52 @@ TEST_P(SslSocketTest, AddSecretsReadyCallback) {
   MockFunction<void()> second_callback_;
   EXPECT_CALL(second_callback_, Call());
   client_ssl_socket_factory.addSecretsReadyCb(second_callback_.AsStdFunction());
+}
+
+// Validate that secrets callbacks are invoked when secrets become ready.
+TEST_P(SslSocketTest, ServerAddSecretsReadyCallback) {
+  Stats::TestUtil::TestStore stats_store;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context);
+  EXPECT_TRUE(server_cfg->tlsCertificates().empty());
+  EXPECT_FALSE(server_cfg->isReady());
+
+  NiceMock<Ssl::MockContextManager> context_manager;
+  ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), context_manager,
+                                                   stats_store, std::vector<std::string>{});
+
+  // Add a secrets ready callback. It should not be invoked until onAddOrUpdateSecret() is called.
+  MockFunction<void()> mock_callback_;
+  EXPECT_CALL(mock_callback_, Call()).Times(0);
+  server_ssl_socket_factory.addSecretsReadyCb(mock_callback_.AsStdFunction());
+
+  // Call onAddOrUpdateSecret, but return a null ssl_ctx. This should not invoke the callback.
+  EXPECT_CALL(context_manager, createSslServerContext(_, _, _)).WillOnce(Return(nullptr));
+  server_ssl_socket_factory.onAddOrUpdateSecret();
+
+  // Now return a ssl context which should result in the callback being invoked.
+  EXPECT_CALL(mock_callback_, Call());
+  Ssl::ServerContextSharedPtr mock_context = std::make_shared<Ssl::MockServerContext>();
+  EXPECT_CALL(context_manager, createSslServerContext(_, _, _)).WillOnce(Return(mock_context));
+  server_ssl_socket_factory.onAddOrUpdateSecret();
+
+  // Add another callback, it should be invoked immediately.
+  MockFunction<void()> second_callback_;
+  EXPECT_CALL(second_callback_, Call());
+  server_ssl_socket_factory.addSecretsReadyCb(second_callback_.AsStdFunction());
 }
 
 TEST_P(SslSocketTest, TestTransportSocketCallback) {
