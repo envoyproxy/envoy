@@ -67,8 +67,7 @@ size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
-  ASSERT(file_event_.get() == nullptr);
-  file_event_ = socket.ioHandle().createFileEvent(
+  socket.ioHandle().initializeFileEvent(
       cb.dispatcher(),
       [this](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
@@ -124,8 +123,7 @@ void Filter::onReadWorker() {
     socket.setRemoteAddress(proxy_protocol_header_.value().remote_address_);
   }
 
-  // Release the file event so that we do not interfere with the connection read events.
-  file_event_.reset();
+  socket.ioHandle().resetFileEvents();
   cb_->continueFilterChain(true);
 }
 

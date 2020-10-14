@@ -260,6 +260,19 @@ public:
   virtual Address::InstanceConstSharedPtr peerAddress() PURE;
 
   /**
+   * Initializes the internal file event that will signal when the io handle is readable, writable or closed.
+   * each handle is allowed to have only a single file event. The internal file event is managed
+   * by the handle and it is turned on and off when the socket would block.
+   * @param dispatcher dispatcher to be used to allocate the file event.
+   * @param cb supplies the callback to fire when the handle is ready.
+   * @param trigger specifies whether to edge or level trigger.
+   * @param events supplies a logical OR of @ref Event::FileReadyType events that the file event
+   *               should initially listen on.
+   */
+  virtual void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                   Event::FileTriggerType trigger, uint32_t events) PURE;
+
+  /**
    * Creates a file event that will signal when the io handle is readable, writable or closed.
    * @param dispatcher dispatcher to be used to allocate the file event.
    * @param cb supplies the callback to fire when the handle is ready.
@@ -268,8 +281,31 @@ public:
    *               should initially listen on.
    * @return @ref Event::FileEventPtr
    */
-  virtual Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                              Event::FileTriggerType trigger, uint32_t events) PURE;
+  virtual Event::FileEventPtr createManagedFileEvent(Event::Dispatcher& dispatcher,
+                                                     Event::FileReadyCb cb,
+                                                     Event::FileTriggerType trigger,
+                                                     uint32_t events) PURE;
+  /**
+   * Activates file events for the current underlying fd.
+   * @param events events that will be activated.
+   */
+  virtual void activateFileEvents(uint32_t events) PURE;
+
+  /**
+   * Enables file events for the current underlying fd.
+   * @param events events that will be enabled.
+   */
+  virtual void enableFileEvents(uint32_t events) PURE;
+
+  /**
+   * Gets the file events that are enabled for the underlying fd.
+   */
+  virtual uint32_t getEnabledFileEvents() PURE;
+
+  /**
+   * Resets the file event.
+   */
+  virtual void resetFileEvents() PURE;
 
   /**
    * Shut down part of a full-duplex connection (see man 2 shutdown)

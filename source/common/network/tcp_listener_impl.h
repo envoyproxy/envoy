@@ -15,6 +15,8 @@ class TcpListenerImpl : public BaseListenerImpl {
 public:
   TcpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                   TcpListenerCallbacks& cb, bool bind_to_port, uint32_t backlog_size);
+  ~TcpListenerImpl() override = default;
+
   void disable() override;
   void enable() override;
 
@@ -25,15 +27,13 @@ protected:
 
   TcpListenerCallbacks& cb_;
   const uint32_t backlog_size_;
-
+  Event::FileEventPtr file_event_;
 private:
   void onSocketEvent(short flags);
 
   // Returns true if global connection limit has been reached and the accepted socket should be
   // rejected/closed. If the accepted socket is to be admitted, false is returned.
   static bool rejectCxOverGlobalLimit();
-
-  Event::FileEventPtr file_event_;
 };
 
 } // namespace Network
