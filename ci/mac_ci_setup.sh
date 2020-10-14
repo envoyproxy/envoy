@@ -37,7 +37,14 @@ function retry () {
     return "$returns"
 }
 
-if ! retry brew update --verbose; then
+set +e
+git -C $(brew --repo) remote show origin
+git -C $(brew --repo homebrew/core) remote show origin
+brew gist-logs homebrew-core
+brew gist-logs core
+set -e
+
+if ! retry brew update --debug --verbose; then
     echo "Failed to update homebrew"
     exit 1
 fi
