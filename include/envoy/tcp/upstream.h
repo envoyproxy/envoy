@@ -116,7 +116,7 @@ public:
    * @param cm the cluster manager to get the connection pool from
    * @param hostname the hostname to use if doing connect tunneling, absl::nullopt otherwise.
    * @param context the load balancing context for this connection.
-   * @param upstream_callbacks the callbacks to provide to the connection if succesfully created.
+   * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
    * @return may be null
    */
   virtual GenericConnPoolPtr
