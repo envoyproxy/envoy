@@ -18,6 +18,7 @@ USER_GROUP=root
 
 [[ -t 1 ]] && ENVOY_DOCKER_OPTIONS+=" -it"
 [[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=" -v $(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)"
+[[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+="-v ${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK} -e SSH_AUTH_SOCK"
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 
