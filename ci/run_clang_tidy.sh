@@ -37,7 +37,7 @@ function exclude_win32_impl() {
 # Do not run clang-tidy against macOS impl
 # TODO: We should run clang-tidy against macOS impl for completeness
 function exclude_macos_impl() {
-  grep -v source/common/filesystem/kqueue/
+  grep -v source/common/filesystem/kqueue/ | grep -v source/common/network/apple_dns_impl | grep -v test/common/network/apple_dns_impl_test
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
@@ -50,13 +50,39 @@ function exclude_headersplit_testdata() {
   grep -v tools/envoy_headersplit/
 }
 
+# Do not run clang-tidy against Chromium URL import, this needs to largely
+# reflect the upstream structure.
+function exclude_chromium_url() {
+  grep -v source/common/chromium_url/
+}
+
 # Exclude files in third_party which are temporary forks from other OSS projects.
 function exclude_third_party() {
   grep -v third_party/
 }
 
+# Exclude files which are part of the Wasm emscripten environment
+function exclude_wasm_emscripten() {
+  grep -v source/extensions/common/wasm/ext
+}
+
+# Exclude files which are part of the Wasm SDK
+function exclude_wasm_sdk() {
+  grep -v proxy_wasm_cpp_sdk
+}
+
+# Exclude files which are part of the Wasm Host environment
+function exclude_wasm_host() {
+  grep -v proxy_wasm_cpp_host
+}
+
+# Exclude proxy-wasm test_data.
+function exclude_wasm_test_data() {
+  grep -v wasm/test_data
+}
+
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party
+  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data
 }
 
 function run_clang_tidy() {

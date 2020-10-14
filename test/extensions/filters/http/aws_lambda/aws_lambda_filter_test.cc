@@ -517,11 +517,8 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
   ASSERT_NE(nullptr, headers.Status());
   EXPECT_EQ("201", headers.getStatusValue());
 
-  EXPECT_EQ(nullptr, headers.get(Http::LowerCaseString(":other")));
-
-  const auto* custom_header = headers.get(Http::LowerCaseString("x-awesome-header"));
-  EXPECT_NE(custom_header, nullptr);
-  EXPECT_EQ("awesome value", custom_header->value().getStringView());
+  EXPECT_FALSE(headers.has(":other"));
+  EXPECT_EQ("awesome value", headers.get_("x-awesome-header"));
 
   std::vector<std::string> cookies;
   headers.iterate([&cookies](const Http::HeaderEntry& entry) {

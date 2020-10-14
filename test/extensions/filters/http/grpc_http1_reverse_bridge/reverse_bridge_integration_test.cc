@@ -173,5 +173,34 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
+TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
+  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-not-protobuf");
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 5, response_headers, 5);
+
+  EXPECT_TRUE(response->complete());
+
+  // The response should indicate an error.
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
+
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
 } // namespace
 } // namespace Envoy

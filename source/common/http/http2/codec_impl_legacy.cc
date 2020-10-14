@@ -169,6 +169,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   local_end_stream_ = end_stream;
   submitHeaders(final_headers, end_stream ? nullptr : &provider);
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
@@ -237,6 +238,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
+    parent_.checkProtocolConstraintViolation();
   }
 }
 
@@ -250,6 +252,7 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
     submitMetadata(flags);
   }
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -265,6 +268,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
       parent_.sendPendingFrames();
+      parent_.checkProtocolConstraintViolation();
     }
   }
 }
@@ -446,6 +450,7 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   // will be run because higher layers think the stream is already finished.
   resetStreamWorker(StreamResetReason::LocalReset);
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -470,6 +475,8 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   }
 
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
+
   if (local_end_stream_ && pending_send_data_.length() > 0) {
     createPendingFlushTimer();
   }
@@ -494,6 +501,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // the cleanup logic to run which will reset the stream in all cases if all data frames could not
   // be sent.
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
@@ -573,6 +581,7 @@ void ConnectionImpl::sendKeepalive() {
   int rc = nghttp2_submit_ping(session_, 0 /*flags*/, reinterpret_cast<uint8_t*>(&ms_since_epoch));
   ASSERT(rc == 0);
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }
@@ -661,6 +670,7 @@ void ConnectionImpl::goAway() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::shutdownNotice() {
@@ -668,6 +678,7 @@ void ConnectionImpl::shutdownNotice() {
   ASSERT(rc == 0);
 
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 }
 
 int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
@@ -894,16 +905,13 @@ bool ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const u
   // onBeforeFrameSend callback is not called for DATA frames.
   bool is_outbound_flood_monitored_control_frame = false;
   std::swap(is_outbound_flood_monitored_control_frame, is_outbound_flood_monitored_control_frame_);
-  auto releasor =
-      protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
   try {
-    checkOutboundFrameLimits();
+    auto releasor = trackOutboundFrames(is_outbound_flood_monitored_control_frame);
+    output.add(data, length);
+    output.addDrainTracker(releasor);
   } catch (const FrameFloodException&) {
     return false;
   }
-
-  output.add(data, length);
-  output.addDrainTracker(releasor);
   return true;
 }
 
@@ -1143,6 +1151,20 @@ void ConnectionImpl::sendSettings(
                                               NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
     ASSERT(rc == 0);
   }
+}
+
+void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
+  if (!protocol_constraint_violation_callback_) {
+    protocol_constraint_violation_callback_ = connection_.dispatcher().createSchedulableCallback(
+        [this]() { onProtocolConstraintViolation(); });
+    protocol_constraint_violation_callback_->scheduleCallbackCurrentIteration();
+  }
+}
+
+void ConnectionImpl::onProtocolConstraintViolation() {
+  // Flooded outbound queue implies that peer is not reading and it does not
+  // make sense to try to flush pending bytes.
+  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
 }
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
@@ -1434,9 +1456,19 @@ bool ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32
   return true;
 }
 
-void ServerConnectionImpl::checkOutboundFrameLimits() {
+Envoy::Http::Http2::ProtocolConstraints::ReleasorProc
+ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) {
+  auto releasor =
+      protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
   if (dispatching_downstream_data_ && !protocol_constraints_.checkOutboundFrameLimits().ok()) {
     throw FrameFloodException(std::string(protocol_constraints_.status().message()));
+  }
+  return releasor;
+}
+
+void ServerConnectionImpl::checkProtocolConstraintViolation() {
+  if (!protocol_constraints_.checkOutboundFrameLimits().ok()) {
+    scheduleProtocolConstraintViolationCallback();
   }
 }
 
@@ -1457,7 +1489,9 @@ Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   Cleanup cleanup([this]() { dispatching_downstream_data_ = false; });
 
   // Make sure downstream outbound queue was not flooded by the upstream frames.
-  checkOutboundFrameLimits();
+  if (!protocol_constraints_.checkOutboundFrameLimits().ok()) {
+    throw FrameFloodException(std::string(protocol_constraints_.status().message()));
+  }
 
   return ConnectionImpl::innerDispatch(data);
 }
