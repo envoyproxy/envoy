@@ -36,7 +36,7 @@ static_resources:
           tls_certificates:
             certificate_chain: { "filename": "certs/servercert.pem" }
             private_key: { "filename": "certs/serverkey.pem" }
-            # ocsp_staple: { "filename": "certs/server_ocsp_resp.der" }
+            ocsp_staple: { "filename": "certs/server_ocsp_resp.der" }
           validation_context:
             match_subject_alt_names:
               exact: "foo"
