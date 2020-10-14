@@ -198,6 +198,11 @@ private:
   bool dispatch_buffered_data_ : 1;
 };
 
+class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
+public:
+  using ConnectionImpl::ConnectionImpl;
+};
+
 /**
  * libevent implementation of Network::ClientConnection.
  */

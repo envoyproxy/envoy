@@ -320,6 +320,13 @@ public:
 using ConnectionPtr = std::unique_ptr<Connection>;
 
 /**
+ * Connections servicing inbound connects.
+ */
+class ServerConnection : public virtual Connection {};
+
+using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
+
+/**
  * Connections capable of outbound connects.
  */
 class ClientConnection : public virtual Connection {

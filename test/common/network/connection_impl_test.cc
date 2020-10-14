@@ -278,7 +278,7 @@ protected:
   Network::ListenerPtr listener_;
   Network::ClientConnectionPtr client_connection_;
   StrictMock<MockConnectionCallbacks> client_callbacks_;
-  Network::ConnectionPtr server_connection_;
+  Network::ServerConnectionPtr server_connection_;
   StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
