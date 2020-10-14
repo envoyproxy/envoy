@@ -96,6 +96,7 @@ TEST_P(RedirectIntegrationTest, RedirectNotConfigured) {
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, redirect_response_, 0);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 // Now test a route with redirects configured on in pass-through mode.
@@ -109,6 +110,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
   EXPECT_EQ(
       0,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
@@ -144,6 +146,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("internal_redirect"));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
@@ -184,6 +187,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
   EXPECT_EQ(
       1, test_server_->counter("http.config_test.passthrough_internal_redirect_too_many_redirects")
              ->value());
+  EXPECT_EQ(4, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
@@ -225,6 +229,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredicate) {
@@ -278,6 +283,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
   EXPECT_EQ(
       1,
       test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
+  EXPECT_EQ(3, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPredicate) {
@@ -336,6 +342,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
   EXPECT_EQ(
       1,
       test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
+  EXPECT_EQ(3, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredicate) {
@@ -396,6 +403,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredic
   EXPECT_EQ(
       1,
       test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
+  EXPECT_EQ(3, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InvalidRedirect) {
@@ -412,6 +420,7 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
   EXPECT_EQ(
       1,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RedirectIntegrationTest,
