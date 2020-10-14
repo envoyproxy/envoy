@@ -40,8 +40,7 @@ USE_CATEGORIES = [
     "test_only",
 ]
 
-# Components with these use categories are not required to specify the 'cpe'
-# and 'last_updated' annotation.
+# Components with these use categories are not required to specify the 'cpe'.
 USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "other", "test_only", "api"]
 
 def _fail_missing_attribute(attr, key):
@@ -87,13 +86,13 @@ def load_repository_locations(repository_locations_spec):
                 _fail_missing_attribute("extensions", key)
             mutable_location.pop("extensions")
 
-        if "last_updated" not in location:
-            _fail_missing_attribute("last_updated", key)
-        last_updated = mutable_location.pop("last_updated")
+        if "release_date" not in location:
+            _fail_missing_attribute("release_date", key)
+        release_date = mutable_location.pop("release_date")
 
         # Starlark doesn't have regexes.
-        if len(last_updated) != 10 or last_updated[4] != "-" or last_updated[7] != "-":
-            fail("last_updated must match YYYY-DD-MM: " + last_updated)
+        if len(release_date) != 10 or release_date[4] != "-" or release_date[7] != "-":
+            fail("release_date must match YYYY-DD-MM: " + release_date)
 
         if "cpe" in location:
             cpe = mutable_location.pop("cpe")
