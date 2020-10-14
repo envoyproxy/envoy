@@ -11,6 +11,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -137,7 +138,7 @@ void SquashFilter::onDestroy() { cleanup(); }
 
 Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Check for squash header
-  if (!headers.get(Http::Headers::get().XSquashDebug)) {
+  if (headers.get(Http::Headers::get().XSquashDebug).empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -148,7 +149,7 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
   request->headers().setReferencePath(POST_ATTACHMENT_PATH);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
   request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  request->body() = std::make_unique<Buffer::OwnedImpl>(config_->attachmentJson());
+  request->body().add(config_->attachmentJson());
 
   is_squashing_ = true;
   in_flight_request_ =
@@ -308,9 +309,7 @@ void SquashFilter::cleanup() {
 }
 
 Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::ResponseMessagePtr&& m) {
-  Buffer::InstancePtr& data = m->body();
-  std::string jsonbody = data->toString();
-  return Json::Factory::loadFromString(jsonbody);
+  return Json::Factory::loadFromString(m->bodyAsString());
 }
 
 } // namespace Squash

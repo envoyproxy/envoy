@@ -9,6 +9,8 @@
 #include "common/common/thread_synchronizer.h"
 #include "common/runtime/runtime_protos.h"
 
+#include "extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -43,17 +45,9 @@ private:
   static LocalRateLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
   void onFillTimer();
 
-  // TODO(mattklein123): Determine if/how to merge this with token_bucket_impl.h/cc. This
-  // implementation is geared towards multi-threading as well assumes a high call rate (which is
-  // why a fixed periodic refresh timer is used).
-  const Event::TimerPtr fill_timer_;
-  const uint32_t max_tokens_;
-  const uint32_t tokens_per_fill_;
-  const std::chrono::milliseconds fill_interval_;
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
-  std::atomic<uint32_t> tokens_;
-  Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
 
   friend class LocalRateLimitTestBase;
 };

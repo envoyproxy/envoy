@@ -5,6 +5,7 @@ set -e
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
 [[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
+[[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.5
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
@@ -66,8 +67,6 @@ fi
 if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     COVERAGE_THRESHOLD=27.0
-  else
-    COVERAGE_THRESHOLD=96.5
   fi
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then

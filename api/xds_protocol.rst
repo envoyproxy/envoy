@@ -695,10 +695,16 @@ An example minimal ``bootstrap.yaml`` fragment for ADS configuration is:
             address: <ADS management server IP address>
             port_value: <ADS management server port>
         lb_policy: ROUND_ROBIN
-        http2_protocol_options: {}
+        # It is recommended to configure either HTTP/2 or TCP keepalives in order to detect
+        # connection issues, and allow Envoy to reconnect. TCP keepalive is less expensive, but
+        # may be inadequate if there is a TCP proxy between Envoy and the management server.
+        # HTTP/2 keepalive is slightly more expensive, but may detect issues through more types
+        # of intermediate proxies.
+        http2_protocol_options:
+          connection_keepalive:
+            interval: 30s
+            timeout: 5s
         upstream_connection_options:
-          # configure a TCP keep-alive to detect and reconnect to the admin
-          # server in the event of a TCP socket disconnection
           tcp_keepalive:
             ...
     admin:

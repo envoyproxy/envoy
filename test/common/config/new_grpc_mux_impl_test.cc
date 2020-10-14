@@ -21,6 +21,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -166,14 +167,104 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   response->add_resources();
   response->mutable_resources()->at(0).set_name("not-found");
   response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
+}
 
-  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+// Watch v2 resource type_url, receive discovery response with v3 resource type_url.
+TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true"}});
+  setup();
 
-  const auto& subscriptions = grpc_mux_->subscriptions();
-  auto sub = subscriptions.find(type_url);
+  // Watch for v2 resource type_url.
+  const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& v3_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          envoy::config::core::v3::ApiVersion::V3);
+  auto watch = grpc_mux_->addWatch(v2_type_url, {}, callbacks_, resource_decoder_);
 
-  EXPECT_TRUE(sub != subscriptions.end());
-  watch->update({});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // Cluster is not watched, v3 resource is rejected.
+  grpc_mux_->start();
+  {
+    auto unexpected_response =
+        std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    envoy::config::cluster::v3::Cluster cluster;
+    unexpected_response->set_type_url(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+        envoy::config::core::v3::ApiVersion::V3));
+    unexpected_response->set_system_version_info("0");
+    unexpected_response->add_resources()->mutable_resource()->PackFrom(cluster);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
+    grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
+  }
+  // Cluster is not watched, v2 resource is rejected.
+  {
+    auto unexpected_response =
+        std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    envoy::config::cluster::v3::Cluster cluster;
+    unexpected_response->set_type_url(Config::TypeUrl::get().Cluster);
+    unexpected_response->set_system_version_info("0");
+    unexpected_response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(cluster));
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
+    grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
+  }
+  // ClusterLoadAssignment v2 is watched, v3 resource will be accepted.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_system_version_info("1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    response->add_resources()->mutable_resource()->PackFrom(load_assignment);
+    // Send response that contains resource with v3 type url.
+    response->set_type_url(v3_type_url);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        }));
+    grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  }
+}
+
+// Watch v3 resource type_url, receive discovery response with v2 resource type_url.
+TEST_F(NewGrpcMuxImplTest, V2ResourceResponseV3ResourceWatch) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true"}});
+  setup();
+
+  // Watch for v3 resource type_url.
+  const std::string& v3_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          envoy::config::core::v3::ApiVersion::V3);
+  const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  auto watch = grpc_mux_->addWatch(v3_type_url, {}, callbacks_, resource_decoder_);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+
+  grpc_mux_->start();
+  // ClusterLoadAssignment v3 is watched, v2 resource will be accepted.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_system_version_info("1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(load_assignment));
+    // Send response that contains resource with v3 type url.
+    response->set_type_url(v2_type_url);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        }));
+    grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  }
 }
 
 } // namespace

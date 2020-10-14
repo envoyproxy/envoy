@@ -31,10 +31,10 @@ public:
       : header_(header), state_(state) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    const Http::HeaderEntry* entry = headers.get(header_);
-    if (entry) {
+    const auto entry = headers.get(header_);
+    if (!entry.empty()) {
       decoder_callbacks_->streamInfo().filterState()->setData(
-          state_, std::make_unique<Router::StringAccessorImpl>(entry->value().getStringView()),
+          state_, std::make_unique<Router::StringAccessorImpl>(entry[0]->value().getStringView()),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
@@ -109,12 +109,12 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   });
 
   waitForNextUpstreamRequest();
-  const auto* payload_entry =
+  const auto payload_entry =
       upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo"));
-  EXPECT_TRUE(payload_entry != nullptr);
-  EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
+  EXPECT_FALSE(payload_entry.empty());
+  EXPECT_EQ(payload_entry[0]->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::CustomHeaders::get().Authorization));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -309,8 +309,7 @@ public:
   void createUpstreams() override {
     HttpProtocolIntegrationTest::createUpstreams();
     // for Jwks upstream.
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, GetParam().upstream_protocol, version_, timeSystem()));
+    addFakeUpstream(GetParam().upstream_protocol);
   }
 
   void initializeFilter(bool add_cluster) {
@@ -387,12 +386,12 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
 
   waitForNextUpstreamRequest();
 
-  const auto* payload_entry =
+  const auto payload_entry =
       upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo"));
-  EXPECT_TRUE(payload_entry != nullptr);
-  EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
+  EXPECT_FALSE(payload_entry.empty());
+  EXPECT_EQ(payload_entry[0]->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::CustomHeaders::get().Authorization));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
@@ -92,6 +93,7 @@ public:
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Http::Http2::CodecStats& stats,
+                 Random::RandomGenerator& random,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                  const uint32_t max_headers_kb, const uint32_t max_headers_count);
 
@@ -275,6 +277,12 @@ protected:
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
+
+    // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
+    // never called. The watermark value is set to the size of the stream window. As a result this
+    // watermark can never overflow because the peer can never send more bytes than the stream
+    // window without triggering protocol error and this buffer is drained after each DATA frame was
+    // dispatched through the filter chain. See source/docs/flow_control.md for more information.
     Buffer::WatermarkBuffer pending_recv_data_{
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
         [this]() -> void { this->pendingRecvBufferHighWatermark(); },
@@ -428,6 +436,30 @@ protected:
     return absl::nullopt;
   }
 
+  /**
+   * This method checks if a protocol constraint had been violated in the sendPendingFrames() call
+   * outside of the dispatch context.
+   * This method is a stop-gap solution for implementing checking of protocol constraint violations
+   * outside of the dispatch context (where at this point the sendPendingFrames() method always
+   * returns success). It allows each case where sendPendingFrames() is called outside of the
+   * dispatch context to be fixed in its own PR so it is easier to review and reason about. Once all
+   * error handling is implemented this method will be removed and the `sendPendingFrames()` will be
+   * changed to return error in both dispatching and non-dispatching contexts. At the same time the
+   * RELEASE_ASSERTs will be removed as well.
+   * The implementation in the ClientConnectionImpl is a no-op as client connections to not check
+   * protocol constraints.
+   * The implementation in the ServerConnectionImpl schedules callback to terminate connection if
+   * the protocol constraint was violated.
+   */
+  virtual void checkProtocolConstraintViolation() PURE;
+
+  /**
+   * Callback for terminating connection when protocol constrain has been violated
+   * outside of the dispatch context.
+   */
+  void scheduleProtocolConstraintViolationCallback();
+  void onProtocolConstraintViolation();
+
   static Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
@@ -478,12 +510,23 @@ private:
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   // Returns true on success or false if outbound queue limits were exceeded.
   bool addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual void checkOutboundFrameLimits() PURE;
+  virtual Envoy::Http::Http2::ProtocolConstraints::ReleasorProc
+  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) PURE;
   virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
+  void sendKeepalive();
+  void onKeepaliveResponse();
+  void onKeepaliveResponseTimeout();
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
+  Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
+  Random::RandomGenerator& random_;
+  Event::TimerPtr keepalive_send_timer_;
+  Event::TimerPtr keepalive_timeout_timer_;
+  std::chrono::milliseconds keepalive_interval_;
+  std::chrono::milliseconds keepalive_timeout_;
+  uint32_t keepalive_interval_jitter_percent_;
 };
 
 /**
@@ -493,7 +536,7 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   using SessionFactory = Nghttp2SessionFactory;
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Http::Http2::CodecStats& stats,
+                       Http::Http2::CodecStats& stats, Random::RandomGenerator& random,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
@@ -508,15 +551,18 @@ private:
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
-  // Presently client connections only perform accounting of outbound frames and do not
+  // Presently client connections do not track or check queue limits for outbound frames and do not
   // terminate connections when queue limits are exceeded. The primary reason is the complexity of
   // the clean-up of upstream connections. The clean-up of upstream connection causes RST_STREAM
   // messages to be sent on corresponding downstream connections. This may actually trigger flood
   // mitigation on the downstream connections, which causes an exception to be thrown in the middle
   // of the clean-up loop, leaving resources in a half cleaned up state.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
-  void checkOutboundFrameLimits() override {}
+  Envoy::Http::Http2::ProtocolConstraints::ReleasorProc trackOutboundFrames(bool) override {
+    return Envoy::Http::Http2::ProtocolConstraints::ReleasorProc([]() {});
+  }
   bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
+  void checkProtocolConstraintViolation() override {}
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -527,7 +573,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Http::Http2::CodecStats& stats,
+                       Http::Http2::CodecStats& stats, Random::RandomGenerator& random,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_request_headers_kb,
                        const uint32_t max_request_headers_count,
@@ -539,9 +585,16 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  void checkOutboundFrameLimits() override;
+  Envoy::Http::Http2::ProtocolConstraints::ReleasorProc
+  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
+
+  /**
+   * Check protocol constraint violations outside of the dispatching context.
+   * This method ASSERTs if it is called in the dispatching context.
+   */
+  void checkProtocolConstraintViolation() override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when

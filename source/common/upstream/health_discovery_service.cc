@@ -32,7 +32,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                          envoy::config::core::v3::ApiVersion transport_api_version,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                          Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                         Random::RandomGenerator& random, ClusterInfoFactory& info_factory,
+                         ClusterInfoFactory& info_factory,
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                          Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
@@ -44,14 +44,14 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                           .getMethodDescriptorForVersion(transport_api_version)),
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
       dispatcher_(dispatcher), runtime_(runtime), store_stats_(stats),
-      ssl_context_manager_(ssl_context_manager), random_(random), info_factory_(info_factory),
+      ssl_context_manager_(ssl_context_manager), info_factory_(info_factory),
       access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
       singleton_manager_(singleton_manager), tls_(tls), specifier_hash_(0),
       validation_visitor_(validation_visitor), api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
-      RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random_);
+      RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, api_.randomGenerator());
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
@@ -208,7 +208,7 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
 
 void HdsDelegate::updateHdsCluster(HdsClusterPtr cluster,
                                    const envoy::config::cluster::v3::Cluster& cluster_config) {
-  cluster->update(admin_, cluster_config, info_factory_, cm_, local_info_, dispatcher_, random_,
+  cluster->update(admin_, cluster_config, info_factory_, cm_, local_info_, dispatcher_,
                   singleton_manager_, tls_, validation_visitor_, api_, access_log_manager_,
                   runtime_);
 }
@@ -220,12 +220,12 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
   // Create HdsCluster.
   auto new_cluster = std::make_shared<HdsCluster>(
       admin_, runtime_, std::move(cluster_config), bind_config, store_stats_, ssl_context_manager_,
-      false, info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_,
+      false, info_factory_, cm_, local_info_, dispatcher_, singleton_manager_, tls_,
       validation_visitor_, api_);
 
   // Begin HCs in the background.
   new_cluster->initialize([] {});
-  new_cluster->initHealthchecks(access_log_manager_, runtime_, random_, dispatcher_, api_);
+  new_cluster->initHealthchecks(access_log_manager_, runtime_, dispatcher_, api_);
 
   return new_cluster;
 }
@@ -344,8 +344,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                        ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                       Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
-                       ThreadLocal::SlotAllocator& tls,
+                       Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : runtime_(runtime), cluster_(std::move(cluster)), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
@@ -358,7 +357,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
 
   info_ = info_factory.createClusterInfo(
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
-       local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+       local_info, dispatcher, singleton_manager, tls, validation_visitor, api});
 
   // Temporary structure to hold Host pointers grouped by locality, to build
   // initial_hosts_per_locality_.
@@ -396,8 +395,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
 void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluster cluster,
                         ClusterInfoFactory& info_factory, ClusterManager& cm,
                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                        Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
-                        ThreadLocal::SlotAllocator& tls,
+                        Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                         AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime) {
 
@@ -416,22 +414,21 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
       update_cluster_info = true;
       info_ = info_factory.createClusterInfo(
           {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_,
-           cm, local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+           cm, local_info, dispatcher, singleton_manager, tls, validation_visitor, api});
     }
 
     // Check to see if anything in the endpoints list has changed.
     updateHosts(cluster_.load_assignment().endpoints(), update_cluster_info);
 
     // Check to see if any of the health checkers have changed.
-    updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
-                       api);
+    updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, dispatcher, api);
   }
 }
 
 void HdsCluster::updateHealthchecks(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
     AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
-    Random::RandomGenerator& random, Event::Dispatcher& dispatcher, Api::Api& api) {
+    Event::Dispatcher& dispatcher, Api::Api& api) {
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers;
   HealthCheckerMap health_checkers_map;
 
@@ -444,9 +441,8 @@ void HdsCluster::updateHealthchecks(
       health_checkers.push_back(health_checker->second);
     } else {
       // If it does not, create a new one.
-      auto new_health_checker =
-          Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
-                                                 access_log_manager, validation_visitor_, api);
+      auto new_health_checker = Upstream::HealthCheckerFactory::create(
+          health_check, *this, runtime, dispatcher, access_log_manager, validation_visitor_, api);
       health_checkers_map.insert({health_check, new_health_checker});
       health_checkers.push_back(new_health_checker);
 
@@ -540,7 +536,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
-      params.dispatcher_, params.random_, params.stats_, params.singleton_manager_, params.tls_,
+      params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
       params.validation_visitor_, params.api_);
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
@@ -555,12 +551,11 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 }
 
 void HdsCluster::initHealthchecks(AccessLog::AccessLogManager& access_log_manager,
-                                  Runtime::Loader& runtime, Random::RandomGenerator& random,
-                                  Event::Dispatcher& dispatcher, Api::Api& api) {
+                                  Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
+                                  Api::Api& api) {
   for (auto& health_check : cluster_.health_checks()) {
-    auto health_checker =
-        Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
-                                               access_log_manager, validation_visitor_, api);
+    auto health_checker = Upstream::HealthCheckerFactory::create(
+        health_check, *this, runtime, dispatcher, access_log_manager, validation_visitor_, api);
 
     health_checkers_.push_back(health_checker);
     health_checkers_map_.insert({health_check, health_checker});

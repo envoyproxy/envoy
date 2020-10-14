@@ -20,6 +20,10 @@ namespace Envoy {
 namespace Network {
 
 class ActiveUdpListenerFactory;
+class UdpListenerWorkerRouter;
+
+using UdpListenerWorkerRouterOptRef =
+    absl::optional<std::reference_wrapper<UdpListenerWorkerRouter>>;
 
 /**
  * ListenSocketFactory is a member of ListenConfig to provide listen socket.
@@ -137,10 +141,16 @@ public:
   virtual ActiveUdpListenerFactory* udpListenerFactory() PURE;
 
   /**
-   * @return factory pointer if writing on UDP socket, otherwise return
-   * nullptr.
+   * @return factory if writing on UDP socket, otherwise return
+   * nullopt.
    */
   virtual UdpPacketWriterFactoryOptRef udpPacketWriterFactory() PURE;
+
+  /**
+   * @return the ``UdpListenerWorkerRouter`` for this listener. This will
+   * be non-empty iff this is a UDP listener.
+   */
+  virtual UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() PURE;
 
   /**
    * @return traffic direction of the listener.
@@ -187,10 +197,14 @@ public:
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 
+  enum class RejectCause {
+    GlobalCxLimit,
+    OverloadAction,
+  };
   /**
    * Called when a new connection is rejected.
    */
-  virtual void onReject() PURE;
+  virtual void onReject(RejectCause cause) PURE;
 };
 
 /**
@@ -246,7 +260,7 @@ public:
    *
    * @param data UdpRecvData from the underlying socket.
    */
-  virtual void onData(UdpRecvData& data) PURE;
+  virtual void onData(UdpRecvData&& data) PURE;
 
   /**
    * Called when the underlying socket is ready for read, before onData() is
@@ -278,7 +292,25 @@ public:
    * UdpListenerCallback
    */
   virtual UdpPacketWriter& udpPacketWriter() PURE;
+
+  /**
+   * Returns the index of this worker, in the range of [0, concurrency).
+   */
+  virtual uint32_t workerIndex() const PURE;
+
+  /**
+   * Called whenever data is received on the underlying udp socket, on
+   * the destination worker for the datagram according to ``destination()``.
+   */
+  virtual void onDataWorker(Network::UdpRecvData&& data) PURE;
+
+  /**
+   * Posts ``data`` to be delivered on this worker.
+   */
+  virtual void post(Network::UdpRecvData&& data) PURE;
 };
+
+using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;
 
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.
@@ -296,6 +328,12 @@ public:
    * Enable accepting new connections.
    */
   virtual void enable() PURE;
+
+  /**
+   * Set the fraction of incoming connections that will be closed immediately
+   * after being opened.
+   */
+  virtual void setRejectFraction(float reject_fraction) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;
@@ -337,9 +375,44 @@ public:
    * @return the error code of the underlying flush api.
    */
   virtual Api::IoCallUint64Result flush() PURE;
+
+  /**
+   * Make this listener readable at the beginning of the next event loop.
+   *
+   * @note: it may become readable during the current loop if feature
+   * ``envoy.reloadable_features.activate_fds_next_event_loop`` is disabled.
+   */
+  virtual void activateRead() PURE;
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
+
+/**
+ * Handles delivering datagrams to the correct worker.
+ */
+class UdpListenerWorkerRouter {
+public:
+  virtual ~UdpListenerWorkerRouter() = default;
+
+  /**
+   * Registers a worker's callbacks for this listener. This worker must accept
+   * packets until it calls ``unregisterWorker``.
+   */
+  virtual void registerWorkerForListener(UdpListenerCallbacks& listener) PURE;
+
+  /**
+   * Unregisters a worker's callbacks for this listener.
+   */
+  virtual void unregisterWorkerForListener(UdpListenerCallbacks& listener) PURE;
+
+  /**
+   * Deliver ``data`` to the correct worker by calling ``onDataWorker()``
+   * or ``post()`` on one of the registered workers.
+   */
+  virtual void deliver(uint32_t dest_worker_index, UdpRecvData&& data) PURE;
+};
+
+using UdpListenerWorkerRouterPtr = std::unique_ptr<UdpListenerWorkerRouter>;
 
 } // namespace Network
 } // namespace Envoy

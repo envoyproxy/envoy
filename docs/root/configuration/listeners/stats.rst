@@ -17,6 +17,7 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    downstream_cx_active, Gauge, Total active connections
    downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_overflow, Counter, Total connections rejected due to enforcement of listener connection limit
+   downstream_cx_overload_reject, Counter, Total connections rejected due to configured overload actions
    downstream_pre_cx_timeout, Counter, Sockets that timed out during listener filter processing
    downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
    global_cx_overflow, Counter, Total connections rejected due to enforecement of the global connection limit
@@ -29,6 +30,10 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    ssl.fail_verify_error, Counter, Total TLS connections that failed CA verification
    ssl.fail_verify_san, Counter, Total TLS connections that failed SAN verification
    ssl.fail_verify_cert_hash, Counter, Total TLS connections that failed certificate pinning verification
+   ssl.ocsp_staple_failed, Counter, Total TLS connections that failed compliance with the OCSP policy
+   ssl.ocsp_staple_omitted, Counter, Total TLS connections that succeeded without stapling an OCSP response
+   ssl.ocsp_staple_responses, Counter, Total TLS connections where a valid OCSP response was available (irrespective of whether the client requested stapling)
+   ssl.ocsp_staple_requests, Counter, Total TLS connections where the client requested an OCSP staple
    ssl.ciphers.<cipher>, Counter, Total successful TLS connections that used cipher <cipher>
    ssl.curves.<curve>, Counter, Total successful TLS connections that used ECDHE curve <curve>
    ssl.sigalgs.<sigalg>, Counter, Total successful TLS connections that used signature algorithm <sigalg>

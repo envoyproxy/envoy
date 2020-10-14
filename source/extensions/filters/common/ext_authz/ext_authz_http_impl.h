@@ -119,16 +119,12 @@ public:
 
 private:
   static MatcherSharedPtr
-  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                    bool enable_case_sensitive_string_matcher);
+  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
   static MatcherSharedPtr
-  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                   bool enable_case_sensitive_string_matcher);
+  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
   static MatcherSharedPtr
-  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                     bool enable_case_sensitive_string_matcher);
+  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
 
-  const bool enable_case_sensitive_string_matcher_;
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
@@ -159,8 +155,9 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
-             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
+  void check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
+             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
+             const StreamInfo::StreamInfo& stream_info) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& message) override;
@@ -170,12 +167,14 @@ public:
                                     const Http::ResponseHeaderMap* response_headers) override;
 
 private:
+  void onTimeout();
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
 
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
+  Event::TimerPtr timeout_timer_;
 };
 
 } // namespace ExtAuthz
