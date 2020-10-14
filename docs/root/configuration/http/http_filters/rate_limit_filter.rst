@@ -14,7 +14,9 @@ can optionally include the virtual host rate limit configurations. More than one
 apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
 
 If the rate limit service is called, and the response for any of the descriptors is over limit, a
-429 response is returned. The rate limit filter also sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header.
+429 response is returned. The rate limit filter also sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header,
+unless :ref:`disable_x_envoy_ratelimited_header <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.disable_x_envoy_ratelimited_header>` is
+set to true.
 
 If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` is 
 set to true, a 500 response is returned.
