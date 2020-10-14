@@ -35,26 +35,6 @@ Kubernetes makes adding Envoy sidecars easy. You’ll need to do two things:
   1. Add an Envoy container to your Pod spec
   2. Modify your services to send all outbound traffic to this sidecar
 
-How you want to configure Envoy will vary depending on your environment—more on
-that below. If you want to use fully dynamic configuration, you can use a
-container like `envoy-simple <https://github.com/turbinelabs/envoy-simple>`_ and
-set the location of the :ref:`various <service_discovery>`
-:ref:`configuration services <routing_configuration>` with environment variables.
-
-.. code-block:: yaml
-
-   - image: turbinelabs/envoy-simple:0.17.2
-     imagePullPolicy: Always
-     name: envoy-simple
-     ports:
-     - containerPort: 8000
-     env:
-     - name: ENVOY_XDS_HOST
-       value: "rotor.default.svc.cluster.local"
-     - name: ENVOY_XDS_PORT
-       value: "50000"
-
-
 Since Pods share the same notion of localhost, you can simply change your
 service to have them call localhost on port 8000 with the correct Host header
 set, instead of calling the remote service. If you’re using Kubernetes’
@@ -108,13 +88,12 @@ your internal network does. Practically, this means three things:
 
   - **Consider using dynamic configuration for instance discovery in the first iteration**. Specifically, using
     :ref:`EDS to update Envoy's notion of available hosts <service_discovery>`
-    with an EDS server like `Rotor <https://github.com/turbinelabs/rotor>`_ keeps
+    with an EDS server keeps
     Envoy’s routing tables in sync with the underlying infrastructure. Envoy can
     use static configuration for listeners and routes, so it’s simple and
     valuable to set up a control plane to manage instance availability.
 
-If you’ve been following the examples above, you can set up
-`Rotor <https://github.com/turbinelabs/rotor>`_, an Envoy control plane and
+If you’ve been following the examples above, you can set up an Envoy control plane and
 service discovery bridge, to implement xDS. Remember that Envoy can mix static
 and dynamic configuration, so if you want to statically configure listeners,
 routes, and clusters (LDS / RDS / CDS), you can use your own Envoy container

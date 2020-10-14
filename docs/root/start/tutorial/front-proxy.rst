@@ -44,12 +44,7 @@ Most modern apps will want to implement a dynamic control plane, since the
 instances within each service are dynamic. A static configuration can only
 point to a fixed set of instances, while a dynamic control plane can keep Envoy
 up-to-date on the state of your environment, typically by reading from your
-service discovery registry. See :ref:`Integrating service discovery with Envoy <routing_configuration>`
-for implementations that will do this for you, like
-`Rotor <https://github.com/turbinelabs/rotor>`_.
-
-For an example of how this would work in AWS,
-`see this repository, which uses AWS, CloudFormation, and Rotor <https://github.com/turbinelabs/examples/tree/master/rotor-nlb>`_.
+service discovery registry. See :ref:`Integrating service discovery with Envoy <routing_configuration>`.
 
 If you’re looking to deploy Envoy for internal traffic only, see
 :ref:`Basic service mesh <service_mesh>`
@@ -60,8 +55,7 @@ Deploying Envoy in Kubernetes
 If you’re in Kubernetes, you can point NLBs directly to a an exposed Kubernetes
 service in front of an Envoy deployment.
 
-Here’s what that Deployment might look like. It uses
-`envoy-simple <https://github.com/turbinelabs/envoy-simple>`_, a Docker
+Here’s what that Deployment might look like. It uses a Docker
 container that allows Envoy to be fully dynamically configured by specifying a
 control plane implementation via environment variables. Simply change
 ``ENVOY_XDS_HOST`` to the network location of your control plane (typically

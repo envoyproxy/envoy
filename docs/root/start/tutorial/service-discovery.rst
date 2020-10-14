@@ -33,13 +33,6 @@ and the Endpoint Discovery Service
 
 Here are several options to avoid starting from scratch:
 
-`Rotor <https://github.com/turbinelabs/rotor>`_ is a **fast, lightweight xDS
-implementation with service discovery integration** to Kubernetes, Consul, AWS,
-and more. It provides a set of defaults for routing and listeners (RDS and
-LDS). It’s also part of the commercial solution
-`Houston, by Turbine Labs <http://turbinelabs.io/product>`_, which adds more
-configuration around routing, resilience, and metrics.
-
 The Envoy repository provides
 `go-control-plane <https://github.com/envoyproxy/go-control-plane>`_, an
 **open-source stub implementation**. If you want to get your hands dirty with

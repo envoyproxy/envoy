@@ -45,7 +45,7 @@ Here is a simple example of a route in RDS:
 Both open-source
 (`go-control-plane <https://github.com/envoyproxy/go-control-plane>`_,
 `Istio Pilot <https://istio.io/docs/concepts/traffic-management/pilot.html>`_)
-and commercial (`Houston <http://turbinelabs.io/product>`_) implementations of RDS are
+and commercial implementations of RDS are
 available, or the Envoy docs define a :ref:`full RDS specification <v2_grpc_streaming_endpoints>`
 for teams that want to roll their own. Keep in mind that the RDS specification
 is only the transport mechanism; how you manage the state is up to you,
