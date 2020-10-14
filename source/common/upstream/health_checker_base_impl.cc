@@ -26,6 +26,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       event_logger_(std::move(event_logger)), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
+      no_traffic_healthy_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_healthy_interval,
+                                                              no_traffic_interval_.count())),
       initial_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, initial_jitter, 0)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
       interval_jitter_percent_(config.interval_jitter_percent()),
@@ -123,7 +125,10 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
       break;
     }
   } else {
-    base_time_ms = no_traffic_interval_.count();
+    base_time_ms =
+        (state == HealthState::Healthy && changed_state != HealthTransition::ChangePending)
+            ? no_traffic_healthy_interval_.count()
+            : no_traffic_interval_.count();
   }
   return intervalWithJitter(base_time_ms, interval_jitter_);
 }
