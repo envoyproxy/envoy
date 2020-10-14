@@ -444,6 +444,27 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
   EXPECT_EQ("012", internal_buffer.toString());
 }
 
+TEST_F(BufferedIoSocketHandleTest, TestWriteAfteShutdown) {
+  Buffer::OwnedImpl data_to_write("0123456789");
+  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  result = io_handle_->write(data_to_write);
+  EXPECT_TRUE(result.ok());
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+  result = io_handle_->write(data_to_write);
+  EXPECT_FALSE(result.ok());
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWritevAfteShutdown) {
+  std::string raw_data("0123456789");
+  Buffer::RawSlice slice{static_cast<void*>(raw_data.data()), raw_data.size()};
+  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  result = io_handle_peer_->writev(&slice, 1);
+  EXPECT_TRUE(result.ok());
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+  result = io_handle_->writev(&slice, 1);
+  EXPECT_FALSE(result.ok());
+}
+
 TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
   std::string accumulator;
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);

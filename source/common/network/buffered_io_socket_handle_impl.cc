@@ -139,14 +139,17 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
+  // Closed peer.
   if (!writable_peer_) {
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
+  // Write to a shutdown peer. 
   if (writable_peer_->isWriteEndSet()) {
     // EPIPE or ENOTCONN
     return {0, Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
+  // Buffer is full. Cannot write anymore.
   if (!writable_peer_->isWritable()) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
@@ -240,11 +243,9 @@ Event::FileEventPtr BufferedIoSocketHandleImpl::createFileEvent(Event::Dispatche
                                                                 Event::FileReadyCb cb,
                                                                 Event::FileTriggerType trigger_type,
                                                                 uint32_t events) {
-  ASSERT(event_counter_ == 0);
-  ++event_counter_;
   io_callback_ = dispatcher.createSchedulableCallback([this]() { user_file_event_->onEvents(); });
   auto res = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      dispatcher, cb, trigger_type, events, *io_callback_, event_counter_);
+      dispatcher, cb, trigger_type, events, *io_callback_);
   user_file_event_ = res.get();
   // Blindly activate the events.
   io_callback_->scheduleCallbackNextIteration();

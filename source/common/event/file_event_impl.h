@@ -170,10 +170,9 @@ class UserSpaceFileEventFactory {
 public:
   static std::unique_ptr<UserSpaceFileEventImpl>
   createUserSpaceFileEventImpl(Event::Dispatcher&, Event::FileReadyCb cb, Event::FileTriggerType,
-                               uint32_t events, SchedulableCallback& scheduable_cb,
-                               int& event_counter) {
+                               uint32_t events, SchedulableCallback& scheduable_cb) {
     return std::unique_ptr<UserSpaceFileEventImpl>(
-        new UserSpaceFileEventImpl(cb, events, scheduable_cb, event_counter));
+        new UserSpaceFileEventImpl(cb, events, scheduable_cb));
   }
 };
 
