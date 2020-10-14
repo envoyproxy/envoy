@@ -6,6 +6,9 @@
 # https://github.com/actions/virtual-environments/blob/master/images/macos/macos-10.15-Readme.md for
 # a list of pre-installed tools in the macOS image.
 
+# https://github.com/actions/virtual-environments/issues/1811
+brew uninstall openssl@1.0.2t
+
 export HOMEBREW_NO_AUTO_UPDATE=1
 HOMEBREW_RETRY_ATTEMPTS=10
 HOMEBREW_RETRY_INTERVAL=1
