@@ -525,14 +525,16 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
 }
 
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                         Event::FileTriggerType trigger, uint32_t events) {
+                                             Event::FileTriggerType trigger, uint32_t events) {
   RELEASE_ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                          "file descriptor. This is not allowed.");
   file_event_ = dispatcher.createFileEvent(fd_, cb, trigger, events);
 }
 
-Event::FileEventPtr IoSocketHandleImpl::createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                         Event::FileTriggerType trigger, uint32_t events) {
+Event::FileEventPtr IoSocketHandleImpl::createManagedFileEvent(Event::Dispatcher& dispatcher,
+                                                               Event::FileReadyCb cb,
+                                                               Event::FileTriggerType trigger,
+                                                               uint32_t events) {
   return dispatcher.createFileEvent(fd_, cb, trigger, events);
 }
 

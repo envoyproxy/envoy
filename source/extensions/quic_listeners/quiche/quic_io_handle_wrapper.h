@@ -117,12 +117,13 @@ public:
   }
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                       Event::FileTriggerType trigger, uint32_t events) override {
+                           Event::FileTriggerType trigger, uint32_t events) override {
     io_handle_.initializeFileEvent(dispatcher, cb, trigger, events);
   }
 
   Event::FileEventPtr createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                       Event::FileTriggerType trigger, uint32_t events) override {
+                                             Event::FileTriggerType trigger,
+                                             uint32_t events) override {
     return io_handle_.initializeFileEvent(dispatcher, cb, trigger, events);
   }
   void activateFileEvents(uint32_t events) override { io_handle_.activateFileEvents(events); }

@@ -29,7 +29,7 @@ protected:
 
   TcpListenerCallbacks& cb_;
   const uint32_t backlog_size_;
-  Event::FileEventPtr file_event_;
+
 private:
   void onSocketEvent(short flags);
 

@@ -65,10 +65,11 @@ public:
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                       Event::FileTriggerType trigger, uint32_t events) override;
+                           Event::FileTriggerType trigger, uint32_t events) override;
 
   Event::FileEventPtr createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                       Event::FileTriggerType trigger, uint32_t events) override;
+                                             Event::FileTriggerType trigger,
+                                             uint32_t events) override;
 
   void activateFileEvents(uint32_t events) override;
   void enableFileEvents(uint32_t events) override;

@@ -255,8 +255,7 @@ protected:
     }
 
     NiceMock<Event::MockFileEvent>* file_event = new NiceMock<Event::MockFileEvent>;
-    EXPECT_CALL(*dispatcher, createFileEvent_(0, _, _, _))
-        .WillOnce(SaveArg<1>(&file_ready_cb_));
+    EXPECT_CALL(*dispatcher, createFileEvent_(0, _, _, _)).WillOnce(SaveArg<1>(&file_ready_cb_));
 
     auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
     EXPECT_CALL(*transport_socket, canFlushClose()).WillRepeatedly(Return(true));
