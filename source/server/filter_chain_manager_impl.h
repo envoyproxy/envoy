@@ -189,11 +189,9 @@ public:
   void addFilterChains(
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
-      FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
-  void copyOrRebuildDefaultFilterChain(
-      const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
       FilterChainFactoryContextCreator& context_creator);
+
   static bool isWildcardServerName(const std::string& name);
 
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
@@ -209,6 +207,15 @@ public:
 
 private:
   void convertIPsToTries();
+
+  // Build default filter chain from filter chain message. Skip the build but copy from original
+  // filter chain manager if the default filter chain message duplicates the message in origin
+  // filter chain manager. Called by addFilterChains().
+  void copyOrRebuildDefaultFilterChain(
+      const envoy::config::listener::v3::FilterChain* default_filter_chain,
+      FilterChainFactoryBuilder& filter_chain_factory_builder,
+      FilterChainFactoryContextCreator& context_creator);
+
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
   using SourcePortsMapSharedPtr = std::shared_ptr<SourcePortsMap>;
   using SourceIPsMap = absl::flat_hash_map<std::string, SourcePortsMapSharedPtr>;

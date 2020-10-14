@@ -743,6 +743,8 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
       callback(*message_and_filter_chain.second);
     }
   }
+  // Filter chain manager maintains an optional default filter chain besides the filter chains
+  // indexed by message.
   if (auto eq = MessageUtil();
       filter_chain_manager_.defaultFilterChainMessage().has_value() &&
       (!another_listener.filter_chain_manager_.defaultFilterChainMessage().has_value() ||

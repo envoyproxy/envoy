@@ -184,8 +184,7 @@ void FilterChainManagerImpl::addFilterChains(
 
     // Reject partial wildcards, we don't match on them.
     for (const auto& server_name : filter_chain_match.server_names()) {
-      if (server_name.find('*') != std::string::npos &&
-          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
+      if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
         throw EnvoyException(
             fmt::format("error adding listener '{}': partial wildcards are not supported in "
                         "\"server_names\"",
@@ -223,16 +222,25 @@ void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
     const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
+  // Default filter chain is built exactly once.
+  ASSERT(!default_filter_chain_message_.has_value());
+
+  // Save the default filter chain message. This message could be used in next listener update.
   if (default_filter_chain == nullptr) {
     return;
   }
   default_filter_chain_message_ = absl::make_optional(*default_filter_chain);
+
+  // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
   if (origin == nullptr) {
     default_filter_chain_ =
         filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
     return;
   }
+
+  // Copy from original filter chain manager, or build new filter chain if the default filter chain
+  // is not equivalent to the one in the original filter chain manager.
   MessageUtil eq;
   if (origin->default_filter_chain_message_.has_value() &&
       eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
