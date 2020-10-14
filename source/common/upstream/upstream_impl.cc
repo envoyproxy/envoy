@@ -356,12 +356,12 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   return connection;
 }
 
-void HostImpl::addSecretsReadyCb(std::function<void()> callback,
-                                 const envoy::config::core::v3::Metadata* metadata) const {
+void HostImpl::addReadyCb(std::function<void()> callback,
+                          const envoy::config::core::v3::Metadata* metadata) const {
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? cluster_->transportSocketMatcher().resolve(metadata).factory_
                             : socket_factory_;
-  factory.addSecretsReadyCb(callback);
+  factory.addReadyCb(callback);
 }
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }

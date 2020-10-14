@@ -4495,7 +4495,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   // Add a secrets ready callback that should not be invoked.
   MockFunction<void()> mock_callback_;
   EXPECT_CALL(mock_callback_, Call()).Times(0);
-  server_ssl_socket_factory.addSecretsReadyCb(mock_callback_.AsStdFunction());
+  server_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
 
   auto transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
@@ -4536,7 +4536,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   // Add a secrets ready callback that should not be invoked.
   MockFunction<void()> mock_callback_;
   EXPECT_CALL(mock_callback_, Call()).Times(0);
-  client_ssl_socket_factory.addSecretsReadyCb(mock_callback_.AsStdFunction());
+  client_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
 
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
@@ -4577,7 +4577,7 @@ TEST_P(SslSocketTest, ClientAddSecretsReadyCallback) {
   // Add a secrets ready callback. It should not be invoked until onAddOrUpdateSecret() is called.
   MockFunction<void()> mock_callback_;
   EXPECT_CALL(mock_callback_, Call()).Times(0);
-  client_ssl_socket_factory.addSecretsReadyCb(mock_callback_.AsStdFunction());
+  client_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
 
   // Call onAddOrUpdateSecret, but return a null ssl_ctx. This should not invoke the callback.
   EXPECT_CALL(context_manager, createSslClientContext(_, _)).WillOnce(Return(nullptr));
@@ -4591,7 +4591,7 @@ TEST_P(SslSocketTest, ClientAddSecretsReadyCallback) {
   // Add another callback, it should be invoked immediately.
   MockFunction<void()> second_callback_;
   EXPECT_CALL(second_callback_, Call());
-  client_ssl_socket_factory.addSecretsReadyCb(second_callback_.AsStdFunction());
+  client_ssl_socket_factory.addReadyCb(second_callback_.AsStdFunction());
 }
 
 // Validate that secrets callbacks are invoked when secrets become ready.
@@ -4622,7 +4622,7 @@ TEST_P(SslSocketTest, ServerAddSecretsReadyCallback) {
   // Add a secrets ready callback. It should not be invoked until onAddOrUpdateSecret() is called.
   MockFunction<void()> mock_callback_;
   EXPECT_CALL(mock_callback_, Call()).Times(0);
-  server_ssl_socket_factory.addSecretsReadyCb(mock_callback_.AsStdFunction());
+  server_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
 
   // Call onAddOrUpdateSecret, but return a null ssl_ctx. This should not invoke the callback.
   EXPECT_CALL(context_manager, createSslServerContext(_, _, _)).WillOnce(Return(nullptr));
@@ -4637,7 +4637,7 @@ TEST_P(SslSocketTest, ServerAddSecretsReadyCallback) {
   // Add another callback, it should be invoked immediately.
   MockFunction<void()> second_callback_;
   EXPECT_CALL(second_callback_, Call());
-  server_ssl_socket_factory.addSecretsReadyCb(second_callback_.AsStdFunction());
+  server_ssl_socket_factory.addReadyCb(second_callback_.AsStdFunction());
 }
 
 TEST_P(SslSocketTest, TestTransportSocketCallback) {

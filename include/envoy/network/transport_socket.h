@@ -232,7 +232,7 @@ public:
    * sockets are ready. Will be invoked immediately if no secrets are required or if they
    * are already loaded.
    */
-  virtual void addSecretsReadyCb(std::function<void()> callback) PURE;
+  virtual void addReadyCb(std::function<void()> callback) PURE;
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

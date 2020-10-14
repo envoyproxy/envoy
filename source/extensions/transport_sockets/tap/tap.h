@@ -42,7 +42,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   // TODO(mpuncel) only invoke callback() once secrets are ready.
-  void addSecretsReadyCb(std::function<void()> callback) override { callback(); };
+  void addReadyCb(std::function<void()> callback) override { callback(); };
 
 private:
   Network::TransportSocketFactoryPtr transport_socket_factory_;

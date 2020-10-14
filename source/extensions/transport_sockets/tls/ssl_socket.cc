@@ -371,7 +371,7 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-void ClientSslSocketFactory::addSecretsReadyCb(std::function<void()> callback) {
+void ClientSslSocketFactory::addReadyCb(std::function<void()> callback) {
   bool immediately_run_callback = false;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
@@ -438,7 +438,7 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-void ServerSslSocketFactory::addSecretsReadyCb(std::function<void()> callback) {
+void ServerSslSocketFactory::addReadyCb(std::function<void()> callback) {
   bool immediately_run_callback = false;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);

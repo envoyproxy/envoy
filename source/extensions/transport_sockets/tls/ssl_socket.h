@@ -109,7 +109,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
-  void addSecretsReadyCb(std::function<void()> callback) override;
+  void addReadyCb(std::function<void()> callback) override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
@@ -136,7 +136,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
-  void addSecretsReadyCb(std::function<void()> callback) override;
+  void addReadyCb(std::function<void()> callback) override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

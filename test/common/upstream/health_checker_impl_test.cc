@@ -942,7 +942,7 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
       Network::TransportSocketFactoryPtr(socket_factory));
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
 
-  EXPECT_CALL(*socket_factory, addSecretsReadyCb(_))
+  EXPECT_CALL(*socket_factory, addReadyCb(_))
       .WillOnce(Invoke([&](std::function<void()> callback) -> void { callback(); }));
   EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
 
@@ -2442,7 +2442,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
       .WillRepeatedly(Return(TransportSocketMatcher::MatchData(
           *health_check_only_socket_factory, health_transport_socket_stats, "health_check_only")))
       .RetiresOnSaturation();
-  EXPECT_CALL(*health_check_only_socket_factory, addSecretsReadyCb(_))
+  EXPECT_CALL(*health_check_only_socket_factory, addReadyCb(_))
       .WillOnce(Invoke([&](std::function<void()> callback) -> void { callback(); }));
   // The health_check_only_socket_factory should be used to create a transport socket for the health
   // check connection.
@@ -2480,7 +2480,7 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
 
   auto default_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
 
-  EXPECT_CALL(*default_socket_factory, addSecretsReadyCb(_))
+  EXPECT_CALL(*default_socket_factory, addReadyCb(_))
       .WillOnce(Invoke([&](std::function<void()> callback) -> void { callback(); }));
   // The default_socket_factory should be used to create a transport socket for the health check
   // connection.
