@@ -199,7 +199,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // subscribed to.
 
       // We convert the incoming list into a set in order to more efficiently perform this
-      // comparsions when there are a lot of watches.
+      // comparison when there are a lot of watches.
       absl::flat_hash_set<std::string> all_expired;
       all_expired.insert(expired.begin(), expired.end());
 
