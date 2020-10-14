@@ -16,8 +16,8 @@ feature of the API, which is most useful for simple requirements. For more compl
     :maxdepth: 2
 
     install
-    docker
     quick-start
-    tools/tools
+    docker
     sandboxes/index
+    tools/tools
     building
