@@ -75,8 +75,10 @@ config:
     timeout: 3s
   credentials:
     client_id: "secret"
-    token_secret: {}
-    hmac_secret: {}
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
   authorization_endpoint: https://oauth.com/oauth/authorize/
   redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
