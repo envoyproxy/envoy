@@ -458,6 +458,9 @@ void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+  // Update local address in case it is restored by a listener filter
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {

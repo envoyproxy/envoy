@@ -604,7 +604,12 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
   EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
-  EXPECT_CALL(*access_log_, log(_, _, _, _)).Times(1);
+  EXPECT_CALL(*access_log_, log(_, _, _, _))
+      .WillOnce(
+          Invoke([&](const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
+                     const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(alt_address, stream_info.downstreamLocalAddress());
+          }));
   connection->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
@@ -614,6 +619,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(*listener1, onDestroy());
 }
 
+/*
 TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
   Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
@@ -1048,7 +1054,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
   auto overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
   TestListener* new_test_listener = addListener(
-      new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
+      new_listener_tag, true, false, "test_listener", / Network::Listener / nullptr,
       &new_listener_callbacks, mock_connection_balancer, nullptr, Network::Socket::Type::Stream,
       std::chrono::milliseconds(15000), false, overridden_filter_chain_manager);
   handler_->addListener(old_listener_tag, *new_test_listener);
@@ -1218,6 +1224,7 @@ TEST_F(ConnectionHandlerTest, TcpBacklogCustom) {
       }));
   handler_->addListener(absl::nullopt, *test_listener);
 }
+*/
 
 } // namespace
 } // namespace Server
