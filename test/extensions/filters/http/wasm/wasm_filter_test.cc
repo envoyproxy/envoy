@@ -1320,6 +1320,44 @@ TEST_P(WasmHttpFilterTest, Property) {
   filter().log(&request_headers, nullptr, nullptr, log_stream_info);
 }
 
+TEST_P(WasmHttpFilterTest, ClusterMetadata) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "cluster_metadata");
+  setupFilter();
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  ;
+  auto cluster_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
+          R"EOF(
+      filter_metadata:
+        namespace:
+          key: cluster
+    )EOF"));
+
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  StreamInfo::MockStreamInfo log_stream_info;
+  Http::TestRequestHeaderMapImpl request_headers{{}};
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
+  EXPECT_CALL(*host_description, cluster()).WillRepeatedly(ReturnRef(*cluster));
+  EXPECT_CALL(request_stream_info_, upstreamHost()).WillRepeatedly(Return(host_description));
+  filter().log(&request_headers, nullptr, nullptr, log_stream_info);
+
+  // If upstream host is empty, fallback to upstream cluster info for cluster metadata.
+  EXPECT_CALL(request_stream_info_, upstreamHost()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
+  filter().log(&request_headers, nullptr, nullptr, log_stream_info);
+}
+
 TEST_P(WasmHttpFilterTest, SharedData) {
   setupTest("shared_data");
   EXPECT_CALL(rootContext(), log_(spdlog::level::info, Eq(absl::string_view("set CasMismatch"))));
