@@ -54,7 +54,7 @@ public:
   MOCK_METHOD(void, createFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
-  MOCK_METHOD(Event::FileEvent*, createManagedFileEvent,
+  MOCK_METHOD(Event::FileEventPtr, createManagedFileEvent,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(void, activateFileEvents, (uint32_t events));
