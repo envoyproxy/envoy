@@ -145,7 +145,7 @@ def RegexGroupsMatch(regex, lhs, rhs):
   '''Do two strings match modulo a regular expression?
 
   Args:
-    regex: regular expresison
+    regex: regular expression
     lhs: LHS string
     rhs: RHS string
   Returns:
@@ -193,7 +193,7 @@ def CpeMatch(cpe, dep_metadata):
   # An exact version match is a hit.
   if cpe.version == dep_version:
     return True
-  # Allow the 'last_updated' dependency metadata to substitue for date.
+  # Allow the 'last_updated' dependency metadata to substitute for date.
   # TODO(htuch): Make a finer grained distinction between Envoy update date and dependency
   # release date in 'last_updated'.
   # TODO(htuch): Consider fuzzier date ranges.
