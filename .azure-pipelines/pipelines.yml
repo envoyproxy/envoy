@@ -294,7 +294,6 @@ jobs:
           NO_BUILD_SETUP: 1
 
   - job: macOS
-    dependsOn: ["format"]
     timeoutInMinutes: 360
     pool:
       vmImage: "macos-latest"
