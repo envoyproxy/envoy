@@ -1353,7 +1353,12 @@ name: inject_trailers
   Buffer::OwnedImpl data(std::string(2 * 256 * 1024 * 1024, 'a'));
   codec_client_->sendData(*downstream_request, data, true);
 
-  response->waitForReset();
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, TrailersInjectedWhileEncodingLargeResponse) {
@@ -1383,7 +1388,12 @@ name: inject_trailers
   EXPECT_EQ("503", response->headers().getStatusValue());
 
   upstream_request_->encodeData(2 * 256 * 1024 * 1024, true);
-  response->waitForReset();
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
 
   EXPECT_EQ(response->trailers(), nullptr);
 }
@@ -1412,7 +1422,13 @@ name: inject_trailers
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
   upstream_request_->encodeData(2 * 256 * 1024 * 1024, true);
-  response->waitForReset();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
 
   EXPECT_EQ(response->trailers(), nullptr);
 }
