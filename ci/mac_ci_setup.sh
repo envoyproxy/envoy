@@ -37,7 +37,7 @@ function retry () {
     return "$returns"
 }
 
-if ! retry brew update; then
+if ! retry brew update --verbose; then
     echo "Failed to update homebrew"
     exit 1
 fi
