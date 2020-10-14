@@ -2,6 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/buffered_io_socket_handle_impl.h"
+#include "common/network/address_impl.h"
 
 #include "test/mocks/event/mocks.h"
 
@@ -16,6 +17,11 @@ namespace Envoy {
 namespace Network {
 namespace {
 
+MATCHER(IsInvalidateAddress, "") {
+  return arg.err_->getErrorCode() == Api::IoError::IoErrorCode::NoSupport;
+}
+
+MATCHER(IsNotSupportedResult, "") { return arg.errno_ == SOCKET_ERROR_NOT_SUP; }
 class MockFileEventCallback {
 public:
   MOCK_METHOD(void, called, (uint32_t arg));
@@ -402,6 +408,16 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
   ev.reset();
 }
 
+TEST_F(BufferedIoSocketHandleTest, TestRepeatedShutdownWR) {
+  EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
+  EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestShutDownOptionsNotSupported) {
+  ASSERT_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RD), "");
+  ASSERT_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
+}
+
 TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
   Buffer::OwnedImpl buf("0123456789");
   io_handle_peer_->write(buf);
@@ -577,6 +593,60 @@ TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
   io_handle_->close();
 }
 
+TEST_F(BufferedIoSocketHandleTest, TestNotSupportingMmsg) {
+  EXPECT_FALSE(io_handle_->supportsMmsg());
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestNotSupportsUdpGro) {
+  EXPECT_FALSE(io_handle_->supportsUdpGro());
+}
+
+class BufferedIoSocketHandleNotImplementedTest : public testing::Test {
+public:
+  BufferedIoSocketHandleNotImplementedTest() {
+    io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+    io_handle_peer_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+    io_handle_->setWritablePeer(io_handle_peer_.get());
+    io_handle_peer_->setWritablePeer(io_handle_.get());
+  }
+  ~BufferedIoSocketHandleNotImplementedTest() override {
+    if (io_handle_->isOpen()) {
+      io_handle_->close();
+    }
+    if (io_handle_peer_->isOpen()) {
+      io_handle_peer_->close();
+    }
+  }
+
+  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_;
+  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_peer_;
+  Buffer::RawSlice slice_;
+};
+
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnSendmsg) {
+  EXPECT_THAT(io_handle_->sendmsg(&slice_, 0, 0, nullptr,
+                                  Network::Address::EnvoyInternalInstance("listener_id")),
+              IsInvalidateAddress());
+}
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnRecvmsg) {
+  Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
+  EXPECT_THAT(io_handle_->recvmsg(&slice_, 0, 0, output_is_ignored), IsInvalidateAddress());
+}
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnRecvmmsg) {
+  RawSliceArrays slices_is_ignored(1, absl::FixedArray<Buffer::RawSlice>({slice_}));
+  Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
+  EXPECT_THAT(io_handle_->recvmmsg(slices_is_ignored, 0, output_is_ignored), IsInvalidateAddress());
+}
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnBind) {
+  auto address_is_ignored =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
+  EXPECT_THAT(io_handle_->bind(address_is_ignored), IsNotSupportedResult());
+}
+
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnListen) {
+  int back_log_is_ignored = 0;
+  EXPECT_THAT(io_handle_->listen(back_log_is_ignored), IsNotSupportedResult());
+}
 } // namespace
 } // namespace Network
 } // namespace Envoy

@@ -116,10 +116,6 @@ private:
   // The attached file event with this socket. The event is not owned by the socket.
   Event::UserSpaceFileEventImpl* user_file_event_;
 
-  // Envoy never schedule two independent IO event on the same socket. Use this counter to verify.
-  // TODO(lambdai): Remove this when the entire #13361 is done.
-  int event_counter_{0};
-
   // The schedulable handle of the above event.
   Event::SchedulableCallbackPtr io_callback_;
 
