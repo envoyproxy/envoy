@@ -25,7 +25,7 @@ struct AbsoluteMinimum {
   const std::chrono::milliseconds value_;
 };
 
-class ScaledTimerMinimum : public absl::variant<ScaledMinimum, AbsoluteMinimum> {
+class ScaledTimerMinimum : private absl::variant<ScaledMinimum, AbsoluteMinimum> {
 public:
   using absl::variant<ScaledMinimum, AbsoluteMinimum>::variant;
 
@@ -41,7 +41,8 @@ public:
       }
       const std::chrono::milliseconds value_;
     };
-    return absl::visit(Visitor(maximum), *this);
+    return absl::visit<Visitor, const absl::variant<ScaledMinimum, AbsoluteMinimum>&>(
+        Visitor(maximum), *this);
   }
 };
 
