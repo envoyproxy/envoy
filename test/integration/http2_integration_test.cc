@@ -568,6 +568,25 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
   ASSERT_FALSE(response->complete());
 }
 
+TEST_P(Http2MetadataIntegrationTest, RequestMetadataThenTrailers) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  Http::TestRequestTrailerMapImpl request_trailers{{"trailer", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+}
+
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
 typed_config:
@@ -1382,9 +1401,11 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
                                      {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
-        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(std::string(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie).empty());
+        served_by.insert(std::string(response.headers()
+                                         .get(Http::LowerCaseString("x-served-by"))[0]
+                                         ->value()
+                                         .getStringView()));
       });
   EXPECT_EQ(served_by.size(), num_upstreams_);
 }
@@ -1413,7 +1434,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
         std::string value(
-            response.headers().get(Http::Headers::get().SetCookie)->value().getStringView());
+            response.headers().get(Http::Headers::get().SetCookie)[0]->value().getStringView());
         set_cookies.insert(value);
         EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15; HttpOnly"));
       });
@@ -1444,7 +1465,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
         std::string value(
-            response.headers().get(Http::Headers::get().SetCookie)->value().getStringView());
+            response.headers().get(Http::Headers::get().SetCookie)[0]->value().getStringView());
         set_cookies.insert(value);
         EXPECT_THAT(value, MatchesRegex("^foo=.*$"));
       });
@@ -1474,9 +1495,11 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
                                      {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
-        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(std::string(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie).empty());
+        served_by.insert(std::string(response.headers()
+                                         .get(Http::LowerCaseString("x-served-by"))[0]
+                                         ->value()
+                                         .getStringView()));
       });
   EXPECT_EQ(served_by.size(), 1);
 }
@@ -1505,9 +1528,11 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
                                      {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
-        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(std::string(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie).empty());
+        served_by.insert(std::string(response.headers()
+                                         .get(Http::LowerCaseString("x-served-by"))[0]
+                                         ->value()
+                                         .getStringView()));
       });
   EXPECT_EQ(served_by.size(), 1);
 }
@@ -2293,6 +2318,62 @@ typed_config:
   // Verify that the flood check was triggered
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+}
+
+// Verify that the server can detect flooding by the RST_STREAM on when upstream disconnects
+// before sending response headers.
+TEST_P(Http2FloodMitigationTest, RstStreamOnUpstreamRemoteCloseBeforeResponseHeaders) {
+  // pre-fill 3 away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 3);
+
+  // Start second request.
+  auto request2 =
+      Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(1), "host", "/test/long/url");
+  sendFrame(request2);
+
+  // Wait for it to be proxied
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_total", 2);
+
+  // Disconnect upstream connection. Since there no response headers were sent yet the router
+  // filter will send 503 with body and then RST_STREAM. With these 3 frames the downstream outbound
+  // frame queue should overflow.
+  ASSERT_TRUE(static_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->closeConnection(0));
+
+  // Wait for connection to be flooded with outbound RST_STREAM frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  ASSERT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// Verify that the server can detect flooding by the RST_STREAM on stream idle timeout
+// after sending response headers.
+TEST_P(Http2FloodMitigationTest, RstStreamOnStreamIdleTimeoutAfterResponseHeaders) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* stream_idle_timeout = hcm.mutable_stream_idle_timeout();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        stream_idle_timeout->set_seconds(seconds.count());
+      });
+  // pre-fill 2 away from overflow
+  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 2);
+
+  // Start second request, which should result in response headers to be sent but the stream kept
+  // open.
+  auto request2 = Http2Frame::makeRequest(
+      Http2Frame::makeClientStreamId(1), "host", "/test/long/url",
+      {Http2Frame::Header("response_data_blocks", "0"), Http2Frame::Header("no_end_stream", "0")});
+  sendFrame(request2);
+
+  // Wait for stream idle timeout to send RST_STREAM. With the response headers frame from the
+  // second response the downstream outbound frame queue should overflow.
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
 }
 
 // Verify detection of overflowing outbound frame queue with the PING frames sent by the keep alive

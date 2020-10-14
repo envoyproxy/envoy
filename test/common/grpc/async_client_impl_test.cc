@@ -121,7 +121,7 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   EXPECT_CALL(grpc_callbacks,
               onCreateInitialMetadata(testing::Truly([&expected_downstream_local_address](
                                                          Http::RequestHeaderMap& headers) {
-                return headers.get(Http::LowerCaseString("downstream-local-address"))->value() ==
+                return headers.get(Http::LowerCaseString("downstream-local-address"))[0]->value() ==
                        expected_downstream_local_address;
               })));
   EXPECT_CALL(http_stream, sendHeaders(_, _))

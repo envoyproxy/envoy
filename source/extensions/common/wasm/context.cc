@@ -403,7 +403,8 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
   _f(METADATA) _f(REQUEST) _f(RESPONSE) _f(CONNECTION) _f(UPSTREAM) _f(NODE) _f(SOURCE)            \
       _f(DESTINATION) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME)                \
           _f(CLUSTER_METADATA) _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME)                   \
-              _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID) _f(FILTER_STATE)
+              _f(UPSTREAM_HOST_METADATA) _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)     \
+                  _f(FILTER_STATE)
 
 static inline std::string downCase(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -524,6 +525,14 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   case PropertyToken::CLUSTER_METADATA:
     if (info && info->upstreamHost()) {
       return CelValue::CreateMessage(&info->upstreamHost()->cluster().metadata(), arena);
+    } else if (info && info->upstreamClusterInfo().has_value() &&
+               info->upstreamClusterInfo().value()) {
+      return CelValue::CreateMessage(&info->upstreamClusterInfo().value()->metadata(), arena);
+    }
+    break;
+  case PropertyToken::UPSTREAM_HOST_METADATA:
+    if (info && info->upstreamHost() && info->upstreamHost()->metadata()) {
+      return CelValue::CreateMessage(info->upstreamHost()->metadata().get(), arena);
     }
     break;
   case PropertyToken::ROUTE_NAME:
@@ -613,6 +622,16 @@ WasmResult Context::getProperty(absl::string_view path, std::string* result) {
           return WasmResult::InternalFailure;
         }
       }
+    } else if (value.IsList()) {
+      auto& list = *value.ListOrDie();
+      int idx = 0;
+      if (!absl::SimpleAtoi(part, &idx)) {
+        return WasmResult::NotFound;
+      }
+      if (idx < 0 || idx >= list.size()) {
+        return WasmResult::NotFound;
+      }
+      value = list[idx];
     } else {
       return WasmResult::NotFound;
     }
@@ -696,8 +715,8 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, absl::string_view 
     return WasmResult::BadArgument;
   }
   const Http::LowerCaseString lower_key{std::string(key)};
-  auto entry = map->get(lower_key);
-  if (!entry) {
+  const auto entry = map->get(lower_key);
+  if (entry.empty()) {
     if (wasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
       *value = "";
       return WasmResult::Ok;
@@ -705,7 +724,9 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, absl::string_view 
       return WasmResult::NotFound;
     }
   }
-  *value = entry->value().getStringView();
+  // TODO(kyessenov, PiotrSikora): This needs to either return a concatenated list of values, or
+  // the ABI needs to be changed to return multiple values. This is a potential security issue.
+  *value = entry[0]->value().getStringView();
   return WasmResult::Ok;
 }
 
