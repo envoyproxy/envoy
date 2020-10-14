@@ -26,6 +26,7 @@ public:
   DirectoryIteratorImpl(DirectoryIteratorImpl&&) = default;
 
   static FileType fileType(const std::string& name, Api::OsSysCallsImpl& os_sys_calls);
+
 private:
   void nextEntry();
   void openDirectory();

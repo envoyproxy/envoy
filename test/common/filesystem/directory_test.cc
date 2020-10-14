@@ -228,9 +228,8 @@ TEST(DirectoryIteratorImpl, NonExistingDir) {
 
 TEST_F(DirectoryTest, FileTypeTest) {
   auto sys_calls = Api::OsSysCallsSingleton::get();
-  EXPECT_THROW_WITH_REGEX(
-      DirectoryIteratorImpl::fileType("foo", sys_calls),  EnvoyException,
-      "unable to stat file: 'foo' .*");
+  EXPECT_THROW_WITH_REGEX(DirectoryIteratorImpl::fileType("foo", sys_calls), EnvoyException,
+                          "unable to stat file: 'foo' .*");
 
   EXPECT_EQ(FileType::Directory, DirectoryIteratorImpl::fileType(dir_path_, sys_calls));
 

@@ -105,7 +105,8 @@ TEST_F(FileSystemImplTest, FileReadToEndNotReadable) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
-  std::filesystem::permissions(file_path, std::filesystem::perms::owner_all, std::filesystem::perm_options::remove);
+  std::filesystem::permissions(file_path, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::remove);
   EXPECT_THROW(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
                EnvoyException);
 }

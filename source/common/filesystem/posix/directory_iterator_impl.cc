@@ -50,7 +50,8 @@ void DirectoryIteratorImpl::nextEntry() {
   }
 }
 
-FileType DirectoryIteratorImpl::fileType(const std::string& full_path, Api::OsSysCallsImpl& os_sys_calls) {
+FileType DirectoryIteratorImpl::fileType(const std::string& full_path,
+                                         Api::OsSysCallsImpl& os_sys_calls) {
   struct stat stat_buf;
 
   const Api::SysCallIntResult result = os_sys_calls.stat(full_path.c_str(), &stat_buf);
