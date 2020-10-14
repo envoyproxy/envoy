@@ -7,19 +7,19 @@ As discussed in the :ref:`listener <arch_overview_listeners>` section, network l
 form the core of Envoy connection handling.
 
 The network filters are chained in a ordered list known as :ref:`filter chain <envoy_v3_api_msg_config.listener.v3.FilterChain>`. 
-Each listener has multiple filter chains and an optional default filter chain.When a connection is accepted, the
-listener picks the best filter chain according to the :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`
+Each listener has multiple filter chains and an optional :ref:`default filter chain <envoy_v3_api_field_config.listener.v3.Listener.default_filter_chain>`.
 associated with each filter chain. If the best match filter chain cannot be found, the default filter chain will be
 chosen to serve the request. If the default filter chain is not supplied, the connection will be closed.
 
+.. _filter_chain_only_update:
 
 Filter chain only update
 ------------------------
 
-:ref:`Filter chain <envoy_v3_api_msg_config.listener.v3.FilterChain>` can be updated indepedently. Upon listener config
-update, if the listener manager determines that the listener update is filter chain only update, the listener update
-will be executed by adding, updating and removing filter chains. The connections owned by destroying filter chain will
-be drained as describe in listener drain. 
+:ref:`Filter chains <envoy_v3_api_msg_config.listener.v3.FilterChain>` can be updated indepedently. Upon listener config
+update, if the listener manager determines that the listener update is a filter chain only update, the listener update
+will be executed by adding, updating and removing filter chains. The connections owned by these destroying filter chains will
+be drained as described in listener drain.
 
 If the new :ref:`filter chain <envoy_v3_api_msg_config.listener.v3.FilterChain>` and the old :ref:`filter chain <envoy_v3_api_msg_config.listener.v3.FilterChain>`
 is protobuf message equivalent, the corresponding filter chain runtime info survives. The connections owned by the
