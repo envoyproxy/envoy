@@ -1,5 +1,7 @@
 #include "common/http/filter_manager.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
@@ -1253,12 +1255,16 @@ void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
 
 uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
-bool ActiveStreamDecoderFilter::recreateStream() {
+bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
   if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
     return false;
+  }
+
+  if (headers != nullptr) {
+    parent_.filter_manager_callbacks_.chargeStats(*headers);
   }
 
   parent_.stream_info_.setResponseCodeDetails(
