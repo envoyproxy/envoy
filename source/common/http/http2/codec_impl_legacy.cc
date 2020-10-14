@@ -63,6 +63,17 @@ public:
   }
 };
 
+int reasonToReset(StreamResetReason reason) {
+  switch (reason) {
+  case StreamResetReason::LocalRefusedStreamReset:
+    return NGHTTP2_REFUSED_STREAM;
+  case StreamResetReason::ConnectError:
+    return NGHTTP2_CONNECT_ERROR;
+  default:
+    return NGHTTP2_NO_ERROR;
+  }
+}
+
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
 using Http::Http2::CodecStats;
 using Http::Http2::MetadataDecoder;
@@ -252,6 +263,7 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
     submitMetadata(flags);
   }
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -267,6 +279,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
       parent_.sendPendingFrames();
+      parent_.checkProtocolConstraintViolation();
     }
   }
 }
@@ -448,6 +461,7 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   // will be run because higher layers think the stream is already finished.
   resetStreamWorker(StreamResetReason::LocalReset);
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -498,13 +512,12 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // the cleanup logic to run which will reset the stream in all cases if all data frames could not
   // be sent.
   parent_.sendPendingFrames();
+  parent_.checkProtocolConstraintViolation();
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   int rc = nghttp2_submit_rst_stream(parent_.session_, NGHTTP2_FLAG_NONE, stream_id_,
-                                     reason == StreamResetReason::LocalRefusedStreamReset
-                                         ? NGHTTP2_REFUSED_STREAM
-                                         : NGHTTP2_NO_ERROR);
+                                     reasonToReset(reason));
   ASSERT(rc == 0);
 }
 
@@ -577,6 +590,7 @@ void ConnectionImpl::sendKeepalive() {
   int rc = nghttp2_submit_ping(session_, 0 /*flags*/, reinterpret_cast<uint8_t*>(&ms_since_epoch));
   ASSERT(rc == 0);
   sendPendingFrames();
+  checkProtocolConstraintViolation();
 
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }
@@ -949,6 +963,9 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
         if (error_code == NGHTTP2_REFUSED_STREAM) {
           reason = StreamResetReason::RemoteRefusedStreamReset;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+        } else if (error_code == NGHTTP2_CONNECT_ERROR) {
+          reason = StreamResetReason::ConnectError;
+          stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
         } else {
           reason = StreamResetReason::RemoteReset;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);

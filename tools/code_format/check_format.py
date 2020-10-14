@@ -15,17 +15,35 @@ import traceback
 import shutil
 import paths
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
-                     "./source/extensions/extensions_build_config.bzl",
-                     "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                     "./tools/pyformat/", "./third_party/")
+EXCLUDED_PREFIXES = (
+    "./generated/",
+    "./thirdparty/",
+    "./build",
+    "./.git/",
+    "./bazel-",
+    "./.cache",
+    "./source/extensions/extensions_build_config.bzl",
+    "./bazel/toolchains/configs/",
+    "./tools/testdata/check_format/",
+    "./tools/pyformat/",
+    "./third_party/",
+    "./test/extensions/filters/http/wasm/test_data",
+    "./test/extensions/filters/network/wasm/test_data",
+    "./test/extensions/stats_sinks/wasm/test_data",
+    "./test/extensions/bootstrap/wasm/test_data",
+    "./test/extensions/common/wasm/test_data",
+    "./test/extensions/access_loggers/wasm/test_data",
+    "./source/extensions/common/wasm/ext",
+    "./examples/wasm",
+)
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_ALLOWLIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
+GOOGLE_PROTOBUF_ALLOWLIST = ("ci/prebuilt", "source/common/protobuf", "api/test",
+                             "test/extensions/bootstrap/wasm/test_data")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
 # Files matching these exact names can reference real-world time. These include the class
@@ -58,10 +76,12 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
     "./test/extensions/filters/http/common/fuzz/uber_filter.h",
+    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
-JSON_STRING_TO_MESSAGE_ALLOWLIST = ("./source/common/protobuf/utility.cc")
+JSON_STRING_TO_MESSAGE_ALLOWLIST = ("./source/common/protobuf/utility.cc",
+                                    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc")
 
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
@@ -111,7 +131,8 @@ DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
-RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
+RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
+INVALID_REFLINK = re.compile(".* ref:.*")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
@@ -447,11 +468,16 @@ class FormatChecker:
         next_word_to_check = ''  # first word after :
         prior_line = ''
 
+      invalid_reflink_match = INVALID_REFLINK.match(line)
+      if invalid_reflink_match:
+        reportError("Found text \" ref:\". This should probably be \" :ref:\"\n%s" % line)
+
       # make sure flags are surrounded by ``s
       flag_match = RELOADABLE_FLAG_REGEX.match(line)
       if flag_match:
-        if not flag_match.groups()[0].startswith('`'):
-          reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
+        if not flag_match.groups()[0].startswith(' `'):
+          reportError("Flag `%s` should be enclosed in a single set of back ticks" %
+                      flag_match.groups()[1])
 
       if line.startswith("* "):
         if not endsWithPeriod(prior_line):
@@ -1045,6 +1071,11 @@ if __name__ == "__main__":
                       nargs="+",
                       default=[],
                       help="exclude paths from envoy_build_fixer check.")
+  parser.add_argument("--bazel_tools_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from bazel_tools check.")
   parser.add_argument("--include_dir_order",
                       type=str,
                       default=",".join(common.includeDirOrder()),

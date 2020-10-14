@@ -43,7 +43,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   // If needed to be handled properly refer to:
   // https://httpwg.org/specs/rfc7234.html#validation.received
   for (auto conditional_header : conditionalHeaders()) {
-    if (headers.get(*conditional_header)) {
+    if (!headers.get(*conditional_header).empty()) {
       return false;
     }
   }

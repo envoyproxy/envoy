@@ -132,9 +132,30 @@ protected:
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     listener_ =
         dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+#if defined(__clang__) && defined(__has_feature) && __has_feature(address_sanitizer)
+    // There is a bug in clang with AddressSanitizer on the CI such that the code below reports:
+    //
+    //   runtime error: constructor call on address 0x6190000b4a80 with insufficient space for
+    //   an object of type 'Envoy::Network::(anonymous namespace)::TestClientConnectionImpl'
+    //   0x6190000b4a80: note: pointer points here
+    //   05 01 80 39  be be be be be be be be  be be be be be be be be  be be be be be be be be
+    //   be be be be
+    //
+    // However, the workaround below trips gcc on the CI, which reports:
+    //
+    //   size check failed 2304 1280 38
+    //   CorrectSize(p, size, tcmalloc::DefaultAlignPolicy())
+    //
+    // so we only use it for clang with AddressSanitizer builds.
+    auto x = malloc(sizeof(TestClientConnectionImpl) + 1024);
+    new (x) TestClientConnectionImpl(*dispatcher_, socket_->localAddress(), source_address_,
+                                     Network::Test::createRawBufferSocket(), socket_options_);
+    client_connection_.reset(reinterpret_cast<TestClientConnectionImpl*>(x));
+#else
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), socket_options_);
+#endif
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -456,6 +477,20 @@ struct NiceMockConnectionStats {
   NiceMock<Stats::MockCounter> bind_errors_;
   NiceMock<Stats::MockCounter> delayed_close_timeouts_;
 };
+
+TEST_P(ConnectionImplTest, ConnectionHash) {
+  setUpBasicConnection();
+
+  MockConnectionStats client_connection_stats;
+  client_connection_->setConnectionStats(client_connection_stats.toBufferStats());
+
+  std::vector<uint8_t> hash1;
+  std::vector<uint8_t> hash2;
+  ConnectionImplBase::addIdToHashKey(hash1, client_connection_->id());
+  client_connection_->hashKey(hash2);
+  ASSERT_EQ(hash1, hash2);
+  disconnect(false);
+}
 
 TEST_P(ConnectionImplTest, ConnectionStats) {
   setUpBasicConnection();
