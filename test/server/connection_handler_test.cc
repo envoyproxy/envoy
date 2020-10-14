@@ -33,6 +33,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
 
@@ -45,9 +46,14 @@ public:
   ConnectionHandlerTest()
       : socket_factory_(std::make_shared<Network::MockListenSocketFactory>()),
         handler_(new ConnectionHandlerImpl(dispatcher_, 0)),
-        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
+        filter_chain_(std::make_shared<NiceMock<Network::MockFilterChain>>()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()),
         access_log_(std::make_shared<AccessLog::MockInstance>()) {
+    ON_CALL(*filter_chain_, transportSocketFactory)
+        .WillByDefault(ReturnPointee(std::shared_ptr<Network::TransportSocketFactory>{
+            Network::Test::createRawBufferSocketFactory()}));
+    ON_CALL(*filter_chain_, networkFilterFactories)
+        .WillByDefault(ReturnPointee(std::make_shared<std::vector<Network::FilterFactoryCb>>()));
     ON_CALL(*listener_filter_matcher_, matches(_)).WillByDefault(Return(false));
   }
 
@@ -249,7 +255,7 @@ public:
   Network::ConnectionHandlerPtr handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
   NiceMock<Network::MockFilterChainFactory> factory_;
-  const Network::FilterChainSharedPtr filter_chain_;
+  const std::shared_ptr<Network::MockFilterChain> filter_chain_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
@@ -481,6 +487,32 @@ TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
 
   handler_->setListenerRejectFraction(0.12345f);
   handler_->addListener(absl::nullopt, *test_listener);
+}
+
+TEST_F(ConnectionHandlerTest, SetsTransportSocketConnectTimeout) {
+  InSequence s;
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, false, false, "test_listener", listener, &listener_callbacks);
+
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  auto server_connection = new NiceMock<Network::MockServerConnection>();
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(server_connection));
+  EXPECT_CALL(*filter_chain_, transportSocketConnectTimeout)
+      .WillOnce(Return(std::chrono::seconds(5)));
+  EXPECT_CALL(*server_connection,
+              setTransportSocketConnectTimeout(std::chrono::milliseconds(5 * 1000)));
+  EXPECT_CALL(*access_log_, log(_, _, _, _)).Times(1);
+
+  listener_callbacks->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());
+
+  EXPECT_CALL(*listener, onDestroy());
 }
 
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
