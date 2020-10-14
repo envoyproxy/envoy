@@ -302,7 +302,7 @@ message WeightedCluster {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.WeightedCluster";
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message ClusterWeight {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.WeightedCluster.ClusterWeight";
@@ -311,9 +311,14 @@ message WeightedCluster {
 
     reserved "per_filter_config";
 
-    // Name of the upstream cluster. The cluster must exist in the
-    // :ref:`cluster manager configuration <config_cluster_manager>`.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    oneof cluster_specifier {
+      // Name of the upstream cluster. The cluster must exist in the
+      // :ref:`cluster manager configuration <config_cluster_manager>`.
+      string name = 1 [(validate.rules).string = {min_len: 1}];
+
+      // [#not-implemented-hide:]
+      udpa.core.v1.ResourceLocator cluster_resource_locator = 11;
+    }
 
     // An integer between 0 and :ref:`total_weight
     // <envoy_api_field_config.route.v4alpha.WeightedCluster.total_weight>`. When a request matches the route,
