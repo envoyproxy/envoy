@@ -77,8 +77,8 @@ public:
 
   // Attempts to match against the matching data (which should contain all the data requested via
   // matching requirements). If the match couldn't be completed, {false, {}} will be returned.
-  // If a match result was determined, {true, action} will be returned. If a match result was determined
-  // to be no match, {true, {}} will be returned.
+  // If a match result was determined, {true, action} will be returned. If a match result was
+  // determined to be no match, {true, {}} will be returned.
   virtual MatchResult match(const MatchingData& data) PURE;
 };
 
