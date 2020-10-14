@@ -36,7 +36,7 @@ Override the default configuration by merging a config file
      - name: listener_0
        address:
          socket_address:
-	   port_value: 20000
+           port_value: 20000
 
 .. code-block:: console
 
