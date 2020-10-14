@@ -323,10 +323,8 @@ bool Filter::isBufferFull() const {
 }
 
 void Filter::continueDecoding() {
-  if (buffer_data_ && !skip_check_) {
-    // After sending the out the check request, we don't need to buffer the data anymore.
-    buffer_data_ = false;
-  }
+  // After sending the out the check request, we don't need to buffer the data anymore.
+  buffer_data_ = false;
 
   filter_return_ = FilterReturn::ContinueDecoding;
   if (!initiating_call_) {
