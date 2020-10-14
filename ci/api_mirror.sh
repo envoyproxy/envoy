@@ -3,16 +3,15 @@
 set -e
 
 CHECKOUT_DIR=../data-plane-api
+MAIN_BRANCH="refs/heads/master"
+API_MAIN_BRANCH="master"
 
-if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "master" ]
-then
+if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
   echo "Cloning..."
-  git clone git@github.com:envoyproxy/data-plane-api "$CHECKOUT_DIR"
+  git clone git@github.com:envoyproxy/data-plane-api "$CHECKOUT_DIR" -b "${API_MAIN_BRANCH}"
 
-  git -C "$CHECKOUT_DIR" config user.name "data-plane-api(CircleCI)"
+  git -C "$CHECKOUT_DIR" config user.name "data-plane-api(Azure Pipelines)"
   git -C "$CHECKOUT_DIR" config user.email data-plane-api@users.noreply.github.com
-  git -C "$CHECKOUT_DIR" fetch
-  git -C "$CHECKOUT_DIR" checkout -B master origin/master
 
   # Determine last envoyproxy/envoy SHA in envoyproxy/data-plane-api
   MIRROR_MSG="Mirrored from https://github.com/envoyproxy/envoy"
@@ -40,6 +39,6 @@ then
   done
 
   echo "Pushing..."
-  git -C "$CHECKOUT_DIR" push origin master
+  git -C "$CHECKOUT_DIR" push origin "${API_MAIN_BRANCH}"
   echo "Done"
 fi

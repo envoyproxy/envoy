@@ -132,7 +132,6 @@ def ApiBoostTree(target_paths,
     sp.run([
         'bazel',
         'build',
-        '--config=libc++',
         '--strip=always',
     ] + BAZEL_BUILD_OPTIONS + dep_lib_build_targets,
            check=True)

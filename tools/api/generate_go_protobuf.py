@@ -4,9 +4,13 @@ from subprocess import check_output
 from subprocess import check_call
 import glob
 import os
+import shlex
 import shutil
 import sys
 import re
+
+# Needed for CI to pass down bazel options.
+BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 TARGETS = '@envoy_api//...'
 IMPORT_BASE = 'github.com/envoyproxy/go-control-plane'
@@ -14,7 +18,7 @@ OUTPUT_BASE = 'build_go'
 REPO_BASE = 'go-control-plane'
 BRANCH = 'master'
 MIRROR_MSG = 'Mirrored from envoyproxy/envoy @ '
-USER_NAME = 'go-control-plane(CircleCI)'
+USER_NAME = 'go-control-plane(Azure Pipelines)'
 USER_EMAIL = 'go-control-plane@users.noreply.github.com'
 
 
@@ -32,7 +36,7 @@ def generateProtobufs(output):
   check_call([
       'bazel', 'build', '-c', 'fastbuild',
       '--experimental_proto_descriptor_sets_include_source_info'
-  ] + go_protos)
+  ] + BAZEL_BUILD_OPTIONS + go_protos)
 
   for rule in go_protos:
     # Example rule:
@@ -67,9 +71,7 @@ def git(repo, *args):
 
 def cloneGoProtobufs(repo):
   # Create a local clone of go-control-plane
-  git(None, 'clone', 'git@github.com:envoyproxy/go-control-plane', repo)
-  git(repo, 'fetch')
-  git(repo, 'checkout', '-B', BRANCH, 'origin/master')
+  git(None, 'clone', 'git@github.com:envoyproxy/go-control-plane', repo, '-b', BRANCH)
 
 
 def findLastSyncSHA(repo):
