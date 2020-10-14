@@ -6,11 +6,8 @@ Installing Envoy
 The `Get Envoy <https://www.getenvoy.io/>`__ project maintains a number of binaries
 and repositories to accommodate many popular distributions.
 
-Once you have installed Envoy, you can check which version you have with:
-
-.. code-block:: console
-
-   $ envoy --version
+Once you have installed Envoy, check out the :ref:`quick start <start_quick_start>` guide for more information on
+getting your Envoy proxy up and running.
 
 Install Envoy on Debian Linux
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

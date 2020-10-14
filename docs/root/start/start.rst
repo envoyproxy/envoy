@@ -13,11 +13,19 @@ feature of the API, which is most useful for simple requirements. For more compl
 :ref:`Dynamic Configuration <arch_overview_dynamic_config>` is supported.
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
 
     install
     quick-start
     docker
+
+.. toctree::
+    :maxdepth: 2
+
     sandboxes/index
+
+.. toctree::
+    :maxdepth: 3
+
     tools/tools
     building
