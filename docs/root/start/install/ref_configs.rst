@@ -17,11 +17,10 @@ see the :ref:`configuration reference <config>`.
 Configuration generator
 -----------------------
 
-Envoy configurations can become relatively complicated. At Lyft we use `jinja
-<http://jinja.pocoo.org/>`_ templating to make the configurations easier to create and manage. The
-source distribution includes a version of the configuration generator that loosely approximates what
-we use at Lyft. We have also included three example configuration templates for each of the above
-three scenarios.
+Envoy configurations can become relatively complicated. The
+source distribution includes a version of the configuration generator that uses `jinja
+<http://jinja.pocoo.org/>`_ templating to make the configurations easier to create and manage. We
+have also included three example configuration templates for each of the above three scenarios.
 
 * Generator script: :repo:`configs/configgen.py`
 * Service to service template: :repo:`configs/envoy_service_to_service_v2.template.yaml`
