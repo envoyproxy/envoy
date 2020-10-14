@@ -20,12 +20,6 @@ class LoadBalancerFuzzBase {
 public:
   LoadBalancerFuzzBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)){};
 
-  // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
-  // over the fuzz iteration.
-  void
-  initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
-                           const uint8_t priority_level);
-
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
   void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
@@ -51,6 +45,13 @@ public:
   NiceMock<MockPrioritySet> priority_set_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::unique_ptr<LoadBalancerBase> lb_;
+
+private:
+  // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
+  // over the fuzz iteration.
+  void
+  initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
+                           const uint8_t priority_level);
 
   // There are used to construct the priority set at the beginning of the fuzz iteration
   uint16_t port_ = 80;

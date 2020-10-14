@@ -55,6 +55,7 @@ public:
       index_vector_.push_back(i);
     }
     std::vector<std::vector<uint8_t>> subsets;
+    subsets.reserve(number_of_elements_in_each_subset.size());
     for (uint32_t i : number_of_elements_in_each_subset) {
       subsets.push_back(constructSubset(i));
     }
@@ -82,7 +83,7 @@ private:
 
   // This bytestring will be iterated through logically representing randomness in order to choose
   // subsets
-  std::string random_bytestring_;
+  const std::string random_bytestring_;
   uint32_t index_of_random_bytestring_ = 0;
 };
 
