@@ -105,6 +105,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     void onEvent(Network::ConnectionEvent event);
+    void onGoAway(Http::GoAwayErrorCode error_code);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
@@ -118,7 +119,18 @@ private:
       HttpActiveHealthCheckSession& parent_;
     };
 
+    class HttpConnectionCallbackImpl : public Http::ConnectionCallbacks {
+    public:
+      HttpConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
+      // Http::ConnectionCallbacks
+      void onGoAway(Http::GoAwayErrorCode error_code) override { parent_.onGoAway(error_code); }
+
+    private:
+      HttpActiveHealthCheckSession& parent_;
+    };
+
     ConnectionCallbackImpl connection_callback_impl_{*this};
+    HttpConnectionCallbackImpl http_connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::ResponseHeaderMapPtr response_headers_;
@@ -126,6 +138,10 @@ private:
     const Http::Protocol protocol_;
     Network::Address::InstanceConstSharedPtr local_address_;
     bool expect_reset_{};
+    // If true, we received a GOAWAY (NO_ERROR code) and are deferring closing the connection
+    // until the active probe completes.
+    bool received_no_error_goaway_ = false;
+    bool request_in_flight_ = false;
   };
 
   using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;

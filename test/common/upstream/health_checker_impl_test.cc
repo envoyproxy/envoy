@@ -132,6 +132,25 @@ public:
     addCompletionCallback();
   }
 
+  void setupHCHttp2() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+      codec_client_type: Http2
+    )EOF";
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
   void setupInitialJitter() {
     const std::string yaml = R"EOF(
     timeout: 1s
@@ -2492,6 +2511,244 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
+}
+
+// Test receiving GOAWAY (error) is interpreted as connection close event.
+TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
+  // FailureType::Network will be issued, it will render host unhealthy only if unhealthy_threshold
+  // is reached.
+  setupNoServiceValidationHCWithHttp2();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // We start off as healthy, and should continue to be healhy.
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true, false, {}, false);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  // GOAWAY with non-NO_ERROR code will result in a healthcheck failure and the
+  // connection closing. Status is unchanged because unhealthy_threshold is 2.
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(1);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectClientCreate(0);
+  expectStreamCreate(0);
+
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  // GOAWAY with non-NO_ERROR code will result in a healthcheck failure and the
+  // connection closing. This time it goes unhealthy
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::FAILED_ACTIVE_HC));
+}
+
+// Test receiving GOAWAY (no error) is handled gracefully while a check is in progress.
+TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
+  setupHCHttp2();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // GOAWAY with NO_ERROR code during check should be handled gracefully.
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  respond(0, "200", false, false, true, false, {}, false);
+
+  // GOAWAY should cause a new connection to be created.
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  // Test host state hasn't changed.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  respond(0, "200", false, false, true, false, {}, false);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// Test receiving GOAWAY (no error) closes connection after an in progress probe times outs.
+TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
+  setupHCHttp2();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  // Unhealthy threshold is 1 so first timeout causes unhealthy
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  test_sessions_[0]->timeout_timer_->invokeCallback();
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  // GOAWAY should cause a new connection to be created.
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  // Host should go back to healthy after a successful check.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  respond(0, "200", false, false, true, false, {}, false);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// Test receiving GOAWAY (no error) closes connection after an in progress probe times outs.
+TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
+  setupHCHttp2();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  // Unhealthy threshold is 1 so first timeout causes unhealthy
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  // GOAWAY should cause a new connection to be created.
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  // Host should go back to healthy after a successful check.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  respond(0, "200", false, false, true, false, {}, false);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// Test receiving GOAWAY (no error) and a connection close.
+TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
+  setupHCHttp2();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  // Unhealthy threshold is 1 so first timeout causes unhealthy
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  // GOAWAY should cause a new connection to be created.
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  // Host should go back to healthy after a successful check.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  respond(0, "200", false, false, true, false, {}, false);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// Test receiving GOAWAY between checks affects nothing.
+TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
+  setupHCHttp2();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  respond(0, "200", false, false, true, false, {}, false);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  // GOAWAY should cause a new connection to be created but should not affect health status.
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  // Host should stay healthy.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  respond(0, "200", false, false, true, false, {}, false);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
 class TestProdHttpHealthChecker : public ProdHttpHealthCheckerImpl {
