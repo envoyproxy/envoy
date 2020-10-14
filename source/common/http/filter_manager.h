@@ -71,10 +71,10 @@ public:
   }
 
   std::vector<MatchWrapperSharedPtr> matchers_;
-  Http::RequestHeaderMap* request_headers_;
-  Http::RequestTrailerMap* request_trailers_;
-  Http::ResponseHeaderMap* response_headers_;
-  Http::ResponseTrailerMap* response_trailers_;
+  Http::RequestHeaderMap* request_headers_{};
+  Http::RequestTrailerMap* request_trailers_{};
+  Http::ResponseHeaderMap* response_headers_{};
+  Http::ResponseTrailerMap* response_trailers_{};
 };
 using HttpMatchingDataSharedPtr = std::unique_ptr<HttpMatchingData>;
 
