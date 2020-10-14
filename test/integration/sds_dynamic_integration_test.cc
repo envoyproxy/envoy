@@ -64,6 +64,7 @@ protected:
                       const std::string& secret_name) {
     secret_config->set_name(secret_name);
     auto* config_source = secret_config->mutable_sds_config();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     auto* api_config_source = config_source->mutable_api_config_source();
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     auto* grpc_service = api_config_source->add_grpc_services();
@@ -123,7 +124,7 @@ protected:
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(API_DOWNGRADE(secret));
+    discovery_response.add_resources()->PackFrom(secret);
 
     xds_stream_->sendGrpcMessage(discovery_response);
   }
