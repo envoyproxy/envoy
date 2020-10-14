@@ -1311,25 +1311,6 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
   ASSERT_TRUE(disabled_filter_found);
 }
 
-// Validates that server uses the abort action exit.
-TEST_P(ServerInstanceImplTest, UsesAbortActionOnWatchdogKill) {
-  options_.concurrency_ = 2;
-
-  EXPECT_DEATH(
-      {
-        startTestServer("test/server/test_data/server/watchdogs_use_abort_action.yaml", false);
-        absl::Notification main_thread_slept;
-        server_->dispatcher().post([&] {
-          absl::SleepFor(absl::Seconds(5));
-          main_thread_slept.Notify();
-        });
-
-        // Wait for the sleep to run, we should die by the watchdog by then.
-        main_thread_slept.WaitForNotification();
-      },
-      "(ABRT|Caught Abort)");
-}
-
 } // namespace
 } // namespace Server
 } // namespace Envoy

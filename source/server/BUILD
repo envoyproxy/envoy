@@ -55,7 +55,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
-        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -130,6 +129,7 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/watchdog:abort_action_config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
     ],
 )
 

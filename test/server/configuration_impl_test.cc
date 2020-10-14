@@ -797,48 +797,6 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
 }
 
-TEST_F(ConfigurationImplTest, ShouldAddAbortActionIfKillingIsEnabled) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  MainImpl config;
-  const std::string kill_json = R"EOF(
-  {
-    "watchdog": {
-      "kill_timeout": "1.0s",
-      "multikill_timeout" : "1.0s"
-    },
-  })EOF";
-
-  TestUtility::loadFromJson(kill_json, bootstrap);
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
-
-  // We should have the abort action added to both KILL and MULTIKILL events.
-  EXPECT_EQ(config.workerWatchdogConfig().actions().size(), 2);
-  EXPECT_EQ(config.mainThreadWatchdogConfig().actions().size(), 2);
-
-  for (const auto& action : config.mainThreadWatchdogConfig().actions()) {
-    EXPECT_EQ(action.config().typed_config().type_url(),
-              "type.googleapis.com/envoy.watchdog.v3alpha.AbortActionConfig");
-  }
-
-  for (const auto& action : config.workerWatchdogConfig().actions()) {
-    EXPECT_EQ(action.config().typed_config().type_url(),
-              "type.googleapis.com/envoy.watchdog.v3alpha.AbortActionConfig");
-  }
-}
-
-TEST_F(ConfigurationImplTest, ShouldNotAddAbortActionIfKillingIsDisabled) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  MainImpl config;
-  const std::string killing_disabled_json = R"EOF( { "watchdog": { "miss_timeout": "1.0s" }})EOF";
-
-  TestUtility::loadFromJson(killing_disabled_json, bootstrap);
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
-
-  // We should have the abort action added
-  EXPECT_EQ(config.workerWatchdogConfig().actions().size(), 0);
-  EXPECT_EQ(config.mainThreadWatchdogConfig().actions().size(), 0);
-}
-
 TEST_F(ConfigurationImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {
   const std::string json = R"EOF( { "watchdogs": {}, "watchdog": {}})EOF";
 

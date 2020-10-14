@@ -15,7 +15,6 @@
 #include "envoy/server/instance.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
@@ -172,25 +171,7 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   multikill_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
   multikill_threshold_ = PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(watchdog, multikill_threshold, 0.0);
-  auto actions = watchdog.actions();
-
-  // Add abort_action if killing is enabled.
-  envoy::watchdog::v3alpha::AbortActionConfig abort_config;
-
-  if (kill_timeout > 0) {
-    envoy::config::bootstrap::v3::Watchdog::WatchdogAction* abort_action_config = actions.Add();
-    abort_action_config->set_event(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::KILL);
-    abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
-  }
-
-  if (multikill_timeout_.count() > 0) {
-    envoy::config::bootstrap::v3::Watchdog::WatchdogAction* abort_action_config = actions.Add();
-    abort_action_config->set_event(
-        envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MULTIKILL);
-    abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
-  }
-
-  actions_ = actions;
+  actions_ = watchdog.actions();
 }
 
 InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

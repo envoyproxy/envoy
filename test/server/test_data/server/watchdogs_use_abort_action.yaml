@@ -1,7 +1,0 @@
-watchdogs:
-  main_thread_watchdog:
-    miss_timeout: 0.2s
-    kill_timeout: 2s
-    multikill_timeout: 0.5s
-  worker_watchdog:
-    miss_timeout: 0.5s
