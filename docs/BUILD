@@ -14,14 +14,18 @@ filegroup(
     srcs = glob(
         ["root/**/*.yaml"],
         exclude = [
-            # this fails on `some.customer.filter`
+            # `some.customer.filter`
             "root/intro/_include/life-of-a-request.yaml",
-            # fails with: "Error: No TLS certificates found for server context"
+            # "Error: No TLS certificates found for server context"
             "root/intro/arch_overview/security/_include/ssl.yaml",
-            # fails on windows: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
-            "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
-            # this fails due to missing proto.pb
+            # missing proto.pb
             "root/configuration/http/http_filters/_include/grpc-transcoder-filter.yaml",
         ],
-    ),
+    ) + select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            # windows: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
+	    "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
+        ],
+    }),
 )
