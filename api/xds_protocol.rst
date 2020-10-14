@@ -664,7 +664,7 @@ resources after a specified period of time if contact with the management server
 be used, for example, to terminate a fault injection test when the management server can no longer
 be reached.
 
-For clients that support the *envoy.config.supports-resource-ttl* client feature, A TTL field may
+For clients that support the *xds.config.supports-resource-ttl* client feature, A TTL field may
 be specified on each :ref:`Resource <envoy_api_msg_Resource>`. Each resource will have its own TTL
 expiry time, at which point the resource will be expired. Each xDS type may have different ways of
 handling such an expiry.
@@ -679,7 +679,7 @@ In order to use TTL with SotW xDS, the relevant resources must be wrapped in a
 :ref:`Resource <envoy_api_msg_Resource>`. This allows setting the same TTL field that is used for
 Delta xDS with SotW, without changing the SotW API.
 
-This feature is gated by the *envoy.config.supports-resource-in-sotw* client feature.
+This feature is gated by the *xds.config.supports-resource-in-sotw* client feature.
 
 .. _xds_protocol_ads:
 
