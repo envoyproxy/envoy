@@ -350,7 +350,7 @@ def _com_github_zlib_ng_zlib_ng():
     )
 
 def _org_brotli():
-    _repository_impl(
+    external_http_archive(
         name = "org_brotli",
     )
     native.bind(
