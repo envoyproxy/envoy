@@ -194,19 +194,25 @@ void GrpcMuxImpl::onDiscoveryResponse(
         api_state_[type_url].watches_.front()->resource_decoder_;
 
     auto ttl_expiry_callback = [this, type_url](const auto& expired) {
+      // The TtlManager triggers a callback with a list of all the expired elements, which we need
+      // to compare against the various watched resources to return the subset that each watch is
+      // subscribed to.
+
+      // We convert the incoming list into a set in order to more efficiently perform this
+      // comparsions when there are a lot of watches.
       absl::flat_hash_set<std::string> all_expired;
       all_expired.insert(expired.begin(), expired.end());
 
       for (auto watch : api_state_[type_url].watches_) {
-        std::vector<std::string> found_resources;
+        Protobuf::RepeatedPtrField<std::string> found_resources_for_watch;
 
         for (const auto& resource : expired) {
           if (all_expired.find(resource) != all_expired.end()) {
-            found_resources.push_back(resource);
+            found_resources_for_watch.Add(std::string(resource));
           }
         }
 
-        watch->callbacks_.onConfigExpired(found_resources);
+        watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, "");
       }
     };
 
@@ -220,8 +226,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                         resource.type_url(), message->type_url(), message->DebugString()));
       }
-      resources.emplace_back(
-          DecodedResourceImpl::maybeUnwrapPtr(resource_decoder, resource, message->version_info()));
+      resources.emplace_back(DecodedResourceImpl::fromResourcePtr(resource_decoder, resource,
+                                                                  message->version_info()));
       all_resource_refs.emplace_back(*resources.back());
       resource_ref_map.emplace(resources.back()->name(), *resources.back());
 

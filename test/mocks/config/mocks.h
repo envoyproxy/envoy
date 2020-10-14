@@ -32,7 +32,6 @@ public:
                const std::string& system_version_info));
   MOCK_METHOD(void, onConfigUpdateFailed,
               (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD(void, onConfigExpired, (const std::vector<std::string>&));
 };
 
 class MockOpaqueResourceDecoder : public OpaqueResourceDecoder {
@@ -59,7 +58,6 @@ public:
        const std::string& system_version_info));
   MOCK_METHOD(void, onConfigUpdateFailed,
               (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD(void, onConfigExpired, (const std::vector<std::string>&));
 };
 
 class MockSubscription : public Subscription {

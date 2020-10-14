@@ -188,8 +188,6 @@ public:
     local_init_target_.ready();
   }
 
-  void onConfigExpired() { setLastUpdated(); }
-
 protected:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
     explicit ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)

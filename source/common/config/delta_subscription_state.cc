@@ -17,10 +17,13 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                Event::Dispatcher& dispatcher)
     : ttl_(
           [this](const auto& expired) {
+            Protobuf::RepeatedPtrField<std::string> removed_resources;
             for (const auto& resource : expired) {
               setResourceWaitingForServer(resource);
+              removed_resources.Add(std::string(resource));
             }
-            watch_map_.onConfigExpired(expired);
+
+            watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
       type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),

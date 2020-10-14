@@ -395,7 +395,11 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
   }
 
   time_system_.setSystemTime(std::chrono::seconds(11));
-  EXPECT_CALL(callbacks_, onConfigExpired(std::vector<std::string>({"x"})));
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, ""))
+      .WillOnce(Invoke([](auto, const auto& removed, auto) {
+        EXPECT_EQ(1, removed.size());
+        EXPECT_EQ("x", removed.Get(0));
+      }));
   // Fire the TTL timer.
   EXPECT_CALL(*ttl_timer, disableTimer());
   ttl_timer->invokeCallback();

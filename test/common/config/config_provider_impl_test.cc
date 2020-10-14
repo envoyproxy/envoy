@@ -98,9 +98,6 @@ public:
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {}
-  void onConfigExpired(const std::vector<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
 
   const absl::optional<test::common::config::DummyConfig>& configProto() const {
     return config_proto_;
@@ -564,9 +561,6 @@ public:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {
     ConfigSubscriptionCommonBase::onConfigUpdateFailed();
-  }
-  void onConfigExpired(const std::vector<std::string>&) override {
-    ConfigSubscriptionCommonBase::onConfigExpired();
   }
   const ProtoMap& protoMap() const { return proto_map_; }
 

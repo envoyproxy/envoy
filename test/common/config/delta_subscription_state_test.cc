@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -8,12 +10,11 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <chrono>
 
 using testing::NiceMock;
 using testing::Throw;
@@ -446,7 +447,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
   deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(2)), {}, "debug1",
                            "nonce1");
 
-  EXPECT_CALL(callbacks_, onConfigExpired(_)).Times(1);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(1);
   EXPECT_CALL(*timer_, disableTimer());
   time_system.setSystemTime(std::chrono::seconds(2));
 

@@ -100,7 +100,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   std::vector<DecodedResourceImplPtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_updates;
   for (const auto& r : resources) {
-    decoded_resources.emplace_back(DecodedResourceImpl::maybeUnwrapPtr(
+    decoded_resources.emplace_back(DecodedResourceImpl::fromResourcePtr(
         (*watches_.begin())->resource_decoder_, r, version_info));
     const absl::flat_hash_set<Watch*>& interested_in_r =
         watchesInterestedIn(decoded_resources.back()->name());
@@ -203,12 +203,6 @@ void WatchMap::onConfigUpdate(
 void WatchMap::onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) {
   for (auto& watch : watches_) {
     watch->callbacks_.onConfigUpdateFailed(reason, e);
-  }
-}
-
-void WatchMap::onConfigExpired(const std::vector<std::string>& expired) {
-  for (auto& watch : watches_) {
-    watch->callbacks_.onConfigExpired(expired);
   }
 }
 
