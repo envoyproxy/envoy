@@ -25,10 +25,20 @@ struct AbsoluteMinimum {
   const std::chrono::milliseconds value_;
 };
 
+/**
+ * Class that describes how to compute a minimum timeout given a maximum timeout value. It wraps
+ * ScaledMinimum and AbsoluteMinimum and provides a single computeMinimum() method.
+ */
 class ScaledTimerMinimum : private absl::variant<ScaledMinimum, AbsoluteMinimum> {
 public:
+  // Use base class constructor.
   using absl::variant<ScaledMinimum, AbsoluteMinimum>::variant;
 
+  // Computes the minimum value for a given maximum timeout. If this object was constructed with a
+  // - ScaledMinimum value:
+  //     the return value is the scale factor applied to the provided maximum.
+  // - AbsoluteMinimum:
+  //     the return value is that minimum, and the provided maximum is ignored.
   std::chrono::milliseconds computeMinimum(std::chrono::milliseconds maximum) const {
     struct Visitor {
       explicit Visitor(std::chrono::milliseconds value) : value_(value) {}
