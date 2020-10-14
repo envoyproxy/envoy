@@ -1330,7 +1330,6 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  ;
   auto cluster_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
       TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
