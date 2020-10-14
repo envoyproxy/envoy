@@ -336,12 +336,12 @@ typed_config:
                             .getStringView(),
                         GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
-  EXPECT_TRUE(
-      absl::StrContains(upstream_request_->headers()
-                            .get(Http::LowerCaseString("request_downstream_directremote_address_value"))
-                            ->value()
-                            .getStringView(),
-                        GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+  EXPECT_TRUE(absl::StrContains(
+      upstream_request_->headers()
+          .get(Http::LowerCaseString("request_downstream_directremote_address_value"))
+          ->value()
+          .getStringView(),
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);

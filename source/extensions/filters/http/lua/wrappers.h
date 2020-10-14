@@ -216,7 +216,7 @@ private:
 
   /**
    * Get current downstream local address
-   * @return string representation of downstream directly connected address. 
+   * @return string representation of downstream directly connected address.
    * This is equivalent to the address of the physical connection.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamDirectRemoteAddress);
