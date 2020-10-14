@@ -66,6 +66,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   if (disable_listeners_) {
     details.listener_->pauseListening();
   }
+  if (auto* listener = details.listener_->listener(); listener != nullptr) {
+    listener->setRejectFraction(listener_reject_fraction_);
+  }
   listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
 }
 
@@ -145,6 +148,13 @@ void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& listener : listeners_) {
     listener.second.listener_->resumeListening();
+  }
+}
+
+void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
+  listener_reject_fraction_ = reject_fraction;
+  for (auto& listener : listeners_) {
+    listener.second.listener_->listener()->setRejectFraction(reject_fraction);
   }
 }
 
@@ -391,6 +401,17 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocke
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
 }
 
+void ConnectionHandlerImpl::ActiveTcpListener::onReject(RejectCause cause) {
+  switch (cause) {
+  case RejectCause::GlobalCxLimit:
+    stats_.downstream_global_cx_overflow_.inc();
+    break;
+  case RejectCause::OverloadAction:
+    stats_.downstream_cx_overload_reject_.inc();
+    break;
+  }
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections,
     bool rebalanced) {
@@ -420,6 +441,18 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
     if (!active_socket->connected_) {
       emitLogs(*config_, *active_socket->stream_info_);
     }
+  }
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::pauseListening() {
+  if (listener_ != nullptr) {
+    listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
+  if (listener_ != nullptr) {
+    listener_->enable();
   }
 }
 
@@ -553,6 +586,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
   listener.stats_.downstream_cx_active_.inc();
   listener.per_worker_stats_.downstream_cx_total_.inc();
   listener.per_worker_stats_.downstream_cx_active_.inc();
+  stream_info_->setConnectionID(connection_->id());
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept

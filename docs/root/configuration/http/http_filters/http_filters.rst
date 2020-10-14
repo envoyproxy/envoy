@@ -7,6 +7,7 @@ HTTP filters
   :maxdepth: 2
 
   adaptive_concurrency_filter
+  admission_control_filter
   aws_lambda_filter
   aws_request_signing_filter
   buffer_filter
@@ -29,6 +30,7 @@ HTTP filters
   header_to_metadata_filter
   ip_tagging_filter
   jwt_authn_filter
+  local_rate_limit_filter
   lua_filter
   oauth2_filter
   on_demand_updates_filter
@@ -38,6 +40,7 @@ HTTP filters
   router_filter
   squash_filter
   tap_filter
+  wasm_filter
 
 .. TODO(toddmgreer): Remove this hack and add user-visible CacheFilter docs when CacheFilter is production-ready.
 .. toctree::

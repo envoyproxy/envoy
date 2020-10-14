@@ -251,7 +251,9 @@ enum class StreamResetReason {
   // If the stream was locally reset due to connection termination.
   ConnectionTermination,
   // The stream was reset because of a resource overflow.
-  Overflow
+  Overflow,
+  // Either there was an early TCP error for a CONNECT request or the peer reset with CONNECT_ERROR
+  ConnectError
 };
 
 /**

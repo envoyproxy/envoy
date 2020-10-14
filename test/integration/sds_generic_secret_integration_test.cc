@@ -147,9 +147,10 @@ TEST_P(SdsGenericSecretIntegrationTest, FilterFetchSuccess) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
-  EXPECT_EQ(
-      "DUMMY_AES_128_KEY",
-      upstream_request_->headers().get(Http::LowerCaseString("secret"))->value().getStringView());
+  EXPECT_EQ("DUMMY_AES_128_KEY", upstream_request_->headers()
+                                     .get(Http::LowerCaseString("secret"))[0]
+                                     ->value()
+                                     .getStringView());
 }
 
 } // namespace Envoy

@@ -92,6 +92,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "apple_dns_lib",
+    srcs = select({
+        "//bazel:apple": ["apple_dns_impl.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:apple": ["apple_dns_impl.h"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":address_lib",
+        ":utility_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:file_event_interface",
+        "//include/envoy/network:dns_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_library(
     name = "dns_lib",
     srcs = ["dns_impl.cc"],
     hdrs = ["dns_impl.h"],
@@ -240,6 +261,7 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
+        ":default_socket_interface_lib",
         ":listen_socket_lib",
         ":udp_default_writer_config",
         "//include/envoy/event:dispatcher_interface",

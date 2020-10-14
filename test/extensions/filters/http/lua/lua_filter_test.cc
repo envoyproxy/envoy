@@ -832,7 +832,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   const char response[8] = {'r', 'e', 's', 'p', '\0', 'n', 's', 'e'};
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>(response, 8);
+  response_message->body().add(response, 8);
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("8")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("resp")));
@@ -899,7 +899,7 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  response_message->body().add("response");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -1018,7 +1018,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  response_message->body().add("response");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(cluster_manager_, get(Eq("cluster2")));
@@ -2140,7 +2140,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_2, true));
-  EXPECT_EQ(nullptr, request_headers_2.get(Http::LowerCaseString("hello")));
+  EXPECT_FALSE(request_headers_2.has("hello"));
 }
 
 // Test whether the route can directly reuse the Lua code in the global configuration.
@@ -2204,7 +2204,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_EQ(nullptr, request_headers.get(Http::LowerCaseString("hello")));
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("hello")).empty());
 }
 
 TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {

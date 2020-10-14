@@ -73,7 +73,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan());
+    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan(),
+                   callbacks_->streamInfo());
     initiating_call_ = false;
   }
 }
@@ -169,11 +170,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
-    if (response_headers_to_add_ == nullptr) {
-      response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
+    if (config_->enableXEnvoyRateLimitedHeader()) {
+      if (response_headers_to_add_ == nullptr) {
+        response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
+      }
+      response_headers_to_add_->setReferenceEnvoyRateLimited(
+          Http::Headers::get().EnvoyRateLimitedValues.True);
     }
-    response_headers_to_add_->setReferenceEnvoyRateLimited(
-        Http::Headers::get().EnvoyRateLimitedValues.True);
     break;
   }
 

@@ -277,6 +277,12 @@ protected:
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
+
+    // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
+    // never called. The watermark value is set to the size of the stream window. As a result this
+    // watermark can never overflow because the peer can never send more bytes than the stream
+    // window without triggering protocol error and this buffer is drained after each DATA frame was
+    // dispatched through the filter chain. See source/docs/flow_control.md for more information.
     Buffer::WatermarkBuffer pending_recv_data_{
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
         [this]() -> void { this->pendingRecvBufferHighWatermark(); },
@@ -408,6 +414,23 @@ protected:
   // that is not associated with an existing stream.
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
+
+  /**
+   * Copies any frames pending internally by nghttp2 into outbound buffer.
+   * The `sendPendingFrames()` can be called in 4 different contexts:
+   * 1. dispatching_ == true, aka the dispatching context. The `sendPendingFrames()` is no-op and
+   *    always returns success to avoid reentering nghttp2 library.
+   * 2. dispatching_ == false and ServerConnectionImpl::dispatching_downstream_data_ == true.
+   *    The `sendPendingFrames()` returns the status of the protocol constraint checks. Outbound
+   *    frame accounting is performed. Applies to server codec only.
+   * 3. dispatching_ == false and ServerConnectionImpl::dispatching_downstream_data_ == false.
+   *    The `sendPendingFrames()` always returns success. Outbound frame accounting is performed.
+   *    Applies to server codec only.
+   * 4. dispatching_ == false. The `sendPendingFrames()` always returns success. No outbound
+   *    frame accounting.
+   *
+   * TODO(yanavlasov): harmonize behavior for cases 2, 3 and 4.
+   */
   Status sendPendingFrames();
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
@@ -432,6 +455,27 @@ protected:
    * Return nghttp2 callback return code corresponding to `status`.
    */
   int setAndCheckNghttp2CallbackStatus(Status&& status);
+
+  /**
+   * This method checks if a protocol constraint had been violated in the sendPendingFrames() call.
+   * This method is a stop-gap solution for harmonizing sendPendingFrames() behavior in contexts 2
+   * and 3 (see comments for the sendPendingFrames() method). It allows each case where
+   * sendPendingFrames() is called outside of the dispatch context to be fixed in its own PR so it
+   * is easier to review and reason about. Once all error handling is implemented this method will
+   * be removed and the `sendPendingFrames()` will be changed to return error in both contexts 2
+   * and 3. At the same time the RELEASE_ASSERTs will be removed as well. The implementation in the
+   * ClientConnectionImpl is a no-op as client connections do not check protocol constraints. The
+   * implementation in the ServerConnectionImpl schedules callback to terminate connection if the
+   * protocol constraint was violated.
+   */
+  virtual void checkProtocolConstraintViolation() PURE;
+
+  /**
+   * Callback for terminating connection when protocol constrain has been violated
+   * outside of the dispatch context.
+   */
+  void scheduleProtocolConstraintViolationCallback();
+  void onProtocolConstraintViolation();
 
   static Http2Callbacks http2_callbacks_;
 
@@ -488,7 +532,8 @@ private:
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   // Returns Ok Status on success or error if outbound queue limits were exceeded.
   Status addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual Status checkOutboundFrameLimits() PURE;
+  virtual StatusOr<ProtocolConstraints::ReleasorProc>
+  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) PURE;
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
   void sendKeepalive();
   void onKeepaliveResponse();
@@ -497,6 +542,7 @@ private:
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
+  Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   Event::TimerPtr keepalive_send_timer_;
   Event::TimerPtr keepalive_timeout_timer_;
@@ -527,15 +573,18 @@ private:
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
-  // Presently client connections only perform accounting of outbound frames and do not
+  // Presently client connections do not track or check queue limits for outbound frames and do not
   // terminate connections when queue limits are exceeded. The primary reason is the complexity of
   // the clean-up of upstream connections. The clean-up of upstream connection causes RST_STREAM
   // messages to be sent on corresponding downstream connections. This may actually trigger flood
   // mitigation on the downstream connections, however there is currently no mechanism for
   // handling these types of errors.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
-  Status checkOutboundFrameLimits() override { return okStatus(); }
+  StatusOr<ProtocolConstraints::ReleasorProc> trackOutboundFrames(bool) override {
+    return ProtocolConstraints::ReleasorProc([]() {});
+  }
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return okStatus(); }
+  void checkProtocolConstraintViolation() override {}
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -558,9 +607,16 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  Status checkOutboundFrameLimits() override;
+  StatusOr<ProtocolConstraints::ReleasorProc>
+  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) override;
   Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
+
+  /**
+   * Check protocol constraint violations outside of the dispatching context.
+   * This method ASSERTs if it is called in the dispatching context.
+   */
+  void checkProtocolConstraintViolation() override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when

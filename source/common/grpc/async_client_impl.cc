@@ -16,8 +16,9 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  const envoy::config::core::v3::GrpcService& config,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
-      host_name_(config.envoy_grpc().authority()), initial_metadata_(config.initial_metadata()),
-      time_source_(time_source) {}
+      host_name_(config.envoy_grpc().authority()), time_source_(time_source),
+      metadata_parser_(
+          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -88,10 +89,9 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
       parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
       service_full_name_, method_name_, options_.timeout);
   // Fill service-wide initial metadata.
-  for (const auto& header_value : parent_.initial_metadata_) {
-    headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
-                                        header_value.value());
-  }
+  parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
+                                            options_.parent_context.stream_info);
+
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }

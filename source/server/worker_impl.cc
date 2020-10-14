@@ -31,6 +31,9 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
       [this](OverloadActionState state) { stopAcceptingConnectionsCb(state); });
+  overload_manager.registerForAction(
+      OverloadActionNames::get().RejectIncomingConnections, *dispatcher_,
+      [this](OverloadActionState state) { rejectIncomingConnectionsCb(state); });
 }
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
@@ -147,6 +150,10 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
   } else {
     handler_->enableListeners();
   }
+}
+
+void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
+  handler_->setListenerRejectFraction(static_cast<float>(state.value()));
 }
 
 } // namespace Server
