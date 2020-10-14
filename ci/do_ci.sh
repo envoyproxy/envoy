@@ -312,7 +312,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
-  # Use libstdc++ because the API booster isn't capable of working with libc++ yet.
+  # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
+  # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
   export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
