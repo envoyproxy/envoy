@@ -20,12 +20,13 @@ filegroup(
             "root/intro/arch_overview/security/_include/ssl.yaml",
             # missing proto.pb
             "root/configuration/http/http_filters/_include/grpc-transcoder-filter.yaml",
+            # windows: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
+            "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
         ],
     ) + select({
         "//bazel:windows_x86_64": [],
         "//conditions:default": [
-            # windows: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
-	    "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
+            "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
         ],
     }),
 )
