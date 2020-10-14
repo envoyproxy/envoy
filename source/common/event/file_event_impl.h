@@ -110,8 +110,6 @@ public:
     if (schedulable_.enabled()) {
       schedulable_.cancel();
     }
-    ASSERT(event_counter_ == 1);
-    --event_counter_;
   }
 
   // Event::FileEvent
@@ -145,7 +143,7 @@ public:
 
 private:
   UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t events,
-                         SchedulableCallback& schedulable_cb, int& event_counter)
+                         SchedulableCallback& schedulable_cb)
       : schedulable_(schedulable_cb), cb_([this, cb]() {
           auto all_events = getEventListener().triggeredEvents();
           auto ephemeral_events = getEventListener().getAndClearEphemeralEvents();
@@ -153,8 +151,7 @@ private:
                     "User space event {} invokes callbacks on allevents = {}, ephermal events = {}",
                     static_cast<void*>(this), all_events, ephemeral_events);
           cb(all_events | ephemeral_events);
-        }),
-        event_counter_(event_counter) {
+        }) {
     event_listener_.onEventEnabled(events);
   }
 
@@ -167,11 +164,6 @@ private:
   // The registered callback of this event. This callback is usually on top of the frame of
   // Dispatcher::run().
   std::function<void()> cb_;
-
-  // The counter owned by io handle. This counter is used to track if more than one file event is
-  // attached to the same io handle.
-  // TODO(lambdai): remove this when the full internal connection implementation is landed.
-  int& event_counter_;
 };
 
 class UserSpaceFileEventFactory {
