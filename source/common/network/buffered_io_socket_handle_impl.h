@@ -21,7 +21,7 @@ namespace Network {
  * IoHandle implementation which provides a buffer as data source. It is designed to used by
  * Network::ConnectionImpl. Some known limitations include
  * 1. It doesn't not include a file descriptor. Do not use "fdDoNotUse".
- * 2. It doesn't suppose socket options. Wrap this in ConnectionSocket and implement the socket
+ * 2. It doesn't support socket options. Wrap this in ConnectionSocket and implement the socket
  * getter/setter options.
  * 3. It doesn't support UDP interface.
  * 4. The peer BufferedIoSocket must be scheduled in the same thread to avoid data race because

@@ -134,8 +134,8 @@ public:
     if (!was_enabled) {
       schedulable_.scheduleCallbackNextIteration();
     }
-    ENVOY_LOG(trace, "User space file event {} setEnabled {} on {}. Will {} reschedule.",
-              static_cast<void*>(this), was_enabled ? "not " : "");
+    ENVOY_LOG(trace, "User space file event {} set events {}. Will {} reschedule.",
+              static_cast<void*>(this), events, was_enabled ? "not " : "");
   }
 
   EventListener& getEventListener() { return event_listener_; }
