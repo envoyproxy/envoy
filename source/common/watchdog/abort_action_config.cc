@@ -1,14 +1,13 @@
-#include "common/watchdog/abort_action/config.h"
+#include "common/watchdog/abort_action_config.h"
 
 #include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"
-#include "common/watchdog/abort_action/abort_action.h"
+#include "common/watchdog/abort_action.h"
 
 namespace Envoy {
 namespace Watchdog {
-namespace AbortAction {
 
 Server::Configuration::GuardDogActionPtr AbortActionFactory::createGuardDogActionFromProto(
     const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
@@ -24,6 +23,5 @@ Server::Configuration::GuardDogActionPtr AbortActionFactory::createGuardDogActio
  */
 REGISTER_FACTORY(AbortActionFactory, Server::Configuration::GuardDogActionFactory);
 
-} // namespace AbortAction
 } // namespace Watchdog
 } // namespace Envoy

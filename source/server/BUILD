@@ -55,7 +55,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
-        "@envoy_api//envoy/watchdog/abort_action/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -128,6 +128,7 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/watchdog:abort_action_config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -446,7 +447,6 @@ envoy_cc_library(
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/common/version:version_lib",
-        "//source/common/watchdog/abort_action:config",
         "//source/server:overload_manager_lib",
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

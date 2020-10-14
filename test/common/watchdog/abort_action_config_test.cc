@@ -1,8 +1,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/guarddog_config.h"
-#include "envoy/watchdog/abort_action/v3alpha/abort_action.pb.h"
+#include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
-#include "common/watchdog/abort_action/config.h"
+#include "common/watchdog/abort_action_config.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -12,7 +12,6 @@
 
 namespace Envoy {
 namespace Watchdog {
-namespace AbortAction {
 namespace {
 
 TEST(AbortActionFactoryTest, CanCreateAction) {
@@ -49,6 +48,5 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
 }
 
 } // namespace
-} // namespace AbortAction
 } // namespace Watchdog
 } // namespace Envoy

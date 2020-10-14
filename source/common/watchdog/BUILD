@@ -19,21 +19,20 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/thread:terminate_thread_lib",
-        "@envoy_api//envoy/watchdog/abort_action/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
     ],
 )
 
-# TODO(kbaichoo): is there a more appropriate build unit for this?
 envoy_cc_library(
-    name = "config",
-    srcs = ["config.cc"],
-    hdrs = ["config.h"],
+    name = "abort_action_config",
+    srcs = ["abort_action_config.cc"],
+    hdrs = ["abort_action_config.h"],
     deps = [
         ":abort_action_lib",
         "//include/envoy/registry",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
-        "@envoy_api//envoy/watchdog/abort_action/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
     ],
 )

@@ -271,7 +271,7 @@ proto_library(
         "//envoy/type/metadata/v3:pkg",
         "//envoy/type/tracing/v3:pkg",
         "//envoy/type/v3:pkg",
-        "//envoy/watchdog/abort_action/v3alpha:pkg",
+        "//envoy/watchdog/v3alpha:pkg",
     ],
 )
 

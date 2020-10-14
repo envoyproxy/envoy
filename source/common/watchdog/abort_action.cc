@@ -1,4 +1,4 @@
-#include "common/watchdog/abort_action/abort_action.h"
+#include "common/watchdog/abort_action.h"
 
 #include "envoy/thread/thread.h"
 
@@ -10,11 +10,14 @@
 
 namespace Envoy {
 namespace Watchdog {
-namespace AbortAction {
+namespace {
+constexpr uint64_t DefaultWaitDurationMs = 5000;
+} // end namespace
 
-AbortAction::AbortAction(envoy::watchdog::abort_action::v3alpha::AbortActionConfig& config,
+AbortAction::AbortAction(envoy::watchdog::v3alpha::AbortActionConfig& config,
                          Server::Configuration::GuardDogActionFactoryContext& /*context*/)
-    : config_(config){};
+    : wait_duration_(absl::Milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, wait_duration, DefaultWaitDurationMs))) {}
 
 void AbortAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
@@ -34,9 +37,8 @@ void AbortAction::run(
 
   if (Thread::terminateThread(thread_id)) {
     // Successfully signaled to thread to terminate, sleep for wait_duration.
-    absl::SleepFor(absl::Milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config_, wait_duration, 0)));
+    absl::SleepFor(wait_duration_);
   } else {
-    // Failed to send the signal, abort?
     ENVOY_LOG_MISC(error, "Failed to terminate tid {}", tid_string);
   }
 
@@ -48,6 +50,5 @@ void AbortAction::run(
       tid_string));
 }
 
-} // namespace AbortAction
 } // namespace Watchdog
 } // namespace Envoy

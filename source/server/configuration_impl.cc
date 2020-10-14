@@ -15,7 +15,7 @@
 #include "envoy/server/instance.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/watchdog/abort_action/v3alpha/abort_action.pb.h"
+#include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
@@ -175,9 +175,7 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   auto actions = watchdog.actions();
 
   // Add abort_action if killing is enabled.
-  envoy::watchdog::abort_action::v3alpha::AbortActionConfig abort_config;
-  // Wait one second for the aborted thread to abort.
-  abort_config.mutable_wait_duration()->set_seconds(1);
+  envoy::watchdog::v3alpha::AbortActionConfig abort_config;
 
   if (kill_timeout > 0) {
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction* abort_action_config = actions.Add();
