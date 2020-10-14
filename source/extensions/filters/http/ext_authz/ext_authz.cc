@@ -323,7 +323,7 @@ bool Filter::isBufferFull() const {
 }
 
 void Filter::continueDecoding() {
-  // After sending the out the check request, we don't need to buffer the data anymore.
+  // After sending the check request, we don't need to buffer the data anymore.
   buffer_data_ = false;
 
   filter_return_ = FilterReturn::ContinueDecoding;
