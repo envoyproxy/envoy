@@ -100,6 +100,13 @@ TEST_P(WasmStatSinkConfigTest, CreateWasmFromWASM) {
   sink_->onHistogramComplete(histogram, 0);
 }
 
+TEST(WasmStatsEmptyConfigTest, CreateEmptyConfig) {
+  auto factory = Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
+      StatsSinkNames::get().Wasm);
+  ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
+  EXPECT_NE(config, nullptr);
+}
+
 } // namespace Wasm
 } // namespace StatSinks
 } // namespace Extensions
