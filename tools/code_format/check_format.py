@@ -131,7 +131,8 @@ DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
-RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
+RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
+INVALID_REFLINK = re.compile(".* ref:.*")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
@@ -467,11 +468,16 @@ class FormatChecker:
         next_word_to_check = ''  # first word after :
         prior_line = ''
 
+      invalid_reflink_match = INVALID_REFLINK.match(line)
+      if invalid_reflink_match:
+        reportError("Found text \" ref:\". This should probably be \" :ref:\"\n%s" % line)
+
       # make sure flags are surrounded by ``s
       flag_match = RELOADABLE_FLAG_REGEX.match(line)
       if flag_match:
-        if not flag_match.groups()[0].startswith('`'):
-          reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
+        if not flag_match.groups()[0].startswith(' `'):
+          reportError("Flag `%s` should be enclosed in a single set of back ticks" %
+                      flag_match.groups()[1])
 
       if line.startswith("* "):
         if not endsWithPeriod(prior_line):
