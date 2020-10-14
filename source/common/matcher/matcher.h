@@ -115,16 +115,16 @@ private:
   const std::string callback_;
 };
 
-class Matcher {
+class LeafMatcher {
 public:
-  virtual ~Matcher() = default;
+  virtual ~LeafMatcher() = default;
 
   virtual absl::optional<bool> match(const MatchingData& data) PURE;
 };
 
-using MatcherPtr = std::unique_ptr<Matcher>;
+using LeafMatcherPtr = std::unique_ptr<LeafMatcher>;
 
-class HttpPredicateMatcher : public Matcher {
+class HttpPredicateMatcher : public LeafMatcher {
 public:
   explicit HttpPredicateMatcher(MatchWrapperSharedPtr matcher) : matcher_(std::move(matcher)) {}
 
@@ -161,13 +161,13 @@ public:
     return {true, no_match_action_};
   }
 
-  void addMatcher(MatcherPtr&& matcher, MatchAction action) {
+  void addMatcher(LeafMatcherPtr&& matcher, MatchAction action) {
     matchers_.push_back({std::move(matcher), action});
   }
 
 private:
   absl::optional<MatchAction> no_match_action_;
-  std::vector<std::pair<MatcherPtr, MatchAction>> matchers_;
+  std::vector<std::pair<LeafMatcherPtr, MatchAction>> matchers_;
 };
 
 /**
