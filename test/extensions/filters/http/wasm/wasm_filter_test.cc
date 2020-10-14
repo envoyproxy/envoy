@@ -1294,6 +1294,8 @@ TEST_P(WasmHttpFilterTest, Property) {
               log_(spdlog::level::warn, Eq(absl::string_view("metadata: wasm_request_get_value"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("response.code: 403"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("state: wasm_value"))));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn, Eq(absl::string_view("upstream host metadata: endpoint"))));
 
   root_context_->onTick(0);
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/test_context"}};
@@ -1306,6 +1308,54 @@ TEST_P(WasmHttpFilterTest, Property) {
   EXPECT_CALL(encoder_callbacks_, connection()).WillRepeatedly(Return(&connection));
   NiceMock<Router::MockRouteEntry> route_entry;
   EXPECT_CALL(request_stream_info_, routeEntry()).WillRepeatedly(Return(&route_entry));
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
+          R"EOF(
+        filter_metadata:
+          namespace:
+            key: endpoint
+      )EOF"));
+  EXPECT_CALL(*host_description, metadata()).WillRepeatedly(Return(metadata));
+  EXPECT_CALL(request_stream_info_, upstreamHost()).WillRepeatedly(Return(host_description));
+  filter().log(&request_headers, nullptr, nullptr, log_stream_info);
+}
+
+TEST_P(WasmHttpFilterTest, ClusterMetadata) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "cluster_metadata");
+  setupFilter();
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  auto cluster_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
+          R"EOF(
+      filter_metadata:
+        namespace:
+          key: cluster
+    )EOF"));
+
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  StreamInfo::MockStreamInfo log_stream_info;
+  Http::TestRequestHeaderMapImpl request_headers{{}};
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
+  EXPECT_CALL(*host_description, cluster()).WillRepeatedly(ReturnRef(*cluster));
+  EXPECT_CALL(request_stream_info_, upstreamHost()).WillRepeatedly(Return(host_description));
+  filter().log(&request_headers, nullptr, nullptr, log_stream_info);
+
+  // If upstream host is empty, fallback to upstream cluster info for cluster metadata.
+  EXPECT_CALL(request_stream_info_, upstreamHost()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
   filter().log(&request_headers, nullptr, nullptr, log_stream_info);
 }
 
