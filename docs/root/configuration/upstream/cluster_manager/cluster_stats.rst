@@ -219,6 +219,15 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Histogram, External origin request time milliseconds
 
+.. _config_cluster_manager_cluster_stats_tls:
+
+TLS statistics
+--------------
+
+If TLS is used by the cluster the following statistics are rooted at *cluster.<name>.ssl.*:
+
+.. include:: ../../../_include/ssl_stats.rst
+
 .. _config_cluster_manager_cluster_stats_alt_tree:
 
 Alternate tree dynamic HTTP statistics
