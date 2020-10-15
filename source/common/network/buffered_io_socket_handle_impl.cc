@@ -246,16 +246,16 @@ Event::FileEventPtr BufferedIoSocketHandleImpl::createFileEvent(Event::Dispatche
                                                                 Event::FileTriggerType trigger_type,
                                                                 uint32_t events) {
   io_callback_ = dispatcher.createSchedulableCallback([this]() { user_file_event_->onEvents(); });
-  auto res = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
+  auto event = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
       dispatcher, cb, trigger_type, events, *io_callback_);
-  user_file_event_ = res.get();
+  user_file_event_ = event.get();
   // Blindly activate the events.
   io_callback_->scheduleCallbackNextIteration();
-  return res;
+  return event;
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
-  // Support shutdown write.
+  // Support only shutdown write.
   ASSERT(how == ENVOY_SHUT_WR);
   ASSERT(!closed_);
   if (!write_shutdown_) {
@@ -266,7 +266,6 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
     write_shutdown_ = true;
   }
   return {0, 0};
-} // namespace Network
-
+}
 } // namespace Network
 } // namespace Envoy

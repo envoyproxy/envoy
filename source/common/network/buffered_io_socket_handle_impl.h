@@ -113,7 +113,8 @@ private:
   // leak.
   bool closed_{false};
 
-  // The attached file event with this socket. The event is not owned by the socket.
+  // The attached file event with this socket. The event is not owned by the socket in the current
+  // Envoy model.
   Event::UserSpaceFileEventImpl* user_file_event_;
 
   // The schedulable handle of the above event.
