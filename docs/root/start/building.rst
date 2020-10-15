@@ -42,9 +42,6 @@ be found in the following repositories:
   binary with debug symbols on top of an Ubuntu Bionic base.
 * `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_: Release
   binary with symbols stripped on top of a **glibc** alpine base.
-* `envoyproxy/envoy-alpine-debug <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug/tags/>`_:
-  *Deprecated in favor of envoyproxy/envoy-debug.* Release binary with debug symbols on top of a
-  Release binary with debug symbols on top of a **glibc** alpine base.
 
 .. note::
 
@@ -59,9 +56,6 @@ be found in the following repositories:
   binary with debug symbols on top of an Ubuntu Bionic base.
 * `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: Release
   binary with symbols stripped on top of a **glibc** alpine base.
-* `envoyproxy/envoy-alpine-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug-dev/tags/>`_:
-  *Deprecated in favor of envoyproxy/envoy-debug-dev.* Release binary with debug symbols on top of a
-  **glibc** alpine base.
 
 In the above *dev* repositories, the *latest* tag points to the last Envoy SHA in master that passed
 tests.

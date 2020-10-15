@@ -250,6 +250,10 @@ stages:
         steps:
           - bash: .azure-pipelines/cleanup.sh
             displayName: "Removing tools from agent"
+          - bash: |
+              echo "disk space at beginning of build:"
+              df -h
+            displayName: "Check disk space at beginning"
           - task: DownloadBuildArtifacts@0
             inputs:
               buildType: current
@@ -275,6 +279,11 @@ stages:
               AZP_SHA1: $(Build.SourceVersion)
               DOCKERHUB_USERNAME: $(DockerUsername)
               DOCKERHUB_PASSWORD: $(DockerPassword)
+          - bash: |
+              echo "disk space at end of build:"
+              df -h
+            displayName: "Check disk space at end"
+            condition: always()
           - task: PublishBuildArtifacts@1
             inputs:
               pathtoPublish: "$(Build.StagingDirectory)/build_images"
