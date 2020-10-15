@@ -127,10 +127,22 @@ wasm::vec<byte_t> stripWasmModule(const wasm::vec<byte_t>& module) {
       std::cerr << "ERROR: Failed to parse corrupted Wasm module." << std::endl;
       return wasm::vec<byte_t>::invalid();
     }
-    if (section_type != 0 /* custom section */) {
+    if (section_type == 0 /* custom section */) {
+      const auto section_data_start = pos;
+      const auto section_name_len = parseVarint(pos, end);
+      if (section_name_len == static_cast<uint32_t>(-1) || pos + section_name_len > end) {
+        std::cerr << "ERROR: Failed to parse corrupted Wasm module." << std::endl;
+        return wasm::vec<byte_t>::invalid();
+      }
+      if (section_name_len < sizeof("precompiled_") - 1 ||
+          ::memcmp(pos, "precompiled_", sizeof("precompiled_") - 1) != 0) {
+        stripped.insert(stripped.end(), section_start, section_data_start + section_len);
+      }
+      pos = section_data_start + section_len;
+    } else {
       stripped.insert(stripped.end(), section_start, pos + section_len);
+      pos += section_len;
     }
-    pos += section_len;
   }
 
   return wasm::vec<byte_t>::make(stripped.size(), stripped.data());
