@@ -33,16 +33,16 @@ actions {
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 20
-    num_hosts_locality_one: 3
-    num_hosts_locality_two: 4
-    num_hosts_locality_three: 5
+    num_hosts_locality_a: 3
+    num_hosts_locality_b: 4
+    num_hosts_locality_c: 5
     random_bytestring: "\x01\x02"
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 20
-    num_hosts_locality_one: 3
-    num_hosts_locality_two: 4
-    num_hosts_locality_three: 5
+    num_hosts_locality_a: 3
+    num_hosts_locality_b: 4
+    num_hosts_locality_c: 5
     random_bytestring: "\x01\x02"
 }
 seed_for_prng: 1

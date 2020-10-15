@@ -49,39 +49,38 @@ public:
   std::vector<std::vector<uint8_t>>
   constructSubsets(const std::vector<uint32_t>& number_of_elements_in_each_subset,
                    uint32_t number_of_elements) {
-    index_vector_.clear();
-    index_vector_.reserve(number_of_elements);
+    std::vector<uint8_t> index_vector;
+    index_vector.reserve(number_of_elements);
     for (uint32_t i = 0; i < number_of_elements; i++) {
-      index_vector_.push_back(i);
+      index_vector.push_back(i);
     }
     std::vector<std::vector<uint8_t>> subsets;
     subsets.reserve(number_of_elements_in_each_subset.size());
     for (uint32_t i : number_of_elements_in_each_subset) {
-      subsets.push_back(constructSubset(i));
+      subsets.push_back(constructSubset(i, index_vector));
     }
     return subsets;
   }
 
 private:
   // Builds a single subset by pulling indexes off index_vector_
-  std::vector<uint8_t> constructSubset(uint32_t number_of_elements_in_subset) {
+  std::vector<uint8_t> constructSubset(uint32_t number_of_elements_in_subset,
+                                       std::vector<uint8_t>& index_vector) {
     std::vector<uint8_t> subset;
-    for (uint32_t i = 0; i < number_of_elements_in_subset && !index_vector_.empty(); i++) {
+    for (uint32_t i = 0; i < number_of_elements_in_subset && !index_vector.empty(); i++) {
       // Index of bytestring will wrap around if it "overflows" past the random bytestring's length.
       uint64_t index_of_index_vector =
           random_bytestring_[index_of_random_bytestring_ % random_bytestring_.length()] %
-          index_vector_.size();
-      uint64_t index = index_vector_.at(index_of_index_vector);
+          index_vector.size();
+      uint64_t index = index_vector.at(index_of_index_vector);
       subset.push_back(index);
-      index_vector_.erase(index_vector_.begin() + index_of_index_vector);
+      index_vector.erase(index_vector.begin() + index_of_index_vector);
       ++index_of_random_bytestring_;
     }
     return subset;
   }
 
-  std::vector<uint8_t> index_vector_;
-
-  // This bytestring will be iterated through logically representing randomness in order to choose
+  // This bytestring will be iterated through representing randomness in order to choose
   // subsets
   const std::string random_bytestring_;
   uint32_t index_of_random_bytestring_ = 0;

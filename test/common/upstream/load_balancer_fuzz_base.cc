@@ -30,15 +30,15 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   Fuzz::ProperSubsetSelector subset_selector(setup_priority_level.random_bytestring());
 
   const std::vector<std::vector<uint8_t>> localities = subset_selector.constructSubsets(
-      {setup_priority_level.num_hosts_locality_one(), setup_priority_level.num_hosts_locality_two(),
-       setup_priority_level.num_hosts_locality_three()},
+      {setup_priority_level.num_hosts_locality_a(), setup_priority_level.num_hosts_locality_b(),
+       setup_priority_level.num_hosts_locality_c()},
       std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel));
 
-  HostVector locality_one = {};
-  HostVector locality_two = {};
-  HostVector locality_three = {};
+  HostVector locality_a = {};
+  HostVector locality_b = {};
+  HostVector locality_c = {};
   // Used to index into correct locality in iteration through subsets
-  std::array<HostVector, 3> locality_indexes = {locality_one, locality_two, locality_three};
+  std::array<HostVector, 3> locality_indexes = {locality_a, locality_b, locality_c};
 
   for (uint8_t locality = 0; locality < locality_indexes.size(); locality++) {
     for (uint8_t index : localities[locality]) {
@@ -51,7 +51,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   ENVOY_LOG_MISC(trace, "Added these hosts to locality 2: ", absl::StrJoin(localities[1], " "));
   ENVOY_LOG_MISC(trace, "Added these hosts to locality 3: ", absl::StrJoin(localities[2], " "));
 
-  host_set.hosts_per_locality_ = makeHostsPerLocality({locality_one, locality_two, locality_three});
+  host_set.hosts_per_locality_ = makeHostsPerLocality({locality_a, locality_b, locality_c});
 }
 
 // Initializes random and fixed host sets
@@ -127,10 +127,10 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
                                                     // flag
       // If the host is in a locality, we have to update the corresponding health flag host vector
       if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
-        // First dimension of array represents health_flag, second represents locality, which is
-        // pulled from map
-        locality_health_flags[health_flag][locality_indexes_[index]].push_back(
-            host_set.hosts_[index]);
+        // After computing the host index subsets, we want to propagate these changes to a host set
+        // by building and using these host vectors
+        uint8_t locality = locality_indexes_[index];
+        locality_health_flags[health_flag][locality].push_back(host_set.hosts_[index]);
         ENVOY_LOG_MISC(trace, "Added host at index {} in locality {} to health flag set {}", index,
                        locality_indexes_[index], health_flag + 1);
       }
