@@ -60,13 +60,13 @@ match the incoming request path, set `match_incoming_request_route` to true.
 .. literalinclude:: _include/helloworld.proto
     :language: proto
 
-Assuming you have checked out the google APIs as described above, and have saved the file as
-``helloworld.proto`` you can build it with:
+Assuming you have checked out the google APIs as described above, and have saved the proto file as
+``protos/helloworld.proto`` you can build it with:
 
 .. code-block:: console
 
   $ protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
-      --descriptor_set_out=helloworld.pb helloworld.proto
+      --descriptor_set_out=protos/helloworld.pb protos/helloworld.proto
 
 
 Sending arbitrary content
