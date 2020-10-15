@@ -68,3 +68,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * Redis, Python, configuration/operational questions.
 * Yuchen Dai ([lambdai](https://github.com/lambdai)) (lambdai@google.com)
   * v2 xDS, listeners, filter chain discovery service.
+* Michael Payne ([moderation](https://github.com/moderation)) (m@m17e.org)
+  * External dependencies, Envoy's supply chain and documentation.
