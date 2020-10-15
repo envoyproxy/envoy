@@ -419,6 +419,8 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // needed. This must happen first so cluster updates are heard first by the load balancer.
   // Also, it assures that all of clusters which this function is called should be always active.
   auto cluster_data = warming_clusters_.find(cluster.info()->name());
+  // We have a situation that clusters will be immediately active, such as static and primary
+  // cluster. So we must have this prevention logic here.
   if (cluster_data != warming_clusters_.end()) {
     clusterWarmingToActive(cluster.info()->name());
     updateClusterCounts();
