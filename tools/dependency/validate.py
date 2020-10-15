@@ -37,8 +37,14 @@ EXTENSION_LABEL_RE = re.compile('(//source/extensions/.*):')
 
 # We can safely ignore these as they are from Bazel or internal repository structure.
 IGNORE_DEPS = set([
-    'envoy', 'envoy_api', 'envoy_api_canonical', 'platforms', 'bazel_tools', 'local_config_cc',
-    'remote_coverage_tools', 'foreign_cc_platform_utils',
+    'envoy',
+    'envoy_api',
+    'envoy_api_canonical',
+    'platforms',
+    'bazel_tools',
+    'local_config_cc',
+    'remote_coverage_tools',
+    'foreign_cc_platform_utils',
 ])
 
 
@@ -125,6 +131,8 @@ class BuildGraph(object):
         ext_dep = match.group(1)
         if ext_dep in self._ignore_deps:
           continue
+        # If the dependency is untracked, add the source dependency that loaded
+        # it transitively.
         if ext_dep in self._implied_untracked_deps_revmap:
           ext_dep = self._implied_untracked_deps_revmap[ext_dep]
         ext_deps.add(ext_dep)
@@ -231,6 +239,7 @@ class Validator(object):
     # these paths.
     queried_controlplane_core_min_deps = self._build_graph.QueryExternalDeps(
         '//source/common/config/...')
+    # Controlplane will always depend on API.
     expected_controlplane_core_deps = self._dep_info.DepsByUseCategory('controlplane').union(
         self._dep_info.DepsByUseCategory('api'))
     bad_controlplane_core_deps = queried_controlplane_core_min_deps.difference(
