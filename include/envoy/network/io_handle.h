@@ -262,8 +262,8 @@ public:
   /**
    * Initializes the internal file event that will signal when the io handle is readable, writable
    * or closed. Each handle is allowed to have only a single file event. The internal file event is
-   * managed by the handle and it is turned on and off when the socket would block. Calls to this function
-   * must be paired with calls to reset the file event or close the socket.
+   * managed by the handle and it is turned on and off when the socket would block. Calls to this
+   * function must be paired with calls to reset the file event or close the socket.
    * @param dispatcher dispatcher to be used to allocate the file event.
    * @param cb supplies the callback to fire when the handle is ready.
    * @param trigger specifies whether to edge or level trigger.
