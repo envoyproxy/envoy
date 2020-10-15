@@ -414,8 +414,8 @@ TEST_F(BufferedIoSocketHandleTest, TestRepeatedShutdownWR) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestShutDownOptionsNotSupported) {
-  ASSERT_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RD), "");
-  ASSERT_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
+  ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RD), "");
+  ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
