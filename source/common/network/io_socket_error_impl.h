@@ -33,24 +33,5 @@ public:
 private:
   int errno_;
 };
-
-// Converts a SysCallSizeResult to IoCallUint64Result.
-template <typename T>
-Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
-  if (result.rc_ >= 0) {
-    // Return nullptr as IoError upon success.
-    return Api::IoCallUint64Result(result.rc_,
-                                   Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
-  }
-  RELEASE_ASSERT(result.errno_ != SOCKET_ERROR_INVAL, "Invalid argument passed in.");
-  return Api::IoCallUint64Result(
-      /*rc=*/0,
-      (result.errno_ == SOCKET_ERROR_AGAIN
-           // EAGAIN is frequent enough that its memory allocation should be avoided.
-           ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                             IoSocketError::deleteIoError)
-           : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
-}
-
 } // namespace Network
 } // namespace Envoy

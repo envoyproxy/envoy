@@ -111,7 +111,8 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
   if (!writable_peer_) {
-    return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL});
+    return {0,
+            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
   if (writable_peer_->isWriteEndSet()) {
     // EPIPE or ENOTCONN
