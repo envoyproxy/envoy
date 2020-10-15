@@ -19,10 +19,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Unified Matcher API]
 
-// A MatchTree defines a mathching tree that can be used to match incoming data, arriving at a match action that indicates what action to take in response to the match resuslt.
+// A MatchTree defines a matching tree that can be used to match incoming data, arriving at a match action that indicates what action to take in response to the match result.
 // This structure allows for traversal to happen as data is becoming available, allowing for optimized matching.
 //
-// We talk about an "associated operation" throughout this docs: this is the context dependent operation that is configued with this match tree. For example, this could be a HTTP/TCP filter.
+// We talk about an "associated operation" throughout this docs: this is the context dependent operation that is configured with this match tree. For example, this could be a HTTP/TCP filter.
 message MatchTree {
   // The action that should be taken upon matching.
   message MatchAction {
@@ -87,6 +87,7 @@ message MatchTree {
 
       MultimapMatcher multimap_matcher = 1;
 
+      // [#not-implemented-hide:]
       core.v3.TypedExtensionConfig typed_config = 2;
     }
 
