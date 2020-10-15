@@ -7,8 +7,8 @@
 #include <thread>
 #include <vector>
 
-#include "v8-version.h"
 #include "src/wasm/c-api.h"
+#include "v8-version.h"
 #include "wasm-api/wasm.hh"
 
 uint32_t parseVarint(const byte_t*& pos, const byte_t* end) {
