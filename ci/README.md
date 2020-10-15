@@ -15,9 +15,9 @@ binary built from the latest tip of master that passed tests.
 
 ## Alpine Envoy image
 
-Minimal images based on Alpine Linux allow for quicker deployment of Envoy. Two Alpine based images are built,
-one with an Envoy binary with debug (`envoyproxy/envoy-alpine-debug`) symbols and one stripped of them (`envoyproxy/envoy-alpine`).
-Both images are pushed with two different tags: `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
+Minimal images based on Alpine Linux allow for quicker deployment of Envoy. The Alpine base image is only built with symbols stripped.
+To get the binary with symbols, use the corresponding Ubuntu based debug image. The image is pushed with two different tags:
+`<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
 master commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of master that passed tests.
 
 ## Windows 2019 Envoy image
