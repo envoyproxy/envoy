@@ -116,6 +116,8 @@ for how to update or override dependencies.
 
     ### Windows
 
+    > Note: These instructions apply to Windows versions **later than RS4**. Earlier versions will not compile because the `afunix.h` header is not available. **The recommended Windows version is equal or later than 1909**
+
     Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
 
     When building Envoy, Bazel creates very long path names. One way to work around these excessive path
@@ -127,9 +129,9 @@ for how to update or override dependencies.
     startup --output_base=C:/_eb
     ```
 
-    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support 
+    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
     using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
-    For other common issues, see the 
+    For other common issues, see the
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
 
     [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
@@ -166,10 +168,10 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
 
-    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32. 
-    
-    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe` 
-    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value 
+    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32.
+
+    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
+    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
     of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
     ```
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin

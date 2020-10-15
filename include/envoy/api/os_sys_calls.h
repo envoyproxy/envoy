@@ -12,6 +12,10 @@
 namespace Envoy {
 namespace Api {
 
+struct envoy_tcp_info {
+  uint32_t tcpi_rtt; // Round Trip Time (RTT) in microseconds.
+};
+
 class OsSysCalls {
 public:
   virtual ~OsSysCalls() = default;
@@ -174,7 +178,7 @@ public:
   /**
    * @see man TCP_INFO. Get the tcp info for the socket.
    */
-  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, tcp_info* tcp_info) PURE;
+  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, envoy_tcp_info* tcp_info) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

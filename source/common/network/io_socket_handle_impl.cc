@@ -519,7 +519,7 @@ Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
 }
 
 absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
-  struct tcp_info info;
+  Api::envoy_tcp_info info;
   auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
   if (!result.rc_) {
     ENVOY_LOG_MISC(warn,

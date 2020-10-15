@@ -84,34 +84,15 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
           &os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
-      .WillOnce(Invoke([](os_fd_t /*sockfd*/, tcp_info* tcp_info) -> Api::SysCallBoolResult {
-        tcp_info->tcpi_rtt = 35;
-        return {true, 0};
-      }));
+      .WillOnce(
+          Invoke([](os_fd_t /*sockfd*/, Api::envoy_tcp_info* tcp_info) -> Api::SysCallBoolResult {
+            tcp_info->tcpi_rtt = 35;
+            return {true, 0};
+          }));
 
   IoSocketHandleImpl io_handle;
   EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{35}));
 }
-
-// Only do the integration tests in supported platforms.
-#if defined(TCP_INFO) || defined(SIO_TCP_INFO)
-TEST(IoSocketHandleImpl, LastRoundTripIntegrationTest) {
-  struct sockaddr_in server;
-  // TCP info can not be calculated on loopback.
-  // For that reason we connect to a public dns server.
-  server.sin_addr.s_addr = inet_addr("1.1.1.1");
-  server.sin_family = AF_INET;
-  server.sin_port = htons(80);
-
-  Address::InstanceConstSharedPtr addr(new Address::Ipv4Instance(&server));
-  auto socket_ = std::make_shared<Envoy::Network::ClientSocketImpl>(addr, nullptr);
-  socket_->setBlockingForTest(true);
-  EXPECT_TRUE(socket_->connect(addr).rc_ == 0);
-
-  EXPECT_TRUE(socket_->ioHandle().lastRoundTripTime() != absl::nullopt);
-}
-#endif
-
 } // namespace
 } // namespace Network
 } // namespace Envoy

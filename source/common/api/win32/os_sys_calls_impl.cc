@@ -365,31 +365,18 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 }
 
 SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
-                                                [[maybe_unused]] tcp_info* tcp_info) {
+                                                [[maybe_unused]] envoy_tcp_info* tcp_info) {
 #ifdef SIO_TCP_INFO
   TCP_INFO_v0 win_tcpinfo;
   DWORD infoVersion = 0;
   DWORD bytesReturned = 0;
   int rc = ::WSAIoctl(sockfd, SIO_TCP_INFO, &infoVersion, sizeof(infoVersion), &win_tcpinfo,
                       sizeof(win_tcpinfo), &bytesReturned, nullptr, nullptr);
-  if (rc == SOCKET_ERROR) {
-    return {false, ::WSAGetLastError()};
-  } else {
-    tcp_info->tcpi_state = win_tcpinfo.State;
-    tcp_info->tcpi_rcv_mss = win_tcpinfo.Mss;
-    tcp_info->tcpi_snd_mss = win_tcpinfo.Mss;
+
+  if (!SOCKET_FAILURE(rc)) {
     tcp_info->tcpi_rtt = win_tcpinfo.RttUs;
-    tcp_info->tcpi_min_rtt = win_tcpinfo.MinRttUs;
-    tcp_info->tcpi_snd_wnd = win_tcpinfo.SndWnd;
-    tcp_info->tcpi_rwnd_limited = win_tcpinfo.RcvWnd;
-    tcp_info->tcpi_bytes_sent = win_tcpinfo.BytesOut;
-    tcp_info->tcpi_bytes_received = win_tcpinfo.BytesIn;
-    tcp_info->tcpi_bytes_retrans = win_tcpinfo.BytesRetrans;
-    tcp_info->tcpi_reordering = win_tcpinfo.BytesReordered;
-    tcp_info->tcpi_fackets = win_tcpinfo.FastRetrans;
-    tcp_info->tcpi_dsack_dups = win_tcpinfo.DupAcksIn;
-    return {true, 0};
   }
+  return {!SOCKET_FAILURE(rc), !SOCKET_FAILURE(rc) ? 0 : ::WSAGetLastError()};
 #endif
   return {false, WSAEOPNOTSUPP};
 }
