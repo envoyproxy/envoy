@@ -46,11 +46,13 @@ schedule, initially aiming for the bi-weekly releases.
 Release managers of stable releases are responsible for approving and merging backports, tagging
 stable releases and sending announcements about them. This role is rotating on a quarterly basis.
 
-| Quarter |       Release manager        |
-|:-------:|:----------------------------:|
-| 2020 Q1 | Piotr Sikora ([PiotrSikora]) |
-| 2020 Q2 | Piotr Sikora ([PiotrSikora]) |
-| 2020 Q3 | Yuchen Dai ([lambdai])       |
+| Quarter |       Release manager            |
+|:-------:|:--------------------------------:|
+| 2020 Q1 | Piotr Sikora ([PiotrSikora])     |
+| 2020 Q2 | Piotr Sikora ([PiotrSikora])     |
+| 2020 Q3 | Yuchen Dai ([lambdai])           |
+| 2020 Q4 | Christoph Pakulski ([cpakulski]) |
+| 2021 Q1 |                                  |
 
 ## Release schedule
 
