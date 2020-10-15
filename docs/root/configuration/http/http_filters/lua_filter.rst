@@ -644,7 +644,7 @@ Returns the string representation of :repo:`HTTP protocol <include/envoy/http/pr
 used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
 
 downstreamLocalAddress()
-^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -654,7 +654,7 @@ Returns the string representation of :repo:`downstream remote address <include/e
 used by the current request.
 
 downstreamDirectRemoteAddress()
-^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
