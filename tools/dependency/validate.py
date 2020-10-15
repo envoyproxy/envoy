@@ -37,8 +37,26 @@ EXTENSION_LABEL_RE = re.compile('(//source/extensions/.*):')
 
 # We can safely ignore these as they are from Bazel or internal repository structure.
 IGNORE_DEPS = set([
-    'envoy', 'envoy_api', 'platforms', 'bazel_tools', 'local_config_cc', 'foreign_cc_platform_utils'
+    'envoy', 'envoy_api', 'envoy_api_canonical', 'platforms', 'bazel_tools', 'local_config_cc',
+    'remote_coverage_tools', 'foreign_cc_platform_utils',
 ])
+
+
+# Should a dependency be ignored if it's only used in test? Any changes to this
+# allowlist method should be accompanied by an update to the explanation in the
+# "Test only" section of
+# docs/root/intro/arch_overview/security/external_deps.rst.
+def TestOnlyIgnore(dep):
+  # Rust
+  if dep.startswith('raze__'):
+    return True
+  # Java
+  if dep.startswith('remotejdk'):
+    return True
+  # Python (pip3)
+  if '_pip3_' in dep:
+    return True
+  return False
 
 
 class DependencyError(Exception):
@@ -152,11 +170,21 @@ class Validator(object):
       DependencyError: on a dependency validation error.
     """
     print('Validating test-only dependencies...')
+    # Validate that //source doesn't depend on test_only
     queried_source_deps = self._build_graph.QueryExternalDeps('//source/...')
     expected_test_only_deps = self._dep_info.DepsByUseCategory('test_only')
     bad_test_only_deps = expected_test_only_deps.intersection(queried_source_deps)
     if len(bad_test_only_deps) > 0:
       raise DependencyError(f'//source depends on test-only dependencies: {bad_test_only_deps}')
+    # Validate that //test deps additional to those of //source are captured in
+    # test_only.
+    test_only_deps = self._build_graph.QueryExternalDeps('//test/...')
+    source_deps = self._build_graph.QueryExternalDeps('//source/...')
+    marginal_test_deps = test_only_deps.difference(source_deps)
+    bad_test_deps = marginal_test_deps.difference(expected_test_only_deps)
+    unknown_bad_test_deps = [dep for dep in bad_test_deps if not TestOnlyIgnore(dep)]
+    if len(unknown_bad_test_deps) > 0:
+      raise DependencyError(f'Missing deps in test_only "use_category": {unknown_bad_test_deps}')
 
   def ValidateDataPlaneCoreDeps(self):
     """Validate dataplane_core dependencies.
