@@ -9,12 +9,15 @@ cc_library(
     srcs = [
         "libwee8.a",
     ],
-    hdrs = [
-        "wee8/include/v8-version.h",
-        "wee8/third_party/wasm-api/wasm.hh",
-    ],
+    hdrs =
+        glob([
+            "wee8/include/**/*.h",
+            "wee8/src/**/*.h",
+            "wee8/third_party/wasm-api/wasm.hh",
+        ]),
     defines = ["ENVOY_WASM_V8"],
     includes = [
+        "wee8",
         "wee8/include",
         "wee8/third_party",
     ],

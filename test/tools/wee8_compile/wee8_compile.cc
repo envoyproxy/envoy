@@ -1,13 +1,14 @@
 // NOLINT(namespace-envoy)
 
-#include <unistd.h>
-
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 #include "v8-version.h"
+#include "src/wasm/c-api.h"
 #include "wasm-api/wasm.hh"
 
 uint32_t parseVarint(const byte_t*& pos, const byte_t* end) {
@@ -154,8 +155,11 @@ wasm::vec<byte_t> serializeWasmModule(const char* path, const wasm::vec<byte_t>&
     return wasm::vec<byte_t>::invalid();
   }
 
-  // TODO(PiotrSikora): figure out how to hook the completion callback.
-  sleep(3);
+  wasm::StoreImpl* store_impl = reinterpret_cast<wasm::StoreImpl*>(store.get());
+  auto isolate = store_impl->isolate();
+  while (isolate->HasPendingBackgroundTasks()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
 
   return module->serialize();
 }
