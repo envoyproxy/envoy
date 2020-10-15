@@ -227,7 +227,7 @@ private:
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
       response_trailers_ = std::move(response_trailers);
     }
-    void chargeStats(const ResponseHeaderMap& headers);
+    void chargeStats(const ResponseHeaderMap& headers) override;
 
     // TODO(snowp): Create shared OptRef/OptConstRef helpers
     Http::RequestHeaderMapOptRef requestHeaders() override {
