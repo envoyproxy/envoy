@@ -54,7 +54,7 @@ static_resources:
                   cluster: some_service
           # CustomFilter and the HTTP router filter are the HTTP filter chain.
           http_filters:
-            - name: some.customer.filter
+            # - name: some.customer.filter
             - name: envoy.filters.http.router
   clusters:
   - name: some_service

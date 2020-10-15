@@ -17,8 +17,6 @@ filegroup(
             "root/**/*.pb",
         ],
         exclude = [
-            # `some.customer.filter`
-            "root/intro/_include/life-of-a-request.yaml",
             # windows: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
         ],
