@@ -79,7 +79,8 @@ body_format:
   EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
   EXPECT_EQ("150", response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("550", response->headers().Status()->value().getStringView());
-  EXPECT_EQ("bar", response->headers().get(Http::LowerCaseString("foo"))->value().getStringView());
+  EXPECT_EQ("bar",
+            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
   // Check if returned json is same as expected
   EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
 }
@@ -210,7 +211,8 @@ body_format:
   EXPECT_EQ("text/plain", response->headers().ContentType()->value().getStringView());
   EXPECT_EQ("24", response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("551", response->headers().Status()->value().getStringView());
-  EXPECT_EQ("bar", response->headers().get(Http::LowerCaseString("foo"))->value().getStringView());
+  EXPECT_EQ("bar",
+            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
   // Check if returned json is same as expected
   EXPECT_EQ(response->body(), expected_body);
 }

@@ -63,7 +63,7 @@ static void headerMapImplGet(benchmark::State& state) {
   headers->setReference(key, value);
   size_t successes = 0;
   for (auto _ : state) { // NOLINT
-    successes += (headers->get(key) != nullptr);
+    successes += !headers->get(key).empty();
   }
   benchmark::DoNotOptimize(successes);
 }
