@@ -4,7 +4,6 @@
 #include "common/network/listen_socket_impl.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
