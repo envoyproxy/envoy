@@ -262,7 +262,7 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 }
 
 SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
-                                                [[maybe_unused]] envoy_tcp_info* tcp_info) {
+                                                [[maybe_unused]] EnvoyTcpInfo* tcp_info) {
 #ifdef TCP_INFO
   struct tcp_info unix_tcp_info;
   socklen_t len = sizeof(unix_tcp_info);

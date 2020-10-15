@@ -365,7 +365,7 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 }
 
 SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
-                                                [[maybe_unused]] envoy_tcp_info* tcp_info) {
+                                                [[maybe_unused]] EnvoyTcpInfo* tcp_info) {
 #ifdef SIO_TCP_INFO
   TCP_INFO_v0 win_tcpinfo;
   DWORD infoVersion = 0;

@@ -85,7 +85,7 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
 
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
       .WillOnce(
-          Invoke([](os_fd_t /*sockfd*/, Api::envoy_tcp_info* tcp_info) -> Api::SysCallBoolResult {
+          Invoke([](os_fd_t /*sockfd*/, Api::EnvoyTcpInfo* tcp_info) -> Api::SysCallBoolResult {
             tcp_info->tcpi_rtt = 35;
             return {true, 0};
           }));
