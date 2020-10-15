@@ -859,7 +859,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # See: https://github.com/bazelbuild/rules_rust/issues/386
         strip_prefix = "rules_rust-{version}",
         urls = ["https://github.com/bazelbuild/rules_rust/archive/{version}.tar.gz"],
-        use_category = ["build"],
+        use_category = ["test_only"],
         last_updated = "2020-10-09",
     ),
     rules_antlr = dict(
@@ -886,8 +886,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "ANTLR v4",
         project_desc = "ANTLR (ANother Tool for Language Recognition) is a powerful parser generator for reading, processing, executing, or translating structured text or binary files",
         project_url = "https://github.com/antlr/antlr4",
-        version = "4.7.1",
-        sha256 = "4d0714f441333a63e50031c9e8e4890c78f3d21e053d46416949803e122a6574",
+        version = "4.7.2",
+        sha256 = "46f5e1af5f4bd28ade55cb632f9a069656b31fc8c2408f9aa045f9b5f5caad64",
         strip_prefix = "antlr4-{version}",
         urls = ["https://github.com/antlr/antlr4/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -898,7 +898,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
         cpe = "N/A",
     ),
 )

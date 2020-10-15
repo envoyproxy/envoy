@@ -351,31 +351,10 @@ def _com_github_zlib_ng_zlib_ng():
 def _com_google_cel_cpp():
     external_http_archive("com_google_cel_cpp")
     external_http_archive("rules_antlr")
-    external_http_archive(
-        name = "antlr4_runtimes",
-        build_file_content = """
-package(default_visibility = ["//visibility:public"])
-cc_library(
-    name = "cpp",
-    srcs = glob(["runtime/Cpp/runtime/src/**/*.cpp"]),
-    hdrs = glob(["runtime/Cpp/runtime/src/**/*.h"]),
-    includes = ["runtime/Cpp/runtime/src"],
-)
-""",
-        patch_args = ["-p1"],
-        # Patches ASAN violation of initialization fiasco
-        patches = ["@envoy//bazel:antlr.patch"],
-    )
 
     # Parser dependencies
     # TODO: upgrade this when cel is upgraded to use the latest version
-    external_http_archive(
-        name = "rules_antlr",
-        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
-        strip_prefix = "rules_antlr-3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
-        urls = ["https://github.com/marcohu/rules_antlr/archive/3cc2f9502a54ceb7b79b37383316b23c4da66f9a.tar.gz"],
-    )
-
+    external_http_archive(name = "rules_antlr")
     external_http_archive(
         name = "antlr4_runtimes",
         build_file_content = """
@@ -387,12 +366,9 @@ cc_library(
     includes = ["runtime/Cpp/runtime/src"],
 )
 """,
-        sha256 = "46f5e1af5f4bd28ade55cb632f9a069656b31fc8c2408f9aa045f9b5f5caad64",
         patch_args = ["-p1"],
         # Patches ASAN violation of initialization fiasco
         patches = ["@envoy//bazel:antlr.patch"],
-        strip_prefix = "antlr4-4.7.2",
-        urls = ["https://github.com/antlr/antlr4/archive/4.7.2.tar.gz"],
     )
 
 def _com_github_nghttp2_nghttp2():
