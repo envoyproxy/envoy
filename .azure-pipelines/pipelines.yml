@@ -118,6 +118,8 @@ jobs:
   - job: filter_example
     displayName: "filter-example sync"
     dependsOn: []
+    pool:
+      vmImage: "ubuntu-18.04"
     condition: and(succeeded(), eq(variables['PostSubmit'], true))
     steps:
       - task: InstallSSHKey@0
@@ -133,6 +135,50 @@ jobs:
         env:
           AZP_BRANCH: $(Build.SourceBranch)
 
+  - job: api
+    displayName: "data-plane-api sync"
+    dependsOn: []
+    condition: and(succeeded(), eq(variables['PostSubmit'], true))
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+      - task: InstallSSHKey@0
+        inputs:
+          hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+          sshPublicKey: "$(DataPlaneApiPublicKey)"
+          sshPassphrase: "$(SshDeployKeyPassphrase)"
+          sshKeySecureFile: "$(DataPlaneApiPrivateKey)"
+
+      - bash: ci/api_mirror.sh
+        displayName: "Sync data-plane-api"
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          AZP_BRANCH: $(Build.SourceBranch)
+
+  - job: go_control_plane
+    displayName: "go-control-plane sync"
+    dependsOn: []
+    condition: and(succeeded(), eq(variables['PostSubmit'], true))
+    steps:
+      - task: InstallSSHKey@0
+        inputs:
+          hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+          sshPublicKey: "$(GoControlPlanePublicKey)"
+          sshPassphrase: "$(SshDeployKeyPassphrase)"
+          sshKeySecureFile: "$(GoControlPlanePrivateKey)"
+
+      - bash: |
+          cp -a ~/.ssh $(Build.StagingDirectory)/
+          ci/run_envoy_docker.sh 'ci/go_mirror.sh'
+        displayName: "Sync go-control-plane"
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          AZP_BRANCH: $(Build.SourceBranch)
+
   - job: bazel
     displayName: "Linux-x64"
     dependsOn: ["release"]
@@ -141,6 +187,8 @@ jobs:
     strategy:
       maxParallel: 3
       matrix:
+        api:
+          CI_TARGET: "bazel.api"
         gcc:
           CI_TARGET: "bazel.gcc"
         clang_tidy:
