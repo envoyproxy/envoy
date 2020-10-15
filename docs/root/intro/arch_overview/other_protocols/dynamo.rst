@@ -12,7 +12,7 @@ Envoy supports an HTTP level DynamoDB sniffing filter with the following feature
 * Batch operation partial failure statistics.
 
 The DynamoDB filter is a good example of Envoy’s extensibility and core abstractions at the HTTP
-layer. At Lyft we use this filter for all application communication with DynamoDB. It provides an
+layer, and can be used to filter all application communication with DynamoDB. It provides an
 invaluable source of data agnostic to the application platform and specific AWS SDK in use.
 
 DynamoDB filter :ref:`configuration <config_http_filters_dynamo>`.

@@ -19,10 +19,6 @@ envoy_cc_test(
     data = envoy_select_wasm([
         "//test/extensions/common/wasm/test_data:test_rust.wasm",
     ]),
-    tags = [
-        # wasm (wee v8 etc) will not compile on Windows
-        "skip_on_windows",
-    ],
     deps = [
         "//source/extensions/common/wasm:wasm_lib",
         "//test/test_common:environment_lib",

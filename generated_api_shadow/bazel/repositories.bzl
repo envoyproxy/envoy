@@ -1,40 +1,43 @@
 load(":envoy_http_archive.bzl", "envoy_http_archive")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
+load(":external_deps.bzl", "load_repository_locations")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+
+REPOSITORY_LOCATIONS = load_repository_locations(REPOSITORY_LOCATIONS_SPEC)
+
+# Use this macro to reference any HTTP archive from bazel/repository_locations.bzl.
+def external_http_archive(name, **kwargs):
+    envoy_http_archive(
+        name,
+        locations = REPOSITORY_LOCATIONS,
+        **kwargs
+    )
 
 def api_dependencies():
-    envoy_http_archive(
-        "bazel_skylib",
-        locations = REPOSITORY_LOCATIONS,
+    external_http_archive(
+        name = "bazel_skylib",
     )
-    envoy_http_archive(
-        "com_envoyproxy_protoc_gen_validate",
-        locations = REPOSITORY_LOCATIONS,
+    external_http_archive(
+        name = "com_envoyproxy_protoc_gen_validate",
     )
-    envoy_http_archive(
+    external_http_archive(
         name = "com_google_googleapis",
-        locations = REPOSITORY_LOCATIONS,
     )
-    envoy_http_archive(
+    external_http_archive(
         name = "com_github_cncf_udpa",
-        locations = REPOSITORY_LOCATIONS,
     )
 
-    envoy_http_archive(
+    external_http_archive(
         name = "prometheus_metrics_model",
-        locations = REPOSITORY_LOCATIONS,
         build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
     )
-    envoy_http_archive(
+    external_http_archive(
         name = "opencensus_proto",
-        locations = REPOSITORY_LOCATIONS,
     )
-    envoy_http_archive(
+    external_http_archive(
         name = "rules_proto",
-        locations = REPOSITORY_LOCATIONS,
     )
-    envoy_http_archive(
+    external_http_archive(
         name = "com_github_openzipkin_zipkinapi",
-        locations = REPOSITORY_LOCATIONS,
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
 

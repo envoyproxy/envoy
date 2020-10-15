@@ -68,14 +68,27 @@ Overload actions
 
 The following overload actions are supported:
 
-.. csv-table::
-  :header: Name, Description
+.. list-table::
+  :header-rows: 1
   :widths: 1, 2
 
-  envoy.overload_actions.stop_accepting_requests, Envoy will immediately respond with a 503 response code to new requests
-  envoy.overload_actions.disable_http_keepalive, Envoy will stop accepting streams on incoming HTTP connections
-  envoy.overload_actions.stop_accepting_connections, Envoy will stop accepting new network connections on its configured listeners
-  envoy.overload_actions.shrink_heap, Envoy will periodically try to shrink the heap by releasing free memory to the system
+  * - Name
+    - Description
+
+  * - envoy.overload_actions.stop_accepting_requests
+    - Envoy will immediately respond with a 503 response code to new requests
+
+  * - envoy.overload_actions.disable_http_keepalive
+    - Envoy will stop accepting streams on incoming HTTP connections
+
+  * - envoy.overload_actions.stop_accepting_connections
+    - Envoy will stop accepting new network connections on its configured listeners
+
+  * - envoy.overload_actions.reject_incoming_connections
+    - Envoy will reject incoming connections on its configured listeners without processing any data
+
+  * - envoy.overload_actions.shrink_heap
+    - Envoy will periodically try to shrink the heap by releasing free memory to the system
 
 Limiting Active Connections
 ---------------------------
