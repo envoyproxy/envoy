@@ -33,17 +33,6 @@ index e65b55e..f0a61dd 100644
  #
  # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
  #XCFLAGS+= -DLUAJIT_DISABLE_JIT
-@@ -110,8 +110,8 @@ XCFLAGS=
- #XCFLAGS+= -DLUAJIT_NUMMODE=1
- #XCFLAGS+= -DLUAJIT_NUMMODE=2
- #
--# Disable LJ_GC64 mode for x64.
--#XCFLAGS+= -DLUAJIT_DISABLE_GC64
-+# Enable GC64 mode for x64.
-+XCFLAGS+= -DLUAJIT_ENABLE_GC64
- #
- ##############################################################################
- 
 @@ -591,7 +591,7 @@ endif
  
  Q= @
@@ -179,7 +168,7 @@ index 0000000..3eb74ff
 +    dst_dir = os.getcwd() + "/luajit"
 +    shutil.copytree(src_dir, os.path.basename(src_dir))
 +    os.chdir(os.path.basename(src_dir) + "/src")
-+    os.system('msvcbuild.bat gc64 ' + os.getenv('WINDOWS_DBG_BUILD', '') + ' static')
++    os.system('msvcbuild.bat ' + os.getenv('WINDOWS_DBG_BUILD', '') + ' static')
 +    os.makedirs(dst_dir + "/lib", exist_ok=True)
 +    shutil.copy("lua51.lib", dst_dir + "/lib")
 +    os.makedirs(dst_dir + "/include/luajit-2.1", exist_ok=True)
