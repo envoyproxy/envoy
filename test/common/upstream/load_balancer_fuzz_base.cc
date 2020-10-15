@@ -47,9 +47,12 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
     }
   }
 
-  ENVOY_LOG_MISC(trace, "Added these hosts to locality 1: ", absl::StrJoin(localities[0], " "));
-  ENVOY_LOG_MISC(trace, "Added these hosts to locality 2: ", absl::StrJoin(localities[1], " "));
-  ENVOY_LOG_MISC(trace, "Added these hosts to locality 3: ", absl::StrJoin(localities[2], " "));
+  ENVOY_LOG_MISC(trace, "Added these hosts to locality 1: {}",
+                 absl::StrJoin(localities.at(0), " "));
+  ENVOY_LOG_MISC(trace, "Added these hosts to locality 2: {}",
+                 absl::StrJoin(localities.at(1), " "));
+  ENVOY_LOG_MISC(trace, "Added these hosts to locality 3: {}",
+                 absl::StrJoin(localities.at(2), " "));
 
   host_set.hosts_per_locality_ = makeHostsPerLocality({locality_a, locality_b, locality_c});
 }
@@ -91,6 +94,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   // Healthy hosts are first subset
   for (uint8_t index : subsets.at(0)) {
     host_set.healthy_hosts_.push_back(host_set.hosts_[index]);
+    // No health flags for healthy
   }
   ENVOY_LOG_MISC(trace, "Hosts made healthy at priority level {}: {}", priority_of_host_set,
                  absl::StrJoin(subsets.at(0), " "));
@@ -98,6 +102,11 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   // Degraded hosts are second subset
   for (uint8_t index : subsets.at(1)) {
     host_set.degraded_hosts_.push_back(host_set.hosts_[index]);
+    // Health flags are not currently directly used by most load balancers, but
+    // they may be added and also are used by other components.
+    // There are two health flags that map to Host::Health::Degraded, DEGRADED_ACTIVE_HC and
+    // DEGRADED_EDS_HEALTH. Choose one hardcoded for simpliclity.
+    host_set.hosts_[index]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   }
   ENVOY_LOG_MISC(trace, "Hosts made degraded at priority level {}: {}", priority_of_host_set,
                  absl::StrJoin(subsets.at(1), " "));
@@ -105,7 +114,13 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   // Excluded hosts are third subset
   for (uint8_t index : subsets.at(2)) {
     host_set.excluded_hosts_.push_back(host_set.hosts_[index]);
+    // Health flags are not currently directly used by most load balancers, but
+    // they may be added and also are used by other components.
+    // There are three health flags that map to Host::Health::Degraded, FAILED_ACTIVE_HC,
+    // FAILED_OUTLIER_CHECK, and FAILED_EDS_HEALTH. Choose one hardcoded for simpliclity.
+    host_set.hosts_[index]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
+
   ENVOY_LOG_MISC(trace, "Hosts made excluded at priority level {}: {}", priority_of_host_set,
                  absl::StrJoin(subsets.at(2), " "));
 

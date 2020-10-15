@@ -1,5 +1,6 @@
 #include <memory>
 #include <random>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/random_generator.h"
@@ -49,6 +50,7 @@ public:
   std::vector<std::vector<uint8_t>>
   constructSubsets(const std::vector<uint32_t>& number_of_elements_in_each_subset,
                    uint32_t number_of_elements) {
+    num_elements_left_ = number_of_elements;
     std::vector<uint8_t> index_vector;
     index_vector.reserve(number_of_elements);
     for (uint32_t i = 0; i < number_of_elements; i++) {
@@ -67,16 +69,21 @@ private:
   std::vector<uint8_t> constructSubset(uint32_t number_of_elements_in_subset,
                                        std::vector<uint8_t>& index_vector) {
     std::vector<uint8_t> subset;
-    for (uint32_t i = 0; i < number_of_elements_in_subset && !index_vector.empty(); i++) {
+
+    for (uint32_t i = 0; i < number_of_elements_in_subset && !(num_elements_left_ == 0); i++) {
       // Index of bytestring will wrap around if it "overflows" past the random bytestring's length.
       uint64_t index_of_index_vector =
           random_bytestring_[index_of_random_bytestring_ % random_bytestring_.length()] %
-          index_vector.size();
+          num_elements_left_;
       uint64_t index = index_vector.at(index_of_index_vector);
       subset.push_back(index);
-      index_vector.erase(index_vector.begin() + index_of_index_vector);
+      // Move the index chosen to the end of the vector - will not be chosen again
+      std::swap(index_vector[index_of_index_vector], index_vector[num_elements_left_ - 1]);
+      --num_elements_left_;
+
       ++index_of_random_bytestring_;
     }
+
     return subset;
   }
 
@@ -84,6 +91,10 @@ private:
   // subsets
   const std::string random_bytestring_;
   uint32_t index_of_random_bytestring_ = 0;
+
+  // Used to make subset construction linear time complexity with std::swap - chosen indexes will be
+  // swapped to end of vector, and won't be chosen again due to modding against this integer
+  uint32_t num_elements_left_;
 };
 
 } // namespace Fuzz
