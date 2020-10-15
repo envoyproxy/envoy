@@ -635,9 +635,10 @@ bool RouteEntryImplBase::shouldRewriteHeader(absl::string_view key, absl::string
   if (it != this->response_headers_to_rewrite_.end()) {
     // Check for match predicate
     if (it->second->getHeaderMatchPredicate()->getMatchers().size()) {
-      Envoy::Extensions::Common::Matcher::Matcher::MatchStatusVector match_predicates;
-      match_predicates.clear();
-      match_predicates.reserve((it->second->getHeaderMatchPredicate()->getMatchers()).size());
+      Envoy::Extensions::Common::Matcher::Matcher::MatchStatusVector match_predicates =
+          Envoy::Extensions::Common::Matcher::Matcher::MatchStatusVector(
+              (it->second->getHeaderMatchPredicate()->getMatchers()).size());
+
       // If we have header match predicates specified in config for this response header,
       // check whether the root of the predicates matches given the set of response headers
       auto& root_matcher = (it->second->getHeaderMatchPredicate()->getMatchers())[0];

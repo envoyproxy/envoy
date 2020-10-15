@@ -34,7 +34,8 @@ bool StringHeaderMatcher::matchStringHeaders(
 
 bool StringHeaderMatcher::matchSingleStringHeader(const Http::HeaderMap& response_headers,
                                                   const StringHeaderMatcher& header) {
-  Http::HeaderMap::GetResult header_entry = response_headers.get(Http::LowerCaseString(header.name_));
+  Http::HeaderMap::GetResult header_entry =
+      response_headers.get(Http::LowerCaseString(header.name_));
   if (!header_entry.empty()) {
     bool match_result = header.pattern_.match(header_entry[0]->value().getStringView());
     return header.invert_match_ ? !match_result : match_result;
@@ -182,6 +183,7 @@ void SetLogicMatcher::updateLocalStatus(MatchStatusVector& statuses,
 
   // TODO(mattklein123): We can potentially short circuit this even further if we git a single false
   // in an AND set or a single true in an OR set.
+
   statuses[my_index_].might_change_status_ =
       std::any_of(indexes_.begin(), indexes_.end(),
                   [&statuses](size_t index) { return statuses[index].might_change_status_; });
