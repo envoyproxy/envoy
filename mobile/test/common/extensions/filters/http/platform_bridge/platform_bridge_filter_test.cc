@@ -107,7 +107,7 @@ TEST_F(PlatformBridgeFilterTest, NullImplementation) {
 TEST_F(PlatformBridgeFilterTest, PartialNullImplementation) {
   envoy_http_filter* noop_filter =
       static_cast<envoy_http_filter*>(safe_calloc(1, sizeof(envoy_http_filter)));
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  filter_invocations invocations{};
   noop_filter->static_context = &invocations;
   noop_filter->init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -146,8 +146,8 @@ TEST_F(PlatformBridgeFilterTest, PartialNullImplementation) {
 }
 
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestHeaders) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -178,8 +178,8 @@ platform_filter_name: BasicContinueOnRequestHeaders
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -232,8 +232,8 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecoding) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -292,8 +292,8 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
 }
 
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -322,8 +322,8 @@ platform_filter_name: BasicContinueOnRequestData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopAndBufferOnRequestData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -376,8 +376,8 @@ platform_filter_name: StopAndBufferOnRequestData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -444,8 +444,8 @@ platform_filter_name: StopAndBufferThenResumeOnRequestData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -538,8 +538,8 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopNoBufferOnRequestData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -577,8 +577,8 @@ platform_filter_name: StopNoBufferOnRequestData
 }
 
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestTrailers) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -608,8 +608,8 @@ platform_filter_name: BasicContinueOnRequestTrailers
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrailers) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -706,8 +706,8 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnTrailers
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -840,8 +840,8 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
 // DIVIDE
 
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseHeaders) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -872,8 +872,8 @@ platform_filter_name: BasicContinueOnResponseHeaders
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -926,8 +926,8 @@ platform_filter_name: StopOnResponseHeadersThenResumeOnData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnResumeEncoding) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -986,8 +986,8 @@ platform_filter_name: StopOnResponseHeadersThenResumeOnResumeEncoding
 }
 
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -1016,8 +1016,8 @@ platform_filter_name: BasicContinueOnResponseData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopAndBufferOnResponseData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -1070,8 +1070,8 @@ platform_filter_name: StopAndBufferOnResponseData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnResponseData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -1138,8 +1138,8 @@ platform_filter_name: StopAndBufferThenResumeOnResponseData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -1231,8 +1231,8 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnData
 }
 
 TEST_F(PlatformBridgeFilterTest, StopNoBufferOnResponseData) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -1270,8 +1270,8 @@ platform_filter_name: StopNoBufferOnResponseData
 }
 
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseTrailers) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -1301,8 +1301,8 @@ platform_filter_name: BasicContinueOnResponseTrailers
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrailers) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -1399,8 +1399,8 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnTrailers
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding) {
-  envoy_http_filter platform_filter;
-  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
