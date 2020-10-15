@@ -30,7 +30,7 @@ message SkyWalkingConfig {
 }
 
 // Client config for SkyWalking tracer.
-// [#next-free-field: 6]
+// [#next-free-field: 5]
 message ClientConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v3.ClientConfig";
 
@@ -46,14 +46,8 @@ message ClientConfig {
   // authentication.
   string authentication = 3;
 
-  // When this field is set to true and Envoy is not the first tracing node, it
-  // directly uses the downstream endpoint as its own endpoint. This is helpful
-  // when the user wants to use the endpoint to aggregate all span data on the
-  // tracing link.
-  bool pass_endpoint = 4;
-
   // Envoy caches the segment in memory when the backend service is temporarily
   // unavailable. This field specifies the maximum number of segments that can
   // be cached. If not specified, the default is 1024.
-  google.protobuf.UInt32Value max_cache_size = 5;
+  google.protobuf.UInt32Value max_cache_size = 4;
 }

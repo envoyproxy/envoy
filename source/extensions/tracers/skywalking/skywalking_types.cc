@@ -108,17 +108,21 @@ SegmentContext::SegmentContext(SpanContextPtr&& previous_span_context, Tracing::
   trace_segment_id_ = generateId(random_generator);
 }
 
-SpanStore* SegmentContext::createSpanStore(TimeSource& time_source, SpanStore* parent_store) {
-  auto store = std::make_unique<SpanStore>(this, time_source);
+SpanStore* SegmentContext::createSpanStore(const SpanStore* parent_store) {
+  SpanStorePtr store = std::make_unique<SpanStore>(this);
   store->setSpanId(span_list_.size());
-  if (parent_store) {
-    // Child span.
-    store->setSampled(parent_store->sampled());
-    store->setParentSpanId(parent_store->spanId());
-  } else {
+  if (!parent_store) {
     // First span.
     store->setSampled(sampled_);
     store->setParentSpanId(-1);
+    // First span of current segment for Envoy Proxy must be a Entry Span. It is created for
+    // downstream HTTP request.
+    store->setAsEntrySpan(true);
+  } else {
+    // Child span.
+    store->setSampled(parent_store->sampled());
+    store->setParentSpanId(parent_store->spanId());
+    store->setAsEntrySpan(false);
   }
   SpanStore* ref = store.get();
   span_list_.emplace_back(std::move(store));
@@ -128,21 +132,19 @@ SpanStore* SegmentContext::createSpanStore(TimeSource& time_source, SpanStore* p
 void SpanStore::injectContext(Http::RequestHeaderMap& request_headers) const {
   ASSERT(segment_context_);
 
-  std::string target_address =
-      upstream_address_.empty() ? std::string(request_headers.getHostValue()) : upstream_address_;
+  ASSERT(!is_entry_span_);
+  const_cast<SpanStore*>(this)->setPeerAddress(std::string(request_headers.getHostValue()));
 
   // Reference:
   // https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md.
-  const auto value =
-      absl::StrCat(sampled_, "-", base64Encode(segment_context_->traceId()), "-",
-                   base64Encode(segment_context_->traceSegmentId()), "-", span_id_, "-",
-                   base64Encode(segment_context_->service()), "-",
-                   base64Encode(segment_context_->serviceInstance()), "-",
-                   base64Encode(segment_context_->endpoint()), "-", base64Encode(target_address));
+  const auto value = absl::StrCat(sampled_, "-", base64Encode(segment_context_->traceId()), "-",
+                                  base64Encode(segment_context_->traceSegmentId()), "-", span_id_,
+                                  "-", base64Encode(segment_context_->service()), "-",
+                                  base64Encode(segment_context_->serviceInstance()), "-",
+                                  base64Encode(segment_context_->rootSpanStore()->operation()), "-",
+                                  base64Encode(peer_address_));
   request_headers.setReferenceKey(propagationHeader(), value);
 }
-
-void SpanStore::finish() { end_time_ = DateUtil::nowToMilliseconds(time_source_); }
 
 } // namespace SkyWalking
 } // namespace Tracers

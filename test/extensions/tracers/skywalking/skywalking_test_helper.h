@@ -50,19 +50,17 @@ public:
 
     segment_context->setService(seed + "#SERVICE");
     segment_context->setServiceInstance(seed + "#INSTANCE");
-    segment_context->setEndpoint(seed + "#ENDPOINT");
+
     return segment_context;
   }
 
   static SpanStore* createSpanStore(SegmentContext* segment_context, SpanStore* parent_span_store,
-                                    std::string seed, Envoy::TimeSource& time_source) {
-    SpanStore* span_store = segment_context->createSpanStore(time_source, parent_span_store);
+                                    std::string seed) {
+    SpanStore* span_store = segment_context->createSpanStore(parent_span_store);
 
-    span_store->setAsEntrySpan(true);
     span_store->setAsError(false);
     span_store->setOperation(seed + "#OPERATION");
     span_store->setPeerAddress("0.0.0.0");
-    span_store->setUpstreamAddress("0.0.0.0");
     span_store->setStartTime(22222222);
     span_store->setEndTime(33333333);
 

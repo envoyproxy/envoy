@@ -14,8 +14,8 @@ const Http::LowerCaseString& authenticationTokenKey() {
 
 // Convert SegmentContext to SegmentObject.
 TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
-  auto new_segment = std::make_unique<SegmentObject>();
-  SegmentObject& segment_object = *new_segment;
+  auto new_segment_ptr = std::make_unique<SegmentObject>();
+  SegmentObject& segment_object = *new_segment_ptr;
 
   segment_object.set_traceid(segment_context.traceId());
   segment_object.set_tracesegmentid(segment_context.traceSegmentId());
@@ -35,7 +35,7 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
     // get more information.
     span->set_componentid(9000);
 
-    if (!span_store->peerAddress().empty()) {
+    if (!span_store->peerAddress().empty() && span_store->isEntrySpan()) {
       span->set_peer(span_store->peerAddress());
     }
 
@@ -57,7 +57,8 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
     }
 
     SpanContext* previous_span_context = segment_context.previousSpanContext();
-    if (!previous_span_context) {
+
+    if (!previous_span_context || !span_store->isEntrySpan()) {
       continue;
     }
 
@@ -70,7 +71,7 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
     ref->set_parentendpoint(previous_span_context->endpoint_);
     ref->set_networkaddressusedatpeer(previous_span_context->target_address_);
   }
-  return new_segment;
+  return new_segment_ptr;
 }
 
 } // namespace

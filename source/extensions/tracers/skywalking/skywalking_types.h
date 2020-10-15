@@ -92,25 +92,23 @@ public:
   }
 
   /*
-   * Set endpoint.
-   *
-   * @param endpoint. The endpoint value. Endpoint should be operation name of the first entry span
-   * in the segment. All spans in the same segment share the same endpoint. In our implementation,
-   * we currently use 'HTTP Method + HTTP Path Without Query' as the endpoint value.
-   */
-  void setEndpoint(const std::string& endpoint) { endpoint_ = endpoint; }
-
-  /*
    * Create a new SpanStore object and return its pointer. The ownership of the newly created
-   * SpanStore object belongs to the current span context.
+   * SpanStore object belongs to the current segment context.
    *
-   * @param time_source The time source.
    * @param parent_store The pointer that point to parent SpanStore object.
    * @return SpanStore* The pointer that point to newly created SpanStore object.
    */
-  SpanStore* createSpanStore(TimeSource& time_source, SpanStore* parent_store);
+  SpanStore* createSpanStore(const SpanStore* parent_store);
 
+  /*
+   * Get all SpanStore objects in the current segment.
+   */
   const std::vector<SpanStorePtr>& spanList() const { return span_list_; }
+
+  /*
+   * Get root SpanStore object in the current segment.
+   */
+  const SpanStore* rootSpanStore() { return span_list_.empty() ? nullptr : span_list_[0].get(); }
 
   int sampled() const { return sampled_; }
   const std::string& traceId() const { return trace_id_; }
@@ -118,7 +116,6 @@ public:
 
   const std::string& service() const { return service_; }
   const std::string& serviceInstance() const { return service_instance_; }
-  const std::string& endpoint() const { return endpoint_; }
 
   SpanContext* previousSpanContext() const { return previous_span_context_.get(); }
 
@@ -133,7 +130,6 @@ private:
 
   std::string service_;
   std::string service_instance_;
-  std::string endpoint_;
 
   // The SegmentContext parsed from the request headers. If no propagation headers in request then
   // this will be nullptr.
@@ -158,31 +154,17 @@ public:
    * @param segment_context The pointer that point to current span context. This can not be null.
    * @param time_source A time source to get the span end time.
    */
-  explicit SpanStore(SegmentContext* segment_context, TimeSource& time_source)
-      : segment_context_(segment_context), time_source_(time_source) {}
+  explicit SpanStore(SegmentContext* segment_context) : segment_context_(segment_context) {}
 
   /*
-   * When a SkyWalking span ends, it will be called to set the end time of the current span.
+   * Get operation name of span.
    */
-  void finish();
-
-  /*
-   * Get operation name of span. If operation name is empty, the endpoint in the span context will
-   * be used instead.
-   */
-  const std::string& operation() const {
-    return operation_.empty() ? segment_context_->endpoint() : operation_;
-  }
-
-  /*
-   * Get upstream address.
-   */
-  const std::string& upstreamAddress() const { return upstream_address_; }
+  const std::string& operation() const { return operation_; }
 
   /*
    * Get peer address. The peer in SkyWalking is different with the tag value of 'peer.address'. The
    * tag value of 'peer.address' in Envoy is downstream address and the peer in SkyWalking is
-   * request host.
+   * upstream address.
    */
   const std::string& peerAddress() const { return peer_address_; }
 
@@ -251,15 +233,9 @@ public:
   void setOperation(const std::string& operation) { operation_ = operation; }
 
   /*
-   * Set upstream address.
-   */
-  void setUpstreamAddress(const std::string& upstream_address) {
-    upstream_address_ = upstream_address;
-  }
-
-  /*
-   * Set peer address. In SkyWalking, the peer address is only set in ExitSpan. And it should the
-   * request host.
+   * Set peer address. In SkyWalking, the peer address is only set in Exit Span. And it should the
+   * upstream address. Since the upstream address cannot be obtained at the request stage, the
+   * request host is used instead.
    */
   void setPeerAddress(const std::string& peer_address) { peer_address_ = peer_address; }
 
@@ -327,7 +303,6 @@ private:
   uint64_t end_time_{0};
 
   std::string operation_;
-  std::string upstream_address_;
   std::string peer_address_;
 
   bool is_error_{false};
@@ -335,8 +310,6 @@ private:
 
   std::vector<Tag> tags_;
   std::vector<Log> logs_;
-
-  TimeSource& time_source_;
 };
 
 } // namespace SkyWalking

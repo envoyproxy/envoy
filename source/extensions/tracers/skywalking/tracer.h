@@ -54,8 +54,9 @@ public:
                              const std::string& operation, SegmentContextSharedPtr segment_context,
                              Span* parent);
 
-private:
   TimeSource& time_source_;
+
+private:
   TraceSegmentReporterPtr reporter_;
 };
 
@@ -95,6 +96,15 @@ public:
   SegmentContext* segmentContext() const { return segment_context_.get(); }
 
 private:
+  void tryToReportSpan() {
+    // If the current span is the root span of the entire segment and its sampling flag is not
+    // false, the data for the entire segment is reported. Please ensure that the root span is the
+    // last span to end in the entire segment.
+    if (span_store_->sampled() && span_store_->spanId() == 0) {
+      tracer_.report(*segment_context_);
+    }
+  }
+
   SegmentContextSharedPtr segment_context_;
   SpanStore* span_store_;
 

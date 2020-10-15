@@ -74,14 +74,11 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   SegmentContextSharedPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "CURR", "", mock_random_generator_);
 
-  EXPECT_CALL(mock_tracing_config_, operationName())
-      .WillOnce(Return(Envoy::Tracing::OperationName::Egress));
   Envoy::Tracing::SpanPtr org_span = tracer_->startSpan(
       mock_tracing_config_, mock_time_source_.systemTime(), "TEST_OP", segment_context, nullptr);
   Span* span = dynamic_cast<Span*>(org_span.get());
 
-  // Since the operation name in config is Egress, the new span is ExitSpan.
-  EXPECT_EQ(false, span->spanStore()->isEntrySpan());
+  EXPECT_EQ(true, span->spanStore()->isEntrySpan());
 
   EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
   span->setBaggage("FakeStringAndNothingToDo", "FakeStringAndNothingToDo");
@@ -94,9 +91,6 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   // The initial operation name is consistent with the 'operation' parameter in the 'startSpan'
   // method call.
   EXPECT_EQ("TEST_OP", span->spanStore()->operation());
-  // Reset operation to empty. Then endpoint will be used as a replacement.
-  span->setOperation("");
-  EXPECT_EQ("CURR#ENDPOINT", span->spanStore()->operation());
   span->setOperation("op");
   EXPECT_EQ("op", span->spanStore()->operation());
 
@@ -118,44 +112,15 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ(Tracing::Tags::get().True, span->spanStore()->tags().at(3).value());
   EXPECT_EQ(true, span->spanStore()->isError());
 
-  // When setting http url tag, the corresponding tag name will be rewritten as 'url'. At the same
-  // time, we will extract the http request host from the url value as the peer address of
-  // SkyWalking.
+  // When setting http url tag, the corresponding tag name will be rewritten as 'url'.
   span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
   EXPECT_EQ("url", span->spanStore()->tags().at(4).key());
-  EXPECT_EQ("http://test.com/test/path", span->spanStore()->tags().at(4).value());
-  EXPECT_EQ("test.com", span->spanStore()->peerAddress());
 
-  // If the url format is wrong, the peer address remains empty.
-  span->spanStore()->setPeerAddress("");
-  span->setTag(Tracing::Tags::get().HttpUrl, "http:/test.com/test/path");
-  EXPECT_EQ("", span->spanStore()->peerAddress());
-
-  span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com");
-  EXPECT_EQ("", span->spanStore()->peerAddress());
-
-  // Test the inject context function and verify the result.
-  Http::TestRequestHeaderMapImpl headers{{":authority", "test.com"}};
-  // No upstream address set and host in request headers will be used as target address.
-  std::string expected_header_value = fmt::format(
-      "{}-{}-{}-{}-{}-{}-{}-{}", 0,
-      SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator_)),
-      SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator_)),
-      0, SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
-      SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
-      SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
-      SkyWalkingTestHelper::base64Encode("test.com"));
-  span->injectContext(headers);
-  EXPECT_EQ(expected_header_value, headers.get_("sw8"));
-
-  EXPECT_CALL(mock_tracing_config_, operationName())
-      .WillOnce(Return(Envoy::Tracing::OperationName::Ingress));
   Envoy::Tracing::SpanPtr org_first_child_span =
       span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
   Span* first_child_span = dynamic_cast<Span*>(org_first_child_span.get());
 
-  // Since the operation name in config is Ingress, the new span is EntrySpan.
-  EXPECT_EQ(true, first_child_span->spanStore()->isEntrySpan());
+  EXPECT_EQ(false, first_child_span->spanStore()->isEntrySpan());
 
   EXPECT_EQ(0, first_child_span->spanStore()->sampled());
   EXPECT_EQ(1, first_child_span->spanStore()->spanId());
@@ -164,27 +129,19 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ("TestChild", first_child_span->spanStore()->operation());
 
   Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
-  expected_header_value = fmt::format(
+  std::string expected_header_value = fmt::format(
       "{}-{}-{}-{}-{}-{}-{}-{}", 0,
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator_)),
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator_)),
       1, SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
-      SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
-      SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
-      SkyWalkingTestHelper::base64Encode("0.0.0.0"));
-
-  first_child_span->setTag(Tracing::Tags::get().UpstreamAddress, "0.0.0.0");
-  first_child_span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
-  // Peer address only set in ExitSpan.
-  EXPECT_EQ("", span->spanStore()->peerAddress());
+      SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"), SkyWalkingTestHelper::base64Encode("op"),
+      SkyWalkingTestHelper::base64Encode("test.com"));
 
   first_child_span->injectContext(first_child_headers);
   EXPECT_EQ(expected_header_value, first_child_headers.get_("sw8"));
 
   // Reset sampling flag to true.
   span->setSampled(true);
-  EXPECT_CALL(mock_tracing_config_, operationName())
-      .WillOnce(Return(Envoy::Tracing::OperationName::Ingress));
   Envoy::Tracing::SpanPtr org_second_child_span =
       span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
   Span* second_child_span = dynamic_cast<Span*>(org_second_child_span.get());
@@ -199,6 +156,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   first_child_span->finishSpan();
   second_child_span->finishSpan();
   EXPECT_NE(0, first_child_span->spanStore()->endTime());
+  EXPECT_NE(0, second_child_span->spanStore()->endTime());
 
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());

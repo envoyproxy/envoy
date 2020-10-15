@@ -60,7 +60,6 @@ static const std::string SKYWALKING_CONFIG_WITH_CLIENT_CONFIG = R"EOF(
     authentication: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
     service_name: "FAKE_FAKE_FAKE"
     instance_name: "FAKE_FAKE_FAKE"
-    pass_endpoint: true
     max_cache_size: 2333
 )EOF";
 
@@ -73,7 +72,8 @@ static const std::string SKYWALKING_CONFIG_NO_CLIENT_CONFIG = R"EOF(
 TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   setupSkyWalkingDriver(SKYWALKING_CONFIG_WITH_CLIENT_CONFIG);
 
-  std::string trace_id = SkyWalkingTestHelper::generateId(context_.server_factory_context_.api_.random_);
+  std::string trace_id =
+      SkyWalkingTestHelper::generateId(context_.server_factory_context_.api_.random_);
   std::string segment_id =
       SkyWalkingTestHelper::generateId(context_.server_factory_context_.api_.random_);
 
@@ -97,7 +97,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   Tracing::Decision decision;
   decision.traced = true;
 
-  Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, request_headers, "",
+  Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, request_headers, "TEST_OP",
                                                  time_system_.systemTime(), decision);
   EXPECT_NE(nullptr, org_span.get());
 
@@ -108,10 +108,6 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
 
   EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->service());
   EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->serviceInstance());
-
-  // If pass_endpoint is set to true, Envoy will use the downstream endpoint directly.
-  EXPECT_EQ(span->segmentContext()->endpoint(),
-            span->segmentContext()->previousSpanContext()->endpoint_);
 
   // Tracing decision will be overwrite by sampling flag in propagation headers.
   EXPECT_EQ(0, span->segmentContext()->sampled());
@@ -133,9 +129,6 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   ASSERT(new_span);
 
   EXPECT_EQ(nullptr, new_span->segmentContext()->previousSpanContext());
-  // Although pass_endpoint is set to true, 'METHOD' and 'PATH' will be used as endpoint when
-  // previous span context is null.
-  EXPECT_EQ("/GET/path", new_span->segmentContext()->endpoint());
 
   EXPECT_EQ(true, new_span->segmentContext()->sampled());
 
@@ -148,8 +141,8 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
                                                        {":method", "GET"},
                                                        {":authority", "test.com"},
                                                        {"sw8", "xxxxxx-error-propagation-header"}};
-  Tracing::SpanPtr org_null_span = driver_->startSpan(mock_tracing_config_, error_request_headers,
-                                                      "", time_system_.systemTime(), decision);
+  Tracing::SpanPtr org_null_span = driver_->startSpan(
+      mock_tracing_config_, error_request_headers, "TEST_OP", time_system_.systemTime(), decision);
 
   EXPECT_EQ(nullptr, dynamic_cast<Span*>(org_null_span.get()));
 
@@ -163,7 +156,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
 
-  Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, request_headers, "",
+  Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, request_headers, "TEST_OP",
                                                  time_system_.systemTime(), Tracing::Decision());
   EXPECT_NE(nullptr, org_span.get());
 
@@ -172,7 +165,6 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
 
   EXPECT_EQ(test_string, span->segmentContext()->service());
   EXPECT_EQ(test_string, span->segmentContext()->serviceInstance());
-  EXPECT_EQ("/GET/path", span->segmentContext()->endpoint());
 }
 
 } // namespace SkyWalking

@@ -150,7 +150,6 @@ TEST(SpanContextTest, SpanContextCommonTest) {
 // does not exist).
 TEST(SegmentContextTest, SegmentContextTestWithEmptyPreviousSpanContext) {
   NiceMock<Random::MockRandomGenerator> mock_random_generator;
-  NiceMock<Envoy::MockTimeSystem> mock_time_source;
 
   ON_CALL(mock_random_generator, random()).WillByDefault(Return(233333));
 
@@ -169,10 +168,6 @@ TEST(SegmentContextTest, SegmentContextTestWithEmptyPreviousSpanContext) {
 
   // Test whether the value of the fields can be set correctly and the value of the fields can be
   // obtained correctly.
-  EXPECT_EQ(segment_context->endpoint(), "NEW#ENDPOINT");
-  segment_context->setEndpoint(TEST_ENDPOINT);
-  EXPECT_EQ(segment_context->endpoint(), TEST_ENDPOINT);
-
   EXPECT_EQ(segment_context->service(), "NEW#SERVICE");
   segment_context->setService(TEST_SERVICE);
   EXPECT_EQ(segment_context->service(), TEST_SERVICE);
@@ -181,27 +176,35 @@ TEST(SegmentContextTest, SegmentContextTestWithEmptyPreviousSpanContext) {
   segment_context->setServiceInstance(TEST_INSTANCE);
   EXPECT_EQ(segment_context->serviceInstance(), TEST_INSTANCE);
 
+  EXPECT_EQ(segment_context->rootSpanStore(), nullptr);
+
   // Test whether SegmentContext can correctly create SpanStore object with null parent SpanStore.
-  SpanStore* root_span = SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr,
-                                                               "PARENT", mock_time_source);
+  SpanStore* root_span =
+      SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr, "PARENT");
   EXPECT_NE(nullptr, root_span);
 
   // The span id of the first SpanStore in each SegmentContext is 0. Its parent span id is -1.
   EXPECT_EQ(root_span->spanId(), 0);
   EXPECT_EQ(root_span->parentSpanId(), -1);
 
+  // Root span of current segment should be Entry Span.
+  EXPECT_EQ(root_span->isEntrySpan(), true);
+
   // Verify that the SpanStore object is correctly stored in the SegmentContext.
   EXPECT_EQ(segment_context->spanList().size(), 1);
   EXPECT_EQ(segment_context->spanList()[0].get(), root_span);
 
   // Test whether SegmentContext can correctly create SpanStore object with a parent SpanStore.
-  SpanStore* child_span = SkyWalkingTestHelper::createSpanStore(segment_context.get(), root_span,
-                                                                "CHILD", mock_time_source);
+  SpanStore* child_span =
+      SkyWalkingTestHelper::createSpanStore(segment_context.get(), root_span, "CHILD");
 
   EXPECT_NE(nullptr, child_span);
 
   EXPECT_EQ(child_span->spanId(), 1);
   EXPECT_EQ(child_span->parentSpanId(), 0);
+
+  // All child spans of current segment should be Exit Span.
+  EXPECT_EQ(child_span->isEntrySpan(), false);
 
   EXPECT_EQ(segment_context->spanList().size(), 2);
   EXPECT_EQ(segment_context->spanList()[1].get(), child_span);
@@ -252,18 +255,17 @@ TEST(SegmentContextTest, SegmentContextTestWithPreviousSpanContext) {
 // Test whether SpanStore can work properly.
 TEST(SpanStoreTest, SpanStoreCommonTest) {
   NiceMock<Random::MockRandomGenerator> mock_random_generator;
-  NiceMock<Envoy::MockTimeSystem> mock_time_source;
+
   Event::SimulatedTimeSystem time_system;
   Envoy::SystemTime now = time_system.systemTime();
 
   ON_CALL(mock_random_generator, random()).WillByDefault(Return(23333));
-  ON_CALL(mock_time_source, systemTime()).WillByDefault(Return(now));
 
   // Create segment context and first span store.
   SegmentContextSharedPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "CURR", "PREV", mock_random_generator);
-  SpanStore* root_store = SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr,
-                                                                "ROOT", mock_time_source);
+  SpanStore* root_store =
+      SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr, "ROOT");
   EXPECT_NE(nullptr, root_store);
   EXPECT_EQ(3, root_store->tags().size());
 
@@ -294,20 +296,14 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   EXPECT_EQ(true, root_store->isError());
 
   EXPECT_EQ("ROOT#OPERATION", root_store->operation());
+  root_store->setOperation("");
+  EXPECT_EQ("", root_store->operation());
   root_store->setOperation("oooooop");
   EXPECT_EQ("oooooop", root_store->operation());
-  root_store->setOperation("");
-  // If the operation name is empty, the endpoint of the current SegmentContext will be used
-  // instead.
-  EXPECT_EQ("CURR#ENDPOINT", root_store->operation());
 
   EXPECT_EQ("0.0.0.0", root_store->peerAddress());
   root_store->setPeerAddress(TEST_ADDRESS);
   EXPECT_EQ(TEST_ADDRESS, root_store->peerAddress());
-
-  EXPECT_EQ("0.0.0.0", root_store->upstreamAddress());
-  root_store->setUpstreamAddress(TEST_ADDRESS);
-  EXPECT_EQ(TEST_ADDRESS, root_store->upstreamAddress());
 
   EXPECT_EQ(22222222, root_store->startTime());
   root_store->setStartTime(23333);
@@ -317,41 +313,23 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   root_store->setEndTime(25555);
   EXPECT_EQ(25555, root_store->endTime());
 
-  // When SpanStore calls finish, the end time will be set.
-  root_store->finish();
-  EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count(),
-            root_store->endTime());
+  SpanStore* child_store =
+      SkyWalkingTestHelper::createSpanStore(segment_context.get(), root_store, "CHILD");
 
   // Test whether SpanStore can correctly inject propagation headers to request headers.
-
-  Http::TestRequestHeaderMapImpl request_headers_with_upstream{{":authority", "test.com"}};
-  root_store->injectContext(request_headers_with_upstream);
-
-  std::string expected_header_value = fmt::format(
-      "{}-{}-{}-{}-{}-{}-{}-{}", root_store->sampled(),
-      SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
-      SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
-      root_store->spanId(), SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
-      SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
-      SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
-      SkyWalkingTestHelper::base64Encode(TEST_ADDRESS));
-
-  EXPECT_EQ(request_headers_with_upstream.get_("sw8"), expected_header_value);
-
-  // Reset upstream address to empty.
-  root_store->setUpstreamAddress("");
-
-  // When the upstream address is empty, use the host in the request as the target address.
   Http::TestRequestHeaderMapImpl request_headers_no_upstream{{":authority", "test.com"}};
-  root_store->injectContext(request_headers_no_upstream);
-  expected_header_value = fmt::format(
-      "{}-{}-{}-{}-{}-{}-{}-{}", root_store->sampled(),
+  // Only child span (Exit Span) can inject context header to request headers.
+  child_store->injectContext(request_headers_no_upstream);
+  std::string expected_header_value = fmt::format(
+      "{}-{}-{}-{}-{}-{}-{}-{}", child_store->sampled(),
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
-      root_store->spanId(), SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
+      child_store->spanId(), SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
       SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
-      SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
+      SkyWalkingTestHelper::base64Encode("oooooop"),
       SkyWalkingTestHelper::base64Encode("test.com"));
+
+  EXPECT_EQ(child_store->peerAddress(), "test.com");
 
   EXPECT_EQ(request_headers_no_upstream.get_("sw8"), expected_header_value);
 }
