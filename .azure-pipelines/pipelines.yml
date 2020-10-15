@@ -186,7 +186,7 @@ stages:
     dependsOn: ["linux_x64"]
     jobs:
       - job: bazel
-        displayName: "Linux-x64"
+        displayName: "linux_x64"
         dependsOn: []
         strategy:
           maxParallel: 3
@@ -212,7 +212,7 @@ stages:
               ciTarget: $(CI_TARGET)
 
       - job: coverage
-        displayName: "Linux-x64"
+        displayName: "linux_x64"
         dependsOn: []
         timeoutInMinutes: 360
         pool: "x64-large"
@@ -285,7 +285,6 @@ stages:
     dependsOn: ["docker"]
     jobs:
       - job: examples
-        displayName: "Verify examples run as documented"
         pool:
           vmImage: "ubuntu-18.04"
         steps:
