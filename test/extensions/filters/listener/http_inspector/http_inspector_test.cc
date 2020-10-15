@@ -332,6 +332,27 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
   EXPECT_EQ(1, cfg_->stats().http2_found_.value());
 }
 
+TEST_F(HttpInspectorTest, ReadClosed) {
+  init();
+
+  const std::string header = "505249202a20485454502f322e300d0af";
+  std::vector<uint8_t> data = Hex::decode(header);
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          }));
+
+  EXPECT_CALL(socket_, close());
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  socket_.close();
+  file_event_callback_(Event::FileReadyType::Closed);
+  EXPECT_EQ(0, cfg_->stats().http2_found_.value());
+}
+
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   init();
 
