@@ -71,7 +71,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # chromium-86.0.4240.80
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-10-14",
+        last_updated = "2020-07-30",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
