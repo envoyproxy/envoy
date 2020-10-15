@@ -398,6 +398,30 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   }
 }
 
+bool ConnectionManager::ActiveRpc::passthroughEnabled() {
+  if (!parent_.config_.payloadPassthrough()) {
+    return false;
+  }
+
+  for (auto entry = decoder_filters_.begin(); entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->handle_->passthroughEnabled() == false) {
+      return false;
+    }
+  }
+  return true;
+}
+
+FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data,
+                                                           uint64_t bytes_to_passthrough) {
+  filter_context_ = &data;
+  filter_action_ = [this, bytes_to_passthrough](DecoderEventHandler* filter) -> FilterStatus {
+    Buffer::Instance* data = absl::any_cast<Buffer::Instance*>(filter_context_);
+    return filter->passthroughData(*data, bytes_to_passthrough);
+  };
+
+  return applyDecoderFilters(nullptr);
+}
+
 FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {
   ASSERT(metadata->hasSequenceId());
   ASSERT(metadata->hasMessageType());

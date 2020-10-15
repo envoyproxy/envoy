@@ -17,6 +17,7 @@ namespace ThriftProxy {
 #define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
   FUNCTION(StopIteration)                                                                          \
   FUNCTION(WaitForData)                                                                            \
+  FUNCTION(PassthroughData)                                                                        \
   FUNCTION(MessageBegin)                                                                           \
   FUNCTION(MessageEnd)                                                                             \
   FUNCTION(StructBegin)                                                                            \
@@ -129,6 +130,7 @@ private:
 
   // These functions map directly to the matching ProtocolState values. Each returns the next state
   // or ProtocolState::WaitForData if more data is required.
+  DecoderStatus passthroughData(Buffer::Instance& buffer);
   DecoderStatus messageBegin(Buffer::Instance& buffer);
   DecoderStatus messageEnd(Buffer::Instance& buffer);
   DecoderStatus structBegin(Buffer::Instance& buffer);
@@ -167,6 +169,7 @@ private:
   DecoderEventHandler& handler_;
   ProtocolState state_;
   std::vector<Frame> stack_;
+  uint32_t body_bytes_{};
 };
 
 using DecoderStateMachinePtr = std::unique_ptr<DecoderStateMachine>;

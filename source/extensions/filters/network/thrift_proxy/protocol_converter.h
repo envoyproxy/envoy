@@ -24,7 +24,19 @@ public:
     buffer_ = &buffer;
   }
 
+  void enablePassthrough(bool enable) { enable_passthrough_ = enable; }
+
   // DecoderEventHandler
+  bool passthroughEnabled() override { return enable_passthrough_; }
+
+  FilterStatus passthroughData(Buffer::Instance& data, uint64_t bytes_to_passthrough) override {
+    // Current implementation will buffer all data after metadata and send it once.
+    ASSERT(bytes_to_passthrough <= data.length());
+
+    buffer_->move(data, bytes_to_passthrough);
+    return FilterStatus::Continue;
+  }
+
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     proto_->writeMessageBegin(*buffer_, *metadata);
     return FilterStatus::Continue;
@@ -125,6 +137,7 @@ public:
 private:
   Protocol* proto_;
   Buffer::Instance* buffer_{};
+  bool enable_passthrough_{};
 };
 
 } // namespace ThriftProxy

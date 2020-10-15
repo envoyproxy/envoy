@@ -39,6 +39,7 @@ public:
   virtual TransportPtr createTransport() PURE;
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
+  virtual bool payloadPassthrough() PURE;
 };
 
 /**
@@ -85,6 +86,7 @@ private:
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
           complete_(false), first_reply_field_(false) {
       initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
+      enablePassthrough(parent_.passthroughEnabled());
     }
 
     bool onData(Buffer::Instance& data);
@@ -180,6 +182,8 @@ private:
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportEnd() override;
+    bool passthroughEnabled() override;
+    FilterStatus passthroughData(Buffer::Instance& data, uint64_t bytes_to_passthrough) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus messageEnd() override;
     FilterStatus structBegin(absl::string_view name) override;

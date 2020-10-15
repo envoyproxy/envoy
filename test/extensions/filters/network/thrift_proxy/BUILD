@@ -267,6 +267,7 @@ envoy_extension_cc_test(
         ":mocks",
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
+        "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
         "//test/mocks/network:network_mocks",

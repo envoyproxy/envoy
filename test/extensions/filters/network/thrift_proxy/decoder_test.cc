@@ -869,6 +869,7 @@ TEST(DecoderTest, OnData) {
         EXPECT_EQ(100U, metadata->sequenceId());
         return FilterStatus::Continue;
       }));
+  EXPECT_CALL(handler, passthroughEnabled()).Times(1).WillRepeatedly(Return(false));
 
   EXPECT_CALL(proto, readStructBegin(Ref(buffer), _)).WillOnce(Return(true));
   EXPECT_CALL(handler, structBegin(absl::string_view())).WillOnce(Return(FilterStatus::Continue));
@@ -936,6 +937,7 @@ TEST(DecoderTest, OnDataWithProtocolHint) {
         EXPECT_EQ(100U, metadata->sequenceId());
         return FilterStatus::Continue;
       }));
+  EXPECT_CALL(handler, passthroughEnabled()).Times(1);
 
   EXPECT_CALL(proto, readStructBegin(Ref(buffer), _)).WillOnce(Return(true));
   EXPECT_CALL(handler, structBegin(absl::string_view())).WillOnce(Return(FilterStatus::Continue));
@@ -1178,6 +1180,7 @@ TEST(DecoderTest, OnDataHandlesStopIterationAndResumes) {
         EXPECT_EQ(100U, metadata->sequenceId());
         return FilterStatus::StopIteration;
       }));
+  EXPECT_CALL(handler, passthroughEnabled()).Times(1).WillRepeatedly(Return(false));
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow);
 
@@ -1216,6 +1219,279 @@ TEST(DecoderTest, OnDataHandlesStopIterationAndResumes) {
   EXPECT_CALL(handler, structEnd()).WillOnce(Return(FilterStatus::StopIteration));
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow);
+
+  EXPECT_CALL(proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(handler, messageEnd()).WillOnce(Return(FilterStatus::StopIteration));
+  EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
+  EXPECT_FALSE(underflow);
+
+  EXPECT_CALL(transport, decodeFrameEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(handler, transportEnd()).WillOnce(Return(FilterStatus::StopIteration));
+  EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
+  EXPECT_FALSE(underflow);
+
+  EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_TRUE(underflow);
+}
+
+TEST(DecoderTest, OnDataPassthrough) {
+  NiceMock<MockTransport> transport;
+  NiceMock<MockProtocol> proto;
+  NiceMock<MockDecoderCallbacks> callbacks;
+  StrictMock<MockDecoderEventHandler> handler;
+  ON_CALL(callbacks, newDecoderEventHandler()).WillByDefault(ReturnRef(handler));
+
+  InSequence dummy;
+  Decoder decoder(transport, proto, callbacks);
+  Buffer::OwnedImpl buffer(std::string(100, 'a'));
+
+  EXPECT_CALL(transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setFrameSize(100);
+        return true;
+      }));
+  EXPECT_CALL(handler, transportBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        EXPECT_TRUE(metadata->hasFrameSize());
+        EXPECT_EQ(100U, metadata->frameSize());
+        return FilterStatus::Continue;
+      }));
+
+  EXPECT_CALL(proto, readMessageBegin(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setMethodName("name");
+        metadata.setMessageType(MessageType::Call);
+        metadata.setSequenceId(100);
+        buffer.drain(20);
+        return true;
+      }));
+  EXPECT_CALL(handler, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        EXPECT_TRUE(metadata->hasMethodName());
+        EXPECT_TRUE(metadata->hasMessageType());
+        EXPECT_TRUE(metadata->hasSequenceId());
+        EXPECT_EQ("name", metadata->methodName());
+        EXPECT_EQ(MessageType::Call, metadata->messageType());
+        EXPECT_EQ(100U, metadata->sequenceId());
+        return FilterStatus::Continue;
+      }));
+
+  EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
+  EXPECT_CALL(handler, passthroughData(Ref(buffer), 80)).WillOnce(Invoke([&]() -> FilterStatus {
+    buffer.drain(80);
+    return FilterStatus::Continue;
+  }));
+
+  EXPECT_CALL(proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(handler, messageEnd()).WillOnce(Return(FilterStatus::Continue));
+
+  EXPECT_CALL(transport, decodeFrameEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(handler, transportEnd()).WillOnce(Return(FilterStatus::Continue));
+
+  bool underflow = false;
+  EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_TRUE(underflow);
+}
+
+TEST(DecoderTest, OnDataPassthroughResumes) {
+  NiceMock<MockTransport> transport;
+  NiceMock<MockProtocol> proto;
+  NiceMock<MockDecoderCallbacks> callbacks;
+  NiceMock<MockDecoderEventHandler> handler;
+  ON_CALL(callbacks, newDecoderEventHandler()).WillByDefault(ReturnRef(handler));
+
+  InSequence dummy;
+
+  Decoder decoder(transport, proto, callbacks);
+  Buffer::OwnedImpl buffer;
+  buffer.add("x");
+
+  EXPECT_CALL(transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setFrameSize(100);
+        return true;
+      }));
+  EXPECT_CALL(proto, readMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setMethodName("name");
+        metadata.setMessageType(MessageType::Call);
+        metadata.setSequenceId(100);
+        return true;
+      }));
+  EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
+  EXPECT_CALL(handler, passthroughData(_, _)).Times(0);
+
+  bool underflow = false;
+  EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_TRUE(underflow);
+
+  buffer.add(std::string(100, 'a'));
+  EXPECT_CALL(handler, passthroughData(Ref(buffer), 100)).WillOnce(Invoke([&]() -> FilterStatus {
+    buffer.drain(100);
+    return FilterStatus::Continue;
+  }));
+  EXPECT_CALL(proto, readMessageEnd(_)).WillOnce(Return(true));
+  EXPECT_CALL(transport, decodeFrameEnd(_)).WillOnce(Return(true));
+
+  EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_FALSE(underflow); // buffer.length() == 1
+}
+
+TEST(DecoderTest, OnDataPassthroughResumesTransportFrameStart) {
+  StrictMock<MockTransport> transport;
+  StrictMock<MockProtocol> proto;
+  NiceMock<MockDecoderCallbacks> callbacks;
+  NiceMock<MockDecoderEventHandler> handler;
+  ON_CALL(callbacks, newDecoderEventHandler()).WillByDefault(ReturnRef(handler));
+
+  EXPECT_CALL(transport, name()).Times(AnyNumber());
+  EXPECT_CALL(proto, name()).Times(AnyNumber());
+
+  InSequence dummy;
+
+  Decoder decoder(transport, proto, callbacks);
+  Buffer::OwnedImpl buffer;
+  buffer.add(std::string(100, 'a'));
+  bool underflow = false;
+
+  EXPECT_CALL(transport, decodeFrameStart(Ref(buffer), _)).WillOnce(Return(false));
+  EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_TRUE(underflow);
+
+  EXPECT_CALL(transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setFrameSize(100);
+        return true;
+      }));
+  EXPECT_CALL(proto, readMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setMethodName("name");
+        metadata.setMessageType(MessageType::Call);
+        metadata.setSequenceId(100);
+        return true;
+      }));
+  EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
+  EXPECT_CALL(handler, passthroughData(Ref(buffer), 100)).WillOnce(Invoke([&]() -> FilterStatus {
+    buffer.drain(100);
+    return FilterStatus::Continue;
+  }));
+
+  EXPECT_CALL(proto, readMessageEnd(_)).WillOnce(Return(true));
+  EXPECT_CALL(transport, decodeFrameEnd(_)).WillOnce(Return(true));
+
+  underflow = false;
+  EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_TRUE(underflow); // buffer.length() == 0
+}
+
+TEST(DecoderTest, OnDataPassthroughResumesTransportFrameEnd) {
+  StrictMock<MockTransport> transport;
+  StrictMock<MockProtocol> proto;
+  NiceMock<MockDecoderCallbacks> callbacks;
+  NiceMock<MockDecoderEventHandler> handler;
+  ON_CALL(callbacks, newDecoderEventHandler()).WillByDefault(ReturnRef(handler));
+
+  EXPECT_CALL(transport, name()).Times(AnyNumber());
+  EXPECT_CALL(proto, name()).Times(AnyNumber());
+
+  InSequence dummy;
+
+  Decoder decoder(transport, proto, callbacks);
+  Buffer::OwnedImpl buffer;
+  buffer.add(std::string(100, 'a'));
+
+  EXPECT_CALL(transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setFrameSize(100);
+        return true;
+      }));
+  EXPECT_CALL(proto, readMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setMethodName("name");
+        metadata.setMessageType(MessageType::Call);
+        metadata.setSequenceId(100);
+        return true;
+      }));
+  EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
+  EXPECT_CALL(handler, passthroughData(Ref(buffer), 100)).WillOnce(Invoke([&]() -> FilterStatus {
+    buffer.drain(100);
+    return FilterStatus::Continue;
+  }));
+
+  EXPECT_CALL(proto, readMessageEnd(_)).WillOnce(Return(true));
+  EXPECT_CALL(transport, decodeFrameEnd(_)).WillOnce(Return(false));
+
+  bool underflow = false;
+  EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_TRUE(underflow);
+
+  EXPECT_CALL(transport, decodeFrameEnd(_)).WillOnce(Return(true));
+  EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_TRUE(underflow); // buffer.length() == 0
+}
+
+TEST(DecoderTest, OnDataPassthroughHandlesStopIterationAndResumes) {
+  StrictMock<MockTransport> transport;
+  EXPECT_CALL(transport, name()).WillRepeatedly(ReturnRef(transport.name_));
+
+  StrictMock<MockProtocol> proto;
+  EXPECT_CALL(proto, name()).WillRepeatedly(ReturnRef(proto.name_));
+
+  NiceMock<MockDecoderCallbacks> callbacks;
+  StrictMock<MockDecoderEventHandler> handler;
+  ON_CALL(callbacks, newDecoderEventHandler()).WillByDefault(ReturnRef(handler));
+
+  InSequence dummy;
+  Decoder decoder(transport, proto, callbacks);
+  Buffer::OwnedImpl buffer;
+  bool underflow = true;
+
+  EXPECT_CALL(transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setFrameSize(100);
+        return true;
+      }));
+  EXPECT_CALL(handler, transportBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        EXPECT_TRUE(metadata->hasFrameSize());
+        EXPECT_EQ(100U, metadata->frameSize());
+
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
+  EXPECT_FALSE(underflow);
+
+  EXPECT_CALL(proto, readMessageBegin(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setMethodName("name");
+        metadata.setMessageType(MessageType::Call);
+        metadata.setSequenceId(100);
+        return true;
+      }));
+  EXPECT_CALL(handler, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        EXPECT_TRUE(metadata->hasMethodName());
+        EXPECT_TRUE(metadata->hasMessageType());
+        EXPECT_TRUE(metadata->hasSequenceId());
+        EXPECT_EQ("name", metadata->methodName());
+        EXPECT_EQ(MessageType::Call, metadata->messageType());
+        EXPECT_EQ(100U, metadata->sequenceId());
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
+  EXPECT_CALL(handler, passthroughData(_, _)).Times(0);
+
+  EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
+  EXPECT_FALSE(underflow);
+
+  buffer.add(std::string(100, 'a'));
+  EXPECT_CALL(handler, passthroughData(Ref(buffer), 100)).WillOnce(Invoke([&]() -> FilterStatus {
+    buffer.drain(100);
+    return FilterStatus::StopIteration;
+  }));
+
+  EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
+  EXPECT_FALSE(underflow); // buffer.length() == 0
 
   EXPECT_CALL(proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
   EXPECT_CALL(handler, messageEnd()).WillOnce(Return(FilterStatus::StopIteration));

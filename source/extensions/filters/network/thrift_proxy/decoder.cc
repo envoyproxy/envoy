@@ -12,8 +12,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
+DecoderStateMachine::DecoderStatus DecoderStateMachine::passthroughData(Buffer::Instance& buffer) {
+  if (body_bytes_ > buffer.length()) {
+    return {ProtocolState::WaitForData};
+  }
+
+  return {ProtocolState::MessageEnd, handler_.passthroughData(buffer, body_bytes_)};
+}
+
 // MessageBegin -> StructBegin
 DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Instance& buffer) {
+  auto total = buffer.length();
   if (!proto_.readMessageBegin(buffer, *metadata_)) {
     return {ProtocolState::WaitForData};
   }
@@ -21,7 +30,14 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Ins
   stack_.clear();
   stack_.emplace_back(Frame(ProtocolState::MessageEnd));
 
-  return {ProtocolState::StructBegin, handler_.messageBegin(metadata_)};
+  auto status = handler_.messageBegin(metadata_);
+
+  if (handler_.passthroughEnabled()) {
+    body_bytes_ = metadata_->frameSize() - (total - buffer.length());
+    return {ProtocolState::PassthroughData, status};
+  }
+
+  return {ProtocolState::StructBegin, status};
 }
 
 // MessageEnd -> Done
@@ -293,6 +309,8 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleValue(Buffer::Inst
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Instance& buffer) {
   switch (state_) {
+  case ProtocolState::PassthroughData:
+    return passthroughData(buffer);
   case ProtocolState::MessageBegin:
     return messageBegin(buffer);
   case ProtocolState::StructBegin:
@@ -415,6 +433,7 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
 
     request_ = std::make_unique<ActiveRequest>(callbacks_.newDecoderEventHandler());
     frame_started_ = true;
+    // TODO: add an option to configure passthrough
     state_machine_ =
         std::make_unique<DecoderStateMachine>(protocol_, metadata_, request_->handler_);
 

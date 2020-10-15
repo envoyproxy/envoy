@@ -140,6 +140,8 @@ public:
   ~MockDecoderEventHandler() override;
 
   // ThriftProxy::DecoderEventHandler
+  MOCK_METHOD(bool, passthroughEnabled, ());
+  MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data, uint64_t body_bytes));
   MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata));
   MOCK_METHOD(FilterStatus, transportEnd, ());
   MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata));
@@ -209,6 +211,8 @@ public:
   MOCK_METHOD(void, resetUpstreamConnection, ());
 
   // ThriftProxy::DecoderEventHandler
+  MOCK_METHOD(bool, passthroughEnabled, ());
+  MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data, uint64_t body_bytes));
   MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata));
   MOCK_METHOD(FilterStatus, transportEnd, ());
   MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata));

@@ -19,7 +19,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 class ThriftConnManagerIntegrationTest
-    : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool>>,
+    : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool, bool>>,
       public BaseThriftIntegrationTest {
 public:
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
@@ -68,7 +68,7 @@ public:
   }
 
   void initializeCall(DriverMode mode) {
-    std::tie(transport_, protocol_, multiplexed_) = GetParam();
+    std::tie(transport_, protocol_, multiplexed_, std::ignore) = GetParam();
 
     absl::optional<std::string> service_name;
     if (multiplexed_) {
@@ -92,7 +92,7 @@ public:
   }
 
   void initializeOneway() {
-    std::tie(transport_, protocol_, multiplexed_) = GetParam();
+    std::tie(transport_, protocol_, multiplexed_, std::ignore) = GetParam();
 
     absl::optional<std::string> service_name;
     if (multiplexed_) {
@@ -119,6 +119,43 @@ public:
       }
     });
 
+    std::tie(std::ignore, std::ignore, std::ignore, payload_passthrough_) = GetParam();
+
+    if (payload_passthrough_) {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        ASSERT_TRUE(bootstrap.mutable_static_resources()->listeners_size());
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        ASSERT_TRUE(listener);
+        ASSERT_TRUE(listener->filter_chains_size());
+
+        envoy::config::listener::v3::Filter* filter = nullptr;
+        auto* filter_chain = listener->mutable_filter_chains(0);
+        for (ssize_t i = 0; i < filter_chain->filters_size(); i++) {
+          if (filter_chain->mutable_filters(i)->name() == "thrift") {
+            filter = filter_chain->mutable_filters(i);
+            break;
+          }
+        }
+        ASSERT_TRUE(filter);
+
+        envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy tcm;
+        // envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy tcm;
+        tcm = MessageUtil::anyConvert<
+            envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy>(
+            // envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy>(
+            *filter->mutable_typed_config());
+
+        tcm.set_payload_passthrough(true);
+
+        filter_chain->clear_filters();
+        filter = filter_chain->add_filters();
+        filter->mutable_typed_config()->PackFrom(tcm);
+        filter->set_name("envoy.filters.network.thrift_proxy");
+
+        ASSERT_TRUE(filter_chain->filters_size() == 1);
+      });
+    }
+
     BaseThriftIntegrationTest::initialize();
   }
 
@@ -142,6 +179,7 @@ protected:
   TransportType transport_;
   ProtocolType protocol_;
   bool multiplexed_;
+  bool payload_passthrough_;
 
   std::string result_;
 
@@ -150,26 +188,35 @@ protected:
 };
 
 static std::string
-paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool>>& params) {
+paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool, bool>>& params) {
   TransportType transport;
   ProtocolType protocol;
   bool multiplexed;
-  std::tie(transport, protocol, multiplexed) = params.param;
+  bool passthrough;
+  std::tie(transport, protocol, multiplexed, passthrough) = params.param;
 
   std::string transport_name = transportNameForTest(transport);
   std::string protocol_name = protocolNameForTest(protocol);
 
+  std::string result;
+
   if (multiplexed) {
-    return fmt::format("{}{}Multiplexed", transport_name, protocol_name);
+    result = fmt::format("{}{}Multiplexed", transport_name, protocol_name);
+  } else {
+    result = fmt::format("{}{}", transport_name, protocol_name);
   }
-  return fmt::format("{}{}", transport_name, protocol_name);
+  if (passthrough) {
+    result = fmt::format("{}Passthrough", result);
+  }
+  return result;
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    TransportAndProtocol, ThriftConnManagerIntegrationTest,
-    Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
-            Values(ProtocolType::Binary, ProtocolType::Compact), Values(false, true)),
-    paramToString);
+INSTANTIATE_TEST_SUITE_P(TransportAndProtocol, ThriftConnManagerIntegrationTest,
+                         Combine(Values(TransportType::Framed, TransportType::Unframed,
+                                        TransportType::Header),
+                                 Values(ProtocolType::Binary, ProtocolType::Compact),
+                                 Values(false, true), Values(false, true)),
+                         paramToString);
 
 TEST_P(ThriftConnManagerIntegrationTest, Success) {
   initializeCall(DriverMode::Success);
@@ -222,7 +269,12 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
   counter = test_server_->counter("thrift.thrift_stats.response_error");
-  EXPECT_EQ(1U, counter->value());
+  if (payload_passthrough_ && transport_ == TransportType::Framed &&
+      protocol_ != ProtocolType::Twitter) {
+    EXPECT_EQ(0U, counter->value());
+  } else {
+    EXPECT_EQ(1U, counter->value());
+  }
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, Exception) {
@@ -395,7 +447,7 @@ class ThriftTwitterConnManagerIntegrationTest : public ThriftConnManagerIntegrat
 
 INSTANTIATE_TEST_SUITE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
                          Combine(Values(TransportType::Framed), Values(ProtocolType::Twitter),
-                                 Values(false, true)),
+                                 Values(false, true), Values(false, true)),
                          paramToString);
 
 // Because of the protocol upgrade requests and the difficulty of separating them, we test this

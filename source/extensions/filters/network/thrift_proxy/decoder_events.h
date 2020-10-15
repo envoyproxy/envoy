@@ -36,6 +36,21 @@ public:
   virtual FilterStatus transportEnd() PURE;
 
   /**
+   * @return True if payload passthrough is enabled.
+   * Once any filter returns false, the payload passthrough mode is disabled.
+   */
+  virtual bool passthroughEnabled() PURE;
+
+  /**
+   * Indicates raw bytes after metadata in a Thrift transport frame was detected.
+   * Filters should not modify data except for the router.
+   * @param data data to send as passthrough
+   * @param bytes_to_passthrough size of data
+   * @return FilterStatus to indicate if filter chain iteration should continue
+   */
+  virtual FilterStatus passthroughData(Buffer::Instance& data, uint64_t bytes_to_passthrough) PURE;
+
+  /**
    * Indicates that the start of a Thrift protocol message was detected.
    * @param metadata MessageMetadataSharedPtr describing the message
    * @return FilterStatus to indicate if filter chain iteration should continue
