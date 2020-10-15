@@ -151,7 +151,7 @@ stages:
               AZP_BRANCH: $(Build.SourceBranch)
 
   - stage: linux_x64
-    dependsOn: ["precheck"]
+    dependsOn: []
     # For master builds, continue even if precheck fails
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
     jobs:
