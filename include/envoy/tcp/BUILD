@@ -23,6 +23,7 @@ envoy_cc_library(
     name = "upstream_interface",
     hdrs = ["upstream.h"],
     deps = [
+        "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/upstream:upstream_interface",
     ],
 )

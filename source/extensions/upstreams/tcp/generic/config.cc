@@ -23,6 +23,8 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     // right since whether a cluster is invalid depends on both the tcp_proxy config + cluster
     // config.
     if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) == 0) {
+      ENVOY_LOG_MISC(error, "Attempted to tunnel over HTTP/1.1, this is not supported. Set "
+                            "http2_protocol_options on the cluster.");
       return nullptr;
     }
     auto ret = std::make_unique<TcpProxy::HttpConnPool>(
