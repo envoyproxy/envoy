@@ -58,6 +58,7 @@ public:
   MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
   MOCK_METHOD(void, encodeMetadata, (MetadataMapVector&));
+  MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
   MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
   MOCK_METHOD(void, setContinueHeaders, (ResponseHeaderMapPtr &&));
   MOCK_METHOD(void, setResponseHeaders_, (ResponseHeaderMap&));
