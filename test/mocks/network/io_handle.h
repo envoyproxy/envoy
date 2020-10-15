@@ -19,8 +19,9 @@ public:
     createFileEvent_(dispatcher, cb, trigger, events);
   }
 
-  void createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                              Event::FileTriggerType trigger, uint32_t events) override {
+  Event::FileEventPtr createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                             Event::FileTriggerType trigger,
+                                             uint32_t events) override {
     return Event::FileEventPtr{createManagedFileEvent_(dispatcher, cb, trigger, events)};
   }
 
@@ -59,7 +60,7 @@ public:
   MOCK_METHOD(void, createFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
-  MOCK_METHOD(FileEvent*, createManagedFileEvent_,
+  MOCK_METHOD(Event::FileEvent*, createManagedFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(void, activateFileEvents, (uint32_t events));
