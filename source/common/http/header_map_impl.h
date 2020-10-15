@@ -86,8 +86,7 @@ public:
   void setReferenceKey(const LowerCaseString& key, absl::string_view value);
   void setCopy(const LowerCaseString& key, absl::string_view value);
   uint64_t byteSize() const;
-  const HeaderEntry* get(const LowerCaseString& key) const;
-  HeaderMap::GetResult getAll(const LowerCaseString& key) const;
+  HeaderMap::GetResult get(const LowerCaseString& key) const;
   void iterate(HeaderMap::ConstIterateCb cb) const;
   void iterateReverse(HeaderMap::ConstIterateCb cb) const;
   void clear();
@@ -222,45 +221,51 @@ protected:
       return headers_.erase(i);
     }
 
-    template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
-      headers_.remove_if([&](const HeaderEntryImpl& entry) {
-        const bool to_remove = p(entry);
-        if (to_remove) {
-          if (pseudo_headers_end_ == entry.entry_) {
-            pseudo_headers_end_++;
-          }
-          if (!lazy_map_.empty()) {
-            ASSERT(lazy_map_.find(entry.key().getStringView()) != lazy_map_.end());
-            auto& values_vec = lazy_map_[entry.key().getStringView()];
-            if (values_vec.size() == 1) {
-              // If the map contains a single value with the same key of the entry, it is certain
-              // that this is the only value that needs to be removed, and can be erased from the
-              // map.
-              lazy_map_.erase(entry.key().getStringView());
-            } else {
-              // Otherwise, find the exact element that is removed from headers_ (entry) in the
-              // vector, and remove it. This keeps an invariant that only the element that is
-              // currently removed from the headers list will also be removed from the map.
-              // In case the predicate holds for all the vector elements, the size of the vector
-              // will eventually decrease to 1 and the entire vector will be erased by the if
-              // clause above.
-              // Note: it is possible to remove all elements in the vector that satisfy the
-              // predicate during this iteration, but it will complicate the code by requiring
-              // handling of missing values in the lazy map.
+    template <class UnaryPredicate> void removeIf(UnaryPredicate p) {
+      if (!lazy_map_.empty()) {
+        // Lazy map is used, iterate over its elements and remove those that satisfy the predicate
+        // from the map and from the list.
+        for (auto map_it = lazy_map_.begin(); map_it != lazy_map_.end();) {
+          auto& values_vec = map_it->second;
+          ASSERT(!values_vec.empty());
+          // The following call to std::remove_if removes the elements that satisfy the
+          // UnaryPredicate and shifts the vector elements, but does not resize the vector.
+          // The call to erase that follows erases the unneeded cells (from remove_pos to the
+          // end) and modifies the vector's size.
+          const auto remove_pos =
+              std::remove_if(values_vec.begin(), values_vec.end(), [&](HeaderNode it) {
+                if (p(*(it->entry_))) {
+                  // Remove the element from the list.
+                  if (pseudo_headers_end_ == it->entry_) {
+                    pseudo_headers_end_++;
+                  }
+                  headers_.erase(it);
+                  return true;
+                }
+                return false;
+              });
+          values_vec.erase(remove_pos, values_vec.end());
 
-              // The call to std::remove_if removes the elements that satisfy the predicate and
-              // shifts the vector elements, but does not resize the vector. The call to erase that
-              // follows erases the unneeded cells (from remove_pos to the end) and modifies the
-              // vector's size.
-              const auto remove_pos =
-                  std::remove_if(values_vec.begin(), values_vec.end(),
-                                 [&](HeaderNode it) { return it == entry.entry_; });
-              values_vec.erase(remove_pos, values_vec.end());
-            }
+          // If all elements were removed from the map entry, erase it.
+          if (values_vec.empty()) {
+            lazy_map_.erase(map_it++);
+          } else {
+            map_it++;
           }
         }
-        return to_remove;
-      });
+      } else {
+        // The lazy map isn't used, iterate over the list elements and remove elements that satisfy
+        // the predicate.
+        headers_.remove_if([&](const HeaderEntryImpl& entry) {
+          const bool to_remove = p(entry);
+          if (to_remove) {
+            if (pseudo_headers_end_ == entry.entry_) {
+              pseudo_headers_end_++;
+            }
+          }
+          return to_remove;
+        });
+      }
     }
 
     /*
@@ -363,11 +368,8 @@ public:
     HeaderMapImpl::setCopy(key, value);
   }
   uint64_t byteSize() const override { return HeaderMapImpl::byteSize(); }
-  const HeaderEntry* get(const LowerCaseString& key) const override {
+  HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return HeaderMapImpl::get(key);
-  }
-  HeaderMap::GetResult getAll(const LowerCaseString& key) const override {
-    return HeaderMapImpl::getAll(key);
   }
   void iterate(HeaderMap::ConstIterateCb cb) const override { HeaderMapImpl::iterate(cb); }
   void iterateReverse(HeaderMap::ConstIterateCb cb) const override {

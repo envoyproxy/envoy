@@ -52,6 +52,17 @@
 namespace Envoy {
 namespace Http {
 
+bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
+  if (!headers) {
+    return false;
+  }
+  if (protocol <= Protocol::Http11) {
+    return HeaderUtility::isConnect(*headers);
+  }
+  // All HTTP/2 style upgrades were originally connect requests.
+  return HeaderUtility::isConnect(*headers) || Utility::isUpgrade(*headers);
+}
+
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
   return ConnectionManagerStats(
@@ -177,7 +188,19 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
     // TODO(snowp): This call might not be necessary, try to clean up + remove setter function.
     stream.filter_manager_.setLocalComplete();
     stream.state_.codec_saw_local_complete_ = true;
-    stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+
+    // Per https://tools.ietf.org/html/rfc7540#section-8.3 if there was an error
+    // with the TCP connection during a CONNECT request, it should be
+    // communicated via CONNECT_ERROR
+    if (requestWasConnect(stream.request_headers_, codec_->protocol()) &&
+        (stream.filter_manager_.streamInfo().hasResponseFlag(
+             StreamInfo::ResponseFlag::UpstreamConnectionFailure) ||
+         stream.filter_manager_.streamInfo().hasResponseFlag(
+             StreamInfo::ResponseFlag::UpstreamConnectionTermination))) {
+      stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
+    } else {
+      stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+    }
     reset_stream = true;
   }
 
@@ -245,7 +268,7 @@ void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   // GOAWAY.
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay,
                     StreamInfo::ResponseFlag::DownstreamProtocolError,
-                    absl::StrCat("codec error: ", error));
+                    absl::StrCat("codec error:", error));
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
@@ -603,6 +626,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   filter_manager_.streamInfo().setDownstreamSslConnection(
       connection_manager_.read_callbacks_->connection().ssl());
 
+  filter_manager_.streamInfo().setConnectionID(
+      connection_manager_.read_callbacks_->connection().id());
+
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -839,7 +865,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   filter_manager_.maybeEndDecode(end_stream);
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
-  if (connection_manager_.overload_stop_accepting_requests_ref_.isSaturated()) {
+  if (connection_manager_.random_generator_.bernoulli(
+          connection_manager_.overload_stop_accepting_requests_ref_.value())) {
     // In this one special case, do not create the filter chain. If there is a risk of memory
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     filter_manager_.skipFilterChainCreation();
@@ -1335,7 +1362,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.overload_disable_keepalive_ref_.isSaturated()) {
+      connection_manager_.random_generator_.bernoulli(
+          connection_manager_.overload_disable_keepalive_ref_.value())) {
     ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
     if (connection_manager_.codec_->protocol() < Protocol::Http2 ||
         Runtime::runtimeFeatureEnabled(

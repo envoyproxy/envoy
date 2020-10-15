@@ -12,6 +12,18 @@ These examples use the :ref:`v3 Envoy API <envoy_api_reference>`, but use only t
 feature of the API, which is most useful for simple requirements. For more complex requirements
 :ref:`Dynamic Configuration <arch_overview_dynamic_config>` is supported.
 
+.. _install:
+
+Building and installation
+-------------------------
+
+.. toctree::
+    :maxdepth: 2
+
+    building
+    install/ref_configs
+    install/tools/tools
+
 Quick Start to Run Simple Example
 ---------------------------------
 
@@ -219,15 +231,3 @@ features. The following sandboxes are available:
     sandboxes/mysql
     sandboxes/redis
     sandboxes/zipkin_tracing
-
-Other use cases
----------------
-
-In addition to the proxy itself, Envoy is also bundled as part of several open
-source distributions that target specific use cases.
-
-.. toctree::
-    :maxdepth: 2
-
-    distro/ambassador
-    distro/gloo

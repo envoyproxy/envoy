@@ -11,6 +11,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -137,7 +138,7 @@ void SquashFilter::onDestroy() { cleanup(); }
 
 Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Check for squash header
-  if (!headers.get(Http::Headers::get().XSquashDebug)) {
+  if (headers.get(Http::Headers::get().XSquashDebug).empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
 

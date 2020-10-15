@@ -281,7 +281,7 @@ public:
     queries_.emplace_back(query);
   }
 
-  void onReject() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onReject(RejectCause) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void addHosts(const std::string& hostname, const IpList& ip, const RecordType& type) {
     if (type == RecordType::A) {

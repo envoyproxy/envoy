@@ -261,6 +261,7 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
+        ":default_socket_interface_lib",
         ":listen_socket_lib",
         ":udp_default_writer_config",
         "//include/envoy/event:dispatcher_interface",

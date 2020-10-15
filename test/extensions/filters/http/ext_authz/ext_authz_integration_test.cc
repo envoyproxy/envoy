@@ -44,8 +44,8 @@ public:
     addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
-  void initializeConfig(bool with_timeout = false) {
-    config_helper_.addConfigModifier([this, with_timeout](
+  void initializeConfig(bool with_timeout = false, bool disable_with_metadata = false) {
+    config_helper_.addConfigModifier([this, with_timeout, disable_with_metadata](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -63,6 +63,13 @@ public:
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
+      if (disable_with_metadata) {
+        // Disable the ext_authz filter with metadata matcher that never matches.
+        auto* metadata = proto_config_.mutable_filter_enabled_metadata();
+        metadata->set_filter("xyz.abc");
+        metadata->add_path()->set_key("k1");
+        metadata->mutable_value()->mutable_string_match()->set_exact("never_matched");
+      }
       proto_config_.mutable_deny_at_disable()->set_runtime_key("envoy.ext_authz.deny_at_disable");
       proto_config_.mutable_deny_at_disable()->mutable_default_value()->set_value(false);
       proto_config_.set_transport_api_version(apiVersion());
@@ -74,8 +81,10 @@ public:
     });
   }
 
-  void setDenyAtDisableRuntimeConfig(bool deny_at_disable) {
-    config_helper_.addRuntimeOverride("envoy.ext_authz.enable", "numerator: 0");
+  void setDenyAtDisableRuntimeConfig(bool deny_at_disable, bool disable_with_metadata) {
+    if (!disable_with_metadata) {
+      config_helper_.addRuntimeOverride("envoy.ext_authz.enable", "numerator: 0");
+    }
     if (deny_at_disable) {
       config_helper_.addRuntimeOverride("envoy.ext_authz.deny_at_disable", "true");
     } else {
@@ -195,7 +204,7 @@ public:
               // string value. Hence for "header2" key, the value is "header2,header2-appended".
               absl::StrCat(header_to_append.first, ",", header_to_append.second)));
       const auto value = upstream_request_->headers()
-                             .get(Http::LowerCaseString(header_to_append.first))
+                             .get(Http::LowerCaseString(header_to_append.first))[0]
                              ->value()
                              .getStringView();
       EXPECT_TRUE(absl::EndsWith(value, "-appended"));
@@ -221,8 +230,8 @@ public:
 
     for (const auto& header_to_remove : headers_to_remove) {
       // The headers that were originally present in the request have now been removed.
-      EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}),
-                nullptr);
+      EXPECT_TRUE(
+          upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}).empty());
     }
 
     response_->waitForEndStream();
@@ -302,11 +311,7 @@ public:
 
   void cleanup() {
     if (fake_ext_authz_connection_ != nullptr) {
-      if (clientType() != Grpc::ClientType::GoogleGrpc) {
-        AssertionResult result = fake_ext_authz_connection_->close();
-        RELEASE_ASSERT(result, result.message());
-      }
-      AssertionResult result = fake_ext_authz_connection_->waitForDisconnect();
+      AssertionResult result = fake_ext_authz_connection_->close();
       RELEASE_ASSERT(result, result.message());
     }
     cleanupUpstreamAndDownstream();
@@ -391,9 +396,10 @@ attributes:
     cleanup();
   }
 
-  void expectFilterDisableCheck(bool deny_at_disable, const std::string& expected_status) {
-    initializeConfig();
-    setDenyAtDisableRuntimeConfig(deny_at_disable);
+  void expectFilterDisableCheck(bool deny_at_disable, bool disable_with_metadata,
+                                const std::string& expected_status) {
+    initializeConfig(false, disable_with_metadata);
+    setDenyAtDisableRuntimeConfig(deny_at_disable, disable_with_metadata);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     HttpIntegrationTest::initialize();
     initiateClientConnection(4);
@@ -503,12 +509,8 @@ public:
     });
   }
 
-  void setupWithDisabledCaseSensitiveStringMatcher(bool disable_case_sensitive_matcher) {
+  void setup() {
     initializeConfig();
-
-    if (disable_case_sensitive_matcher) {
-      disableCaseSensitiveStringMatcher();
-    }
 
     HttpIntegrationTest::initialize();
 
@@ -546,13 +548,13 @@ public:
     // The "remove-me" header that was present in the downstream request has
     // been removed by envoy as a result of being present in
     // "x-envoy-auth-headers-to-remove".
-    EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{"remove-me"}), nullptr);
+    EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString{"remove-me"}).empty());
     // "x-envoy-auth-headers-to-remove" itself has also been removed because
     // it's only used for communication between the authorization server and
     // envoy itself.
-    EXPECT_EQ(
-        upstream_request_->headers().get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"}),
-        nullptr);
+    EXPECT_TRUE(upstream_request_->headers()
+                    .get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"})
+                    .empty());
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     response_->waitForEndStream();
@@ -663,9 +665,21 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckTimesOutFromCheckCreation) {
   expectCheckRequestTimedout(true);
 }
 
-TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) { expectFilterDisableCheck(false, "200"); }
+TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) {
+  expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/false, "200");
+}
 
-TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) { expectFilterDisableCheck(true, "403"); }
+TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisableWithMetadata) {
+  expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/true, "200");
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) {
+  expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/false, "403");
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
+  expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/true, "403");
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
                          ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -673,19 +687,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher.
 TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
-  setupWithDisabledCaseSensitiveStringMatcher(false);
-  const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_EQ(header_entry, nullptr);
-}
-
-// Verifies that by setting "false" to
-// envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher, the string
-// matcher used by HTTP service will be case-insensitive.
-TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
-  setupWithDisabledCaseSensitiveStringMatcher(true);
-  const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_NE(header_entry, nullptr);
-  EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
+  setup();
+  const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
+  ASSERT_TRUE(header_entry.empty());
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, CheckTimesOutLegacy) { expectCheckRequestTimedout(false); }
@@ -801,6 +805,69 @@ body_format:
       "message": ""
 })";
   EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection(4, Headers{}, Headers{});
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Make sure one Google grpc client is created.
+    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+  }
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{});
+
+  waitForSuccessfulUpstreamResponse("200");
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+  TestUtility::feedBufferWithRandomCharacters(request_body_, 4);
+  response_ = codec_client_->makeRequestWithBody(headers, request_body_.toString());
+
+  auto result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+  RELEASE_ASSERT(result, result.message());
+
+  EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
+  EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
+                                                apiVersion()),
+            ext_authz_request_->headers().getPathValue());
+  EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Make sure one Google grpc client is created.
+    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+  }
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{});
+
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(response_size_, true);
+
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+  EXPECT_EQ(response_size_, response_->body().size());
 
   cleanup();
 }

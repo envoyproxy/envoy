@@ -635,9 +635,9 @@ TEST_F(LookupRequestTest, VariedHeaders) {
   const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
   const Http::RequestHeaderMap& result = lookup_request.getVaryHeaders();
 
-  ASSERT_TRUE(result.get(Http::LowerCaseString("accept")));
-  ASSERT_EQ(result.get(Http::LowerCaseString("accept"))->value().getStringView(), "image/*");
-  ASSERT_FALSE(result.get(Http::LowerCaseString("other-header")));
+  ASSERT_FALSE(result.get(Http::LowerCaseString("accept")).empty());
+  ASSERT_EQ(result.get(Http::LowerCaseString("accept"))[0]->value().getStringView(), "image/*");
+  ASSERT_TRUE(result.get(Http::LowerCaseString("other-header")).empty());
 }
 
 } // namespace
