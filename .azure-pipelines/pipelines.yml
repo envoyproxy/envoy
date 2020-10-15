@@ -244,7 +244,7 @@ stages:
     dependsOn: ["linux_x64", "linux_arm64"]
     jobs:
       - job: docker
-        displayName: "Linux multi-arch docker"
+        displayName: "linux multiarch"
         pool:
           vmImage: "ubuntu-18.04"
         steps:
