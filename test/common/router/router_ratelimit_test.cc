@@ -513,11 +513,10 @@ filter_metadata:
               testing::ContainerEq(descriptors_));
 }
 
-// Tests that the default_value is used in the descriptor when the metadata_key is empty.
-TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataNoMatchWithDefaultValue) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchDynamicSourceByDefault) {
   const std::string yaml = R"EOF(
 actions:
-- dynamic_metadata:
+- metadata:
     descriptor_key: fake_key
     default_value: fake_value
     metadata_key:
@@ -532,7 +531,7 @@ actions:
   std::string metadata_yaml = R"EOF(
 filter_metadata:
   envoy.xxx:
-    another_key:
+    test:
       prop: foo
   )EOF";
 
@@ -542,20 +541,22 @@ filter_metadata:
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
                                          &metadata);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataNoMatch) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchDynamicSource) {
   const std::string yaml = R"EOF(
 actions:
-- dynamic_metadata:
+- metadata:
     descriptor_key: fake_key
+    default_value: fake_value
     metadata_key:
       key: 'envoy.xxx'
       path:
       - key: test
       - key: prop
+    source: DYNAMIC
   )EOF";
 
   setupTest(yaml);
@@ -563,7 +564,7 @@ actions:
   std::string metadata_yaml = R"EOF(
 filter_metadata:
   envoy.xxx:
-    another_key:
+    test:
       prop: foo
   )EOF";
 
@@ -573,105 +574,14 @@ filter_metadata:
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
                                          &metadata);
 
-  EXPECT_TRUE(descriptors_.empty());
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
+              testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataEmptyValue) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchRouteEntrySource) {
   const std::string yaml = R"EOF(
 actions:
-- dynamic_metadata:
-    descriptor_key: fake_key
-    metadata_key:
-      key: 'envoy.xxx'
-      path:
-      - key: test
-      - key: prop
-  )EOF";
-
-  setupTest(yaml);
-
-  std::string metadata_yaml = R"EOF(
-filter_metadata:
-  envoy.xxx:
-    test:
-      prop: ""
-  )EOF";
-
-  envoy::config::core::v3::Metadata metadata;
-  TestUtility::loadFromYaml(metadata_yaml, metadata);
-
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
-                                         &metadata);
-
-  EXPECT_TRUE(descriptors_.empty());
-}
-// Tests that no descriptor is generated when both the metadata_key and default_value are empty.
-TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataAndDefaultValueEmpty) {
-  const std::string yaml = R"EOF(
-actions:
-- dynamic_metadata:
-    descriptor_key: fake_key
-    default_value: ""
-    metadata_key:
-      key: 'envoy.xxx'
-      path:
-      - key: test
-      - key: prop
-  )EOF";
-
-  setupTest(yaml);
-
-  std::string metadata_yaml = R"EOF(
-filter_metadata:
-  envoy.xxx:
-    another_key:
-      prop: ""
-  )EOF";
-
-  envoy::config::core::v3::Metadata metadata;
-  TestUtility::loadFromYaml(metadata_yaml, metadata);
-
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
-                                         &metadata);
-
-  EXPECT_TRUE(descriptors_.empty());
-}
-
-TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataNonStringNoMatch) {
-  const std::string yaml = R"EOF(
-actions:
-- dynamic_metadata:
-    descriptor_key: fake_key
-    metadata_key:
-      key: 'envoy.xxx'
-      path:
-      - key: test
-      - key: prop
-  )EOF";
-
-  setupTest(yaml);
-
-  std::string metadata_yaml = R"EOF(
-filter_metadata:
-  envoy.xxx:
-    test:
-      prop:
-        foo: bar
-  )EOF";
-
-  envoy::config::core::v3::Metadata metadata;
-  TestUtility::loadFromYaml(metadata_yaml, metadata);
-
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
-                                         &metadata);
-
-  EXPECT_TRUE(descriptors_.empty());
-}
-
-TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataMatch) {
-  const std::string yaml = R"EOF(
-actions:
-- route_entry_metadata:
+- metadata:
     descriptor_key: fake_key
     default_value: fake_value
     metadata_key:
@@ -679,6 +589,7 @@ actions:
       path:
       - key: test
       - key: prop
+    source: ROUTE_ENTRY
   )EOF";
 
   setupTest(yaml);
@@ -700,10 +611,10 @@ filter_metadata:
 }
 
 // Tests that the default_value is used in the descriptor when the metadata_key is empty.
-TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataNoMatchWithDefaultValue) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataNoMatchWithDefaultValue) {
   const std::string yaml = R"EOF(
 actions:
-- route_entry_metadata:
+- dynamic_metadata:
     descriptor_key: fake_key
     default_value: fake_value
     metadata_key:
@@ -722,19 +633,20 @@ filter_metadata:
       prop: foo
   )EOF";
 
-  TestUtility::loadFromYaml(metadata_yaml, route_.metadata_);
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
-                                         dynamic_metadata_);
+                                         &metadata);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataNoMatch) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataNoMatch) {
   const std::string yaml = R"EOF(
 actions:
-- route_entry_metadata:
+- dynamic_metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
@@ -752,18 +664,19 @@ filter_metadata:
       prop: foo
   )EOF";
 
-  TestUtility::loadFromYaml(metadata_yaml, route_.metadata_);
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
-                                         dynamic_metadata_);
+                                         &metadata);
 
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataEmptyValue) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataEmptyValue) {
   const std::string yaml = R"EOF(
 actions:
-- route_entry_metadata:
+- dynamic_metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
@@ -781,18 +694,19 @@ filter_metadata:
       prop: ""
   )EOF";
 
-  TestUtility::loadFromYaml(metadata_yaml, route_.metadata_);
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
-                                         dynamic_metadata_);
+                                         &metadata);
 
   EXPECT_TRUE(descriptors_.empty());
 }
 // Tests that no descriptor is generated when both the metadata_key and default_value are empty.
-TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataAndDefaultValueEmpty) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataAndDefaultValueEmpty) {
   const std::string yaml = R"EOF(
 actions:
-- route_entry_metadata:
+- dynamic_metadata:
     descriptor_key: fake_key
     default_value: ""
     metadata_key:
@@ -811,18 +725,19 @@ filter_metadata:
       prop: ""
   )EOF";
 
-  TestUtility::loadFromYaml(metadata_yaml, route_.metadata_);
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
-                                         dynamic_metadata_);
+                                         &metadata);
 
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, RouteEntryMetaDataNonStringNoMatch) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataNonStringNoMatch) {
   const std::string yaml = R"EOF(
 actions:
-- route_entry_metadata:
+- dynamic_metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
@@ -841,10 +756,11 @@ filter_metadata:
         foo: bar
   )EOF";
 
-  TestUtility::loadFromYaml(metadata_yaml, route_.metadata_);
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
-                                         dynamic_metadata_);
+                                         &metadata);
 
   EXPECT_TRUE(descriptors_.empty());
 }

@@ -114,11 +114,13 @@ private:
 };
 
 /**
- * Action for dynamic metadata rate limiting.
+ * Action for metadata rate limiting.
  */
-class DynamicMetaDataAction : public RateLimitAction {
+class MetaDataAction : public RateLimitAction {
 public:
-  DynamicMetaDataAction(const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action);
+  MetaDataAction(const envoy::config::route::v3::RateLimit::Action::MetaData& action);
+  // for maintaining backward compatibility with the deprecated DynamicMetaData action
+  MetaDataAction(const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action);
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
@@ -129,25 +131,7 @@ private:
   const Envoy::Config::MetadataKey metadata_key_;
   const std::string descriptor_key_;
   const std::string default_value_;
-};
-
-/**
- * Action for route entry metadata rate limiting.
- */
-class RouteEntryMetaDataAction : public RateLimitAction {
-public:
-  RouteEntryMetaDataAction(
-      const envoy::config::route::v3::RateLimit::Action::RouteEntryMetaData& action);
-  // Router::RateLimitAction
-  bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const Network::Address::Instance& remote_address,
-                          const envoy::config::core::v3::Metadata* dynamic_metadata) const override;
-
-private:
-  const Envoy::Config::MetadataKey metadata_key_;
-  const std::string descriptor_key_;
-  const std::string default_value_;
+  const envoy::config::route::v3::RateLimit::Action::MetaData::Source source_;
 };
 
 /**
