@@ -1,3 +1,4 @@
+#include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -426,6 +427,31 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
   EXPECT_EQ(0, buf.length());
 }
 
+// Test write return error code without event
+TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
+  Buffer::OwnedImpl buf("0123456789");
+  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+
+  {
+    // Populate write destiniation with massive data so as to not writable.
+    auto& internal_buffer = io_handle_peer_->getBufferForTest();
+    internal_buffer.setWatermarks(1024);
+    internal_buffer.add(std::string(2048, ' '));
+
+    result = io_handle_->write(buf);
+    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+    EXPECT_EQ(10, buf.length());
+  }
+
+  {
+    // Write after shutdown.
+    io_handle_->shutdown(ENVOY_SHUT_WR);
+    result = io_handle_->write(buf);
+    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+    EXPECT_EQ(10, buf.length());
+  }
+}
+
 TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
   std::string raw_data("0123456789");
   absl::InlinedVector<Buffer::RawSlice, 4> slices{
@@ -622,6 +648,10 @@ TEST_F(BufferedIoSocketHandleTest, TestNotSupportsUdpGro) {
   EXPECT_FALSE(io_handle_->supportsUdpGro());
 }
 
+TEST_F(BufferedIoSocketHandleTest, TestDomainNullOpt) {
+  EXPECT_FALSE(io_handle_->domain().has_value());
+}
+
 class BufferedIoSocketHandleNotImplementedTest : public testing::Test {
 public:
   BufferedIoSocketHandleNotImplementedTest() {
@@ -644,20 +674,28 @@ public:
   Buffer::RawSlice slice_;
 };
 
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnSetBlocking) {
+  EXPECT_THAT(io_handle_->setBlocking(false), IsNotSupportedResult());
+  EXPECT_THAT(io_handle_->setBlocking(true), IsNotSupportedResult());
+}
+
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnSendmsg) {
   EXPECT_THAT(io_handle_->sendmsg(&slice_, 0, 0, nullptr,
                                   Network::Address::EnvoyInternalInstance("listener_id")),
               IsInvalidateAddress());
 }
+
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnRecvmsg) {
   Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
   EXPECT_THAT(io_handle_->recvmsg(&slice_, 0, 0, output_is_ignored), IsInvalidateAddress());
 }
+
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnRecvmmsg) {
   RawSliceArrays slices_is_ignored(1, absl::FixedArray<Buffer::RawSlice>({slice_}));
   Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
   EXPECT_THAT(io_handle_->recvmmsg(slices_is_ignored, 0, output_is_ignored), IsInvalidateAddress());
 }
+
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnBind) {
   auto address_is_ignored =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
@@ -667,6 +705,19 @@ TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnBind) {
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnListen) {
   int back_log_is_ignored = 0;
   EXPECT_THAT(io_handle_->listen(back_log_is_ignored), IsNotSupportedResult());
+}
+
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnAddress) {
+  ASSERT_THROW(io_handle_->peerAddress(), EnvoyException);
+  ASSERT_THROW(io_handle_->localAddress(), EnvoyException);
+}
+
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnSetOption) {
+  EXPECT_THAT(io_handle_->setOption(0, 0, nullptr, 0), IsNotSupportedResult());
+}
+
+TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnGetOption) {
+  EXPECT_THAT(io_handle_->getOption(0, 0, nullptr, nullptr), IsNotSupportedResult());
 }
 } // namespace
 } // namespace Network
