@@ -20,7 +20,7 @@ public:
   }
 
   void createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                           Event::FileTriggerType trigger, uint32_t events) override {
+                              Event::FileTriggerType trigger, uint32_t events) override {
     return Event::FileEventPtr{createManagedFileEvent_(dispatcher, cb, trigger, events)};
   }
 
