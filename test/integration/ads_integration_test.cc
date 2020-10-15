@@ -1141,7 +1141,7 @@ TEST_P(AdsClusterV3Test, BasicClusterInitialWarming) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", false);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 }
 
 // Verify CDS is paused during cluster warming.
