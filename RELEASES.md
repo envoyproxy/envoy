@@ -52,7 +52,7 @@ stable releases and sending announcements about them. This role is rotating on a
 | 2020 Q2 | Piotr Sikora ([PiotrSikora])     |
 | 2020 Q3 | Yuchen Dai ([lambdai])           |
 | 2020 Q4 | Christoph Pakulski ([cpakulski]) |
-| 2021 Q1 |                                  |
+| 2021 Q1 | Rei Shimizu (@Shikugawa)         |
 
 ## Release schedule
 
