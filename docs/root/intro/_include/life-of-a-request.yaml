@@ -89,4 +89,4 @@ stats_sinks:
   - name: envoy.stat_sinks.statsd
     typed_config:
       "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
-      tcp_cluster_name: some_statsd_cluster
+      tcp_cluster_name: some_statsd_sink
