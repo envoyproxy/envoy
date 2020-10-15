@@ -614,7 +614,7 @@ filter_metadata:
 TEST_F(RateLimitPolicyEntryTest, MetaDataNoMatchWithDefaultValue) {
   const std::string yaml = R"EOF(
 actions:
-- dynamic_metadata:
+- metadata:
     descriptor_key: fake_key
     default_value: fake_value
     metadata_key:
@@ -646,7 +646,7 @@ filter_metadata:
 TEST_F(RateLimitPolicyEntryTest, MetaDataNoMatch) {
   const std::string yaml = R"EOF(
 actions:
-- dynamic_metadata:
+- metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
@@ -676,7 +676,7 @@ filter_metadata:
 TEST_F(RateLimitPolicyEntryTest, MetaDataEmptyValue) {
   const std::string yaml = R"EOF(
 actions:
-- dynamic_metadata:
+- metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
@@ -706,7 +706,7 @@ filter_metadata:
 TEST_F(RateLimitPolicyEntryTest, MetaDataAndDefaultValueEmpty) {
   const std::string yaml = R"EOF(
 actions:
-- dynamic_metadata:
+- metadata:
     descriptor_key: fake_key
     default_value: ""
     metadata_key:
@@ -737,7 +737,7 @@ filter_metadata:
 TEST_F(RateLimitPolicyEntryTest, MetaDataNonStringNoMatch) {
   const std::string yaml = R"EOF(
 actions:
-- dynamic_metadata:
+- metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
