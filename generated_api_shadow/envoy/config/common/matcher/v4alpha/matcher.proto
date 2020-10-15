@@ -2,7 +2,10 @@ syntax = "proto3";
 
 package envoy.config.common.matcher.v4alpha;
 
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
+
+import "google/protobuf/any.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -14,6 +17,110 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Unified Matcher API]
+
+// A MatchTree defines a mathching tree that can be used to match incoming data, arriving at a match action that indicates what action to take in response to the match resuslt.
+// This structure allows for traversal to happen as data is becoming available, allowing for optimized matching.
+//
+// We talk about an "associated operation" throughout this docs: this is the context dependent operation that is configued with this match tree. For example, this could be a HTTP/TCP filter.
+message MatchTree {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.common.matcher.v3.MatchTree";
+
+  // The action that should be taken upon matching.
+  message MatchAction {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.common.matcher.v3.MatchTree.MatchAction";
+
+    oneof action {
+      option (validate.required) = true;
+
+      // The associated operation should be skipped.
+      bool skip = 1 [(validate.rules).bool = {const: true}];
+
+      // The specified callback value should be passed to the associated operation.
+      string callback = 2;
+    }
+  }
+
+  message MatchLeaf {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.common.matcher.v3.MatchTree.MatchLeaf";
+
+    message LeafMatcher {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.common.matcher.v3.MatchTree.MatchLeaf.LeafMatcher";
+
+      oneof matcher {
+        option (validate.required) = true;
+
+        MatchPredicate predicate = 1;
+
+        // [#not-implemented-hide:]
+        core.v4alpha.TypedExtensionConfig typed_config = 2;
+      }
+
+      // The action to perform if the match evaluates to true.
+      MatchAction action = 3 [(validate.rules).message = {required: true}];
+    }
+
+    // A linear set of match conditions that will be evaluated in order.
+    // Each matcher will be attempted in order until one succeeds.
+    // If none of the matchers match, the no_match_action will be performed if specified.
+    repeated LeafMatcher matchers = 1 [(validate.rules).repeated = {min_items: 1}];
+
+    // Action to perform if none of the above matchers match.
+    MatchAction no_match_action = 3;
+  }
+
+  message SublinearMatcher {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.common.matcher.v3.MatchTree.SublinearMatcher";
+
+    message MultimapMatcher {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.common.matcher.v3.MatchTree.SublinearMatcher.MultimapMatcher";
+
+      // The key to apply this matcher for.
+      string key = 1 [(validate.rules).string = {min_len: 1}];
+
+      // The namespace of this key. This is used to distinguish multiple maps
+      // that could be consulted during matching.
+      string key_namespace = 2 [(validate.rules).string = {min_len: 1}];
+
+      // Mapping from exact value matches to the matching subtree to use when
+      // the match applies.
+      // If a header value matches both a prefix and an exact match, the exact
+      // match path will be taken.
+      map<string, MatchTree> exact_matches = 3;
+
+      // Mapping from prefix matches to the matching subtree to use when the match applies.
+      // If a header value matches both a prefix and an exact match, the exact match path will be taken.
+      // If multiple prefixes match, the longest prefix path will be taken.
+      map<string, MatchTree> prefix_matches = 4;
+    }
+
+    oneof matcher {
+      option (validate.required) = true;
+
+      MultimapMatcher multimap_matcher = 1;
+
+      core.v4alpha.TypedExtensionConfig typed_config = 2;
+    }
+
+    // If none of the above matchers match, attempt to match against this subtree.
+    MatchTree no_match_tree = 3;
+  }
+
+  oneof kind {
+    option (validate.required) = true;
+
+    // The children of this node is defined by the matching rules of this matcher.
+    SublinearMatcher matcher = 1;
+
+    // If this is a terminating node, then the leaf match criteria will be evaluated.
+    MatchLeaf leaf = 2;
+  }
+}
 
 // Match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
