@@ -433,7 +433,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
   Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 
   {
-    // Populate write destiniation with massive data so as to not writable.
+    // Populate write destination with massive data so as to not writable.
     auto& internal_buffer = io_handle_peer_->getBufferForTest();
     internal_buffer.setWatermarks(1024);
     internal_buffer.add(std::string(2048, ' '));
