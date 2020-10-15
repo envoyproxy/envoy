@@ -417,6 +417,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // been setup for cross-thread updates to avoid needless updates during initialization. The order
   // of operations here is important. We start by initializing the thread aware load balancer if
   // needed. This must happen first so cluster updates are heard first by the load balancer.
+  // Also, it assures that all of clusters which this function is called should be always active.
   auto cluster_data = warming_clusters_.find(cluster.info()->name());
   if (cluster_data != warming_clusters_.end()) {
     clusterWarmingToActive(cluster.info()->name());
