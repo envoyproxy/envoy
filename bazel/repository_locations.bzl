@@ -268,7 +268,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "nghttp2-{version}",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-06-02",
+        last_updated = "2020-06-03",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
     io_opentracing_cpp = dict(
@@ -586,7 +586,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        cpe = "cpe:2.3:a:llvm:*",
+        cpe = "cpe:2.3:a:llvm:*:*",
     ),
     com_github_wavm_wavm = dict(
         project_name = "WAVM",
