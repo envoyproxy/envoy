@@ -36,6 +36,7 @@ public:
     io_handle_->setWritablePeer(io_handle_peer_.get());
     io_handle_peer_->setWritablePeer(io_handle_.get());
   }
+
   ~BufferedIoSocketHandleTest() override {
     if (io_handle_->isOpen()) {
       io_handle_->close();
@@ -44,11 +45,13 @@ public:
       io_handle_peer_->close();
     }
   }
+
   void expectAgain() {
     auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   }
+
   NiceMock<Event::MockDispatcher> dispatcher_{};
 
   // Owned by BufferedIoSocketHandle.
@@ -427,7 +430,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
   EXPECT_EQ(0, buf.length());
 }
 
-// Test write return error code without event
+// Test write return error code. Ignoring the side effect of event scheduling.
 TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
   Buffer::OwnedImpl buf("0123456789");
   Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
@@ -450,6 +453,44 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
     ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
     EXPECT_EQ(10, buf.length());
   }
+
+  {
+    io_handle_peer_->close();
+    EXPECT_TRUE(io_handle_->isOpen());
+    result = io_handle_->write(buf);
+    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  }
+}
+
+// Test writev return error code. Ignoring the side effect of event scheduling.
+TEST_F(BufferedIoSocketHandleTest, TestWritevErrorCode) {
+  std::string buf(10, 'a');
+  Buffer::RawSlice slice{static_cast<void*>(buf.data()), 10};
+  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+
+  {
+    // Populate write destination with massive data so as to not writable.
+    auto& internal_buffer = io_handle_peer_->getBufferForTest();
+    internal_buffer.setWatermarks(1024);
+    internal_buffer.add(std::string(2048, ' '));
+    result = io_handle_->writev(&slice, 1);
+    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+  }
+
+  {
+    // Writev after shutdown.
+    io_handle_->shutdown(ENVOY_SHUT_WR);
+    result = io_handle_->writev(&slice, 1);
+    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  }
+
+  {
+    // Close the peer.
+    io_handle_peer_->close();
+    EXPECT_TRUE(io_handle_->isOpen());
+    result = io_handle_->writev(&slice, 1);
+    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  }
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
@@ -468,27 +509,6 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
   auto& internal_buffer = io_handle_->getBufferForTest();
   EXPECT_EQ(3, internal_buffer.length());
   EXPECT_EQ("012", internal_buffer.toString());
-}
-
-TEST_F(BufferedIoSocketHandleTest, TestWriteAfteShutdown) {
-  Buffer::OwnedImpl data_to_write("0123456789");
-  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
-  result = io_handle_->write(data_to_write);
-  EXPECT_TRUE(result.ok());
-  io_handle_->shutdown(ENVOY_SHUT_WR);
-  result = io_handle_->write(data_to_write);
-  EXPECT_FALSE(result.ok());
-}
-
-TEST_F(BufferedIoSocketHandleTest, TestWritevAfteShutdown) {
-  std::string raw_data("0123456789");
-  Buffer::RawSlice slice{static_cast<void*>(raw_data.data()), raw_data.size()};
-  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
-  result = io_handle_peer_->writev(&slice, 1);
-  EXPECT_TRUE(result.ok());
-  io_handle_->shutdown(ENVOY_SHUT_WR);
-  result = io_handle_->writev(&slice, 1);
-  EXPECT_FALSE(result.ok());
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
@@ -652,6 +672,12 @@ TEST_F(BufferedIoSocketHandleTest, TestDomainNullOpt) {
   EXPECT_FALSE(io_handle_->domain().has_value());
 }
 
+TEST_F(BufferedIoSocketHandleTest, TestConnect) {
+  auto address_is_ignored =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
+  EXPECT_EQ(0, io_handle_->connect(address_is_ignored).rc_);
+}
+
 class BufferedIoSocketHandleNotImplementedTest : public testing::Test {
 public:
   BufferedIoSocketHandleNotImplementedTest() {
@@ -660,6 +686,7 @@ public:
     io_handle_->setWritablePeer(io_handle_peer_.get());
     io_handle_peer_->setWritablePeer(io_handle_.get());
   }
+
   ~BufferedIoSocketHandleNotImplementedTest() override {
     if (io_handle_->isOpen()) {
       io_handle_->close();
