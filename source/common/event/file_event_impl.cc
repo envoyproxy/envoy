@@ -13,7 +13,7 @@ namespace Event {
 
 FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
-    : cb_(cb), fd_(fd), trigger_(trigger), events_(events),
+    : cb_(cb), fd_(fd), trigger_(trigger), enabled_events_(events),
       activate_fd_events_next_event_loop_(
           // Only read the runtime feature if the runtime loader singleton has already been created.
           // Attempts to access runtime features too early in the initialization sequence triggers
@@ -81,6 +81,7 @@ void FileEventImpl::activate(uint32_t events) {
 
 void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
   ASSERT(base != nullptr);
+  enabled_events_ = events;
   event_assign(
       &raw_event_, base, fd_,
       EV_PERSIST | (trigger_ == FileTriggerType::Level ? 0 : EV_ET) |
@@ -122,7 +123,6 @@ void FileEventImpl::setEnabled(uint32_t events) {
   event_del(&raw_event_);
   assignEvents(events, base);
   event_add(&raw_event_, nullptr);
-  events_ = events;
 }
 
 void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {

@@ -325,7 +325,13 @@ void ConnectionImpl::readDisable(bool disable) {
       return;
     }
 
-    ioHandle().enableFileEvents(ioHandle().getEnabledFileEvents() & ~Event::FileReadyType::Read);
+    // If half-close semantics are enabled, we never want early close notifications; we
+    // always want to read all available data, even if the other side has closed.
+    if (detect_early_close_ && !enable_half_close_) {
+      ioHandle().enableFileEvents(Event::FileReadyType::Write | Event::FileReadyType::Closed);
+    } else {
+      ioHandle().enableFileEvents(Event::FileReadyType::Write);
+    }
   } else {
     ASSERT(read_disable_count_ != 0);
     --read_disable_count_;

@@ -159,7 +159,6 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
-  Event::FileEventPtr file_event_;
 
 private:
   friend class Envoy::RandomPauseFilter;

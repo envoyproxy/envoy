@@ -22,7 +22,7 @@ public:
   // Event::FileEvent
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
-  uint32_t getEnabled() override { return events_; }
+  uint32_t getEnabled() override { return enabled_events_; }
 
 private:
   void assignEvents(uint32_t events, event_base* base);
@@ -31,7 +31,7 @@ private:
   FileReadyCb cb_;
   os_fd_t fd_;
   FileTriggerType trigger_;
-  uint32_t events_;
+  uint32_t enabled_events_;
 
   // Injected FileReadyType events that were scheduled by recent calls to activate() and are pending
   // delivery.

@@ -98,7 +98,9 @@ void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socke
   socket.ioHandle().listen(backlog_size_);
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
-  // loss of the trigger due to transient accept errors.
+  // loss of the trigger due to transient accept errors. Listeners are special and there is a case
+  // where multiple registrations can happen on the same fd. For that reason we need to create a
+  // a managed file event.
   file_event_ = socket.ioHandle().createManagedFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);

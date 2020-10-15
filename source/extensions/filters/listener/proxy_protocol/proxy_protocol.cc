@@ -123,6 +123,7 @@ void Filter::onReadWorker() {
     socket.setRemoteAddress(proxy_protocol_header_.value().remote_address_);
   }
 
+  // Release the file event so that we do not interfere with the connection read events.
   socket.ioHandle().resetFileEvents();
   cb_->continueFilterChain(true);
 }
