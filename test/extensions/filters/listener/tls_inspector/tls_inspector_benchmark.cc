@@ -41,7 +41,6 @@ public:
 class FastMockFileEvent : public Event::FileEvent {
   void activate(uint32_t) override {}
   void setEnabled(uint32_t) override {}
-  uint32_t getEnabled() override { return 1; }
 };
 
 class FastMockDispatcher : public Event::MockDispatcher {

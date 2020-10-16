@@ -67,17 +67,10 @@ public:
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
 
-  Event::FileEventPtr createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                             Event::FileTriggerType trigger,
-                                             uint32_t events) override;
+  IoHandlePtr duplicate() override;
 
   void activateFileEvents(uint32_t events) override;
   void enableFileEvents(uint32_t events) override;
-
-  uint32_t getEnabledFileEvents() override {
-    ASSERT(file_event_);
-    return file_event_->getEnabled();
-  };
 
   void resetFileEvents() override {
     if (file_event_) {

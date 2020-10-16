@@ -481,6 +481,15 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
 }
 
+IoHandlePtr IoSocketHandleImpl::duplicate() {
+  auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
+  if (result.rc_ == -1) {
+    throw EnvoyException(fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
+                                     errorDetails(result.errno_)));
+  }
+  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
+}
+
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
@@ -526,13 +535,6 @@ void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Even
   ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                  "file descriptor. This is not allowed.");
   file_event_ = dispatcher.createFileEvent(fd_, cb, trigger, events);
-}
-
-Event::FileEventPtr IoSocketHandleImpl::createManagedFileEvent(Event::Dispatcher& dispatcher,
-                                                               Event::FileReadyCb cb,
-                                                               Event::FileTriggerType trigger,
-                                                               uint32_t events) {
-  return dispatcher.createFileEvent(fd_, cb, trigger, events);
 }
 
 void IoSocketHandleImpl::activateFileEvents(uint32_t events) { file_event_->activate(events); }

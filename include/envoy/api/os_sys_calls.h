@@ -170,6 +170,11 @@ public:
    * @see man 2 accept. The fds returned are configured to be non-blocking.
    */
   virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see man 2 dup(2).
+   */
+  virtual SysCallSocketResult duplicate(os_fd_t oldfd) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

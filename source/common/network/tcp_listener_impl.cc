@@ -101,7 +101,7 @@ void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socke
   // loss of the trigger due to transient accept errors. Listeners are special and there is a case
   // where multiple registrations can happen on the same fd. For that reason we need to create a
   // a managed file event.
-  file_event_ = socket.ioHandle().createManagedFileEvent(
+  socket.ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
 
@@ -122,9 +122,9 @@ TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::Rand
   }
 }
 
-void TcpListenerImpl::enable() { file_event_->setEnabled(Event::FileReadyType::Read); }
+void TcpListenerImpl::enable() { socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read); }
 
-void TcpListenerImpl::disable() { file_event_->setEnabled(0); }
+void TcpListenerImpl::disable() { socket_->ioHandle().enableFileEvents(0); }
 
 void TcpListenerImpl::setRejectFraction(const float reject_fraction) {
   ASSERT(0 <= reject_fraction && reject_fraction <= 1);

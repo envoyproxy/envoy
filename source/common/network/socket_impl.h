@@ -17,6 +17,11 @@ public:
     local_address_ = local_address;
   }
 
+  SocketPtr duplicate() override {
+    auto socket = new SocketImpl(io_handle_->duplicate(), local_address_);
+    return SocketPtr{socket};
+  }
+
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {

@@ -260,6 +260,12 @@ public:
   virtual Address::InstanceConstSharedPtr peerAddress() PURE;
 
   /**
+   * Duplicates the handle. (see man dup)
+   * @return a pointer to the new handle.
+   */
+  virtual std::unique_ptr<IoHandle> duplicate() PURE;
+
+  /**
    * Initializes the internal file event that will signal when the io handle is readable, writable
    * or closed. Each handle is allowed to have only a single file event. The internal file event is
    * managed by the handle and it is turned on and off when the socket would block. Calls to this
@@ -274,19 +280,6 @@ public:
                                    Event::FileTriggerType trigger, uint32_t events) PURE;
 
   /**
-   * Creates a file event that will signal when the io handle is readable, writable or closed.
-   * @param dispatcher dispatcher to be used to allocate the file event.
-   * @param cb supplies the callback to fire when the handle is ready.
-   * @param trigger specifies whether to edge or level trigger.
-   * @param events supplies a logical OR of @ref Event::FileReadyType events that the file event
-   *               should initially listen on.
-   * @return @ref Event::FileEventPtr
-   */
-  virtual Event::FileEventPtr createManagedFileEvent(Event::Dispatcher& dispatcher,
-                                                     Event::FileReadyCb cb,
-                                                     Event::FileTriggerType trigger,
-                                                     uint32_t events) PURE;
-  /**
    * Activates file events for the current underlying fd.
    * @param events events that will be activated.
    */
@@ -297,11 +290,6 @@ public:
    * @param events events that will be enabled.
    */
   virtual void enableFileEvents(uint32_t events) PURE;
-
-  /**
-   * Gets the file events that are enabled for the underlying fd.
-   */
-  virtual uint32_t getEnabledFileEvents() PURE;
 
   /**
    * Resets the file event.

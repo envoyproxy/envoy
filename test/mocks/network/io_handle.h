@@ -19,12 +19,6 @@ public:
     createFileEvent_(dispatcher, cb, trigger, events);
   }
 
-  Event::FileEventPtr createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                             Event::FileTriggerType trigger,
-                                             uint32_t events) override {
-    return Event::FileEventPtr{createManagedFileEvent_(dispatcher, cb, trigger, events)};
-  }
-
   MOCK_METHOD(os_fd_t, fdDoNotUse, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
@@ -60,12 +54,8 @@ public:
   MOCK_METHOD(void, createFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
-  MOCK_METHOD(Event::FileEvent*, createManagedFileEvent_,
-              (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
-               Event::FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(void, activateFileEvents, (uint32_t events));
   MOCK_METHOD(void, enableFileEvents, (uint32_t events));
-  MOCK_METHOD(uint32_t, getEnabledFileEvents, ());
   MOCK_METHOD(void, resetFileEvents, ());
   MOCK_METHOD(Api::SysCallIntResult, shutdown, (int how));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());

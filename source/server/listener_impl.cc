@@ -126,7 +126,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
   if (!reuse_port_) {
-    return socket_;
+    return socket_->duplicate();
   }
 
   Network::SocketSharedPtr socket;

@@ -121,14 +121,10 @@ public:
     io_handle_.initializeFileEvent(dispatcher, cb, trigger, events);
   }
 
-  Event::FileEventPtr createManagedFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                             Event::FileTriggerType trigger,
-                                             uint32_t events) override {
-    return io_handle_.createManagedFileEvent(dispatcher, cb, trigger, events);
-  }
+  IoHandlePtr duplicate() override { return io_handle_.duplicate(); }
+
   void activateFileEvents(uint32_t events) override { io_handle_.activateFileEvents(events); }
   void enableFileEvents(uint32_t events) override { io_handle_.enableFileEvents(events); }
-  uint32_t getEnabledFileEvents() override { return io_handle_.getEnabledFileEvents(); };
   void resetFileEvents() override { return io_handle_.resetFileEvents(); };
 
   Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
