@@ -276,8 +276,8 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentProtocol) {
 TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
   const std::string SCRIPT{R"EOF(
       function callMe(object)
-        testPrint(string.format("%s", object:downstreamLocalAddress()))
-        testPrint(string.format("%s", object:downstreamDirectRemoteAddress()))
+        testPrint(object:downstreamLocalAddress())
+        testPrint(object:downstreamDirectRemoteAddress())
       end
     )EOF"};
 
@@ -289,9 +289,9 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
       new Network::Address::Ipv4Instance("127.0.0.1", 8000)};
   auto downstream_direct_remote =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
-  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
-  EXPECT_CALL(stream_info, downstreamDirectRemoteAddress())
-      .WillRepeatedly(ReturnRef(downstream_direct_remote));
+  ON_CALL(stream_info, downstreamLocalAddress()).WillByDefault(ReturnRef(address));
+  ON_CALL(stream_info, downstreamDirectRemoteAddress())
+      .WillByDefault(ReturnRef(downstream_direct_remote));
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint(address->asString()));
