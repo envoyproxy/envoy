@@ -43,12 +43,12 @@ std::string base64Decode(absl::string_view input) {
 
 SpanContextPtr SpanContext::spanContextFromRequest(Http::RequestHeaderMap& headers) {
   auto propagation_header = headers.get(propagationHeader());
-  if (propagation_header == nullptr) {
+  if (propagation_header.empty()) {
     // No propagation header then Envoy is first hop.
     return nullptr;
   }
 
-  auto header_value_string = propagation_header->value().getStringView();
+  auto header_value_string = propagation_header[0]->value().getStringView();
   const auto parts = StringUtil::splitToken(header_value_string, "-", false, true);
   // Reference:
   // https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md.
