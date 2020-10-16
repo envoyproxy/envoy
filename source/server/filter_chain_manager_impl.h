@@ -186,17 +186,36 @@ public:
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
-  void addFilterChain(
+  void addFilterChains(
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
-      FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
+      const envoy::config::listener::v3::FilterChain* default_filter_chain,
+      FilterChainFactoryBuilder& filter_chain_factory_builder,
+      FilterChainFactoryContextCreator& context_creator);
+
   static bool isWildcardServerName(const std::string& name);
 
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
   // listener to calculate the intersection of filter chains with another listener.
   const FcContextMap& filterChainsByMessage() const { return fc_contexts_; }
+  const absl::optional<envoy::config::listener::v3::FilterChain>&
+  defaultFilterChainMessage() const {
+    return default_filter_chain_message_;
+  }
+  const Network::DrainableFilterChainSharedPtr& defaultFilterChain() const {
+    return default_filter_chain_;
+  }
 
 private:
   void convertIPsToTries();
+
+  // Build default filter chain from filter chain message. Skip the build but copy from original
+  // filter chain manager if the default filter chain message duplicates the message in origin
+  // filter chain manager. Called by addFilterChains().
+  void copyOrRebuildDefaultFilterChain(
+      const envoy::config::listener::v3::FilterChain* default_filter_chain,
+      FilterChainFactoryBuilder& filter_chain_factory_builder,
+      FilterChainFactoryContextCreator& context_creator);
+
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
   using SourcePortsMapSharedPtr = std::shared_ptr<SourcePortsMap>;
   using SourceIPsMap = absl::flat_hash_map<std::string, SourcePortsMapSharedPtr>;
@@ -293,9 +312,15 @@ private:
   // detect the filter chains in the intersection of existing listener and new listener.
   FcContextMap fc_contexts_;
 
+  absl::optional<envoy::config::listener::v3::FilterChain> default_filter_chain_message_;
+  // The optional fallback filter chain if destination_ports_map_ does not find a matched filter
+  // chain.
+  Network::DrainableFilterChainSharedPtr default_filter_chain_;
+
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
+
   const Network::Address::InstanceConstSharedPtr address_;
   // This is the reference to a factory context which all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
