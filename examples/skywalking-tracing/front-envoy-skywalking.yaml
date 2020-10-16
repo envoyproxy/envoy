@@ -40,7 +40,9 @@ static_resources:
                   operation: checkAvailability
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+              start_child_span: true
   clusters:
   - name: service1
     connect_timeout: 0.250s
