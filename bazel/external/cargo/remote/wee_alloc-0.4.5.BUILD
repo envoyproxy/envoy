@@ -40,7 +40,7 @@ rust_library(
     version = "0.4.5",
     deps = [
         "@raze__cfg_if__0_1_10//:cfg_if",
-        "@raze__libc__0_2_74//:libc",
+        "@raze__libc__0_2_79//:libc",
         "@raze__memory_units__0_4_0//:memory_units",
     ],
 )

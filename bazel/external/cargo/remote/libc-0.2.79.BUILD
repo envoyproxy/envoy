@@ -18,11 +18,14 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # Apache-2.0 from expression "Apache-2.0 OR MIT"
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
 ])
 
+# Unsupported target "build-script-build" with type "custom-build" omitted
+# Unsupported target "const_fn" with type "test" omitted
+
 rust_library(
-    name = "autocfg",
+    name = "libc",
     srcs = glob(["**/*.rs"]),
     crate_features = [
     ],
@@ -33,13 +36,7 @@ rust_library(
         "--cap-lints=allow",
     ],
     tags = ["cargo-raze"],
-    version = "1.0.0",
+    version = "0.2.79",
     deps = [
     ],
 )
-
-# Unsupported target "integers" with type "example" omitted
-# Unsupported target "paths" with type "example" omitted
-# Unsupported target "rustflags" with type "test" omitted
-# Unsupported target "traits" with type "example" omitted
-# Unsupported target "versions" with type "example" omitted
