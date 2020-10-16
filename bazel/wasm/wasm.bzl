@@ -115,7 +115,7 @@ def envoy_wasm_cc_binary(name, tags = [], **kwargs):
     wasm_cc_binary(name, tags, repository = "@envoy", **kwargs)
 
 def wasm_rust_binary(name, tags = [], **kwargs):
-    wasm_name = "_wasm_" + (name if not ".wasm" in name else name.strip(".wasm"))
+    wasm_name = "_wasm_" + name.replace(".", "_")
     kwargs.setdefault("visibility", ["//visibility:public"])
 
     rust_binary(
