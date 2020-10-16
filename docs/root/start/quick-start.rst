@@ -26,6 +26,28 @@ Once you have :ref:`installed Envoy <install>`, you can check the version you ha
 
 	 $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
+
+View the Envoy command line options
+-----------------------------------
+
+You can view the Envoy :ref:`command line options <operations_cli>` with the ``--help``
+flag:
+
+.. tabs::
+
+   .. tab:: System
+
+      .. code-block:: console
+
+	 $ envoy --help
+
+   .. tab:: Docker
+
+      .. substitution-code-block:: console
+
+	 $ docker run --rm envoyproxy/|envoy_docker_image| --help
+
+
 Run Envoy with the demo configuration
 -------------------------------------
 
@@ -177,7 +199,7 @@ which in the demo configuration is ``0.0.0.0:9901``.
 
 .. warning::
 
-   You may wish to restrict the networ address the admin server listens to in your own deployment.
+   You may wish to restrict the network address the admin server listens to in your own deployment.
 
 
 Dynamic configuration

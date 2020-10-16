@@ -7,27 +7,6 @@ The following examples use the :ref:`official Envoy Docker image <start_install_
 
 These instructions are known to work for the ``x86_64`` architecture.
 
-Running Envoy Docker with the default configuration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The Envoy image contains a demo configuration which has an admin interface listening on port ``9901``,
-and proxies port ``10000`` to https://www.google.com.
-
-You can test it as follows:
-
-.. substitution-code-block:: console
-
-   $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoyproxy/|envoy_docker_image|
-
-If you now browse to http://localhost:10000 you should see the google website.
-
-:ref:`Command line options <operations_cli>` passed to the container are passed through to Envoy, for
-example, to get the Envoy version:
-
-.. substitution-code-block:: console
-
-   $ docker run --rm envoyproxy/|envoy_docker_image| --version
-
 Running Envoy with docker-compose
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
