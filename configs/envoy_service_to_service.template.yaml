@@ -1,5 +1,5 @@
-{% import 'routing_helper_v3.template.yaml' as helper -%}
-{% import 'access_log_format_helper_v3.template.yaml' as access_log_helper -%}
+{% import 'routing_helper.template.yaml' as helper -%}
+{% import 'access_log_format_helper.template.yaml' as access_log_helper -%}
 {% macro ingress_listener(protocol, address, port_value) -%}
 - address:
     socket_address:

@@ -1,4 +1,4 @@
-{% import 'routing_helper_v3.template.yaml' as helper -%}
+{% import 'routing_helper.template.yaml' as helper -%}
 {% macro router_file_content() -%}{% include kwargs['router_file'] -%}{% endmacro -%}
 {% macro listener(protocol, address, port_value, proxy_proto, tls, tracing) -%}
   name: not_required_for_static_listeners
@@ -43,7 +43,7 @@
         {%endif-%}
         stat_prefix: ingress_http
         route_config:
-          {{ router_file_content(router_file='envoy_router_v3.template.yaml')|indent(10) }}
+          {{ router_file_content(router_file='envoy_router.template.yaml')|indent(10) }}
         http_filters:
         - name: envoy.filters.http.health_check
           typed_config:
