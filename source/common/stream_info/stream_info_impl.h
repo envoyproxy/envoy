@@ -14,8 +14,22 @@
 #include "common/http/request_id_extension_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace StreamInfo {
+
+namespace {
+
+using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
+
+const ReplacementMap& emptySpaceReplacement() {
+  CONSTRUCT_ON_FIRST_USE(
+      ReplacementMap,
+      ReplacementMap{{" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}});
+}
+
+} // namespace
 
 struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source,
@@ -118,7 +132,7 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
-    response_code_details_.emplace(rc_details);
+    response_code_details_.emplace(absl::StrReplaceAll(rc_details, emptySpaceReplacement()));
   }
 
   const absl::optional<std::string>& connectionTerminationDetails() const override {

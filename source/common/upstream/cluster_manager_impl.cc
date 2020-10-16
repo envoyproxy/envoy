@@ -420,7 +420,10 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // been setup for cross-thread updates to avoid needless updates during initialization. The order
   // of operations here is important. We start by initializing the thread aware load balancer if
   // needed. This must happen first so cluster updates are heard first by the load balancer.
+  // Also, it assures that all of clusters which this function is called should be always active.
   auto cluster_data = warming_clusters_.find(cluster.info()->name());
+  // We have a situation that clusters will be immediately active, such as static and primary
+  // cluster. So we must have this prevention logic here.
   if (cluster_data != warming_clusters_.end()) {
     if (cluster.info()->transportSocket().has_typed_config()) {
       auto upstream_tls_context = MessageUtil::anyConvert<
@@ -438,7 +441,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
         auto& config_name = sds_secret_config.name();
         auto& config_source = sds_secret_config.sds_config();
         if (!secret_manager_.checkTlsCertificateEntityExists(config_source, config_name)) {
-          ENVOY_LOG(info, "Failed to activate {} on {}", config_name, cluster.info()->name());
+          ENVOY_LOG(warn, "Failed to activate {} on {}", config_name, cluster.info()->name());
           return;
         }
       }
@@ -450,7 +453,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
         auto& config_source = validation_context_sds_secret_config.sds_config();
         if (!secret_manager_.checkCertificateValidationContextEntityExists(config_source,
                                                                            config_name)) {
-          ENVOY_LOG(info, "Failed to activate {} on {}", config_name, cluster.info()->name());
+          ENVOY_LOG(warn, "Failed to activate {} on {}", config_name, cluster.info()->name());
           return;
         }
       }
@@ -630,17 +633,6 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
       // The following init manager remove call is a NOP in the case we are already initialized.
       // It's just kept here to avoid additional logic.
       init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
-    } else {
-      // Validate that warming clusters are not added to the init_helper_.
-      // NOTE: This loop is compiled out in optimized builds.
-      for (const std::list<Cluster*>& cluster_list :
-           {std::cref(init_helper_.primary_init_clusters_),
-            std::cref(init_helper_.secondary_init_clusters_)}) {
-        ASSERT(!std::any_of(cluster_list.begin(), cluster_list.end(),
-                            [&existing_warming_cluster](Cluster* cluster) {
-                              return existing_warming_cluster->second->cluster_.get() == cluster;
-                            }));
-      }
     }
     cm_stats_.cluster_modified_.inc();
   } else {

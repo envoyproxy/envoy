@@ -397,7 +397,7 @@ TEST_P(HeaderMapImplTest, CustomRegisteredHeaders) {
   header_map->remove##name();                                                                      \
   EXPECT_EQ(nullptr, header_map->name());                                                          \
   header_map->set##name(#name);                                                                    \
-  EXPECT_EQ(header_map->get(Headers::get().name)->value().getStringView(), #name);
+  EXPECT_EQ(header_map->get(Headers::get().name)[0]->value().getStringView(), #name);
 
 // Make sure that the O(1) headers are wired up properly.
 TEST_P(HeaderMapImplTest, AllInlineHeaders) {
@@ -430,7 +430,7 @@ TEST_P(HeaderMapImplTest, InlineInsert) {
   EXPECT_EQ(1, headers.size());
   EXPECT_EQ(":authority", headers.Host()->key().getStringView());
   EXPECT_EQ("hello", headers.getHostValue());
-  EXPECT_EQ("hello", headers.get(Headers::get().Host)->value().getStringView());
+  EXPECT_EQ("hello", headers.get(Headers::get().Host)[0]->value().getStringView());
 }
 
 TEST_P(HeaderMapImplTest, InlineAppend) {
@@ -505,12 +505,12 @@ TEST_P(HeaderMapImplTest, Remove) {
   LowerCaseString static_key("hello");
   std::string ref_value("value");
   headers.addReference(static_key, ref_value);
-  EXPECT_EQ("value", headers.get(static_key)->value().getStringView());
-  EXPECT_TRUE(headers.get(static_key)->value().isReference());
+  EXPECT_EQ("value", headers.get(static_key)[0]->value().getStringView());
+  EXPECT_TRUE(headers.get(static_key)[0]->value().isReference());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
   EXPECT_EQ(1UL, headers.remove(static_key));
-  EXPECT_EQ(nullptr, headers.get(static_key));
+  EXPECT_TRUE(headers.get(static_key).empty());
   EXPECT_EQ(0UL, headers.size());
   EXPECT_TRUE(headers.empty());
 
@@ -615,19 +615,19 @@ TEST_P(HeaderMapImplTest, RemovePrefix) {
 
   // Test removing the first header, middle headers, and the end header.
   EXPECT_EQ(3UL, headers.removePrefix(LowerCaseString("x-prefix-")));
-  EXPECT_EQ(nullptr, headers.get(key1));
-  EXPECT_NE(nullptr, headers.get(key2));
-  EXPECT_EQ(nullptr, headers.get(key3));
-  EXPECT_NE(nullptr, headers.get(key4));
-  EXPECT_EQ(nullptr, headers.get(key5));
+  EXPECT_TRUE(headers.get(key1).empty());
+  EXPECT_FALSE(headers.get(key2).empty());
+  EXPECT_TRUE(headers.get(key3).empty());
+  EXPECT_FALSE(headers.get(key4).empty());
+  EXPECT_TRUE(headers.get(key5).empty());
 
   // Try to remove headers with no prefix match.
   EXPECT_EQ(0UL, headers.removePrefix(LowerCaseString("foo")));
 
   // Remove all headers.
   EXPECT_EQ(2UL, headers.removePrefix(LowerCaseString("")));
-  EXPECT_EQ(nullptr, headers.get(key2));
-  EXPECT_EQ(nullptr, headers.get(key4));
+  EXPECT_TRUE(headers.get(key2).empty());
+  EXPECT_TRUE(headers.get(key4).empty());
 
   // Add inline and remove by prefix
   headers.setContentLength(5);
@@ -735,11 +735,10 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
   headers.addReference(set_cookie, bar);
   EXPECT_EQ(2UL, headers.size());
 
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(headers, "set-cookie", out);
-  ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "foo");
-  ASSERT_EQ(out[1], "bar");
+  const auto set_cookie_value = headers.get(LowerCaseString("set-cookie"));
+  ASSERT_EQ(set_cookie_value.size(), 2);
+  ASSERT_EQ(set_cookie_value[0]->value().getStringView(), "foo");
+  ASSERT_EQ(set_cookie_value[1]->value().getStringView(), "bar");
 }
 
 TEST_P(HeaderMapImplTest, DoubleInlineSet) {
@@ -754,20 +753,20 @@ TEST_P(HeaderMapImplTest, AddReferenceKey) {
   TestRequestHeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.addReferenceKey(foo, "world");
-  EXPECT_NE("world", headers.get(foo)->value().getStringView().data());
-  EXPECT_EQ("world", headers.get(foo)->value().getStringView());
+  EXPECT_NE("world", headers.get(foo)[0]->value().getStringView().data());
+  EXPECT_EQ("world", headers.get(foo)[0]->value().getStringView());
 }
 
 TEST_P(HeaderMapImplTest, SetReferenceKey) {
   TestRequestHeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.setReferenceKey(foo, "world");
-  EXPECT_NE("world", headers.get(foo)->value().getStringView().data());
-  EXPECT_EQ("world", headers.get(foo)->value().getStringView());
+  EXPECT_NE("world", headers.get(foo)[0]->value().getStringView().data());
+  EXPECT_EQ("world", headers.get(foo)[0]->value().getStringView());
 
   headers.setReferenceKey(foo, "monde");
-  EXPECT_NE("monde", headers.get(foo)->value().getStringView().data());
-  EXPECT_EQ("monde", headers.get(foo)->value().getStringView());
+  EXPECT_NE("monde", headers.get(foo)[0]->value().getStringView().data());
+  EXPECT_EQ("monde", headers.get(foo)[0]->value().getStringView());
 }
 
 TEST_P(HeaderMapImplTest, SetCopyOldBehavior) {
@@ -777,11 +776,11 @@ TEST_P(HeaderMapImplTest, SetCopyOldBehavior) {
   TestRequestHeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.setCopy(foo, "world");
-  EXPECT_EQ("world", headers.get(foo)->value().getStringView());
+  EXPECT_EQ("world", headers.get(foo)[0]->value().getStringView());
 
   // Overwrite value.
   headers.setCopy(foo, "monde");
-  EXPECT_EQ("monde", headers.get(foo)->value().getStringView());
+  EXPECT_EQ("monde", headers.get(foo)[0]->value().getStringView());
 
   // Add another foo header.
   headers.addCopy(foo, "monde2");
@@ -805,7 +804,7 @@ TEST_P(HeaderMapImplTest, SetCopyOldBehavior) {
   headers.setCopy(foo, empty);
   EXPECT_EQ(headers.size(), 1);
   headers.setCopy(foo, "not-empty");
-  EXPECT_EQ(headers.get(foo)->value().getStringView(), "not-empty");
+  EXPECT_EQ(headers.get(foo)[0]->value().getStringView(), "not-empty");
 
   // Use setCopy with inline headers both indirectly and directly.
   headers.clear();
@@ -822,11 +821,11 @@ TEST_P(HeaderMapImplTest, SetCopyNewBehavior) {
   TestRequestHeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.setCopy(foo, "world");
-  EXPECT_EQ("world", headers.get(foo)->value().getStringView());
+  EXPECT_EQ("world", headers.get(foo)[0]->value().getStringView());
 
   // Overwrite value.
   headers.setCopy(foo, "monde");
-  EXPECT_EQ("monde", headers.get(foo)->value().getStringView());
+  EXPECT_EQ("monde", headers.get(foo)[0]->value().getStringView());
 
   // Add another foo header.
   headers.addCopy(foo, "monde2");
@@ -849,7 +848,7 @@ TEST_P(HeaderMapImplTest, SetCopyNewBehavior) {
   headers.setCopy(foo, empty);
   EXPECT_EQ(headers.size(), 1);
   headers.setCopy(foo, "not-empty");
-  EXPECT_EQ(headers.get(foo)->value().getStringView(), "not-empty");
+  EXPECT_EQ(headers.get(foo)[0]->value().getStringView(), "not-empty");
 
   // Use setCopy with inline headers both indirectly and directly.
   headers.clear();
@@ -869,14 +868,14 @@ TEST_P(HeaderMapImplTest, AddCopy) {
   std::unique_ptr<LowerCaseString> lcKeyPtr(new LowerCaseString("hello"));
   headers.addCopy(*lcKeyPtr, "world");
 
-  const HeaderString& value = headers.get(*lcKeyPtr)->value();
+  const HeaderString& value = headers.get(*lcKeyPtr)[0]->value();
 
   EXPECT_EQ("world", value.getStringView());
   EXPECT_EQ(5UL, value.size());
 
   lcKeyPtr.reset();
 
-  const HeaderString& value2 = headers.get(LowerCaseString("hello"))->value();
+  const HeaderString& value2 = headers.get(LowerCaseString("hello"))[0]->value();
 
   EXPECT_EQ("world", value2.getStringView());
   EXPECT_EQ(5UL, value2.size());
@@ -898,14 +897,14 @@ TEST_P(HeaderMapImplTest, AddCopy) {
 
   headers.addCopy(*lcKeyPtr, 42);
 
-  const HeaderString& value3 = headers.get(*lcKeyPtr)->value();
+  const HeaderString& value3 = headers.get(*lcKeyPtr)[0]->value();
 
   EXPECT_EQ("42", value3.getStringView());
   EXPECT_EQ(2UL, value3.size());
 
   lcKeyPtr.reset();
 
-  const HeaderString& value4 = headers.get(LowerCaseString("hello"))->value();
+  const HeaderString& value4 = headers.get(LowerCaseString("hello"))[0]->value();
 
   EXPECT_EQ("42", value4.getStringView());
   EXPECT_EQ(2UL, value4.size());
@@ -915,22 +914,22 @@ TEST_P(HeaderMapImplTest, AddCopy) {
   LowerCaseString lcKey3(std::string("he") + "ll" + "o");
   EXPECT_STREQ("hello", lcKey3.get().c_str());
 
-  EXPECT_EQ("42", headers.get(lcKey3)->value().getStringView());
-  EXPECT_EQ(2UL, headers.get(lcKey3)->value().size());
+  EXPECT_EQ("42", headers.get(lcKey3)[0]->value().getStringView());
+  EXPECT_EQ(2UL, headers.get(lcKey3)[0]->value().size());
 
   LowerCaseString envoy_retry_on("x-envoy-retry-on");
   headers.addCopy(envoy_retry_on, "max-age=1345");
-  EXPECT_EQ("max-age=1345", headers.get(envoy_retry_on)->value().getStringView());
+  EXPECT_EQ("max-age=1345", headers.get(envoy_retry_on)[0]->value().getStringView());
   EXPECT_EQ("max-age=1345", headers.getEnvoyRetryOnValue());
   headers.addCopy(envoy_retry_on, "public");
-  EXPECT_EQ("max-age=1345,public", headers.get(envoy_retry_on)->value().getStringView());
+  EXPECT_EQ("max-age=1345,public", headers.get(envoy_retry_on)[0]->value().getStringView());
   headers.addCopy(envoy_retry_on, "");
-  EXPECT_EQ("max-age=1345,public", headers.get(envoy_retry_on)->value().getStringView());
+  EXPECT_EQ("max-age=1345,public", headers.get(envoy_retry_on)[0]->value().getStringView());
   headers.addCopy(envoy_retry_on, 123);
-  EXPECT_EQ("max-age=1345,public,123", headers.get(envoy_retry_on)->value().getStringView());
+  EXPECT_EQ("max-age=1345,public,123", headers.get(envoy_retry_on)[0]->value().getStringView());
   headers.addCopy(envoy_retry_on, std::numeric_limits<uint64_t>::max());
   EXPECT_EQ("max-age=1345,public,123,18446744073709551615",
-            headers.get(envoy_retry_on)->value().getStringView());
+            headers.get(envoy_retry_on)[0]->value().getStringView());
 }
 
 TEST_P(HeaderMapImplTest, Equality) {
@@ -950,7 +949,7 @@ TEST_P(HeaderMapImplTest, LargeCharInHeader) {
   LowerCaseString static_key("\x90hello");
   std::string ref_value("value");
   headers.addReference(static_key, ref_value);
-  EXPECT_EQ("value", headers.get(static_key)->value().getStringView());
+  EXPECT_EQ("value", headers.get(static_key)[0]->value().getStringView());
 }
 
 TEST_P(HeaderMapImplTest, Iterate) {
@@ -996,9 +995,9 @@ TEST_P(HeaderMapImplTest, IterateReverse) {
 TEST_P(HeaderMapImplTest, Get) {
   {
     auto headers = TestRequestHeaderMapImpl({{Headers::get().Path.get(), "/"}, {"hello", "world"}});
-    EXPECT_EQ("/", headers.get(LowerCaseString(":path"))->value().getStringView());
-    EXPECT_EQ("world", headers.get(LowerCaseString("hello"))->value().getStringView());
-    EXPECT_EQ(nullptr, headers.get(LowerCaseString("foo")));
+    EXPECT_EQ("/", headers.get(LowerCaseString(":path"))[0]->value().getStringView());
+    EXPECT_EQ("world", headers.get(LowerCaseString("hello"))[0]->value().getStringView());
+    EXPECT_TRUE(headers.get(LowerCaseString("foo")).empty());
   }
 
   {
@@ -1006,11 +1005,11 @@ TEST_P(HeaderMapImplTest, Get) {
     // There is not HeaderMap method to set a header and copy both the key and value.
     const LowerCaseString path(":path");
     headers.setReferenceKey(path, "/new_path");
-    EXPECT_EQ("/new_path", headers.get(LowerCaseString(":path"))->value().getStringView());
+    EXPECT_EQ("/new_path", headers.get(LowerCaseString(":path"))[0]->value().getStringView());
     const LowerCaseString foo("hello");
     headers.setReferenceKey(foo, "world2");
-    EXPECT_EQ("world2", headers.get(foo)->value().getStringView());
-    EXPECT_EQ(nullptr, headers.get(LowerCaseString("foo")));
+    EXPECT_EQ("world2", headers.get(foo)[0]->value().getStringView());
+    EXPECT_TRUE(headers.get(LowerCaseString("foo")).empty());
   }
 }
 
@@ -1018,9 +1017,9 @@ TEST_P(HeaderMapImplTest, CreateHeaderMapFromIterator) {
   std::vector<std::pair<LowerCaseString, std::string>> iter_headers{
       {LowerCaseString(Headers::get().Path), "/"}, {LowerCaseString("hello"), "world"}};
   auto headers = createHeaderMap<RequestHeaderMapImpl>(iter_headers.cbegin(), iter_headers.cend());
-  EXPECT_EQ("/", headers->get(LowerCaseString(":path"))->value().getStringView());
-  EXPECT_EQ("world", headers->get(LowerCaseString("hello"))->value().getStringView());
-  EXPECT_EQ(nullptr, headers->get(LowerCaseString("foo")));
+  EXPECT_EQ("/", headers->get(LowerCaseString(":path"))[0]->value().getStringView());
+  EXPECT_EQ("world", headers->get(LowerCaseString("hello"))[0]->value().getStringView());
+  EXPECT_TRUE(headers->get(LowerCaseString("foo")).empty());
 }
 
 TEST_P(HeaderMapImplTest, TestHeaderList) {
@@ -1048,7 +1047,7 @@ TEST_P(HeaderMapImplTest, TestAppendHeader) {
     LowerCaseString foo("key1");
     headers.addCopy(foo, "some;");
     headers.appendCopy(foo, "test");
-    EXPECT_EQ(headers.get(foo)->value().getStringView(), "some;,test");
+    EXPECT_EQ(headers.get(foo)[0]->value().getStringView(), "some;,test");
   }
 
   // Test appending to an empty string.
@@ -1056,7 +1055,7 @@ TEST_P(HeaderMapImplTest, TestAppendHeader) {
     TestRequestHeaderMapImpl headers;
     LowerCaseString key2("key2");
     headers.appendCopy(key2, "my tag data");
-    EXPECT_EQ(headers.get(key2)->value().getStringView(), "my tag data");
+    EXPECT_EQ(headers.get(key2)[0]->value().getStringView(), "my tag data");
   }
 
   // Test empty data case.
@@ -1065,7 +1064,7 @@ TEST_P(HeaderMapImplTest, TestAppendHeader) {
     LowerCaseString key3("key3");
     headers.addCopy(key3, "empty");
     headers.appendCopy(key3, "");
-    EXPECT_EQ(headers.get(key3)->value().getStringView(), "empty");
+    EXPECT_EQ(headers.get(key3)[0]->value().getStringView(), "empty");
   }
   // Regression test for appending to an empty string with a short string, then
   // setting integer.
@@ -1257,13 +1256,13 @@ TEST_P(HeaderMapImplTest, TestRequestHeaderMapImplCopy) {
   TestRequestHeaderMapImpl foo;
   foo.addCopy(LowerCaseString("foo"), "bar");
   auto headers = std::make_unique<TestRequestHeaderMapImpl>(foo);
-  EXPECT_EQ("bar", headers->get(LowerCaseString("foo"))->value().getStringView());
+  EXPECT_EQ("bar", headers->get(LowerCaseString("foo"))[0]->value().getStringView());
   TestRequestHeaderMapImpl baz{{"foo", "baz"}};
   baz = *headers;
-  EXPECT_EQ("bar", baz.get(LowerCaseString("foo"))->value().getStringView());
+  EXPECT_EQ("bar", baz.get(LowerCaseString("foo"))[0]->value().getStringView());
   const TestRequestHeaderMapImpl& baz2 = baz;
   baz = baz2;
-  EXPECT_EQ("bar", baz.get(LowerCaseString("foo"))->value().getStringView());
+  EXPECT_EQ("bar", baz.get(LowerCaseString("foo"))[0]->value().getStringView());
 }
 
 // Make sure 'host' -> ':authority' auto translation only occurs for request headers.
@@ -1299,12 +1298,12 @@ TEST_P(HeaderMapImplTest, ClearHeaderMap) {
 
   // Add random header and then clear.
   headers.addReference(static_key, ref_value);
-  EXPECT_EQ("value", headers.get(static_key)->value().getStringView());
-  EXPECT_TRUE(headers.get(static_key)->value().isReference());
+  EXPECT_EQ("value", headers.get(static_key)[0]->value().getStringView());
+  EXPECT_TRUE(headers.get(static_key)[0]->value().isReference());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
   headers.clear();
-  EXPECT_EQ(nullptr, headers.get(static_key));
+  EXPECT_TRUE(headers.get(static_key).empty());
   EXPECT_EQ(0UL, headers.size());
   EXPECT_EQ(headers.byteSize(), 0);
   EXPECT_TRUE(headers.empty());
