@@ -15,7 +15,7 @@ def _python_deps():
         # project_url = "https://github.com/yaml/pyyaml",
         # version = "5.3.1",
         # last_update = "2020-03-18"
-        # use_category = ["other"],
+        # use_category = ["devtools"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )
     pip3_import(
@@ -63,7 +63,7 @@ def _python_deps():
         # project_url = "https://clang.llvm.org/",
         # version = "10.0.1",
         # last_update = "2020-07-21"
-        # use_category = ["other"],
+        # use_category = ["devtools"],
         # cpe = "cpe:2.3:a:llvm:clang:*",
     )
     pip3_import(
@@ -75,7 +75,7 @@ def _python_deps():
         # project_url = "https://github.com/yaml/pyyaml",
         # version = "5.3.1",
         # last_update = "2020-03-18"
-        # use_category = ["other"],
+        # use_category = ["docs"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )
     pip3_import(
@@ -87,14 +87,14 @@ def _python_deps():
         # project_url = "http://thrift.apache.org/",
         # version = "0.11.0",
         # last_update = "2017-12-07"
-        # use_category = ["dataplane"],
+        # use_category = ["test"],
         # cpe = "cpe:2.3:a:apache:thrift:*",
 
         # project_name = "Six: Python 2 and 3 Compatibility Library",
         # project_url = "https://six.readthedocs.io/",
         # version = "1.15.0",
         # last_update = "2020-05-21"
-        # use_category = ["dataplane"],
+        # use_category = ["test"],
     )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().

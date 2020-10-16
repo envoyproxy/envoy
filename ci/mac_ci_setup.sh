@@ -11,7 +11,7 @@ brew uninstall openssl@1.0.2t
 
 export HOMEBREW_NO_AUTO_UPDATE=1
 HOMEBREW_RETRY_ATTEMPTS=10
-HOMEBREW_RETRY_INTERVAL=1
+HOMEBREW_RETRY_INTERVAL=3
 
 
 function is_installed {
