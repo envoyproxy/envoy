@@ -632,6 +632,11 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       Buffer::RawSlice* slice = slices[i].data();
       const uint64_t msg_len = output.msg_[i].msg_len_;
       ASSERT(msg_len <= slice->len_);
+      if (msg_len == 0) {
+        // 0 length packets at this point are truncated and dropped.
+        continue;
+      }
+
       ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
                      output.msg_[i].peer_address_->asString());
 
@@ -651,7 +656,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   Api::IoCallUint64Result result =
       receiveMessage(udp_packet_processor.maxPacketSize(), buffer, output, handle, local_address);
 
-  if (!result.ok()) {
+  if (!result.ok() || result.rc_ == 0) {
+    // 0 length packets at this point are truncated and dropped.
     return result;
   }
 
@@ -678,12 +684,6 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
       return std::move(result.err_);
     }
 
-    if (result.rc_ == 0) {
-      // TODO(conqerAtapple): Is zero length packet interesting? If so add stats
-      // for it. Otherwise remove the warning log below.
-      ENVOY_LOG_MISC(trace, "received 0-length packet");
-    }
-
     if (packets_dropped != old_packets_dropped) {
       // The kernel tracks SO_RXQ_OVFL as a uint32 which can overflow to a smaller
       // value. So as long as this count differs from previously recorded value,
@@ -695,7 +695,7 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                  1);
       // TODO(danzh) add stats for this.
       ENVOY_LOG_MISC(
-          debug, "Kernel dropped {} more packets. Consider increase receive buffer size.", delta);
+          debug, "Kernel dropped {} more packet(s). Consider increase receive buffer size.", delta);
     }
   } while (true);
 }
