@@ -110,6 +110,9 @@ void TraceSegmentReporter::report(const SegmentContext& segment_context) {
 }
 
 void TraceSegmentReporter::sendTraceSegment(TraceSegmentPtr&& request) {
+  ASSERT(request);
+  ENVOY_LOG(trace, "Try to report segment to SkyWalking Server:\n{}", request->DebugString());
+
   if (stream_ != nullptr) {
     tracing_stats_.segments_sent_.inc();
     stream_->sendMessage(*request, false);

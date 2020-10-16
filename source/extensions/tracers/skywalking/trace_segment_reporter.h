@@ -21,7 +21,8 @@ namespace SkyWalking {
 
 using TraceSegmentPtr = std::unique_ptr<SegmentObject>;
 
-class TraceSegmentReporter : Grpc::AsyncStreamCallbacks<Commands> {
+class TraceSegmentReporter : public Logger::Loggable<Logger::Id::tracing>,
+                             public Grpc::AsyncStreamCallbacks<Commands> {
 public:
   explicit TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory,
                                 Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
