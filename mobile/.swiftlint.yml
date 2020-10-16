@@ -140,7 +140,7 @@ modifier_order:
     - dynamic
     - convenience
 deployment_target:
-  iOS_deployment_target: 10.0
+  iOS_deployment_target: 11.0
 
 custom_rules:
   newline_after_brace:
