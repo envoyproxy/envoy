@@ -2066,7 +2066,6 @@ TEST_P(Http2CodecImplTest, PingFlood) {
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
           ? "Too many control frames in the outbound queue."
           : "Too many frames in the outbound queue.");
-  EXPECT_EQ(ack_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_control_flood").value());
 }
 
@@ -2313,7 +2312,6 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
                             "Too many frames in the outbound queue.");
 
-  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
 
@@ -2592,7 +2590,10 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
 
   // Trigger sending a PING, which should overflow the outbound frame queue and cause
   // client to be disconnected
-  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+    // new codec does not schedule timeout callback if the PING had triggered flood protection
+    EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  }
   send_timer->callback_();
 
   EXPECT_TRUE(violation_callback->enabled_);
@@ -2756,14 +2757,9 @@ TestNghttp2SessionFactory<Nghttp2SessionFactoryType, TestClientConnectionImplTyp
       callbacks_,
       [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
         // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
-        auto status_or_len =
-            static_cast<MetadataTestClientConnectionImpl<TestClientConnectionImplType>*>(
-                static_cast<typename Nghttp2SessionFactoryType::ConnectionImplType*>(user_data))
-                ->onSend(data, length);
-        if (status_or_len.ok()) {
-          return status_or_len.value();
-        }
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
+        return static_cast<MetadataTestClientConnectionImpl<TestClientConnectionImplType>*>(
+                   static_cast<typename Nghttp2SessionFactoryType::ConnectionImplType*>(user_data))
+            ->onSend(data, length);
       });
   nghttp2_option_new(&options_);
   nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
