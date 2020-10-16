@@ -481,7 +481,7 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataMatch) {
+TEST_F(RateLimitPolicyEntryTest, DEPRECATED_FEATURE_TEST(DynamicMetaDataMatch)) {
   const std::string yaml = R"EOF(
 actions:
 - dynamic_metadata:
