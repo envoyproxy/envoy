@@ -108,7 +108,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
     // Health flags are not currently directly used by most load balancers, but
     // they may be added and also are used by other components.
     // There are two health flags that map to Host::Health::Degraded, DEGRADED_ACTIVE_HC and
-    // DEGRADED_EDS_HEALTH. Choose one hardcoded for simpliclity.
+    // DEGRADED_EDS_HEALTH. Choose one hardcoded for simplicity.
     host_set.hosts_[index]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   }
   ENVOY_LOG_MISC(trace, "Hosts made degraded at priority level {}: {}", priority_of_host_set,
@@ -120,7 +120,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
     // Health flags are not currently directly used by most load balancers, but
     // they may be added and also are used by other components.
     // There are three health flags that map to Host::Health::Degraded, FAILED_ACTIVE_HC,
-    // FAILED_OUTLIER_CHECK, and FAILED_EDS_HEALTH. Choose one hardcoded for simpliclity.
+    // FAILED_OUTLIER_CHECK, and FAILED_EDS_HEALTH. Choose one hardcoded for simplicity.
     host_set.hosts_[index]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
 
