@@ -204,7 +204,7 @@ public:
               // string value. Hence for "header2" key, the value is "header2,header2-appended".
               absl::StrCat(header_to_append.first, ",", header_to_append.second)));
       const auto value = upstream_request_->headers()
-                             .get(Http::LowerCaseString(header_to_append.first))
+                             .get(Http::LowerCaseString(header_to_append.first))[0]
                              ->value()
                              .getStringView();
       EXPECT_TRUE(absl::EndsWith(value, "-appended"));
@@ -230,8 +230,8 @@ public:
 
     for (const auto& header_to_remove : headers_to_remove) {
       // The headers that were originally present in the request have now been removed.
-      EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}),
-                nullptr);
+      EXPECT_TRUE(
+          upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}).empty());
     }
 
     response_->waitForEndStream();
@@ -548,13 +548,13 @@ public:
     // The "remove-me" header that was present in the downstream request has
     // been removed by envoy as a result of being present in
     // "x-envoy-auth-headers-to-remove".
-    EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{"remove-me"}), nullptr);
+    EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString{"remove-me"}).empty());
     // "x-envoy-auth-headers-to-remove" itself has also been removed because
     // it's only used for communication between the authorization server and
     // envoy itself.
-    EXPECT_EQ(
-        upstream_request_->headers().get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"}),
-        nullptr);
+    EXPECT_TRUE(upstream_request_->headers()
+                    .get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"})
+                    .empty());
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     response_->waitForEndStream();
@@ -688,8 +688,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
 // Verifies that by default HTTP service uses the case-sensitive string matcher.
 TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
   setup();
-  const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_EQ(header_entry, nullptr);
+  const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
+  ASSERT_TRUE(header_entry.empty());
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, CheckTimesOutLegacy) { expectCheckRequestTimedout(false); }

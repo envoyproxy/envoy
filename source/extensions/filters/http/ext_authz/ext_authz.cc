@@ -191,7 +191,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->addCopy(header.first, header.second);
     }
     for (const auto& header : response->headers_to_append) {
-      const Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
+      const auto header_to_modify = request_headers_->get(header.first);
       // TODO(dio): Add a flag to allow appending non-existent headers, without setting it first
       // (via `headers_to_add`). For example, given:
       // 1. Original headers {"original": "true"}
@@ -200,7 +200,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
       // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
       // to upstream server by only sets `headers_to_append`.
-      if (header_to_modify != nullptr) {
+      if (!header_to_modify.empty()) {
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
         // The current behavior of appending is by combining entries with the same key, into one
         // entry. The value of that combined entry is separated by ",".
@@ -323,6 +323,9 @@ bool Filter::isBufferFull() const {
 }
 
 void Filter::continueDecoding() {
+  // After sending the check request, we don't need to buffer the data anymore.
+  buffer_data_ = false;
+
   filter_return_ = FilterReturn::ContinueDecoding;
   if (!initiating_call_) {
     callbacks_->continueDecoding();

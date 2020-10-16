@@ -176,6 +176,7 @@ public:
 
     MOCK_METHOD(void, enable, (), (override));
     MOCK_METHOD(void, disable, (), (override));
+    MOCK_METHOD(void, setRejectFraction, (float));
     MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
     MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
@@ -448,6 +449,37 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
   EXPECT_CALL(*listener, onDestroy());
 
   handler_->disableListeners();
+  handler_->addListener(absl::nullopt, *test_listener);
+}
+
+TEST_F(ConnectionHandlerTest, SetListenerRejectFraction) {
+  InSequence s;
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, false, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  EXPECT_CALL(*listener, setRejectFraction(0.1234f));
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->setListenerRejectFraction(0.1234f);
+}
+
+TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
+  InSequence s;
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, false, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*listener, setRejectFraction(0.12345f));
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->setListenerRejectFraction(0.12345f);
   handler_->addListener(absl::nullopt, *test_listener);
 }
 
@@ -1078,6 +1110,36 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   EXPECT_CALL(*listener, onDestroy());
   handler_.reset();
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerGlobalCxLimitReject) {
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  listener_callbacks->onReject(Network::TcpListenerCallbacks::RejectCause::GlobalCxLimit);
+
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_global_cx_overflow")->value());
+  EXPECT_EQ(0UL, TestUtility::findCounter(stats_store_, "downstream_cx_overload_reject")->value());
+  EXPECT_CALL(*listener, onDestroy());
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerOverloadActionReject) {
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  listener_callbacks->onReject(Network::TcpListenerCallbacks::RejectCause::OverloadAction);
+
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_cx_overload_reject")->value());
+  EXPECT_EQ(0UL, TestUtility::findCounter(stats_store_, "downstream_global_cx_overflow")->value());
+  EXPECT_CALL(*listener, onDestroy());
 }
 
 // Listener Filter matchers works.
