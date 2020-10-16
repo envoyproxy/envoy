@@ -340,6 +340,12 @@ class FormatChecker:
                               "    go get -u github.com/bazelbuild/buildtools/{}".format(
                                   path, name, var, var, name, name, name))
 
+    if not BUILDIFIER_PATH or not BUILDOZER_PATH:
+      error_messages.append("`buildifier` or `buildozer` not found, " +
+          "Make sure you have installed them. See step 3 and 4 on: " +
+          "https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers for details.")
+      return error_messages
+
     checkBazelTool('buildifier', BUILDIFIER_PATH, 'BUILDIFIER_BIN')
     checkBazelTool('buildozer', BUILDOZER_PATH, 'BUILDOZER_BIN')
 
