@@ -8,7 +8,8 @@
 
 namespace Envoy {
 
-using testing::HasSubstr;
+using ::testing::HasSubstr;
+using ::testing::AllOf;
 
 namespace {
 constexpr char HandleThreeHopLocationFormat[] =
@@ -89,6 +90,8 @@ protected:
 
 // By default if internal redirects are not configured, redirects are proxied.
 TEST_P(RedirectIntegrationTest, RedirectNotConfigured) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS%");
+
   // Use base class initialize.
   HttpProtocolIntegrationTest::initialize();
 
@@ -97,10 +100,12 @@ TEST_P(RedirectIntegrationTest, RedirectNotConfigured) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), AllOf(HasSubstr("via_upstream"), HasSubstr("302")));
 }
 
 // Now test a route with redirects configured on in pass-through mode.
 TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS%");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -111,10 +116,11 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
       0,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), AllOf(HasSubstr("via_upstream"), HasSubstr("302")));
 }
 
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
-  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS%");
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -145,7 +151,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("internal_redirect"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), AllOf(HasSubstr("internal_redirect"), HasSubstr("302")));
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
 }
 
