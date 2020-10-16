@@ -7,16 +7,7 @@ import pathlib
 import sys
 import urllib.parse
 
-from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import SourceFileLoader
-
-# bazel/repository_locations.bzl must have a .bzl suffix for Starlark import, so
-# we are forced to do this workaround.
-_repository_locations_spec = spec_from_loader(
-    'repository_locations',
-    SourceFileLoader('repository_locations', 'bazel/repository_locations.bzl'))
-repository_locations = module_from_spec(_repository_locations_spec)
-_repository_locations_spec.loader.exec_module(repository_locations)
+from tools.dependency import utils as dep_utils
 
 
 # Render a CSV table given a list of table headers, widths and list of rows
@@ -101,7 +92,7 @@ if __name__ == '__main__':
   Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'last_updated'])
   use_categories = defaultdict(lambda: defaultdict(list))
   # Bin rendered dependencies into per-use category lists.
-  for k, v in repository_locations.DEPENDENCY_REPOSITORIES.items():
+  for k, v in dep_utils.RepositoryLocations().items():
     cpe = v.get('cpe', '')
     if cpe == 'N/A':
       cpe = ''

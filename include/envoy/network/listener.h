@@ -197,10 +197,14 @@ public:
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 
+  enum class RejectCause {
+    GlobalCxLimit,
+    OverloadAction,
+  };
   /**
    * Called when a new connection is rejected.
    */
-  virtual void onReject() PURE;
+  virtual void onReject(RejectCause cause) PURE;
 };
 
 /**
@@ -324,6 +328,12 @@ public:
    * Enable accepting new connections.
    */
   virtual void enable() PURE;
+
+  /**
+   * Set the fraction of incoming connections that will be closed immediately
+   * after being opened.
+   */
+  virtual void setRejectFraction(float reject_fraction) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;

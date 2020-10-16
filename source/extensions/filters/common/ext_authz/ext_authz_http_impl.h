@@ -119,16 +119,12 @@ public:
 
 private:
   static MatcherSharedPtr
-  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                    bool enable_case_sensitive_string_matcher);
+  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
   static MatcherSharedPtr
-  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                   bool enable_case_sensitive_string_matcher);
+  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
   static MatcherSharedPtr
-  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                     bool enable_case_sensitive_string_matcher);
+  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
 
-  const bool enable_case_sensitive_string_matcher_;
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;

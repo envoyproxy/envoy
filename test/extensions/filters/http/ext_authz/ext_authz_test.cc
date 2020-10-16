@@ -489,6 +489,62 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 }
 
+// Checks that the filter initiates an authorization request when the buffer reaches maximum
+// request bytes and allow_partial_message is set to true. In addition to that, after the filter
+// sends the check request, data decoding continues.
+TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 10
+    allow_partial_message: true
+  )EOF");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+
+  // The check call should only be called once.
+  EXPECT_CALL(*client_, check(_, _, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+
+  data_.add("more data after watermark is set is possible");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  data_.add("more data after calling check request");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, true));
+
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+}
+
 // Checks that the filter initiates the authorization process only when the filter decode trailers
 // is called.
 TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
@@ -759,7 +815,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   EXPECT_EQ("/users", request_headers_.get_(Http::Headers::get().Path));
   EXPECT_EQ("websocket", request_headers_.get_(Http::Headers::get().Protocol));
   EXPECT_EQ("https", request_headers_.get_(Http::Headers::get().Scheme));
-  EXPECT_EQ(nullptr, request_headers_.get(Http::LowerCaseString{"remove-me"}));
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString{"remove-me"}).empty());
 }
 
 // Verifies that the filter clears the route cache when an authorization response:
@@ -1879,10 +1935,11 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
         EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");
         EXPECT_EQ(test_headers.get_("accept-encoding"), "gzip,deflate");
         EXPECT_EQ(data.toString(), "foo");
-
-        std::vector<absl::string_view> setCookieHeaderValues;
-        Http::HeaderUtility::getAllOfHeader(test_headers, "set-cookie", setCookieHeaderValues);
-        EXPECT_THAT(setCookieHeaderValues, UnorderedElementsAre("cookie1=value", "cookie2=value"));
+        EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(test_headers,
+                                                              Http::LowerCaseString("set-cookie"))
+                      .result()
+                      .value(),
+                  "cookie1=value,cookie2=value");
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));

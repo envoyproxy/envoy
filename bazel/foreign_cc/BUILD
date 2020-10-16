@@ -67,16 +67,13 @@ configure_make(
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
         "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
-        "//bazel:windows_dbg_build": {"WINDOWS_DBG_BUILD": "debug"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_moonjit_moonjit//:all",
     make_commands = [],
     out_include_dir = "include/moonjit-2.2",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["lua51.lib"],
-        "//conditions:default": ["libluajit-5.1.a"],
-    }),
+    static_libraries = ["libluajit-5.1.a"],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
@@ -138,11 +135,6 @@ envoy_cmake_external(
         "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_C_FLAGS_BAZEL": "-fPIC",
-        # Note we use Bazel's flags (not _RELEASE/_DEBUG CMake flags), but this toggle
-        # also works around a bug in CMP0091 logic which re-injected a badly placed -M flag.
-        # See https://github.com/bazelbuild/rules_foreign_cc/issues/426
-        "CURL_STATIC_CRT": "on",
     },
     defines = ["CURL_STATICLIB"],
     generate_crosstool_file = True,
@@ -351,7 +343,6 @@ envoy_cmake_external(
 envoy_cmake_external(
     name = "zlib",
     cache_entries = {
-        "BUILD_SHARED_LIBS": "off",
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "CMAKE_C_COMPILER_FORCED": "on",
         "SKIP_BUILD_EXAMPLES": "on",

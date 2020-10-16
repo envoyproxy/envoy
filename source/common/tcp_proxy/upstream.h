@@ -3,42 +3,95 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace TcpProxy {
 
-// Interface for a generic ConnectionHandle, which can wrap a TcpConnectionHandle
-// or an HttpConnectionHandle
-class ConnectionHandle {
+class GenericConnectionPoolCallbacks;
+class GenericUpstream;
+
+// An API for wrapping either an HTTP or a TCP connection pool.
+class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
 public:
-  virtual ~ConnectionHandle() = default;
-  // Cancel the conn pool request and close any excess pending requests.
-  virtual void cancel() PURE;
+  virtual ~GenericConnPool() = default;
+
+  // Called to create a new HTTP stream or TCP connection. The implementation
+  // is then responsible for calling either onPoolReady or onPoolFailure on the
+  // supplied GenericConnectionPoolCallbacks.
+  virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
+  // Returns true if there was a valid connection pool, false otherwise.
+  virtual bool valid() const PURE;
 };
 
-// An implementation of ConnectionHandle which works with the Tcp::ConnectionPool.
-class TcpConnectionHandle : public ConnectionHandle {
+class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnectionHandle(Tcp::ConnectionPool::Cancellable* handle) : upstream_handle_(handle) {}
+  TcpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+              Upstream::LoadBalancerContext* context,
+              Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
+  ~TcpConnPool() override;
 
-  void cancel() override {
-    upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess);
-  }
+  // GenericConnPool
+  bool valid() const override;
+  void newStream(GenericConnectionPoolCallbacks* callbacks) override;
+
+  // Tcp::ConnectionPool::Callbacks
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                   Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
+  Tcp::ConnectionPool::Instance* conn_pool_{};
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
+  GenericConnectionPoolCallbacks* callbacks_{};
+  Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
 };
 
-class HttpConnectionHandle : public ConnectionHandle {
+class HttpUpstream;
+
+class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
-  HttpConnectionHandle(Http::ConnectionPool::Cancellable* handle) : upstream_http_handle_(handle) {}
-  void cancel() override {
-    upstream_http_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
-  }
+  HttpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+               Upstream::LoadBalancerContext* context, std::string hostname,
+               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
+  ~HttpConnPool() override;
+
+  // GenericConnPool
+  bool valid() const override;
+  void newStream(GenericConnectionPoolCallbacks* callbacks) override;
+
+  // Http::ConnectionPool::Callbacks,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolReady(Http::RequestEncoder& request_encoder,
+                   Upstream::HostDescriptionConstSharedPtr host,
+                   const StreamInfo::StreamInfo& info) override;
 
 private:
-  Http::ConnectionPool::Cancellable* upstream_http_handle_{};
+  const std::string hostname_;
+  Http::ConnectionPool::Instance* conn_pool_{};
+  Http::ConnectionPool::Cancellable* upstream_handle_{};
+  GenericConnectionPoolCallbacks* callbacks_{};
+  Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
+  std::unique_ptr<HttpUpstream> upstream_;
+};
+
+// An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
+// connection pool.
+class GenericConnectionPoolCallbacks {
+public:
+  virtual ~GenericConnectionPoolCallbacks() = default;
+
+  virtual void onGenericPoolReady(StreamInfo::StreamInfo* info,
+                                  std::unique_ptr<GenericUpstream>&& upstream,
+                                  Upstream::HostDescriptionConstSharedPtr& host,
+                                  const Network::Address::InstanceConstSharedPtr& local_address,
+                                  Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
+  virtual void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                    Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 
 // Interface for a generic Upstream, which can communicate with a TCP or HTTP

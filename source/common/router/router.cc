@@ -965,6 +965,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
                              absl::string_view body, bool dropped, absl::string_view details) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
+  callbacks_->streamInfo().setResponseFlag(response_flags);
   if (downstream_response_started_ &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     // This will destroy any created retry timers.
@@ -974,9 +975,6 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
   } else {
     // This will destroy any created retry timers.
     cleanup();
-
-    callbacks_->streamInfo().setResponseFlag(response_flags);
-
     // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         code, body,
@@ -1089,6 +1087,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::UpstreamOverflow;
   case Http::StreamResetReason::RemoteReset:
   case Http::StreamResetReason::RemoteRefusedStreamReset:
+  case Http::StreamResetReason::ConnectError:
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
   }
 
