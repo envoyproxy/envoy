@@ -131,7 +131,7 @@ Configuration: static_resources
 The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
 as opposed to the means of configuring resources dynamically when Envoy is running.
 
-.. literalinclude:: _include/example.yaml
+.. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :linenos:
     :lines: 1-3
@@ -142,7 +142,7 @@ Configuration: listeners
 
 The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
 
-.. literalinclude:: _include/example.yaml
+.. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :linenos:
     :lines: 1-25
@@ -154,7 +154,7 @@ Configuration: clusters
 
 The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`.
 
-.. literalinclude:: _include/example.yaml
+.. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :lineno-start: 22
     :lines: 22-47
@@ -169,7 +169,7 @@ the administration server.
 The ``address`` key specifies the listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
 which in the demo configuration is ``0.0.0.0:9901``.
 
-.. literalinclude:: _include/example.yaml
+.. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :lineno-start: 45
     :lines: 45-50
