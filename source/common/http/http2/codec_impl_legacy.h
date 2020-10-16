@@ -277,6 +277,12 @@ protected:
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
+
+    // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
+    // never called. The watermark value is set to the size of the stream window. As a result this
+    // watermark can never overflow because the peer can never send more bytes than the stream
+    // window without triggering protocol error and this buffer is drained after each DATA frame was
+    // dispatched through the filter chain. See source/docs/flow_control.md for more information.
     Buffer::WatermarkBuffer pending_recv_data_{
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
         [this]() -> void { this->pendingRecvBufferHighWatermark(); },
@@ -445,7 +451,7 @@ protected:
    * The implementation in the ServerConnectionImpl schedules callback to terminate connection if
    * the protocol constraint was violated.
    */
-  virtual void checkProtocolConstrainViolation() PURE;
+  virtual void checkProtocolConstraintViolation() PURE;
 
   /**
    * Callback for terminating connection when protocol constrain has been violated
@@ -556,7 +562,7 @@ private:
     return Envoy::Http::Http2::ProtocolConstraints::ReleasorProc([]() {});
   }
   bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
-  void checkProtocolConstrainViolation() override {}
+  void checkProtocolConstraintViolation() override {}
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -588,7 +594,7 @@ private:
    * Check protocol constraint violations outside of the dispatching context.
    * This method ASSERTs if it is called in the dispatching context.
    */
-  void checkProtocolConstrainViolation() override;
+  void checkProtocolConstraintViolation() override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when

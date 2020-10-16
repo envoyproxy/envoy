@@ -20,7 +20,7 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
 

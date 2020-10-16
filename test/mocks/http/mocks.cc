@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/header_map.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,6 +20,16 @@ MockConnectionCallbacks::~MockConnectionCallbacks() = default;
 
 MockServerConnectionCallbacks::MockServerConnectionCallbacks() = default;
 MockServerConnectionCallbacks::~MockServerConnectionCallbacks() = default;
+
+MockFilterManagerCallbacks::MockFilterManagerCallbacks() {
+  ON_CALL(*this, responseHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
+    if (response_headers_) {
+      return absl::make_optional(std::ref(*response_headers_));
+    }
+    return absl::nullopt;
+  }));
+}
+MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
 
 MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;

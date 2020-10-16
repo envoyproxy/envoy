@@ -19,7 +19,8 @@ build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
 
-# Enable position independent code, this option is not supported on Windows and default on on macOS.
+# Enable position independent code (this is the default on macOS and Windows)
+# (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
 build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
@@ -109,7 +110,8 @@ build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
+build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.
@@ -227,7 +229,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:e7ea4e81bbd5028abb9d3a2f2c0afe063d9b62c0
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:b480535e8423b5fd7c102fd30c92f4785519e33a
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -284,27 +286,27 @@ build:windows --define signal_trace=disabled
 build:windows --define hot_restart=disabled
 build:windows --define tcmalloc=disabled
 build:windows --define manual_stamp=manual_stamp
+build:windows --cxxopt="/std:c++17"
 
-# Should not be required after upstream fix to bazel,
-# and already a no-op to linux/macos builds
-# see issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
+# TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
+# See issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
 build:windows --copt="-DCARES_STATICLIB"
 build:windows --copt="-DNGHTTP2_STATICLIB"
 build:windows --copt="-DCURL_STATICLIB"
-build:windows --cxxopt="/std:c++17"
 
-# Required to work around build defects on Windows MSVC cl
-# Unguarded gcc pragmas in quiche are not recognized by MSVC
-build:msvc-cl --copt="/wd4068"
-# Allows 'nodiscard' function return values to be discarded
-build:msvc-cl --copt="/wd4834"
-# Allows inline functions to be undefined
-build:msvc-cl --copt="/wd4506"
-build:msvc-cl --copt="-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
+# Override any clang preference if building msvc-cl
+# Drop the determinism feature (-DDATE etc are a no-op in msvc-cl)
+build:msvc-cl --action_env=USE_CLANG_CL=""
+build:msvc-cl --define clang_cl=0
+build:msvc-cl --features=-determinism
+
+# Windows build behaviors when using clang-cl
+build:clang-cl --action_env=USE_CLANG_CL=1
+build:clang-cl --define clang_cl=1
 
 # Required to work around Windows clang-cl build defects
 # Ignore conflicting definitions of _WIN32_WINNT
-# Overriding __TIME__ etc is problematic (and is actually an invalid no-op)
+# Override determinism flags (DATE etc) is valid on clang-cl compiler
 build:clang-cl --copt="-Wno-macro-redefined"
 build:clang-cl --copt="-Wno-builtin-macro-redefined"
 build:clang-cl --action_env=USE_CLANG_CL=1

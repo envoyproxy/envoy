@@ -153,6 +153,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
     EXPECT_EQ(ResponseCodeDetails::get().ViaUpstream, stream_info.responseCodeDetails().value());
 
+    EXPECT_FALSE(stream_info.connectionTerminationDetails().has_value());
+    stream_info.setConnectionTerminationDetails("access_denied");
+    ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
+    EXPECT_EQ("access_denied", stream_info.connectionTerminationDetails().value());
+
     EXPECT_EQ(nullptr, stream_info.upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
     stream_info.onUpstreamHostSelected(host);
@@ -265,6 +270,14 @@ TEST_F(StreamInfoImplTest, ConnectionID) {
   uint64_t id = 123;
   stream_info.setConnectionID(id);
   EXPECT_EQ(id, stream_info.connectionID());
+}
+
+TEST_F(StreamInfoImplTest, Details) {
+  StreamInfoImpl stream_info(test_time_.timeSystem());
+  EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
+  stream_info.setResponseCodeDetails("two words");
+  ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+  EXPECT_EQ(stream_info.responseCodeDetails().value(), "two_words");
 }
 
 } // namespace

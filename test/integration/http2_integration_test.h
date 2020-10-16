@@ -138,5 +138,7 @@ protected:
 
   void setNetworkConnectionBufferSize();
   void beginSession() override;
+  void prefillOutboundDownstreamQueue(uint32_t data_frame_count, uint32_t data_frame_size = 10);
+  void triggerListenerDrain();
 };
 } // namespace Envoy

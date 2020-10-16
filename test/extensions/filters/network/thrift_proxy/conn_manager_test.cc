@@ -1366,9 +1366,9 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
       }));
   EXPECT_CALL(*decoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        const Http::HeaderEntry* header = metadata->headers().get(key);
-        EXPECT_NE(nullptr, header);
-        EXPECT_EQ("value", header->value().getStringView());
+        const auto header = metadata->headers().get(key);
+        EXPECT_FALSE(header.empty());
+        EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
       }));
 

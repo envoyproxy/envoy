@@ -1,7 +1,7 @@
 .. _arch_overview_postgres:
 
 Postgres
-==========
+========
 
 Envoy supports a network level Postgres sniffing filter to add network observability. By using the
 Postgres proxy, Envoy is able to decode `Postgres frontend/backend protocol`_ and gather
@@ -14,7 +14,7 @@ offers the following features:
 * Decode non SSL traffic, ignore SSL traffic.
 * Decode session information.
 * Capture transaction information, including commits and rollbacks.
-* Expose counters for different types of statements (INSERTs, DELETEs, UPDATEs, etc). 
+* Expose counters for different types of statements (INSERTs, DELETEs, UPDATEs, etc).
   The counters are updated based on decoding backend CommandComplete messages not by decoding SQL statements sent by a client.
 * Count frontend, backend and unknown messages.
 * Identify errors and notices backend responses.

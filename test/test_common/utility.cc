@@ -28,6 +28,7 @@
 #include "common/config/resource_name.h"
 #include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
+#include "common/http/header_utility.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -65,22 +66,29 @@ uint64_t TestRandomGenerator::random() { return generator_(); }
 
 bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
                                             const Http::HeaderMap& rhs) {
-  if (lhs.size() != rhs.size()) {
-    return false;
-  }
-
-  bool equal = true;
-  rhs.iterate([&lhs, &equal](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    const Http::HeaderEntry* entry =
-        lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
-    if (entry == nullptr || (entry->value() != header.value().getStringView())) {
-      equal = false;
-      return Http::HeaderMap::Iterate::Break;
-    }
+  absl::flat_hash_set<std::string> lhs_keys;
+  absl::flat_hash_set<std::string> rhs_keys;
+  lhs.iterate([&lhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const std::string key{header.key().getStringView()};
+    lhs_keys.insert(key);
     return Http::HeaderMap::Iterate::Continue;
   });
-
-  return equal;
+  rhs.iterate([&lhs, &rhs, &rhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const std::string key{header.key().getStringView()};
+    // Compare with canonicalized multi-value headers. This ensures we respect order within
+    // a header.
+    const auto lhs_entry =
+        Http::HeaderUtility::getAllOfHeaderAsString(lhs, Http::LowerCaseString(key));
+    const auto rhs_entry =
+        Http::HeaderUtility::getAllOfHeaderAsString(rhs, Http::LowerCaseString(key));
+    ASSERT(rhs_entry.result());
+    if (lhs_entry.result() != rhs_entry.result()) {
+      return Http::HeaderMap::Iterate::Break;
+    }
+    rhs_keys.insert(key);
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  return lhs_keys.size() == rhs_keys.size();
 }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
