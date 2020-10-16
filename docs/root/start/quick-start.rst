@@ -10,7 +10,7 @@ the Envoy Docker image.
 Check your Envoy version
 ------------------------
 
-Once you have :ref:`installed Envoy <install>`, you can check the version you have as follows:
+Once you have :ref:`installed Envoy <install>`, you can check the version information as follows:
 
 .. tabs::
 
