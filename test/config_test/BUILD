@@ -20,6 +20,7 @@ example_configs_extensions = [
     "envoy.filters.http.cache.simple_http_cache",
     "envoy.filters.http.cors",
     "envoy.filters.http.csrf",
+    "envoy.filters.http.dynamic_forward_proxy",
     "envoy.filters.http.ext_authz",
     "envoy.filters.http.fault",
     "envoy.filters.http.health_check",
