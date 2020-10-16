@@ -2639,7 +2639,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-// Test receiving GOAWAY (no error) closes connection after an in progress probe times outs.
+// Test receiving GOAWAY (no error) closes connection after a stream reset.
 TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
