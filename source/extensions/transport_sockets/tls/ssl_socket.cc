@@ -367,6 +367,7 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
     for (const auto& cb : secrets_ready_callbacks_) {
       cb();
     }
+    secrets_ready_callbacks_.clear();
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
@@ -434,6 +435,7 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
     for (const auto& cb : secrets_ready_callbacks_) {
       cb();
     }
+    secrets_ready_callbacks_.clear();
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
