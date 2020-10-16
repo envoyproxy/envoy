@@ -1,3 +1,4 @@
+.. _start_tools_configuration_generator:
 
 Configuration generator
 -----------------------
