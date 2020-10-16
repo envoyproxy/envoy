@@ -131,7 +131,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
 }
 
 // Test a large datagram that gets dropped using recvmmsg if supported.
-TEST_P(UdpListenerImplTest, LargeDatagram) {
+TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   // This will get dropped.
   const std::string first(4096, 'a');
   client_.write(first, *send_to_addr_);
@@ -151,7 +151,7 @@ TEST_P(UdpListenerImplTest, LargeDatagram) {
 }
 
 // Test a large datagram that gets dropped using recvmsg.
-TEST_P(UdpListenerImplTest, LargeDatagramNoMmsg) {
+TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
   ON_CALL(override_syscall_, supportsMmsg()).WillByDefault(Return(false));
 
   // This will get dropped.
