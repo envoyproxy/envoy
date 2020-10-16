@@ -212,7 +212,7 @@ public:
 private:
   void onTransportSocketConnectTimeout();
 
-  // Implements a timeout for the transport socket signalling connection. The timer is enabled by a
+  // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
   // call to setTransportSocketConnectTimeout and is reset when the connection is established.
   Event::TimerPtr transport_socket_connect_timer_;
 };
