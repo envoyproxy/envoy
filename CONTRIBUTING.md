@@ -69,7 +69,7 @@ versioning guidelines:
   cause a configuration load failure, unless the feature in question is
   explicitly overridden in
   [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime#using-runtime-overrides-for-deprecated-features)
-  config ([example](configs/using_deprecated_config.v2.yaml)), or if
+  config ([example](configs/using_deprecated_config.yaml)), or if
   `envoy.features.enable_all_deprecated_features` is set to true. Finally, following the deprecation
   of the API major version where the field was first marked deprecated, the entire implementation
   code will be removed from the Envoy implementation.
