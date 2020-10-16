@@ -523,8 +523,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "0.23.7",
         sha256 = "0310e837aed522875791750de44408ec91046c630374990edd51827cb169f616",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.tar.gz"],
-        use_category = ["build"],
+        use_category = ["build", "api"],
         last_updated = "2020-08-06",
+        implied_untracked_deps = [
+            "com_github_golang_protobuf",
+            "io_bazel_rules_nogo",
+            "org_golang_google_protobuf",
+            "org_golang_x_tools",
+        ],
     ),
     rules_cc = dict(
         project_name = "C++ rules for Bazel",
