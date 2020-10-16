@@ -1,4 +1,4 @@
-{% import 'routing_helper_v2.template.yaml' as helper -%}
+{% import 'routing_helper.template.yaml' as helper -%}
 {% macro router_file_content() -%}{% include kwargs['router_file'] -%}{% endmacro -%}
 {% macro listener(protocol, address, port_value, proxy_proto, tls, tracing) -%}
   name: not_required_for_static_listeners
@@ -12,7 +12,7 @@
   - transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
         common_tls_context:
           alpn_protocols: h2,http/1.1
           tls_certificates:
@@ -35,7 +35,7 @@
     filters:
     - name: envoy.filters.network.http_connection_manager
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         codec_type: AUTO
         stat_prefix: router
         {% if proxy_proto -%}
@@ -43,18 +43,18 @@
         {%endif-%}
         stat_prefix: ingress_http
         route_config:
-          {{ router_file_content(router_file='envoy_router_v2.template.yaml')|indent(10) }}
+          {{ router_file_content(router_file='envoy_router.template.yaml')|indent(10) }}
         http_filters:
         - name: envoy.filters.http.health_check
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+            "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
             pass_through_mode: false
             headers:
               - name: ":path"
                 exact_match: "/healthcheck"
         - name: envoy.filters.http.buffer
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
+            "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
             max_request_bytes: 5242880
         - name: envoy.filters.http.ratelimit
           typed_config:
@@ -70,11 +70,10 @@
         add_user_agent: true
         {% if tracing %}
         tracing:
-          operation_name: INGRESS
           provider:
             name: envoy.tracers.lightstep
             typed_config:
-              "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
+              "@type": type.googleapis.com/envoy.config.trace.v3.LightstepConfig
               collector_cluster: lightstep_saas
               access_token_file: "/etc/envoy/lightstep_access_token"
         {% endif %}
@@ -99,9 +98,10 @@
                         runtime_key: access_log.access_error.duration
                 - traceable_filter: {}
           typed_config:
-            "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog      
+            "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
             path: "/var/log/envoy/access_error.log"
-            format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+            log_format:
+              text_format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
 {% endmacro -%}
 static_resources:
   listeners:

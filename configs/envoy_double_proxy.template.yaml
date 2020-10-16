@@ -11,7 +11,7 @@
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
         common_tls_context:
           tls_certificates:
           - certificate_chain:
@@ -29,7 +29,7 @@
     filters:
     - name: envoy.filters.network.http_connection_manager
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         codec_type: AUTO
         stat_prefix: router
         route_config:
@@ -47,24 +47,23 @@
         http_filters:
         - name: envoy.filters.http.health_check
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+            "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
             pass_through_mode: false
             headers:
               - exact_match: /healthcheck
                 name: :path
         - name: envoy.filters.http.buffer
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
+            "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
             max_request_bytes: 5242880
         - name: envoy.filters.http.router
           typed_config: {}
         {% if tracing %}
         tracing:
-          operation_name: INGRESS
           provider:
             name: envoy.tracers.lightstep
             typed_config:
-              "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
+              "@type": type.googleapis.com/envoy.config.trace.v3.LightstepConfig
               access_token_file: "/etc/envoy/lightstep_access_token"
               collector_cluster: lightstep_saas
         {% endif %}
@@ -89,9 +88,10 @@
                         runtime_key: access_log.access_error.duration
                 - traceable_filter: {}
           typed_config:
-            "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+            "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
             path: /var/log/envoy/access_error.log
-            format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+            log_format:
+              text_format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
         {% if proxy_proto %}
         use_remote_address: true
         {%endif -%}
@@ -141,7 +141,7 @@ static_resources:
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         common_tls_context:
           tls_certificates:
           - certificate_chain:
@@ -151,7 +151,7 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names: 
+            match_subject_alt_names:
               exact: "front-proxy.yourcompany.net"
     http2_protocol_options: {}
   - name: lightstep_saas
@@ -172,18 +172,18 @@ static_resources:
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         common_tls_context:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names: 
+            match_subject_alt_names:
               exact: "collector-grpc.lightstep.com"
 flags_path: "/etc/envoy/flags"
 stats_sinks:
 - name: envoy.stat_sinks.statsd
   typed_config:
-    "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
+    "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
     tcp_cluster_name: statsd
 layered_runtime:
   layers:

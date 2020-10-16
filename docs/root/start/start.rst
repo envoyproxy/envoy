@@ -32,7 +32,7 @@ more detailed explanation of the configuration file and execution steps for
 the same configuration.
 
 A very minimal Envoy configuration that can be used to validate basic plain HTTP
-proxying is available in :repo:`configs/google_com_proxy.v2.yaml`. This is not
+proxying is available in :repo:`configs/google_com_proxy.yaml`. This is not
 intended to represent a realistic Envoy deployment:
 
 .. substitution-code-block:: none
