@@ -60,18 +60,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "BoringSSL",
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
-        version = "597b810379e126ae05d32c1d94b1a9464385acd0",
-        sha256 = "1ea42456c020daf0a9b0f9e8d8bc3a403c9314f4f54230c617257af996cd5fa6",
+        version = "2192bbc878822cf6ab5977d4257a1339453d9d39",
+        sha256 = "bb55b0ed2f0cb548b5dce6a6b8307ce37f7f748eb9f1be6bfe2d266ff2b4d52b",
         strip_prefix = "boringssl-{version}",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-85.0.4183.83
+        # chromium-86.0.4240.80
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-06-23",
+        last_updated = "2020-07-30",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -237,13 +237,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "LuaJIT",
         project_desc = "Just-In-Time compiler for Lua",
         project_url = "https://luajit.org",
-        version = "2.1.0-beta3",
-        sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
+        # The last release version, 2.1.0-beta3 has a number of CVEs filed
+        # against it. These may not impact correct non-malicious Lua code, but for prudence we bump.
+        version = "1d8b747c161db457e032a023ebbff511f5de5ec2",
+        sha256 = "20a159c38a98ecdb6368e8d655343b6036622a29a1621da9dc303f7ed9bf37f3",
         strip_prefix = "LuaJIT-{version}",
-        urls = ["https://github.com/LuaJIT/LuaJIT/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
+        last_updated = "2020-10-13",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.lua"],
-        last_updated = "2017-11-07",
         cpe = "cpe:2.3:a:luajit:luajit:*",
     ),
     com_github_moonjit_moonjit = dict(
@@ -268,7 +270,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "nghttp2-{version}",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-06-02",
+        last_updated = "2020-06-03",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
     io_opentracing_cpp = dict(
@@ -586,7 +588,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        cpe = "cpe:2.3:a:llvm:*",
+        cpe = "cpe:2.3:a:llvm:*:*",
     ),
     com_github_wavm_wavm = dict(
         project_name = "WAVM",
@@ -611,13 +613,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "OpenCensus C++",
         project_desc = "OpenCensus tracing library",
         project_url = "https://github.com/census-instrumentation/opencensus-cpp",
-        version = "7877337633466358ed680f9b26967da5b310d7aa",
-        sha256 = "12ff300fa804f97bd07e2ff071d969e09d5f3d7bbffeac438c725fa52a51a212",
+        version = "ba631066779a534267fdb1321b19850eb2b0c000",
+        sha256 = "f239a40803f6e2e42b57c9e68771b0990c4ca8b2d76b440073cdf14f4211ad26",
         strip_prefix = "opencensus-cpp-{version}",
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.opencensus"],
-        last_updated = "2020-06-01",
+        last_updated = "2020-10-13",
         cpe = "N/A",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/11816.
@@ -853,14 +855,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "fda9a1ce6482973adfda022cadbfa6b300e269c3",
-        sha256 = "484a2b2b67cd2d1fa1054876de7f8d291c4b203fd256bc8cbea14d749bb864ce",
+        version = "fb90a7484800157fbb8a5904fbeb608dc1effc0c",
+        sha256 = "cbb253b8c5ab1a3c1787790f900e7d6774e95ba038714fc0f710935e62f30f5f",
         # Last commit where "out_binary = True" works.
         # See: https://github.com/bazelbuild/rules_rust/issues/386
         strip_prefix = "rules_rust-{version}",
         urls = ["https://github.com/bazelbuild/rules_rust/archive/{version}.tar.gz"],
-        use_category = ["build"],
-        last_updated = "2020-10-09",
+        use_category = ["test_only"],
+        last_updated = "2020-10-15",
     ),
     rules_antlr = dict(
         project_name = "ANTLR Rules for Bazel",
@@ -886,8 +888,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "ANTLR v4",
         project_desc = "ANTLR (ANother Tool for Language Recognition) is a powerful parser generator for reading, processing, executing, or translating structured text or binary files",
         project_url = "https://github.com/antlr/antlr4",
-        version = "4.7.1",
-        sha256 = "4d0714f441333a63e50031c9e8e4890c78f3d21e053d46416949803e122a6574",
+        version = "4.7.2",
+        sha256 = "46f5e1af5f4bd28ade55cb632f9a069656b31fc8c2408f9aa045f9b5f5caad64",
         strip_prefix = "antlr4-{version}",
         urls = ["https://github.com/antlr/antlr4/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -898,7 +900,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-29",
+        last_updated = "2020-10-09",
         cpe = "N/A",
     ),
 )
