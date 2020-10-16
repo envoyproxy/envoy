@@ -15,8 +15,8 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
     const test::common::upstream::SetupPriorityLevel& setup_priority_level,
     const uint8_t priority_level) {
   const uint32_t num_hosts_in_priority_level = setup_priority_level.num_hosts_in_priority_level();
-  ENVOY_LOG_MISC(trace, "Will attempt to initialize host set {} with {} hosts.", priority_level,
-                 num_hosts_in_priority_level);
+  ENVOY_LOG_MISC(trace, "Will attempt to initialize host set at priority level {} with {} hosts.",
+                 priority_level, num_hosts_in_priority_level);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
   uint32_t hosts_made = 0;
   // Cap each host set at 256 hosts for efficiency - Leave port clause in for future changes
@@ -32,7 +32,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   const std::vector<std::vector<uint8_t>> localities = subset_selector.constructSubsets(
       {setup_priority_level.num_hosts_locality_a(), setup_priority_level.num_hosts_locality_b(),
        setup_priority_level.num_hosts_locality_c()},
-      std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel));
+      host_set.hosts_.size());
 
   HostVector locality_a = {};
   HostVector locality_b = {};
@@ -45,14 +45,9 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
       locality_indexes[locality].push_back(host_set.hosts_[index]);
       locality_indexes_[index] = locality;
     }
+    ENVOY_LOG_MISC(trace, "Added these hosts to locality {}: {}", locality + 1,
+                   absl::StrJoin(localities.at(locality), " "));
   }
-
-  ENVOY_LOG_MISC(trace, "Added these hosts to locality 1: {}",
-                 absl::StrJoin(localities.at(0), " "));
-  ENVOY_LOG_MISC(trace, "Added these hosts to locality 2: {}",
-                 absl::StrJoin(localities.at(1), " "));
-  ENVOY_LOG_MISC(trace, "Added these hosts to locality 3: {}",
-                 absl::StrJoin(localities.at(2), " "));
 
   host_set.hosts_per_locality_ = makeHostsPerLocality({locality_a, locality_b, locality_c});
 }
@@ -80,6 +75,14 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   const uint8_t priority_of_host_set = host_priority % num_priority_levels_;
   ENVOY_LOG_MISC(trace, "Updating health flags for host set at priority: {}", priority_of_host_set);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
+  // Remove health flags from hosts with health flags set - previous iterations of this function
+  // with hosts placed degraded and excluded buckets
+  for (auto& host : host_set.degraded_hosts_) {
+    host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  }
+  for (auto& host : host_set.excluded_hosts_) {
+    host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
   // This downcast will not overflow because size is capped by port numbers
   const uint32_t host_set_size = host_set.hosts_.size();
   host_set.healthy_hosts_.clear();
@@ -131,23 +134,24 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   std::array<HostVector, 3> degraded_hosts_per_locality;
   std::array<HostVector, 3> excluded_hosts_per_locality;
 
-  // Wrap those three in an array here, where the index represents health flag of
+  // Wrap those three in an array here, where the index represents health status of
   // healthy/degraded/excluded, used for indexing during iteration through subsets
-  std::array<std::array<HostVector, 3>, 3> locality_health_flags = {
+  std::array<std::array<HostVector, 3>, 3> locality_health_statuses = {
       healthy_hosts_per_locality, degraded_hosts_per_locality, excluded_hosts_per_locality};
 
   // Iterate through subsets
-  for (uint8_t health_flag = 0; health_flag < locality_health_flags.size(); health_flag++) {
-    for (uint8_t index : subsets.at(health_flag)) { // Each subset logically represents a health
-                                                    // flag
-      // If the host is in a locality, we have to update the corresponding health flag host vector
+  for (uint8_t health_status = 0; health_status < locality_health_statuses.size();
+       health_status++) {
+    for (uint8_t index : subsets.at(health_status)) { // Each subset logically represents a health
+                                                      // status
+      // If the host is in a locality, we have to update the corresponding health status host vector
       if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
         // After computing the host index subsets, we want to propagate these changes to a host set
         // by building and using these host vectors
         uint8_t locality = locality_indexes_[index];
-        locality_health_flags[health_flag][locality].push_back(host_set.hosts_[index]);
-        ENVOY_LOG_MISC(trace, "Added host at index {} in locality {} to health flag set {}", index,
-                       locality_indexes_[index], health_flag + 1);
+        locality_health_statuses[health_status][locality].push_back(host_set.hosts_[index]);
+        ENVOY_LOG_MISC(trace, "Added host at index {} in locality {} to health status {}", index,
+                       locality_indexes_[index] + 1, health_status + 1);
       }
     }
   }
