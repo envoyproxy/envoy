@@ -96,8 +96,6 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
     throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
 
-  std::ios::sync_with_stdio(false);
-
   std::ifstream file(path);
   if (file.fail()) {
     throw EnvoyException(absl::StrCat("unable to read file: ", path));

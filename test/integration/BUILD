@@ -216,7 +216,9 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    tags = ["fails_on_windows"],
+    tags = [
+        "fails_on_windows",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -329,6 +331,7 @@ envoy_cc_test(
         "http2_integration_test.cc",
         "http2_integration_test.h",
     ],
+    shard_count = 4,
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -779,6 +782,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
+    shard_count = 2,
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
