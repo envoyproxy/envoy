@@ -15,7 +15,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/json:90.6"
 "source/common/filesystem:96.1"
 "source/common/filesystem/posix:94.5"
-"source/common/thread:0.0" # Functions terminate threads, leading to death.
+"source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/thread_local:95.7"
 "source/common/crypto:0.0"
 "source/common/common:96.1"
