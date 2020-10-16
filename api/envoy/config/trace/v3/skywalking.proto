@@ -30,7 +30,6 @@ message SkyWalkingConfig {
 }
 
 // Client config for SkyWalking tracer.
-// [#next-free-field: 5]
 message ClientConfig {
   // Service name for SkyWalking tracer. If service_name is empty, then cluster
   // name of Envoy will be used as service name.
