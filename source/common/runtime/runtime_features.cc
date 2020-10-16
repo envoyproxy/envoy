@@ -79,6 +79,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.listener_in_place_filterchain_update",
+    "envoy.reloadable_features.new_codec_behavior",
     "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
@@ -103,8 +104,6 @@ constexpr const char* disabled_runtime_features[] = {
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
     // v2 url is removed from codebase.
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
-    // TODO(asraa) flip this feature after codec errors are handled
-    "envoy.reloadable_features.new_codec_behavior",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
     // Sentinel and test flag.

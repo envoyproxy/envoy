@@ -40,10 +40,6 @@ CODEC_TEST_DEPS = [
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    # The default codec is the legacy codec. Override runtime flag for testing new codec.
-    args = [
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.new_codec_behavior",
-    ],
     shard_count = 5,
     deps = CODEC_TEST_DEPS,
 )
@@ -51,7 +47,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_legacy_test",
     srcs = ["codec_impl_test.cc"],
-    # The default codec is the legacy codec. Verify the runtime flag for the new codec is disabled.
+    # The default codec is the new codec. Disable runtime flag for testing old codec.
     args = [
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.new_codec_behavior",
     ],

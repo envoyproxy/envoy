@@ -167,17 +167,10 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     break;
   }
   case Type::HTTP2: {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-          *connection_, *this, host->cluster().http2CodecStats(), random_generator,
-          host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-          host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
-    } else {
-      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-          *connection_, *this, host->cluster().http2CodecStats(), random_generator,
-          host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-          host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
-    }
+    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+        *connection_, *this, host->cluster().http2CodecStats(), random_generator,
+        host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+        host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   }
   case Type::HTTP3: {
