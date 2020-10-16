@@ -293,7 +293,6 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
       end
     )EOF"};
 
-  InSequence s;
   setup(SCRIPT);
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());

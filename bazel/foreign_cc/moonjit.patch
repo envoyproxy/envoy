@@ -3,7 +3,7 @@ new file mode 100644
 index 00000000..dab3606c
 --- /dev/null
 +++ b/build.py
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,39 @@
 +#!/usr/bin/env python3
 +
 +import argparse
@@ -41,24 +41,7 @@ index 00000000..dab3606c
 +
 +    os.system('make -j{} V=1 PREFIX="{}" install'.format(os.cpu_count(), args.prefix))
 +
-+def win_main():
-+    src_dir = os.path.dirname(os.path.realpath(__file__))
-+    dst_dir = os.getcwd() + "/moonjit"
-+    shutil.copytree(src_dir, os.path.basename(src_dir))
-+    os.chdir(os.path.basename(src_dir) + "/src")
-+    os.system('msvcbuild.bat gc64 ' + os.getenv('WINDOWS_DBG_BUILD', '') + ' static')
-+    os.makedirs(dst_dir + "/lib", exist_ok=True)
-+    shutil.copy("lua51.lib", dst_dir + "/lib")
-+    os.makedirs(dst_dir + "/include/moonjit-2.2", exist_ok=True)
-+    for header in ["lauxlib.h", "luaconf.h", "lua.h", "lua.hpp", "luajit.h", "lualib.h"]:
-+      shutil.copy(header, dst_dir + "/include/moonjit-2.2")
-+    os.makedirs(dst_dir + "/bin", exist_ok=True)
-+    shutil.copy("luajit.exe", dst_dir + "/bin")
-+
-+if os.name == 'nt':
-+  win_main()
-+else:
-+  main()
++main()
 +
 diff --git a/src/Makefile b/src/Makefile
 index dad9aeec..e10b3118 100644
@@ -104,78 +87,3 @@ index dad9aeec..e10b3118 100644
  #E= @:
  
  ##############################################################################
-diff --git a/src/msvcbuild.bat b/src/msvcbuild.bat
-index c2d2c212..71f24422 100644
---- a/src/msvcbuild.bat
-+++ b/src/msvcbuild.bat
-@@ -15,7 +15,7 @@
- @setlocal
- @rem Add more debug flags here, e.g. DEBUGCFLAGS=/DLUA_USE_APICHECK
- @set DEBUGCFLAGS=
--@set LJCOMPILE=cl /nologo /c /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline
-+@set LJCOMPILE=cl /nologo /c /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline /DLUAJIT_ENABLE_LUA52COMPAT
- @set LJLINK=link /nologo
- @set LJMT=mt /nologo
- @set LJLIB=lib /nologo /nodefaultlib
-@@ -24,10 +24,9 @@
- @set DASC=vm_x86.dasc
- @set LJDLLNAME=lua51.dll
- @set LJLIBNAME=lua51.lib
--@set BUILDTYPE=release
- @set ALL_LIB=lib_base.c lib_math.c lib_bit.c lib_string.c lib_table.c lib_io.c lib_os.c lib_package.c lib_debug.c lib_jit.c lib_ffi.c lib_utf8.c
- 
--%LJCOMPILE% host\minilua.c
-+%LJCOMPILE% /O2 host\minilua.c
- @if errorlevel 1 goto :BAD
- %LJLINK% /out:minilua.exe minilua.obj
- @if errorlevel 1 goto :BAD
-@@ -50,7 +49,7 @@ if exist minilua.exe.manifest^
- minilua %DASM% -LN %DASMFLAGS% -o host\buildvm_arch.h %DASC%
- @if errorlevel 1 goto :BAD
- 
--%LJCOMPILE% /I "." /I %DASMDIR% host\buildvm*.c
-+%LJCOMPILE% /O2 /I "." /I %DASMDIR% host\buildvm*.c
- @if errorlevel 1 goto :BAD
- %LJLINK% /out:buildvm.exe buildvm*.obj
- @if errorlevel 1 goto :BAD
-@@ -74,25 +73,35 @@ buildvm -m folddef -o lj_folddef.h lj_opt_fold.c
- 
- @if "%1" neq "debug" goto :NODEBUG
- @shift
--@set BUILDTYPE=debug
--@set LJCOMPILE=%LJCOMPILE% /Zi %DEBUGCFLAGS%
-+@set LJCOMPILE=%LJCOMPILE% /O0 /Z7
-+@set LJLINK=%LJLINK% /debug /opt:ref /opt:icf /incremental:no
-+@set LJCRTDBG=d
-+@goto :ENDDEBUG
- :NODEBUG
--@set LJLINK=%LJLINK% /%BUILDTYPE%
-+@set LJCOMPILE=%LJCOMPILE% /O2 /Z7
-+@set LJLINK=%LJLINK% /release /incremental:no
-+@set LJCRTDBG=
-+:ENDDEBUG
- @if "%1"=="amalg" goto :AMALGDLL
- @if "%1"=="static" goto :STATIC
--%LJCOMPILE% /MD /DLUA_BUILD_AS_DLL lj_*.c lib_*.c
-+@set LJCOMPILE=%LJCOMPILE% /MD%LJCRTDBG%
-+LJCOMPILE% /DLUA_BUILD_AS_DLL lj_*.c lib_*.c
- @if errorlevel 1 goto :BAD
- %LJLINK% /DLL /out:%LJDLLNAME% lj_*.obj lib_*.obj
- @if errorlevel 1 goto :BAD
- @goto :MTDLL
- :STATIC
-+@shift
-+@set LJCOMPILE=%LJCOMPILE% /MT%LJCRTDBG%
- %LJCOMPILE% lj_*.c lib_*.c
- @if errorlevel 1 goto :BAD
- %LJLIB% /OUT:%LJLIBNAME% lj_*.obj lib_*.obj
- @if errorlevel 1 goto :BAD
- @goto :MTDLL
- :AMALGDLL
--%LJCOMPILE% /MD /DLUA_BUILD_AS_DLL ljamalg.c
-+@shift
-+@set LJCOMPILE=%LJCOMPILE% /MD%LJCRTDBG%
-+%LJCOMPILE% /DLUA_BUILD_AS_DLL ljamalg.c
- @if errorlevel 1 goto :BAD
- %LJLINK% /DLL /out:%LJDLLNAME% ljamalg.obj lj_vm.obj
- @if errorlevel 1 goto :BAD
