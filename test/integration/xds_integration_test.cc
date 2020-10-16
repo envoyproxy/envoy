@@ -282,7 +282,7 @@ public:
   LdsInplaceUpdateHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  void initialize() override {
+  void inplaceInitialize(bool add_default_filter_chain = false) {
     autonomous_upstream_ = true;
     setUpstreamCount(2);
 
@@ -290,7 +290,8 @@ public:
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
     config_helper_.addListenerFilter(tls_inspector_config);
     config_helper_.addSslConfig();
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this, add_default_filter_chain](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!use_default_balancer_) {
         bootstrap.mutable_static_resources()
             ->mutable_listeners(0)
@@ -327,6 +328,13 @@ public:
       bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
           *bootstrap.mutable_static_resources()->mutable_clusters(0));
       bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
+
+      if (add_default_filter_chain) {
+        auto default_filter_chain = bootstrap.mutable_static_resources()
+                                        ->mutable_listeners(0)
+                                        ->mutable_default_filter_chain();
+        default_filter_chain->MergeFrom(*filter_chain_0);
+      }
     });
 
     BaseIntegrationTest::initialize();
@@ -375,16 +383,20 @@ public:
   bool use_default_balancer_{false};
 };
 
-// Verify that http response on filter chain 0 has "Connection: close" header when filter chain 0
-// is deleted during the listener update.
+// Verify that http response on filter chain 1 and default filter chain have "Connection: close"
+// header when these 2 filter chains are  deleted during the listener update.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
-  initialize();
+  inplaceInitialize(/*add_default_filter_chain=*/true);
 
   auto codec_client_1 = createHttpCodec("alpn1");
   auto codec_client_0 = createHttpCodec("alpn0");
-  Cleanup cleanup([c1 = codec_client_1.get(), c0 = codec_client_0.get()]() {
+  auto codec_client_default = createHttpCodec("alpndefault");
+
+  Cleanup cleanup([c1 = codec_client_1.get(), c0 = codec_client_0.get(),
+                   c_default = codec_client_default.get()]() {
     c1->close();
     c0->close();
+    c_default->close();
   });
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
@@ -392,6 +404,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
         listener->mutable_filter_chains()->RemoveLast();
+        listener->clear_default_filter_chain();
       });
 
   new_config_helper.setLds("1");
@@ -399,37 +412,76 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
 
   expectResponseHeaderConnectionClose(*codec_client_1, true);
+  expectResponseHeaderConnectionClose(*codec_client_default, true);
+
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
   expectConnenctionServed();
 }
 
 // Verify that http clients of filter chain 0 survives if new listener config adds new filter
-// chain 2.
+// chain 2 and default filter chain.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
-  initialize();
+  inplaceInitialize();
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
-  new_config_helper.addConfigModifier(
-      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(1));
-        *listener->mutable_filter_chains(2)
-             ->mutable_filter_chain_match()
-             ->mutable_application_protocols(0) = "alpn2";
-      });
+  new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+                                          -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(1));
+    *listener->mutable_filter_chains(2)
+         ->mutable_filter_chain_match()
+         ->mutable_application_protocols(0) = "alpn2";
+    auto default_filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_default_filter_chain();
+    default_filter_chain->MergeFrom(*listener->mutable_filter_chains(1));
+  });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 
   auto codec_client_2 = createHttpCodec("alpn2");
-  Cleanup cleanup2([c2 = codec_client_2.get()]() { c2->close(); });
+  auto codec_client_default = createHttpCodec("alpndefault");
+
+  Cleanup cleanup2([c2 = codec_client_2.get(), c_default = codec_client_default.get()]() {
+    c2->close();
+    c_default->close();
+  });
   expectResponseHeaderConnectionClose(*codec_client_2, false);
+  expectResponseHeaderConnectionClose(*codec_client_default, false);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
+  expectConnenctionServed();
+}
+
+// Verify that http clients of default filter chain is drained and recreated if the default filter
+// chain updates.
+TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterChain) {
+  inplaceInitialize(true);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  auto codec_client_default = createHttpCodec("alpndefault");
+  Cleanup cleanup0([c_default = codec_client_default.get()]() { c_default->close(); });
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+                                          -> void {
+    auto default_filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_default_filter_chain();
+    default_filter_chain->set_name("default_filter_chain_v2");
+  });
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  auto codec_client_default_v2 = createHttpCodec("alpndefaultv2");
+
+  Cleanup cleanup2([c_default_v2 = codec_client_default_v2.get()]() { c_default_v2->close(); });
+  expectResponseHeaderConnectionClose(*codec_client_default, true);
+  expectResponseHeaderConnectionClose(*codec_client_default_v2, false);
   expectConnenctionServed();
 }
 
@@ -437,7 +489,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
 // is verified in filter chain add and delete test case.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConnection) {
   use_default_balancer_ = true;
-  initialize();
+  inplaceInitialize();
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup([c0 = codec_client_0.get()]() { c0->close(); });
@@ -455,6 +507,8 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
   expectConnenctionServed();
 }
 
+// Verify default filter chain update is filter chain only update.
+TEST_P(LdsInplaceUpdateHttpIntegrationTest, DefaultFilterChainUpdate) {}
 INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

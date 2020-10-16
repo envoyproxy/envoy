@@ -67,7 +67,7 @@ Bug Fixes
 * http: fixed bugs in datadog and squash filter's handling of responses with no bodies.
 * http: made the HeaderValues::prefix() method const.
 * jwt_authn: supports jwt payload without "iss" field.
-* listener: fixed crash at listener inplace update when connetion load balancer is set.
+* listener: fixed crash at listener inplace update when connection load balancer is set.
 * rocketmq_proxy: fixed an issue involving incorrect header lengths. In debug mode it causes crash and in release mode it causes underflow.
 * thrift_proxy: fixed crashing bug on request overflow.
 * udp_proxy: fixed a crash due to UDP packets being processed after listener removal.

@@ -18,10 +18,15 @@ The semantics of listener updates are as follows:
 * Listeners are effectively constant once created. Thus, when a listener is updated, an entirely
   new listener is created (with the same listen socket). This listener goes through the same
   warming process described above for a newly added listener.
-* When a listener is updated or removed, the old listener will be placed into a "draining" state
+* When a listener is removed, the old listener will be placed into a "draining" state
   much like when the entire server is drained for restart. Connections owned by the listener will
   be gracefully closed (if possible) for some period of time before the listener is removed and any
   remaining connections are closed. The drain time is set via the :option:`--drain-time-s` option.
+* When a tcp listener is updated, if the new listener contains a subset of filter chains in the old listener,
+  the connections owned by these overlapping filter chains remain open. Only the connections owned by the
+  removed filter chains will be drained following the above pattern. Note that if any global listener attributes are
+  changed, the entire listener (and all filter chains) are drained similar to removal above. See
+  :ref:`filter chain only update <filter_chain_only_update>` for detailed rules to reason about the impacted filter chains.
 
   .. note::
 
