@@ -51,24 +51,32 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
   const auto& token_secret = credentials.token_secret();
   const auto& hmac_secret = credentials.hmac_secret();
 
-  auto& secret_manager = context.clusterManager().clusterManagerFactory().secretManager();
+  auto& cluster_manager = context.clusterManager();
+  auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
   auto secret_provider_token_secret =
       secretsProvider(token_secret, secret_manager, transport_socket_factory);
+  if (secret_provider_token_secret == nullptr) {
+    throw EnvoyException("invalid token secret configuration");
+  }
   auto secret_provider_hmac_secret =
       secretsProvider(hmac_secret, secret_manager, transport_socket_factory);
+  if (secret_provider_hmac_secret == nullptr) {
+    throw EnvoyException("invalid HMAC secret configuration");
+  }
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       secret_provider_token_secret, secret_provider_hmac_secret, context.api());
-  auto config = std::make_shared<FilterConfig>(proto_config, context.clusterManager(),
-                                               secret_reader, context.scope(), stats_prefix);
+  auto config = std::make_shared<FilterConfig>(proto_config, cluster_manager, secret_reader,
+                                               context.scope(), stats_prefix);
 
-  return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    std::unique_ptr<OAuth2Client> oauth_client =
-        std::make_unique<OAuth2ClientImpl>(context.clusterManager(), config->oauthTokenEndpoint());
-    callbacks.addStreamDecoderFilter(
-        std::make_shared<OAuth2Filter>(config, std::move(oauth_client), context.timeSource()));
-  };
+  return
+      [&context, config, &cluster_manager](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+        std::unique_ptr<OAuth2Client> oauth_client =
+            std::make_unique<OAuth2ClientImpl>(cluster_manager, config->oauthTokenEndpoint());
+        callbacks.addStreamDecoderFilter(
+            std::make_shared<OAuth2Filter>(config, std::move(oauth_client), context.timeSource()));
+      };
 }
 
 /*
