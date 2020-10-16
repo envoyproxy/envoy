@@ -21,6 +21,11 @@ Control plane
 
 .. include:: external_dep_controlplane.rst
 
+API
+---
+
+.. include:: external_dep_api.rst
+
 Observability (core)
 --------------------
 
@@ -31,11 +36,6 @@ Observability (extensions)
 
 .. include:: external_dep_observability_ext.rst
 
-Test only
----------
-
-.. include:: external_dep_test_only.rst
-
 Build
 -----
 
@@ -45,3 +45,11 @@ Miscellaneous
 -------------
 
 .. include:: external_dep_other.rst
+
+Test only
+---------
+
+Below we provide the status of the C/C++ dependencies that are only used in tests. Tests also
+include additional Java, Rust and Python dependencies that are not tracked below.
+
+.. include:: external_dep_test_only.rst

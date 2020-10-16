@@ -790,6 +790,8 @@ TEST(HttpUtility, ResetReasonToString) {
   EXPECT_EQ("remote reset", Utility::resetReasonToString(Http::StreamResetReason::RemoteReset));
   EXPECT_EQ("remote refused stream reset",
             Utility::resetReasonToString(Http::StreamResetReason::RemoteRefusedStreamReset));
+  EXPECT_EQ("remote error with CONNECT request",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectError));
 }
 
 // Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.

@@ -211,7 +211,7 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS+=(-c dbg "--config=clang-asan" "--build_tests_only")
+  BAZEL_BUILD_OPTIONS+=(-c opt --copt -g "--config=clang-asan" "--build_tests_only")
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
@@ -279,6 +279,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "boringssl=fips"
     "--define" "log_debug_assert_in_release=enabled"
     "--define" "quiche=enabled"
+    "--define" "wasm=disabled"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
     "--define" "use_new_codecs_in_integration_tests=true"
@@ -311,19 +312,21 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
+  # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
+  # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
+  ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
+  export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
   echo "Validating API structure..."
   ./tools/api/validate_structure.py
+  echo "Testing API and API Boosting..."
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
+    @envoy_api_canonical//tools:tap2pcap_test @envoy_dev//clang_tools/api_booster/...
   echo "Building API..."
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//envoy/...
-  echo "Testing API..."
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
-    @envoy_api_canonical//tools:tap2pcap_test
-  echo "Testing API boosting (unit tests)..."
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_dev//clang_tools/api_booster/...
   echo "Testing API boosting (golden C++ tests)..."
   # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
-  LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config BAZEL_BUILD_OPTIONS="--config=clang" python3.8 ./tools/api_boost/api_boost_test.py
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" python3.8 ./tools/api_boost/api_boost_test.py
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
@@ -368,21 +371,23 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
+
   echo "fix_format..."
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
-  ./tools/proto_format/proto_format.sh fix --test
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
+
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
   ./tools/code_format/check_shellcheck_format.sh
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
-  ./tools/proto_format/proto_format.sh check --test
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
@@ -409,8 +414,10 @@ elif [[ "$CI_TARGET" == "docs" ]]; then
   # Validate dependency relationships between core/extensions and external deps.
   tools/dependency/validate_test.py
   tools/dependency/validate.py
+  # Validate the CVE scanner works. TODO(htuch): create a dedicated tools CI target.
+  python3.8 tools/dependency/cve_scan_test.py
   # Build docs.
-  docs/build.sh
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   echo "verify examples..."
