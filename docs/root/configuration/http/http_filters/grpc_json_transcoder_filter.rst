@@ -29,17 +29,18 @@ To generate a protobuf descriptor set for the gRPC service, you'll also need to 
 googleapis repository from GitHub before running protoc, as you'll need annotations.proto
 in your include path, to define the HTTP mapping.
 
-.. code-block:: bash
+.. code-block:: console
 
-  git clone https://github.com/googleapis/googleapis
-  GOOGLEAPIS_DIR=<your-local-googleapis-folder>
+  $ git clone https://github.com/googleapis/googleapis
+  $ GOOGLEAPIS_DIR=<your-local-googleapis-folder>
 
-Then run protoc to generate the descriptor set from bookstore.proto:
+Then run protoc to generate the descriptor set. For example using the test
+:repo:`bookstore.proto <test/proto/bookstore.proto>` provided in the Envoy repository:
 
-.. code-block:: bash
+.. code-block:: console
 
-  protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
-    --descriptor_set_out=proto.pb test/proto/bookstore.proto
+  $ protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
+      --descriptor_set_out=proto.pb test/proto/bookstore.proto
 
 If you have more than one proto source files, you can pass all of them in one command.
 
@@ -56,19 +57,17 @@ For example, with the following proto example, the router will process `/hellowo
 as the path, so the route config prefix `/say` won't match requests to `SayHello`. If you want to
 match the incoming request path, set `match_incoming_request_route` to true.
 
-.. code-block:: proto
+.. literalinclude:: _include/helloworld.proto
+    :language: proto
 
-  package helloworld;
+Assuming you have checked out the google APIs as described above, and have saved the proto file as
+``protos/helloworld.proto`` you can build it with:
 
-  // The greeting service definition.
-  service Greeter {
-    // Sends a greeting
-    rpc SayHello (HelloRequest) returns (HelloReply) {
-      option (google.api.http) = {
-        get: "/say"
-      };
-    }
-  }
+.. code-block:: console
+
+  $ protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
+      --descriptor_set_out=protos/helloworld.pb protos/helloworld.proto
+
 
 Sending arbitrary content
 -------------------------
