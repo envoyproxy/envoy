@@ -72,7 +72,6 @@ public:
   bool onData(Buffer::Instance& data, bool frontend) override;
   PostgresSession& getSession() override { return session_; }
 
-  void setMessage(std::string message) { message_ = message; }
   std::string getMessage() { return message_; }
 
   void setStartup(bool startup) { startup_ = startup; }
@@ -122,7 +121,7 @@ protected:
     MsgAction unknown_;
   };
 
-  bool parseMessage(Buffer::Instance& data);
+  bool parseHeader(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
   void decodeBackendStatements();

@@ -15,6 +15,9 @@ cc_library(
             "wee8/src/**/*.h",
             "wee8/third_party/wasm-api/wasm.hh",
         ]),
+    copts = [
+        "-Wno-range-loop-analysis",
+    ],
     defines = ["ENVOY_WASM_V8"],
     includes = [
         "wee8",
