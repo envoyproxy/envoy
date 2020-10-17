@@ -24,7 +24,7 @@ using SpanStorePtr = std::unique_ptr<SpanStore>;
 class SpanContext;
 using SpanContextPtr = std::unique_ptr<SpanContext>;
 
-class SpanContext {
+class SpanContext : public Logger::Loggable<Logger::Id::tracing> {
 public:
   /*
    * Parse the context of the previous span from the request and decide whether to sample it or
@@ -62,7 +62,7 @@ private:
   SpanContext() = default;
 };
 
-class SegmentContext {
+class SegmentContext : public Logger::Loggable<Logger::Id::tracing> {
 public:
   /*
    * Create a new segment context based on the previous span context that parsed from request
@@ -146,7 +146,7 @@ using Tag = KeyStringValuePair;
  * object. The new span will hold a pointer to the newly created SpanStore object and write data to
  * it or get data from it.
  */
-class SpanStore {
+class SpanStore : public Logger::Loggable<Logger::Id::tracing> {
 public:
   /*
    * Construct a SpanStore object using span context and time source.

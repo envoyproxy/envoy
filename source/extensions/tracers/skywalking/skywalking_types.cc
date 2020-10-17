@@ -106,9 +106,18 @@ SegmentContext::SegmentContext(SpanContextPtr&& previous_span_context, Tracing::
     sampled_ = decision.traced;
   }
   trace_segment_id_ = generateId(random_generator);
+
+  // Some detailed log for debug.
+  ENVOY_LOG(trace, "{} and create new SkyWalking segment:",
+            previous_span_context_ ? "Has previous span context" : "No previous span context");
+
+  ENVOY_LOG(trace, "    Trace ID: {}", trace_id_);
+  ENVOY_LOG(trace, "    Segment ID: {}", trace_segment_id_);
+  ENVOY_LOG(trace, "    Sampled: {}", sampled_);
 }
 
 SpanStore* SegmentContext::createSpanStore(const SpanStore* parent_span_store) {
+  ENVOY_LOG(trace, "Create new SpanStore object for current segment: {}", trace_segment_id_);
   SpanStorePtr new_span_store = std::make_unique<SpanStore>(this);
   new_span_store->setSpanId(span_list_.size());
   if (!parent_span_store) {
@@ -136,10 +145,17 @@ void SpanStore::injectContext(Http::RequestHeaderMap& request_headers) const {
   // For SkyWalking Entry Span, Envoy does not need to inject tracing context into the request
   // headers.
   if (is_entry_span_) {
+    ENVOY_LOG(debug, "Skip tracing context injection for SkyWalking Entry Span");
     return;
   }
 
+  ENVOY_LOG(debug, "Inject or update SkyWalking propagation header in upstream request headers");
   const_cast<SpanStore*>(this)->setPeerAddress(std::string(request_headers.getHostValue()));
+
+  ENVOY_LOG(trace, "'sw8' header: '({}) - ({}) - ({}) - ({}) - ({}) - ({}) - ({}) - ({})'",
+            sampled_, segment_context_->traceId(), segment_context_->traceSegmentId(), span_id_,
+            segment_context_->service(), segment_context_->serviceInstance(),
+            segment_context_->rootSpanStore()->operation(), peer_address_);
 
   // Reference:
   // https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md.

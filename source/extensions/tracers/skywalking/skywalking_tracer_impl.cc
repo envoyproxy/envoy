@@ -58,7 +58,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     return tracer.startSpan(config, start_time, operation_name, std::move(segment_context),
                             nullptr);
 
-  } catch (const EnvoyException&) {
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(warn, "New SkyWalking Span/Segment cannot be created for error: {}", e.what());
     return std::make_unique<Tracing::NullSpan>();
   }
 }
