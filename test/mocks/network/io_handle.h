@@ -51,6 +51,7 @@ public:
   MOCK_METHOD(absl::optional<int>, domain, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr, localAddress, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr, peerAddress, ());
+  MOCK_METHOD(IoHandlePtr, duplicate, ());
   MOCK_METHOD(void, createFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
