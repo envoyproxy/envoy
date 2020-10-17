@@ -121,7 +121,7 @@ public:
     io_handle_.initializeFileEvent(dispatcher, cb, trigger, events);
   }
 
-  IoHandlePtr duplicate() override { return io_handle_.duplicate(); }
+  Network::IoHandlePtr duplicate() override { return io_handle_.duplicate(); }
 
   void activateFileEvents(uint32_t events) override { io_handle_.activateFileEvents(events); }
   void enableFileEvents(uint32_t events) override { io_handle_.enableFileEvents(events); }
