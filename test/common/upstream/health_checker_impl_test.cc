@@ -942,6 +942,8 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
       Network::TransportSocketFactoryPtr(socket_factory));
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
 
+  EXPECT_CALL(*socket_factory, addReadyCb(_))
+      .WillOnce(Invoke([&](std::function<void()> callback) -> void { callback(); }));
   EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
 
   allocHealthChecker(yaml);
@@ -2429,13 +2431,19 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
       ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_store, "test"))};
   auto health_check_only_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
 
-  // We expect resolve() to be called twice, once for endpoint socket matching (with no metadata in
-  // this test) and once for health check socket matching. In the latter we expect metadata that
-  // matches the above object.
+  // We expect resolve() to be called 3 times, once for endpoint socket matching (with no metadata
+  // in this test) and twice for health check socket matching (once for checking if secrets are
+  // ready on the transport socket, and again for actually getting the health check transport socket
+  // to create a connection). In the latter 2 calls, we expect metadata that matches the above
+  // object.
   EXPECT_CALL(*transport_socket_match, resolve(nullptr));
   EXPECT_CALL(*transport_socket_match, resolve(MetadataEq(metadata)))
-      .WillOnce(Return(TransportSocketMatcher::MatchData(
-          *health_check_only_socket_factory, health_transport_socket_stats, "health_check_only")));
+      .Times(2)
+      .WillRepeatedly(Return(TransportSocketMatcher::MatchData(
+          *health_check_only_socket_factory, health_transport_socket_stats, "health_check_only")))
+      .RetiresOnSaturation();
+  EXPECT_CALL(*health_check_only_socket_factory, addReadyCb(_))
+      .WillOnce(Invoke([&](std::function<void()> callback) -> void { callback(); }));
   // The health_check_only_socket_factory should be used to create a transport socket for the health
   // check connection.
   EXPECT_CALL(*health_check_only_socket_factory, createTransportSocket(_));
@@ -2471,6 +2479,9 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
     )EOF";
 
   auto default_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
+
+  EXPECT_CALL(*default_socket_factory, addReadyCb(_))
+      .WillOnce(Invoke([&](std::function<void()> callback) -> void { callback(); }));
   // The default_socket_factory should be used to create a transport socket for the health check
   // connection.
   EXPECT_CALL(*default_socket_factory, createTransportSocket(_));
