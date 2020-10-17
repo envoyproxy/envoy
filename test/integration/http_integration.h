@@ -7,11 +7,14 @@
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
 
 namespace Envoy {
+
+using ::Envoy::Http::Http2::Http2Frame;
 
 /**
  * HTTP codec client used during integration testing.
@@ -253,4 +256,20 @@ protected:
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };
+
+// Helper class for integration tests using raw HTTP/2 frames
+class Http2RawFrameIntegrationTest : public HttpIntegrationTest {
+public:
+  Http2RawFrameIntegrationTest(Network::Address::IpVersion version)
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, version) {}
+
+protected:
+  void startHttp2Session();
+  Http2Frame readFrame();
+  void sendFrame(const Http2Frame& frame);
+  virtual void beginSession();
+
+  IntegrationTcpClientPtr tcp_client_;
+};
+
 } // namespace Envoy
