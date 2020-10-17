@@ -17,7 +17,7 @@ public:
   TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
                   SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
                   uint32_t backlog_size);
-  ~TcpListenerImpl() {socket_->ioHandle().resetFileEvents();}
+  ~TcpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
   void disable() override;
   void enable() override;
   void setRejectFraction(float reject_fraction) override;
