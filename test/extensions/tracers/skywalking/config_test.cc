@@ -69,7 +69,6 @@ TEST(SkyWalkingTracerConfigTest, SkyWalkingHttpTracerWithClientConfig) {
         authentication: "A fake auth string for SkyWalking test"
         service_name: "Test Service"
         instance_name: "Test Instance"
-        pass_endpoint: true
         max_cache_size: 2333
    )EOF";
   envoy::config::trace::v3::Tracing configuration;
