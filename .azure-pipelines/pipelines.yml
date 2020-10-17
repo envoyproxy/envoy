@@ -151,7 +151,7 @@ stages:
               AZP_BRANCH: $(Build.SourceBranch)
 
   - stage: linux_x64
-    dependsOn: []
+    dependsOn: ["precheck"]
     # For master builds, continue even if precheck fails
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
     jobs:
@@ -166,7 +166,7 @@ stages:
               ciTarget: bazel.release
 
   - stage: linux_arm64
-    dependsOn: []
+    dependsOn: ["precheck"]
     # For master builds, continue even if precheck fails
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
     jobs:
