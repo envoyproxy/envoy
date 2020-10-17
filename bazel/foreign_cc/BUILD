@@ -67,16 +67,13 @@ configure_make(
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
         "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
-        "//bazel:windows_dbg_build": {"WINDOWS_DBG_BUILD": "debug"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_moonjit_moonjit//:all",
     make_commands = [],
     out_include_dir = "include/moonjit-2.2",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["lua51.lib"],
-        "//conditions:default": ["libluajit-5.1.a"],
-    }),
+    static_libraries = ["libluajit-5.1.a"],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
