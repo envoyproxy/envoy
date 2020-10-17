@@ -15,8 +15,6 @@ services:
       - "8080:8080"
       - "8443:8443"
       - "8001:8001"
-    volumes:
-      - ./front-envoy.yaml:/etc/front-envoy.yaml
 
   service1:
     build:
