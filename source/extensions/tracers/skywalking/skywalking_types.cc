@@ -108,31 +108,37 @@ SegmentContext::SegmentContext(SpanContextPtr&& previous_span_context, Tracing::
   trace_segment_id_ = generateId(random_generator);
 }
 
-SpanStore* SegmentContext::createSpanStore(const SpanStore* parent_store) {
-  SpanStorePtr store = std::make_unique<SpanStore>(this);
-  store->setSpanId(span_list_.size());
-  if (!parent_store) {
-    // First span.
-    store->setSampled(sampled_);
-    store->setParentSpanId(-1);
+SpanStore* SegmentContext::createSpanStore(const SpanStore* parent_span_store) {
+  SpanStorePtr new_span_store = std::make_unique<SpanStore>(this);
+  new_span_store->setSpanId(span_list_.size());
+  if (!parent_span_store) {
+    // The parent SpanStore object does not exist. Create the root SpanStore object in the current
+    // segment.
+    new_span_store->setSampled(sampled_);
+    new_span_store->setParentSpanId(-1);
     // First span of current segment for Envoy Proxy must be a Entry Span. It is created for
     // downstream HTTP request.
-    store->setAsEntrySpan(true);
+    new_span_store->setAsEntrySpan(true);
   } else {
-    // Child span.
-    store->setSampled(parent_store->sampled());
-    store->setParentSpanId(parent_store->spanId());
-    store->setAsEntrySpan(false);
+    // Create child SpanStore object.
+    new_span_store->setSampled(parent_span_store->sampled());
+    new_span_store->setParentSpanId(parent_span_store->spanId());
+    new_span_store->setAsEntrySpan(false);
   }
-  SpanStore* ref = store.get();
-  span_list_.emplace_back(std::move(store));
+  SpanStore* ref = new_span_store.get();
+  span_list_.emplace_back(std::move(new_span_store));
   return ref;
 }
 
 void SpanStore::injectContext(Http::RequestHeaderMap& request_headers) const {
   ASSERT(segment_context_);
 
-  ASSERT(!is_entry_span_);
+  // For SkyWalking Entry Span, Envoy does not need to inject tracing context into the request
+  // headers.
+  if (is_entry_span_) {
+    return;
+  }
+
   const_cast<SpanStore*>(this)->setPeerAddress(std::string(request_headers.getHostValue()));
 
   // Reference:
