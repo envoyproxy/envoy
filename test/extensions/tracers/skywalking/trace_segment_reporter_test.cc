@@ -91,19 +91,18 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
   ON_CALL(mock_time_source_, systemTime()).WillByDefault(Return(time_system.systemTime()));
   SegmentContextSharedPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE", mock_random_generator_);
-  SpanStore* parent_store = SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr,
-                                                                  "PARENT", mock_time_source_);
+  SpanStore* parent_store =
+      SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr, "PARENT");
   // Parent span store has peer address.
   parent_store->setPeerAddress("0.0.0.0");
 
-  SpanStore* first_child_sptore = SkyWalkingTestHelper::createSpanStore(
-      segment_context.get(), parent_store, "CHILD", mock_time_source_);
+  SpanStore* first_child_sptore =
+      SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD");
   // Skip reporting the first child span.
   first_child_sptore->setSampled(0);
 
   // Create second child span.
-  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD",
-                                        mock_time_source_);
+  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD");
 
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
 
@@ -117,8 +116,7 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
   // Create a segment context with no previous span context.
   SegmentContextSharedPtr second_segment_context = SkyWalkingTestHelper::createSegmentContext(
       true, "SECOND_SEGMENT", "", mock_random_generator_);
-  SkyWalkingTestHelper::createSpanStore(second_segment_context.get(), nullptr, "PARENT",
-                                        mock_time_source_);
+  SkyWalkingTestHelper::createSpanStore(second_segment_context.get(), nullptr, "PARENT");
 
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
   reporter_->report(*second_segment_context);
@@ -136,10 +134,9 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithDefaultCache) {
   ON_CALL(mock_time_source_, systemTime()).WillByDefault(Return(time_system.systemTime()));
   SegmentContextSharedPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE", mock_random_generator_);
-  SpanStore* parent_store = SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr,
-                                                                  "PARENT", mock_time_source_);
-  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD",
-                                        mock_time_source_);
+  SpanStore* parent_store =
+      SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr, "PARENT");
+  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD");
 
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(1025);
 
@@ -187,10 +184,9 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
   ON_CALL(mock_time_source_, systemTime()).WillByDefault(Return(time_system.systemTime()));
   SegmentContextSharedPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE", mock_random_generator_);
-  SpanStore* parent_store = SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr,
-                                                                  "PARENT", mock_time_source_);
-  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD",
-                                        mock_time_source_);
+  SpanStore* parent_store =
+      SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr, "PARENT");
+  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD");
 
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(4);
 
