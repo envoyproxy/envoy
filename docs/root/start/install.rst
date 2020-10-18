@@ -172,33 +172,30 @@ Pre-built Docker images
      - description
      - multiarch
    * - envoyproxy/envoy
-     - asdfasdf
+     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
      - X
    * - envoyproxy/envoy-alpine
-     - asdfasdf
-     - X
+     - Release binary with symbols stripped on top of a **glibc** alpine base.
+     -
    * - envoyproxy/envoy-debug
-     - asdfasdf
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
      - X
    * - envoyproxy/envoy-dev
-     - asdfasdf
+     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
      - X
    * - envoyproxy/envoy-debug-dev
-     - asdfasd
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
      - X
    * - envoyproxy/envoy-alpine-dev
-     - asdfa
-     - X
+     - Release binary with symbols stripped on top of a **glibc** alpine base.
+     -
 
 We build and tag Docker images with release versions when we do official releases. These images can
 be found in the following repositories:
 
-* `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_: Release binary with
-  symbols stripped on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_: Release
-  binary with debug symbols on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_: Release
-  binary with symbols stripped on top of a **glibc** alpine base.
+* `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_:
+* `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_:
+* `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_:
 
 .. note::
 
@@ -207,12 +204,9 @@ be found in the following repositories:
 On every master commit we additionally create a set of development Docker images. These images can
 be found in the following repositories:
 
-* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_: Release binary with
-  symbols stripped on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_: Release
-  binary with debug symbols on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: Release
-  binary with symbols stripped on top of a **glibc** alpine base.
+* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_:
+* `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_:
+* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_:
 
 In the above *dev* repositories, the *latest* tag points to the last Envoy SHA in master that passed
 tests.
