@@ -158,46 +158,6 @@ Pre-built Envoy Docker images
 .. list-table::
    :widths: 30 40 10 10 10
    :header-rows: 1
-
-   * - Docker image
-     - description
-     - stable/amd64
-     - stable/arm64
-     - master
-   * - `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_
-     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`__
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`__
-     -
-   * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
-     - Release binary with symbols stripped on top of a **glibc** alpine base.
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`__
-     -
-     -
-   * - `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_:
-     - Release binary with debug symbols on top of an Ubuntu Bionic base.
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`__
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`__
-     -
-   * - `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
-     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`__
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`__
-     - `latest <https://hub.docker.com/layers/envoyproxy/envoy-dev/latest/images/sha256-f829a7a7cf26049ff0fb785677681c464f9c98b5759f5fa1bb41746ec844acc8?context=explore>`__
-   * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
-     - Release binary with debug symbols on top of an Ubuntu Bionic base.
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`__
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`__
-     - `latest <https://hub.docker.com/layers/envoyproxy/envoy-dev/latest/images/sha256-f829a7a7cf26049ff0fb785677681c464f9c98b5759f5fa1bb41746ec844acc8?context=explore>`__
-   * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
-     - Release binary with symbols stripped on top of a **glibc** alpine base.
-     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`__
-     -
-     - `latest <https://hub.docker.com/layers/envoyproxy/envoy-dev/latest/images/sha256-f829a7a7cf26049ff0fb785677681c464f9c98b5759f5fa1bb41746ec844acc8?context=explore>`__
-
-.. csv-table::
-   :widths: 30 40 10 10 10
-   :header-rows: 1
    :file: _include/dockerhub-images.csv
 
 
