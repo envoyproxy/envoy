@@ -163,32 +163,45 @@ The following commands will pull and show the Envoy version of current images.
 Pre-built Docker images
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-
 .. list-table:: Title
-   :widths: 40 40 20
+   :widths: 20 50 10 10 10
    :header-rows: 1
 
    * - Docker image
      - description
-     - multiarch
+     - stable/amd64
+     - stable/arm64
+     - master
    * - envoyproxy/envoy
      - Release binary with symbols stripped on top of an Ubuntu Bionic base.
-     - X
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`_:
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`_
+     -
    * - envoyproxy/envoy-alpine
      - Release binary with symbols stripped on top of a **glibc** alpine base.
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`_:
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`_
      -
    * - envoyproxy/envoy-debug
      - Release binary with debug symbols on top of an Ubuntu Bionic base.
-     - X
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`_:
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`_
+     -
    * - envoyproxy/envoy-dev
      - Release binary with symbols stripped on top of an Ubuntu Bionic base.
-     - X
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`_:
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`_
+     - `latest <https://hub.docker.com/layers/envoyproxy/envoy-dev/latest/images/sha256-f829a7a7cf26049ff0fb785677681c464f9c98b5759f5fa1bb41746ec844acc8?context=explore>`_
    * - envoyproxy/envoy-debug-dev
      - Release binary with debug symbols on top of an Ubuntu Bionic base.
-     - X
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`_:
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`_
+     - `latest <https://hub.docker.com/layers/envoyproxy/envoy-dev/latest/images/sha256-f829a7a7cf26049ff0fb785677681c464f9c98b5759f5fa1bb41746ec844acc8?context=explore>`_
    * - envoyproxy/envoy-alpine-dev
      - Release binary with symbols stripped on top of a **glibc** alpine base.
-     -
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`_:
+     - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`_
+     - `latest <https://hub.docker.com/layers/envoyproxy/envoy-dev/latest/images/sha256-f829a7a7cf26049ff0fb785677681c464f9c98b5759f5fa1bb41746ec844acc8?context=explore>`_
 
 We build and tag Docker images with release versions when we do official releases. These images can
 be found in the following repositories:
