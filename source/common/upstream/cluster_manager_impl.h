@@ -199,8 +199,7 @@ public:
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context, Grpc::Context& grpc_context,
-                     Secret::SecretManager& secret_manager);
+                     Http::Context& http_context, Grpc::Context& grpc_context);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -519,7 +518,6 @@ private:
   Http::Context& http_context_;
   Config::SubscriptionFactoryImpl subscription_factory_;
   ClusterSet primary_clusters_;
-  Secret::SecretManager& secret_manager_;
 };
 
 } // namespace Upstream

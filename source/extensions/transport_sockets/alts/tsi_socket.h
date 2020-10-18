@@ -103,6 +103,7 @@ public:
 
   // TODO(mpuncel) only invoke callback() once secrets are ready.
   void addReadyCb(std::function<void()> callback) override { callback(); };
+  bool secureTransportReady() const override;
 
 private:
   HandshakerFactory handshaker_factory_;

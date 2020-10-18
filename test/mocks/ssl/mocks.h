@@ -83,6 +83,10 @@ public:
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
+  MOCK_METHOD(const std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>&,
+              tlsCertificateSdsConfigs, (), (const));
+  MOCK_METHOD(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig&,
+              validationContextSdsConfig, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
@@ -119,6 +123,10 @@ public:
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
+  MOCK_METHOD(const std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>&,
+              tlsCertificateSdsConfigs, (), (const));
+  MOCK_METHOD(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig&,
+              validationContextSdsConfig, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));

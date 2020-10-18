@@ -322,11 +322,12 @@ SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& sto
 }
 } // namespace
 
-ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
+ClientSslSocketFactory::ClientSslSocketFactory(Secret::SecretManager& secret_manager,
+                                               Envoy::Ssl::ClientContextConfigPtr config,
                                                Envoy::Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope)
-    : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
-      config_(std::move(config)),
+    : secret_manager_(secret_manager), manager_(manager), stats_scope_(stats_scope),
+      stats_(generateStats("client", stats_scope)), config_(std::move(config)),
       ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
@@ -386,6 +387,24 @@ void ClientSslSocketFactory::addReadyCb(std::function<void()> callback) {
   } else {
     secrets_ready_callbacks_.push_back(callback);
   }
+}
+
+bool ClientSslSocketFactory::secureTransportReady() const {
+  if (!implementsSecureTransport()) {
+    return false;
+  }
+  const auto& tls_certificate_sds_configs = config_->tlsCertificateSdsConfigs();
+  for (const auto& config : tls_certificate_sds_configs) {
+    if (!secret_manager_.checkTlsCertificateEntityExists(config.sds_config(), config.name())) {
+      return false;
+    }
+  }
+  const auto& validation_context_sds_config = config_->validationContextSdsConfig();
+  if (!secret_manager_.checkCertificateValidationContextEntityExists(
+          validation_context_sds_config.sds_config(), validation_context_sds_config.name())) {
+    return false;
+  }
+  return true;
 }
 
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
@@ -455,6 +474,7 @@ void ServerSslSocketFactory::addReadyCb(std::function<void()> callback) {
   }
 }
 
+bool ServerSslSocketFactory::secureTransportReady() const { NOT_REACHED_GCOVR_EXCL_LINE; }
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

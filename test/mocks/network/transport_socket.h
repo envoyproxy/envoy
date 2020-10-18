@@ -39,6 +39,7 @@ public:
   MOCK_METHOD(TransportSocketPtr, createTransportSocket, (TransportSocketOptionsSharedPtr),
               (const));
   MOCK_METHOD(void, addReadyCb, (std::function<void()>));
+  MOCK_METHOD(bool, secureTransportReady, (), (const));
 };
 
 } // namespace Network

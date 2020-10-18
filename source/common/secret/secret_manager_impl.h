@@ -108,7 +108,7 @@ private:
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
       std::shared_ptr<SecretType> secret_provider = dynamic_secret_providers_[map_key].lock();
       if (!secret_provider) {
-        return false;
+        return true;
       }
       return secret_provider->secret() != nullptr;
     }

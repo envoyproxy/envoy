@@ -77,9 +77,10 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
       tls_context, options.sigalgs_, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
+  auto secret_manager = Secret::MockSecretManager();
   return Network::TransportSocketFactoryPtr{
-      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(std::move(cfg), context_manager,
-                                                                    *client_stats_store)};
+      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
+          secret_manager, std::move(cfg), context_manager, *client_stats_store)};
 }
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,

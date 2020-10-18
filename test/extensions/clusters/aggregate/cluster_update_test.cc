@@ -40,7 +40,7 @@ public:
     cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_, secret_manager_);
+        *factory_.api_, http_context_, grpc_context_);
     cluster_manager_->initializeSecondaryClusters(bootstrap);
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->get("aggregate_cluster");
@@ -49,7 +49,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Server::MockAdmin> admin_;
   NiceMock<Upstream::TestClusterManagerFactory> factory_;
-  NiceMock<Secret::MockSecretManager> secret_manager_;
   Upstream::ThreadLocalCluster* cluster_;
 
   Event::SimulatedTimeSystem time_system_;
@@ -264,7 +263,7 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
       bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.local_info_,
       log_manager_, factory_.dispatcher_, admin_, validation_context_, *factory_.api_,
-      http_context_, grpc_context_, secret_manager_);
+      http_context_, grpc_context_);
   cluster_manager_->initializeSecondaryClusters(bootstrap);
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->get("aggregate_cluster");

@@ -234,6 +234,11 @@ ContextConfigImpl::ContextConfigImpl(
         factory_context.messageValidationVisitor());
   }
   capabilities_ = handshaker_factory->capabilities();
+
+  for (const auto& sds_secret_config : config.tls_certificate_sds_secret_configs()) {
+    tls_certificate_sds_configs_.emplace_back(sds_secret_config);
+  }
+  validation_context_sds_config_ = config.validation_context_sds_secret_config();
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(

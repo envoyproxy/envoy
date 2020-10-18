@@ -4,7 +4,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
-#include "envoy/secret/secret_manager.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/upstream/cds_api.h"
@@ -52,7 +51,7 @@ public:
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_, secret_manager_);
+        *factory_.api_, http_context_, grpc_context_);
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
@@ -96,8 +95,7 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
-        secret_manager_);
+        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -143,7 +141,6 @@ public:
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  NiceMock<Secret::MockSecretManager> secret_manager_;
   MockLocalClusterUpdate local_cluster_update_;
   MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
@@ -2312,28 +2309,22 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
 TEST_F(ClusterManagerImplTest,
        DynamicAddedAndKeepWarmingWithoutCertificateValidationContextEntity) {
-  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  auto* validation_context_sds_secret_config =
-      tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
-  validation_context_sds_secret_config->set_name("sds_validation_context");
-  auto* config_source = validation_context_sds_secret_config->mutable_sds_config();
-  auto* api_config_source = config_source->mutable_api_config_source();
-  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-
-  envoy::config::core::v3::TransportSocket transport_socket;
-  transport_socket.set_name("envoy.transport_sockets.tls");
-  transport_socket.mutable_typed_config()->PackFrom(tls_context);
-
   create(defaultConfig());
 
-  InSequence s;
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "fake_cluster";
-  cluster1->info_->transport_socket_ = transport_socket;
+
+  auto transport_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
+  EXPECT_CALL(*transport_socket_factory, implementsSecureTransport()).WillOnce(Return(true));
+  EXPECT_CALL(*transport_socket_factory, secureTransportReady()).WillOnce(Return(false));
+
+  auto transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
+      std::move(transport_socket_factory));
+  cluster1->info_->transport_socket_matcher_ = std::move(transport_socket_matcher);
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
@@ -2354,31 +2345,22 @@ TEST_F(ClusterManagerImplTest,
 }
 
 TEST_F(ClusterManagerImplTest, DynamicAddedAndKeepWarmingWithoutTlsCertificateEntity) {
-  envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig secret_config;
-  secret_config.set_name("sds_tls_certificate");
-  auto* config_source = secret_config.mutable_sds_config();
-  auto* api_config_source = config_source->mutable_api_config_source();
-  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-
-  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  auto tls_certificate_sds_secret_configs =
-      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs();
-  *tls_certificate_sds_secret_configs->Add() = secret_config;
-
-  envoy::config::core::v3::TransportSocket transport_socket;
-  transport_socket.set_name("envoy.transport_sockets.tls");
-  transport_socket.mutable_typed_config()->PackFrom(tls_context);
-
   create(defaultConfig());
 
-  InSequence s;
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "fake_cluster";
-  cluster1->info_->transport_socket_ = transport_socket;
+
+  auto transport_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
+  EXPECT_CALL(*transport_socket_factory, implementsSecureTransport()).WillOnce(Return(true));
+  EXPECT_CALL(*transport_socket_factory, secureTransportReady()).WillOnce(Return(false));
+
+  auto transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
+      std::move(transport_socket_factory));
+  cluster1->info_->transport_socket_matcher_ = std::move(transport_socket_matcher);
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));

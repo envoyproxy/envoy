@@ -37,6 +37,14 @@ public:
     }
     return configs;
   }
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>&
+  tlsCertificateSdsConfigs() const override {
+    return tls_certificate_sds_configs_;
+  }
+  const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig&
+  validationContextSdsConfig() const override {
+    return validation_context_sds_config_;
+  }
   const Envoy::Ssl::CertificateValidationContextConfig*
   certificateValidationContext() const override {
     return validation_context_config_.get();
@@ -81,6 +89,9 @@ private:
 
   std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>
+      tls_certificate_sds_configs_;
+  envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig validation_context_sds_config_;
   // If certificate validation context type is combined_validation_context. default_cvc_
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.
   // Otherwise, default_cvc_ is nullptr.

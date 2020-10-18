@@ -123,6 +123,10 @@ bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
   return transport_socket_factory_->implementsSecureTransport();
 }
 
+bool UpstreamProxyProtocolSocketFactory::secureTransportReady() const {
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
 } // namespace ProxyProtocol
 } // namespace TransportSockets
 } // namespace Extensions

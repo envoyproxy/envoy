@@ -333,7 +333,8 @@ void testUtil(const TestUtilOptions& options) {
 
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
-  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+  auto secret_manager = Secret::MockSecretManager();
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager, std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -640,9 +641,10 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       client_factory_context;
   ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
 
+  auto secret_manager = Secret::MockSecretManager();
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(options.clientCtxProto(), client_factory_context);
-  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager, std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -830,6 +832,7 @@ protected:
 
   Event::DispatcherPtr dispatcher_;
   StreamInfo::StreamInfoImpl stream_info_;
+  Secret::MockSecretManager secret_manager_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,
@@ -2490,7 +2493,7 @@ TEST_P(SslSocketTest, HalfClose) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::TestUtil::TestStore client_stats_store;
-  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager_, std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -2576,7 +2579,8 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::TestUtil::TestStore client_stats_store;
-  ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
+  ClientSslSocketFactory ssl_socket_factory(secret_manager_, std::move(client_cfg), manager,
+                                            client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
@@ -2673,9 +2677,11 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       client_factory_context;
   ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
 
+  auto secret_manager = Secret::MockSecretManager();
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
-  ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
+  ClientSslSocketFactory ssl_socket_factory(secret_manager, std::move(client_cfg), manager,
+                                            client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket1->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
@@ -2809,9 +2815,11 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
       client_factory_context;
   ON_CALL(client_factory_context, api()).WillByDefault(ReturnRef(*client_api));
 
+  auto secret_manager = Secret::MockSecretManager();
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
-  ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
+  ClientSslSocketFactory ssl_socket_factory(secret_manager, std::move(client_cfg), manager,
+                                            client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       tcp_socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
@@ -3258,7 +3266,8 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::TestUtil::TestStore client_stats_store;
-  ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
+  ClientSslSocketFactory ssl_socket_factory(secret_manager_, std::move(client_cfg), manager,
+                                            client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
@@ -3374,7 +3383,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_ctx_proto, client_factory_context);
-  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager_, std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -4531,7 +4540,8 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_FALSE(client_cfg->isReady());
 
   ContextManagerImpl manager(time_system_);
-  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager_, std::move(client_cfg), manager,
+                                                   stats_store);
 
   // Add a secrets ready callback that should not be invoked.
   MockFunction<void()> mock_callback_;
@@ -4547,6 +4557,63 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   result = transport_socket->doWrite(buffer, true);
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
   EXPECT_EQ("TLS error: Secret is not supplied by SDS", transport_socket->failureReason());
+}
+
+TEST_P(SslSocketTest, TransportSocketNotReadyWhenNoTlsCertEntity) {
+  Stats::TestUtil::TestStore stats_store;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
+  EXPECT_TRUE(client_cfg->tlsCertificates().empty());
+  EXPECT_FALSE(client_cfg->isReady());
+
+  NiceMock<Ssl::MockContextManager> context_manager;
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager_, std::move(client_cfg),
+                                                   context_manager, stats_store);
+  EXPECT_CALL(secret_manager_, checkTlsCertificateEntityExists(_, _)).WillOnce(Return(false));
+  EXPECT_CALL(secret_manager_, checkCertificateValidationContextEntityExists(_, _)).Times(0);
+  EXPECT_FALSE(client_ssl_socket_factory.secureTransportReady());
+}
+
+TEST_P(SslSocketTest, TransportSocketNotReadyWhenNoValidationContextEntity) {
+  Stats::TestUtil::TestStore stats_store;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto sds_secret_config =
+      tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
+  sds_secret_config->set_name("abc.com");
+  sds_secret_config->mutable_sds_config();
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
+  EXPECT_TRUE(client_cfg->tlsCertificates().empty());
+  EXPECT_FALSE(client_cfg->isReady());
+
+  NiceMock<Ssl::MockContextManager> context_manager;
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager_, std::move(client_cfg),
+                                                   context_manager, stats_store);
+  EXPECT_CALL(secret_manager_, checkTlsCertificateEntityExists(_, _)).Times(0);
+  EXPECT_CALL(secret_manager_, checkCertificateValidationContextEntityExists(_, _))
+      .WillOnce(Return(false));
+  EXPECT_FALSE(client_ssl_socket_factory.secureTransportReady());
 }
 
 // Validate that secrets callbacks are invoked when secrets become ready.
@@ -4571,8 +4638,8 @@ TEST_P(SslSocketTest, ClientAddSecretsReadyCallback) {
   EXPECT_FALSE(client_cfg->isReady());
 
   NiceMock<Ssl::MockContextManager> context_manager;
-  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), context_manager,
-                                                   stats_store);
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager_, std::move(client_cfg),
+                                                   context_manager, stats_store);
 
   // Add a secrets ready callback. It should not be invoked until onAddOrUpdateSecret() is called.
   MockFunction<void()> mock_callback_;
@@ -4657,7 +4724,8 @@ TEST_P(SslSocketTest, TestTransportSocketCallback) {
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
 
   ContextManagerImpl manager(time_system_);
-  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
+  ClientSslSocketFactory client_ssl_socket_factory(secret_manager_, std::move(client_cfg), manager,
+                                                   stats_store);
 
   Network::TransportSocketPtr transport_socket =
       client_ssl_socket_factory.createTransportSocket(nullptr);
@@ -4693,7 +4761,7 @@ protected:
         std::make_unique<ClientContextConfigImpl>(upstream_tls_context_, factory_context_);
 
     client_ssl_socket_factory_ = std::make_unique<ClientSslSocketFactory>(
-        std::move(client_cfg), *manager_, client_stats_store_);
+        secret_manager_, std::move(client_cfg), *manager_, client_stats_store_);
     auto transport_socket = client_ssl_socket_factory_->createTransportSocket(nullptr);
     client_transport_socket_ = transport_socket.get();
     client_connection_ = dispatcher_->createClientConnection(
@@ -4870,6 +4938,7 @@ protected:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   StrictMock<Network::MockConnectionCallbacks> client_callbacks_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  Secret::MockSecretManager secret_manager_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslReadBufferLimitTest,

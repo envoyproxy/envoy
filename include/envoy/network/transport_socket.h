@@ -233,6 +233,11 @@ public:
    * are already loaded.
    */
   virtual void addReadyCb(std::function<void()> callback) PURE;
+
+  /**
+   * Check whether matched transport socket which required to use secret information is available.
+   */
+  virtual bool secureTransportReady() const PURE;
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

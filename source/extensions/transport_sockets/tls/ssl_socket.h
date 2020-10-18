@@ -6,6 +6,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
@@ -102,19 +103,22 @@ class ClientSslSocketFactory : public Network::TransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
+  ClientSslSocketFactory(Secret::SecretManager& secret_manager,
+                         Envoy::Ssl::ClientContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
 
+  // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-
   void addReadyCb(std::function<void()> callback) override;
+  bool secureTransportReady() const override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
 private:
+  Secret::SecretManager& secret_manager_;
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
@@ -137,6 +141,7 @@ public:
   bool implementsSecureTransport() const override;
 
   void addReadyCb(std::function<void()> callback) override;
+  bool secureTransportReady() const override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

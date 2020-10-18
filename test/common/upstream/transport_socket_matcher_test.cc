@@ -34,6 +34,7 @@ public:
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsSharedPtr), (const));
   MOCK_METHOD(void, addReadyCb, (std::function<void()>));
+  MOCK_METHOD(bool, secureTransportReady, (), (const));
   FakeTransportSocketFactory(std::string id) : id_(std::move(id)) {}
   std::string id() const { return id_; }
 
@@ -50,6 +51,7 @@ public:
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsSharedPtr), (const));
   MOCK_METHOD(void, addReadyCb, (std::function<void()>));
+  MOCK_METHOD(bool, secureTransportReady, (), (const));
 
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,

@@ -84,6 +84,18 @@ public:
    * @return the set of capabilities for handshaker instances created by this context.
    */
   virtual HandshakerCapabilities capabilities() const PURE;
+
+  /**
+   * @return the set of sds configurations for TLS certificate entity.
+   */
+  virtual const std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>&
+  tlsCertificateSdsConfigs() const PURE;
+
+  /**
+   * @return sds configuration for validation context entity.
+   */
+  virtual const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig&
+  validationContextSdsConfig() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

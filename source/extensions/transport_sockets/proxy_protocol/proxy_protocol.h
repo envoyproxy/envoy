@@ -50,6 +50,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   void addReadyCb(std::function<void()> callback) override { callback(); };
+  bool secureTransportReady() const override;
 
 private:
   Network::TransportSocketFactoryPtr transport_socket_factory_;

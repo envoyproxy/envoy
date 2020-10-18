@@ -27,6 +27,7 @@ public:
 
   // TODO(mpuncel) only invoke callback() once secrets are ready.
   void addReadyCb(std::function<void()> callback) override { callback(); };
+  bool secureTransportReady() const override { NOT_REACHED_GCOVR_EXCL_LINE; }
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
