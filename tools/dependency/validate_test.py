@@ -61,9 +61,13 @@ class ValidateTest(unittest.TestCase):
   def test_valid_test_only_deps(self):
     validator = self.BuildValidator({'a': FakeDep('dataplane_core')}, {'//source/...': ['a']})
     validator.ValidateTestOnlyDeps()
+    validator = self.BuildValidator({'a': FakeDep('test_only')}, {'//test/...': ['a', 'b__pip3_']})
+    validator.ValidateTestOnlyDeps()
 
   def test_invalid_test_only_deps(self):
     validator = self.BuildValidator({'a': FakeDep('test_only')}, {'//source/...': ['a']})
+    self.assertRaises(validate.DependencyError, lambda: validator.ValidateTestOnlyDeps())
+    validator = self.BuildValidator({'a': FakeDep('test_only')}, {'//test/...': ['b']})
     self.assertRaises(validate.DependencyError, lambda: validator.ValidateTestOnlyDeps())
 
   def test_valid_dataplane_core_deps(self):
