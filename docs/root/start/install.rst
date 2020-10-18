@@ -155,7 +155,7 @@ The following commands will pull and show the Envoy version of current images.
 Pre-built Envoy Docker images
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. list-table::
+.. csv-table::
    :widths: 30 40 10 10 10
    :header-rows: 1
    :file: _include/dockerhub-images.csv
