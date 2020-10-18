@@ -138,14 +138,6 @@ The following commands will pull and show the Envoy version of current images.
 	 $ docker pull envoyproxy/|envoy_docker_image|
 	 $ docker run envoyproxy/|envoy_docker_image| --version
 
-      .. tip::
-
-	 See the `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_ and
-	 `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
-	 dockerhub pages for the list of available tags/versions.
-
-	 :ref:`See here <install_binaries>` for a list of the available Envoy Docker image types.
-
    .. tab:: Get Envoy
 
       .. code-block:: console
@@ -160,11 +152,11 @@ The following commands will pull and show the Envoy version of current images.
 
 .. _install_binaries:
 
-Pre-built Docker images
-~~~~~~~~~~~~~~~~~~~~~~~
+Pre-built Envoy Docker images
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. list-table:: Title
-   :widths: 20 50 10 10 10
+.. list-table::
+   :widths: 30 40 10 10 10
    :header-rows: 1
 
    * - Docker image
@@ -202,6 +194,12 @@ Pre-built Docker images
      - `v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`__
      -
      - `latest <https://hub.docker.com/layers/envoyproxy/envoy-dev/latest/images/sha256-f829a7a7cf26049ff0fb785677681c464f9c98b5759f5fa1bb41746ec844acc8?context=explore>`__
+
+.. csv-table::
+   :widths: 30 40 10 10 10
+   :header-rows: 1
+   :file: _include/dockerhub-images.csv
+
 
 We build and tag Docker images with release versions when we do official releases. These images can
 be found in the following repositories:

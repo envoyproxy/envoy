@@ -1,0 +1,2 @@
+Docker image,description,stable/amd64,stable/arm64,master
+`envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_,Release binary with symbols stripped on top of an Ubuntu Bionic base.,`v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-5e54002b16ad194cf1338a802fab9358ba7bd235360eb733b5871d1024219be4?context=explore>`__,`v1.16-latest <https://hub.docker.com/layers/envoyproxy/envoy/v1.16-latest/images/sha256-0ab72c75ab1250475f83f5ce1adc11d8f7ecb9cd2a6bea419ffbf61bf154a0ed?context=explore>`__,
