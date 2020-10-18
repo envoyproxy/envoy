@@ -157,3 +157,78 @@ The following commands will pull and show the Envoy version of current images.
 
 	 To use the ``nightly`` version from `Get Envoy <https://www.getenvoy.io/>`__
 	 replace the word ``stable`` with ``nightly`` in the above commands.
+
+.. _install_binaries:
+
+Pre-built Docker images
+~~~~~~~~~~~~~~~~~~~~~~~
+
+
+.. list-table:: Title
+   :widths: 40 40 20
+   :header-rows: 1
+
+   * - Docker image
+     - description
+     - multiarch
+   * - envoyproxy/envoy
+     - asdfasdf
+     - X
+   * - envoyproxy/envoy-alpine
+     - asdfasdf
+     - X
+   * - envoyproxy/envoy-debug
+     - asdfasdf
+     - X
+   * - envoyproxy/envoy-dev
+     - asdfasdf
+     - X
+   * - envoyproxy/envoy-debug-dev
+     - asdfasd
+     - X
+   * - envoyproxy/envoy-alpine-dev
+     - asdfa
+     - X
+
+We build and tag Docker images with release versions when we do official releases. These images can
+be found in the following repositories:
+
+* `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_: Release binary with
+  symbols stripped on top of an Ubuntu Bionic base.
+* `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_: Release
+  binary with debug symbols on top of an Ubuntu Bionic base.
+* `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_: Release
+  binary with symbols stripped on top of a **glibc** alpine base.
+
+.. note::
+
+  In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
+
+On every master commit we additionally create a set of development Docker images. These images can
+be found in the following repositories:
+
+* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_: Release binary with
+  symbols stripped on top of an Ubuntu Bionic base.
+* `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_: Release
+  binary with debug symbols on top of an Ubuntu Bionic base.
+* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: Release
+  binary with symbols stripped on top of a **glibc** alpine base.
+
+In the above *dev* repositories, the *latest* tag points to the last Envoy SHA in master that passed
+tests.
+
+.. note::
+
+  The Envoy project considers master to be release candidate quality at all times, and many
+  organizations track and deploy master in production. We encourage you to do the same so that
+  issues can be reported as early as possible in the development process.
+
+Packaged Envoy pre-built binaries for a variety of platforms are available via
+`GetEnvoy.io <https://www.getenvoy.io/>`_.
+
+We will consider producing additional binary types depending on community interest in helping with
+CI, packaging, etc. Please open an `issue in GetEnvoy <https://github.com/tetratelabs/getenvoy/issues>`_
+for pre-built binaries for different platforms.
+
+non-alpine images are `multi-arch <https://www.docker.com/blog/multi-arch-build-and-images-the-simple-way/>`_ images
+and should run transparently on compatible ARM64 hosts.
