@@ -368,7 +368,6 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
       std::move(mocks.transport_socket_), stream_info_, true);
 
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
-
   server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
   EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose));
   mock_timer->invokeCallback();
@@ -387,7 +386,8 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
       std::move(mocks.transport_socket_), stream_info_, true);
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
-  // This should be a no-op.
+  // This should be a no-op. No timer should be created.
+  EXPECT_CALL(dispatcher, createTimer_(_)).Times(0);
   server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
 
   server_connection->close(ConnectionCloseType::NoFlush);

@@ -725,7 +725,6 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
 }
 
 void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
-  ConnectionImpl::raiseEvent(event);
   switch (event) {
   case ConnectionEvent::Connected:
   case ConnectionEvent::RemoteClose:
@@ -733,6 +732,7 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
     transport_connect_pending_ = false;
     transport_socket_connect_timer_.reset();
   }
+  ConnectionImpl::raiseEvent(event);
 }
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
