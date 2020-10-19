@@ -4,12 +4,12 @@
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/watchdog/abort_action/v3alpha/abort_action.pb.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
+#include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
-#include "extensions/watchdog/abort_action/abort_action.h"
-#include "extensions/watchdog/abort_action/config.h"
+#include "common/watchdog/abort_action.h"
+#include "common/watchdog/abort_action_config.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
@@ -18,12 +18,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Watchdog {
-namespace AbortAction {
 namespace {
 
-using AbortActionConfig = envoy::extensions::watchdog::abort_action::v3alpha::AbortActionConfig;
+using AbortActionConfig = envoy::watchdog::v3alpha::AbortActionConfig;
 
 class AbortActionTest : public testing::Test {
 protected:
@@ -54,8 +52,7 @@ TEST_F(AbortActionTest, ShouldNotAbortIfNoTids) {
   action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::KILL, tid_ltt_pairs, now);
 }
 
-// insufficient signal support on Windows.
-TEST_F(AbortActionTest, CanKillThread) {
+TEST_F(AbortActionTest, ShouldKillTheProcess) {
   AbortActionConfig config;
   config.mutable_wait_duration()->set_seconds(1);
   action_ = std::make_unique<AbortAction>(config, context_);
@@ -83,6 +80,8 @@ TEST_F(AbortActionTest, CanKillThread) {
   EXPECT_DEATH(die_function(), "");
 }
 
+#ifndef WIN32
+// insufficient signal support on Windows.
 void handler(int sig, siginfo_t* /*siginfo*/, void* /*context*/) {
   std::cout << "Eating signal :" << std::to_string(sig) << ". will ignore it." << std::endl;
   signal(SIGABRT, SIG_IGN);
@@ -122,9 +121,8 @@ TEST_F(AbortActionTest, PanicsIfThreadDoesNotDie) {
 
   EXPECT_DEATH(die_function(), "aborting from Watchdog AbortAction instead");
 }
+#endif
 
 } // namespace
-} // namespace AbortAction
 } // namespace Watchdog
-} // namespace Extensions
 } // namespace Envoy

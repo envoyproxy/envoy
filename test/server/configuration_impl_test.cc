@@ -754,8 +754,8 @@ TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
+  EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
 }
 
 TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
@@ -793,8 +793,8 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.mainThreadWatchdogConfig().killTimeout());
-  EXPECT_EQ(std::chrono::milliseconds(0), config.workerWatchdogConfig().killTimeout());
+  EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
+  EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
 }
 
 TEST_F(ConfigurationImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {

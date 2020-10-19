@@ -1,14 +1,12 @@
 #pragma once
 
-#include "envoy/extensions/watchdog/abort_action/v3alpha/abort_action.pb.h"
 #include "envoy/server/guarddog_config.h"
+#include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Watchdog {
-namespace AbortAction {
 
 class AbortActionFactory : public Server::Configuration::GuardDogActionFactory {
 public:
@@ -24,10 +22,8 @@ public:
 
   std::string name() const override { return "envoy.watchdog.abort_action"; }
 
-  using AbortActionConfig = envoy::extensions::watchdog::abort_action::v3alpha::AbortActionConfig;
+  using AbortActionConfig = envoy::watchdog::v3alpha::AbortActionConfig;
 };
 
-} // namespace AbortAction
 } // namespace Watchdog
-} // namespace Extensions
 } // namespace Envoy
