@@ -329,7 +329,6 @@ TEST_F(ScaledRangeTimerManagerTest, SingleTimerMinGreaterThanMax) {
   EXPECT_FALSE(timer->enabled());
 }
 
-
 TEST_F(ScaledRangeTimerManagerTest, MaxOnlyScaledMinimumTimer) {
   ScaledRangeTimerManagerImpl manager(dispatcher_);
 
