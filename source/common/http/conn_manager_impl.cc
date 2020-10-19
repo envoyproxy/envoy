@@ -726,10 +726,9 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
   connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
-  sendLocalReply(request_headers_ != nullptr &&
-                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-                 Http::Code::RequestTimeout, "request header timeout", nullptr, absl::nullopt,
-                 StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+  filter_manager_.streamInfo().setResponseCodeDetails(
+      StreamInfo::ResponseCodeDetails::get().DownstreamHeaderTimeout);
+  connection_manager_.doEndStream(*this);
 }
 
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
