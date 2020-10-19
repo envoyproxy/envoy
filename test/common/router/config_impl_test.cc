@@ -249,8 +249,7 @@ most_specific_header_mutations_wins: {0}
     return fmt::format(yaml, most_specific_wins, append);
   }
 
-  std::string responseHeadersRewriteConfig(const bool most_specific_wins, 
-                                           const bool append,
+  std::string responseHeadersRewriteConfig(const bool most_specific_wins, const bool append,
                                            const std::string& header_name,
                                            const std::string& match_value,
                                            const std::string& substitution) const {
@@ -1733,7 +1732,8 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
 
 // Validates behavior of response_headers_to_rewrite at route level.
 TEST_F(RouteMatcherTest, TestRewriteResponseHeaders) {
-  const std::string yaml = responseHeadersRewriteConfig(false, true, "x-global-rewrite", "glob", "univers");
+  const std::string yaml =
+      responseHeadersRewriteConfig(false, true, "x-global-rewrite", "glob", "univers");
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
@@ -1778,14 +1778,15 @@ TEST_F(RouteMatcherTest, TestRewriteResponseHeaders) {
       EXPECT_EQ("global", headers.get_("x-global-nope"));
     }
 
-  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
-              ContainerEq(config.internalOnlyHeaders()));
+    EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
+                ContainerEq(config.internalOnlyHeaders()));
   }
 }
 
 // Validates behavior of response_headers_to_rewrite when header value does not match
 TEST_F(RouteMatcherTest, TestRewriteResponseHeadersPrefixNotMatched) {
-  const std::string yaml = responseHeadersRewriteConfig(false, true, "x-global-rewrite", "something", "univers");
+  const std::string yaml =
+      responseHeadersRewriteConfig(false, true, "x-global-rewrite", "something", "univers");
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
