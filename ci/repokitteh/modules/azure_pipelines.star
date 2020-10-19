@@ -25,7 +25,7 @@ def _get_azp_checks():
     return checks
 
 def _retry(config, comment_id, command):
-    msgs = "Retrying Azure Pipelines, to retry CircleCI checks, use `/retest-circle`.\n"
+    msgs = "Retrying Azure Pipelines.\n"
     checks = _get_azp_checks()
 
     retried_checks = []
