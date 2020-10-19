@@ -35,7 +35,7 @@ message TapConfig {
   // Exactly one of :ref:`match <envoy_api_field_config.tap.v4alpha.TapConfig.match>` and
   // :ref:`match_config <envoy_api_field_config.tap.v4alpha.TapConfig.match_config>` must be set. If both
   // are set, the :ref:`match <envoy_api_field_config.tap.v4alpha.TapConfig.match>` will be used.
-  common.matcher.v4alpha.MatchPredicate match = 4;
+  common.matcher.v4alpha.MatchPredicate match = 4 [deprecated = true];
 
   // The tap output configuration. If a match configuration matches a data source being tapped,
   // a tap will occur and the data will be written to the configured output.

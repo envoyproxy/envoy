@@ -829,14 +829,9 @@ message RouteAction {
   reserved "request_mirror_policy", "include_vh_rate_limits", "max_grpc_timeout",
       "grpc_timeout_offset", "internal_redirect_action", "max_internal_redirects";
 
-  // Indicates that some headers received from upstream cluster need to be rewritten. When upstream
-  // returns a header, the header will be overwritten with the given value before being sent back as
-  // response to the client.
-  //
-  // In the below example we rewrite the location header received from the upstream cluster. In the
-  // case of the location header, two things need to match before a value substitution happens for
-  // the location header - Location header's value, and a few other headers present in upstream
-  // response.
+  // Indicates that some headers received from upstream cluster need to be rewritten.
+  // In the example below, we rewrite the location header received from the upstream cluster
+  // if the location header is present.
   //
   // If a header is specified in response_headers_to_rewrite section but is not returned from the
   // upstream it it simply ignored.
@@ -853,37 +848,6 @@ message RouteAction {
   //               string_match:
   //                 prefix: /itm/not-found/
   //               substitution: /n/error
-  //             response_match_criteria:
-  //               and_match:
-  //                 rules:
-  //                 - and_match:
-  //                   rules:
-  //                   - http_response_headers_match:
-  //                     headers:
-  //                     - name: "cookie"
-  //                       pattern:
-  //                         exact: "pagetype=123"
-  //                       invert_match: false
-  //                   - http_response_headers_match:
-  //                     headers:
-  //                     - name: "content-type"
-  //                       pattern:
-  //                         exact: "text/html"
-  //                       invert_match: false
-  //                 - or_match:
-  //                   rules:
-  //                   - http_response_headers_match:
-  //                     headers:
-  //                     - name: "status"
-  //                       pattern:
-  //                         exact: "301"
-  //                       invert_match: false
-  //                   - http_response_headers_match:
-  //                     headers:
-  //                     - name: "status"
-  //                       pattern:
-  //                         exact: "302"
-  //                       invert_match: false
   repeated UpstreamHeaderRewriter response_headers_to_rewrite = 37;
 
   oneof cluster_specifier {

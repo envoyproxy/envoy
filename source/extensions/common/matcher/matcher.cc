@@ -106,9 +106,6 @@ void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& matc
   matchers[new_matcher->index()] = std::move(new_matcher);
 }
 
-// TODO(shivanshu21): Once HeaderMatcher is deprecated in favor of StringMatcher,
-// this overloaded method will no longer be required as we will use
-// envoy::config::common::matcher::v3::MatchPredicate
 void buildMatcher(const envoy::type::matcher::v3::MatchPredicate& match_config,
                   std::vector<MatcherPtr>& matchers) {
   matchers.emplace_back(nullptr);
@@ -141,9 +138,6 @@ void buildMatcher(const envoy::type::matcher::v3::MatchPredicate& match_config,
   matchers[new_matcher->index()] = std::move(new_matcher);
 }
 
-// TODO(shivanshu21): Once HeaderMatcher is deprecated in favor of StringMatcher,
-// this overloaded method will no longer be required as we will use
-// envoy::config::common::matcher::v3::MatchPredicate
 SetLogicMatcher::SetLogicMatcher(const envoy::type::matcher::v3::MatchPredicate::MatchSet& configs,
                                  std::vector<MatcherPtr>& matchers, Type type)
     : LogicMatcherBase(matchers), matchers_(matchers), type_(type) {
