@@ -5,15 +5,14 @@ export NAME=wasm
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-
 run_log "Test connection"
 responds_with \
     "Hello, world" \
     http://localhost:8000
 
-run_log "Test location header"
+run_log "Test content-type header"
 responds_with_header \
-    "location: envoy-wasm" \
+    "content-type: text/plain" \
     http://localhost:8000
 
 run_log "Test custom Wasm header"
@@ -41,9 +40,9 @@ responds_with \
     "Hello, Wasm world" \
     http://localhost:8000
 
-run_log "Test updated location header"
+run_log "Test updated content-type header"
 responds_with_header \
-    "location: updated-envoy-wasm" \
+    "content-type: text/html" \
     http://localhost:8000
 
 run_log "Test updated Wasm header"

@@ -41,12 +41,12 @@ The Wasm filter should inject "Hello, world" at the end of the response body.
    $ curl -s http://localhost:8000 | grep "Hello, world"
    }Hello, world
 
-The filter also sets the ``location`` header to ``envoy-wasm``, and adds a custom Wasm header ``x-wasm-custom``.
+The filter also sets the ``content-type`` header to ``text/plain``, and adds a custom Wasm header ``x-wasm-custom``.
 
 .. code-block:: console
 
-   $ curl -v http://localhost:8000 | grep "location: "
-   location: envoy-wasm
+   $ curl -v http://localhost:8000 | grep "content-type: "
+   content-type: text/plain; charset=utf-8
 
    $ curl -v http://localhost:8000 | grep "x-wasm-custom: "
    x-wasm-custom: FOO
@@ -57,10 +57,10 @@ Step 4: Compile updated filter
 
 There are two source code files for the Wasm filter.
 
-The first (:download:`envoy_filter_http_wasm_example.cc <_include/envoy_filter_http_wasm_example.cc>`) is the source code for
+The first (:download:`envoy_filter_http_wasm_example.cc <_include/wasm/envoy_filter_http_wasm_example.cc>`) is the source code for
 the included prebuilt binary.
 
-The second (:download:`envoy_filter_http_wasm_updated_example.cc <_include/envoy_filter_http_wasm_updated_example.cc>`) makes
+The second (:download:`envoy_filter_http_wasm_updated_example.cc <_include/wasm/envoy_filter_http_wasm_updated_example.cc>`) makes
 a few changes to the original.
 
 The following diff shows the changes that have been made:
@@ -97,12 +97,12 @@ The Wasm filter should now inject "Hello, Wasm world" into the end of the respon
    $ curl -s http://localhost:8000 | grep "Hello, world"
    }Hello, Wasm world
 
-The location and custom Wasm headers have also changed
+The content-type and custom Wasm headers have also changed
 
 .. code-block:: console
 
-   $ curl -v http://localhost:8000 | grep "location: "
-   location: updated-envoy-wasm
+   $ curl -v http://localhost:8000 | grep "content-type: "
+   content-type: text/html; charset=utf-8
 
    $ curl -v http://localhost:8000 | grep "x-wasm-custom: "
    x-wasm-custom: BAR

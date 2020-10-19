@@ -66,7 +66,7 @@ FilterHeadersStatus ExampleContext::onResponseHeaders(uint32_t, bool) {
     LOG_INFO(std::string(p.first) + std::string(" -> ") + std::string(p.second));
   }
   addResponseHeader("X-Wasm-custom", "BAR");
-  replaceResponseHeader("location", "updated-envoy-wasm");
+  replaceResponseHeader("content-type", "text/html; charset=utf-8");
   removeResponseHeader("content-length");
   return FilterHeadersStatus::Continue;
 }
