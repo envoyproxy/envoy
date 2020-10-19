@@ -711,14 +711,17 @@ ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
                                            TransportSocketPtr&& transport_socket,
                                            StreamInfo::StreamInfo& stream_info, bool connected)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
-                     connected),
-      transport_socket_connect_timer_{
-          dispatcher.createTimer([this] { onTransportSocketConnectTimeout(); })} {}
+                     connected) {}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
-  if (transport_socket_connect_timer_ != nullptr) {
-    transport_socket_connect_timer_->enableTimer(timeout);
+  if (!transport_connect_pending_) {
+    return;
   }
+  if (transport_socket_connect_timer_ == nullptr) {
+    transport_socket_connect_timer_ =
+        dispatcher_.createTimer([this] { onTransportSocketConnectTimeout(); });
+  }
+  transport_socket_connect_timer_->enableTimer(timeout);
 }
 
 void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
@@ -727,6 +730,7 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
   case ConnectionEvent::Connected:
   case ConnectionEvent::RemoteClose:
   case ConnectionEvent::LocalClose:
+    transport_connect_pending_ = false;
     transport_socket_connect_timer_.reset();
   }
 }

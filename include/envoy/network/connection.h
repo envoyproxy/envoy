@@ -326,8 +326,8 @@ class ServerConnection : public virtual Connection {
 public:
   /**
    * Set the amount of time allowed for the transport socket to report that a connection is
-   * established. The provided timeout is relative to the current time. If the connection is already
-   * established, this has no effect.
+   * established. The provided timeout is relative to the current time. If this method is called
+   * after a connection has already been established, it is a no-op.
    */
   virtual void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) PURE;
 };

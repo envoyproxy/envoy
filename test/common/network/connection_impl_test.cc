@@ -353,7 +353,6 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Verify that also the immediate connect errors generate a remote close event.
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -382,14 +381,13 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
 
-  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
-  EXPECT_CALL(*mock_timer, enableTimer).Times(0);
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::move(mocks.transport_socket_), stream_info_, true);
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
+  // This should be a no-op.
   server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
 
   server_connection->close(ConnectionCloseType::NoFlush);

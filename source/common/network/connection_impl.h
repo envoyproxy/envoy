@@ -206,12 +206,12 @@ public:
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) override;
-
   void raiseEvent(ConnectionEvent event) override;
 
 private:
   void onTransportSocketConnectTimeout();
 
+  bool transport_connect_pending_{true};
   // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
   // call to setTransportSocketConnectTimeout and is reset when the connection is established.
   Event::TimerPtr transport_socket_connect_timer_;
