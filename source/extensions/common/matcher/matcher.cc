@@ -183,7 +183,6 @@ void SetLogicMatcher::updateLocalStatus(MatchStatusVector& statuses,
 
   // TODO(mattklein123): We can potentially short circuit this even further if we git a single false
   // in an AND set or a single true in an OR set.
-
   statuses[my_index_].might_change_status_ =
       std::any_of(indexes_.begin(), indexes_.end(),
                   [&statuses](size_t index) { return statuses[index].might_change_status_; });

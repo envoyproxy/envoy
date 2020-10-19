@@ -103,7 +103,6 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
-  // ON_CALL(*this, locationHeaderRewrite()).WillByDefault(ReturnRef(location_header_rewrite_));
   ON_CALL(*this, connectConfig()).WillByDefault(ReturnRef(connect_config_));
 }
 

@@ -386,11 +386,9 @@ public:
   MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
-  // MOCK_METHOD(const std::string&, locationHeaderRewrite, (), (const));
 
   std::string cluster_name_{"fake_cluster"};
   std::string route_name_{"fake_route_name"};
-  // std::string location_header_rewrite_{"fake_location_header_value"};
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
