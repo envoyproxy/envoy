@@ -1,7 +1,6 @@
 #include "common/runtime/runtime_impl.h"
 
 #include <cstdint>
-#include <iostream>
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
