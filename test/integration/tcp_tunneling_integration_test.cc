@@ -115,7 +115,6 @@ TEST_P(ConnectTerminationIntegrationTest, UsingHostMatch) {
   ASSERT_FALSE(response_->reset());
 }
 
-
 TEST_P(ConnectTerminationIntegrationTest, DownstreamClose) {
   initialize();
 
