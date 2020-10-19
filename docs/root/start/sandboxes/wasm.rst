@@ -3,8 +3,8 @@
 WASM filter
 ===========
 
-This sandbox demonstrates a basic Wasm filter which injects content into the body of the request, adds and updates some
-headers.
+This sandbox demonstrates a basic Wasm filter which injects content into the body of an ``HTTP`` request, and adds
+and updates some headers.
 
 It also takes you through the steps required to build your own Wasm filter, and run it with Envoy.
 
