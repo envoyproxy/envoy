@@ -22,7 +22,7 @@ public:
   uint64_t random() override {
     // Makes sure initializeSeed() was already called
     ASSERT(prng_ != nullptr);
-    uint64_t to_return = (*prng_)();
+    const uint64_t to_return = (*prng_)();
     ENVOY_LOG_MISC(trace, "random() returned: {}", to_return);
     return to_return;
   }
@@ -75,7 +75,7 @@ private:
       uint64_t index_of_index_vector =
           random_bytestring_[index_of_random_bytestring_ % random_bytestring_.length()] %
           num_elements_left_;
-      uint64_t index = index_vector.at(index_of_index_vector);
+      const uint64_t index = index_vector.at(index_of_index_vector);
       subset.push_back(index);
       // Move the index chosen to the end of the vector - will not be chosen again
       std::swap(index_vector[index_of_index_vector], index_vector[num_elements_left_ - 1]);

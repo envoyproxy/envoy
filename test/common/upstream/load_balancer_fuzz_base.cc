@@ -6,14 +6,17 @@ namespace Envoy {
 namespace Upstream {
 
 namespace {
-
+// TODO(zasweq): This will be relaxed in the future in order to fully represent the state space
+// possible within Load Balancing. In it's current state, it is too slow (particularly due to calls
+// to makeTestHost()) to scale up hosts. Once this is made more efficient, this number will be
+// increased.
 constexpr uint32_t MaxNumHostsPerPriorityLevel = 256;
 
 } // namespace
 
 void LoadBalancerFuzzBase::initializeASingleHostSet(
     const test::common::upstream::SetupPriorityLevel& setup_priority_level,
-    const uint8_t priority_level) {
+    const uint8_t priority_level, uint16_t& port) {
   const uint32_t num_hosts_in_priority_level = setup_priority_level.num_hosts_in_priority_level();
   ENVOY_LOG_MISC(trace, "Will attempt to initialize host set at priority level {} with {} hosts.",
                  priority_level, num_hosts_in_priority_level);
@@ -21,9 +24,9 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   uint32_t hosts_made = 0;
   // Cap each host set at 256 hosts for efficiency - Leave port clause in for future changes
   while (hosts_made < std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel) &&
-         port_ < 65535) {
-    host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port_)));
-    ++port_;
+         port < 65535) {
+    host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port)));
+    ++port;
     ++hosts_made;
   }
 
@@ -56,10 +59,11 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
 void LoadBalancerFuzzBase::initializeLbComponents(
     const test::common::upstream::LoadBalancerTestCase& input) {
   random_.initializeSeed(input.seed_for_prng());
+  uint16_t port;
   for (uint8_t priority_of_host_set = 0;
        priority_of_host_set < input.setup_priority_levels().size(); ++priority_of_host_set) {
     initializeASingleHostSet(input.setup_priority_levels().at(priority_of_host_set),
-                             priority_of_host_set);
+                             priority_of_host_set, port);
   }
   num_priority_levels_ = input.setup_priority_levels().size();
 }
@@ -89,21 +93,27 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   host_set.degraded_hosts_.clear();
   host_set.excluded_hosts_.clear();
 
+  enum HealthStatus {
+    HEALTHY = 0,
+    DEGRADED = 1,
+    EXCLUDED = 2,
+  };
+
   Fuzz::ProperSubsetSelector subset_selector(random_bytestring);
 
   const std::vector<std::vector<uint8_t>> subsets = subset_selector.constructSubsets(
       {num_healthy_hosts, num_degraded_hosts, num_excluded_hosts}, host_set_size);
 
   // Healthy hosts are first subset
-  for (uint8_t index : subsets.at(0)) {
+  for (uint8_t index : subsets.at(HealthStatus::HEALTHY)) {
     host_set.healthy_hosts_.push_back(host_set.hosts_[index]);
     // No health flags for healthy
   }
   ENVOY_LOG_MISC(trace, "Hosts made healthy at priority level {}: {}", priority_of_host_set,
-                 absl::StrJoin(subsets.at(0), " "));
+                 absl::StrJoin(subsets.at(HealthStatus::HEALTHY), " "));
 
   // Degraded hosts are second subset
-  for (uint8_t index : subsets.at(1)) {
+  for (uint8_t index : subsets.at(HealthStatus::DEGRADED)) {
     host_set.degraded_hosts_.push_back(host_set.hosts_[index]);
     // Health flags are not currently directly used by most load balancers, but
     // they may be added and also are used by other components.
@@ -112,10 +122,10 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
     host_set.hosts_[index]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   }
   ENVOY_LOG_MISC(trace, "Hosts made degraded at priority level {}: {}", priority_of_host_set,
-                 absl::StrJoin(subsets.at(1), " "));
+                 absl::StrJoin(subsets.at(HealthStatus::DEGRADED), " "));
 
   // Excluded hosts are third subset
-  for (uint8_t index : subsets.at(2)) {
+  for (uint8_t index : subsets.at(HealthStatus::EXCLUDED)) {
     host_set.excluded_hosts_.push_back(host_set.hosts_[index]);
     // Health flags are not currently directly used by most load balancers, but
     // they may be added and also are used by other components.
@@ -123,11 +133,15 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
     // FAILED_OUTLIER_CHECK, and FAILED_EDS_HEALTH. Choose one hardcoded for simplicity.
     host_set.hosts_[index]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
-
   ENVOY_LOG_MISC(trace, "Hosts made excluded at priority level {}: {}", priority_of_host_set,
-                 absl::StrJoin(subsets.at(2), " "));
+                 absl::StrJoin(subsets.at(HealthStatus::EXCLUDED), " "));
 
   // Handle updating health flags for hosts_per_locality_
+  enum Locality {
+    A = 0,
+    B = 1,
+    C = 2,
+  };
 
   // The index within the array of the vector represents the locality
   std::array<HostVector, 3> healthy_hosts_per_locality;
@@ -158,16 +172,19 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
 
   // This overrides what is currently present in the host set, thus not having to explicitly call
   // vector.clear()
-  host_set.healthy_hosts_per_locality_ =
-      makeHostsPerLocality({healthy_hosts_per_locality[0], healthy_hosts_per_locality[1],
-                            healthy_hosts_per_locality[2]});
-  host_set.degraded_hosts_per_locality_ =
-      makeHostsPerLocality({degraded_hosts_per_locality[0], degraded_hosts_per_locality[1],
-                            degraded_hosts_per_locality[2]});
-  host_set.excluded_hosts_per_locality_ =
-      makeHostsPerLocality({excluded_hosts_per_locality[0], excluded_hosts_per_locality[1],
-                            excluded_hosts_per_locality[2]});
+  host_set.healthy_hosts_per_locality_ = makeHostsPerLocality(
+      {healthy_hosts_per_locality[Locality::A], healthy_hosts_per_locality[Locality::B],
+       healthy_hosts_per_locality[Locality::C]});
+  host_set.degraded_hosts_per_locality_ = makeHostsPerLocality(
+      {degraded_hosts_per_locality[Locality::A], degraded_hosts_per_locality[Locality::B],
+       degraded_hosts_per_locality[Locality::C]});
+  host_set.excluded_hosts_per_locality_ = makeHostsPerLocality(
+      {excluded_hosts_per_locality[Locality::A], excluded_hosts_per_locality[Locality::B],
+       excluded_hosts_per_locality[Locality::C]});
 
+  // These callbacks update load balancing data structures (callbacks are piped into priority set
+  // in LoadBalancerBase constructor) This won't have any hosts added or removed, as untrusted
+  // upstreams cannot do that.
   host_set.runCallbacks({}, {});
 }
 

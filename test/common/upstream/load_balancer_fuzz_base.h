@@ -51,10 +51,10 @@ private:
   // over the fuzz iteration.
   void
   initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
-                           const uint8_t priority_level);
+                           const uint8_t priority_level, uint16_t& port);
 
-  // There are used to construct the priority set at the beginning of the fuzz iteration
-  uint16_t port_ = 80;
+  // This is used to choose a host set to update the flags in an update flags event by modding a
+  // random uint64 against this number.
   uint8_t num_priority_levels_ = 0;
 
   // This map used when updating health flags - making sure the health flags are updated hosts in

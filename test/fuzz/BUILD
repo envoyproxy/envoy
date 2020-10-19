@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
@@ -76,5 +77,13 @@ envoy_cc_test_library(
         "//include/envoy/common:random_generator_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "random_test",
+    srcs = ["random_test.cc"],
+    deps = [
+        "//test/fuzz:random_lib",
     ],
 )
