@@ -282,7 +282,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "wasm=disabled"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
-    "--define" "use_new_codecs_in_integration_tests=true"
+    "--define" "use_new_codecs_in_integration_tests=false"
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng")
 
@@ -438,6 +438,7 @@ elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   sudo apt-get install -y -qq --no-install-recommends redis-tools
   export DOCKER_NO_PULL=1
   umask 027
+  chmod -R o-rwx examples/
   ci/verify_examples.sh
   exit 0
 else
