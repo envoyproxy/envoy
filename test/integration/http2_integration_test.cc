@@ -1611,6 +1611,46 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
 }
 
+TEST_P(Http2FrameIntegrationTest, OverflowingResponseCode) {
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower outbound frame limits to make tests run faster
+  config_helper_.setOutboundFramesLimits(1000, 100);
+  initialize();
+  auto options = std::make_shared<Network::Socket::Options>();
+  tcp_client_ = makeTcpConnection(lookupPort("http"), options);
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  // setup preamble and setting
+  ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
+  Http2Frame::SettingsFlags settings_flags = static_cast<Http2Frame::SettingsFlags>(0);
+  Http2Frame setting_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
+  ASSERT_TRUE(tcp_client_->write(std::string(setting_frame), false, false)); // empty settings
+  // Ack settings
+  settings_flags = static_cast<Http2Frame::SettingsFlags>(1); // ack
+  Http2Frame ack_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
+  ASSERT_TRUE(tcp_client_->write(std::string(ack_frame), false, false)); // ack setting
+  Http2Frame h2_frame = Http2Frame::makeRequest(1, "host", "/");
+  ASSERT_TRUE(tcp_client_->write(std::string(h2_frame), false, false));
+  // setup upstream and settings etc.
+  ASSERT(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                  std::chrono::milliseconds(10)));
+  ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
+  ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
+
+  // Overflowing response code
+  Http::Http2::Http2Frame overflowed_status = Http::Http2::Http2Frame::makeHeadersFrameWithStatus(
+      "11111111111111111111111111111111111111111111111111111111111111111",
+      1 /*, static_cast<Http::Http2::Http2Frame::HeadersFlags>(4)*/);
+
+  // Http::Http2::Http2Frame overflowed_status =
+  // Http::Http2::Http2Frame::makeHeadersFrameWithStatus("400", 1);
+
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(overflowed_status)));
+
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

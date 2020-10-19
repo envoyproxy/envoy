@@ -151,31 +151,30 @@ Http2Frame Http2Frame::makeEmptyHeadersFrame(uint32_t stream_index, HeadersFlags
   return frame;
 }
 
-Http2Frame Http2Frame::makeHeadersFrameWithStatus(std::string status, uint32_t stream_index, HeadersFlags flags) {
+Http2Frame Http2Frame::makeHeadersFrameWithStatus(std::string status, uint32_t stream_index) {
   Http2Frame frame;
-  frame.buildHeader(Type::Headers, 0, static_cast<uint8_t>(flags),
-                    makeRequestStreamId(stream_index));
+  frame.buildHeader(
+      Type::Headers, 0,
+      orFlags(HeadersFlags::EndStream,
+              HeadersFlags::EndHeaders), // TODO: Support not hardcoding these two flags
+      makeRequestStreamId(stream_index));
   if (status == "200") {
     frame.appendStaticHeader(StaticHeaderIndex::Status200);
-    return frame;
   } else if (status == "204") {
     frame.appendStaticHeader(StaticHeaderIndex::Status204);
-    return frame;
   } else if (status == "206") {
     frame.appendStaticHeader(StaticHeaderIndex::Status206);
-    return frame;
   } else if (status == "304") {
     frame.appendStaticHeader(StaticHeaderIndex::Status304);
-    return frame;
   } else if (status == "400") {
     frame.appendStaticHeader(StaticHeaderIndex::Status400);
-    return frame;
   } else if (status == "500") {
     frame.appendStaticHeader(StaticHeaderIndex::Status500);
-    return frame;
+  } else { // Not a static header
+    Header statusHeader = Header(":status", status);
+    frame.appendHeaderWithoutIndexing(statusHeader);
   }
-  Header statusHeader = Header(":status", status);
-  frame.appendHeaderWithoutIndexing(statusHeader);
+  frame.adjustPayloadSize();
   return frame;
 }
 
