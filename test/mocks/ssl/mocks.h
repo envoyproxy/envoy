@@ -97,6 +97,17 @@ public:
   MOCK_METHOD(const std::string&, signingAlgorithmsForTest, (), (const));
 };
 
+class MockServerContext : public ServerContext {
+public:
+  MockServerContext();
+  ~MockServerContext() override;
+
+  MOCK_METHOD(size_t, daysUntilFirstCertExpires, (), (const));
+  MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
+  MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
+  MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
+};
+
 class MockServerContextConfig : public ServerContextConfig {
 public:
   MockServerContextConfig();
