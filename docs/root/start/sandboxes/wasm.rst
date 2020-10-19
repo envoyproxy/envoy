@@ -34,33 +34,60 @@ First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a
 Step 3: Check web response
 **************************
 
-The Wasm filter should inject "Hello, world" into the end of the repsonse body.
+The Wasm filter should inject "Hello, world" into the end of the response body.
 
 .. code-block:: console
 
    $ curl -s http://localhost:8000 | grep "Hello, world"
    }Hello, world
 
-The filter also sets the location header to ``envoy-wasm``
+The filter also sets the location header to ``envoy-wasm``, and adds a custom Wasm header ``x-wasm-custom``.
 
 .. code-block:: console
 
    $ curl -v http://localhost:8000 | grep "location: "
    location: envoy-wasm
 
-The filter adds a custom Wasm header ``x-wasm-custom``
-
-.. code-block:: console
-
    $ curl -v http://localhost:8000 | grep "x-wasm-custom: "
    x-wasm-custom: FOO
-
-
-
 
 
 Step 4: Compile updated filter
 ******************************
 
-Step 4: Compile web response again
-**********************************
+Stop the proxy server and recompile the Wasm binary:
+
+.. code-block:: console
+
+   $ docker-compose stop proxy
+   $ docker-compose -f docker-compose-wasm.yaml up --remove-orphans wasm_compile_update
+
+
+Step 4: Check the updated web response
+**************************************
+
+Edit the Docker recipe to use the updated binary
+
+Restart the proxy server
+
+.. code-block:: console
+
+   $ docker-compose up --build -d proxy
+
+
+The Wasm filter should now inject "Hello, Wasm world" into the end of the response body.
+
+.. code-block:: console
+
+   $ curl -s http://localhost:8000 | grep "Hello, world"
+   }Hello, Wasm world
+
+The location and custom Wasm headers have also changed
+
+.. code-block:: console
+
+   $ curl -v http://localhost:8000 | grep "location: "
+   location: updated-envoy-wasm
+
+   $ curl -v http://localhost:8000 | grep "x-wasm-custom: "
+   x-wasm-custom: BAR
