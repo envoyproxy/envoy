@@ -71,7 +71,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
 }
 
 void AppleDnsResolverImpl::onEventCallback(uint32_t events) {
-  ENVOY_LOG(debug, "DNS resolver file event ()", events);
+  ENVOY_LOG(debug, "DNS resolver file event ({})", events);
   ASSERT(events & Event::FileReadyType::Read);
   DNSServiceErrorType error = DNSServiceProcessResult(main_sd_ref_);
   if (error != kDNSServiceErr_NoError) {
