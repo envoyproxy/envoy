@@ -366,8 +366,10 @@ message HttpConnectionManager {
   // activated when the first byte of the headers is received, and is disarmed when the last byte of
   // the headers has been received (i.e. all decoding filters have processed the headers). If not
   // specified or set to 0, this timeout is disabled.
-  google.protobuf.Duration request_headers_timeout = 41
-      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
+  google.protobuf.Duration request_headers_timeout = 41 [
+    (validate.rules).duration = {gte {}},
+    (udpa.annotations.security).configure_for_untrusted_downstream = true
+  ];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.
