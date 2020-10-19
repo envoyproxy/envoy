@@ -90,11 +90,6 @@ void cleanAttachmentTemplate(Protobuf::Message* message) {
 void cleanTapConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::tap::v3::Tap& config =
       dynamic_cast<envoy::extensions::filters::http::tap::v3::Tap&>(*message);
-  if (config.common_config().config_type_case() ==
-      envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kTapdsConfig) {
-    config.mutable_common_config()->mutable_static_config()->mutable_match_config()->set_any_match(
-        true);
-  }
   // TODO(samflattery): remove once StreamingGrpcSink is implemented
   // a static config filter is required to have one sink, but since validation isn't performed on
   // the filter until after this function runs, we have to manually check that there are sinks
