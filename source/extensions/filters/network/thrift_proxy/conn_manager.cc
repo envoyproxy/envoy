@@ -403,8 +403,8 @@ bool ConnectionManager::ActiveRpc::passthroughEnabled() {
     return false;
   }
 
-  for (auto entry = decoder_filters_.begin(); entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->handle_->passthroughEnabled() == false) {
+  for (auto& entry : decoder_filters_) {
+    if (entry->handle_->passthroughEnabled() == false) {
       return false;
     }
   }

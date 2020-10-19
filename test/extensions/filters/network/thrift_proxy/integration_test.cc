@@ -138,18 +138,19 @@ public:
         }
         ASSERT_TRUE(filter);
 
-        envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy conn_manager;
-        conn_manager = MessageUtil::anyConvert<
-            envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy>(
-            *filter->mutable_typed_config());
+        if (filter) {
+          envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy conn_manager;
+          conn_manager = MessageUtil::anyConvert<
+              envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy>(
+              *(filter->mutable_typed_config()));
 
-        conn_manager.set_payload_passthrough(true);
+          conn_manager.set_payload_passthrough(true);
 
-        filter_chain->clear_filters();
-        filter = filter_chain->add_filters();
-        filter->mutable_typed_config()->PackFrom(conn_manager);
-        filter->set_name("envoy.filters.network.thrift_proxy");
-
+          filter_chain->clear_filters();
+          filter = filter_chain->add_filters();
+          filter->mutable_typed_config()->PackFrom(conn_manager);
+          filter->set_name("envoy.filters.network.thrift_proxy");
+        }
         ASSERT_TRUE(filter_chain->filters_size() == 1);
       });
     }
