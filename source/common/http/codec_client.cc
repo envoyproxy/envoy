@@ -140,6 +140,12 @@ void CodecClient::onData(Buffer::Instance& data) {
     if (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout) {
       protocol_error = true;
     }
+  } else if (isBufferFloodError(status) || isInboundFramesWithEmptyPayloadError(status)) {
+    ENVOY_CONN_LOG(debug, "flood detected: {}", *connection_, status.message());
+    close();
+    protocol_error = true;
+  } else {
+    ASSERT(status.ok());
   }
 
   if (protocol_error) {

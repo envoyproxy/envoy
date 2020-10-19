@@ -1109,6 +1109,18 @@ void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max
   }
 }
 
+void ConfigHelper::setUpstreamOutboundFramesLimits(uint32_t max_all_frames,
+                                                   uint32_t max_control_frames) {
+  addConfigModifier(
+      [max_all_frames, max_control_frames](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* static_resources = bootstrap.mutable_static_resources();
+        auto* cluster = static_resources->mutable_clusters(0);
+        auto* http_protocol_options = cluster->mutable_http2_protocol_options();
+        http_protocol_options->mutable_max_outbound_frames()->set_value(max_all_frames);
+        http_protocol_options->mutable_max_outbound_control_frames()->set_value(max_control_frames);
+      });
+}
+
 void ConfigHelper::setLocalReply(
     const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
         config) {
