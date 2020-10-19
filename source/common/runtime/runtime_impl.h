@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -205,7 +206,8 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
                             const EnvoyException* e) override;
 
   void start();
-  void validateUpdateSize(uint32_t num_resources);
+  void validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
+  void onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
   void createSubscription();
 
   LoaderImpl& parent_;
