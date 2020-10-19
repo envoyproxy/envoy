@@ -3,9 +3,6 @@
 gRPC Bridge
 ===========
 
-Envoy gRPC
-~~~~~~~~~~
-
 The gRPC bridge sandbox is an example usage of Envoy's
 :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>`.
 
@@ -83,8 +80,8 @@ To build this sandbox example and start the example services, run the following 
     grpc-bridge_grpc-server_1              /bin/sh -c /bin/server         Up      0.0.0.0:8081->8081/tcp
 
 
-Sending requests to the Key/Value store
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 5: Send requests to the Key/Value store
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To use the Python service and send gRPC requests:
 
