@@ -56,7 +56,7 @@ Step 4: Compile updated filter
 ******************************
 
 .. literalinclude:: _include/wasm/envoy_filter_http_wasm_updated_example.cc
-    :language: c++
+    :diff: _include/wasm/envoy_filter_http_wasm_example.cc
 
 Stop the proxy server and recompile the Wasm binary:
 
