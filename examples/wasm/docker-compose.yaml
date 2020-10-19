@@ -17,11 +17,7 @@ services:
       context: .
       dockerfile: Dockerfile-web-service
     networks:
-      envoymesh:
-        aliases:
-          - web_service
-    ports:
-      - "9000:9000"
+      - envoymesh
 
 networks:
   envoymesh: {}
