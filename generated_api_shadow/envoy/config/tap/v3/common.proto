@@ -39,6 +39,7 @@ message TapConfig {
   // Exactly one of :ref:`match <envoy_api_field_config.tap.v3.TapConfig.match>` and
   // :ref:`match_config <envoy_api_field_config.tap.v3.TapConfig.match_config>` must be set. If both
   // are set, the :ref:`match <envoy_api_field_config.tap.v3.TapConfig.match>` will be used.
+  // [#next-major-version: common.matcher.v3.MatchPredicate should be refactored to use type.matcher.v3.MatchPredicate.]
   common.matcher.v3.MatchPredicate match = 4;
 
   // The tap output configuration. If a match configuration matches a data source being tapped,

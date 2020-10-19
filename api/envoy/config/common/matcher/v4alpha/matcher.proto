@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // Match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
-// [#next-major-version: common.matcher.v4alpha.MatchPredicate should be refactored to use type.matcher.v4alpha.MatchPredicate.]
+// [#next-major-version: common.matcher.v3.MatchPredicate should be refactored to use type.matcher.v3.MatchPredicate.]
 // [#next-free-field: 11]
 message MatchPredicate {
   option (udpa.annotations.versioning).previous_message_type =
