@@ -18,14 +18,10 @@ feature of the API, which is most useful for simple requirements. For more compl
     install
     quick-start
     docker
+    tools/tools
+    building
 
 .. toctree::
     :maxdepth: 2
 
     sandboxes/index
-
-.. toctree::
-    :maxdepth: 3
-
-    tools/tools
-    building
