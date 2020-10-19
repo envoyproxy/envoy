@@ -4,7 +4,8 @@ This is a high level overview of how the repository is laid out to both aid in c
 as well as to clearly specify how extensions are added to the repository. The top level directories
 are:
 
-* [.circleci/](.circleci/): Configuration for [CircleCI](https://circleci.com/gh/envoyproxy).
+* [.azure-pipelines/](.azure-pipelines/): Configuration for
+[Azure Pipelines](https://azure.microsoft.com/en-us/services/devops/pipelines/).
 * [api/](api/): Envoy data plane API.
 * [bazel/](bazel/): Configuration for Envoy's use of [Bazel](https://bazel.build/).
 * [ci/](ci/): Scripts used both during CI as well as to build Docker containers.

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This is run on every commit that CircleCI picks up. It assumes that docs have already been built
+# This is run on every commit that Azure Pipelines picks up. It assumes that docs have already been built
 # via docs/build.sh. The push behavior differs depending on the nature of the commit:
 # * Tag commit (e.g. v1.6.0): pushes docs to versioned location, e.g.
 #   https://www.envoyproxy.io/docs/envoy/v1.6.0/.

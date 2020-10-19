@@ -5,7 +5,7 @@ and an image based on Windows2019.
 
 ## Ubuntu Envoy image
 
-The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CircleCI checks,
+The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh). Developers
 may work with the latest build image SHA in [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8)
 repo to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest built Ubuntu Envoy image.
@@ -189,10 +189,10 @@ This build the Ubuntu based `envoyproxy/envoy-build-ubuntu` image, and the final
 
 # macOS Build Flow
 
-The macOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/envoy) workflow.
+The macOS CI build is part of the [Azure Pipelines](https://dev.azure.com/cncf/envoy/_build) workflow.
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
-which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
-on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
+which is pre-installed on the [Azure Pipelines macOS image](https://github.com/actions/virtual-environments/blob/main/images/macos/macos-10.15-Readme.md).
+The dependencies are cached and re-installed on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy. Note that the full version of Xcode (not just Command Line Tools) is required.
 
 # Coverity Scan Build Flow

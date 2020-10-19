@@ -1,7 +1,7 @@
 # C++ coding style
 
 * The Envoy source code is formatted using clang-format. Thus all white spaces, etc.
-  issues are taken care of automatically. The CircleCI tests will automatically check
+  issues are taken care of automatically. The Azure Pipelines will automatically check
   the code format and fail. There are make targets that can both check the format
   (check_format) as well as fix the code format for you (fix_format). Errors in
   .clang-tidy are enforced while other warnings are suggestions. Note that code and
