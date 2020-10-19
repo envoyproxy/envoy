@@ -71,9 +71,13 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
 }
 
 void AppleDnsResolverImpl::onEventCallback(uint32_t events) {
-  ENVOY_LOG(debug, "DNS resolver file event");
+  ENVOY_LOG(debug, "DNS resolver file event ()", events);
   ASSERT(events & Event::FileReadyType::Read);
-  DNSServiceProcessResult(main_sd_ref_);
+  DNSServiceErrorType error = DNSServiceProcessResult(main_sd_ref_);
+  if (error != kDNSServiceErr_NoError) {
+    ENVOY_LOG(warn, "DNS resolver error ({}) in DNSServiceProcessResult", error);
+    flushPendingQueries(true /* with_error */);
+  }
 }
 
 ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
