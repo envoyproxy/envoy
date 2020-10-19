@@ -55,6 +55,9 @@ The filter also sets the location header to ``envoy-wasm``, and adds a custom Wa
 Step 4: Compile updated filter
 ******************************
 
+.. literalinclude:: _include/wasm/envoy_filter_http_wasm_updated_example.cc
+    :language: c++
+
 Stop the proxy server and recompile the Wasm binary:
 
 .. code-block:: console
