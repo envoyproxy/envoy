@@ -65,7 +65,7 @@ public:
       state_.emplace<ScalingMax>(handle);
     } else {
       state_.emplace<WaitingForMin>(max_ms - min_ms);
-      min_duration_timer_->enableTimer(min_ms);
+      min_duration_timer_->enableTimer(std::min(max_ms, min_ms));
     }
   }
 

@@ -316,6 +316,20 @@ TEST_F(ScaledRangeTimerManagerTest, SingleTimerSameMinMax) {
   EXPECT_FALSE(timer->enabled());
 }
 
+TEST_F(ScaledRangeTimerManagerTest, SingleTimerMinGreaterThanMax) {
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+
+  MockFunction<TimerCb> callback;
+  auto timer = manager.createRangeTimer(callback.AsStdFunction());
+  EXPECT_CALL(callback, Call());
+
+  timer->enableTimer(std::chrono::seconds(2), std::chrono::seconds(1));
+
+  simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
+  EXPECT_FALSE(timer->enabled());
+}
+
+
 TEST_F(ScaledRangeTimerManagerTest, MaxOnlyScaledMinimumTimer) {
   ScaledRangeTimerManagerImpl manager(dispatcher_);
 
@@ -370,6 +384,19 @@ TEST_F(ScaledRangeTimerManagerTest, MaxOnlyAbsoluteMinimumTimer) {
   EXPECT_CALL(callback, Call());
   timer->enableTimer(std::chrono::seconds(10));
   simTime().advanceTimeAndRun(std::chrono::seconds(3), dispatcher_, Dispatcher::RunType::Block);
+  EXPECT_FALSE(timer->enabled());
+}
+
+TEST_F(ScaledRangeTimerManagerTest, MaxOnlyScaledMinimumTimerLargeScaleFactor) {
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+
+  // If the minimum scale factor is > 1, it should be treated as if it was 1.
+  MockFunction<TimerCb> callback;
+  auto timer = manager.createTimer(ScaledMinimum(2), callback.AsStdFunction());
+
+  timer->enableTimer(std::chrono::seconds(10));
+  EXPECT_CALL(callback, Call);
+  simTime().advanceTimeAndRun(std::chrono::seconds(10), dispatcher_, Dispatcher::RunType::Block);
   EXPECT_FALSE(timer->enabled());
 }
 
