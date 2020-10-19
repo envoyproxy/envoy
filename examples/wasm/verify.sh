@@ -8,10 +8,45 @@ export NAME=wasm
 
 run_log "Test connection"
 responds_with \
-    foo \
+    "Hello, world" \
     http://localhost:8000
 
-run_log "Test header"
+run_log "Test location header"
 responds_with_header \
-    "newheader: newheadervalue" \
+    "location: envoy-wasm" \
+    http://localhost:8000
+
+run_log "Test custom Wasm header"
+responds_with_header \
+    "x-wasm-custom: FOO" \
+    http://localhost:8000
+
+run_log "Bring down the proxy"
+docker-compose stop proxy
+
+run_log "Compile updated Wasm filter"
+docker-compose -f docker-compose-wasm.yaml up --remove-orphans wasm_compile_update
+
+run_log "Edit the Docker recipe to use the updated binary"
+sed -i s/\\.\\/wasmlib\\/envoy_filter_http_wasm_example.wasm/.\\/wasmlib\\/envoy_filter_http_wasm_updated_example.wasm/ Dockerfile-proxy
+
+run_log "Bring the proxy back up"
+docker-compose up --build -d proxy
+
+run_log "Snooze for 5 while proxy starts"
+sleep 5
+
+run_log "Test updated connection"
+responds_with \
+    "Hello, Wasm world" \
+    http://localhost:8000
+
+run_log "Test updated location header"
+responds_with_header \
+    "location: updated-envoy-wasm" \
+    http://localhost:8000
+
+run_log "Test updated Wasm header"
+responds_with_header \
+    "x-wasm-custom: BAR" \
     http://localhost:8000

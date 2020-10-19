@@ -5,20 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-proxy
-    volumes:
-      - ./envoy.yaml:/etc/envoy.yaml
-      - ./envoy_wasm_example.wasm:/etc/envoy_wasm_example.wasm
-      - ./envoy_filter_http_wasm_example.wasm:/etc/envoy_filter_http_wasm_example.wasm
-      # Uncomment this line if you want to use your own Envoy with WASM enabled.
-      #- /tmp/envoy-docker-build/envoy/source/exe/envoy:/usr/local/bin/envoy
+    depends_on:
+      - web_service
     networks:
       - envoymesh
-    expose:
-      - "80"
-      - "8001"
     ports:
-      - "18000:80"
-      - "18001:8001"
+      - "8000:8000"
 
   web_service:
     build:
@@ -28,10 +20,8 @@ services:
       envoymesh:
         aliases:
           - web_service
-    expose:
-      - "80"
     ports:
-      - "18080:80"
+      - "9000:9000"
 
 networks:
   envoymesh: {}

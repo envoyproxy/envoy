@@ -8,9 +8,36 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+filegroup(
+    name = "configs",
+    srcs = glob(
+            [
+                "**/*.wasm",
+            ],
+    ) + select({
+        "//bazel:linux_x86_64": glob(
+            [
+                "**/*.yaml",
+            ],
+            exclude = [
+                "**/*docker-compose*.yaml",
+            ],
+        ),
+        "//conditions:default": [],
+    }),
+)
+
 envoy_wasm_cc_binary(
     name = "envoy_filter_http_wasm_example.wasm",
     srcs = ["envoy_filter_http_wasm_example.cc"],
+    deps = [
+        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
+    ],
+)
+
+envoy_wasm_cc_binary(
+    name = "envoy_filter_http_wasm_updated_example.wasm",
+    srcs = ["envoy_filter_http_wasm_updated_example.cc"],
     deps = [
         "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
     ],

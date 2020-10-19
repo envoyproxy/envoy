@@ -10,6 +10,7 @@ shift
 mkdir -p "$OUT_DIR/certs"
 mkdir -p "$OUT_DIR/lib"
 mkdir -p "$OUT_DIR/protos"
+mkdir -p "$OUT_DIR/wasmlib"
 "$CONFIGGEN" "$OUT_DIR"
 
 for FILE in "$@"; do
@@ -23,6 +24,9 @@ for FILE in "$@"; do
   *.pb)
     cp "$FILE" "$OUT_DIR/protos"
     ;;
+  *.wasm)
+    cp "$FILE" "$OUT_DIR/wasmlib"
+    ;;
   *)
 
     FILENAME="$(echo "$FILE" | sed -e 's/.*examples\///g')"
@@ -33,4 +37,4 @@ for FILE in "$@"; do
 done
 
 # tar is having issues with -C for some reason so just cd into OUT_DIR.
-(cd "$OUT_DIR"; tar -hcvf example_configs.tar -- *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.lua)
+(cd "$OUT_DIR"; tar -hcvf example_configs.tar -- *.yaml certs/*.pem certs/*.der protos/*.pb wasmlib/*.wasm lib/*.lua)
