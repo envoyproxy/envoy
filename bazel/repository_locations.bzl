@@ -243,7 +243,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "20a159c38a98ecdb6368e8d655343b6036622a29a1621da9dc303f7ed9bf37f3",
         strip_prefix = "LuaJIT-{version}",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
-        release_date = "2020-10-13",
+        release_date = "2020-10-12",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.lua"],
         cpe = "cpe:2.3:a:luajit:luajit:*",
@@ -270,7 +270,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "nghttp2-{version}",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-06-03",
+        release_date = "2020-06-02",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
     io_opentracing_cpp = dict(
@@ -664,7 +664,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        release_date = "2020-08-31",
+        release_date = "2020-08-17",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
@@ -677,7 +677,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.transport_sockets.quic"],
-        release_date = "2020-09-18",
+        release_date = "2020-09-17",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -690,7 +690,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [],
-        release_date = "2020-08-05",
+        release_date = "2020-07-30",
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
@@ -906,7 +906,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        release_date = "2020-10-09",
+        release_date = "2018-12-18",
         cpe = "N/A",
     ),
 )

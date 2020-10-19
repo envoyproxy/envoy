@@ -17,13 +17,17 @@ DEPENDENCY_ANNOTATIONS = [
     # Envoy (see the external dependency at the given version for information).
     "implied_untracked_deps",
 
-    # When the dependency was last updated in Envoy.
-    "last_updated",
-
     # Project metadata.
     "project_desc",
     "project_name",
     "project_url",
+
+    # Reflects the UTC date (YYYY-MM-DD format) for the dependency release. This
+    # is when the dependency was updated in its repository. For dependencies
+    # that have releases, this is the date of the release. For dependencies
+    # without releases or for scenarios where we temporarily need to use a
+    # commit, this date should be the date of the commit in UTC.
+    "release_date",
 
     # List of the categories describing how the dependency is being used. This attribute is used
     # for automatic tracking of security posture of Envoy's dependencies.

@@ -53,37 +53,17 @@ def RenderTitle(title):
 # SHA. Otherwise, return the tarball download.
 def GetVersionUrl(metadata):
   # Figure out if it's a GitHub repo.
-  github_repo = None
-  github_version = None
-  for url in metadata['urls']:
-    if url.startswith('https://github.com/'):
-      components = url.split('/')
-      github_repo = f'https://github.com/{components[3]}/{components[4]}'
-      if components[5] == 'archive':
-        # Only support .tar.gz, .zip today. Figure out the release tag from this
-        # filename.
-        if components[6].endswith('.tar.gz'):
-          github_version = components[6][:-len('.tar.gz')]
-        else:
-          assert (components[6].endswith('.zip'))
-          github_version = components[6][:-len('.zip')]
-      else:
-        # Release tag is a path component.
-        assert (components[5] == 'releases')
-        github_version = components[7]
-      break
+  github_release = dep_utils.GetGitHubReleaseFromUrls(metadata['urls'])
   # If not, direct download link for tarball
-  download_url = metadata['urls'][0]
-  if not github_repo:
-    return download_url
-  # If it's not a GH hash, it's a tagged release.
-  tagged_release = len(metadata['version']) != 40
-  if tagged_release:
+  if not github_release:
+    return metadata['urls'][0]
+  github_repo = f'https://github.com/{github_release.organization}/{github_release.project}'
+  if github_release.tagged:
     # The GitHub version should look like the metadata version, but might have
     # something like a "v" prefix.
-    return f'{github_repo}/releases/tag/{github_version}'
-  assert (metadata['version'] == github_version)
-  return f'{github_repo}/tree/{github_version}'
+    return f'{github_repo}/releases/tag/{github_release.version}'
+  assert (metadata['version'] == github_release.version)
+  return f'{github_repo}/tree/{github_release.version}'
 
 
 if __name__ == '__main__':
