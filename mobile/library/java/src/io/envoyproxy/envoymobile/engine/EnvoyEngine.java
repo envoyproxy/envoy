@@ -42,7 +42,7 @@ public interface EnvoyEngine {
    * @param count    Amount to add to the counter.
    * @return A status indicating if the action was successful.
    */
-  int recordCounter(String elements, int count);
+  int recordCounterInc(String elements, int count);
 
   /**
    * Set a gauge of a given string of elements with the given value.

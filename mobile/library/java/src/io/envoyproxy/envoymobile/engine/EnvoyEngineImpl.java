@@ -82,8 +82,8 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    * @return A status indicating if the action was successful.
    */
   @Override
-  public int recordCounter(String elements, int count) {
-    return JniLibrary.recordCounter(engineHandle, elements, count);
+  public int recordCounterInc(String elements, int count) {
+    return JniLibrary.recordCounterInc(engineHandle, elements, count);
   }
 
   /**

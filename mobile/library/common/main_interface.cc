@@ -70,7 +70,7 @@ envoy_status_t record_counter(envoy_engine_t, const char* elements, uint64_t cou
   // TODO: use specific engine once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
   if (auto e = engine_.lock()) {
-    return e->recordCounter(std::string(elements), count);
+    return e->recordCounterInc(std::string(elements), count);
   }
   return ENVOY_FAILURE;
 }
