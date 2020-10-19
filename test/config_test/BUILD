@@ -30,6 +30,8 @@ example_configs_extensions = [
     "envoy.filters.http.ratelimit",
     "envoy.filters.http.router",
     "envoy.filters.http.grpc_http1_bridge",
+    "envoy.filters.http.grpc_http1_reverse_bridge",
+    "envoy.filters.http.grpc_json_transcoder",
     "envoy.filters.listener.original_dst",
     "envoy.filters.listener.proxy_protocol",
     "envoy.filters.listener.tls_inspector",
