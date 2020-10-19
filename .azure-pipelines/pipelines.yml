@@ -87,6 +87,7 @@ stages:
               AZP_BRANCH: $(Build.SourceBranch)
               AZP_SHA1: $(Build.SourceVersion)
             condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['PostSubmit'], true))
+
       - job: dependencies
         dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
         pool:
