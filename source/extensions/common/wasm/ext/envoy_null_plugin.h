@@ -18,6 +18,10 @@ namespace Wasm {
 proxy_wasm::Word resolve_dns(void* raw_context, proxy_wasm::Word dns_address,
                              proxy_wasm::Word dns_address_size, proxy_wasm::Word token_ptr);
 
+proxy_wasm::Word set_active_span_tag(void* raw_context, proxy_wasm::Word key_ptr,
+                                     proxy_wasm::Word key_size, proxy_wasm::Word value_ptr,
+                                     proxy_wasm::Word value_size);
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions
@@ -38,6 +42,14 @@ inline WasmResult envoy_resolve_dns(const char* dns_address, size_t dns_address_
   return static_cast<WasmResult>(
       ::Envoy::Extensions::Common::Wasm::resolve_dns(proxy_wasm::current_context_, WR(dns_address),
                                                      WS(dns_address_size), WR(token))
+          .u64_);
+}
+
+inline WasmResult envoy_set_active_span_tag(const char* key_ptr, size_t key_size,
+                                            const char* value_ptr, size_t value_size) {
+  return static_cast<WasmResult>(
+      ::Envoy::Extensions::Common::Wasm::set_active_span_tag(
+          proxy_wasm::current_context_, WR(key_ptr), WS(key_size), WR(value_ptr), WS(value_size))
           .u64_);
 }
 

@@ -204,6 +204,19 @@ Word resolve_dns(void* raw_context, Word dns_address_ptr, Word dns_address_size,
   return WasmResult::Ok;
 }
 
+// // NOLINTNEXTLINE(readability-identifier-naming)
+Word set_active_span_tag(void* raw_context, Word key_ptr, Word key_size, Word value_ptr,
+                         Word value_size) {
+  auto context = WASM_CONTEXT(raw_context);
+  auto key = context->wasmVm()->getMemory(key_ptr.u64_, key_size.u64_);
+  auto value = context->wasmVm()->getMemory(value_ptr.u64_, value_size.u64_);
+  if (!key || !value) {
+    return WasmResult::InvalidMemoryAccess;
+  }
+  context->activeSpanSetTag(key.value(), value.value());
+  return WasmResult::Ok;
+}
+
 void Wasm::registerCallbacks() {
   WasmBase::registerCallbacks();
 #define _REGISTER(_fn)                                                                             \
@@ -211,6 +224,7 @@ void Wasm::registerCallbacks() {
       "env", "envoy_" #_fn, &_fn,                                                                  \
       &proxy_wasm::ConvertFunctionWordToUint32<decltype(_fn), _fn>::convertFunctionWordToUint32)
   _REGISTER(resolve_dns);
+  _REGISTER(set_active_span_tag);
 #undef _REGISTER
 }
 

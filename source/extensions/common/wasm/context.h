@@ -276,6 +276,7 @@ public:
                     std::list<Envoy::Network::DnsResponse>&& response);
 
   void onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot);
+  WasmResult activeSpanSetTag(absl::string_view key, absl::string_view value);
 
   // CEL evaluation
   std::vector<const google::api::expr::runtime::CelFunction*>

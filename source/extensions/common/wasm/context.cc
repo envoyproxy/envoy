@@ -308,6 +308,18 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
   wasm()->on_stats_update_(this, id_, counter_block_size + gauge_block_size);
 }
 
+// Tracing
+WasmResult Context::activeSpanSetTag(absl::string_view key, absl::string_view value) {
+  if (decoder_callbacks_) {
+    Tracing::Span& span = decoder_callbacks_->activeSpan();
+    span.setTag(key, value);
+  } else if (encoder_callbacks_) {
+    Tracing::Span& span = encoder_callbacks_->activeSpan();
+    span.setTag(key, value);
+  }
+  return WasmResult::Ok;
+}
+
 // Native serializer carrying over bit representation from CEL value to the extension.
 // This implementation assumes that the value type is static and known to the consumer.
 WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* result) {
