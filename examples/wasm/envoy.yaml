@@ -40,7 +40,7 @@ static_resources:
                     vm_id: "my_vm_id"
                     code:
                       local:
-                        filename: "wasmlib/envoy_filter_http_wasm_example.wasm"
+                        filename: "lib/envoy_filter_http_wasm_example.wasm"
                     configuration: {}
           - name: envoy.filters.http.router
             typed_config: {}

@@ -28,7 +28,7 @@ run_log "Compile updated Wasm filter"
 docker-compose -f docker-compose-wasm.yaml up --remove-orphans wasm_compile_update
 
 run_log "Edit the Docker recipe to use the updated binary"
-sed -i s/\\.\\/wasmlib\\/envoy_filter_http_wasm_example.wasm/.\\/wasmlib\\/envoy_filter_http_wasm_updated_example.wasm/ Dockerfile-proxy
+sed -i s/\\.\\/lib\\/envoy_filter_http_wasm_example.wasm/.\\/lib\\/envoy_filter_http_wasm_updated_example.wasm/ Dockerfile-proxy
 
 run_log "Bring the proxy back up"
 docker-compose up --build -d proxy
