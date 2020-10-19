@@ -458,7 +458,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
-  // Refresh local address in case it was restored by a listener filter like the original_dst filter.
+  // Refresh local address in case it was restored by a listener filter like the original_dst
+  // filter.
   stream_info->setDownstreamLocalAddress(socket->localAddress());
 
   // Find matching filter chain.
