@@ -26,9 +26,6 @@ address (routes setup in :repo:`/examples/front-proxy/service-envoy.yaml`). This
 setup illustrates the advantage of running service Envoys collocated with your services: all
 requests are handled by the service Envoy, and efficiently routed to your services.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers

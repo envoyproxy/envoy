@@ -19,10 +19,6 @@ The client send messages through a proxy that upgrades the HTTP requests from ``
 Another Envoy feature demonstrated in this example is Envoy's ability to do authority
 base routing via its route configuration.
 
-
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Generate the protocol stubs
