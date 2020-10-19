@@ -16,7 +16,7 @@ static_resources:
     - filters:
       - name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: AUTO
           route_config:
@@ -26,7 +26,7 @@ static_resources:
               domains: ["*"]
               routes:
               - match: { prefix: "/" }
-                route: { host_rewrite: www.google.com, cluster: service_google }
+                route: { host_rewrite_literal: www.google.com, cluster: service_google }
   clusters:
   - name: service_google
     connect_timeout: 0.25s

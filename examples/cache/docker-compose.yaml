@@ -13,8 +13,6 @@ services:
     ports:
       - "8000:8000"
       - "8001:8001"
-    environment:
-      - ENVOY_UID=0
 
   service1:
     build:

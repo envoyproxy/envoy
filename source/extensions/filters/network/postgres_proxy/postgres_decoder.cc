@@ -176,7 +176,7 @@ void DecoderImpl::initialize() {
   };
 }
 
-bool DecoderImpl::parseMessage(Buffer::Instance& data) {
+bool DecoderImpl::parseHeader(Buffer::Instance& data) {
   ENVOY_LOG(trace, "postgres_proxy: parsing message, len {}", data.length());
 
   // The minimum size of the message sufficient for parsing is 5 bytes.
@@ -220,10 +220,6 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
 
   data.drain(startup_ ? 4 : 5); // Length plus optional 1st byte.
 
-  uint32_t bytes_to_read = message_len_ - 4;
-  message.assign(std::string(static_cast<char*>(data.linearize(bytes_to_read)), bytes_to_read));
-  setMessage(message);
-
   ENVOY_LOG(trace, "postgres_proxy: msg parsed");
   return true;
 }
@@ -238,7 +234,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 
   ENVOY_LOG(trace, "postgres_proxy: decoding {} bytes", data.length());
 
-  if (!parseMessage(data)) {
+  if (!parseHeader(data)) {
     return false;
   }
 
@@ -259,15 +255,24 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     }
   }
 
-  std::vector<MsgAction>& actions = std::get<2>(msg.get());
-  for (const auto& action : actions) {
-    action(this);
-  }
-
   // message_len_ specifies total message length including 4 bytes long
   // "length" field. The length of message body is total length minus size
   // of "length" field (4 bytes).
   uint32_t bytes_to_read = message_len_ - 4;
+
+  std::vector<MsgAction>& actions = std::get<2>(msg.get());
+  if (!actions.empty()) {
+    // Linearize the message for processing.
+    message_.assign(std::string(static_cast<char*>(data.linearize(bytes_to_read)), bytes_to_read));
+
+    // Invoke actions associated with the type of received message.
+    for (const auto& action : actions) {
+      action(this);
+    }
+
+    // Drop the linearized message.
+    message_.erase();
+  }
 
   ENVOY_LOG(debug, "({}) command = {} ({})", msg_processor.direction_, command_,
             std::get<0>(msg.get()));
