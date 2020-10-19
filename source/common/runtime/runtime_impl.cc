@@ -51,7 +51,7 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
   if (entry == values_.end() || !entry->second.bool_value_.has_value()) {
     // Key wasn't found, the feature is enabled if default_value is true or
     // "envoy.features.enable_all_deprecated_features" is enabled.
-    if (!default_value && !getBoolean("envoy.features.enable_all_deprecated_features", false)) {
+    if (!getBoolean("envoy.features.enable_all_deprecated_features", default_value)) {
       return false;
     }
   } else if (!entry->second.bool_value_.value()) {
