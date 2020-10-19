@@ -138,6 +138,7 @@ find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s
 copy_example_configs () {
     mkdir -p "${GENERATED_RST_DIR}/start/sandboxes/_include/wasm"
     cp -a "${SRC_DIR}"/examples/wasm/*.cc "${GENERATED_RST_DIR}/start/sandboxes/_include/wasm"
+    cp -a "${SRC_DIR}"/examples/wasm/Dockerfile-proxy "${GENERATED_RST_DIR}/start/sandboxes/_include/wasm"
 }
 
 copy_example_configs
