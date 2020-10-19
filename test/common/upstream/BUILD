@@ -680,7 +680,7 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "health_check_fuzz_test",
     srcs = ["health_check_fuzz_test.cc"],
-    corpus = "//test/common/upstream:health_check_corpus",
+    corpus = "health_check_corpus",
     deps = [
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",
