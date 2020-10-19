@@ -1,3 +1,4 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +9,11 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+selects.config_setting_group(
+    name = "include_wasm_config",
+    match_all = ["//bazel:linux_x86_64", "//bazel:wasm_all"],
+)
+
 filegroup(
     name = "configs",
     srcs = glob(
@@ -15,7 +21,7 @@ filegroup(
                 "**/*.wasm",
             ],
     ) + select({
-        "//bazel:linux_x86_64": glob(
+        ":include_wasm_config": glob(
             [
                 "**/*.yaml",
             ],
