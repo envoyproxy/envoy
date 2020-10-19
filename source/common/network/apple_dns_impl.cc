@@ -85,7 +85,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
 
   DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
   if (error != kDNSServiceErr_NoError) {
-    ENVOY_LOG(warn, "DNS resolver error in dnsServiceGetAddrInfo for {}", dns_name);
+    ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
     return nullptr;
   }
 
@@ -150,7 +150,10 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   ENVOY_LOG(debug, "Destroying PendingResolution for {}", dns_name_);
-  DNSServiceRefDeallocate(individual_sd_ref_);
+  // FIXME: add comment about why the ref might be null.
+  if (individual_sd_ref_) {
+    DNSServiceRefDeallocate(individual_sd_ref_);
+  }
 }
 
 void AppleDnsResolverImpl::PendingResolution::cancel() {
