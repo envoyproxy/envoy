@@ -202,8 +202,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                         resource.type_url(), message->type_url(), message->DebugString()));
       }
-      resources.emplace_back(DecodedResourceImpl::fromResourcePtr(resource_decoder, resource,
-                                                                  message->version_info()));
+      resources.emplace_back(
+          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info()));
       all_resource_refs.emplace_back(*resources.back());
       resource_ref_map.emplace(resources.back()->name(), *resources.back());
 

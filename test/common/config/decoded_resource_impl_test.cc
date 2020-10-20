@@ -25,11 +25,11 @@ TEST(DecodedResourceImplTest, All) {
         .WillOnce(Return("some_name"));
     auto decoded_resource =
         DecodedResourceImpl::fromResource(resource_decoder, some_opaque_resource, "foo");
-    EXPECT_EQ("some_name", decoded_resource.name());
-    EXPECT_TRUE(decoded_resource.aliases().empty());
-    EXPECT_EQ("foo", decoded_resource.version());
-    EXPECT_THAT(decoded_resource.resource(), ProtoEq(ProtobufWkt::Empty()));
-    EXPECT_TRUE(decoded_resource.hasResource());
+    EXPECT_EQ("some_name", decoded_resource->name());
+    EXPECT_TRUE(decoded_resource->aliases().empty());
+    EXPECT_EQ("foo", decoded_resource->version());
+    EXPECT_THAT(decoded_resource->resource(), ProtoEq(ProtobufWkt::Empty()));
+    EXPECT_TRUE(decoded_resource->hasResource());
   }
 
   {

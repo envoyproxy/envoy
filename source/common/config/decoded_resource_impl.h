@@ -26,23 +26,9 @@ using DecodedResourceImplPtr = std::unique_ptr<DecodedResourceImpl>;
 
 class DecodedResourceImpl : public DecodedResource {
 public:
-  static DecodedResourceImpl fromResource(OpaqueResourceDecoder& resource_decoder,
-                                          const ProtobufWkt::Any& resource,
-                                          const std::string& version) {
-    if (resource.Is<envoy::service::discovery::v3::Resource>()) {
-      envoy::service::discovery::v3::Resource r;
-      MessageUtil::unpackTo(resource, r);
-      r.set_version(version);
-      return DecodedResourceImpl(resource_decoder, r);
-    }
-
-    return DecodedResourceImpl(resource_decoder, {}, Protobuf::RepeatedPtrField<std::string>(),
-                               resource, true, version, absl::nullopt);
-  }
-
-  static DecodedResourceImplPtr fromResourcePtr(OpaqueResourceDecoder& resource_decoder,
-                                                const ProtobufWkt::Any& resource,
-                                                const std::string& version) {
+  static DecodedResourceImplPtr fromResource(OpaqueResourceDecoder& resource_decoder,
+                                             const ProtobufWkt::Any& resource,
+                                             const std::string& version) {
     if (resource.Is<envoy::service::discovery::v3::Resource>()) {
       envoy::service::discovery::v3::Resource r;
       MessageUtil::unpackTo(resource, r);
@@ -107,7 +93,7 @@ struct DecodedResourcesWrapper {
                           const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                           const std::string& version) {
     for (const auto& resource : resources) {
-      pushBack((DecodedResourceImpl::fromResourcePtr(resource_decoder, resource, version)));
+      pushBack((DecodedResourceImpl::fromResource(resource_decoder, resource, version)));
     }
   }
 

@@ -100,8 +100,8 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   std::vector<DecodedResourceImplPtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_updates;
   for (const auto& r : resources) {
-    decoded_resources.emplace_back(DecodedResourceImpl::fromResourcePtr(
-        (*watches_.begin())->resource_decoder_, r, version_info));
+    decoded_resources.emplace_back(
+        DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info));
     const absl::flat_hash_set<Watch*>& interested_in_r =
         watchesInterestedIn(decoded_resources.back()->name());
     for (const auto& interested_watch : interested_in_r) {
