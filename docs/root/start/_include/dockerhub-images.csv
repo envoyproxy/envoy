@@ -1,4 +1,4 @@
-,,,stable,stable,master,master
+,,,:cspan:`2` stable,:cspan:`2` master
 Docker image,description,amd64,arm64,amd64,arm64
 `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_,Release binary with symbols stripped on top of an Ubuntu Bionic base.,v1.16-latest,v1.16-latest,,
 `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_,Release binary with symbols stripped on top of a **glibc** alpine base.,v1.16-latest,,,
