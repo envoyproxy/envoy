@@ -94,16 +94,12 @@ void cleanTapConfig(Protobuf::Message* message) {
   // a static config filter is required to have one sink, but since validation isn't performed on
   // the filter until after this function runs, we have to manually check that there are sinks
   // before checking that they are not StreamingGrpc
-  else if (config.common_config().config_type_case() ==
-               envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
-                   kStaticConfig &&
-           !config.common_config().static_config().output_config().sinks().empty() &&
-           config.common_config()
-                   .static_config()
-                   .output_config()
-                   .sinks(0)
-                   .output_sink_type_case() ==
-               envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
+  if (config.common_config().config_type_case() ==
+          envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
+              kStaticConfig &&
+      !config.common_config().static_config().output_config().sinks().empty() &&
+      config.common_config().static_config().output_config().sinks(0).output_sink_type_case() ==
+          envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
     // will be caught in UberFilterFuzzer::fuzz
     throw EnvoyException("received input with not implemented output_sink_type StreamingGrpcSink");
   }
