@@ -289,37 +289,37 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
   drainRequests();
 }
 
-  ApiState& GrpcMuxImpl::apiStateFor(const std::string& type_url) {
-    auto itr = api_state_.find(type_url);
-    if (itr == api_state_.end()) {
-      auto ttl_expiry_callback = [this, type_url](const std::vector<std::string>& expired) {
-        // The TtlManager triggers a callback with a list of all the expired elements, which we need
-        // to compare against the various watched resources to return the subset that each watch is
-        // subscribed to.
+ApiState& GrpcMuxImpl::apiStateFor(const std::string& type_url) {
+  auto itr = api_state_.find(type_url);
+  if (itr == api_state_.end()) {
+    auto ttl_expiry_callback = [this, type_url](const std::vector<std::string>& expired) {
+      // The TtlManager triggers a callback with a list of all the expired elements, which we need
+      // to compare against the various watched resources to return the subset that each watch is
+      // subscribed to.
 
-        // We convert the incoming list into a set in order to more efficiently perform this
-        // comparison when there are a lot of watches.
-        absl::flat_hash_set<std::string> all_expired;
-        all_expired.insert(expired.begin(), expired.end());
+      // We convert the incoming list into a set in order to more efficiently perform this
+      // comparison when there are a lot of watches.
+      absl::flat_hash_set<std::string> all_expired;
+      all_expired.insert(expired.begin(), expired.end());
 
-        for (auto watch : apiStateFor(type_url).watches_) {
-          Protobuf::RepeatedPtrField<std::string> found_resources_for_watch;
+      for (auto watch : apiStateFor(type_url).watches_) {
+        Protobuf::RepeatedPtrField<std::string> found_resources_for_watch;
 
-          for (const auto& resource : expired) {
-            if (all_expired.find(resource) != all_expired.end()) {
-              found_resources_for_watch.Add(std::string(resource));
-            }
+        for (const auto& resource : expired) {
+          if (all_expired.find(resource) != all_expired.end()) {
+            found_resources_for_watch.Add(std::string(resource));
           }
-
-          watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, "");
         }
-      };
 
-      api_state_.emplace(type_url, std::make_unique<ApiState>(dispatcher_, ttl_expiry_callback));
-    }
+        watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, "");
+      }
+    };
 
-    return *api_state_.find(type_url)->second;
+    api_state_.emplace(type_url, std::make_unique<ApiState>(dispatcher_, ttl_expiry_callback));
   }
+
+  return *api_state_.find(type_url)->second;
+}
 
 void GrpcMuxImpl::drainRequests() {
   while (!request_queue_->empty() && grpc_stream_.checkRateLimitAllowsDrain()) {

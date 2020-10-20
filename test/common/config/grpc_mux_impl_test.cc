@@ -302,7 +302,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
       resource_decoder("cluster_name");
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   InSequence s;
-auto* ttl_timer = new Event::MockTimer(&dispatcher_);
+  auto* ttl_timer = new Event::MockTimer(&dispatcher_);
   auto eds_sub = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
