@@ -171,3 +171,19 @@ The following table shows the available Docker images
    The Envoy project considers master to be release candidate quality at all times, and many
    organizations track and deploy master in production. We encourage you to do the same so that
    issues can be reported as early as possible in the development process.
+
+
+.. list-table:: Title
+   :widths: 25 25 50
+   :header-rows: 2
+
+   * - :cspan:`3` spanned row
+   * - Heading row 1, column 1
+     - Heading row 1, column 2
+     - Heading row 1, column 3
+   * - Row 1, column 1
+     -
+     - Row 1, column 3
+   * - Row 2, column 1
+     - Row 2, column 2
+     - Row 2, column 3
