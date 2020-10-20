@@ -37,7 +37,6 @@ public:
    */
   virtual void touch() PURE;
   virtual Thread::ThreadId threadId() const PURE;
-  virtual MonotonicTime lastTouchTime() const PURE;
 };
 
 using WatchDogSharedPtr = std::shared_ptr<WatchDog>;
