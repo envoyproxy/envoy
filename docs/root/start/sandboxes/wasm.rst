@@ -23,6 +23,8 @@ Step 3: Start all of our containers
 
 First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a backend which echos back our request.
 
+Change to the ``examples/wasm`` folder in the Envoy repo, and start the composition:
+
 .. code-block:: console
 
     $ pwd
@@ -39,7 +41,7 @@ First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a
 Step 4: Check web response
 **************************
 
-The Wasm filter should inject "Hello, world" at the end of the response body.
+The Wasm filter should inject "Hello, world" at the end of the response body when you make a request to the proxy.
 
 .. code-block:: console
 
