@@ -72,12 +72,13 @@ The following diff shows the changes that have been made:
 .. literalinclude:: _include/wasm/envoy_filter_http_wasm_updated_example.cc
     :diff: _include/wasm/envoy_filter_http_wasm_example.cc
 
-Stop the proxy server and compile the Wasm binary with the updated code:
-
 .. warning::
 
-   These instructions use the `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags>`_
-   image. You will need 4-5GB of disk space to accommodate this image.
+   These instructions for compiling an updated Wasm binary use the
+   `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags>`_ image.
+   You will need 4-5GB of disk space to accommodate this image.
+
+Stop the proxy server and compile the Wasm binary with the updated code:
 
 .. code-block:: console
 
