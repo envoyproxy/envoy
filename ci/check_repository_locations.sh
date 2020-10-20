@@ -9,5 +9,5 @@ function no_change {
 
 (./tools/git/modified_since_last_github_commit.sh . bzl | grep repository_locations) || no_change
 
-./tools/dependency/release_dates.sh  ./bazel/repository_locations.bzl
-./tools/dependency/release_dates.sh  ./api/bazel/repository_locations.bzl
+./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl
+./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl

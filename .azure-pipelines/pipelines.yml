@@ -99,7 +99,7 @@ stages:
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-              GH_ACCESS_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+              GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
             displayName: "Verify dependency information"
 
 

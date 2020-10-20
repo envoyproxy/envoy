@@ -7,7 +7,7 @@
 # Usage:
 #   tools/dependency/release_dates.sh <path to repository_locations.bzl>
 #
-# You will need to set a GitHub access token in the GH_ACCESS_TOKEN environment
+# You will need to set a GitHub access token in the GITHUB_TOKEN environment
 # variable. You can generate personal access tokens under developer settings on
 # GitHub. You should restrict the scope of the token to "repo: public_repo".
 
@@ -92,9 +92,9 @@ if __name__ == '__main__':
   if len(sys.argv) != 2:
     print('Usage: %s <path to repository_locations.bzl>' % sys.argv[0])
     sys.exit(1)
-  access_token = os.getenv('GH_ACCESS_TOKEN')
+  access_token = os.getenv('GITHUB_TOKEN')
   if not access_token:
-    print('Missing GH_ACCESS_TOKEN')
+    print('Missing GITHUB_TOKEN')
     sys.exit(1)
   path = sys.argv[1]
   spec_loader = utils.repository_locations_utils.load_repository_locations_spec
