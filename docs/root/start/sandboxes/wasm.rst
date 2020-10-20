@@ -16,6 +16,11 @@ Running the Sandbox
 Step 3: Start all of our containers
 ***********************************
 
+.. note::
+
+   The provided Wasm binary was compiled for the ``x86_64`` architecture. If you would like to use this sandbox
+   with the ``arm64`` architecture, skip to Step 5.
+
 First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a backend which echos back our request.
 
 .. code-block:: console
@@ -30,11 +35,6 @@ First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a
     -----------------------------------------------------------------------------------------------
     wasm_proxy_1         /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
     wasm_web_service_1   node ./index.js                Up      0.0.0.0:9000->9000/tcp
-
-.. note::
-
-   The provided Wasm binary was compiled for the ``x86_64`` architecture. If you would like to use this sandbox
-   with the ``arm64`` architecture, skip to Step 5.
 
 Step 4: Check web response
 **************************
