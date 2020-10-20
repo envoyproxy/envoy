@@ -55,7 +55,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   // for kDNSServiceFlagsShareConnection in dns_sd.h, and copied (and edited) in this implementation
   // where relevant.
   auto error = DNSServiceCreateConnection(&main_sd_ref_);
-  RELEASE_ASSERT(!error, "error in DNSServiceCreateConnection");
+  RELEASE_ASSERT(!error, fmt::format("error ({}) in DNSServiceCreateConnection", error));
 
   auto fd = DNSServiceRefSockFD(main_sd_ref_);
   RELEASE_ASSERT(fd != -1, "error in DNSServiceRefSockFD");
@@ -158,7 +158,7 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   ENVOY_LOG(debug, "Destroying PendingResolution for {}", dns_name_);
   // It is possible that DNSServiceGetAddrInfo returns a synchronous error, with a NULLed
-  // DNSServiceRef in AppleDnsResolverImpl::resolve.
+  // DNSServiceRef, in AppleDnsResolverImpl::resolve.
   if (individual_sd_ref_) {
     RELEASE_ASSERT(!owned, "individual_sd_ref_ should only be null on a synchronous error.");
     DNSServiceRefDeallocate(individual_sd_ref_);
