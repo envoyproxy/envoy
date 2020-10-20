@@ -160,7 +160,7 @@ AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   // It is possible that DNSServiceGetAddrInfo returns a synchronous error, with a NULLed
   // DNSServiceRef, in AppleDnsResolverImpl::resolve.
   if (individual_sd_ref_) {
-    RELEASE_ASSERT(!owned, "individual_sd_ref_ should only be null on a synchronous error.");
+    RELEASE_ASSERT(!owned_, "individual_sd_ref_ should only be null on a synchronous error.");
     DNSServiceRefDeallocate(individual_sd_ref_);
   }
 }
