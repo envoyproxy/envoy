@@ -55,10 +55,6 @@ MockTimer::~MockTimer() {
   }
 }
 
-MockRangeTimer::MockRangeTimer(MockScaledRangeTimerManager* manager) {
-  EXPECT_CALL(*manager, createRangeTimer_).WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)));
-}
-
 MockSchedulableCallback::~MockSchedulableCallback() = default;
 
 MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher)

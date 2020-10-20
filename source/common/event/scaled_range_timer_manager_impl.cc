@@ -4,7 +4,6 @@
 #include <cmath>
 #include <memory>
 
-#include "envoy/event/range_timer.h"
 #include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
@@ -14,7 +13,7 @@ namespace Envoy {
 namespace Event {
 
 /**
- * Implementation of RangeTimer that can be scaled by the backing manager object.
+ * Implementation of Timer that can be scaled by the backing manager object.
  *
  * Instances of this class exist in one of 3 states:
  *  - inactive: not enabled
@@ -31,10 +30,10 @@ namespace Event {
  * [scaling-max -> inactive -> waiting-for-min -> scaling-max] in a single
  * method call. The waiting-for-min transitions are elided for efficiency.
  */
-class ScaledRangeTimerManagerImpl::RangeTimerImpl final : public RangeTimer {
+class ScaledRangeTimerManagerImpl::RangeTimerImpl final : public Timer {
 public:
-  RangeTimerImpl(TimerCb callback, ScaledRangeTimerManagerImpl& manager)
-      : manager_(manager), callback_(std::move(callback)),
+  RangeTimerImpl(ScaledTimerMinimum minimum, TimerCb callback, ScaledRangeTimerManagerImpl& manager)
+      : minimum_(minimum), manager_(manager), callback_(std::move(callback)),
         min_duration_timer_(manager.dispatcher_.createTimer([this] { onMinTimerComplete(); })) {}
 
   ~RangeTimerImpl() override { disableTimer(); }
@@ -52,12 +51,13 @@ public:
     scope_ = nullptr;
   }
 
-  void enableTimer(const std::chrono::milliseconds min_ms, const std::chrono::milliseconds max_ms,
+  void enableTimer(const std::chrono::milliseconds max_ms,
                    const ScopeTrackedObject* scope) override {
     disableTimer();
     scope_ = scope;
-    ENVOY_LOG_MISC(trace, "enableTimer called on {} for ({}ms, {}ms)", static_cast<void*>(this),
-                   min_ms.count(), max_ms.count());
+    const std::chrono::milliseconds min_ms = std::min(minimum_.computeMinimum(max_ms), max_ms);
+    ENVOY_LOG_MISC(trace, "enableTimer called on {} for {}ms, min is {}ms",
+                   static_cast<void*>(this), max_ms.count(), min_ms.count());
     if (min_ms <= std::chrono::milliseconds::zero()) {
       // If the duration spread (max - min) is zero, skip over the waiting-for-min and straight to
       // the scaling-max state.
@@ -67,6 +67,11 @@ public:
       state_.emplace<WaitingForMin>(max_ms - min_ms);
       min_duration_timer_->enableTimer(std::min(max_ms, min_ms));
     }
+  }
+
+  void enableHRTimer(std::chrono::microseconds us,
+                     const ScopeTrackedObject* object = nullptr) override {
+    enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(us), object);
   }
 
   bool enabled() override { return !absl::holds_alternative<Inactive>(state_); }
@@ -123,37 +128,13 @@ private:
     }
   }
 
+  const ScaledTimerMinimum minimum_;
   ScaledRangeTimerManagerImpl& manager_;
   const TimerCb callback_;
   const TimerPtr min_duration_timer_;
 
   absl::variant<Inactive, WaitingForMin, ScalingMax> state_;
   const ScopeTrackedObject* scope_;
-};
-
-class ScaledRangeTimerManagerImpl::FixedMinimumRangeTimerImpl final : public Event::Timer {
-public:
-  FixedMinimumRangeTimerImpl(ScaledTimerMinimum minimum, TimerCb timer_cb,
-                             ScaledRangeTimerManagerImpl& manager)
-      : minimum_(minimum), range_timer_(std::move(timer_cb), manager) {}
-
-  void enableTimer(std::chrono::milliseconds ms,
-                   const ScopeTrackedObject* object = nullptr) override {
-    range_timer_.enableTimer(minimum_.computeMinimum(ms), ms, object);
-  }
-
-  void enableHRTimer(std::chrono::microseconds us,
-                     const ScopeTrackedObject* object = nullptr) override {
-    enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(us), object);
-  }
-
-  void disableTimer() override { range_timer_.disableTimer(); }
-
-  bool enabled() override { return range_timer_.enabled(); }
-
-private:
-  const ScaledTimerMinimum minimum_;
-  RangeTimerImpl range_timer_;
 };
 
 ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(Dispatcher& dispatcher)
@@ -165,12 +146,8 @@ ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   ASSERT(queues_.empty());
 }
 
-RangeTimerPtr ScaledRangeTimerManagerImpl::createRangeTimer(TimerCb callback) {
-  return std::make_unique<RangeTimerImpl>(callback, *this);
-}
-
 TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerMinimum minimum, TimerCb callback) {
-  return std::make_unique<FixedMinimumRangeTimerImpl>(minimum, callback, *this);
+  return std::make_unique<RangeTimerImpl>(minimum, callback, *this);
 }
 
 void ScaledRangeTimerManagerImpl::setScaleFactor(double scale_factor) {

@@ -41,19 +41,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "range_timer_interface",
-    hdrs = ["range_timer.h"],
-    deps = [
-        ":timer_interface",
-        "//include/envoy/common:time_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "scaled_range_timer_manager_interface",
     hdrs = ["scaled_range_timer_manager.h"],
     deps = [
-        ":range_timer_interface",
         ":timer_interface",
     ],
 )

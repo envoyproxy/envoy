@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/event/range_timer.h"
 #include "envoy/event/timer.h"
 
 #include "absl/types/variant.h"
@@ -57,38 +56,31 @@ public:
 };
 
 /**
- * Class for creating RangeTimer objects that can be adjusted towards either the minimum or maximum
+ * Class for creating Timer objects that can be adjusted towards either the minimum or maximum
  * of their range by the owner of the manager object. Users of this class can call createTimer() to
- * receive a new RangeTimer object that they can then enable or disable at will (but only on the
- * same dispatcher), and setScaleFactor() to change the scaling factor. Updates to the current
- * scale factor are applied to all timers, including those created in the past.
+ * receive a new Timer object that they can then enable or disable at will (but only on the same
+ * dispatcher), and setScaleFactor() to change the scaling factor. The current scale factor is
+ * applied to all timers, including those that are created later.
  */
 class ScaledRangeTimerManager {
 public:
   virtual ~ScaledRangeTimerManager() = default;
 
   /**
-   * Creates a new range timer backed by the manager. The returned timer will be subject to the
-   * current and future scale factor values set on the manager. All returned timers must be deleted
-   * before the manager.
-   */
-  virtual RangeTimerPtr createRangeTimer(TimerCb callback) PURE;
-
-  /**
-   * Creates a new range timer backed by the manager that mimics the Timer interface. Calling
-   * enableTimer on the returned object sets the maximum duration, while the first argument here
-   * controls the minimum. Passing a value of ScaleFactor(x) sets the min to (x * max) when the
-   * timer is enabled, while AbsoluteValue(y) sets the min to the duration y.
+   * Creates a new timer backed by the manager. Calling enableTimer on the returned object sets the
+   * maximum duration, while the first argument here controls the minimum. Passing a value of
+   * ScaleFactor(x) sets the min to (x * max) when the timer is enabled, while AbsoluteValue(y) sets
+   * the min to the duration y.
    */
   virtual TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) PURE;
 
   /**
-   * Sets the scale factor for all timers that have been or will be created through this manager.
-   * The value must be between 0.0 and 1.0, inclusive. The scale factor affects the amount of time
-   * timers spend in their target range. The RangeTimers returned by createTimer will fire after
-   * (min + (max - min) * scale_factor). This means that a scale factor of 0 causes timers to fire
-   * immediately at the min duration, a factor of 0.5 causes firing halfway between min and max, and
-   * a factor of 1 causes firing at max.
+   * Sets the scale factor for all timers created through this manager. The value should be between
+   * 0 and 1, inclusive. The scale factor affects the amount of time timers spend in their target
+   * range. The timers returned by createTimer will fire after (min + (max - min) * scale_factor).
+   * This means that a scale factor of 0 causes timers to fire immediately at the min duration, a
+   * factor of 0.5 causes firing halfway between min and max, and a factor of 1 causes firing at
+   * max.
    */
   virtual void setScaleFactor(double scale_factor) PURE;
 };
