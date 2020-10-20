@@ -46,7 +46,7 @@ The Wasm filter should inject "Hello, world" at the end of the response body.
    $ curl -s http://localhost:8000 | grep "Hello, world"
    }Hello, world
 
-The filter also sets the ``content-type`` header to ``text/plain``, and adds a custom Wasm header ``x-wasm-custom``.
+The filter also sets the ``content-type`` header to ``text/plain``, and adds a custom ``x-wasm-custom`` header.
 
 .. code-block:: console
 
