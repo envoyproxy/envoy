@@ -8,7 +8,7 @@ export DELAY=10
 
 _psql () {
     local postgres_client
-    postgres_client=(docker run -i --rm --network envoymesh -e PGSSLMODE=disable postgres:latest psql -U postgres -h envoy -p 1999)
+    postgres_client=(docker run -i --rm --network envoymesh -e "PGSSLMODE=disable" postgres:latest psql -U postgres -h envoy -p 1999)
     "${postgres_client[@]}" "${@}"
 }
 
@@ -23,7 +23,7 @@ run_log "Insert some data"
 _psql -d test -c 'INSERT INTO test VALUES (DEFAULT);'
 
 run_log "Checking inserted data"
-_psql -d test -c 'SELECT * FROM test;' | grep 1
+_psql -d test -c 'SELECT * FROM test;' | grep -E '1$'
 
 run_log "Updating data"
 _psql -d test -c 'UPDATE test SET f = 2 WHERE f = 1;'
