@@ -378,13 +378,13 @@ void ClientSslSocketFactory::addReadyCb(std::function<void()> callback) {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     if (ssl_ctx_) {
       immediately_run_callback = true;
+    } else {
+      secrets_ready_callbacks_.push_back(callback);
     }
   }
 
   if (immediately_run_callback) {
     callback();
-  } else {
-    secrets_ready_callbacks_.push_back(callback);
   }
 }
 
