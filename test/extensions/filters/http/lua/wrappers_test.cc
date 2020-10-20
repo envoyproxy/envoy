@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/http/utility.h"
+#include "common/network/address_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/filters/http/lua/wrappers.h"
@@ -11,6 +12,7 @@
 
 using testing::InSequence;
 using testing::ReturnPointee;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -267,6 +269,35 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentProtocol) {
   expectToPrintCurrentProtocol(Http::Protocol::Http10);
   expectToPrintCurrentProtocol(Http::Protocol::Http11);
   expectToPrintCurrentProtocol(Http::Protocol::Http2);
+}
+
+// Verify downstream local addresses and downstream direct remote addresses are available from
+// stream info wrapper.
+TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
+  const std::string SCRIPT{R"EOF(
+      function callMe(object)
+        testPrint(object:downstreamLocalAddress())
+        testPrint(object:downstreamDirectRemoteAddress())
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.0.0.1", 8000)};
+  auto downstream_direct_remote =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
+  ON_CALL(stream_info, downstreamLocalAddress()).WillByDefault(ReturnRef(address));
+  ON_CALL(stream_info, downstreamDirectRemoteAddress())
+      .WillByDefault(ReturnRef(downstream_direct_remote));
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint(address->asString()));
+  EXPECT_CALL(printer_, testPrint(downstream_direct_remote->asString()));
+  start("callMe");
+  wrapper.reset();
 }
 
 // Set, get and iterate stream info dynamic metadata.
