@@ -47,15 +47,8 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
   // 3. A boolean runtime entry "envoy.features.enable_all_deprecated_features" with a value of
   //    "true" exists, and there isn't a boolean runtime entry <key> with a value of "false".
 
-  const auto& entry = key.empty() ? values_.end() : values_.find(key);
-  if (entry == values_.end() || !entry->second.bool_value_.has_value()) {
-    // Key wasn't found, the feature is enabled if default_value is true or
-    // "envoy.features.enable_all_deprecated_features" is enabled.
-    if (!getBoolean("envoy.features.enable_all_deprecated_features", default_value)) {
-      return false;
-    }
-  } else if (!entry->second.bool_value_.value()) {
-    // Key exists, but it is false.
+  if (!getBoolean(key,
+                  getBoolean("envoy.features.enable_all_deprecated_features", default_value))) {
     return false;
   }
 
