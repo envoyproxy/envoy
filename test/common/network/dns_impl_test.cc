@@ -281,7 +281,7 @@ public:
     queries_.emplace_back(query);
   }
 
-  void onReject() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onReject(RejectCause) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void addHosts(const std::string& hostname, const IpList& ip, const RecordType& type) {
     if (type == RecordType::A) {
@@ -390,6 +390,9 @@ public:
   const std::string& logicalName() const override { return antagonistic_name_; }
   const Address::Ip* ip() const override { return instance_.ip(); }
   const Address::Pipe* pipe() const override { return instance_.pipe(); }
+  const Address::EnvoyInternalAddress* envoyInternalAddress() const override {
+    return instance_.envoyInternalAddress();
+  }
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   Address::Type type() const override { return instance_.type(); }

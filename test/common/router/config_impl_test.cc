@@ -491,8 +491,8 @@ virtual_hosts:
     route:
       cluster: connect_break
   - match:
-        connect_matcher:
-          {}
+      connect_matcher:
+        {}
     route:
       cluster: connect_match
       prefix_rewrite: "/rewrote"
@@ -507,9 +507,21 @@ virtual_hosts:
   - bat4.com
   routes:
   - match:
-        connect_matcher:
-          {}
+      connect_matcher:
+        {}
     redirect: { path_redirect: /new_path }
+- name: connect3
+  domains:
+  - bat5.com
+  routes:
+  - match:
+      connect_matcher:
+        {}
+      headers:
+      - name: x-safe
+        exact_match: "safe"
+    route:
+      cluster: connect_header_match
 - name: default
   domains:
   - "*"
@@ -557,6 +569,15 @@ virtual_hosts:
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://bat4.com/new_path", redirect->newPath(headers));
   }
+
+  // Header matching (for HTTP/1.1)
+  EXPECT_EQ(
+      "connect_header_match",
+      config.route(genPathlessHeaders("bat5.com", "CONNECT"), 0)->routeEntry()->clusterName());
+
+  // Header matching (for HTTP/2)
+  EXPECT_EQ("connect_header_match",
+            config.route(genHeaders("bat5.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
 }
 
 TEST_F(RouteMatcherTest, TestRoutes) {
@@ -2831,7 +2852,38 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, GrpcTimeoutOffset) {
+TEST_F(RouteMatcherTest, DurationTimeouts) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: local_service_grpc
+  - match:
+      prefix: "/"
+    route:
+      max_stream_duration:
+        max_stream_duration: 0.01s
+        grpc_timeout_header_max: 0.02s
+        grpc_timeout_header_offset: 0.03s
+      cluster: local_service_grpc
+      )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    auto entry = config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry();
+    EXPECT_EQ(std::chrono::milliseconds(10), entry->maxStreamDuration());
+    EXPECT_EQ(std::chrono::milliseconds(20), entry->grpcTimeoutHeaderMax());
+    EXPECT_EQ(std::chrono::milliseconds(30), entry->grpcTimeoutHeaderOffset());
+  }
+}
+
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(GrpcTimeoutOffset)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -2861,7 +2913,7 @@ virtual_hosts:
                                ->grpcTimeoutOffset());
 }
 
-TEST_F(RouteMatcherTest, GrpcTimeoutOffsetOfDynamicRoute) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(GrpcTimeoutOffsetOfDynamicRoute)) {
   // A DynamicRouteEntry will be created when 'cluster_header' is set.
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -4804,7 +4856,9 @@ virtual_hosts:
     EXPECT_EQ(nullptr, route_entry->hashPolicy());
     EXPECT_TRUE(route_entry->opaqueConfig().empty());
     EXPECT_FALSE(route_entry->autoHostRewrite());
-    EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
+    // Default behavior when include_vh_rate_limits is not set, similar to
+    // VhRateLimitOptions::Override
+    EXPECT_FALSE(route_entry->includeVirtualHostRateLimits());
     EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
     EXPECT_EQ(nullptr, route_entry->corsPolicy());
     EXPECT_EQ("test_value",
@@ -5395,7 +5449,7 @@ virtual_hosts:
 
 class RoutePropertyTest : public testing::Test, public ConfigImplTestBase {};
 
-TEST_F(RoutePropertyTest, ExcludeVHRateLimits) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(ExcludeVHRateLimits)) {
   std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -5413,7 +5467,9 @@ virtual_hosts:
 
   config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
                                                 factory_context_, true);
-  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
+  // Default behavior when include_vh_rate_limits is not set, similar to
+  // VhRateLimitOptions::Override
+  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   yaml = R"EOF(
 virtual_hosts:

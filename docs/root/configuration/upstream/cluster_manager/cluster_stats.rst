@@ -70,7 +70,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_maintenance_mode, Counter, Total requests that resulted in an immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
   upstream_rq_max_duration_reached, Counter, Total requests closed due to max duration reached
-  upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout
+  upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout (except when request hedging is enabled)
   upstream_rq_rx_reset, Counter, Total requests that were reset remotely
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
@@ -218,6 +218,15 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   external.upstream_rq_<\*xx>, Counter, External origin aggregate HTTP response codes
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Histogram, External origin request time milliseconds
+
+.. _config_cluster_manager_cluster_stats_tls:
+
+TLS statistics
+--------------
+
+If TLS is used by the cluster the following statistics are rooted at *cluster.<name>.ssl.*:
+
+.. include:: ../../../_include/ssl_stats.rst
 
 .. _config_cluster_manager_cluster_stats_alt_tree:
 

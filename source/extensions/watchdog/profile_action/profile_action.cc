@@ -6,6 +6,7 @@
 
 #include "common/profiler/profiler.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_format.h"
 
@@ -32,31 +33,44 @@ ProfileAction::ProfileAction(
       duration_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, profile_duration, 5000))),
       max_profiles_(config.max_profiles() == 0 ? DefaultMaxProfiles : config.max_profiles()),
-      running_profile_(false), profiles_started_(0), context_(context),
-      timer_cb_(context_.dispatcher_.createTimer([this] {
+      profiles_attempted_(context.stats_.counterFromStatName(
+          Stats::StatNameManagedStorage(
+              absl::StrCat(context.guarddog_name_, ".profile_action.attempted"),
+              context.stats_.symbolTable())
+              .statName())),
+      profiles_successfully_captured_(context.stats_.counterFromStatName(
+          Stats::StatNameManagedStorage(
+              absl::StrCat(context.guarddog_name_, ".profile_action.successfully_captured"),
+              context.stats_.symbolTable())
+              .statName())),
+      context_(context), timer_cb_(context_.dispatcher_.createTimer([this] {
         if (Profiler::Cpu::profilerEnabled()) {
           Profiler::Cpu::stopProfiler();
           running_profile_ = false;
         } else {
           ENVOY_LOG_MISC(error,
                          "Profile Action's stop() was scheduled, but profiler isn't running!");
+          return;
         }
 
         if (!context_.api_.fileSystem().fileExists(profile_filename_)) {
           ENVOY_LOG_MISC(error, "Profile file {} wasn't created!", profile_filename_);
+        } else {
+          profiles_successfully_captured_.inc();
         }
       })) {}
 
 void ProfileAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
     MonotonicTime /*now*/) {
   if (running_profile_) {
     return;
   }
+  profiles_attempted_.inc();
 
   // Check if there's a tid that justifies profiling
-  if (thread_ltt_pairs.empty()) {
+  if (thread_last_checkin_pairs.empty()) {
     ENVOY_LOG_MISC(warn, "Profile Action: No tids were provided.");
     return;
   }

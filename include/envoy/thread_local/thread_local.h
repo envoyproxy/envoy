@@ -16,6 +16,14 @@ namespace ThreadLocal {
 class ThreadLocalObject {
 public:
   virtual ~ThreadLocalObject() = default;
+
+  /**
+   * Return the object casted to a concrete type. See getTyped() below for comments on the casts.
+   */
+  template <class T> T& asType() {
+    ASSERT(dynamic_cast<T*>(this) != nullptr);
+    return *static_cast<T*>(this);
+  }
 };
 
 using ThreadLocalObjectSharedPtr = std::shared_ptr<ThreadLocalObject>;
@@ -55,26 +63,14 @@ public:
   }
 
   /**
-   * Run a callback on all registered threads.
-   * @param cb supplies the callback to run.
-   */
-  virtual void runOnAllThreads(Event::PostCb cb) PURE;
-
-  /**
-   * Run a callback on all registered threads with a barrier. A shutdown initiated during the
-   * running of the PostCBs may prevent all_threads_complete_cb from being called.
-   * @param cb supplies the callback to run on each thread.
-   * @param all_threads_complete_cb supplies the callback to run on main thread after cb has
-   * been run on all registered threads.
-   */
-  virtual void runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) PURE;
-
-  /**
    * Set thread local data on all threads previously registered via registerThread().
    * @param initializeCb supplies the functor that will be called *on each thread*. The functor
    *                     returns the thread local object which is then stored. The storage is via
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
+   *
+   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner. As the owner
+   * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using InitializeCb = std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)>;
   virtual void set(InitializeCb cb) PURE;

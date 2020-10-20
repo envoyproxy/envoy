@@ -6,7 +6,6 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/json/json_object.h"
 #include "envoy/type/v3/range.pb.h"
 
 #include "common/protobuf/protobuf.h"
@@ -22,16 +21,34 @@ public:
   enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix, Contains };
 
   /**
-   * Get all instances of the header key specified, and return the values in the vector provided.
-   *
-   * This should not be used for inline headers, as it turns a constant time lookup into O(n).
-   *
-   * @param headers the headers to return keys from
-   * @param key the header key to return values for
-   * @param out the vector to return values in
+   * Get all header values as a single string. Multiple headers are concatenated with ','.
    */
-  static void getAllOfHeader(const HeaderMap& headers, absl::string_view key,
-                             std::vector<absl::string_view>& out);
+  class GetAllOfHeaderAsStringResult {
+  public:
+    // The ultimate result of the concatenation. If absl::nullopt, no header values were found.
+    // If the final string required a string allocation, the memory is held in
+    // backingString(). This allows zero allocation in the common case of a single header
+    // value.
+    absl::optional<absl::string_view> result() const {
+      // This is safe for move/copy of this class as the backing string will be moved or copied.
+      // Otherwise result_ is valid. The assert verifies that both are empty or only 1 is set.
+      ASSERT((!result_.has_value() && result_backing_string_.empty()) ||
+             (result_.has_value() ^ !result_backing_string_.empty()));
+      return !result_backing_string_.empty() ? result_backing_string_ : result_;
+    }
+
+    const std::string& backingString() const { return result_backing_string_; }
+
+  private:
+    absl::optional<absl::string_view> result_;
+    // Valid only if result_ relies on memory allocation that must live beyond the call. See above.
+    std::string result_backing_string_;
+
+    friend class HeaderUtility;
+  };
+  static GetAllOfHeaderAsStringResult getAllOfHeaderAsString(const HeaderMap& headers,
+                                                             const Http::LowerCaseString& key,
+                                                             absl::string_view separator = ",");
 
   // A HeaderData specifies one of exact value or regex or range element
   // to match in a request's header, specified in the header_match_type_ member.

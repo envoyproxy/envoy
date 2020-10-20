@@ -48,7 +48,7 @@ a deployment of the form:
 In this case, if a client is for example using WebSocket, we want the Websocket to arrive at the
 upstream server functionally intact, which means it needs to traverse the HTTP/2 hop.
 
-This is accomplished via `extended CONNECT <https://tools.ietf.org/html/rfc8441>`_ support,
+This is accomplished via `Extended CONNECT (RFC8441) <https://tools.ietf.org/html/rfc8441>`_ support,
 turned on by setting :ref:`allow_connect <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.allow_connect>`
 true at the second layer Envoy. The
 WebSocket request will be transformed into an HTTP/2 CONNECT stream, with :protocol header
@@ -85,7 +85,7 @@ and forward the HTTP payload upstream. On receipt of initial TCP data from upstr
 will synthesize 200 response headers, and then forward the TCP data as the HTTP response body.
 
 .. warning::
-  This mode of CONNECT support can create major security holes if configured correctly, as the upstream
+  This mode of CONNECT support can create major security holes if not configured correctly, as the upstream
   will be forwarded *unsanitized* headers if they are in the body payload. Please use with caution
 
 Tunneling TCP over HTTP/2
@@ -97,8 +97,8 @@ An example set up proxying SMTP would look something like this
 [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
 
 Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
-If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_connect.v3.yaml --base-id 1`
-and `bazel-bin/source/exe/envoy-static --config-path  configs/terminate_connect.v3.yaml`
+If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_connect.yaml --base-id 1`
+and `bazel-bin/source/exe/envoy-static --config-path  configs/terminate_connect.yaml`
 you will be running two Envoys, the first listening for TCP traffic on port 10000 and encapsulating it in an HTTP/2
 CONNECT request, and the second listening for HTTP/2 on 10001, stripping the CONNECT headers, and forwarding the
 original TCP upstream, in this case to google.com.
