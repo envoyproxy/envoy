@@ -51,12 +51,6 @@ do
     is_installed "${DEP}" || install "${DEP}"
 done
 
-if [ -n "$CIRCLECI" ]; then
-    # bazel uses jgit internally and the default circle-ci .gitconfig says to
-    # convert https://github.com to ssh://git@github.com, which jgit does not support.
-    mv ~/.gitconfig ~/.gitconfig_save
-fi
-
 # Required as bazel and a foreign bazelisk are installed in the latest macos vm image, we have
 # to unlink/overwrite them to install bazelisk
 echo "Installing bazelisk"

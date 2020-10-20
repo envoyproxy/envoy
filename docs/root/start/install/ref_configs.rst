@@ -23,9 +23,9 @@ source distribution includes a version of the configuration generator that uses 
 have also included three example configuration templates for each of the above three scenarios.
 
 * Generator script: :repo:`configs/configgen.py`
-* Service to service template: :repo:`configs/envoy_service_to_service_v2.template.yaml`
-* Front proxy template: :repo:`configs/envoy_front_proxy_v2.template.yaml`
-* Double proxy template: :repo:`configs/envoy_double_proxy_v2.template.yaml`
+* Service to service template: :repo:`configs/envoy_service_to_service.template.yaml`
+* Front proxy template: :repo:`configs/envoy_front_proxy.template.yaml`
+* Double proxy template: :repo:`configs/envoy_double_proxy.template.yaml`
 
 To generate the example configurations run the following from the root of the repo:
 
