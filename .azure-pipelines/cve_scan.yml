@@ -10,16 +10,14 @@ schedules:
   branches:
     include:
     - master
+  always: true
 
-stages:
-  - stage: cve_scan
-      - job: cve_scan
-        pool:
-          vmImage: "ubuntu-18.04"
-        steps:
-          - script: ci/run_envoy_docker.sh 'ci/do_ci.sh cve_scan'
-            workingDirectory: $(Build.SourcesDirectory)
-            env:
-              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-              GH_ACCESS_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
-            displayName: "Scan for CVEs in dependencies"
+pool:
+  vmImage: "ubuntu-18.04"
+steps:
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh cve_scan'
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      GH_ACCESS_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+    displayName: "Scan for CVEs in dependencies"
