@@ -9,6 +9,7 @@
 #include "common/common/backoff_strategy.h"
 #include "common/grpc/async_client_impl.h"
 
+#include "extensions/tracers/skywalking/skywalking_client_config.h"
 #include "extensions/tracers/skywalking/skywalking_stats.h"
 #include "extensions/tracers/skywalking/skywalking_types.h"
 
@@ -27,7 +28,7 @@ public:
   explicit TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory,
                                 Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                 SkyWalkingTracerStats& stats,
-                                const envoy::config::trace::v3::ClientConfig& client_config);
+                                const SkyWalkingClientConfig& client_config);
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -59,8 +60,8 @@ private:
 
   SkyWalkingTracerStats& tracing_stats_;
 
-  const std::string simple_authentication_token_;
-  uint32_t max_delayed_segments_cache_size_{0};
+  const SkyWalkingClientConfig& client_config_;
+
   Grpc::AsyncClient<SegmentObject, Commands> client_;
   Grpc::AsyncStream<SegmentObject> stream_{};
   const Protobuf::MethodDescriptor& service_method_;

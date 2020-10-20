@@ -16,6 +16,7 @@ envoy_cc_library(
     srcs = ["trace_segment_reporter.cc"],
     hdrs = ["trace_segment_reporter.h"],
     deps = [
+        ":skywalking_client_config_lib",
         ":skywalking_stats_lib",
         ":skywalking_types_lib",
         "//include/envoy/grpc:async_client_manager_interface",
@@ -44,6 +45,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "skywalking_client_config_lib",
+    srcs = ["skywalking_client_config.cc"],
+    hdrs = ["skywalking_client_config.h"],
+    deps = [
+        "//include/envoy/secret:secret_provider_interface",
+        "//include/envoy/server:factory_context_interface",
+        "//include/envoy/server:tracer_config_interface",
+        "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "skywalking_tracer_lib",
     srcs = [
         "skywalking_tracer_impl.cc",
@@ -54,6 +68,7 @@ envoy_cc_library(
         "tracer.h",
     ],
     deps = [
+        ":skywalking_client_config_lib",
         ":skywalking_types_lib",
         ":trace_segment_reporter_lib",
         "//include/envoy/common:time_interface",

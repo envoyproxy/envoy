@@ -25,6 +25,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "skywalking_client_config_test",
+    srcs = ["skywalking_client_config_test.cc"],
+    extension_name = "envoy.tracers.skywalking",
+    deps = [
+        "//source/extensions/tracers/skywalking:skywalking_client_config_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "skywalking_types_test",
     srcs = ["skywalking_types_test.cc"],
     extension_name = "envoy.tracers.skywalking",
@@ -47,6 +59,7 @@ envoy_extension_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
@@ -75,6 +88,7 @@ envoy_extension_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:simulated_time_system_lib",

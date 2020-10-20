@@ -31,20 +31,25 @@ message SkyWalkingConfig {
 
 // Client config for SkyWalking tracer.
 message ClientConfig {
-  // Service name for SkyWalking tracer. If service_name is empty, then cluster
-  // name of Envoy will be used as service name.
+  // Service name for SkyWalking tracer. If service_name is empty, then cluster name of Envoy will
+  // be used as service name.
   string service_name = 1;
 
-  // Service instance name for SkyWalking tracer. If instance_name is empty, the
-  // node name of Envoy will be used as service instance name.
+  // Service instance name for SkyWalking tracer. If instance_name is empty, the node name of Envoy
+  // will be used as service instance name.
   string instance_name = 2;
 
-  // Authentication token. Set client token if backend open token
-  // authentication.
-  string authentication = 3;
+  // Authentication token config for SkyWalking. Skywalking can use token authentication to secure
+  // that monitoring application data can be trusted. In current version, Token is considered as a
+  // simple string.
+  // [#comment:TODO(wbpcode): Get authentication through the SDS API.]
+  oneof authentication_specifier {
+    // Inline authentication token string.
+    string authentication = 3;
+  }
 
-  // Envoy caches the segment in memory when the backend service is temporarily
-  // unavailable. This field specifies the maximum number of segments that can
-  // be cached. If not specified, the default is 1024.
+  // Envoy caches the segment in memory when the backend service is temporarily unavailable. This
+  // field specifies the maximum number of segments that can be cached. If not specified, the
+  // default is 1024.
   google.protobuf.UInt32Value max_cache_size = 4;
 }

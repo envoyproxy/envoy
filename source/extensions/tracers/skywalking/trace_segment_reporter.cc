@@ -6,7 +6,6 @@ namespace Tracers {
 namespace SkyWalking {
 
 namespace {
-static constexpr uint32_t DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE = 1024;
 
 const Http::LowerCaseString& authenticationTokenKey() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "Authentication");
@@ -76,19 +75,15 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
 
 } // namespace
 
-TraceSegmentReporter::TraceSegmentReporter(
-    Grpc::AsyncClientFactoryPtr&& factory, Event::Dispatcher& dispatcher,
-    Random::RandomGenerator& random_generator, SkyWalkingTracerStats& stats,
-    const envoy::config::trace::v3::ClientConfig& client_config)
-    : tracing_stats_(stats), simple_authentication_token_(client_config.authentication()),
-      client_(factory->create()),
+TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory,
+                                           Event::Dispatcher& dispatcher,
+                                           Random::RandomGenerator& random_generator,
+                                           SkyWalkingTracerStats& stats,
+                                           const SkyWalkingClientConfig& client_config)
+    : tracing_stats_(stats), client_config_(client_config), client_(factory->create()),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "TraceSegmentReportService.collect")),
       random_generator_(random_generator) {
-
-  max_delayed_segments_cache_size_ = client_config.has_max_cache_size()
-                                         ? client_config.max_cache_size().value()
-                                         : DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE;
 
   static constexpr uint32_t RetryInitialDelayMs = 500;
   static constexpr uint32_t RetryMaxDelayMs = 30000;
@@ -100,8 +95,8 @@ TraceSegmentReporter::TraceSegmentReporter(
 }
 
 void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  if (!simple_authentication_token_.empty()) {
-    metadata.setReferenceKey(authenticationTokenKey(), simple_authentication_token_);
+  if (!client_config_.authentication().empty()) {
+    metadata.setReferenceKey(authenticationTokenKey(), client_config_.authentication());
   }
 }
 
@@ -120,7 +115,7 @@ void TraceSegmentReporter::sendTraceSegment(TraceSegmentPtr&& request) {
   }
   // Null stream_ and cache segment data temporarily.
   delayed_segments_cache_.emplace(std::move(request));
-  if (delayed_segments_cache_.size() > max_delayed_segments_cache_size_) {
+  if (delayed_segments_cache_.size() > client_config_.maxCacheSize()) {
     tracing_stats_.segments_dropped_.inc();
     delayed_segments_cache_.pop();
   }

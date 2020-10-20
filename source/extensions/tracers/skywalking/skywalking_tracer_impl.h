@@ -7,6 +7,7 @@
 
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/tracers/skywalking/skywalking_client_config.h"
 #include "extensions/tracers/skywalking/tracer.h"
 
 namespace Envoy {
@@ -32,7 +33,7 @@ private:
 
   SkyWalkingTracerStats tracing_stats_;
 
-  envoy::config::trace::v3::ClientConfig client_config_;
+  SkyWalkingClientConfigPtr client_config_;
 
   // This random_generator_ will be used to create SkyWalking trace id and segment id.
   Random::RandomGenerator& random_generator_;

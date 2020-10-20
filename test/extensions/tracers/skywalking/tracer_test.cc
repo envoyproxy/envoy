@@ -1,7 +1,9 @@
+#include "extensions/tracers/skywalking/skywalking_client_config.h"
 #include "extensions/tracers/skywalking/tracer.h"
 
 #include "test/extensions/tracers/skywalking/skywalking_test_helper.h"
 #include "test/mocks/common.h"
+#include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -37,28 +39,45 @@ public:
     EXPECT_CALL(*mock_client, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
     EXPECT_CALL(*mock_client_factory, create()).WillOnce(Return(ByMove(std::move(mock_client))));
 
-    TestUtility::loadFromYaml(yaml_string, client_config_);
+    auto& local_info = context_.server_factory_context_.local_info_;
+
+    ON_CALL(local_info, clusterName()).WillByDefault(ReturnRef(test_string));
+    ON_CALL(local_info, nodeName()).WillByDefault(ReturnRef(test_string));
+
+    envoy::config::trace::v3::ClientConfig proto_client_config;
+    TestUtility::loadFromYaml(yaml_string, proto_client_config);
+    client_config_ = std::make_unique<SkyWalkingClientConfig>(context_, proto_client_config);
+
     tracer_ = std::make_unique<Tracer>(mock_time_source_);
     tracer_->setReporter(std::make_unique<TraceSegmentReporter>(
         std::move(mock_client_factory), mock_dispatcher_, mock_random_generator_, tracing_stats_,
-        client_config_));
+        *client_config_));
   }
 
 protected:
   NiceMock<Envoy::Tracing::MockConfig> mock_tracing_config_;
-  NiceMock<Event::MockDispatcher> mock_dispatcher_;
-  NiceMock<Random::MockRandomGenerator> mock_random_generator_;
-  NiceMock<Envoy::MockTimeSystem> mock_time_source_;
-  NiceMock<Stats::MockIsolatedStatsStore> mock_scope_;
+
+  NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
+
+  NiceMock<Event::MockDispatcher>& mock_dispatcher_ = context_.server_factory_context_.dispatcher_;
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  Event::GlobalTimeSystem& mock_time_source_ = context_.server_factory_context_.time_system_;
+
+  NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
 
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
 
   NiceMock<Event::MockTimer>* timer_;
   Event::TimerCb timer_cb_;
 
-  envoy::config::trace::v3::ClientConfig client_config_;
+  std::string test_string = "ABCDEFGHIJKLMN";
+
+  SkyWalkingClientConfigPtr client_config_;
+
   SkyWalkingTracerStats tracing_stats_{
       SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
+
   TracerPtr tracer_;
 };
 
@@ -67,8 +86,6 @@ protected:
 TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   setupTracer("{}");
   EXPECT_CALL(mock_random_generator_, random()).WillRepeatedly(Return(666666));
-  Event::SimulatedTimeSystem time_system;
-  ON_CALL(mock_time_source_, systemTime()).WillByDefault(Return(time_system.systemTime()));
 
   // Create a new SegmentContext.
   SegmentContextSharedPtr segment_context =
