@@ -65,7 +65,7 @@ public:
       state_.emplace<ScalingMax>(handle);
     } else {
       state_.emplace<WaitingForMin>(max_ms - min_ms);
-      min_duration_timer_->enableTimer(min_ms);
+      min_duration_timer_->enableTimer(std::min(max_ms, min_ms));
     }
   }
 
@@ -131,6 +131,31 @@ private:
   const ScopeTrackedObject* scope_;
 };
 
+class ScaledRangeTimerManagerImpl::FixedMinimumRangeTimerImpl final : public Event::Timer {
+public:
+  FixedMinimumRangeTimerImpl(ScaledTimerMinimum minimum, TimerCb timer_cb,
+                             ScaledRangeTimerManagerImpl& manager)
+      : minimum_(minimum), range_timer_(std::move(timer_cb), manager) {}
+
+  void enableTimer(std::chrono::milliseconds ms,
+                   const ScopeTrackedObject* object = nullptr) override {
+    range_timer_.enableTimer(minimum_.computeMinimum(ms), ms, object);
+  }
+
+  void enableHRTimer(std::chrono::microseconds us,
+                     const ScopeTrackedObject* object = nullptr) override {
+    enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(us), object);
+  }
+
+  void disableTimer() override { range_timer_.disableTimer(); }
+
+  bool enabled() override { return range_timer_.enabled(); }
+
+private:
+  const ScaledTimerMinimum minimum_;
+  RangeTimerImpl range_timer_;
+};
+
 ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(Dispatcher& dispatcher)
     : dispatcher_(dispatcher), scale_factor_(1.0) {}
 
@@ -140,8 +165,12 @@ ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   ASSERT(queues_.empty());
 }
 
-RangeTimerPtr ScaledRangeTimerManagerImpl::createTimer(TimerCb callback) {
+RangeTimerPtr ScaledRangeTimerManagerImpl::createRangeTimer(TimerCb callback) {
   return std::make_unique<RangeTimerImpl>(callback, *this);
+}
+
+TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerMinimum minimum, TimerCb callback) {
+  return std::make_unique<FixedMinimumRangeTimerImpl>(minimum, callback, *this);
 }
 
 void ScaledRangeTimerManagerImpl::setScaleFactor(double scale_factor) {

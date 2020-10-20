@@ -178,10 +178,14 @@ public:
 
 class MockScaledRangeTimerManager : public ScaledRangeTimerManager {
 public:
-  RangeTimerPtr createTimer(TimerCb callback) override {
-    return RangeTimerPtr{createTimer_(std::move(callback))};
+  RangeTimerPtr createRangeTimer(TimerCb callback) override {
+    return RangeTimerPtr{createRangeTimer_(std::move(callback))};
   }
-  MOCK_METHOD(RangeTimer*, createTimer_, (TimerCb));
+  TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
+    return TimerPtr{createTimer_(minimum, std::move(callback))};
+  }
+  MOCK_METHOD(RangeTimer*, createRangeTimer_, (TimerCb));
+  MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
   MOCK_METHOD(void, setScaleFactor, (double), (override));
 };
 

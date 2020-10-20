@@ -76,30 +76,6 @@ private:
   OverloadActionState state_;
 };
 
-class FixedMinimumScaledTimer : public Event::Timer {
-public:
-  FixedMinimumScaledTimer(Event::RangeTimerPtr range_timer, ScaledTimerMinimum minimum)
-      : minimum_(minimum), range_timer_(std::move(range_timer)) {}
-
-  void enableTimer(std::chrono::milliseconds ms,
-                   const ScopeTrackedObject* object = nullptr) override {
-    range_timer_->enableTimer(minimum_.compute(ms), ms, object);
-  }
-
-  void enableHRTimer(std::chrono::microseconds us,
-                     const ScopeTrackedObject* object = nullptr) override {
-    enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(us), object);
-  }
-
-  void disableTimer() override { range_timer_->disableTimer(); }
-
-  bool enabled() override { return range_timer_->enabled(); }
-
-private:
-  const ScaledTimerMinimum minimum_;
-  const Event::RangeTimerPtr range_timer_;
-};
-
 /**
  * Thread-local copy of the state of each configured overload action.
  */
@@ -108,7 +84,7 @@ public:
   ThreadLocalOverloadStateImpl(
       Event::ScaledRangeTimerManagerPtr scaled_timer_manager_,
       const NamedOverloadActionSymbolTable& action_symbol_table,
-      const absl::flat_hash_map<OverloadTimerType, ScaledTimerMinimum>& timer_minimums)
+      const absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum>& timer_minimums)
       : action_symbol_table_(action_symbol_table), timer_minimums_(timer_minimums),
         actions_(action_symbol_table.size(), OverloadActionState(0)),
         scaled_timer_action_(action_symbol_table.lookup(OverloadActionNames::get().ReduceTimeouts)),
@@ -124,10 +100,10 @@ public:
   Event::TimerPtr createScaledTimer(OverloadTimerType timer_type,
                                     Event::TimerCb callback) override {
     auto minimum_it = timer_minimums_.find(timer_type);
-    ScaledTimerMinimum minimum =
-        minimum_it != timer_minimums_.end() ? minimum_it->second : ScaledTimerMinimum(1.0);
-    return std::make_unique<FixedMinimumScaledTimer>(
-        scaled_timer_manager_->createTimer(std::move(callback)), minimum);
+    const Event::ScaledTimerMinimum minimum =
+        minimum_it != timer_minimums_.end() ? minimum_it->second
+                                            : Event::ScaledTimerMinimum(Event::ScaledMinimum(1.0));
+    return scaled_timer_manager_->createTimer(minimum, std::move(callback));
   }
 
   void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
@@ -140,7 +116,7 @@ public:
 private:
   static const OverloadActionState always_inactive_;
   const NamedOverloadActionSymbolTable& action_symbol_table_;
-  const absl::flat_hash_map<OverloadTimerType, ScaledTimerMinimum>& timer_minimums_;
+  const absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum>& timer_minimums_;
   std::vector<OverloadActionState> actions_;
   absl::optional<NamedOverloadActionSymbolTable::Symbol> scaled_timer_action_;
   const Event::ScaledRangeTimerManagerPtr scaled_timer_manager_;
@@ -173,23 +149,24 @@ OverloadTimerType parseTimerType(
   }
 }
 
-absl::flat_hash_map<OverloadTimerType, ScaledTimerMinimum>
+absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum>
 parseTimerMinimums(const ProtobufWkt::Any& typed_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
   const Config action_config =
       MessageUtil::anyConvertAndValidate<Config>(typed_config, validation_visitor);
 
-  absl::flat_hash_map<OverloadTimerType, ScaledTimerMinimum> timer_map;
+  absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum> timer_map;
 
   for (const auto& scale_timer : action_config.timer_scale_factors()) {
     const OverloadTimerType timer_type = parseTimerType(scale_timer.timer());
 
-    const ScaledTimerMinimum minimum =
+    const Event::ScaledTimerMinimum minimum =
         scale_timer.has_min_timeout()
-            ? ScaledTimerMinimum(std::chrono::milliseconds(
-                  DurationUtil::durationToMilliseconds(scale_timer.min_timeout())))
-            : ScaledTimerMinimum(scale_timer.min_scale().value() / 100);
+            ? Event::ScaledTimerMinimum(Event::AbsoluteMinimum(std::chrono::milliseconds(
+                  DurationUtil::durationToMilliseconds(scale_timer.min_timeout()))))
+            : Event::ScaledTimerMinimum(
+                  Event::ScaledMinimum(scale_timer.min_scale().value() / 100));
 
     auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));
     if (!inserted) {
@@ -232,14 +209,6 @@ const absl::string_view NamedOverloadActionSymbolTable::name(Symbol symbol) cons
 bool operator==(const NamedOverloadActionSymbolTable::Symbol& lhs,
                 const NamedOverloadActionSymbolTable::Symbol& rhs) {
   return lhs.index() == rhs.index();
-}
-
-ScaledTimerMinimum::ScaledTimerMinimum(double scale_factor) : value_(ScaleFactor(scale_factor)) {}
-ScaledTimerMinimum::ScaledTimerMinimum(std::chrono::milliseconds absolute_duration)
-    : value_(AbsoluteValue(absolute_duration)) {}
-
-std::chrono::milliseconds ScaledTimerMinimum::compute(std::chrono::milliseconds ms) const {
-  return absl::visit([ms](auto value) { return value.compute(ms); }, value_);
 }
 
 OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,

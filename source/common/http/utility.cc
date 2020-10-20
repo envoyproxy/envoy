@@ -645,7 +645,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    const HeaderEntry* nominated_header = nullptr;
+    HeaderMap::GetResult nominated_header;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -672,8 +672,10 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       nominated_header = headers.get(lcs_header_to_remove);
     }
 
-    if (nominated_header) {
-      auto nominated_header_value_sv = nominated_header->value().getStringView();
+    if (!nominated_header.empty()) {
+      // NOTE: The TE header is an inline header, so by definition if we operate on it there can
+      // only be a single value. In all other cases we remove the nominated header.
+      auto nominated_header_value_sv = nominated_header[0]->value().getStringView();
 
       const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
 
@@ -684,6 +686,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       }
 
       if (is_te_header) {
+        ASSERT(nominated_header.size() == 1);
         for (const auto& header_value :
              StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
 
@@ -816,6 +819,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote reset";
   case Http::StreamResetReason::RemoteRefusedStreamReset:
     return "remote refused stream reset";
+  case Http::StreamResetReason::ConnectError:
+    return "remote error with CONNECT request";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

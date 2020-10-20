@@ -23,27 +23,18 @@ namespace Event {
 class ScaledRangeTimerManagerImpl : public ScaledRangeTimerManager {
 public:
   explicit ScaledRangeTimerManagerImpl(Dispatcher& dispatcher);
-  ~ScaledRangeTimerManagerImpl();
+  ~ScaledRangeTimerManagerImpl() override;
 
-  /**
-   * Creates a new range timer backed by the manager. The returned timer will be subject to the
-   * current and future scale factor values set on the manager. All returned timers must be deleted
-   * before the manager.
-   */
-  RangeTimerPtr createTimer(TimerCb callback) override;
+  // ScaledRangeTimerManager impl
+  RangeTimerPtr createRangeTimer(TimerCb callback) override;
 
-  /**
-   * Sets the scale factor for all timers created through this manager. The value should be between
-   * 0 and 1, inclusive. The scale factor affects the amount of time timers spend in their target
-   * range. The RangeTimers returned by createTimer will fire after (min + (max - min) *
-   * scale_factor). This means that a scale factor of 0 causes timers to fire immediately at the min
-   * duration, a factor of 0.5 causes firing halfway between min and max, and a factor of 1 causes
-   * firing at max.
-   */
+  TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override;
+
   void setScaleFactor(double scale_factor) override;
 
 private:
   class RangeTimerImpl;
+  class FixedMinimumRangeTimerImpl;
 
   // A queue object that maintains a list of timers with the same (max - min) values.
   struct Queue {

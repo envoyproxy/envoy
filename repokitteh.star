@@ -5,6 +5,7 @@ use("github.com/repokitteh/modules/review.star")
 use("github.com/repokitteh/modules/wait.star")
 use("github.com/repokitteh/modules/circleci.star", secret_token=get_secret('circle_token'))
 use("github.com/envoyproxy/envoy/ci/repokitteh/modules/azure_pipelines.star", secret_token=get_secret('azp_token'))
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/newcontributor.star")
 use(
   "github.com/envoyproxy/envoy/ci/repokitteh/modules/ownerscheck.star",
   paths=[
@@ -27,9 +28,11 @@ use(
       "path": "api/envoy/",
     },
     {
-      "owner": "envoyproxy/dependency-watchers",
+      "owner": "envoyproxy/dependency-shepherds!",
       "path":
-      "(bazel/repository_locations\.bzl)|(api/bazel/repository_locations\.bzl)|(.*/requirements\.txt)",
+      "(bazel/.*repos.*\.bzl)|(bazel/dependency_imports\.bzl)|(api/bazel/.*\.bzl)|(.*/requirements\.txt)",
+      "label": "deps",
+      "github_status_label": "any dependency change",
     },
   ],
 )

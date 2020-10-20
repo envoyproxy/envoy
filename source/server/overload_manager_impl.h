@@ -100,30 +100,6 @@ private:
   std::vector<std::string> names_;
 };
 
-class ScaledTimerMinimum {
-public:
-  explicit ScaledTimerMinimum(double scale_factor);
-  explicit ScaledTimerMinimum(std::chrono::milliseconds absolute_duration);
-
-  std::chrono::milliseconds compute(std::chrono::milliseconds ms) const;
-
-  struct ScaleFactor {
-    explicit ScaleFactor(double scale_factor) : scale_factor_(scale_factor) {}
-    std::chrono::milliseconds compute(std::chrono::milliseconds duration) {
-      return std::chrono::duration_cast<std::chrono::milliseconds>(duration * scale_factor_);
-    }
-    const double scale_factor_;
-  };
-  struct AbsoluteValue {
-    explicit AbsoluteValue(std::chrono::milliseconds value) : value_(value) {}
-    std::chrono::milliseconds compute(std::chrono::milliseconds) { return value_; }
-    const std::chrono::milliseconds value_;
-  };
-
-private:
-  const absl::variant<ScaleFactor, AbsoluteValue> value_;
-};
-
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
@@ -192,7 +168,7 @@ private:
   absl::node_hash_map<std::string, Resource> resources_;
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
-  absl::flat_hash_map<OverloadTimerType, ScaledTimerMinimum> timer_minimums_;
+  absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum> timer_minimums_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;

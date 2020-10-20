@@ -440,8 +440,6 @@ void UpstreamRequest::encodeBodyAndTrailers() {
                        downstream_metadata_map_vector_);
       upstream_->encodeMetadata(downstream_metadata_map_vector_);
       downstream_metadata_map_vector_.clear();
-
-      ASSERT(buffered_request_body_);
     }
 
     if (buffered_request_body_) {

@@ -56,6 +56,7 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 
 [[ -t 1 ]] && ENVOY_DOCKER_OPTIONS+=("-it")
 [[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=(-v "$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)")
+[[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+=(-v "${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK}" -e SSH_AUTH_SOCK)
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 
@@ -64,6 +65,7 @@ docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}" \
        -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}" \
+       -e AZP_BRANCH \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
