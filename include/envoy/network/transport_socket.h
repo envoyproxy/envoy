@@ -247,6 +247,13 @@ public:
    * negotiation.
    */
   virtual bool supportsAlpn() const { return false; }
+
+  /**
+   * @param a callback to be invoked when the secrets required by the created transport
+   * sockets are ready. Will be invoked immediately if no secrets are required or if they
+   * are already loaded.
+   */
+  virtual void addReadyCb(std::function<void()> callback) PURE;
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

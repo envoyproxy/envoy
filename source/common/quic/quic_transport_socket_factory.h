@@ -53,6 +53,7 @@ public:
   bool implementsSecureTransport() const override { return true; }
   bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
+  void addReadyCb(std::function<void()> callback) override { callback(); }
 
 protected:
   virtual void onSecretUpdated() PURE;
