@@ -39,7 +39,7 @@ message ListenerCollection {
   repeated udpa.core.v1.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.listener.v3.Listener";
 
@@ -118,6 +118,10 @@ message Listener {
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
+
+  // The default filter chain if none of the filter chain matches. If no default filter chain is supplied,
+  // the connection will be closed. The filter chain match is ignored in this field.
+  FilterChain default_filter_chain = 25;
 
   // Soft limit on size of the listener’s new connection read and write buffers.
   // If unspecified, an implementation defined default is applied (1MiB).
