@@ -126,7 +126,7 @@ The Wasm filter should instead inject "Hello, Wasm world" at the end of the resp
    $ curl -s http://localhost:8000 | grep "Hello, Wasm world"
    }Hello, Wasm world
 
-The ``content-type`` and custom Wasm headers should also have changed
+The ``content-type`` and ``x-wasm-custom`` headers should also have changed
 
 .. code-block:: console
 
