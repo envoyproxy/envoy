@@ -6,29 +6,34 @@ export DELAY=10
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-_postgres () {
+_psql () {
     local postgres_client
-    postgres_client='docker run -i --rm --network envoymesh -e PGSSLMODE=disable -e PGPASSWORD=postgres postgres:latest psql -U postgres -h envoy -p 1999'
-    ${postgres_client} <<EOF
-        ${1}
-EOF
+    postgres_client=(docker run -i --rm --network envoymesh -e PGSSLMODE=disable postgres:latest psql -U postgres -h envoy -p 1999)
+    "${postgres_client[@]}" "${@}"
 }
 
 run_log "Create a postgres database"
-_postgres "CREATE DATABASE test;"
-_postgres "\l" | grep test
+_psql -c 'CREATE DATABASE test;'
+_psql -c '\l' | grep test
 
 run_log "Create a postgres table"
-_postgres <<EOF
-\c test
-CREATE TABLE test ( f VARCHAR );
-INSERT INTO test VALUES ('hello, world!');"
-EOF
+_psql -d test -c 'CREATE TABLE test ( f SERIAL PRIMARY KEY );'
 
-_postgres <<EOF | grep 1
-\c test
-SELECT COUNT(*) FROM test;
-EOF
+run_log "Insert some data"
+_psql -d test -c 'INSERT INTO test VALUES (DEFAULT);'
+
+run_log "Checking inserted data"
+_psql -d test -c 'SELECT * FROM test;' | grep 1
+
+run_log "Updating data"
+_psql -d test -c 'UPDATE test SET f = 2 WHERE f = 1;'
+
+run_log "Raise an exception for duplicate key violation"
+_psql -d test -c 'INSERT INTO test VALUES (DEFAULT);' 2>&1 | grep -A1 'duplicate key value violates unique constraint'
+
+run_log "Change some more data"
+_psql -d test -c 'DELETE FROM test;'
+_psql -d test -c 'INSERT INTO test VALUES (DEFAULT);'
 
 run_log "Check postgres egress stats"
 responds_with \
