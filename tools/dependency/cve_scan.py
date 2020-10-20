@@ -33,7 +33,7 @@ IGNORES_CVES = set([
     # Node.js issue unrelated to http-parser (libuv).
     'CVE-2020-8252',
     # Fixed via the nghttp2 1.41.0 bump in Envoy 8b6ea4.
-    'CVE-2020-11080',
+    #'CVE-2020-11080',
 ])
 
 # Subset of CVE fields that are useful below.
