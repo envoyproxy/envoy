@@ -12,6 +12,18 @@ These examples use the :ref:`v3 Envoy API <envoy_api_reference>`, but use only t
 feature of the API, which is most useful for simple requirements. For more complex requirements
 :ref:`Dynamic Configuration <arch_overview_dynamic_config>` is supported.
 
+.. _install:
+
+Building and installation
+-------------------------
+
+.. toctree::
+    :maxdepth: 2
+
+    building
+    install/ref_configs
+    install/tools/tools
+
 Quick Start to Run Simple Example
 ---------------------------------
 
@@ -20,7 +32,7 @@ more detailed explanation of the configuration file and execution steps for
 the same configuration.
 
 A very minimal Envoy configuration that can be used to validate basic plain HTTP
-proxying is available in :repo:`configs/google_com_proxy.v2.yaml`. This is not
+proxying is available in :repo:`configs/google_com_proxy.yaml`. This is not
 intended to represent a realistic Envoy deployment:
 
 .. substitution-code-block:: none

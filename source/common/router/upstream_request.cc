@@ -612,7 +612,23 @@ void UpstreamRequestFilter::onPoolReady(
   if (deferred_reset_reason_) {
     active_request_.onResetStream(deferred_reset_reason_.value(), absl::string_view());
     return;
-  }
+  } else {
+    // Encode metadata after headers and before any other frame type.
+    if (!downstream_metadata_map_vector_.empty()) {
+      ENVOY_STREAM_LOG(debug, "Send metadata onPoolReady. {}", *parent_.callbacks(),
+                       downstream_metadata_map_vector_);
+      upstream_->encodeMetadata(downstream_metadata_map_vector_);
+      downstream_metadata_map_vector_.clear();
+    }
+
+    if (buffered_request_body_) {
+      stream_info_.addBytesSent(buffered_request_body_->length());
+      upstream_->encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);
+    }
+
+    if (encode_trailers_) {
+      upstream_->encodeTrailers(*parent_.downstreamTrailers());
+    }
 
   if (!paused_for_connect_ && !decoding_headers_) {
     paused_for_connect_ = false;

@@ -59,7 +59,11 @@ public:
 
 class MongoProxyFilterTest : public testing::Test {
 public:
-  MongoProxyFilterTest() : mongo_stats_(std::make_shared<MongoStats>(store_, "test")) { setup(); }
+  MongoProxyFilterTest()
+      : mongo_stats_(std::make_shared<MongoStats>(store_, "test",
+                                                  std::vector<std::string>{"insert", "count"})) {
+    setup();
+  }
 
   void setup() {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))

@@ -85,6 +85,33 @@ config_setting(
 )
 
 config_setting(
+    name = "clang_cl_opt_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "opt",
+    },
+)
+
+config_setting(
+    name = "clang_cl_dbg_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "dbg",
+    },
+)
+
+config_setting(
+    name = "clang_cl_fastbuild_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "fastbuild",
+    },
+)
+
+config_setting(
     name = "opt_build",
     values = {"compilation_mode": "opt"},
 )
@@ -285,6 +312,27 @@ config_setting(
 config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},
+)
+
+# TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
+config_setting(
+    name = "wasm_all",
+    values = {"define": "wasm=enabled"},
+)
+
+config_setting(
+    name = "wasm_wavm",
+    values = {"define": "wasm=wavm"},
+)
+
+config_setting(
+    name = "wasm_v8",
+    values = {"define": "wasm=v8"},
+)
+
+config_setting(
+    name = "wasm_none",
+    values = {"define": "wasm=disabled"},
 )
 
 # Alias pointing to the selected version of BoringSSL:

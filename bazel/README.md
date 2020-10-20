@@ -29,10 +29,10 @@ to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` en
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
-dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements) are typically
+dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements) are typically
 independently sourced, the following steps should be followed:
 
-1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
+1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements).
 1. `bazel build -c opt //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
@@ -127,9 +127,9 @@ for how to update or override dependencies.
     startup --output_base=C:/_eb
     ```
 
-    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support 
+    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
     using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
-    For other common issues, see the 
+    For other common issues, see the
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
 
     [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
@@ -166,10 +166,10 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
 
-    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32. 
-    
-    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe` 
-    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value 
+    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32.
+
+    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
+    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
     of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
     ```
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
