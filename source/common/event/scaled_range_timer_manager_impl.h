@@ -2,7 +2,6 @@
 #include <stack>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/range_timer.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/timer.h"
 
@@ -26,15 +25,11 @@ public:
   ~ScaledRangeTimerManagerImpl() override;
 
   // ScaledRangeTimerManager impl
-  RangeTimerPtr createRangeTimer(TimerCb callback) override;
-
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override;
-
   void setScaleFactor(double scale_factor) override;
 
 private:
   class RangeTimerImpl;
-  class FixedMinimumRangeTimerImpl;
 
   // A queue object that maintains a list of timers with the same (max - min) values.
   struct Queue {
