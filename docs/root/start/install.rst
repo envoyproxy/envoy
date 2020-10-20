@@ -162,14 +162,11 @@ The following table shows the available Docker images
    :header-rows: 1
    :file: _include/dockerhub-images.csv
 
-On every master commit we additionally create a set of development Docker images. These images can
-be found in the following repositories:
-
-In the above *dev* repositories, the *latest* tag points to the last Envoy SHA in master that passed
-tests.
-
 .. note::
 
-  The Envoy project considers master to be release candidate quality at all times, and many
-  organizations track and deploy master in production. We encourage you to do the same so that
-  issues can be reported as early as possible in the development process.
+   In the above *dev* repositories, the *latest* tag points to a container including the last
+   Envoy build on master that passed tests.
+
+   The Envoy project considers master to be release candidate quality at all times, and many
+   organizations track and deploy master in production. We encourage you to do the same so that
+   issues can be reported as early as possible in the development process.
