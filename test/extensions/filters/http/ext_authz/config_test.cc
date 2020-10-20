@@ -6,6 +6,7 @@
 #include "extensions/filters/http/ext_authz/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -36,8 +37,9 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
       fmt::format(yaml, TestUtility::getVersionStringFromApiVersion(api_version)), *proto_config);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, singletonManager()).Times(1);
+  EXPECT_CALL(context, threadLocal()).Times(1);
   EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, localInfo()).Times(1);
   EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(2);
@@ -61,6 +63,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   std::string yaml = R"EOF(
+  stat_prefix: "wall"
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -97,6 +100,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   failure_mode_allow: true
   with_request_body:
     max_request_bytes: 100
+    pack_as_bytes: true
   )EOF";
 
   ExtAuthzFilterConfig factory;
@@ -104,7 +108,6 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   TestUtility::loadFromYaml(yaml, *proto_config);
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, localInfo()).Times(1);
   EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(1);
@@ -112,6 +115,49 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
+}
+
+// Test that setting the use_alpha proto field throws.
+TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupported)) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features:envoy.extensions.filters.http.ext_authz.v3.ExtAuthz.hidden_"
+        "envoy_deprecated_use_alpha",
+        "true"}});
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+  proto_config.set_hidden_envoy_deprecated_use_alpha(true);
+
+  // Trigger the throw in the Envoy gRPC branch.
+  {
+    testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+    EXPECT_CALL(context, messageValidationVisitor());
+    EXPECT_CALL(context, runtime());
+    EXPECT_CALL(context, scope());
+
+    ExtAuthzFilterConfig factory;
+    EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+                              EnvoyException,
+                              "The use_alpha field is deprecated and is no longer supported.")
+  }
+
+  // Trigger the throw in the Google gRPC branch.
+  {
+    auto google_grpc = new envoy::config::core::v3::GrpcService_GoogleGrpc();
+    google_grpc->set_stat_prefix("grpc");
+    google_grpc->set_target_uri("http://example.com");
+    proto_config.mutable_grpc_service()->set_allocated_google_grpc(google_grpc);
+
+    testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+    EXPECT_CALL(context, messageValidationVisitor());
+    EXPECT_CALL(context, runtime());
+    EXPECT_CALL(context, scope());
+
+    ExtAuthzFilterConfig factory;
+    EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+                              EnvoyException,
+                              "The use_alpha field is deprecated and is no longer supported.")
+  }
 }
 
 // Test that the deprecated extension name still functions.

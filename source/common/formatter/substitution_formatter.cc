@@ -45,7 +45,7 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
 
 // Matches newline pattern in a StartTimeFormatter format string.
 const std::regex& getStartTimeNewlinePattern() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
+  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
@@ -617,6 +617,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.responseCodeDetails();
         });
+  } else if (field_name == "CONNECTION_TERMINATION_DETAILS") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.connectionTerminationDetails();
+        });
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
@@ -684,6 +689,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamDirectRemoteAddress();
+        });
+  } else if (field_name == "CONNECTION_ID") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.connectionID().value_or(0);
         });
   } else if (field_name == "REQUESTED_SERVER_NAME") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
@@ -853,13 +863,15 @@ HeaderFormatter::HeaderFormatter(const std::string& main_header,
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
 const Http::HeaderEntry* HeaderFormatter::findHeader(const Http::HeaderMap& headers) const {
-  const Http::HeaderEntry* header = headers.get(main_header_);
+  const auto header = headers.get(main_header_);
 
-  if (!header && !alternative_header_.get().empty()) {
-    return headers.get(alternative_header_);
+  if (header.empty() && !alternative_header_.get().empty()) {
+    const auto alternate_header = headers.get(alternative_header_);
+    // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header values.
+    return alternate_header.empty() ? nullptr : alternate_header[0];
   }
 
-  return header;
+  return header.empty() ? nullptr : header[0];
 }
 
 absl::optional<std::string> HeaderFormatter::format(const Http::HeaderMap& headers) const {

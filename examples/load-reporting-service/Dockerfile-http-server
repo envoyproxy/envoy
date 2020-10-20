@@ -8,4 +8,4 @@ COPY . ./code
 RUN pip3 install -q Flask==0.11.1
 
 RUN chmod u+x /usr/local/bin/start_service.sh
-ENTRYPOINT /usr/local/bin/start_service.sh
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/start_service.sh"]

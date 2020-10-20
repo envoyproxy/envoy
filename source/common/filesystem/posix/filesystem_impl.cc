@@ -30,13 +30,26 @@ FileImplPosix::~FileImplPosix() {
   }
 }
 
-void FileImplPosix::openFile(FlagSet in) {
+Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
+  if (isOpen()) {
+    return resultSuccess(true);
+  }
+
   const auto flags_and_mode = translateFlag(in);
   fd_ = ::open(path_.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
+  return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
 }
 
-ssize_t FileImplPosix::writeFile(absl::string_view buffer) {
-  return ::write(fd_, buffer.data(), buffer.size());
+Api::IoCallSizeResult FileImplPosix::write(absl::string_view buffer) {
+  const ssize_t rc = ::write(fd_, buffer.data(), buffer.size());
+  return rc != -1 ? resultSuccess(rc) : resultFailure(rc, errno);
+};
+
+Api::IoCallBoolResult FileImplPosix::close() {
+  ASSERT(isOpen());
+  int rc = ::close(fd_);
+  fd_ = -1;
+  return (rc != -1) ? resultSuccess(true) : resultFailure(false, errno);
 }
 
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
@@ -61,8 +74,6 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
 
   return {out, mode};
 }
-
-bool FileImplPosix::closeFile() { return ::close(fd_) != -1; }
 
 FilePtr InstanceImplPosix::createFile(const std::string& path) {
   return std::make_unique<FileImplPosix>(path);

@@ -24,12 +24,12 @@ std::string getProtoName(const DnsTable::DnsServiceProtocol& protocol) {
     case 17:
       proto = "udp";
       break;
-    default: {
-      struct protoent* pe = getprotobynumber(protocol.number());
-      if (pe != nullptr) {
-        proto = std::string(pe->p_name);
-      }
-    }
+    default:
+      // For Envoy to resolve a protocol to a name "/etc/protocols"
+      // should exist. This isn't guaranteed. Since most services are
+      // tcp or udp, if we get a different value, return an empty string.
+      proto = EMPTY_STRING;
+      break;
     } // end switch
   }
   return proto;
@@ -61,10 +61,6 @@ absl::string_view getProtoFromName(const absl::string_view name) {
 
 std::string buildServiceName(const std::string& name, const std::string& proto,
                              const std::string& domain) {
-  if (name.empty() || proto.empty() || domain.empty()) {
-    return EMPTY_STRING;
-  }
-
   std::string result{};
   if (name[0] != '_') {
     result += "_";

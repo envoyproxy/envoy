@@ -186,8 +186,11 @@ parseRequestHeader(absl::string_view param) {
   Http::LowerCaseString header_name{std::string(param)};
   return [header_name](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
     if (const auto* request_headers = stream_info.getRequestHeaders()) {
-      if (const auto* entry = request_headers->get(header_name)) {
-        return std::string(entry->value().getStringView());
+      const auto entry = request_headers->get(header_name);
+      if (!entry.empty()) {
+        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially use all header
+        // values.
+        return std::string(entry[0]->value().getStringView());
       }
     }
     return std::string();
