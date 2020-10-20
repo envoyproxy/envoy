@@ -159,8 +159,10 @@ AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   ENVOY_LOG(debug, "Destroying PendingResolution for {}", dns_name_);
   // It is possible that DNSServiceGetAddrInfo returns a synchronous error, with a NULLed
   // DNSServiceRef, in AppleDnsResolverImpl::resolve.
+  // Additionally, it is also possible that the query is cancelled before resolution starts, and
+  // thus the DNSServiceRef is null.
+  // Therefore, only deallocate if the ref is not null.
   if (individual_sd_ref_) {
-    RELEASE_ASSERT(!owned_, "individual_sd_ref_ should only be null on a synchronous error.");
     DNSServiceRefDeallocate(individual_sd_ref_);
   }
 }
