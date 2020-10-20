@@ -1630,22 +1630,27 @@ TEST_P(Http2FrameIntegrationTest, OverflowingResponseCode) {
   settings_flags = static_cast<Http2Frame::SettingsFlags>(1); // ack
   Http2Frame ack_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
   ASSERT_TRUE(tcp_client_->write(std::string(ack_frame), false, false)); // ack setting
-  Http2Frame h2_frame = Http2Frame::makeRequest(1, "host", "/");
-  ASSERT_TRUE(tcp_client_->write(std::string(h2_frame), false, false));
+  Http2Frame request_frame = Http2Frame::makeRequest(1, "host", "/");
+  ASSERT_TRUE(tcp_client_->write(std::string(request_frame), false, false));
   // setup upstream and settings etc.
   ASSERT(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
                                                   std::chrono::milliseconds(10)));
+  // Read Preamble
+  EXPECT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch(Http2Frame::Preamble)));
   ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
   ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
-
-  // Overflowing response code
+  // Read settings
+  EXPECT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch(std::string(setting_frame).c_str())));
+  // Read Ack
+  EXPECT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch(std::string(ack_frame).c_str())));
+  // Read request frame
+  EXPECT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch(std::string(request_frame).c_str())));
   Http::Http2::Http2Frame overflowed_status = Http::Http2::Http2Frame::makeHeadersFrameWithStatus(
-      "11111111111111111111111111111111111111111111111111111111111111111",
-      1 /*, static_cast<Http::Http2::Http2Frame::HeadersFlags>(4)*/);
-
-  // Http::Http2::Http2Frame overflowed_status =
-  // Http::Http2::Http2Frame::makeHeadersFrameWithStatus("400", 1);
-
+      "11111111111111111111111111111111111111111111111111111111111111111", 0);
   ASSERT_TRUE(fake_upstream_connection->write(std::string(overflowed_status)));
 
   tcp_client_->close();
