@@ -487,9 +487,9 @@ message Cluster {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.Cluster.CommonLbConfig.ConsistentHashingLbConfig";
 
-      // If set to `true`, the cluster will use hostname instead of the resolved
-      // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
-      bool use_hostname_for_hashing = 1;
+      // If set to `true`, the cluster will use the array index of the endpoints
+      // as the key to consistently hash to an upstream host
+      bool use_index_for_hashing = 1;
 
       // Configures percentage of average cluster load to bound per upstream host. For example, with a value of 150
       // no upstream host will get a load more than 1.5 times the average load of all the hosts in the cluster.

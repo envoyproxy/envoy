@@ -59,7 +59,7 @@ private:
   struct Ring : public HashingLoadBalancer {
     Ring(const NormalizedHostWeightVector& normalized_host_weights, double min_normalized_weight,
          uint64_t min_ring_size, uint64_t max_ring_size, HashFunction hash_function,
-         bool use_hostname_for_hashing, RingHashLoadBalancerStats& stats);
+         bool use_index_for_hashing, RingHashLoadBalancerStats& stats);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
@@ -76,7 +76,7 @@ private:
                      double min_normalized_weight, double /* max_normalized_weight */) override {
     HashingLoadBalancerSharedPtr ring_hash_lb =
         std::make_shared<Ring>(normalized_host_weights, min_normalized_weight, min_ring_size_,
-                               max_ring_size_, hash_function_, use_hostname_for_hashing_, stats_);
+                               max_ring_size_, hash_function_, use_index_for_hashing_, stats_);
     if (hash_balance_factor_ == 0) {
       return ring_hash_lb;
     }
@@ -95,7 +95,7 @@ private:
   const uint64_t min_ring_size_;
   const uint64_t max_ring_size_;
   const HashFunction hash_function_;
-  const bool use_hostname_for_hashing_;
+  const bool use_index_for_hashing_;
   const uint32_t hash_balance_factor_;
 };
 

@@ -263,8 +263,8 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
 
-// Expect reasonable results with hostname.
-TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
+// Expect reasonable results with index based hashing.
+TEST_P(RingHashLoadBalancerTest, BasicWithIndexHashing) {
   hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90"),
                       makeTestHost(info_, "91", "tcp://127.0.0.1:91"),
                       makeTestHost(info_, "92", "tcp://127.0.0.1:92"),
@@ -279,7 +279,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
 
   common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
   auto chc = envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig();
-  chc.set_use_hostname_for_hashing(true);
+  chc.set_use_index_for_hashing(true);
   common_config_.set_allocated_consistent_hashing_lb_config(&chc);
 
   init();
@@ -295,37 +295,37 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
   // hash ring:
   // host | position
   // ---------------------------
-  // 95 | 1975508444536362413
-  // 95 | 2376063919839173711
-  // 93 | 2386806903309390596
-  // 94 | 6749904478991551885
-  // 93 | 6803900775736438537
-  // 92 | 7225015537174310577
-  // 90 | 8787465352164086522
-  // 92 | 11282020843382717940
-  // 91 | 13723418369486627818
-  // 90 | 13776502110861797421
-  // 91 | 14338313586354474791
-  // 94 | 15364271037087512980
+  // 91 | 623620434812591335
+  // 91 | 1291284742260624308
+  // 93 | 2240678485176585483
+  // 90 | 7336049725490893212
+  // 95 | 11067797875844516204
+  // 94 | 11152906599107103836
+  // 90 | 11180626175924339903
+  // 95 | 11880846191933415469
+  // 94 | 11940626933830197904
+  // 92 | 13159892096342920361
+  // 92 | 17241333882518980491
+  // 93 | 18330096856982668041
 
   LoadBalancerPtr lb = lb_->factory()->create();
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+    EXPECT_EQ(hostSet().hosts_[1], lb->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+    EXPECT_EQ(hostSet().hosts_[1], lb->chooseHost(&context));
   }
   {
-    TestLoadBalancerContext context(7225015537174310577);
-    EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(&context));
-  }
-  {
-    TestLoadBalancerContext context(6803900775736438537);
+    TestLoadBalancerContext context(2240678485176585483);
     EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context));
   }
-  { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr)); }
+  {
+    TestLoadBalancerContext context(7336049725490893212);
+    EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(&context));
+  }
+  { EXPECT_EQ(hostSet().hosts_[1], lb->chooseHost(nullptr)); }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
   hostSet().healthy_hosts_.clear();
@@ -333,7 +333,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
   lb = lb_->factory()->create();
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+    EXPECT_EQ(hostSet().hosts_[1], lb->chooseHost(&context));
   }
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }

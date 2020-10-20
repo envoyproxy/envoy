@@ -7,7 +7,7 @@ namespace Upstream {
 
 MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
                          double max_normalized_weight, uint64_t table_size,
-                         bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats)
+                         bool use_index_for_hashing, MaglevLoadBalancerStats& stats)
     : table_size_(table_size), stats_(stats) {
   // We can't do anything sensible with no hosts.
   if (normalized_host_weights.empty()) {
@@ -17,14 +17,16 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
   // Implementation of pseudocode listing 1 in the paper (see header file for more info).
   std::vector<TableBuildEntry> table_build_entries;
   table_build_entries.reserve(normalized_host_weights.size());
+  uint64_t i = 0;
   for (const auto& host_weight : normalized_host_weights) {
     const auto& host = host_weight.first;
-    const std::string& address =
-        use_hostname_for_hashing ? host->hostname() : host->address()->asString();
-    ASSERT(!address.empty());
-    table_build_entries.emplace_back(host, HashUtil::xxHash64(address) % table_size_,
-                                     (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
+    const std::string& key =
+        use_index_for_hashing ? absl::StrCat("", i) : host->address()->asString();
+    ASSERT(!key.empty());
+    table_build_entries.emplace_back(host, HashUtil::xxHash64(key) % table_size_,
+                                     (HashUtil::xxHash64(key, 1) % (table_size_ - 1)) + 1,
                                      host_weight.second);
+    i++;
   }
 
   table_.resize(table_size_);
@@ -67,8 +69,7 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
   if (ENVOY_LOG_CHECK_LEVEL(trace)) {
     for (uint64_t i = 0; i < table_.size(); i++) {
       ENVOY_LOG(trace, "maglev: i={} host={}", i,
-                use_hostname_for_hashing ? table_[i]->hostname()
-                                         : table_[i]->address()->asString());
+                use_index_for_hashing ? table_[i]->hostname() : table_[i]->address()->asString());
     }
   }
 }
@@ -102,9 +103,9 @@ MaglevLoadBalancer::MaglevLoadBalancer(
       table_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), table_size,
                                                            MaglevTable::DefaultTableSize)
                          : MaglevTable::DefaultTableSize),
-      use_hostname_for_hashing_(
+      use_index_for_hashing_(
           common_config.has_consistent_hashing_lb_config()
-              ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
+              ? common_config.consistent_hashing_lb_config().use_index_for_hashing()
               : false),
       hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)) {

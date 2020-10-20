@@ -392,9 +392,9 @@ message Cluster {
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     message ConsistentHashingLbConfig {
-      // If set to `true`, the cluster will use hostname instead of the resolved
-      // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
-      bool use_hostname_for_hashing = 1;
+      // If set to `true`, the cluster will use the array index of the endpoints
+      // as the key to consistently hash to an upstream host
+      bool use_index_for_hashing = 1;
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.

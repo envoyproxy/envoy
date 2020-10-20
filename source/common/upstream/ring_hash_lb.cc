@@ -31,9 +31,9 @@ RingHashLoadBalancer::RingHashLoadBalancer(
                             : DefaultMaxRingSize),
       hash_function_(config ? config.value().hash_function()
                             : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH),
-      use_hostname_for_hashing_(
+      use_index_for_hashing_(
           common_config.has_consistent_hashing_lb_config()
-              ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
+              ? common_config.consistent_hashing_lb_config().use_index_for_hashing()
               : false),
       hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)) {
@@ -102,7 +102,7 @@ using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::Hash
 RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_host_weights,
                                  double min_normalized_weight, uint64_t min_ring_size,
                                  uint64_t max_ring_size, HashFunction hash_function,
-                                 bool use_hostname_for_hashing, RingHashLoadBalancerStats& stats)
+                                 bool use_index_for_hashing, RingHashLoadBalancerStats& stats)
     : stats_(stats) {
   ENVOY_LOG(trace, "ring hash: building ring");
 
@@ -147,13 +147,14 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
   double target_hashes = 0.0;
   uint64_t min_hashes_per_host = ring_size;
   uint64_t max_hashes_per_host = 0;
+  uint64_t host_index = 0;
   for (const auto& entry : normalized_host_weights) {
     const auto& host = entry.first;
-    const std::string& address_string =
-        use_hostname_for_hashing ? host->hostname() : host->address()->asString();
-    ASSERT(!address_string.empty());
+    const std::string& host_key =
+        use_index_for_hashing ? absl::StrCat("", host_index) : host->address()->asString();
+    ASSERT(!host_key.empty());
 
-    hash_key_buffer.assign(address_string.begin(), address_string.end());
+    hash_key_buffer.assign(host_key.begin(), host_key.end());
     hash_key_buffer.emplace_back('_');
     auto offset_start = hash_key_buffer.end();
 
@@ -181,6 +182,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
     }
     min_hashes_per_host = std::min(i, min_hashes_per_host);
     max_hashes_per_host = std::max(i, max_hashes_per_host);
+    host_index++;
   }
 
   std::sort(ring_.begin(), ring_.end(), [](const RingEntry& lhs, const RingEntry& rhs) -> bool {
@@ -188,9 +190,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
   });
   if (ENVOY_LOG_CHECK_LEVEL(trace)) {
     for (const auto& entry : ring_) {
-      ENVOY_LOG(trace, "ring hash: host={} hash={}",
-                use_hostname_for_hashing ? entry.host_->hostname()
-                                         : entry.host_->address()->asString(),
+      ENVOY_LOG(trace, "ring hash: host={} hash={}", entry.host_->address()->asString(),
                 entry.hash_);
     }
   }
