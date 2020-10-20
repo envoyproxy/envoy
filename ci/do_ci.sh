@@ -282,7 +282,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "wasm=disabled"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
-    "--define" "use_new_codecs_in_integration_tests=true"
+    "--define" "use_new_codecs_in_integration_tests=false"
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng")
 
@@ -411,11 +411,17 @@ elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
-  # Validate dependency relationships between core/extensions and external deps.
-  tools/dependency/validate_test.py
-  tools/dependency/validate.py
   # Build docs.
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" docs/build.sh
+  exit 0
+elif [[ "$CI_TARGET" == "deps" ]]; then
+  echo "verifying dependencies..."
+  # Validate dependency relationships between core/extensions and external deps.
+  ./tools/dependency/validate_test.py
+  ./tools/dependency/validate.py
+  # Validate the CVE scanner works.
+  python3.8 tools/dependency/cve_scan_test.py
+  ./ci/check_repository_locations.sh
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   echo "verify examples..."
@@ -436,6 +442,7 @@ elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   sudo apt-get install -y -qq --no-install-recommends redis-tools
   export DOCKER_NO_PULL=1
   umask 027
+  chmod -R o-rwx examples/
   ci/verify_examples.sh
   exit 0
 else
