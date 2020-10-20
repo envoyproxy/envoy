@@ -53,43 +53,23 @@ def RenderTitle(title):
 # SHA. Otherwise, return the tarball download.
 def GetVersionUrl(metadata):
   # Figure out if it's a GitHub repo.
-  github_repo = None
-  github_version = None
-  for url in metadata['urls']:
-    if url.startswith('https://github.com/'):
-      components = url.split('/')
-      github_repo = f'https://github.com/{components[3]}/{components[4]}'
-      if components[5] == 'archive':
-        # Only support .tar.gz, .zip today. Figure out the release tag from this
-        # filename.
-        if components[6].endswith('.tar.gz'):
-          github_version = components[6][:-len('.tar.gz')]
-        else:
-          assert (components[6].endswith('.zip'))
-          github_version = components[6][:-len('.zip')]
-      else:
-        # Release tag is a path component.
-        assert (components[5] == 'releases')
-        github_version = components[7]
-      break
+  github_release = dep_utils.GetGitHubReleaseFromUrls(metadata['urls'])
   # If not, direct download link for tarball
-  download_url = metadata['urls'][0]
-  if not github_repo:
-    return download_url
-  # If it's not a GH hash, it's a tagged release.
-  tagged_release = len(metadata['version']) != 40
-  if tagged_release:
+  if not github_release:
+    return metadata['urls'][0]
+  github_repo = f'https://github.com/{github_release.organization}/{github_release.project}'
+  if github_release.tagged:
     # The GitHub version should look like the metadata version, but might have
     # something like a "v" prefix.
-    return f'{github_repo}/releases/tag/{github_version}'
-  assert (metadata['version'] == github_version)
-  return f'{github_repo}/tree/{github_version}'
+    return f'{github_repo}/releases/tag/{github_release.version}'
+  assert (metadata['version'] == github_release.version)
+  return f'{github_repo}/tree/{github_release.version}'
 
 
 if __name__ == '__main__':
   security_rst_root = sys.argv[1]
 
-  Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'last_updated'])
+  Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date'])
   use_categories = defaultdict(lambda: defaultdict(list))
   # Bin rendered dependencies into per-use category lists.
   for k, v in dep_utils.RepositoryLocations().items():
@@ -102,14 +82,14 @@ if __name__ == '__main__':
     project_url = v['project_url']
     name = RstLink(project_name, project_url)
     version = RstLink(RenderVersion(v['version']), GetVersionUrl(v))
-    last_updated = v['last_updated']
-    dep = Dep(name, project_name.lower(), version, cpe, last_updated)
+    release_date = v['release_date']
+    dep = Dep(name, project_name.lower(), version, cpe, release_date)
     for category in v['use_category']:
       for ext in v.get('extensions', ['core']):
         use_categories[category][ext].append(dep)
 
   def CsvRow(dep):
-    return [dep.name, dep.version, dep.last_updated, dep.cpe]
+    return [dep.name, dep.version, dep.release_date, dep.cpe]
 
   # Generate per-use category RST with CSV tables.
   for category, exts in use_categories.items():
@@ -118,6 +98,6 @@ if __name__ == '__main__':
       if ext_name != 'core':
         content += RenderTitle(ext_name)
       output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
-      content += CsvTable(['Name', 'Version', 'Last updated', 'CPE'], [2, 1, 1, 2],
+      content += CsvTable(['Name', 'Version', 'Release date', 'CPE'], [2, 1, 1, 2],
                           [CsvRow(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
     output_path.write_text(content)

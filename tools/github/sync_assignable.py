@@ -45,9 +45,9 @@ def SyncAssignable(access_token):
 
 
 if __name__ == '__main__':
-  access_token = os.getenv('GH_ACCESS_TOKEN')
+  access_token = os.getenv('GITHUB_TOKEN')
   if not access_token:
-    print('Missing GH_ACCESS_TOKEN')
+    print('Missing GITHUB_TOKEN')
     sys.exit(1)
 
   sys.exit(SyncAssignable(access_token))

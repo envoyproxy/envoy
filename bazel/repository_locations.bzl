@@ -8,7 +8,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "bcecfd622c4ef272fd4ba42726a52e140b961c4eac23025f18b346c968a8cfb4",
         strip_prefix = "bazel-compilation-database-{version}",
         urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
-        last_updated = "2020-08-01",
+        release_date = "2020-08-01",
         use_category = ["build"],
     ),
     bazel_gazelle = dict(
@@ -18,7 +18,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "0.21.1",
         sha256 = "cdb02a887a7187ea4d5a27452311a75ed8637379a1287d8eeb952138ea485f7d",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
-        last_updated = "2020-05-28",
+        release_date = "2020-05-28",
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
@@ -32,7 +32,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "https://github.com/bazelbuild/bazel-toolchains/releases/download/{version}/bazel-toolchains-{version}.tar.gz",
             "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/{version}.tar.gz",
         ],
-        last_updated = "2020-08-10",
+        release_date = "2020-08-10",
         use_category = ["build"],
     ),
     build_bazel_rules_apple = dict(
@@ -42,7 +42,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "0.19.0",
         sha256 = "7a7afdd4869bb201c9352eed2daf37294d42b093579b70423490c1b4d4f6ce42",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
-        last_updated = "2020-10-10",
+        release_date = "2019-10-10",
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
@@ -53,7 +53,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "dc3881d16e7b0c855a7279f5757d55e4aa55fe2befbd9e34215b971818622f9e",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        last_updated = "2020-10-01",
+        release_date = "2020-10-01",
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -71,7 +71,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # chromium-86.0.4240.80
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-07-30",
+        release_date = "2020-07-30",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -82,7 +82,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "3b5fdf23274d4179c2077b5e8fa625d9debd7a390aac1d165b7e47234f648bb8",
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-ae223d6138807a13006342edfeef32e813246b39.tar.xz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2019-08-08",
+        release_date = "2019-08-08",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     com_google_absl = dict(
@@ -94,7 +94,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "abseil-cpp-{version}",
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-10-01",
+        release_date = "2020-10-01",
         cpe = "N/A",
     ),
     com_github_c_ares_c_ares = dict(
@@ -106,7 +106,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/cares-{underscore_version}/c-ares-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-05-11",
+        release_date = "2020-05-11",
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
     com_github_circonus_labs_libcircllhist = dict(
@@ -118,7 +118,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "libcircllhist-{version}",
         urls = ["https://github.com/circonus-labs/libcircllhist/archive/{version}.tar.gz"],
         use_category = ["controlplane", "observability_core", "dataplane_core"],
-        last_updated = "2019-02-11",
+        release_date = "2019-02-11",
         cpe = "N/A",
     ),
     com_github_cyan4973_xxhash = dict(
@@ -130,7 +130,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "xxHash-{version}",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-03-04",
+        release_date = "2020-03-05",
         cpe = "N/A",
     ),
     com_github_envoyproxy_sqlparser = dict(
@@ -146,7 +146,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.mysql_proxy",
             "envoy.filters.network.postgres_proxy",
         ],
-        last_updated = "2020-06-10",
+        release_date = "2020-06-10",
         cpe = "N/A",
     ),
     com_github_mirror_tclap = dict(
@@ -157,7 +157,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
         strip_prefix = "tclap-tclap-{version}-release-final",
         urls = ["https://github.com/mirror/tclap/archive/tclap-{version}-release-final.tar.gz"],
-        last_updated = "2017-11-10",
+        release_date = "2011-04-16",
         use_category = ["other"],
     ),
     com_github_fmtlib_fmt = dict(
@@ -169,7 +169,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "fmt-{version}",
         urls = ["https://github.com/fmtlib/fmt/releases/download/{version}/fmt-{version}.zip"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-08-07",
+        release_date = "2020-08-06",
         cpe = "cpe:2.3:a:fmt:fmt:*",
     ),
     com_github_gabime_spdlog = dict(
@@ -181,7 +181,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "spdlog-{version}",
         urls = ["https://github.com/gabime/spdlog/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-07-09",
+        release_date = "2020-07-09",
         cpe = "N/A",
     ),
     com_github_google_libprotobuf_mutator = dict(
@@ -192,7 +192,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "49a26dbe77c75f2eca1dd8a9fbdb31c4496d9af42df027ff57569c5a7a5d980d",
         strip_prefix = "libprotobuf-mutator-{version}",
         urls = ["https://github.com/google/libprotobuf-mutator/archive/{version}.tar.gz"],
-        last_updated = "2020-08-18",
+        release_date = "2020-08-18",
         use_category = ["test_only"],
     ),
     com_github_google_tcmalloc = dict(
@@ -204,7 +204,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "tcmalloc-{version}",
         urls = ["https://github.com/google/tcmalloc/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-09-16",
+        release_date = "2020-09-16",
         cpe = "N/A",
     ),
     com_github_gperftools_gperftools = dict(
@@ -215,7 +215,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "240deacdd628b6459671b83eb0c4db8e97baadf659f25b92e9a078d536bd513e",
         strip_prefix = "gperftools-{version}",
         urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-{version}/gperftools-{version}.tar.gz"],
-        last_updated = "2020-07-06",
+        release_date = "2020-07-06",
         use_category = ["dataplane_core", "controlplane"],
         cpe = "cpe:2.3:a:gperftools_project:gperftools:*",
     ),
@@ -230,7 +230,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-02-11",
+        release_date = "2020-02-11",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
     com_github_luajit_luajit = dict(
@@ -243,7 +243,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "20a159c38a98ecdb6368e8d655343b6036622a29a1621da9dc303f7ed9bf37f3",
         strip_prefix = "LuaJIT-{version}",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
-        last_updated = "2020-10-13",
+        release_date = "2020-10-12",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.lua"],
         cpe = "cpe:2.3:a:luajit:luajit:*",
@@ -258,7 +258,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/moonjit/moonjit/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.lua"],
-        last_updated = "2020-01-14",
+        release_date = "2020-01-14",
         cpe = "cpe:2.3:a:moonjit_project:moonjit:*",
     ),
     com_github_nghttp2_nghttp2 = dict(
@@ -270,7 +270,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "nghttp2-{version}",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-06-03",
+        release_date = "2020-06-02",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
     io_opentracing_cpp = dict(
@@ -287,7 +287,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.tracers.dynamic_ot",
             "envoy.tracers.lightstep",
         ],
-        last_updated = "2019-01-16",
+        release_date = "2019-01-16",
         cpe = "N/A",
     ),
     com_lightstep_tracer_cpp = dict(
@@ -300,7 +300,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.lightstep"],
-        last_updated = "2020-08-24",
+        release_date = "2020-08-25",
         cpe = "N/A",
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
@@ -313,7 +313,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.datadog"],
-        last_updated = "2020-05-15",
+        release_date = "2020-05-15",
         cpe = "N/A",
     ),
     com_github_google_benchmark = dict(
@@ -325,7 +325,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "benchmark-{version}",
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
         use_category = ["test_only"],
-        last_updated = "2020-06-09",
+        release_date = "2020-06-09",
     ),
     com_github_libevent_libevent = dict(
         project_name = "libevent",
@@ -346,7 +346,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "libevent-{version}",
         urls = ["https://github.com/libevent/libevent/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-07-31",
+        release_date = "2020-07-28",
         cpe = "cpe:2.3:a:libevent_project:libevent:*",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
@@ -362,7 +362,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "zlib-{version}",
         urls = ["https://github.com/madler/zlib/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2019-04-14",
+        release_date = "2019-04-14",
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
     com_github_zlib_ng_zlib_ng = dict(
@@ -374,7 +374,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "zlib-ng-{version}",
         urls = ["https://github.com/zlib-ng/zlib-ng/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-08-16",
+        release_date = "2020-08-16",
         cpe = "N/A",
     ),
     com_github_jbeder_yaml_cpp = dict(
@@ -388,7 +388,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # YAML is also used for runtime as well as controlplane. It shouldn't appear on the
         # dataplane but we can't verify this automatically due to code structure today.
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-07-28",
+        release_date = "2020-07-27",
         cpe = "cpe:2.3:a:yaml-cpp_project:yaml-cpp:*",
     ),
     com_github_msgpack_msgpack_c = dict(
@@ -401,7 +401,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-{version}/msgpack-{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.datadog"],
-        last_updated = "2020-06-05",
+        release_date = "2020-06-05",
         cpe = "N/A",
     ),
     com_github_google_jwt_verify = dict(
@@ -414,7 +414,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/jwt_verify_lib/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.jwt_authn"],
-        last_updated = "2020-07-09",
+        release_date = "2020-07-10",
         cpe = "N/A",
     ),
     com_github_nodejs_http_parser = dict(
@@ -428,7 +428,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "http-parser-{version}",
         urls = ["https://github.com/nodejs/http-parser/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-07-10",
+        release_date = "2020-07-10",
         cpe = "cpe:2.3:a:nodejs:node.js:*",
     ),
     com_github_tencent_rapidjson = dict(
@@ -442,7 +442,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # We're mostly using com_google_protobuf for JSON, but there are some extensions and hard to
         # disentangle uses on the dataplane, e.g. header_formatter, Squash filter.
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2019-12-02",
+        release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
     ),
     com_github_twitter_common_lang = dict(
@@ -453,7 +453,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "56d1d266fd4767941d11c27061a57bc1266a3342e551bde3780f9e9eb5ad0ed1",
         strip_prefix = "twitter.common.lang-{version}/src",
         urls = ["https://files.pythonhosted.org/packages/08/bc/d6409a813a9dccd4920a6262eb6e5889e90381453a5f58938ba4cf1d9420/twitter.common.lang-{version}.tar.gz"],
-        last_updated = "2018-06-26",
+        release_date = "2016-10-17",
         use_category = ["test_only"],
     ),
     com_github_twitter_common_rpc = dict(
@@ -464,7 +464,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "0792b63fb2fb32d970c2e9a409d3d00633190a22eb185145fe3d9067fdaa4514",
         strip_prefix = "twitter.common.rpc-{version}/src",
         urls = ["https://files.pythonhosted.org/packages/be/97/f5f701b703d0f25fbf148992cd58d55b4d08d3db785aad209255ee67e2d0/twitter.common.rpc-{version}.tar.gz"],
-        last_updated = "2018-06-26",
+        release_date = "2016-10-17",
         use_category = ["test_only"],
     ),
     com_github_twitter_common_finagle_thrift = dict(
@@ -475,7 +475,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "1e3a57d11f94f58745e6b83348ecd4fa74194618704f45444a15bc391fde497a",
         strip_prefix = "twitter.common.finagle-thrift-{version}/src",
         urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-{version}.tar.gz"],
-        last_updated = "2018-06-26",
+        release_date = "2016-10-17",
         use_category = ["test_only"],
     ),
     com_google_googletest = dict(
@@ -488,7 +488,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "7897bfaa5ad39a479177cfb5c3ce010184dbaee22a7c3727b212282871918751",
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
-        last_updated = "2020-09-10",
+        release_date = "2020-09-10",
         use_category = ["test_only"],
     ),
     com_google_protobuf = dict(
@@ -500,7 +500,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        last_updated = "2020-10-24",
+        release_date = "2019-10-24",
         cpe = "cpe:2.3:a:google:protobuf:*",
     ),
     grpc_httpjson_transcoding = dict(
@@ -513,7 +513,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        last_updated = "2020-03-02",
+        release_date = "2020-03-02",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
@@ -524,7 +524,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "0310e837aed522875791750de44408ec91046c630374990edd51827cb169f616",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.tar.gz"],
         use_category = ["build", "api"],
-        last_updated = "2020-08-06",
+        release_date = "2020-08-06",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -541,7 +541,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "9d48151ea71b3e225adfb6867e6d2c7d0dce46cbdc8710d9a9a628574dfd40a0",
         strip_prefix = "rules_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_cc/archive/{version}.tar.gz"],
-        last_updated = "2020-05-13",
+        release_date = "2020-05-13",
         use_category = ["build"],
     ),
     rules_foreign_cc = dict(
@@ -552,7 +552,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "2b1cf88de0b6e0195f6571cfde3a5bd406d11b42117d6adef2395c9525a1902e",
         strip_prefix = "rules_foreign_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
-        last_updated = "2020-08-21",
+        release_date = "2020-08-21",
         use_category = ["build"],
     ),
     rules_python = dict(
@@ -564,7 +564,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "76a8fd4e7eca2a3590f816958faa0d83c9b2ce9c32634c5c375bcccf161d3bb5",
         strip_prefix = "rules_python-{version}",
         urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
-        last_updated = "2020-04-09",
+        release_date = "2020-04-09",
         use_category = ["build"],
     ),
     six = dict(
@@ -574,7 +574,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "1.12.0",
         sha256 = "d16a0141ec1a18405cd4ce8b4613101da75da0e9a7aec5bdd4fa804d0e0eba73",
         urls = ["https://files.pythonhosted.org/packages/dd/bf/4138e7bfb757de47d1f4b6994648ec67a51efe58fa907c1e11e350cddfca/six-{version}.tar.gz"],
-        last_updated = "2019-11-17",
+        release_date = "2018-12-09",
         use_category = ["other"],
     ),
     org_llvm_llvm = dict(
@@ -585,7 +585,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "df83a44b3a9a71029049ec101fb0077ecbbdf5fe41e395215025779099a98fdf",
         strip_prefix = "llvm-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-{version}.src.tar.xz"],
-        last_updated = "2020-10-09",
+        release_date = "2020-03-23",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -604,7 +604,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "cc3fcaf05d57010c9cf8eb920234679dede6c780137b55001fd34e4d14806f7c",
         strip_prefix = "WAVM-{version}",
         urls = ["https://github.com/WAVM/WAVM/archive/{version}.tar.gz"],
-        last_updated = "2020-10-09",
+        release_date = "2020-07-07",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -625,7 +625,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.opencensus"],
-        last_updated = "2020-10-13",
+        release_date = "2020-10-08",
         cpe = "N/A",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/11816.
@@ -644,7 +644,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.grpc_credentials.aws_iam",
             "envoy.tracers.opencensus",
         ],
-        last_updated = "2020-08-19",
+        release_date = "2020-08-19",
         cpe = "cpe:2.3:a:haxx:curl:*",
     ),
     com_googlesource_chromium_v8 = dict(
@@ -664,7 +664,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-08-31",
+        release_date = "2020-08-17",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
@@ -677,7 +677,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.transport_sockets.quic"],
-        last_updated = "2020-09-18",
+        release_date = "2020-09-17",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -690,7 +690,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [],
-        last_updated = "2020-08-05",
+        release_date = "2020-07-30",
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
@@ -711,7 +711,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-14",
+        release_date = "2020-07-14",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
@@ -730,7 +730,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-29",
+        release_date = "2020-04-02",
         cpe = "N/A",
     ),
     com_googlesource_code_re2 = dict(
@@ -742,7 +742,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "re2-{version}",
         urls = ["https://github.com/google/re2/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        last_updated = "2020-07-06",
+        release_date = "2020-07-06",
         cpe = "N/A",
     ),
     # Included to access FuzzedDataProvider.h. This is compiler agnostic but
@@ -757,7 +757,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
-        last_updated = "2020-03-24",
+        release_date = "2020-03-23",
         use_category = ["test_only"],
     ),
     upb = dict(
@@ -769,7 +769,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "upb-{version}",
         urls = ["https://github.com/protocolbuffers/upb/archive/{version}.tar.gz"],
         use_category = ["controlplane"],
-        last_updated = "2019-11-19",
+        release_date = "2019-11-19",
         cpe = "N/A",
     ),
     kafka_source = dict(
@@ -782,7 +782,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.network.kafka_broker"],
-        last_updated = "2020-08-26",
+        release_date = "2020-03-03",
         cpe = "cpe:2.3:a:apache:kafka:*",
     ),
     kafka_server_binary = dict(
@@ -793,7 +793,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "2177cbd14118999e1d76fec628ca78ace7e6f841219dbc6035027c796bbe1a2a",
         strip_prefix = "kafka_2.12-{version}",
         urls = ["https://mirrors.gigenet.com/apache/kafka/{version}/kafka_2.12-{version}.tgz"],
-        last_updated = "2020-08-26",
+        release_date = "2020-03-12",
         use_category = ["test_only"],
     ),
     kafka_python_client = dict(
@@ -804,7 +804,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "05f7c6eecb402f11fcb7e524c903f1ba1c38d3bdc9bf42bc8ec3cf7567b9f979",
         strip_prefix = "kafka-python-{version}",
         urls = ["https://github.com/dpkp/kafka-python/archive/{version}.tar.gz"],
-        last_updated = "2020-08-26",
+        release_date = "2020-02-20",
         use_category = ["test_only"],
     ),
     proxy_wasm_cpp_sdk = dict(
@@ -823,7 +823,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-10-09",
+        release_date = "2020-09-11",
         cpe = "N/A",
     ),
     proxy_wasm_cpp_host = dict(
@@ -842,7 +842,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-10-16",
+        release_date = "2020-10-16",
         cpe = "N/A",
     ),
     # TODO: upgrade to the latest version (1.41 currently fails tests)
@@ -855,7 +855,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "emsdk-{version}",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["build"],
-        last_updated = "2020-10-09",
+        release_date = "2020-01-15",
     ),
     io_bazel_rules_rust = dict(
         project_name = "Bazel rust rules",
@@ -868,7 +868,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "rules_rust-{version}",
         urls = ["https://github.com/bazelbuild/rules_rust/archive/{version}.tar.gz"],
         use_category = ["test_only"],
-        last_updated = "2020-10-15",
+        release_date = "2020-10-15",
     ),
     rules_antlr = dict(
         project_name = "ANTLR Rules for Bazel",
@@ -887,7 +887,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-07-29",
+        release_date = "2019-06-21",
         cpe = "N/A",
     ),
     antlr4_runtimes = dict(
@@ -906,7 +906,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        last_updated = "2020-10-09",
+        release_date = "2018-12-18",
         cpe = "N/A",
     ),
 )

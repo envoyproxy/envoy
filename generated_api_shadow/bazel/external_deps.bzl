@@ -17,13 +17,17 @@ DEPENDENCY_ANNOTATIONS = [
     # Envoy (see the external dependency at the given version for information).
     "implied_untracked_deps",
 
-    # When the dependency was last updated in Envoy.
-    "last_updated",
-
     # Project metadata.
     "project_desc",
     "project_name",
     "project_url",
+
+    # Reflects the UTC date (YYYY-MM-DD format) for the dependency release. This
+    # is when the dependency was updated in its repository. For dependencies
+    # that have releases, this is the date of the release. For dependencies
+    # without releases or for scenarios where we temporarily need to use a
+    # commit, this date should be the date of the commit in UTC.
+    "release_date",
 
     # List of the categories describing how the dependency is being used. This attribute is used
     # for automatic tracking of security posture of Envoy's dependencies.
@@ -63,8 +67,7 @@ USE_CATEGORIES = [
     "devtools",
 ]
 
-# Components with these use categories are not required to specify the 'cpe'
-# and 'last_updated' annotation.
+# Components with these use categories are not required to specify the 'cpe'.
 USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "other", "test_only", "api"]
 
 def _fail_missing_attribute(attr, key):
@@ -106,13 +109,13 @@ def load_repository_locations(repository_locations_spec):
             if "extensions" not in location:
                 _fail_missing_attribute("extensions", key)
 
-        if "last_updated" not in location:
-            _fail_missing_attribute("last_updated", key)
-        last_updated = location["last_updated"]
+        if "release_date" not in location:
+            _fail_missing_attribute("release_date", key)
+        release_date = location["release_date"]
 
         # Starlark doesn't have regexes.
-        if len(last_updated) != 10 or last_updated[4] != "-" or last_updated[7] != "-":
-            fail("last_updated must match YYYY-DD-MM: " + last_updated)
+        if len(release_date) != 10 or release_date[4] != "-" or release_date[7] != "-":
+            fail("release_date must match YYYY-DD-MM: " + release_date)
 
         if "cpe" in location:
             cpe = location["cpe"]
