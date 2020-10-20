@@ -19,5 +19,4 @@ steps:
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      GH_ACCESS_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
     displayName: "Scan for CVEs in dependencies"
