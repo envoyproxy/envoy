@@ -86,6 +86,11 @@ Stop the proxy server and compile the Wasm binary with the updated code:
 
 The compiled binary should now be in the ``lib`` folder.
 
+   $ ls -l lib
+   total 120
+   -r-xr-xr-x 1 root root 59641 Oct 20 00:00 envoy_filter_http_wasm_example.wasm
+   -r-xr-xr-x 1 root root 59653 Oct 20 10:16 envoy_filter_http_wasm_updated_example.wasm
+
 Step 6: Edit the Dockerfile and restart the proxy
 *************************************************
 
