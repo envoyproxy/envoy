@@ -661,6 +661,7 @@ bool RouteEntryImplBase::shouldRewriteHeader(absl::string_view key, absl::string
 
 void RouteEntryImplBase::rewriteUpstreamResponseHeaders(Http::ResponseHeaderMap& headers) const {
   std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_rewrite;
+  headers_to_rewrite.clear();
   headers.iterate([this, &headers_to_rewrite,
                    &headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     absl::string_view key_to_use = header.key().getStringView();

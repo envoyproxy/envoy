@@ -351,7 +351,7 @@ response_headers_to_add:
   - header:
       key: x-global-header1
       value: global1
-    append: {1}
+    append: {1}  
 response_headers_to_remove: ["x-global-remove"]
 most_specific_header_mutations_wins: {0}
 )EOF";
@@ -1733,49 +1733,53 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
 // Validates behavior of response_headers_to_rewrite at route level.
 TEST_F(RouteMatcherTest, TestRewriteResponseHeaders) {
   const std::string yaml =
-      responseHeadersRewriteConfig(false, true, "x-global-rewrite", "glob", "univers");
+      responseHeadersRewriteConfig(false, false, "x-header-rewrite", "glob", "univers");
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   {
     {
-      // x-global-rewrite should be rewritten from global to universal
+      // x-header-rewrite should be rewritten from global to universal
       Http::TestRequestHeaderMapImpl req_headers =
           genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestResponseHeaderMapImpl headers(
-          {{"x-global-rewrite", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}});
+          {{"x-header-one", "one"}, {"x-header-rewrite", "global"}, {"x-header-two", "two"}});
       route->finalizeResponseHeaders(headers, stream_info);
-      EXPECT_EQ("universal", headers.get_("x-global-rewrite"));
+      EXPECT_EQ("universal", headers.get_("x-header-rewrite"));
+      EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("route-override", headers.get_("x-route-header"));
+      EXPECT_EQ("one", headers.get_("x-header-one"));
+      EXPECT_EQ("two", headers.get_("x-header-two"));
     }
 
     {
-      // x-global-rewrite should be not be rewritten as match predicate will not match
+      // x-header-rewrite should be not be rewritten as match predicate will not match
       // In the config, match predicates are defined for x-header-one and x-header-two
       Http::TestRequestHeaderMapImpl req_headers =
           genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestResponseHeaderMapImpl headers(
-          {{"x-global-rewrite", "global"}, {"x-header-one", "three"}, {"x-header-two", "two"}});
+          {{"x-header-rewrite", "global"}, {"x-header-one", "three"}, {"x-header-two", "two"}});
       route->finalizeResponseHeaders(headers, stream_info);
-      EXPECT_EQ("route-override", headers.get_("x-global-header1"));
-      EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
+      EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-override", headers.get_("x-route-header"));
-      EXPECT_EQ("global", headers.get_("x-global-rewrite"));
+      EXPECT_EQ("global", headers.get_("x-header-rewrite"));
     }
 
     {
-      // x-global-rewrite will not be received so no rewrite should occur
+      // x-header-rewrite will not be received so no rewrite should occur
       Http::TestRequestHeaderMapImpl req_headers =
           genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestResponseHeaderMapImpl headers(
-          {{"x-global-nope", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}});
+          {{"x-header-nope", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}});
       route->finalizeResponseHeaders(headers, stream_info);
-      EXPECT_EQ("route-override", headers.get_("x-global-header1"));
-      EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
+      EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-override", headers.get_("x-route-header"));
-      EXPECT_EQ("global", headers.get_("x-global-nope"));
+      EXPECT_EQ("global", headers.get_("x-header-nope"));
     }
 
     EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
@@ -1786,21 +1790,21 @@ TEST_F(RouteMatcherTest, TestRewriteResponseHeaders) {
 // Validates behavior of response_headers_to_rewrite when header value does not match
 TEST_F(RouteMatcherTest, TestRewriteResponseHeadersPrefixNotMatched) {
   const std::string yaml =
-      responseHeadersRewriteConfig(false, true, "x-global-rewrite", "something", "univers");
+      responseHeadersRewriteConfig(false, false, "x-header-rewrite", "something", "univers");
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  // x-global-rewrite should be not be rewritten as its value will not match the prefix
+  // x-header-rewrite should be not be rewritten as its value will not match the prefix
   Http::TestRequestHeaderMapImpl req_headers =
       genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
   Http::TestResponseHeaderMapImpl headers(
-      {{"x-global-rewrite", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}});
+      {{"x-header-rewrite", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}});
   route->finalizeResponseHeaders(headers, stream_info);
-  EXPECT_EQ("route-override", headers.get_("x-global-header1"));
-  EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
+  EXPECT_EQ("global1", headers.get_("x-global-header1"));
+  EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
   EXPECT_EQ("route-override", headers.get_("x-route-header"));
-  EXPECT_EQ("global", headers.get_("x-global-rewrite"));
+  EXPECT_EQ("global", headers.get_("x-header-rewrite"));
   EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
               ContainerEq(config.internalOnlyHeaders()));
 }
