@@ -13,6 +13,7 @@
 #include "envoy/server/guarddog.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -64,7 +65,23 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
         Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_, stats_scope,
                                                                name};
 
-        const auto& actions = config.actions();
+        auto actions = config.actions();
+
+        // Add default abort_action if kill and/or multi-kill is enabled.
+        if (config.killTimeout().count() > 0) {
+          envoy::watchdog::v3alpha::AbortActionConfig abort_config;
+          WatchDogAction* abort_action_config = actions.Add();
+          abort_action_config->set_event(WatchDogAction::KILL);
+          abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
+        }
+
+        if (config.multiKillTimeout().count() > 0) {
+          envoy::watchdog::v3alpha::AbortActionConfig abort_config;
+          WatchDogAction* abort_action_config = actions.Add();
+          abort_action_config->set_event(WatchDogAction::MULTIKILL);
+          abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
+        }
+
         for (const auto& action : actions) {
           // Get factory and add the created cb
           auto& factory = Config::Utility::getAndCheckFactory<Configuration::GuardDogActionFactory>(
@@ -133,19 +150,12 @@ void GuardDogImpl::step() {
       }
       if (killEnabled() && delta > kill_timeout_) {
         invokeGuardDogActions(WatchDogAction::KILL, {{tid, last_checkin}}, now);
-
-        PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
-                          watched_dog->dog_->threadId().debugString()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
         multi_kill_threads.emplace_back(tid, last_checkin);
 
         if (multi_kill_threads.size() >= required_for_multi_kill) {
           invokeGuardDogActions(WatchDogAction::MULTIKILL, multi_kill_threads, now);
-
-          PANIC(fmt::format("GuardDog: At least {} threads ({},...) stuck for more than "
-                            "watchdog_multikill_timeout",
-                            multi_kill_threads.size(), tid.debugString()));
         }
       }
     }

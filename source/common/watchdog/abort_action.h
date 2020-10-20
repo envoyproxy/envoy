@@ -1,24 +1,18 @@
 #pragma once
 
-#include <chrono>
-
-#include "envoy/extensions/watchdog/abort_action/v3alpha/abort_action.pb.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
+#include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Watchdog {
-namespace AbortAction {
-
 /**
- * A GuardDogAction that will terminate the process by sending SIGABRT to the
- * stuck thread. This is currently only implemented for systems that
- * support kill to send signals.
+ * A GuardDogAction that will terminate the process by killing the
+ * stuck thread.
  */
 class AbortAction : public Server::Configuration::GuardDogAction {
 public:
-  AbortAction(envoy::extensions::watchdog::abort_action::v3alpha::AbortActionConfig& config,
+  AbortAction(envoy::watchdog::v3alpha::AbortActionConfig& config,
               Server::Configuration::GuardDogActionFactoryContext& context);
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
@@ -26,12 +20,10 @@ public:
            MonotonicTime now) override;
 
 private:
-  const envoy::extensions::watchdog::abort_action::v3alpha::AbortActionConfig config_;
+  const absl::Duration wait_duration_;
 };
 
 using AbortActionPtr = std::unique_ptr<AbortAction>;
 
-} // namespace AbortAction
 } // namespace Watchdog
-} // namespace Extensions
 } // namespace Envoy

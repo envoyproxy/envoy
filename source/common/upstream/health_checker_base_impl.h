@@ -77,7 +77,7 @@ protected:
     ~ActiveHealthCheckSession() override;
     HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type);
     void onDeferredDeleteBase();
-    void start();
+    void start() { onInitialInterval(); }
 
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
