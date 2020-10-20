@@ -202,9 +202,6 @@ public:
               (override));
   MOCK_METHOD(bool, enabled, (), (override));
 
-  const ScopeTrackedObject* scope_{};
-  bool enabled_{};
-
   Event::TimerCb callback_;
 };
 

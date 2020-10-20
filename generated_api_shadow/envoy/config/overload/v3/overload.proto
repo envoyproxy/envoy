@@ -80,9 +80,11 @@ message Trigger {
   }
 }
 
+// Typed configuration for the "envoy.overload_actions.reduce_timeouts" action.
 message ScaleTimersOverloadActionConfig {
   enum TimerType {
     // Adjusts the idle timer for downstream HTTP connections that takes effect when there are no active streams.
+    // This affects the value of :ref:`RouteAction.idle_timeout <envoy_api_field_config.route.v3.RouteAction.idle_timeout>`.
     HTTP_DOWNSTREAM_CONNECTION_IDLE = 0;
   }
 

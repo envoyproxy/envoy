@@ -166,7 +166,7 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
             ? Event::ScaledTimerMinimum(Event::AbsoluteMinimum(std::chrono::milliseconds(
                   DurationUtil::durationToMilliseconds(scale_timer.min_timeout()))))
             : Event::ScaledTimerMinimum(
-                  Event::ScaledMinimum(scale_timer.min_scale().value() / 100));
+                  Event::ScaledMinimum(scale_timer.min_scale().value() / 100.0));
 
     auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));
     if (!inserted) {

@@ -519,15 +519,16 @@ TEST_F(OverloadManagerImplTest, CreateUnscaledScaledTimer) {
 
   auto* mock_scaled_timer = new Event::MockTimer();
   MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(*scaled_timer_manager, createTimer_).WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
-    // Since this timer was created with the timer type "unscaled", it should use the same value for
-    // the min and max. Test that by checking an arbitrary value.
-    EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(55));
-    return mock_scaled_timer;
-  });
+  EXPECT_CALL(*scaled_timer_manager, createTimer_)
+      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
+        // Since this timer was created with the timer type "unscaled", it should use the same value
+        // for the min and max. Test that by checking an arbitrary value.
+        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(55));
+        return mock_scaled_timer;
+      });
 
   auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
-      OverloadTimerType::UnscaledRealTimer, mock_callback.AsStdFunction());
+      OverloadTimerType::UnscaledRealTimerForTest, mock_callback.AsStdFunction());
 
   EXPECT_CALL(*mock_scaled_timer, enableTimer(std::chrono::milliseconds(5 * 1000), _));
   timer->enableTimer(std::chrono::seconds(5));
@@ -544,11 +545,13 @@ TEST_F(OverloadManagerImplTest, CreateScaledTimerWithAbsoluteMinimum) {
 
   auto* mock_scaled_timer = new Event::MockTimer();
   MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(*scaled_timer_manager, createTimer_).WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
-    // This timer was created with an absolute minimum. Test that by checking an arbitrary value.
-    EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(2));
-    return mock_scaled_timer;
-  });
+  EXPECT_CALL(*scaled_timer_manager, createTimer_)
+      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
+        // This timer was created with an absolute minimum. Test that by checking an arbitrary
+        // value.
+        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(2));
+        return mock_scaled_timer;
+      });
 
   auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
       OverloadTimerType::HttpDownstreamIdleConnectionTimeout, mock_callback.AsStdFunction());
