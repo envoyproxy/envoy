@@ -133,6 +133,7 @@ protected:
     listener_ =
         dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
 #if defined(__clang__) && defined(__has_feature) && __has_feature(address_sanitizer)
+    // TODO(PiotrSikora, Lizan) sort this out.
     // There is a bug in clang with AddressSanitizer on the CI such that the code below reports:
     //
     //   runtime error: constructor call on address 0x6190000b4a80 with insufficient space for
@@ -147,7 +148,7 @@ protected:
     //   CorrectSize(p, size, tcmalloc::DefaultAlignPolicy())
     //
     // so we only use it for clang with AddressSanitizer builds.
-    auto x = malloc(sizeof(TestClientConnectionImpl) + 1024);
+    auto x = ::operator new(sizeof(TestClientConnectionImpl));
     new (x) TestClientConnectionImpl(*dispatcher_, socket_->localAddress(), source_address_,
                                      Network::Test::createRawBufferSocket(), socket_options_);
     client_connection_.reset(reinterpret_cast<TestClientConnectionImpl*>(x));
