@@ -88,7 +88,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
   if (headers.get(Http::CustomHeaders::get().GrpcAcceptEncoding).empty()) {
     // Adds grpc-accept-encoding:identity
     headers.setReferenceInline(grpc_accept_encoding_handle.handle(),
-                              Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
+                               Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
   }
   return Http::FilterHeadersStatus::Continue;
 }

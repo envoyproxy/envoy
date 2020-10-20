@@ -258,9 +258,7 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
 }
 
 TEST_P(GrpcWebFilterTest, ExternallyProvidedEncodingHeader) {
-  Http::TestRequestHeaderMapImpl request_headers{
-      {"grpc-accept-encoding", "foo"},
-      {":path", "/"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"grpc-accept-encoding", "foo"}, {":path", "/"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ("foo", request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
