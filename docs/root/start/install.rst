@@ -155,18 +155,12 @@ The following commands will pull and show the Envoy version of current images.
 Pre-built Envoy Docker images
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The following table shows the available Docker images
+
 .. csv-table::
    :widths: 30 40 10 10 10
    :header-rows: 1
    :file: _include/dockerhub-images.csv
-
-
-We build and tag Docker images with release versions when we do official releases. These images can
-be found in the following repositories:
-
-.. note::
-
-  In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
 
 On every master commit we additionally create a set of development Docker images. These images can
 be found in the following repositories:
@@ -179,13 +173,3 @@ tests.
   The Envoy project considers master to be release candidate quality at all times, and many
   organizations track and deploy master in production. We encourage you to do the same so that
   issues can be reported as early as possible in the development process.
-
-Packaged Envoy pre-built binaries for a variety of platforms are available via
-`GetEnvoy.io <https://www.getenvoy.io/>`_.
-
-We will consider producing additional binary types depending on community interest in helping with
-CI, packaging, etc. Please open an `issue in GetEnvoy <https://github.com/tetratelabs/getenvoy/issues>`_
-for pre-built binaries for different platforms.
-
-non-alpine images are `multi-arch <https://www.docker.com/blog/multi-arch-build-and-images-the-simple-way/>`_ images
-and should run transparently on compatible ARM64 hosts.
