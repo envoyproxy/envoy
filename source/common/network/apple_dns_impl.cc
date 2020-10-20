@@ -55,7 +55,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   // for kDNSServiceFlagsShareConnection in dns_sd.h, and copied (and edited) in this implementation
   // where relevant.
   auto error = DNSServiceCreateConnection(&main_sd_ref_);
-  RELEASE_ASSERT(!error, "error in DNSServiceCreateConnection");
+  RELEASE_ASSERT(!error, fmt::format("error ({}) in DNSServiceCreateConnection", error));
 
   auto fd = DNSServiceRefSockFD(main_sd_ref_);
   RELEASE_ASSERT(fd != -1, "error in DNSServiceRefSockFD");
@@ -71,9 +71,16 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
 }
 
 void AppleDnsResolverImpl::onEventCallback(uint32_t events) {
-  ENVOY_LOG(debug, "DNS resolver file event");
+  ENVOY_LOG(debug, "DNS resolver file event ({})", events);
   ASSERT(events & Event::FileReadyType::Read);
-  DNSServiceProcessResult(main_sd_ref_);
+  DNSServiceErrorType error = DNSServiceProcessResult(main_sd_ref_);
+  if (error != kDNSServiceErr_NoError) {
+    ENVOY_LOG(warn, "DNS resolver error ({}) in DNSServiceProcessResult", error);
+    // Similar to receiving an error in onDNSServiceGetAddrInfoReply, an error while processing fd
+    // events indicates that the sd_ref state is broken.
+    // Therefore, flush queries with_error == true.
+    flushPendingQueries(true /* with_error */);
+  }
 }
 
 ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
@@ -85,7 +92,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
 
   DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
   if (error != kDNSServiceErr_NoError) {
-    ENVOY_LOG(warn, "DNS resolver error in dnsServiceGetAddrInfo for {}", dns_name);
+    ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
     return nullptr;
   }
 
@@ -150,7 +157,14 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   ENVOY_LOG(debug, "Destroying PendingResolution for {}", dns_name_);
-  DNSServiceRefDeallocate(individual_sd_ref_);
+  // It is possible that DNSServiceGetAddrInfo returns a synchronous error, with a NULLed
+  // DNSServiceRef, in AppleDnsResolverImpl::resolve.
+  // Additionally, it is also possible that the query is cancelled before resolution starts, and
+  // thus the DNSServiceRef is null.
+  // Therefore, only deallocate if the ref is not null.
+  if (individual_sd_ref_) {
+    DNSServiceRefDeallocate(individual_sd_ref_);
+  }
 }
 
 void AppleDnsResolverImpl::PendingResolution::cancel() {
