@@ -153,7 +153,7 @@ void ActiveMessage::onQueryTopicRoute() {
     cluster = cluster_manager.get(cluster_name);
   }
   if (cluster) {
-    ENVOY_LOG(trace, "Enovy has an operating cluster {} for topic {}", cluster_name, topic_name);
+    ENVOY_LOG(trace, "Envoy has an operating cluster {} for topic {}", cluster_name, topic_name);
     std::vector<QueueData> queue_data_list;
     std::vector<BrokerData> broker_data_list;
     for (auto& host_set : cluster->prioritySet().hostSetsPerPriority()) {
