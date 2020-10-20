@@ -158,7 +158,7 @@ Pre-built Envoy Docker images
 The following table shows the available Docker images
 
 .. csv-table::
-   :widths: 30 40 10 10 10
+   :widths: 30 38 8 8 8 8
    :header-rows: 1
    :file: _include/dockerhub-images.csv
 
