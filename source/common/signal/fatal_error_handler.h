@@ -4,6 +4,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/signal/fatal_action.h"
+
 namespace Envoy {
 
 // A simple class which allows registering functions to be called when Envoy
@@ -14,6 +16,9 @@ public:
   // Called when Envoy receives a fatal signal. Must be async-signal-safe: in
   // particular, it can't allocate memory.
   virtual void onFatalError(std::ostream& os) const PURE;
+
+  virtual void runFatalActionsOnTrackedObject(
+      std::list<const Server::Configuration::FatalActionPtr>& actions) const PURE;
 };
 
 namespace FatalErrorHandler {
@@ -35,5 +40,31 @@ void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler);
  * called from a fatal signal handler.
  */
 void callFatalErrorHandlers(std::ostream& os);
+
+/**
+ * Creates the singleton FatalActionManager if not already created and
+ * registers the specified actions to run on failure.
+ */
+void registerFatalActions(
+    std::unique_ptr<std::list<const Server::Configuration::FatalActionPtr>> safe_actions,
+    std::unique_ptr<std::list<const Server::Configuration::FatalActionPtr>> unsafe_actions,
+    Envoy::Server::Instance* server);
+
+/**
+ * Tries to run all of the safe fatal actions. Only one thread will
+ * be allowed to run the fatal functions. This returns true if the caller should
+ * continue running the failure functions and have ran the safe actions.
+ * Otherwise it returns false.
+ */
+bool runSafeActions();
+
+/**
+ * Tries to run all of the unsafe fatal actions. Call this only
+ * after calling runSafeActions.
+ *
+ * Returns whether the thread was successfully able to run the
+ * unsafe actions.
+ */
+bool runUnsafeActions();
 } // namespace FatalErrorHandler
 } // namespace Envoy

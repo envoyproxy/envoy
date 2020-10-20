@@ -20,6 +20,7 @@ envoy_cc_test(
         "//source/common/signal:fatal_error_handler_lib",
         "//source/common/signal:sigaction_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
     ],
 )

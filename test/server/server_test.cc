@@ -1,8 +1,10 @@
 #include <memory>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/fatal_action_config.h"
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
@@ -19,6 +21,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
+#include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
@@ -1179,6 +1182,51 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/bootstrap_extensions.yaml"), EnvoyException,
       "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
+}
+
+class FooFatalAction : public Configuration::FatalAction {
+public:
+  FooFatalAction(bool is_safe) : is_safe_(is_safe) {}
+
+  void run(const ScopeTrackedObject* /*current_object*/) {
+    std::cerr << "FooFatalAction isSafe:" << is_safe_ << std::endl;
+  }
+
+  bool isSafe() const { return is_safe_; }
+
+private:
+  bool is_safe_;
+};
+
+TEST_P(ServerInstanceImplTest, WithFatalActions) {
+  NiceMock<Configuration::MockFatalActionFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+  }));
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.foo"));
+
+  Registry::InjectFactory<Configuration::FatalActionFactory> registered_factory(mock_factory);
+
+  EXPECT_DEATH(
+      {
+        EXPECT_CALL(mock_factory, createFatalActionFromProto(_, _))
+            .Times(2)
+            .WillRepeatedly(Invoke(
+                [](const envoy::config::bootstrap::v3::FatalAction& config, Instance* /*server*/) {
+                  return std::make_unique<FooFatalAction>(config.safe());
+                }));
+        absl::Notification abort_called;
+        auto server_thread =
+            startTestServer("test/server/test_data/server/fatal_actions.yaml", false);
+        // Trigger SIGABRT, wait for the ABORT
+        server_->dispatcher().post([&] {
+          abort();
+          abort_called.Notify();
+        });
+
+        abort_called.WaitForNotification();
+      },
+      "FooFatalAction isSafe:1.*FooFatalAction isSafe:0");
 }
 
 // Static configuration validation. We test with both allow/reject settings various aspects of

@@ -91,6 +91,18 @@ public:
     }
   }
 
+  void runFatalActionsOnTrackedObject(
+      std::list<const Server::Configuration::FatalActionPtr>& actions) const override {
+    if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+      return;
+    }
+
+    // Run the actions
+    for (const auto& action : actions) {
+      action->run(current_object_);
+    }
+  }
+
 private:
   TimerPtr createTimerInternal(TimerCb cb);
   void updateApproximateMonotonicTimeInternal();

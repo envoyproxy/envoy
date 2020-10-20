@@ -22,8 +22,12 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
   }
   tracer.logTrace();
 
-  // Finally after logging the stack trace, call any registered crash handlers.
-  FatalErrorHandler::callFatalErrorHandlers(std::cerr);
+  // Finally after logging the stack trace, call the crash handlers
+  // in order from safe to unsafe.
+  if (FatalErrorHandler::runSafeActions()) {
+    FatalErrorHandler::callFatalErrorHandlers(std::cerr);
+    FatalErrorHandler::runUnsafeActions();
+  }
 
   signal(sig, SIG_DFL);
   raise(sig);
