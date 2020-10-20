@@ -95,9 +95,7 @@ void TraceReporter::flushTraces() {
       message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }
 
-    Buffer::InstancePtr body(new Buffer::OwnedImpl());
-    body->add(encoder_->payload());
-    message->body() = std::move(body);
+    message->body().add(encoder_->payload());
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 

@@ -16,7 +16,6 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats
 }
 
 std::string responseDetail(const std::string& policy_id) {
-  // TODO(alyssawilk): put this as a StreamInfo utility and apply to all response details.
   // Replace whitespaces in policy_id with '_' to avoid breaking the access log (inconsistent number
   // of segments between log entries when the separator is whitespace).
   const absl::flat_hash_map<std::string, std::string> replacement{

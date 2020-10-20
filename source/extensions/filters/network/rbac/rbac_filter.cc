@@ -39,27 +39,35 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
                 : "none",
             callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
 
+  std::string log_policy_id = "none";
   // When the enforcement type is continuous always do the RBAC checks. If it is a one time check,
   // run the check once and skip it for subsequent onData calls.
   if (config_->enforcementType() ==
       envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS) {
-    shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
-    engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+    shadow_engine_result_ =
+        checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow).engine_result_;
+    auto result = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+    engine_result_ = result.engine_result_;
+    log_policy_id = result.connection_termination_details_;
   } else {
     if (shadow_engine_result_ == Unknown) {
       // TODO(quanlin): Pass the shadow engine results to other filters.
-      shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
+      shadow_engine_result_ =
+          checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow).engine_result_;
     }
 
     if (engine_result_ == Unknown) {
-      engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+      auto result = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+      engine_result_ = result.engine_result_;
+      log_policy_id = result.connection_termination_details_;
     }
   }
 
   if (engine_result_ == Allow) {
     return Network::FilterStatus::Continue;
   } else if (engine_result_ == Deny) {
-    // TODO(yangminzhu): Set the corresponding response detail once supported in network filter.
+    callbacks_->connection().streamInfo().setConnectionTerminationDetails(
+        Filters::Common::RBAC::responseDetail(log_policy_id));
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
@@ -81,8 +89,7 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
   callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().Rbac, metrics);
 }
 
-EngineResult
-RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
+Result RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
   const auto engine = config_->engine(mode);
   std::string effective_policy_id;
   if (engine != nullptr) {
@@ -101,7 +108,7 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
         ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
         config_->stats().allowed_.inc();
       }
-      return Allow;
+      return Result{Allow, effective_policy_id};
     } else {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow denied, matched policy {}", log_policy_id);
@@ -113,10 +120,10 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
         ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
         config_->stats().denied_.inc();
       }
-      return Deny;
+      return Result{Deny, log_policy_id};
     }
   }
-  return None;
+  return Result{None, "none"};
 }
 
 } // namespace RBACFilter

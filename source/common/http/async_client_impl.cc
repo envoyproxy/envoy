@@ -257,11 +257,11 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
 
 void AsyncRequestImpl::initialize() {
   child_span_->injectContext(request_->headers());
-  sendHeaders(request_->headers(), !request_->body());
-  if (request_->body()) {
+  sendHeaders(request_->headers(), request_->body().length() == 0);
+  if (request_->body().length() != 0) {
     // It's possible this will be a no-op due to a local response synchronously generated in
     // sendHeaders; guards handle this within AsyncStreamImpl.
-    sendData(*request_->body(), true);
+    sendData(request_->body(), true);
   }
   // TODO(mattklein123): Support request trailers.
 }
@@ -283,11 +283,8 @@ void AsyncRequestImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
 }
 
 void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
-  if (!response_->body()) {
-    response_->body() = std::make_unique<Buffer::OwnedImpl>();
-  }
   streamInfo().addBytesReceived(data.length());
-  response_->body()->move(data);
+  response_->body().move(data);
 }
 
 void AsyncRequestImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {

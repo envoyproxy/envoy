@@ -49,7 +49,7 @@ bool DrainManagerImpl::drainClose() const {
   ASSERT(server_.options().drainTime() >= remaining_time);
   const auto elapsed_time = server_.options().drainTime() - remaining_time;
   return static_cast<uint64_t>(elapsed_time.count()) >
-         (server_.random().random() % server_.options().drainTime().count());
+         (server_.api().randomGenerator().random() % server_.options().drainTime().count());
 }
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
