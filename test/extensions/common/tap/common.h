@@ -36,6 +36,13 @@ MATCHER_P(TraceEqual, rhs, "") {
 namespace Common {
 namespace Tap {
 
+// Reads a PROTO_BINARY_LENGTH_DELIMITED set of messages from a file, found within the specified
+// path prefix.
+std::vector<envoy::data::tap::v3::TraceWrapper> readTracesFromPath(const std::string& path_prefix);
+
+// Reads a PROTO_BINARY_LENGTH_DELIMITED set of messages from a file.
+std::vector<envoy::data::tap::v3::TraceWrapper> readTracesFromFile(const std::string& file);
+
 class MockPerTapSinkHandleManager : public PerTapSinkHandleManager {
 public:
   MockPerTapSinkHandleManager();
