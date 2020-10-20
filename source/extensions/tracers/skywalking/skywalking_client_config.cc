@@ -1,6 +1,6 @@
-#include "common/config/datasource.h"
-
 #include "extensions/tracers/skywalking/skywalking_client_config.h"
+
+#include "common/config/datasource.h"
 
 namespace Envoy {
 namespace Extensions {

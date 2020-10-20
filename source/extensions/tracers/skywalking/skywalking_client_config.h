@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/config/trace/v3/skywalking.pb.h"
+#include "envoy/secret/secret_provider.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/tracer_config.h"
-#include "envoy/secret/secret_provider.h"
 
 #include "absl/synchronization/mutex.h"
 
