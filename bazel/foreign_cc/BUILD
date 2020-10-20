@@ -374,7 +374,7 @@ envoy_cmake_external(
         "//conditions:default": "@net_zlib//:all",
     }),
     static_libraries = select({
-        "//bazel:windows_x86_64": ["zlibstatic.lib"],
+        "//bazel:windows_x86_64": ["zlib.lib"],
         "//conditions:default": ["libz.a"],
     }),
 )
