@@ -346,6 +346,7 @@ envoy_cmake_external(
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "CMAKE_C_COMPILER_FORCED": "on",
         "SKIP_BUILD_EXAMPLES": "on",
+        "BUILD_SHARED_LIBS": "off",
 
         # The following entries are for zlib-ng. Since zlib and zlib-ng are compatible source
         # codes and CMake ignores unknown cache entries, it is fine to combine it into one
