@@ -171,3 +171,15 @@ The following table shows the available Docker images
    The Envoy project considers master to be release candidate quality at all times, and many
    organizations track and deploy master in production. We encourage you to do the same so that
    issues can be reported as early as possible in the development process.
+
+
+Idealised Envoy Docker images
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following table shows the available Docker images
+
+.. csv-table::
+   :widths: 30 38 8 8 8 8
+   :header-rows: 2
+   :stub-columns: 1
+   :file: _include/dockerhub-images-ideal.csv
