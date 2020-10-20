@@ -37,19 +37,15 @@ namespace Config {
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  GrpcSubscriptionTestHarness()
-      : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0), false) {}
+  GrpcSubscriptionTestHarness() : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
 
-  GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout,
-                              bool skip_ttl_initialization)
+  GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
-    if (!skip_ttl_initialization) {
-      ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    }
+    ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
 

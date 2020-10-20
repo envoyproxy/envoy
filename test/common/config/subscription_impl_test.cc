@@ -22,21 +22,18 @@ enum class SubscriptionType {
 
 class SubscriptionImplTest : public testing::TestWithParam<SubscriptionType> {
 public:
-  SubscriptionImplTest() : SubscriptionImplTest(std::chrono::milliseconds(0), false) {}
-  SubscriptionImplTest(std::chrono::milliseconds init_fetch_timeout, bool skip_ttl_initialization) {
-    initialize(init_fetch_timeout, skip_ttl_initialization);
+  SubscriptionImplTest() : SubscriptionImplTest(std::chrono::milliseconds(0)) {}
+  SubscriptionImplTest(std::chrono::milliseconds init_fetch_timeout) {
+    initialize(init_fetch_timeout);
   }
 
-  void initialize(std::chrono::milliseconds init_fetch_timeout = std::chrono::milliseconds(0),
-                  bool skip_ttl_initialization = false) {
+  void initialize(std::chrono::milliseconds init_fetch_timeout = std::chrono::milliseconds(0)) {
     switch (GetParam()) {
     case SubscriptionType::Grpc:
-      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout,
-                                                                    skip_ttl_initialization);
+      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);
       break;
     case SubscriptionType::DeltaGrpc:
-      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout,
-                                                                    skip_ttl_initialization);
+      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);
       break;
     case SubscriptionType::Http:
       test_harness_ = std::make_unique<HttpSubscriptionTestHarness>(init_fetch_timeout);
@@ -89,22 +86,13 @@ public:
 
 class SubscriptionImplInitFetchTimeoutTest : public SubscriptionImplTest {
 public:
-  SubscriptionImplInitFetchTimeoutTest()
-      : SubscriptionImplTest(std::chrono::milliseconds(1000), false) {}
-};
-
-class SubscriptionImplInitFetchTimeoutTestDisableTtl : public SubscriptionImplTest {
-public:
-  SubscriptionImplInitFetchTimeoutTestDisableTtl()
-      : SubscriptionImplTest(std::chrono::milliseconds(1000), true) {}
+  SubscriptionImplInitFetchTimeoutTest() : SubscriptionImplTest(std::chrono::milliseconds(1000)) {}
 };
 
 SubscriptionType types[] = {SubscriptionType::Grpc, SubscriptionType::DeltaGrpc,
                             SubscriptionType::Http, SubscriptionType::Filesystem};
 INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplTest, testing::ValuesIn(types));
 INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplInitFetchTimeoutTest,
-                         testing::ValuesIn(types));
-INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplInitFetchTimeoutTestDisableTtl,
                          testing::ValuesIn(types));
 
 // Validate basic request-response succeeds.
@@ -165,7 +153,7 @@ TEST_P(SubscriptionImplTest, UpdateResources) {
 }
 
 // Validate that initial fetch timer is created and calls callback on timeout
-TEST_P(SubscriptionImplInitFetchTimeoutTestDisableTtl, InitialFetchTimeout) {
+TEST_P(SubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
   if (GetParam() == SubscriptionType::Filesystem) {
     return; // initial_fetch_timeout not implemented for filesystem.
   }

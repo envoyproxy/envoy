@@ -10,15 +10,8 @@ namespace {
 
 class GrpcSubscriptionImplTest : public testing::Test, public GrpcSubscriptionTestHarness {};
 
-class GrpcSubscriptionImplTestWithoutTtl : public testing::Test,
-                                           public GrpcSubscriptionTestHarness {
-public:
-  GrpcSubscriptionImplTestWithoutTtl()
-      : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0), true) {}
-};
-
 // Validate that stream creation results in a timer based retry and can recover.
-TEST_F(GrpcSubscriptionImplTestWithoutTtl, StreamCreationFailure) {
+TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   InSequence s;
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 
@@ -44,7 +37,7 @@ TEST_F(GrpcSubscriptionImplTestWithoutTtl, StreamCreationFailure) {
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
-TEST_F(GrpcSubscriptionImplTestWithoutTtl, RemoteStreamClose) {
+TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
