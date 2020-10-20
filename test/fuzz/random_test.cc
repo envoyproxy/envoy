@@ -1,6 +1,9 @@
 #include "test/fuzz/random.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::ContainerEq;
 
 namespace Envoy {
 namespace Fuzz {
@@ -14,10 +17,10 @@ TEST(BasicSubsetSelection, RandomTest) {
   std::string random_bytestring = "\x01\x03\x09\x04\x33";
   ProperSubsetSelector subset_selector(random_bytestring);
   const std::vector<std::vector<uint8_t>> subsets = subset_selector.constructSubsets({2, 3}, 5);
-  std::vector<uint8_t> subset_one = {1, 3};
-  std::vector<uint8_t> subset_two = {0, 2, 4};
-  ASSERT_EQ(subsets[0], subset_one);
-  ASSERT_EQ(subsets[1], subset_two);
+  const std::vector<uint8_t> expected_subset_one = {1, 3};
+  const std::vector<uint8_t> expected_subset_two = {0, 2, 4};
+  EXPECT_THAT(subsets[0], ContainerEq(expected_subset_one));
+  EXPECT_THAT(subsets[1], ContainerEq(expected_subset_two));
 }
 
 } // namespace Fuzz

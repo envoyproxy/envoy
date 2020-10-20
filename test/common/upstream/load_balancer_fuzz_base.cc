@@ -59,7 +59,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
 void LoadBalancerFuzzBase::initializeLbComponents(
     const test::common::upstream::LoadBalancerTestCase& input) {
   random_.initializeSeed(input.seed_for_prng());
-  uint16_t port;
+  uint16_t port = 80;
   for (uint8_t priority_of_host_set = 0;
        priority_of_host_set < input.setup_priority_levels().size(); ++priority_of_host_set) {
     initializeASingleHostSet(input.setup_priority_levels().at(priority_of_host_set),

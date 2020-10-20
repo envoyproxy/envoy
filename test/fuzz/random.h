@@ -44,7 +44,10 @@ public:
    * "randomness" of the subset that the class will use is determined by a bytestring passed into
    * the class. Example: call into function with a vector {3, 5} representing subset sizes, and 15
    * as number_of_elements. This function would return something such as {{3, 14, 7}, {2, 1, 13, 8,
-   * 6}}
+   * 6}}. If the sum of the number of elements in each elements in each subset > number of elements,
+   * this will stop constructing subsets once the number of elements has ran out and been already
+   * placed into subsets. So, if you had a vector {3, 5} representing subset sizes, and 2 as number
+   * of elements, the function would return something such as {{5, 3}}.
    */
 
   std::vector<std::vector<uint8_t>>
