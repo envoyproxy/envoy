@@ -355,37 +355,11 @@ bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
-  bool should_run_callbacks = false;
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
-    if (ssl_ctx_) {
-      should_run_callbacks = true;
-    }
-  }
-  if (should_run_callbacks) {
-    for (const auto& cb : secrets_ready_callbacks_) {
-      cb();
-    }
-    secrets_ready_callbacks_.clear();
   }
   stats_.ssl_context_update_by_sds_.inc();
-}
-
-void ClientSslSocketFactory::addReadyCb(std::function<void()> callback) {
-  bool immediately_run_callback = false;
-  {
-    absl::ReaderMutexLock l(&ssl_ctx_mu_);
-    if (ssl_ctx_) {
-      immediately_run_callback = true;
-    }
-  }
-
-  if (immediately_run_callback) {
-    callback();
-  } else {
-    secrets_ready_callbacks_.push_back(callback);
-  }
 }
 
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
@@ -422,37 +396,11 @@ bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
-  bool should_run_callbacks = false;
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
-
-    if (ssl_ctx_) {
-      should_run_callbacks = true;
-    }
-  }
-  if (should_run_callbacks) {
-    for (const auto& cb : secrets_ready_callbacks_) {
-      cb();
-    }
-    secrets_ready_callbacks_.clear();
   }
   stats_.ssl_context_update_by_sds_.inc();
-}
-
-void ServerSslSocketFactory::addReadyCb(std::function<void()> callback) {
-  bool immediately_run_callback = false;
-  {
-    absl::ReaderMutexLock l(&ssl_ctx_mu_);
-    if (ssl_ctx_) {
-      immediately_run_callback = true;
-    }
-  }
-  if (immediately_run_callback) {
-    callback();
-  } else {
-    secrets_ready_callbacks_.push_back(callback);
-  }
 }
 
 } // namespace Tls

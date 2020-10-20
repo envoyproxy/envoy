@@ -15,9 +15,6 @@ MockClientContext::~MockClientContext() = default;
 MockClientContextConfig::MockClientContextConfig() = default;
 MockClientContextConfig::~MockClientContextConfig() = default;
 
-MockServerContext::MockServerContext() = default;
-MockServerContext::~MockServerContext() = default;
-
 MockServerContextConfig::MockServerContextConfig() = default;
 MockServerContextConfig::~MockServerContextConfig() = default;
 
