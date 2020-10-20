@@ -1,4 +1,5 @@
-Docker image,description,stable/amd64,stable/arm64,master/amd64,master/arm64
+,,,stable,stable,master,master
+Docker image,description,amd64,arm64,amd64,arm64
 `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_,Release binary with symbols stripped on top of an Ubuntu Bionic base.,v1.16-latest,v1.16-latest,,
 `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_,Release binary with symbols stripped on top of a **glibc** alpine base.,v1.16-latest,,,
 `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_,Release binary with debug symbols on top of an Ubuntu Bionic base.,v1.16-latest,v1.16-latest,,

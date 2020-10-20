@@ -159,7 +159,7 @@ The following table shows the available Docker images
 
 .. csv-table::
    :widths: 30 38 8 8 8 8
-   :header-rows: 1
+   :header-rows: 2
    :file: _include/dockerhub-images.csv
 
 .. note::
