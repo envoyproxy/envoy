@@ -13,7 +13,7 @@ schedules:
 
 stages:
   - stage: cve_scan
-      - job: scan
+      - job: cve_scan
         pool:
           vmImage: "ubuntu-18.04"
         steps:
