@@ -37,6 +37,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         },
     )
 
+    # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(
         name = "org_golang_google_grpc",
         build_file_proto_mode = "disable",
@@ -44,14 +45,12 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         sum = "h1:EC2SB8S04d2r73uptxphDSUG+kTKVgjRPF+N3xpxRB4=",
         version = "v1.29.1",
     )
-
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
         sum = "h1:fHDIZ2oxGnUZRN6WgWFCbYBjH9uqVPRCUVUDhs0wnbA=",
         version = "v0.0.0-20190813141303-74dc4d7220e7",
     )
-
     go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",

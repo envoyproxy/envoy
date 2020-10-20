@@ -81,7 +81,7 @@ mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 ./docs/generate_extension_rst.py "${EXTENSION_DB_PATH}" "${GENERATED_RST_DIR}"/intro/arch_overview/security
 
 # Generate RST for external dependency docs in intro/arch_overview/security.
-./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
+PYTHONPATH=. ./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
 
 function generate_api_rst() {
   local proto_target
