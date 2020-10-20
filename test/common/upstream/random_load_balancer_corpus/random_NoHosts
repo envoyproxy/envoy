@@ -1,0 +1,24 @@
+load_balancer_test_case {
+common_lb_config {
+
+}
+actions {
+    prefetch {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 0
+    random_bytestring: "\x01\x02"
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 0
+    random_bytestring: "\x01\x02"
+}
+seed_for_prng: 2
+}

@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "envoy/config/cluster/v3/cluster.proto";
+import "google/protobuf/empty.proto";
+
+message UpdateHealthFlags {
+  // The host priority determines what host set within the priority set which will get updated.
+  uint64 host_priority = 1;
+  // These will determine how many hosts will get placed into health hosts, degraded hosts, and
+  // excluded hosts from the full host list.
+  uint32 num_healthy_hosts = 2;
+  uint32 num_degraded_hosts = 3;
+  uint32 num_excluded_hosts = 4;
+  // This is used to determine which hosts get marked as healthy, degraded, and excluded.
+  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 1, max_len: 256}];
+}
+
+message LbAction {
+  oneof action_selector {
+    option (validate.required) = true;
+    // This updates the health flags of hosts at a certain priority level. The number of hosts in each priority level/in localities is static,
+    // as untrusted upstreams cannot change that, and can only change their health flags.
+    UpdateHealthFlags update_health_flags = 1;
+    // Prefetches a host using the encapsulated specific load balancer.
+    google.protobuf.Empty prefetch = 2;
+    // Chooses a host using the encapsulated specific load balancer.
+    google.protobuf.Empty choose_host = 3;
+  }
+}
+
+message SetupPriorityLevel {
+  uint32 num_hosts_in_priority_level = 1 [(validate.rules).uint32.lte = 500];
+  uint32 num_hosts_locality_a = 2 [(validate.rules).uint32.lte = 500];
+  uint32 num_hosts_locality_b = 3 [(validate.rules).uint32.lte = 500];
+  // Hard cap at 3 localities for simplicity
+  uint32 num_hosts_locality_c = 4 [(validate.rules).uint32.lte = 500];
+  // For choosing which hosts go in which locality
+  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 1, max_len: 256}];
+}
+
+// This message represents what LoadBalancerFuzzBase will interact with, performing setup of host sets and calling into load balancers.
+// The logic that this message represents and the base class for load balancing fuzzing will be logic that maps to all types of load balancing
+// and can be used in a modular way at the highest level for each load balancer.
+message LoadBalancerTestCase {
+  envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
+      [(validate.rules).message.required = true];
+  repeated LbAction actions = 2;
+
+  // Each generated integer will cause the fuzzer to initialize hosts at a certain priority level, each integer generated adding a priority
+  // level with integer generated hosts in that new priority level. Capped at 20 for simplicity.
+  repeated SetupPriorityLevel setup_priority_levels = 3
+      [(validate.rules).repeated = {min_items: 1, max_items: 20}];
+
+  // This number is used to instantiate the prng. The prng takes the place of random() calls, allowing a representative random distribution
+  // which is also deterministic.
+  uint64 seed_for_prng = 4 [(validate.rules).uint64.gt = 0];
+}

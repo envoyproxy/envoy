@@ -1,0 +1,40 @@
+load_balancer_test_case {
+  common_lb_config {
+    update_merge_window {
+      nanos: 512
+    }
+  }
+  actions {
+    update_health_flags {
+      num_healthy_hosts: 2
+      random_bytestring: "\001\002\003\004"
+    }
+  }
+  actions {
+    prefetch {
+    }
+  }
+  actions {
+    prefetch {
+    }
+  }
+  actions {
+    choose_host {
+    }
+  }
+  actions {
+    update_health_flags {
+      num_healthy_hosts: 2
+      random_bytestring: "\001\002\003\004"
+    }
+  }
+  setup_priority_levels {
+    num_hosts_in_priority_level: 536903638
+    random_bytestring: "\001\002"
+  }
+  setup_priority_levels {
+    num_hosts_in_priority_level: 32726
+    random_bytestring: "\001\002"
+  }
+  seed_for_prng: 88
+}

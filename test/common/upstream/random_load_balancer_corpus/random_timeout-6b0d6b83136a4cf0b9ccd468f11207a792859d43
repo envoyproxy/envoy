@@ -1,0 +1,31 @@
+load_balancer_test_case {
+  common_lb_config {
+    healthy_panic_threshold {
+      value: 1.35807730621777e-312
+    }
+    zone_aware_lb_config {
+      routing_enabled {
+      }
+      min_cluster_size {
+        value: 7380836839843720192
+      }
+      fail_traffic_on_panic: true
+    }
+    consistent_hashing_lb_config {
+      hash_balance_factor {
+        value: 27656
+      }
+    }
+  }
+  actions {
+    update_health_flags {
+      num_excluded_hosts: 268435456
+      random_bytestring: "\x01\x02"
+    }
+  }
+  setup_priority_levels {
+    num_hosts_in_priority_level: 13534154135
+    random_bytestring: "\x01\x02"
+  }
+  seed_for_prng: 32
+}

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "test/common/upstream/load_balancer_fuzz.proto";
+
+//This has no specific logic needed for initialization
+message RandomLoadBalancerTestCase {
+  LoadBalancerTestCase load_balancer_test_case = 1 [(validate.rules).message.required = true];
+}
