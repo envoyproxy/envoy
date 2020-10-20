@@ -41,8 +41,8 @@ function retry () {
 }
 
 if ! retry brew update; then
-    echo "Failed to update homebrew"
-    exit 1
+  # Do not exit early if update fails.
+  echo "Failed to update homebrew"
 fi
 
 DEPS="automake cmake coreutils go libtool wget ninja"
