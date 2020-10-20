@@ -84,7 +84,7 @@ private:
                      OpaqueResourceDecoder& resource_decoder, const std::string& type_url,
                      GrpcMuxImpl& parent)
         : resources_(resources), callbacks_(callbacks), resource_decoder_(resource_decoder),
-          type_url_(type_url), parent_(parent), watches_(parent.api_state_[type_url].watches_) {
+          type_url_(type_url), parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
       watches_.emplace(watches_.begin(), this);
     }
 
@@ -118,19 +118,11 @@ private:
 
   // Per muxed API state.
   struct ApiState {
+    ApiState(Event::Dispatcher& dispatcher,
+             std::function<void(const std::vector<std::string>&)> callback)
+        : ttl_(callback, dispatcher, dispatcher.timeSource()) {}
+
     bool paused() const { return pauses_ > 0; }
-
-    void ensureTtlManagerCreated(Event::Dispatcher& dispatcher,
-                                 std::function<void(const std::vector<std::string>&)> callback) {
-      // TODO(snowp): This pattern is a bit gross, but it keeps ApiState default allocatable which
-      // makes the call sites much nicer by allowing operator[]. Ideally we should properly allocate
-      // ApiState with the Ttl object created in its ctor.
-      if (ttl_) {
-        return;
-      }
-
-      ttl_ = std::make_unique<TtlManager>(callback, dispatcher, dispatcher.timeSource());
-    }
 
     // Watches on the returned resources for the API;
     std::list<GrpcMuxWatchImpl*> watches_;
@@ -142,7 +134,7 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
-    std::unique_ptr<TtlManager> ttl_;
+    TtlManager ttl_;
   };
 
   // Request queue management logic.
@@ -154,7 +146,12 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   bool first_stream_request_;
-  absl::node_hash_map<std::string, ApiState> api_state_;
+
+  // Helper function for looking up and potentially allocating a new ApiState.
+  ApiState& apiStateFor(const std::string& type_url);
+
+  absl::node_hash_map<std::string, std::unique_ptr<ApiState>> api_state_;
+
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
 

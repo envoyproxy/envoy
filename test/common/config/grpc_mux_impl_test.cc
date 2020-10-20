@@ -143,14 +143,11 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
 TEST_F(GrpcMuxImplTest, ResetStream) {
   InSequence s;
 
-  Event::MockTimer* timer = nullptr;
-  Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-    timer_cb = cb;
-    EXPECT_EQ(nullptr, timer);
-    timer = new Event::MockTimer();
-    return timer;
-  }));
+  auto* timer = new Event::MockTimer(&dispatcher_);
+  // TTL timers.
+  new Event::MockTimer(&dispatcher_);
+  new Event::MockTimer(&dispatcher_);
+  new Event::MockTimer(&dispatcher_);
 
   setup();
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_);
@@ -166,7 +163,6 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
       .Times(3);
   EXPECT_CALL(random_, random());
-  ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_, _));
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_EQ(0, control_plane_connected_state_.value());
@@ -175,7 +171,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("foo", {"x", "y"}, "", true);
   expectSendMessage("bar", {}, "");
   expectSendMessage("baz", {"z"}, "");
-  timer_cb();
+  timer->invokeCallback();
 
   expectSendMessage("baz", {}, "");
   expectSendMessage("foo", {}, "");
@@ -306,13 +302,13 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
       resource_decoder("cluster_name");
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   InSequence s;
+auto* ttl_timer = new Event::MockTimer(&dispatcher_);
   auto eds_sub = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x"}, "", true);
   grpc_mux_->start();
 
-  Event::MockTimer* ttl_timer;
   {
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
@@ -323,7 +319,6 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(1000), load_assignment);
     response->add_resources()->PackFrom(wrapped_resource);
 
-    ttl_timer = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
