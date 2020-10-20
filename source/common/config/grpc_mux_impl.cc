@@ -289,7 +289,7 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
   drainRequests();
 }
 
-ApiState& GrpcMuxImpl::apiStateFor(const std::string& type_url) {
+GrpcMuxImpl::ApiState& GrpcMuxImpl::apiStateFor(const std::string& type_url) {
   auto itr = api_state_.find(type_url);
   if (itr == api_state_.end()) {
     auto ttl_expiry_callback = [this, type_url](const std::vector<std::string>& expired) {
