@@ -442,14 +442,19 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 }
 
 bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::string& cluster_name) {
+  std::cerr << " HERE\n";
   GenericConnPoolFactory* factory = nullptr;
   if (cluster.info()->upstreamConfig().has_value()) {
-    factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
+    factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster.info()->upstreamConfig().value());
   } else {
-    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
+    factory = Envoy::Config::Utility::getFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.tcp.generic");
   }
+  if (!factory) {
+    return false;
+  }
+
   absl::optional<std::string> hostname =
       (config_->tunnelingConfig() ? absl::optional(config_->tunnelingConfig()->hostname())
                                   : absl::nullopt);

@@ -9,6 +9,7 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
+#include "envoy/extensions/upstreams/http/generic/v3/generic_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -1051,6 +1052,46 @@ TEST_F(TcpProxyTest, ExplicitFactory) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Test nothing bad happens if an invalid factory is configured.
+TEST_F(TcpProxyTest, BadFactory) {
+  auto& info = factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
+  info->upstream_config_ = absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  // The HTTP Generic connection pool is not a valid type for TCP upstreams.
+  envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
+  info->upstream_config_.value().mutable_typed_config()->PackFrom(generic_config);
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+
+  configure(config);
+
+  upstream_connections_.push_back(std::make_unique<NiceMock<Network::MockClientConnection>>());
+  upstream_connection_data_.push_back(
+      std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
+  ON_CALL(*upstream_connection_data_.back(), connection())
+      .WillByDefault(ReturnRef(*upstream_connections_.back()));
+  upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+  conn_pool_handles_.push_back(
+      std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
+
+  ON_CALL(*upstream_hosts_.at(0), cluster())
+      .WillByDefault(
+          ReturnPointee(factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
+  EXPECT_CALL(*upstream_connections_.at(0), dispatcher())
+      .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
+
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
+      filter_callbacks_.connection_.ssl());
+  filter_callbacks_.connection_.streamInfo().setDownstreamLocalAddress(
+      filter_callbacks_.connection_.localAddress());
+  filter_callbacks_.connection_.streamInfo().setDownstreamRemoteAddress(
+      filter_callbacks_.connection_.remoteAddress());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
 
 // Test that downstream is closed after an upstream LocalClose.
