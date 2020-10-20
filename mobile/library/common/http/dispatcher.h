@@ -21,7 +21,7 @@ namespace Envoy {
 namespace Http {
 
 /**
- * All decompressor filter stats. @see stats_macros.h
+ * All dispatcher stats. @see stats_macros.h
  */
 #define ALL_HTTP_DISPATCHER_STATS(COUNTER)                                                         \
   COUNTER(stream_success)                                                                          \
@@ -29,7 +29,7 @@ namespace Http {
   COUNTER(stream_cancel)
 
 /**
- * Struct definition for decompressor stats. @see stats_macros.h
+ * Struct definition for dispatcher stats. @see stats_macros.h
  */
 struct DispatcherStats {
   ALL_HTTP_DISPATCHER_STATS(GENERATE_COUNTER_STRUCT)
