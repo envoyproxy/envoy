@@ -387,7 +387,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
   // This should be a no-op. No timer should be created.
-  EXPECT_CALL(dispatcher, createTimer_(_)).Times(0);
+  EXPECT_CALL(*mocks.dispatcher_, createTimer_(_)).Times(0);
   server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
 
   server_connection->close(ConnectionCloseType::NoFlush);
