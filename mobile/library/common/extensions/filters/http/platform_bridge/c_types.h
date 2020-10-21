@@ -149,6 +149,8 @@ typedef void (*envoy_filter_resume_f)(const void* context);
  */
 typedef struct {
   envoy_filter_resume_f resume_iteration;
+  envoy_filter_release_f release_callbacks;
+  const void* callback_context;
 } envoy_http_filter_callbacks;
 
 typedef void (*envoy_filter_set_callbacks_f)(envoy_http_filter_callbacks callbacks,
