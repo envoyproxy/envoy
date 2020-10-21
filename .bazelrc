@@ -3,10 +3,10 @@
 # Bazel doesn't need more than 200MB of memory for local build based on memory profiling:
 # https://docs.bazel.build/versions/master/skylark/performance.html#memory-profiling
 # The default JVM max heapsize is 1/4 of physical memory up to 32GB which could be large
-# enough to consume all memory constrained by cgroup in large host, which is the case in CircleCI.
+# enough to consume all memory constrained by cgroup in large host.
 # Limiting JVM heapsize here to let it do GC more when approaching the limit to
 # leave room for compiler/linker.
-# The number 2G is choosed heuristically to both support in CircleCI and large enough for RBE.
+# The number 2G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx2g
 
