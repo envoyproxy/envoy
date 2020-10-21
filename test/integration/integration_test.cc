@@ -189,9 +189,11 @@ TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
 }
 
 TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
+  useAccessLog("%ROUTE_NAME%");
   static const std::string domain("direct.example.com");
   static const std::string prefix("/");
   static const Http::Code status(Http::Code::OK);
+  static const std::string route_name("direct_response_route");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -215,6 +217,7 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
         virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
         virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
             static_cast<uint32_t>(status));
+        virtual_host->mutable_routes(0)->set_name(route_name);
       });
   initialize();
 
@@ -230,6 +233,9 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
   EXPECT_EQ(nullptr, response->headers().ContentType());
   // Content-length header is correct.
   EXPECT_EQ("0", response->headers().getContentLengthValue());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr(route_name));
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
