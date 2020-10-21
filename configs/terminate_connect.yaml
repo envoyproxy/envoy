@@ -1,3 +1,6 @@
+# This configuration terminates a CONNECT request and sends the CONNECT payload upstream.
+# It can be used to test TCP tunneling as described in docs/root/intro/arch_overview/http/upgrades.rst
+# or used to test CONNECT directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
 admin:
   access_log_path: /tmp/admin_access.log
   address:
@@ -57,8 +60,3 @@ static_resources:
               socket_address:
                 address: www.google.com
                 port_value: 443
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: www.google.com
