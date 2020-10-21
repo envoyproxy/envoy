@@ -85,9 +85,11 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
 
   // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
-  // Adds grpc-accept-encoding:identity,deflate,gzip. It's required for gRPC.
-  headers.setReferenceInline(grpc_accept_encoding_handle.handle(),
-                             Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
+  if (headers.get(Http::CustomHeaders::get().GrpcAcceptEncoding).empty()) {
+    // Adds grpc-accept-encoding:identity
+    headers.setReferenceInline(grpc_accept_encoding_handle.handle(),
+                               Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
