@@ -23,7 +23,7 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
       tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
 
   auto& factory_context = context.serverFactoryContext();
-  tls_slot_ptr_->set([&proto_config, &factory_context, this](Event::Dispatcher& dispatcher) {
+  tls_slot_ptr_->set([proto_config, &factory_context, this](Event::Dispatcher& dispatcher) {
     TracerPtr tracer = std::make_unique<Tracer>(factory_context.timeSource());
     tracer->setReporter(std::make_unique<TraceSegmentReporter>(
         factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
