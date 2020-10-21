@@ -157,7 +157,6 @@ TEST_P(WasmVmTest, V8Code) {
     EXPECT_TRUE(!wasm_vm->getCustomSection(wasm_vm->getPrecompiledSectionName()).empty());
   }
   EXPECT_THAT(wasm_vm->getCustomSection("producers"), HasSubstr("rustc"));
-  EXPECT_TRUE(wasm_vm->getCustomSection("emscripten_metadata").empty());
 
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm->clone() != nullptr);

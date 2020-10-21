@@ -222,21 +222,6 @@ TEST_P(WasmTest, DivByZero) {
   wasm_->isFailed();
 }
 
-TEST_P(WasmTest, EmscriptenVersion) {
-  createWasm();
-  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
-  EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->initialize(code, false));
-  uint32_t major = 9, minor = 9, abi_major = 9, abi_minor = 9;
-  EXPECT_TRUE(wasm_->getEmscriptenVersion(&major, &minor, &abi_major, &abi_minor));
-  EXPECT_EQ(major, 0);
-  EXPECT_LE(minor, 3);
-  // Up to (at least) emsdk 1.39.6.
-  EXPECT_EQ(abi_major, 0);
-  EXPECT_LE(abi_minor, 20);
-}
-
 TEST_P(WasmTest, IntrinsicGlobals) {
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
