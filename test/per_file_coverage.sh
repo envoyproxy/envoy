@@ -13,11 +13,13 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api/posix:71.8"
 "source/common/init:96.2"
 "source/common/json:90.6"
+"source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/thread_local:95.7"
 "source/common/crypto:0.0"
 "source/common/common:96.1"
 "source/common/common/posix:94.1"
 "source/common/signal:90.4"
+"source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:93.7"
 "source/extensions:96.3"
 "source/extensions/common:94.4"
@@ -65,7 +67,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls/private_key:76.9"
 "source/extensions/watchdog:69.6" # Death tests within extensions
 "source/extensions/watchdog/profile_action:84.9"
-"source/extensions/watchdog/abort_action:42.9" # Death tests don't report LCOV
 "source/server:94.6"
 "source/server/config_validation:76.6"
 "source/server/admin:95.3"
