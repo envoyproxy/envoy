@@ -211,7 +211,7 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS+=(-c opt --copt -g "--config=clang-asan" "--build_tests_only")
+  BAZEL_BUILD_OPTIONS+=(-c dbg "--config=clang-asan" "--build_tests_only")
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
