@@ -101,9 +101,6 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
 
-  // TODO(mpuncel) only invoke callback() once secrets are ready.
-  void addReadyCb(std::function<void()> callback) override { callback(); };
-
 private:
   HandshakerFactory handshaker_factory_;
   HandshakeValidator handshake_validator_;
