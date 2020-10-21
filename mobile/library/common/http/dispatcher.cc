@@ -51,7 +51,7 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
 
   // Error path: missing EnvoyUpstreamServiceTime implies this is a local reply, which we treat as
   // a stream error.
-  if (!success_ && headers.get(Headers::get().EnvoyUpstreamServiceTime) == nullptr) {
+  if (!success_ && headers.get(Headers::get().EnvoyUpstreamServiceTime).empty()) {
     ENVOY_LOG(debug, "[S{}] intercepted local response", direct_stream_.stream_handle_);
     mapLocalResponseToError(headers);
     if (end_stream) {
@@ -427,13 +427,14 @@ void Dispatcher::setDestinationCluster(HeaderMap& headers) {
   // TODO(junr03): once http3 is available this would probably benefit from some sort of struct that
   // maps to appropriate cluster names. However, with only two options (http1/2) this suffices.
   bool use_h2_cluster{};
-  const HeaderEntry* entry = headers.get(H2UpstreamHeader);
-  if (entry) {
-    if (entry->value() == "http2") {
+  auto get_result = headers.get(H2UpstreamHeader);
+  if (!get_result.empty()) {
+    ASSERT(get_result.size() == 1);
+    const auto value = get_result[0]->value().getStringView();
+    if (value == "http2") {
       use_h2_cluster = true;
     } else {
-      ASSERT(entry->value() == "http1",
-             fmt::format("using unsupported protocol version {}", entry->value().getStringView()));
+      ASSERT(value == "http1", fmt::format("using unsupported protocol version {}", value));
     }
     headers.remove(H2UpstreamHeader);
   }

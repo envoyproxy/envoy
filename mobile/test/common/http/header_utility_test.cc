@@ -67,9 +67,9 @@ TEST(RequestHeaderDataConstructorTest, FromCToCpp) {
     auto expected_value = Utility::convertToString(c_headers_copy.headers[i].value);
 
     // Key is present.
-    EXPECT_NE(cpp_headers->get(expected_key), nullptr);
+    EXPECT_FALSE(cpp_headers->get(expected_key).empty());
     // Value for the key is the same.
-    EXPECT_EQ(cpp_headers->get(expected_key)->value().getStringView(), expected_value);
+    EXPECT_EQ(cpp_headers->get(expected_key)[0]->value().getStringView(), expected_value);
   }
   release_envoy_headers(c_headers_copy);
   delete sentinel;
@@ -108,9 +108,9 @@ TEST(RequestTrailerDataConstructorTest, FromCToCpp) {
     auto expected_value = Utility::convertToString(c_trailers_copy.headers[i].value);
 
     // Key is present.
-    EXPECT_NE(cpp_trailers->get(expected_key), nullptr);
+    EXPECT_FALSE(cpp_trailers->get(expected_key).empty());
     // Value for the key is the same.
-    EXPECT_EQ(cpp_trailers->get(expected_key)->value().getStringView(), expected_value);
+    EXPECT_EQ(cpp_trailers->get(expected_key)[0]->value().getStringView(), expected_value);
   }
   release_envoy_headers(c_trailers_copy);
   delete sentinel;
@@ -139,9 +139,9 @@ TEST(HeaderDataConstructorTest, FromCppToC) {
     auto actual_value = Utility::convertToString(c_headers.headers[i].value);
 
     // Key is present.
-    EXPECT_NE(cpp_headers->get(actual_key), nullptr);
+    EXPECT_FALSE(cpp_headers->get(actual_key).empty());
     // Value for the key is the same.
-    EXPECT_EQ(actual_value, cpp_headers->get(actual_key)->value().getStringView());
+    EXPECT_EQ(actual_value, cpp_headers->get(actual_key)[0]->value().getStringView());
   }
 
   release_envoy_headers(c_headers);

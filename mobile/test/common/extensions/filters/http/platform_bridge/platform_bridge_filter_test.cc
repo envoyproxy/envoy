@@ -229,9 +229,10 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnData
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_data, true));
   EXPECT_EQ(invocations.on_request_data_calls, 1);
 
-  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("content-length")));
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
-            "12");
+  EXPECT_FALSE(request_headers.get(Http::LowerCaseString("content-length")).empty());
+  EXPECT_EQ(
+      request_headers.get(Http::LowerCaseString("content-length"))[0]->value().getStringView(),
+      "12");
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecoding) {
@@ -292,9 +293,10 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   resume_post_cb();
   EXPECT_EQ(invocations.on_resume_request_calls, 1);
 
-  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-async-resumed")));
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("x-async-resumed"))->value().getStringView(),
-            "Very Yes");
+  EXPECT_FALSE(request_headers.get(Http::LowerCaseString("x-async-resumed")).empty());
+  EXPECT_EQ(
+      request_headers.get(Http::LowerCaseString("x-async-resumed"))[0]->value().getStringView(),
+      "Very Yes");
 }
 
 TEST_F(PlatformBridgeFilterTest, AsyncResumeDecodingIsNoopAfterPreviousResume) {
@@ -351,9 +353,10 @@ platform_filter_name: AsyncResumeDecodingIsNoopAfterPreviousResume
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_data, true));
   EXPECT_EQ(invocations.on_request_data_calls, 1);
 
-  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("content-length")));
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
-            "12");
+  EXPECT_FALSE(request_headers.get(Http::LowerCaseString("content-length")).empty());
+  EXPECT_EQ(
+      request_headers.get(Http::LowerCaseString("content-length"))[0]->value().getStringView(),
+      "12");
 
   Event::PostCb resume_post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
@@ -604,9 +607,10 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnData
   EXPECT_EQ(decoding_buffer.toString(), "C");
 
   // Pending headers have been updated with value from ResumeIteration.
-  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("content-length")));
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
-            "1");
+  EXPECT_FALSE(request_headers.get(Http::LowerCaseString("content-length")).empty());
+  EXPECT_EQ(
+      request_headers.get(Http::LowerCaseString("content-length"))[0]->value().getStringView(),
+      "1");
 }
 
 TEST_F(PlatformBridgeFilterTest, StopNoBufferOnRequestData) {
@@ -772,9 +776,10 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnTrailers
   EXPECT_EQ(decoding_buffer.toString(), "C");
 
   // Pending headers have been updated with value from ResumeIteration.
-  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("content-length")));
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
-            "1");
+  EXPECT_FALSE(request_headers.get(Http::LowerCaseString("content-length")).empty());
+  EXPECT_EQ(
+      request_headers.get(Http::LowerCaseString("content-length"))[0]->value().getStringView(),
+      "1");
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding) {
@@ -899,17 +904,19 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_resume_request_calls, 1);
 
   // Pending headers have been updated with the value from ResumeIteration.
-  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-async-resumed")));
-  EXPECT_EQ(request_headers.get(Http::LowerCaseString("x-async-resumed"))->value().getStringView(),
-            "Very Yes");
+  EXPECT_FALSE(request_headers.get(Http::LowerCaseString("x-async-resumed")).empty());
+  EXPECT_EQ(
+      request_headers.get(Http::LowerCaseString("x-async-resumed"))[0]->value().getStringView(),
+      "Very Yes");
 
   // Buffer has been updated with value from ResumeIteration.
   EXPECT_EQ(decoding_buffer.toString(), "C");
 
   // Pending trailers have been updated with value from ResumeIteration.
-  EXPECT_TRUE(request_trailers.get(Http::LowerCaseString("x-async-resumed")));
-  EXPECT_EQ(request_trailers.get(Http::LowerCaseString("x-async-resumed"))->value().getStringView(),
-            "yes");
+  EXPECT_FALSE(request_trailers.get(Http::LowerCaseString("x-async-resumed")).empty());
+  EXPECT_EQ(
+      request_trailers.get(Http::LowerCaseString("x-async-resumed"))[0]->value().getStringView(),
+      "yes");
 }
 
 // DIVIDE
@@ -995,9 +1002,10 @@ platform_filter_name: StopOnResponseHeadersThenResumeOnData
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, true));
   EXPECT_EQ(invocations.on_response_data_calls, 1);
 
-  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("content-length")));
-  EXPECT_EQ(response_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
-            "13");
+  EXPECT_FALSE(response_headers.get(Http::LowerCaseString("content-length")).empty());
+  EXPECT_EQ(
+      response_headers.get(Http::LowerCaseString("content-length"))[0]->value().getStringView(),
+      "13");
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnResumeEncoding) {
@@ -1058,9 +1066,10 @@ platform_filter_name: StopOnResponseHeadersThenResumeOnResumeEncoding
   resume_post_cb();
   EXPECT_EQ(invocations.on_resume_response_calls, 1);
 
-  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-async-resumed")));
-  EXPECT_EQ(response_headers.get(Http::LowerCaseString("x-async-resumed"))->value().getStringView(),
-            "Very Yes");
+  EXPECT_FALSE(response_headers.get(Http::LowerCaseString("x-async-resumed")).empty());
+  EXPECT_EQ(
+      response_headers.get(Http::LowerCaseString("x-async-resumed"))[0]->value().getStringView(),
+      "Very Yes");
 }
 
 TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterPreviousResume) {
@@ -1117,9 +1126,10 @@ platform_filter_name: AsyncResumeEncodingIsNoopAfterPreviousResume
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, true));
   EXPECT_EQ(invocations.on_response_data_calls, 1);
 
-  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("content-length")));
-  EXPECT_EQ(response_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
-            "13");
+  EXPECT_FALSE(response_headers.get(Http::LowerCaseString("content-length")).empty());
+  EXPECT_EQ(
+      response_headers.get(Http::LowerCaseString("content-length"))[0]->value().getStringView(),
+      "13");
 
   Event::PostCb resume_post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
@@ -1369,9 +1379,10 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnData
   EXPECT_EQ(encoding_buffer.toString(), "C");
 
   // Pending headers have been updated with value from ResumeIteration.
-  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("content-length")));
-  EXPECT_EQ(response_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
-            "1");
+  EXPECT_FALSE(response_headers.get(Http::LowerCaseString("content-length")).empty());
+  EXPECT_EQ(
+      response_headers.get(Http::LowerCaseString("content-length"))[0]->value().getStringView(),
+      "1");
 }
 
 TEST_F(PlatformBridgeFilterTest, StopNoBufferOnResponseData) {
@@ -1537,9 +1548,10 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnTrailers
   EXPECT_EQ(encoding_buffer.toString(), "C");
 
   // Pending headers have been updated with value from ResumeIteration.
-  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("content-length")));
-  EXPECT_EQ(response_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
-            "1");
+  EXPECT_FALSE(response_headers.get(Http::LowerCaseString("content-length")).empty());
+  EXPECT_EQ(
+      response_headers.get(Http::LowerCaseString("content-length"))[0]->value().getStringView(),
+      "1");
 }
 
 TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding) {
@@ -1664,17 +1676,18 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding
   EXPECT_EQ(invocations.on_resume_response_calls, 1);
 
   // Pending headers have been updated with the value from ResumeIteration.
-  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-async-resumed")));
-  EXPECT_EQ(response_headers.get(Http::LowerCaseString("x-async-resumed"))->value().getStringView(),
-            "Very Yes");
+  EXPECT_FALSE(response_headers.get(Http::LowerCaseString("x-async-resumed")).empty());
+  EXPECT_EQ(
+      response_headers.get(Http::LowerCaseString("x-async-resumed"))[0]->value().getStringView(),
+      "Very Yes");
 
   // Buffer has been updated with value from ResumeIteration.
   EXPECT_EQ(encoding_buffer.toString(), "C");
 
   // Pending trailers have been updated with value from ResumeIteration.
-  EXPECT_TRUE(response_trailers.get(Http::LowerCaseString("x-async-resumed")));
+  EXPECT_FALSE(response_trailers.get(Http::LowerCaseString("x-async-resumed")).empty());
   EXPECT_EQ(
-      response_trailers.get(Http::LowerCaseString("x-async-resumed"))->value().getStringView(),
+      response_trailers.get(Http::LowerCaseString("x-async-resumed"))[0]->value().getStringView(),
       "yes");
 }
 

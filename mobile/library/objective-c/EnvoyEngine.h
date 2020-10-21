@@ -60,7 +60,6 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 /// Return codes for on-headers filter invocations. @see envoy/http/filter.h
 extern const int kEnvoyFilterHeadersStatusContinue;
 extern const int kEnvoyFilterHeadersStatusStopIteration;
-extern const int kEnvoyFilterHeadersStatusContinueAndEndStream;
 extern const int kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
 
 /// Return codes for on-data filter invocations. @see envoy/http/filter.h

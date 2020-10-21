@@ -20,7 +20,6 @@ extern const envoy_headers envoy_unaltered_headers;
 typedef int envoy_filter_headers_status_t;
 extern const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusContinue;
 extern const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusStopIteration;
-extern const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusContinueAndEndStream;
 extern const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
 // Note this return status is unique to platform filters and used only to resume iteration after
 // it has been previously stopped.
