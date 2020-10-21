@@ -88,6 +88,9 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
   This mode of CONNECT support can create major security holes if not configured correctly, as the upstream
   will be forwarded *unsanitized* headers if they are in the body payload. Please use with caution
 
+For an example of proxying connect, please see :repo:`configs/proxy_connect.yaml <configs/proxy_connect.yaml>`
+For an example of terminating connect, please see :repo:`configs/terminate_connect.yaml <configs/terminate_connect.yaml>`
+
 Tunneling TCP over HTTP/2
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Envoy also has support for transforming raw TCP into HTTP/2 CONNECT requests. This can be used to
