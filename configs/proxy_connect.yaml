@@ -1,6 +1,5 @@
-# This configuration terminates a CONNECT request and sends the CONNECT payload upstream.
-# It can be used to test TCP tunneling as described in docs/root/intro/arch_overview/http/upgrades.rst
-# or used to test CONNECT directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
+# This will proxy CONNECT requests from a downstream connecting on 127.0.0.1:10001
+# to an upstream listening on 127.0.0.1:10002
 admin:
   access_log_path: /tmp/admin_access.log
   address:
@@ -33,11 +32,9 @@ static_resources:
                     connect_matcher:
                       {}
                   route:
-                    cluster: service_google
+                    cluster: cluster_0
                     upgrade_configs:
                       - upgrade_type: CONNECT
-                        connect_config:
-                          {}
           http_filters:
           - name: envoy.filters.http.router
           http2_protocol_options:
@@ -45,18 +42,17 @@ static_resources:
           upgrade_configs:
             - upgrade_type: CONNECT
   clusters:
-  - name: service_google
-    connect_timeout: 0.25s
-    type: LOGICAL_DNS
-    # Comment out the following line to test on v6 networks
-    dns_lookup_family: V4_ONLY
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: service_google
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: www.google.com
-                port_value: 443
+    - name: cluster_0
+      connect_timeout: 5s
+      http2_protocol_options:
+        {}
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 10002
+
