@@ -87,7 +87,9 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
   * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
   * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
-  * Update the [RELEASES](RELEASES.md) doc with the relevant dates.
+  * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
+    release, please also make sure there's a stable maintainer signed up for next quarter,
+    and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
 * Wait for tests to pass on [master](https://dev.azure.com/cncf/envoy/_build).
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
