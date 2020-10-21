@@ -41,10 +41,14 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 } // namespace
 
 bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_value) const {
-  // If the value is not explicitly set as a runtime boolean, trust the proto annotations passed as
-  // default_value.
-  if (!getBoolean(key, default_value)) {
-    // If either disallowed by default or configured off, the feature is not enabled.
+  // A deprecated feature is enabled if at least one of the following conditions holds:
+  // 1. A boolean runtime entry <key> doesn't exist, and default_value is true.
+  // 2. A boolean runtime entry <key> exists, with a value of "true".
+  // 3. A boolean runtime entry "envoy.features.enable_all_deprecated_features" with a value of
+  //    "true" exists, and there isn't a boolean runtime entry <key> with a value of "false".
+
+  if (!getBoolean(key,
+                  getBoolean("envoy.features.enable_all_deprecated_features", default_value))) {
     return false;
   }
 
