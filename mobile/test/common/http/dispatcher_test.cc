@@ -503,7 +503,7 @@ TEST_F(DispatcherTest, BasicStreamTrailers) {
   bridge_callbacks.context = &cc;
   bridge_callbacks.on_trailers = [](envoy_headers c_trailers, void* context) -> void* {
     ResponseHeaderMapPtr response_trailers = toResponseHeaders(c_trailers);
-    EXPECT_EQ(response_trailers->get(LowerCaseString("x-test-trailer"))->value().getStringView(),
+    EXPECT_EQ(response_trailers->get(LowerCaseString("x-test-trailer"))[0]->value().getStringView(),
               "test_trailer");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_trailers_calls++;
