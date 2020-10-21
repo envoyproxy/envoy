@@ -905,6 +905,7 @@ public:
 private:
   Regex::CompiledMatcherPtr regex_;
   std::string regex_str_;
+  bool percent_decode_input_{false};
 };
 
 /**

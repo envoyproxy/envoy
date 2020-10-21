@@ -1029,6 +1029,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
            envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
     regex_ = Regex::Utility::parseRegex(route.match().safe_regex());
     regex_str_ = route.match().safe_regex().regex();
+    percent_decode_input_ = route.match().safe_regex().percent_decode_input();
   }
 }
 
@@ -1045,7 +1046,12 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+    absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+    if (percent_decode_input_) {
+      std::string decoded_path = Http::Utility::PercentEncoding::decode(path);
+      absl::string_view temp_path(decoded_path.c_str());
+      path.swap(temp_path);
+    }
     if (regex_->match(path)) {
       return clusterEntry(headers, random_value);
     }
