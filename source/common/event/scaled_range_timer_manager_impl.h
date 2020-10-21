@@ -2,7 +2,7 @@
 #include <stack>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/range_timer.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/timer.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -11,40 +11,22 @@ namespace Envoy {
 namespace Event {
 
 /**
- * Class for creating RangeTimer objects that can be adjusted towards either the minimum or maximum
- * of their range by the owner of the manager object. Users of this class can call createTimer() to
- * receive a new RangeTimer object that they can then enable or disable at will (but only on the
- * same dispatcher), and setScaleFactor() to change the scaling factor. The current scale factor is
- * applied to all timers, including those that are created later.
- *
- * Internally, the manager uses a set of queues to track timers. When an enabled timer reaches its
- * min duration, it adds a tracker object to the queue corresponding to the duration (max - min).
- * Each queue tracks timers of only a single duration, and uses a real Timer object to schedule the
- * expiration of the first timer in the queue. The expectation is that the number of (max - min)
- * values used to enable timers is small, so the number of queues is tightly bounded. The
- * queue-based implementation depends on that expectation for efficient operation.
+ * Implementation class for ScaledRangeTimerManager. Internally, this uses a set of queues to track
+ * timers. When an enabled timer reaches its min duration, it adds a tracker object to the queue
+ * corresponding to the duration (max - min). Each queue tracks timers of only a single duration,
+ * and uses a real Timer object to schedule the expiration of the first timer in the queue. The
+ * expectation is that the number of (max - min) values used to enable timers is small, so the
+ * number of queues is tightly bounded. The queue-based implementation depends on that expectation
+ * for efficient operation.
  */
-class ScaledRangeTimerManager {
+class ScaledRangeTimerManagerImpl : public ScaledRangeTimerManager {
 public:
-  explicit ScaledRangeTimerManager(Dispatcher& dispatcher);
-  ~ScaledRangeTimerManager();
+  explicit ScaledRangeTimerManagerImpl(Dispatcher& dispatcher);
+  ~ScaledRangeTimerManagerImpl() override;
 
-  /**
-   * Creates a new range timer backed by the manager. The returned timer will be subject to the
-   * current and future scale factor values set on the manager. All returned timers must be deleted
-   * before the manager.
-   */
-  RangeTimerPtr createTimer(TimerCb callback);
-
-  /**
-   * Sets the scale factor for all timers created through this manager. The value should be between
-   * 0 and 1, inclusive. The scale factor affects the amount of time timers spend in their target
-   * range. The RangeTimers returned by createTimer will fire after (min + (max - min) *
-   * scale_factor). This means that a scale factor of 0 causes timers to fire immediately at the min
-   * duration, a factor of 0.5 causes firing halfway between min and max, and a factor of 1 causes
-   * firing at max.
-   */
-  void setScaleFactor(double scale_factor);
+  // ScaledRangeTimerManager impl
+  TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override;
+  void setScaleFactor(double scale_factor) override;
 
 private:
   class RangeTimerImpl;
@@ -62,7 +44,7 @@ private:
     // Typedef for convenience.
     using Iterator = std::list<Item>::iterator;
 
-    Queue(std::chrono::milliseconds duration, ScaledRangeTimerManager& manager,
+    Queue(std::chrono::milliseconds duration, ScaledRangeTimerManagerImpl& manager,
           Dispatcher& dispatcher);
 
     // The (max - min) value for all timers in range_timers_.
