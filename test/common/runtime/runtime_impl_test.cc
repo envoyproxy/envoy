@@ -887,11 +887,6 @@ public:
     VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""));
   }
 
-  void doDeltaOnConfigRemoval(const std::string& resource_name) {
-    Protobuf::RepeatedPtrField<std::string> removed_resources;
-    *removed_resources.Add() = resource_name;
-  }
-
   std::vector<std::string> layers_{"some_resource"};
   std::vector<Config::SubscriptionCallbacks*> rtds_callbacks_;
   std::vector<Config::MockSubscription*> rtds_subscriptions_;
@@ -1107,11 +1102,12 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalFailure) {
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 
-  doDeltaOnConfigRemoval("some_wrong_resource_name");
-
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, ""), EnvoyException,
-                            "Unexpected RTDS resource length, number of added recources 0, number "
-                            "of removed recources 0");
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  *removed_resources.Add() = "some_wrong_resource_name";
+  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""),
+                            EnvoyException,
+                            "Unexpected removal of unknown RTDS runtime layer "
+                            "some_wrong_resource_name, expected some_resource");
 
   // Removal failed, the keys point to the same value before the removal call.
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());

@@ -489,7 +489,7 @@ void RtdsSubscription::onConfigRemoved(
   if (removed_resources[0] != resource_name_) {
     throw EnvoyException(
         fmt::format("Unexpected removal of unknown RTDS runtime layer {}, expected {}",
-                    resource_name_, removed_resources[0]));
+                    removed_resources[0], resource_name_));
   }
   ENVOY_LOG(debug, "Clear RTDS snapshot for onConfigUpdate");
   proto_.Clear();
