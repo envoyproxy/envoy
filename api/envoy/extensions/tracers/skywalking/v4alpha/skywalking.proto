@@ -6,6 +6,7 @@ import "envoy/config/core/v4alpha/grpc_service.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -50,7 +51,7 @@ message ClientConfig {
   // [#comment:TODO(wbpcode): Get authentication through the SDS API.]
   oneof authentication_specifier {
     // Inline authentication token string.
-    string authentication = 3;
+    string authentication = 3 [(udpa.annotations.sensitive) = true];
   }
 
   // Envoy caches the segment in memory when the backend service is temporarily unavailable. This
