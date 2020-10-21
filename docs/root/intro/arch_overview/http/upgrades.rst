@@ -71,7 +71,10 @@ the upgrade value to the special keyword "CONNECT".
 
 While for HTTP/2, CONNECT request may have a path, in general and for HTTP/1.1 CONNECT requests do
 not have a path, and can only be matched using a
-:ref:`connect_matcher <envoy_v3_api_msg_config.route.v3.RouteMatch.ConnectMatcher>`
+:ref:`connect_matcher <envoy_v3_api_msg_config.route.v3.RouteMatch.ConnectMatcher>`. Please also note
+that when doing non-wildcard domain matching for CONNECT requests, the CONNECT target is  matched
+rather than the Host/Authority header. You may need to include the port (e.g. "hostname:port") to
+successfully match.
 
 Envoy can handle CONNECT in one of two ways, either proxying the CONNECT headers through as if they
 were any other request, and letting the upstream terminate the CONNECT request, or by terminating the
