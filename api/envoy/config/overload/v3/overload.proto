@@ -120,13 +120,13 @@ message OverloadAction {
   // DNS to ensure uniqueness.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Configuration for the action being instantiated.
-  google.protobuf.Any typed_config = 3;
-
   // A set of triggers for this action. The state of the action is the maximum
   // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
   // are notified when the overload action changes state.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // Configuration for the action being instantiated.
+  google.protobuf.Any typed_config = 3;
 }
 
 message OverloadManager {

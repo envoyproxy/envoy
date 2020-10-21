@@ -32,6 +32,17 @@ requests when heap memory usage reaches 99%.
          - name: "envoy.resource_monitors.fixed_heap"
            threshold:
              value: 0.99
+     - name: "envoy.overload_actions.reduce_timeouts"
+       triggers:
+         - name: "envoy.resource_monitors.fixed_heap"
+           scaled:
+             scaling_threshold: 0.85
+             saturation_threshold: 0.95
+       typed_config:
+         "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+         timer_scale_factors:
+           - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+             min_timeout: 2s
 
 Resource monitors
 -----------------
@@ -89,6 +100,28 @@ The following overload actions are supported:
 
   * - envoy.overload_actions.shrink_heap
     - Envoy will periodically try to shrink the heap by releasing free memory to the system
+
+  * - envoy.overload_actions.reduce_timeouts
+    - Envoy will reduce the waiting period for a configured set of timeouts. See
+      :ref:`below <config_overload_manager_reducing_timeouts>` for details on configuration.
+
+.. _config_overload_manager_reducing_timeouts:
+
+Reducing timeouts
+^^^^^^^^^^^^^^^^^
+
+The `envoy.overload_actions.reduce_timeouts` overload action will reduce the amount of time Envoy
+will spend waiting for some interactions to finish in response to resource pressure. The amount of
+reduction can be configured per timeout type by specifying the minimum timer value to use when the
+triggering resource monitor detects saturation. The minimum value for each timeout can be specified
+either by providing a scale factor to apply to the configured maximum, or as a concrete duration
+value.
+
+The example fragment above configures the `reduce_timeouts` action to affect the downstream HTTP
+connection idle timeout. If the `fixed_heap` resource pressure is between the scaling and
+threshold values, the time that downstream HTTP connections are allowed to remain idle scales from
+the maximum (configured elsewhere) down to the specified minimum of 2 seconds. For a complete list
+of the timeouts that can be reduced, see the :ref:`configuration reference<envoy_v3_api_enum_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType>`.
 
 Limiting Active Connections
 ---------------------------
