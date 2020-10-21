@@ -114,7 +114,8 @@ private:
   bool closed_{false};
 
   // The attached file event with this socket. The event is not owned by the socket in the current
-  // Envoy model.
+  // Envoy model. Multiple events can be created during the life time of this IO handle but at any
+  // moment at most 1 event is attached.
   Event::UserSpaceFileEventImpl* user_file_event_;
 
   // The schedulable handle of the above event.
