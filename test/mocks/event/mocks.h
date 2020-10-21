@@ -214,7 +214,6 @@ public:
 
   MOCK_METHOD(void, activate, (uint32_t events));
   MOCK_METHOD(void, setEnabled, (uint32_t events));
-  MOCK_METHOD(uint32_t, getEnabled, ());
 };
 
 } // namespace Event
