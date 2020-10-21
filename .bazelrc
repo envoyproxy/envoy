@@ -168,6 +168,16 @@ build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
+# Do not inherit from "clang-asan" to avoid picking up flags from local clang.bazelrc.
+build:rbe-toolchain-asan --config=asan
+build:rbe-toolchain-asan --linkopt -fuse-ld=lld
+build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
+build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
+build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
+build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/10.0.0/lib/linux
+build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
+build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
+
 build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --config=clang-msan
@@ -217,6 +227,10 @@ build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:remote-gcc --config=remote
 build:remote-gcc --config=rbe-toolchain-gcc
+
+build:remote-asan --config=remote
+build:remote-asan --config=rbe-toolchain-clang-libc++
+build:remote-asan --config=rbe-toolchain-asan
 
 build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
