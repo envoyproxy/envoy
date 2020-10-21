@@ -18,8 +18,6 @@ namespace Generic {
 
 class TcpConnPoolTest : public ::testing::Test {
 public:
-  TcpConnPoolTest() {}
-
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   const std::string cluster_name_{"cluster_name"};
   GenericConnPoolFactory factory_;
