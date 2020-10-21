@@ -5,7 +5,7 @@ Using the Envoy Docker Image
 
 The following examples use the :ref:`official Envoy Docker image <start_install_docker>`.
 
-These instructions are known to work for the ``x86_64`` architecture.
+These instructions are known to work for the ``x86_64`` and ``arm64`` architectures.
 
 Running Envoy with docker-compose
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
