@@ -13,6 +13,8 @@ objc_library(
         "EnvoyEngineImpl.m",
         "EnvoyHTTPCallbacks.m",
         "EnvoyHTTPFilter.m",
+        "EnvoyHTTPFilterCallbacksImpl.h",
+        "EnvoyHTTPFilterCallbacksImpl.m",
         "EnvoyHTTPFilterFactory.m",
         "EnvoyHTTPStreamImpl.m",
         "EnvoyNetworkMonitor.m",

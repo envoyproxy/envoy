@@ -17,6 +17,7 @@ envoy_extension_cc_test(
         "//library/common/api:external_api_lib",
         "//library/common/extensions/filters/http/platform_bridge:config",
         "//library/common/extensions/filters/http/platform_bridge:pkg_cc_proto",
+        "@envoy//test/mocks/event:event_mocks",
         "@envoy//test/mocks/http:http_mocks",
         "@envoy//test/test_common:utility_lib",
     ],

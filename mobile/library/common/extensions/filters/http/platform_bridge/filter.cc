@@ -17,14 +17,38 @@ namespace Extensions {
 namespace HttpFilters {
 namespace PlatformBridge {
 
+static void envoy_filter_release_callbacks(const void* context) {
+  PlatformBridgeFilterWeakPtr* weak_filter =
+      static_cast<PlatformBridgeFilterWeakPtr*>(const_cast<void*>(context));
+  delete weak_filter;
+}
+
+static void envoy_filter_callback_resume_decoding(const void* context) {
+  PlatformBridgeFilterWeakPtr* weak_filter =
+      static_cast<PlatformBridgeFilterWeakPtr*>(const_cast<void*>(context));
+  if (auto filter = weak_filter->lock()) {
+    filter->resumeDecoding();
+  }
+}
+
+static void envoy_filter_callback_resume_encoding(const void* context) {
+  PlatformBridgeFilterWeakPtr* weak_filter =
+      static_cast<PlatformBridgeFilterWeakPtr*>(const_cast<void*>(context));
+  if (auto filter = weak_filter->lock()) {
+    filter->resumeEncoding();
+  }
+}
+
 PlatformBridgeFilterConfig::PlatformBridgeFilterConfig(
     const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& proto_config)
     : filter_name_(proto_config.platform_filter_name()),
       platform_filter_(static_cast<envoy_http_filter*>(
           Api::External::retrieveApi(proto_config.platform_filter_name()))) {}
 
-PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr config)
-    : filter_name_(config->filter_name()), platform_filter_(*config->platform_filter()) {
+PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr config,
+                                           Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher), filter_name_(config->filter_name()),
+      platform_filter_(*config->platform_filter()) {
   // The initialization above sets platform_filter_ to a copy of the struct stored on the config.
   // In the typical case, this will represent a filter implementation that needs to be intantiated.
   // static_context will contain the necessary platform-specific mechanism to produce a filter
@@ -44,6 +68,25 @@ PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr c
   ASSERT(platform_filter_.instance_context,
          fmt::format("init_filter unsuccessful for {}", filter_name_));
   iteration_state_ = IterationState::Ongoing;
+
+  if (platform_filter_.set_request_callbacks) {
+    platform_request_callbacks_.resume_iteration = envoy_filter_callback_resume_decoding;
+    platform_request_callbacks_.release_callbacks = envoy_filter_release_callbacks;
+    // We use a weak_ptr wrapper for the filter to ensure presence before dispatching callbacks.
+    platform_request_callbacks_.callback_context =
+        new PlatformBridgeFilterWeakPtr{weak_from_this()};
+    platform_filter_.set_request_callbacks(platform_request_callbacks_,
+                                           platform_filter_.instance_context);
+  }
+
+  if (platform_filter_.set_response_callbacks) {
+    platform_response_callbacks_.resume_iteration = envoy_filter_callback_resume_encoding;
+    platform_response_callbacks_.release_callbacks = envoy_filter_release_callbacks;
+    platform_response_callbacks_.callback_context =
+        new PlatformBridgeFilterWeakPtr{weak_from_this()};
+    platform_filter_.set_response_callbacks(platform_response_callbacks_,
+                                            platform_filter_.instance_context);
+  }
 }
 
 void PlatformBridgeFilter::onDestroy() {
@@ -172,6 +215,7 @@ Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool
       data.drain(data.length());
       data.addBufferFragment(*Buffer::BridgeFragment::createBridgeFragment(result.data));
     }
+    iteration_state_ = IterationState::Ongoing;
     return Http::FilterDataStatus::Continue;
 
   default:
@@ -227,6 +271,7 @@ PlatformBridgeFilter::onTrailers(Http::HeaderMap& trailers, Buffer::Instance* in
       free(result.pending_data);
     }
     PlatformBridgeFilter::replaceHeaders(trailers, result.trailers);
+    iteration_state_ = IterationState::Ongoing;
     return Http::FilterTrailersStatus::Continue;
 
   default:
@@ -325,7 +370,27 @@ PlatformBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   return status;
 }
 
+void PlatformBridgeFilter::resumeDecoding() {
+  auto weak_self = weak_from_this();
+  // TODO(goaway): There's a potential shutdown race here, due to the fact that the shared
+  // reference that now holds the filter does not retain the dispatcher. In the future we should
+  // make this safer by, e.g.:
+  // 1) adding support to Envoy for (optionally) retaining the dispatcher, or
+  // 2) retaining the engine to transitively retain the dispatcher via Envoy's ownership graph, or
+  // 3) dispatching via a safe intermediary
+  // Relevant: https://github.com/lyft/envoy-mobile/issues/332
+  dispatcher_.post([weak_self]() -> void {
+    if (auto self = weak_self.lock()) {
+      self->onResumeDecoding();
+    }
+  });
+}
+
 void PlatformBridgeFilter::onResumeDecoding() {
+  if (iteration_state_ == IterationState::Ongoing) {
+    return;
+  }
+
   Buffer::Instance* internal_buffer = nullptr;
   if (decoder_callbacks_->decodingBuffer()) {
     decoder_callbacks_->modifyDecodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
@@ -388,10 +453,24 @@ void PlatformBridgeFilter::onResumeDecoding() {
     pending_request_trailers_ = nullptr;
     free(result.pending_trailers);
   }
+  iteration_state_ = IterationState::Ongoing;
   decoder_callbacks_->continueDecoding();
 }
 
+void PlatformBridgeFilter::resumeEncoding() {
+  auto weak_self = weak_from_this();
+  dispatcher_.post([weak_self]() -> void {
+    if (auto self = weak_self.lock()) {
+      self->onResumeEncoding();
+    }
+  });
+}
+
 void PlatformBridgeFilter::onResumeEncoding() {
+  if (iteration_state_ == IterationState::Ongoing) {
+    return;
+  }
+
   Buffer::Instance* internal_buffer = nullptr;
   if (encoder_callbacks_->encodingBuffer()) {
     encoder_callbacks_->modifyEncodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
@@ -451,6 +530,7 @@ void PlatformBridgeFilter::onResumeEncoding() {
     pending_response_trailers_ = nullptr;
     free(result.pending_trailers);
   }
+  iteration_state_ = IterationState::Ongoing;
   encoder_callbacks_->continueEncoding();
 }
 

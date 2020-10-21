@@ -162,13 +162,6 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 
 @end
 
-#pragma mark - EnvoyHTTPFilterCallbacksImpl
-
-// Concrete implementation of the `EnvoyHTTPFilterCallbacks` protocol.
-@interface EnvoyHTTPFilterCallbacksImpl : NSObject <EnvoyHTTPFilterCallbacks>
-
-@end
-
 #pragma mark - EnvoyHTTPStream
 
 @protocol EnvoyHTTPStream

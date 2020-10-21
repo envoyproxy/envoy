@@ -1,3 +1,4 @@
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -9,6 +10,7 @@
 
 using testing::ByMove;
 using testing::Return;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -50,7 +52,7 @@ public:
     Api::External::registerApi(config.platform_filter_name(), platform_filter);
 
     config_ = std::make_shared<PlatformBridgeFilterConfig>(config);
-    filter_ = std::make_unique<PlatformBridgeFilter>(config_);
+    filter_ = std::make_shared<PlatformBridgeFilter>(config_, dispatcher_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -70,8 +72,9 @@ public:
     unsigned int release_filter_calls;
   } filter_invocations;
 
-  PlatformBridgeFilterConfigSharedPtr config_{};
-  std::unique_ptr<PlatformBridgeFilter> filter_{};
+  PlatformBridgeFilterConfigSharedPtr config_;
+  PlatformBridgeFilterSharedPtr filter_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
@@ -282,13 +285,82 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
             filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(1);
-  filter_->onResumeDecoding();
+  filter_->resumeDecoding();
+  resume_post_cb();
   EXPECT_EQ(invocations.on_resume_request_calls, 1);
 
   EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-async-resumed")));
   EXPECT_EQ(request_headers.get(Http::LowerCaseString("x-async-resumed"))->value().getStringView(),
             "Very Yes");
+}
+
+TEST_F(PlatformBridgeFilterTest, AsyncResumeDecodingIsNoopAfterPreviousResume) {
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
+  platform_filter.static_context = &invocations;
+  platform_filter.init_filter = [](const void* context) -> const void* {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->init_filter_calls++;
+    return context;
+  };
+  platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
+                                          const void* context) -> envoy_filter_headers_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    EXPECT_EQ(c_headers.length, 1);
+    EXPECT_EQ(to_string(c_headers.headers[0].key), ":authority");
+    EXPECT_EQ(to_string(c_headers.headers[0].value), "test.code");
+    EXPECT_FALSE(end_stream);
+    invocations->on_request_headers_calls++;
+    release_envoy_headers(c_headers);
+    return {kEnvoyFilterHeadersStatusStopIteration, envoy_noheaders};
+  };
+  platform_filter.on_request_data = [](envoy_data c_data, bool end_stream,
+                                       const void* context) -> envoy_filter_data_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    EXPECT_EQ(to_string(c_data), "request body");
+    EXPECT_TRUE(end_stream);
+    invocations->on_request_data_calls++;
+    envoy_headers* modified_headers =
+        static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
+    *modified_headers = make_envoy_headers({{":authority", "test.code"}, {"content-length", "12"}});
+    return {kEnvoyFilterDataStatusResumeIteration, c_data, modified_headers};
+  };
+  platform_filter.on_resume_request = [](envoy_headers*, envoy_data*, envoy_headers*, bool,
+                                         const void*) -> envoy_filter_resume_status {
+    ADD_FAILURE() << "on_resume_request should not get called when iteration is already ongoing.";
+    return {kEnvoyFilterResumeStatusResumeIteration, nullptr, nullptr, nullptr};
+  };
+
+  setUpFilter(R"EOF(
+platform_filter_name: AsyncResumeDecodingIsNoopAfterPreviousResume
+)EOF",
+              &platform_filter);
+  EXPECT_EQ(invocations.init_filter_calls, 1);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(invocations.on_request_headers_calls, 1);
+
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_data, true));
+  EXPECT_EQ(invocations.on_request_data_calls, 1);
+
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("content-length")));
+  EXPECT_EQ(request_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
+            "12");
+
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  filter_->resumeDecoding();
+  resume_post_cb();
+  EXPECT_EQ(invocations.on_resume_request_calls, 0);
 }
 
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestData) {
@@ -819,8 +891,11 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
   EXPECT_EQ(invocations.on_request_trailers_calls, 1);
 
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(1);
-  filter_->onResumeDecoding();
+  filter_->resumeDecoding();
+  resume_post_cb();
   EXPECT_EQ(invocations.on_resume_request_calls, 1);
 
   // Pending headers have been updated with the value from ResumeIteration.
@@ -976,13 +1051,82 @@ platform_filter_name: StopOnResponseHeadersThenResumeOnResumeEncoding
             filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(invocations.on_response_headers_calls, 1);
 
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
   EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(1);
-  filter_->onResumeEncoding();
+  filter_->resumeEncoding();
+  resume_post_cb();
   EXPECT_EQ(invocations.on_resume_response_calls, 1);
 
   EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-async-resumed")));
   EXPECT_EQ(response_headers.get(Http::LowerCaseString("x-async-resumed"))->value().getStringView(),
             "Very Yes");
+}
+
+TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterPreviousResume) {
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
+  platform_filter.static_context = &invocations;
+  platform_filter.init_filter = [](const void* context) -> const void* {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->init_filter_calls++;
+    return context;
+  };
+  platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
+                                           const void* context) -> envoy_filter_headers_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    EXPECT_EQ(c_headers.length, 1);
+    EXPECT_EQ(to_string(c_headers.headers[0].key), ":status");
+    EXPECT_EQ(to_string(c_headers.headers[0].value), "test.code");
+    EXPECT_FALSE(end_stream);
+    invocations->on_response_headers_calls++;
+    release_envoy_headers(c_headers);
+    return {kEnvoyFilterHeadersStatusStopIteration, envoy_noheaders};
+  };
+  platform_filter.on_response_data = [](envoy_data c_data, bool end_stream,
+                                        const void* context) -> envoy_filter_data_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    EXPECT_EQ(to_string(c_data), "response body");
+    EXPECT_TRUE(end_stream);
+    invocations->on_response_data_calls++;
+    envoy_headers* modified_headers =
+        static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
+    *modified_headers = make_envoy_headers({{":status", "test.code"}, {"content-length", "13"}});
+    return {kEnvoyFilterDataStatusResumeIteration, c_data, modified_headers};
+  };
+  platform_filter.on_resume_response = [](envoy_headers*, envoy_data*, envoy_headers*, bool,
+                                          const void*) -> envoy_filter_resume_status {
+    ADD_FAILURE() << "on_resume_response should not get called when iteration is already ongoing.";
+    return {kEnvoyFilterResumeStatusResumeIteration, nullptr, nullptr, nullptr};
+  };
+
+  setUpFilter(R"EOF(
+platform_filter_name: AsyncResumeEncodingIsNoopAfterPreviousResume
+)EOF",
+              &platform_filter);
+  EXPECT_EQ(invocations.init_filter_calls, 1);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(invocations.on_response_headers_calls, 1);
+
+  Buffer::OwnedImpl response_data = Buffer::OwnedImpl("response body");
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, true));
+  EXPECT_EQ(invocations.on_response_data_calls, 1);
+
+  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("content-length")));
+  EXPECT_EQ(response_headers.get(Http::LowerCaseString("content-length"))->value().getStringView(),
+            "13");
+
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
+  filter_->resumeEncoding();
+  resume_post_cb();
+  EXPECT_EQ(invocations.on_resume_response_calls, 0);
 }
 
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseData) {
@@ -1512,8 +1656,11 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(invocations.on_response_trailers_calls, 1);
 
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
   EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(1);
-  filter_->onResumeEncoding();
+  filter_->resumeEncoding();
+  resume_post_cb();
   EXPECT_EQ(invocations.on_resume_response_calls, 1);
 
   // Pending headers have been updated with the value from ResumeIteration.
