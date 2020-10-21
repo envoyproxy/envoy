@@ -180,8 +180,8 @@ public:
   /**
    * Retrieve the DNS host info of a given host currently stored in the cache.
    * @param host_name supplies the host name.
-   * @return the DNS host info associated with the given host name if such a host is currently
-   * stored in the cache, otherwise `absl::nullopt`.
+   * @return the DNS host info associated with the given host name if the host's address is cached,
+   * otherwise `absl::nullopt`.
    */
   virtual absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) PURE;
 
