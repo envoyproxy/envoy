@@ -886,8 +886,6 @@ HostConstSharedPtr RandomLoadBalancer::peekOrChoose(LoadBalancerContext* context
     return nullptr;
   }
 
-  // FIXME if oversubscribed, return null.
-
   const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
   if (hosts_to_use.empty()) {
     return nullptr;
