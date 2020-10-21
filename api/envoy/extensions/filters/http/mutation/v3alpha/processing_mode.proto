@@ -47,7 +47,7 @@ message AsyncParams {
   bool request_headers = 1;
 
   // If true, send request body chunks asynchronously
-  bool request_body = 2;
+  bool request_body_chunks = 2;
 
   // If true, send request trailers asynchronously
   bool request_trailers = 3;
@@ -56,7 +56,7 @@ message AsyncParams {
   bool response_headers = 4;
 
   // If true, send response body chunks asynchronously
-  bool response_body = 5;
+  bool response_body_chunks = 5;
 
   // If true, send response trailers asynchronously
   bool response_trailers = 6;

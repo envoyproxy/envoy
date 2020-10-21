@@ -29,8 +29,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // 2. The service sends back a MutationResponse message that directs Envoy
 //    to either stop processing, continue without it, or send it the
 //    next chunk of the message body.
-// 3. If so requested, Envoy sends the server a chunk of the message body.
-//    and the server sends back a MutationResponse.
+// 3. If so requested, Envoy sends the server chunks of the message body,
+//    or the entire body at once. In either case, the server sends back
+//    a MutationResponse after each message it receives.
 // 4. If so requested, Envoy sends the server the HTTP trailers,
 //    and the server sends back a MutationResponse.
 // 5. At this point, request processing is done, and we pick up again
@@ -60,116 +61,142 @@ service Mutation {
 // to a mutation server.
 // [#next-free-field: 8]
 message MutationRequest {
-  oneof r {
-    // If true, then Envoy requires that the server send one MutationResponse message
-    // back up the stream in response to this message -- otherwise, Envoy will
-    // never resume processing the filter chain. In practice, this will always
-    // be "true" unless the server or the user has configured the filter
-    // to run in "async mode."
-    bool response_required = 1;
+  // If true, then Envoy requires that the server send one MutationResponse message
+  // back up the stream in response to this message -- otherwise, Envoy will
+  // never resume processing the filter chain. In practice, this will always
+  // be "true" unless the server or the user has configured the filter
+  // to run in "async mode."
+  bool response_required = 1;
 
-    // Information about the HTTP request, sent when the decodeHeaders callback
-    // is invoked on the Envoy filter.
-    Request request = 2;
+  // Information about the HTTP request, sent when the decodeHeaders callback
+  // is invoked on the Envoy filter.
+  Request request = 2;
 
-    // Information about the HTTP response, sent when the encodeHeaders callback
-    // is invoked on the Envoy filter.
-    Response response = 3;
+  // Information about the HTTP response, sent when the encodeHeaders callback
+  // is invoked on the Envoy filter.
+  Response response = 3;
 
-    // A chunk of the HTTP request body. This is only sent if the server
-    // requested it.
-    Body request_body = 4;
+  // A chunk of the HTTP request body. This is only sent if the server
+  // requested it.
+  Body request_body = 4;
 
-    // A chunk of the HTTP response body, if the server requested it.
-    Body response_body = 5;
+  // A chunk of the HTTP response body, if the server requested it.
+  Body response_body = 5;
 
-    // The HTTP trailers for the request path. These are only sent if
-    // the server requested them.
-    config.core.v3.HeaderMap request_trailers = 6;
+  // The HTTP trailers for the request path. These are only sent if
+  // the server requested them.
+  config.core.v3.HeaderMap request_trailers = 6;
 
-    // The HTTP trailers for the response path, sent if the server
-    // requested them.
-    config.core.v3.HeaderMap response_trailers = 7;
-  }
+  // The HTTP trailers for the response path, sent if the server
+  // requested them.
+  config.core.v3.HeaderMap response_trailers = 7;
+}
+
+// The following are commands that the external server can send back to
+// the proxy to direct the next phase of processing.
+
+// The server is done with the request and response, and no further
+// filters should be invoked. This is typically used with the
+// "CompleteResponse" to return an error.
+message StopCommand {
+}
+
+// The server is done with the request. Continue processing
+// and do not consult the server again for this request.
+message ContinueRequestCommand {
+}
+
+// The server is done with the response. Do not consult the server
+// again.
+message ContinueResponseCommand {
+}
+
+// Request that Envoy next send a Body message downstream
+// containing either the next chunk of the request body available, or an end-of-stream.
+// Once this is returned, it will no longer be possible to modify the
+// message headers.
+message SendRequestBodyChunkCommand {
+}
+
+// Send the next chunk of the response body.
+message SendResponseBodyChunkCommand {
+}
+
+// Request that Envoy will buffer the entire request message body in memory
+// subject to the currently-configured body buffer limit, and send a
+// single Body message downstream containing the entire message body.
+// It is still possible for the server to modify the message headers
+// with the next upstream message.
+message SendBufferedRequestBodyCommand {
+}
+
+// Request that Envoy buffer and send the response body in a single chunk.
+message SendBufferedResponseBodyCommand {
+}
+
+// Request that Envoy will send the HTTP request trailers when they are
+// available. Once trailers have been requested, no more bodies
+// will be delivered, so this must be sent after all desired body chunks are
+// desired.
+message SendRequestTrailersCommand {
+}
+
+// Request that Envoy send the response trailers when available.
+message SendResponseTrailersCommand {
 }
 
 // The mutation server may respond with zero or more of these responses
 // before closing the stream.
-// [#next-free-field: 8]
+// [#next-free-field: 16]
 message MutationResponse {
-  enum Command {
-    // The server is done with the request and response, and no further
-    // filters should be invoked. This is typically used with the
-    // "CompleteResponse" to return an error.
-    STOP = 0;
+  oneof command {
+    option (validate.required) = true;
 
-    // The server is done with the request. Continue processing
-    // and do not consult the server again for this request.
-    CONTINUE_REQUEST = 1;
+    StopCommand stop = 1;
 
-    // The server is done with the response. Do not consult the server
-    // again.
-    CONTINUE_RESPONSE = 2;
+    ContinueRequestCommand continue_request = 2;
 
-    // Request that Envoy next send a Body message downstream
-    // containing either the next chunk of the request body available, or an end-of-stream.
-    // Once this is returned, it will no longer be possible to modify the
-    // message headers.
-    SEND_REQUEST_BODY_CHUNK = 3;
+    ContinueResponseCommand continue_response = 3;
 
-    // Send the next chunk of the response body.
-    SEND_RESPONSE_BODY_CHUNK = 4;
+    SendRequestBodyChunkCommand send_request_body_chunk = 4;
 
-    // Request that Envoy will buffer the entire request message body in memory
-    // subject to the currently-configured body buffer limit, and send a
-    // single Body message downstream containing the entire message body.
-    // It is still possible for the server to modify the message headers
-    // with the next upstream message.
-    SEND_REQUEST_BODY = 5;
+    SendResponseBodyChunkCommand send_response_body_chunk = 5;
 
-    // Request that Envoy buffer and send the response body in a single chunk.
-    SEND_RESPONSE_BODY = 6;
+    SendBufferedRequestBodyCommand send_buffered_request_body = 6;
 
-    // Request that Envoy will send the HTTP request trailers when they are
-    // available. Once trailers have been requested, no more bodies
-    // will be delivered, so this must be sent after all desired body chunks are
-    // desired.
-    SEND_REQUEST_TRAILERS = 7;
+    SendBufferedResponseBodyCommand send_buffered_response_body = 7;
 
-    // Request that Envoy send the response trailers when available.
-    SEND_RESPONSE_TRAILERS = 8;
+    SendRequestTrailersCommand send_request_trailers = 8;
+
+    SendResponseTrailersCommand send_response_trailers = 9;
   }
-
-  // This indicates how to handle the next step in the processing chain,
-  // as shown by the enum constants above.
-  Command command = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Replace the entire HTTP response (whether on the request or on the
   // response path) with the contents of the CompleteResponse message.
-  // If a STOP command is set, then send this response back immediately
+  // If a StopCommand command is set, then send this response back immediately
   // to the client with no additional filter processing.
-  CompleteResponse complete_response = 2;
+  CompleteResponse complete_response = 10;
 
-  // Add or replace HTTP headers. This will be ignored after SEND_XXX_BODY_CHUNK has
-  // been sent. If SEND_TRAILERS was previously sent, then
+  // Add or replace HTTP headers. This will be ignored after SendXXXBodyChunkCommand has
+  // been sent. If SendXXXTrailers was previously sent, then
   // modify the trailers instead.
-  repeated config.core.v3.HeaderValueOption set_headers = 3;
+  repeated config.core.v3.HeaderValueOption set_headers = 11;
 
-  // Remove these HTTP headers. This will be ignored after SEND_XXX_BODY_CHUNK
-  // has been sent. If SEND_XXX_TRAILERS was previously sent, then
+  // Remove these HTTP headers. This will be ignored after SendXXXBodyChunk
+  // has been sent. If SendXXXTrailers was previously sent, then
   // modify the trailers instead.
-  repeated string remove_headers = 4;
+  repeated string remove_headers = 12;
 
   // Replace some or all of the last message body received with a new
   // set of bytes. This will be ignored unless the previous message sent
-  // by the client is a "XXXBODY" request.
-  BodyMutation body_mutation = 5;
+  // by the client is a "Body" request.
+  BodyMutation body_mutation = 13;
 
   // Add new metadata to the Envoy context
-  google.protobuf.Struct new_metadata = 6;
+  google.protobuf.Struct new_metadata = 14;
 
   // Change how and if the filter waits for responses from the server
-  ProcessingModeChange async_mode_change = 7;
+  ProcessingModeChange async_mode_change = 15;
 }
 
 // This message is sent to the mutation server when the HTTP request is
@@ -197,7 +224,7 @@ message Request {
   // The HTTP URL scheme, such as `http` and `https`.
   string scheme = 6;
 
-  // Information about the upstream service's connection
+  // Information about the downstream client's connection
   auth.v3.AttributeContext.Peer client_info = 7;
 
   // The values of properties selected by the "request_properties"
@@ -235,7 +262,7 @@ message Body {
   bool end_of_stream = 2;
 }
 
-// This message completely replaces the request or response.
+// This message completely replaces the response.
 // If a STOP was also returned, then short-circuit the
 // rest of the filter processing, and if on the request path,
 // return this response directly back to the client.
@@ -255,9 +282,9 @@ message CompleteResponse {
 // Change all or part of the message body by replacing the portion
 // of the original body denoted by "offset" and "length" with "body."
 message BodyMutation {
-  int32 offset = 1;
+  uint32 offset = 1;
 
-  int32 length = 2;
+  uint32 length = 2;
 
   bytes body = 3;
 }
