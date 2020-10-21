@@ -33,6 +33,10 @@ use(
       "label": "deps",
       "github_status_label": "any dependency change",
     },
+    {
+      "owner": "envoyproxy/tls-watchers",
+      "path": "source/extensions/transport_sockets/tls/",
+    },
   ],
 )
 
