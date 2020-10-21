@@ -384,14 +384,6 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   handleFailure(envoy::data::core::v3::NETWORK);
 }
 
-void HealthCheckerImplBase::ActiveHealthCheckSession::start() {
-  // Start health checks only after secrets are ready for the transport socket
-  // that health checks will be performed on. If health checks start
-  // immediately, they may fail with "network" errors due to TLS credentials
-  // not yet being loaded, which can result in long startup times.
-  host_->addReadyCb([this] { onInitialInterval(); }, parent_.transportSocketMatchMetadata().get());
-}
-
 void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {
   if (parent_.initial_jitter_.count() == 0) {
     onIntervalBase();
