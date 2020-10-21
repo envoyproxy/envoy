@@ -10,8 +10,8 @@ namespace Gzip {
 Http::FilterFactoryCb GzipFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::gzip::v3::Gzip& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  // This will flip to false eventually.
-  const bool runtime_feature_default = true;
+  // The current deprecation phase is fail-by-default.
+  const bool runtime_feature_default = false;
   const char runtime_key[] = "envoy.deprecated_features.allow_deprecated_gzip_http_filter";
   const std::string warn_message =
       "Using deprecated extension 'envoy.extensions.filters.http.gzip'. This "

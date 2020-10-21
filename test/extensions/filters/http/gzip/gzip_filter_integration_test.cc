@@ -21,6 +21,8 @@ public:
 
   void initializeFilter(const std::string& config) {
     config_helper_.addFilter(config);
+    config_helper_.addRuntimeOverride("envoy.deprecated_features.allow_deprecated_gzip_http_filter",
+                                      "true");
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
