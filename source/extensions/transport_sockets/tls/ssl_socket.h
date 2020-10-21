@@ -103,29 +103,24 @@ class ClientSslSocketFactory : public Network::TransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  ClientSslSocketFactory(Secret::SecretManager& secret_manager,
-                         Envoy::Ssl::ClientContextConfigPtr config,
+  ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  void addReadyCb(std::function<void()> callback) override;
-  bool secureTransportReady() const override;
-
+  bool isReady() const override;
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
 private:
-  Secret::SecretManager& secret_manager_;
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
   Envoy::Ssl::ClientContextConfigPtr config_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
-  std::list<std::function<void()>> secrets_ready_callbacks_;
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
@@ -139,10 +134,7 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-
-  void addReadyCb(std::function<void()> callback) override;
-  bool secureTransportReady() const override;
-
+  bool isReady() const override;
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
@@ -154,7 +146,6 @@ private:
   const std::vector<std::string> server_names_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
-  std::list<std::function<void()>> secrets_ready_callbacks_;
 };
 
 } // namespace Tls

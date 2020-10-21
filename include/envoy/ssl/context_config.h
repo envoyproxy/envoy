@@ -84,18 +84,6 @@ public:
    * @return the set of capabilities for handshaker instances created by this context.
    */
   virtual HandshakerCapabilities capabilities() const PURE;
-
-  /**
-   * @return the set of sds configurations for TLS certificate entity.
-   */
-  virtual const std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>&
-  tlsCertificateSdsConfigs() const PURE;
-
-  /**
-   * @return sds configuration for validation context entity.
-   */
-  virtual const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig&
-  validationContextSdsConfig() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
@@ -123,6 +111,16 @@ public:
    *         for names.
    */
   virtual const std::string& signingAlgorithmsForTest() const PURE;
+
+  /**
+   * Check whether TLS Certificate entity was being extracted from SDS server.
+   */
+  virtual bool checkTlsCertificateEntityExists() const PURE;
+
+  /**
+   * Check whether certificate validation context entity was being extracted from SDS server.
+   */
+  virtual bool checkCertificateValidationContextEntityExists() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;

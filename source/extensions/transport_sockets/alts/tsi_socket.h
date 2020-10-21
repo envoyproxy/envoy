@@ -100,10 +100,7 @@ public:
   bool implementsSecureTransport() const override;
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
-
-  // TODO(mpuncel) only invoke callback() once secrets are ready.
-  void addReadyCb(std::function<void()> callback) override { callback(); };
-  bool secureTransportReady() const override;
+  bool isReady() const override;
 
 private:
   HandshakerFactory handshaker_factory_;

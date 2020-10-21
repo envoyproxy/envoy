@@ -21,7 +21,7 @@ Network::TransportSocketFactoryPtr UpstreamSslSocketFactory::createTransportSock
           const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&>(
           message, context.messageValidationVisitor()),
       context);
-  return std::make_unique<ClientSslSocketFactory>(context.secretManager(), std::move(client_config),
+  return std::make_unique<ClientSslSocketFactory>(std::move(client_config),
                                                   context.sslContextManager(), context.scope());
 }
 

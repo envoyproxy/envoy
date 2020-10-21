@@ -83,10 +83,6 @@ public:
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
-  MOCK_METHOD(const std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>&,
-              tlsCertificateSdsConfigs, (), (const));
-  MOCK_METHOD(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig&,
-              validationContextSdsConfig, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
@@ -99,17 +95,8 @@ public:
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
   MOCK_METHOD(const std::string&, signingAlgorithmsForTest, (), (const));
-};
-
-class MockServerContext : public ServerContext {
-public:
-  MockServerContext();
-  ~MockServerContext() override;
-
-  MOCK_METHOD(size_t, daysUntilFirstCertExpires, (), (const));
-  MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
-  MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
-  MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
+  MOCK_METHOD(bool, checkTlsCertificateEntityExists, (), (const));
+  MOCK_METHOD(bool, checkCertificateValidationContextEntityExists, (), (const));
 };
 
 class MockServerContextConfig : public ServerContextConfig {

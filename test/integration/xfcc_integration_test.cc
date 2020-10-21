@@ -46,7 +46,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_names: 
+    match_subject_alt_names:
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -57,7 +57,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_names: 
+    match_subject_alt_names:
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -79,10 +79,9 @@ common_tls_context:
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
       config, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
-  auto secret_manager = Secret::MockSecretManager();
   return Network::TransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
-          secret_manager, std::move(cfg), *context_manager_, *client_stats_store)};
+          std::move(cfg), *context_manager_, *client_stats_store)};
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {

@@ -322,12 +322,11 @@ SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& sto
 }
 } // namespace
 
-ClientSslSocketFactory::ClientSslSocketFactory(Secret::SecretManager& secret_manager,
-                                               Envoy::Ssl::ClientContextConfigPtr config,
+ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
                                                Envoy::Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope)
-    : secret_manager_(secret_manager), manager_(manager), stats_scope_(stats_scope),
-      stats_(generateStats("client", stats_scope)), config_(std::move(config)),
+    : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
+      config_(std::move(config)),
       ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
@@ -356,60 +355,16 @@ bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
-  bool should_run_callbacks = false;
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
-    if (ssl_ctx_) {
-      should_run_callbacks = true;
-    }
-  }
-  if (should_run_callbacks) {
-    for (const auto& cb : secrets_ready_callbacks_) {
-      cb();
-    }
-    secrets_ready_callbacks_.clear();
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-void ClientSslSocketFactory::addReadyCb(std::function<void()> callback) {
-  bool immediately_run_callback = false;
-  {
-    absl::ReaderMutexLock l(&ssl_ctx_mu_);
-    if (ssl_ctx_) {
-      immediately_run_callback = true;
-    }
-  }
-
-  if (immediately_run_callback) {
-    callback();
-  } else {
-    secrets_ready_callbacks_.push_back(callback);
-  }
-}
-
-bool ClientSslSocketFactory::secureTransportReady() const {
-  if (!implementsSecureTransport()) {
-    return false;
-  }
-  // If there is no secret entity, currently supports only TLS Certificate and Validation
-  // Context, when it failed to extract them via SDS, it will fail to change cluster status from
-  // warming to active. In current implementation, there is no strategy to activate clusters
-  // which failed to initialize at once.
-  // TODO(shikugawa): Consider retry strategy of clusters which failed to activate at once.
-  const auto& tls_certificate_sds_configs = config_->tlsCertificateSdsConfigs();
-  for (const auto& config : tls_certificate_sds_configs) {
-    if (!secret_manager_.checkTlsCertificateEntityExists(config.sds_config(), config.name())) {
-      return false;
-    }
-  }
-  const auto& validation_context_sds_config = config_->validationContextSdsConfig();
-  if (!secret_manager_.checkCertificateValidationContextEntityExists(
-          validation_context_sds_config.sds_config(), validation_context_sds_config.name())) {
-    return false;
-  }
-  return true;
+bool ClientSslSocketFactory::isReady() const {
+  return config_->checkTlsCertificateEntityExists() &&
+         config_->checkCertificateValidationContextEntityExists();
 }
 
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
@@ -446,40 +401,15 @@ bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
-  bool should_run_callbacks = false;
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
-
-    if (ssl_ctx_) {
-      should_run_callbacks = true;
-    }
-  }
-  if (should_run_callbacks) {
-    for (const auto& cb : secrets_ready_callbacks_) {
-      cb();
-    }
-    secrets_ready_callbacks_.clear();
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-void ServerSslSocketFactory::addReadyCb(std::function<void()> callback) {
-  bool immediately_run_callback = false;
-  {
-    absl::ReaderMutexLock l(&ssl_ctx_mu_);
-    if (ssl_ctx_) {
-      immediately_run_callback = true;
-    }
-  }
-  if (immediately_run_callback) {
-    callback();
-  } else {
-    secrets_ready_callbacks_.push_back(callback);
-  }
-}
+bool ServerSslSocketFactory::isReady() const { NOT_REACHED_GCOVR_EXCL_LINE; }
 
-bool ServerSslSocketFactory::secureTransportReady() const { NOT_REACHED_GCOVR_EXCL_LINE; }
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

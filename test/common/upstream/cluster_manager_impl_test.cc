@@ -2319,8 +2319,7 @@ TEST_F(ClusterManagerImplTest,
   cluster1->info_->name_ = "fake_cluster";
 
   auto transport_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
-  EXPECT_CALL(*transport_socket_factory, implementsSecureTransport()).WillOnce(Return(true));
-  EXPECT_CALL(*transport_socket_factory, secureTransportReady()).WillOnce(Return(false));
+  EXPECT_CALL(*transport_socket_factory, isReady()).WillOnce(Return(false));
 
   auto transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
       std::move(transport_socket_factory));
@@ -2355,8 +2354,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddedAndKeepWarmingWithoutTlsCertificateEn
   cluster1->info_->name_ = "fake_cluster";
 
   auto transport_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
-  EXPECT_CALL(*transport_socket_factory, implementsSecureTransport()).WillOnce(Return(true));
-  EXPECT_CALL(*transport_socket_factory, secureTransportReady()).WillOnce(Return(false));
+  EXPECT_CALL(*transport_socket_factory, isReady()).WillOnce(Return(false));
 
   auto transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
       std::move(transport_socket_factory));

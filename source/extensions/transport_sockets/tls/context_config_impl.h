@@ -37,14 +37,6 @@ public:
     }
     return configs;
   }
-  const std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>&
-  tlsCertificateSdsConfigs() const override {
-    return tls_certificate_sds_configs_;
-  }
-  const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig&
-  validationContextSdsConfig() const override {
-    return validation_context_sds_config_;
-  }
   const Envoy::Ssl::CertificateValidationContextConfig*
   certificateValidationContext() const override {
     return validation_context_config_.get();
@@ -89,19 +81,13 @@ private:
 
   std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
-  std::vector<envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig>
-      tls_certificate_sds_configs_;
-  envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig validation_context_sds_config_;
   // If certificate validation context type is combined_validation_context. default_cvc_
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.
   // Otherwise, default_cvc_ is nullptr.
   std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
       default_cvc_;
-  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
   // Handle for TLS certificate dynamic secret callback.
   Envoy::Common::CallbackHandle* tc_update_callback_handle_{};
-  Secret::CertificateValidationContextConfigProviderSharedPtr
-      certificate_validation_context_provider_;
   // Handle for certificate validation context dynamic secret callback.
   Envoy::Common::CallbackHandle* cvc_update_callback_handle_{};
   Envoy::Common::CallbackHandle* cvc_validation_callback_handle_{};
@@ -110,6 +96,11 @@ private:
 
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
+
+protected:
+  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
+  Secret::CertificateValidationContextConfigProviderSharedPtr
+      certificate_validation_context_provider_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
@@ -131,6 +122,8 @@ public:
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
   const std::string& signingAlgorithmsForTest() const override { return sigalgs_; }
+  bool checkTlsCertificateEntityExists() const override;
+  bool checkCertificateValidationContextEntityExists() const override;
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;

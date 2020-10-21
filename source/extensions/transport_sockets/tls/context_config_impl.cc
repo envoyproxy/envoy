@@ -174,13 +174,13 @@ ContextConfigImpl::ContextConfigImpl(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
-      tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
-      certificate_validation_context_provider_(
-          getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
-                                                default_max_protocol_version)) {
+                                                default_max_protocol_version)),
+      tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
+      certificate_validation_context_provider_(
+          getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -234,11 +234,6 @@ ContextConfigImpl::ContextConfigImpl(
         factory_context.messageValidationVisitor());
   }
   capabilities_ = handshaker_factory->capabilities();
-
-  for (const auto& sds_secret_config : config.tls_certificate_sds_secret_configs()) {
-    tls_certificate_sds_configs_.emplace_back(sds_secret_config);
-  }
-  validation_context_sds_config_ = config.validation_context_sds_secret_config();
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -378,6 +373,19 @@ ClientContextConfigImpl::ClientContextConfigImpl(
        config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1) {
     throw EnvoyException("Multiple TLS certificates are not supported for client contexts");
   }
+}
+
+bool ClientContextConfigImpl::checkTlsCertificateEntityExists() const {
+  for (const auto& provider : tls_certificate_providers_) {
+    if (provider->secret() == nullptr) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool ClientContextConfigImpl::checkCertificateValidationContextEntityExists() const {
+  return certificate_validation_context_provider_->secret() != nullptr;
 }
 
 const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
