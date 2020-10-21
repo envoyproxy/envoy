@@ -487,8 +487,9 @@ void RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
 void RtdsSubscription::onConfigRemoved(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   if (removed_resources[0] != resource_name_) {
-    throw EnvoyException(fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_,
-                                     removed_resources[0]));
+    throw EnvoyException(
+        fmt::format("Unexpected removal of unknown RTDS runtime layer {}, expected {}",
+                    resource_name_, removed_resources[0]));
   }
   ENVOY_LOG(debug, "Clear RTDS snapshot for onConfigUpdate");
   proto_.Clear();
