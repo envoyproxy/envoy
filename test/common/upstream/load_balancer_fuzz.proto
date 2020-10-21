@@ -15,7 +15,7 @@ message UpdateHealthFlags {
   uint32 num_degraded_hosts = 3;
   uint32 num_excluded_hosts = 4;
   // This is used to determine which hosts get marked as healthy, degraded, and excluded.
-  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 1, max_len: 256}];
+  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 4, max_len: 40000}];
 }
 
 message LbAction {
@@ -32,13 +32,13 @@ message LbAction {
 }
 
 message SetupPriorityLevel {
-  uint32 num_hosts_in_priority_level = 1 [(validate.rules).uint32.lte = 500];
-  uint32 num_hosts_locality_a = 2 [(validate.rules).uint32.lte = 500];
-  uint32 num_hosts_locality_b = 3 [(validate.rules).uint32.lte = 500];
+  uint32 num_hosts_in_priority_level = 1 [(validate.rules).uint32.lte = 10000];
+  uint32 num_hosts_locality_a = 2 [(validate.rules).uint32.lte = 10000];
+  uint32 num_hosts_locality_b = 3 [(validate.rules).uint32.lte = 10000];
   // Hard cap at 3 localities for simplicity
-  uint32 num_hosts_locality_c = 4 [(validate.rules).uint32.lte = 500];
+  uint32 num_hosts_locality_c = 4 [(validate.rules).uint32.lte = 10000];
   // For choosing which hosts go in which locality
-  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 1, max_len: 256}];
+  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 4, max_len: 40000}];
 }
 
 // This message represents what LoadBalancerFuzzBase will interact with, performing setup of host sets and calling into load balancers.

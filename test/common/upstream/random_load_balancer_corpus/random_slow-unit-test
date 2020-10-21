@@ -7,7 +7,7 @@ load_balancer_test_case {
   actions {
     update_health_flags {
       num_healthy_hosts: 2
-      random_bytestring: "\001\002\003\004"
+      random_bytestring: "aergswyhtydjkkyugikt"
     }
   }
   actions {
@@ -25,7 +25,7 @@ load_balancer_test_case {
   actions {
     update_health_flags {
       num_healthy_hosts: 2
-      random_bytestring: "\001\002\003\004"
+      random_bytestring: "arwefawefeaqgftrsehttyjhui"
     }
   }
   setup_priority_levels {
@@ -33,14 +33,14 @@ load_balancer_test_case {
     num_hosts_locality_one: 50
     num_hosts_locality_two: 50
     num_hosts_locality_three: 50
-    random_bytestring: "\001\002"
+    random_bytestring: "awertfeyjuhytukgjmu"
   }
   setup_priority_levels {
     num_hosts_in_priority_level: 500
     num_hosts_locality_one: 50
     num_hosts_locality_two: 50
     num_hosts_locality_three: 50
-    random_bytestring: "\001\002"
+    random_bytestring: "awerfuilyetrs"
   }
   seed_for_prng: 88
 }

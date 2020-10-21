@@ -32,17 +32,17 @@ actions {
     }
 }
 setup_priority_levels {
-    num_hosts_in_priority_level: 20
-    num_hosts_locality_a: 3
-    num_hosts_locality_b: 4
-    num_hosts_locality_c: 5
+    num_hosts_in_priority_level: 3000
+    num_hosts_locality_a: 1000
+    num_hosts_locality_b: 500
+    num_hosts_locality_c: 1500
     random_bytestring: "eragaerghahtgrathaertthgrtahrathggraaergeargaergae"
 }
 setup_priority_levels {
-    num_hosts_in_priority_level: 20
-    num_hosts_locality_a: 3
-    num_hosts_locality_b: 4
-    num_hosts_locality_c: 5
+    num_hosts_in_priority_level: 3000
+    num_hosts_locality_a: 300
+    num_hosts_locality_b: 1200
+    num_hosts_locality_c: 1500
     random_bytestring: "dsfawetfawertfrawawetukyfyguukytfufrrawer"
 }
 seed_for_prng: 1

@@ -10,7 +10,7 @@ namespace {
 // possible within Load Balancing. In it's current state, it is too slow (particularly due to calls
 // to makeTestHost()) to scale up hosts. Once this is made more efficient, this number will be
 // increased.
-constexpr uint32_t MaxNumHostsPerPriorityLevel = 256;
+constexpr uint32_t MaxNumHostsPerPriorityLevel = 10000;
 
 } // namespace
 
@@ -32,7 +32,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
 
   Fuzz::ProperSubsetSelector subset_selector(setup_priority_level.random_bytestring());
 
-  const std::vector<std::vector<uint8_t>> localities = subset_selector.constructSubsets(
+  const std::vector<std::vector<uint32_t>> localities = subset_selector.constructSubsets(
       {setup_priority_level.num_hosts_locality_a(), setup_priority_level.num_hosts_locality_b(),
        setup_priority_level.num_hosts_locality_c()},
       host_set.hosts_.size());
@@ -44,7 +44,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   std::array<HostVector, 3> locality_indexes = {locality_a, locality_b, locality_c};
 
   for (uint8_t locality = 0; locality < locality_indexes.size(); locality++) {
-    for (uint8_t index : localities[locality]) {
+    for (uint32_t index : localities[locality]) {
       locality_indexes[locality].push_back(host_set.hosts_[index]);
       locality_indexes_[index] = locality;
     }
@@ -101,11 +101,11 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
 
   Fuzz::ProperSubsetSelector subset_selector(random_bytestring);
 
-  const std::vector<std::vector<uint8_t>> subsets = subset_selector.constructSubsets(
+  const std::vector<std::vector<uint32_t>> subsets = subset_selector.constructSubsets(
       {num_healthy_hosts, num_degraded_hosts, num_excluded_hosts}, host_set_size);
 
   // Healthy hosts are first subset
-  for (uint8_t index : subsets.at(HealthStatus::HEALTHY)) {
+  for (uint32_t index : subsets.at(HealthStatus::HEALTHY)) {
     host_set.healthy_hosts_.push_back(host_set.hosts_[index]);
     // No health flags for healthy
   }
@@ -113,7 +113,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
                  absl::StrJoin(subsets.at(HealthStatus::HEALTHY), " "));
 
   // Degraded hosts are second subset
-  for (uint8_t index : subsets.at(HealthStatus::DEGRADED)) {
+  for (uint32_t index : subsets.at(HealthStatus::DEGRADED)) {
     host_set.degraded_hosts_.push_back(host_set.hosts_[index]);
     // Health flags are not currently directly used by most load balancers, but
     // they may be added and also are used by other components.
@@ -125,7 +125,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
                  absl::StrJoin(subsets.at(HealthStatus::DEGRADED), " "));
 
   // Excluded hosts are third subset
-  for (uint8_t index : subsets.at(HealthStatus::EXCLUDED)) {
+  for (uint32_t index : subsets.at(HealthStatus::EXCLUDED)) {
     host_set.excluded_hosts_.push_back(host_set.hosts_[index]);
     // Health flags are not currently directly used by most load balancers, but
     // they may be added and also are used by other components.
@@ -156,8 +156,8 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   // Iterate through subsets
   for (uint8_t health_status = 0; health_status < locality_health_statuses.size();
        health_status++) {
-    for (uint8_t index : subsets.at(health_status)) { // Each subset logically represents a health
-                                                      // status
+    for (uint32_t index : subsets.at(health_status)) { // Each subset logically represents a health
+                                                       // status
       // If the host is in a locality, we have to update the corresponding health status host vector
       if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
         // After computing the host index subsets, we want to propagate these changes to a host set
