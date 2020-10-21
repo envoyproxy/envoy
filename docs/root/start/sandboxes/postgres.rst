@@ -34,40 +34,40 @@ Step 3: Build the sandbox
 Step 4: Issue commands using psql
 *********************************
 
-Use ``psql`` to issue some commands and verify they are routed via Envoy. Note
-that we should set the environment variable ``PGSSLMODE=disable`` to disable
-``SSL`` because the current implementation of the filter can't decode encrypted
-sessions.
+This example uses ``psql`` client inside a container to issue some commands and
+verify they are routed via Envoy. Note that we should set the environment variable
+``PGSSLMODE=disable`` to disable ``SSL`` because the current implementation of the
+filter can't decode encrypted sessions.
 
 .. code-block:: console
 
-  $ docker run --rm -it --network envoymesh -e PGSSLMODE=disable postgres:latest psql -U postgres -h envoy -p 1999
+  $ docker run --rm -it --network envoymesh -e PGSSLMODE=disable postgres:latest psql -U postgres -h proxy -p 1999
   ... snip ...
 
-  postgres=# CREATE DATABASE test;
+  postgres=# CREATE DATABASE testdb;
   CREATE DATABASE
-  postgres=# \c test 
-  You are now connected to database "test" as user "postgres".
-  test=# CREATE TABLE test ( f SERIAL PRIMARY KEY );
+  postgres=# \c testdb 
+  You are now connected to database "testdb" as user "postgres".
+  testdb=# CREATE TABLE tbl ( f SERIAL PRIMARY KEY );
   CREATE TABLE
-  test=# INSERT INTO test VALUES (DEFAULT);
+  testdb=# INSERT INTO tbl VALUES (DEFAULT);
   INSERT 0 1
-  test=# SELECT * FROM test;
+  testdb=# SELECT * FROM tbl;
    f 
   ---
    1
   (1 row)
 
-  test=# UPDATE test SET f = 2 WHERE f = 1;
+  testdb=# UPDATE tbl SET f = 2 WHERE f = 1;
   UPDATE 1
-  test=# INSERT INTO test VALUES (DEFAULT);
-  ERROR:  duplicate key value violates unique constraint "test_pkey"
+  testdb=# INSERT INTO tbl VALUES (DEFAULT);
+  ERROR:  duplicate key value violates unique constraint "tbl_pkey"
   DETAIL:  Key (f)=(2) already exists.
-  test=# DELETE FROM test;
+  testdb=# DELETE FROM tbl;
   DELETE 1
-  test=# INSERT INTO test VALUES (DEFAULT);
+  testdb=# INSERT INTO tbl VALUES (DEFAULT);
   INSERT 0 1
-  test=# \q
+  testdb=# \q
 
 
 Step 5: Check egress stats
@@ -114,8 +114,6 @@ Step 6: Check TCP stats
 ***********************
 
 Check TCP stats were updated.
-
-Terminal 1
 
 .. code-block:: console
 

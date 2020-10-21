@@ -2,16 +2,11 @@ version: "3.7"
 services:
 
   proxy:
-    image: envoyproxy/envoy-dev:latest
-    volumes:
-      - ./envoy.yaml:/etc/envoy.yaml
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
     networks:
       envoymesh:
-        aliases:
-          - envoy
-    expose:
-      - "1999"
-      - "8001"
     ports:
       - "1999:1999"
       - "8001:8001"
@@ -21,8 +16,6 @@ services:
     image: postgres:latest
     networks:
       envoymesh:
-        aliases:
-          - postgres
     environment:
       # WARNING! Do not use it on production environments because this will
       #          allow anyone with access to the Postgres port to access your
@@ -30,10 +23,6 @@ services:
       #          See PostgreSQL documentation about "trust":
       #          https://www.postgresql.org/docs/current/auth-trust.html
       POSTGRES_HOST_AUTH_METHOD: trust
-    expose:
-      - "5432"
-    ports:
-      - "5432:5432"
 
 networks:
   envoymesh:
