@@ -59,4 +59,4 @@ static_resources:
             address:
               socket_address:
                 address: www.google.com
-                port_value: 80
+                port_value: 443
