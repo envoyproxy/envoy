@@ -40,9 +40,8 @@ def api_dependencies():
         name = "com_github_openzipkin_zipkinapi",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
-    envoy_http_archive(
+    external_http_archive(
         name = "com_github_apache_skywalking_data_collect_protocol",
-        locations = REPOSITORY_LOCATIONS,
         build_file_content = SKYWALKING_DATA_COLLECT_PROTOCOL_BUILD_CONTENT,
     )
 
@@ -108,15 +107,38 @@ go_proto_library(
 """
 
 SKYWALKING_DATA_COLLECT_PROTOCOL_BUILD_CONTENT = """
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
-cc_proto_library(
-    name = "protocol_cc_proto",
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_proto_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+
+proto_library(
+    name = "protocol",
     srcs = [
         "common/Common.proto",
         "language-agent/Tracing.proto",
     ],
-    default_runtime = "@com_google_protobuf//:protobuf",
-    protoc = "@com_google_protobuf//:protoc",
+    visibility = ["//visibility:public"],
+)
+
+py_proto_library(
+    name = "protocol_py_proto",
+    srcs = [
+        "common/Common.proto",
+        "language-agent/Tracing.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_proto_library(
+    name = "protocol_cc_proto",
+    deps = [":protocol"],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "protocol_go_proto",
+    proto = ":protocol",
     visibility = ["//visibility:public"],
 )
 """
