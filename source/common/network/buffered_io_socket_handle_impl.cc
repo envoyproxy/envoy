@@ -6,7 +6,7 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
-#include "common/event/file_event_impl.h"
+#include "common/event/user_space_file_event_impl.h"
 #include "common/network/address_impl.h"
 
 #include "absl/container/fixed_array.h"

@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = [
         "dispatcher_impl.cc",
         "file_event_impl.cc",
+        "user_space_file_event_impl.cc",
         "signal_impl.cc",
     ],
     hdrs = [
@@ -68,6 +69,7 @@ envoy_cc_library(
         "dispatcher_impl.h",
         "event_impl_base.h",
         "file_event_impl.h",
+        "user_space_file_event_impl.h",
         "schedulable_cb_impl.h",
     ],
     deps = [
