@@ -290,6 +290,8 @@ envoy_cc_test(
     name = "filter_chain_manager_impl_test",
     srcs = ["filter_chain_manager_impl_test.cc"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
+    tags = ["skip_on_windows_clang"],
     deps = [
         ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -392,6 +394,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "ssl_context_manager_test",
     srcs = ["ssl_context_manager_test.cc"],
+    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
+    tags = ["skip_on_windows_clang"],
     deps = [
         "//source/server:ssl_context_manager_lib",
         "//test/mocks/ssl:ssl_mocks",
@@ -434,6 +438,8 @@ envoy_cc_benchmark_binary(
         "benchmark",
         "googletest",
     ],
+    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
+    tags = ["skip_on_windows_clang"],
     deps = [
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "//source/server:filter_chain_manager_lib",

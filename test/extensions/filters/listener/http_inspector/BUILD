@@ -16,10 +16,12 @@ envoy_extension_cc_test(
     name = "http_inspector_test",
     srcs = ["http_inspector_test.cc"],
     extension_name = "envoy.filters.listener.http_inspector",
-    #TODO(davinci26): The test passes on Windows *but* http inspector
+    # TODO(davinci26): The test passes on Windows *but* http inspector
     # *used* to rely on Event::FileTriggerType::Edge and we got away with it
     # because we mock the dispatcher. Need to verify that the scenario is
     # actually working.
+    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
+    tags = ["skip_on_windows_clang"],
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/http:utility_lib",
@@ -35,6 +37,8 @@ envoy_extension_cc_test(
     name = "http_inspector_config_test",
     srcs = ["http_inspector_config_test.cc"],
     extension_name = "envoy.filters.listener.http_inspector",
+    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
+    tags = ["skip_on_windows_clang"],
     deps = [
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/listener/http_inspector:config",
