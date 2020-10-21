@@ -842,7 +842,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        release_date = "2020-10-20",
+        release_date = "2020-10-21",
         cpe = "N/A",
     ),
     # TODO: upgrade to the latest version (1.41 currently fails tests)
