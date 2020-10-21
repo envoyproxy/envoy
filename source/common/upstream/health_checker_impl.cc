@@ -301,6 +301,12 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
   ENVOY_CONN_LOG(debug, "connection going away health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
 
+  // If GOAWAY handling is explicitly disabled via runtime, go back to the old
+  // behavior of ignoring GOAWAY completely.
+  if (parent_.runtime_.snapshot().featureEnabled("health_check.disable_goaway_handling", 0UL)) {
+    return;
+  }
+
   if (request_in_flight_ && error_code == Http::GoAwayErrorCode::NoError) {
     // The server is starting a graceful shutdown. Allow the in flight request
     // to finish without treating this as a health check error, and then
