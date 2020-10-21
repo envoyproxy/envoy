@@ -64,7 +64,7 @@ build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
 build:asan --test_env=ASAN_SYMBOLIZER_PATH
 # ASAN needs -O1 to get reasonable performance.
 build:asan --copt -O1
-build:asan --copt -foptimize-sibling-calls
+build:asan --copt -fno-optimize-sibling-calls
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
