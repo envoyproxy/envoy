@@ -13,6 +13,7 @@ class MockThreadLocalOverloadState : public ThreadLocalOverloadState {
 public:
   MockThreadLocalOverloadState();
   MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
+  MOCK_METHOD(Event::TimerPtr, createScaledTimer, (OverloadTimerType, Event::TimerCb), (override));
 
 private:
   const OverloadActionState disabled_state_;
