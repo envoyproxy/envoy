@@ -93,6 +93,14 @@ stream timeouts already introduced above.
   :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`
   for individual routes as well as setting both limits and a fixed time offset on grpc-timeout headers.
 
+Transport Socket
+----------------
+
+* The :ref:`transport_socket_connect_timeout <envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket_connect_timeout>`
+  specifies the amount of time Envoy will wait for a downstream client to complete transport-level
+  negotiations. When configured on a filter chain with a TLS or ALTS transport socket, this limits
+  the amount of time allowed to finish the encrypted handshake after establishing a TCP connection.
+  
 TCP
 ---
 
@@ -107,11 +115,3 @@ TCP
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout>`
   is the amount of time that the TCP proxy will allow a connection to exist with no upstream
   or downstream activity. The default idle timeout if not otherwise specified is *1 hour*.
-
-Transport Socket
-----------------------
-
-* The :ref:`transport_socket_connect_timeout <envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket_connect_timeout>`
-  specifies the amount of time Envoy will wait for a downstream client to complete transport-level
-  negotiations. When configured on a filter chain with a TLS or ALTS transport socket, this limits
-  the amount of time allowed to finish the encrypted handshake after establishing a TCP connection.
