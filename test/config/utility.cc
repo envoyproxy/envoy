@@ -1093,7 +1093,8 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   TestEnvironment::renameFile(file, lds_filename);
 }
 
-void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames) {
+void ConfigHelper::setDownstreamOutboundFramesLimits(uint32_t max_all_frames,
+                                                     uint32_t max_control_frames) {
   auto filter = getFilterFromListener("http");
   if (filter) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager

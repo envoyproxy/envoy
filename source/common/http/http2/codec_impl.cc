@@ -1424,6 +1424,7 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
   return saveHeader(frame, std::move(name), std::move(value));
 }
 
+// TODO(yanavlasov): move to the base class once the runtime flag is removed.
 Status ClientConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
                                                 uint32_t padding_length) {
   Status result;
@@ -1447,6 +1448,7 @@ Status ClientConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
   return result;
 }
 
+// TODO(yanavlasov): move to the base class once the runtime flag is removed.
 ProtocolConstraints::ReleasorProc
 ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.upstream_http2_flood_checks")) {

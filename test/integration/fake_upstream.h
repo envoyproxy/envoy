@@ -618,8 +618,8 @@ public:
   // Note: that this write bypasses any processing by the upstream codec.
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  writeConnection(uint32_t index, const std::string& data, bool end_stream = false,
-                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  rawWriteConnection(uint32_t index, const std::string& data, bool end_stream = false,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;

@@ -611,9 +611,9 @@ void FakeUpstream::sendUdpDatagram(const std::string& buffer,
   });
 }
 
-testing::AssertionResult FakeUpstream::writeConnection(uint32_t index, const std::string& data,
-                                                       bool end_stream,
-                                                       std::chrono::milliseconds timeout) {
+testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const std::string& data,
+                                                          bool end_stream,
+                                                          std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   auto iter = consumed_connections_.begin();
   std::advance(iter, index);

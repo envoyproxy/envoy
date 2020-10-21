@@ -138,7 +138,7 @@ void Http2FloodMitigationTest::beginSession() {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   // set lower outbound frame limits to make tests run faster
-  config_helper_.setOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
+  config_helper_.setDownstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
   // Set up a raw connection to easily send requests without reading responses. Also, set a small
   // TCP receive buffer to speed up connection backup.
@@ -1088,7 +1088,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPingFlood) {
   auto buf = serializeFrames(Http2Frame::makePingFrame(), ControlFrameFloodLimit + 1);
 
   writev_matcher_->setWritevReturnsEgain();
-  ASSERT_TRUE(upstream->writeConnection(0, std::string(buf.begin(), buf.end())));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
 
   // Upstream connection should be disconnected
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());

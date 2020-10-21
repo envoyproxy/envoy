@@ -563,7 +563,9 @@ private:
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
-  // TODO(yanavlasov): move to the base class once upstream flood checks are not flag protected.
+  // Tracking of frames for flood and abuse mitigation for upstream connections is presently enabled
+  // by the `envoy.reloadable_features.upstream_http2_flood_checks` flag.
+  // TODO(yanavlasov): move to the base class once the runtime flag is removed.
   ProtocolConstraints::ReleasorProc trackOutboundFrames(bool) override;
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
 

@@ -224,7 +224,7 @@ public:
   void setLds(absl::string_view version_info);
 
   // Set limits on pending downstream outbound frames.
-  void setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
+  void setDownstreamOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
 
   // Set limits on pending upstream outbound frames.
   void setUpstreamOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
