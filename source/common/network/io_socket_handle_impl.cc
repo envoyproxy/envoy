@@ -522,9 +522,6 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
   Api::EnvoyTcpInfo info;
   auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
   if (!result.rc_) {
-    ENVOY_LOG_MISC(warn,
-                   "Failed to calculate the last round trip time for tcp connection, error: {}",
-                   errorDetails(result.errno_));
     return {};
   }
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
