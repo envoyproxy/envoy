@@ -178,6 +178,14 @@ public:
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 
   /**
+   * Retrieve the DNS host info of a given host currently stored in the cache.
+   * @param host_name supplies the host name.
+   * @return the DNS host info associated with the given host name if the host's address is cached,
+   * otherwise `absl::nullopt`.
+   */
+  virtual absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) PURE;
+
+  /**
    * Check if a DNS request is allowed given resource limits.
    * @param pending_request optional pending request resource limit. If no resource limit is
    * provided the internal DNS cache limit is used.

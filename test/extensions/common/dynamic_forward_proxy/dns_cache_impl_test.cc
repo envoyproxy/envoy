@@ -546,6 +546,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   auto result1 = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks1);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result1.status_);
   EXPECT_NE(result1.handle_, nullptr);
+  EXPECT_EQ(dns_cache_->getHost("foo.com"), absl::nullopt);
 
   MockLoadDnsCacheEntryCallbacks callbacks2;
   Network::DnsResolver::ResolveCb resolve_cb2;
@@ -554,6 +555,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   auto result2 = dns_cache_->loadDnsCacheEntry("bar.com", 443, callbacks2);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result2.status_);
   EXPECT_NE(result2.handle_, nullptr);
+  EXPECT_EQ(dns_cache_->getHost("bar.com"), absl::nullopt);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("bar.com", DnsHostInfoEquals("10.0.0.1:443", "bar.com", false)));
@@ -571,6 +573,14 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   EXPECT_EQ(2, hosts.size());
   EXPECT_THAT(hosts["bar.com"], DnsHostInfoEquals("10.0.0.1:443", "bar.com", false));
   EXPECT_THAT(hosts["foo.com"], DnsHostInfoEquals("10.0.0.2:80", "foo.com", false));
+
+  EXPECT_TRUE(dns_cache_->getHost("bar.com").has_value());
+  EXPECT_THAT(dns_cache_->getHost("bar.com").value(),
+              DnsHostInfoEquals("10.0.0.1:443", "bar.com", false));
+  EXPECT_TRUE(dns_cache_->getHost("foo.com").has_value());
+  EXPECT_THAT(dns_cache_->getHost("foo.com").value(),
+              DnsHostInfoEquals("10.0.0.2:80", "foo.com", false));
+  EXPECT_EQ(dns_cache_->getHost("baz.com"), absl::nullopt);
 }
 
 // A successful resolve followed by a cache hit.
