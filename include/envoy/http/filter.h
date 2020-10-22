@@ -28,8 +28,9 @@ namespace Http {
 enum class FilterHeadersStatus {
   // Continue filter chain iteration.
   Continue,
-  // Do not iterate to any of the remaining filters in the chain.
-  // continueDecoding() or continueEncoding() MUST be called if continued filter iteration is desired.
+  // Do not iterate to any of the remaining filters in the chain. Returning
+  // FilterDataStatus::Continue from decodeData()/encodeData() or calling
+  // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
   StopIteration,
   // Continue headers iteration to remaining filters, but delay ending the stream. This status MUST
   // NOT be returned when end_stream is already set to false.
