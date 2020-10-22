@@ -25,7 +25,7 @@ filegroup(
     name = "configs",
     srcs = glob(
         [
-            "**/*\.yaml",
+            "**/*\\.yaml",
         ],
         exclude = [
             "freebind/freebind.yaml",
