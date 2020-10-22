@@ -16,12 +16,11 @@ envoy_cc_test(
         "ssl_socket_test.cc",
     ],
     data = [
-        "gen_unittest_certs.sh",
         # TODO(mattklein123): We should consolidate all of our test certs in a single place as
         # right now we have a bunch of duplication which is confusing.
         "//test/config/integration/certs",
+        "//test/extensions/transport_sockets/tls/ocsp/test_data:certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
-        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
     ],
     external_deps = ["ssl"],
     shard_count = 4,
@@ -74,12 +73,9 @@ envoy_cc_test(
         "ssl_certs_test.h",
     ],
     data = [
-        "gen_unittest_certs.sh",
-        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
+        "//test/extensions/transport_sockets/tls/ocsp/test_data:certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
-    # Fails intermittantly on local build
-    tags = ["flaky_on_windows"],
     deps = [
         ":ssl_test_utils",
         "//source/common/common:base64_lib",
@@ -121,8 +117,6 @@ envoy_cc_test(
         "utility_test.cc",
     ],
     data = [
-        "gen_unittest_certs.sh",
-        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
@@ -171,14 +165,9 @@ envoy_cc_test(
     name = "handshaker_test",
     srcs = ["handshaker_test.cc"],
     data = [
-        "gen_unittest_certs.sh",
-        "//test/config/integration/certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    # TODO(sunjayBhatia): Diagnose openssl DLL load issue on Windows
-    # See: https://github.com/envoyproxy/envoy/pull/13276
-    tags = ["flaky_on_windows"],
     deps = [
         ":ssl_socket_test",
         ":ssl_test_utils",

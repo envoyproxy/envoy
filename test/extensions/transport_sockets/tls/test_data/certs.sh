@@ -256,3 +256,7 @@ openssl rand 79 > ticket_key_wrong_len
 # Generate a certificate with no subject CN and no altnames.
 generate_rsa_key no_subject
 generate_x509_cert_nosubject no_subject ca
+
+# Generate unit test certificate
+generate_rsa_key unittest
+generate_selfsigned_x509_cert unittest
