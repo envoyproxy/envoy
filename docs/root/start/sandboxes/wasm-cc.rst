@@ -1,12 +1,12 @@
 .. _install_sandboxes_wasm_filter:
 
-WASM filter
-===========
+WASM C++ filter
+===============
 
-This sandbox demonstrates a basic Wasm filter which injects content into the body of an ``HTTP`` response, and adds
+This sandbox demonstrates a basic C++ Wasm filter which injects content into the body of an ``HTTP`` response, and adds
 and updates some headers.
 
-It also takes you through the steps required to build your own Wasm filter, and run it with Envoy.
+It also takes you through the steps required to build your own C++ Wasm filter, and run it with Envoy.
 
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
@@ -23,12 +23,12 @@ Step 3: Start all of our containers
 
 First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a backend which echos back our request.
 
-Change to the ``examples/wasm`` folder in the Envoy repo, and start the composition:
+Change to the ``examples/wasm-cc`` folder in the Envoy repo, and start the composition:
 
 .. code-block:: console
 
     $ pwd
-    envoy/examples/wasm
+    envoy/examples/wasm-cc
     $ docker-compose build --pull
     $ docker-compose up -d
     $ docker-compose ps
