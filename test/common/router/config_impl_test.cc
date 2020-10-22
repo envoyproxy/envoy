@@ -1741,8 +1741,8 @@ TEST_F(RouteMatcherTest, TestRewriteResponseHeaders) {
   Http::TestRequestHeaderMapImpl req_headers =
       genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
-  Http::TestResponseHeaderMapImpl headers(
-      {{"x-header-one", "one"}, {"x-header-rewrite", "global"}, {"x-header-two", "two"}});
+  Http::TestResponseHeaderMapImpl headers{
+      {"x-header-one", "one"}, {"x-header-rewrite", "global"}, {"x-header-two", "two"}};
   route->finalizeResponseHeaders(headers, stream_info);
   EXPECT_EQ("universal", headers.get_("x-header-rewrite"));
   EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
@@ -1763,8 +1763,8 @@ TEST_F(RouteMatcherTest, TestRewriteResponseHeadersMatchPredicate) {
   Http::TestRequestHeaderMapImpl req_headers =
       genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
-  Http::TestResponseHeaderMapImpl headers(
-      {{"x-header-rewrite", "global"}, {"x-header-one", "three"}, {"x-header-two", "two"}});
+  Http::TestResponseHeaderMapImpl headers{
+      {"x-header-rewrite", "global"}, {"x-header-one", "three"}, {"x-header-two", "two"}};
   route->finalizeResponseHeaders(headers, stream_info);
   EXPECT_EQ("global1", headers.get_("x-global-header1"));
   EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
@@ -1783,8 +1783,8 @@ TEST_F(RouteMatcherTest, TestRewriteResponseHeadersNoRewritableHeader) {
   Http::TestRequestHeaderMapImpl req_headers =
       genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
-  Http::TestResponseHeaderMapImpl headers(
-      {{"x-header-nope", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}});
+  Http::TestResponseHeaderMapImpl headers{
+      {"x-header-nope", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}};
   route->finalizeResponseHeaders(headers, stream_info);
   EXPECT_EQ("global", headers.get_("x-header-nope"));
 }
@@ -1800,8 +1800,8 @@ TEST_F(RouteMatcherTest, TestRewriteResponseHeadersPrefixNotMatched) {
   Http::TestRequestHeaderMapImpl req_headers =
       genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
-  Http::TestResponseHeaderMapImpl headers(
-      {{"x-header-rewrite", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}});
+  Http::TestResponseHeaderMapImpl headers{
+      {"x-header-rewrite", "global"}, {"x-header-one", "one"}, {"x-header-two", "two"}};
   route->finalizeResponseHeaders(headers, stream_info);
   EXPECT_EQ("global1", headers.get_("x-global-header1"));
   EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
