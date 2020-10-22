@@ -580,6 +580,35 @@ public:
   }
 
   MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
+
+  void expectUnhealthyTransition(size_t index, bool first_check) {
+    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+    EXPECT_CALL(*test_sessions_[index]->timeout_timer_, disableTimer());
+    EXPECT_CALL(*test_sessions_[index]->interval_timer_, enableTimer(_, _));
+    if (first_check) {
+      EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, _));
+    }
+    EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  }
+
+  void expectHealthyTransition(size_t index) {
+    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+    EXPECT_CALL(*test_sessions_[index]->timeout_timer_, disableTimer());
+    EXPECT_CALL(*test_sessions_[index]->interval_timer_, enableTimer(_, _));
+    EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  }
+
+  void expectUnchanged(size_t index) {
+    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+    EXPECT_CALL(*test_sessions_[index]->timeout_timer_, disableTimer());
+    EXPECT_CALL(*test_sessions_[index]->interval_timer_, enableTimer(_, _));
+  }
+
+  void expectChangePending(size_t index) {
+    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+    EXPECT_CALL(*test_sessions_[index]->timeout_timer_, disableTimer());
+    EXPECT_CALL(*test_sessions_[index]->interval_timer_, enableTimer(_, _));
+  }
 };
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
@@ -2518,7 +2547,6 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   // FailureType::Network will be issued, it will render host unhealthy only if unhealthy_threshold
   // is reached.
   setupNoServiceValidationHCWithHttp2();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(false));
 
@@ -2531,8 +2559,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   health_checker_->start();
 
   // We start off as healthy, and should continue to be healthy.
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  expectUnchanged(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2542,9 +2569,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
 
   // GOAWAY with non-NO_ERROR code will result in a healthcheck failure and the
   // connection closing. Status is unchanged because unhealthy_threshold is 2.
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(1);
+  expectChangePending(0);
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
@@ -2559,11 +2584,8 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   test_sessions_[0]->interval_timer_->invokeCallback();
 
   // GOAWAY with non-NO_ERROR code will result in a healthcheck failure and the
-  // connection closing. This time it goes unhealthy
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  // connection closing. This time it goes unhealthy.
+  expectUnhealthyTransition(0, false);
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
@@ -2597,9 +2619,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  expectUnchanged(0);
   respond(0, "200", false, false, true, false, {}, false);
 
   // GOAWAY should cause a new connection to be created.
@@ -2608,10 +2628,8 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   test_sessions_[0]->interval_timer_->invokeCallback();
 
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   // Test host state hasn't changed.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  expectUnchanged(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -2637,11 +2655,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
   // Unhealthy threshold is 1 so first timeout causes unhealthy
-  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  expectUnhealthyTransition(0, true);
   test_sessions_[0]->timeout_timer_->invokeCallback();
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2653,10 +2667,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   test_sessions_[0]->interval_timer_->invokeCallback();
 
   // Host should go back to healthy after a successful check.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  expectHealthyTransition(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -2682,11 +2693,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
   // Unhealthy threshold is 1 so first timeout causes unhealthy
-  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  expectUnhealthyTransition(0, true);
   test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2698,10 +2705,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   test_sessions_[0]->interval_timer_->invokeCallback();
 
   // Host should go back to healthy after a successful check.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  expectHealthyTransition(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -2727,11 +2731,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
   // Unhealthy threshold is 1 so first timeout causes unhealthy
-  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  expectUnhealthyTransition(0, true);
   test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2743,10 +2743,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
   test_sessions_[0]->interval_timer_->invokeCallback();
 
   // Host should go back to healthy after a successful check.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  expectHealthyTransition(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -2764,9 +2761,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  expectUnchanged(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2784,9 +2779,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
   test_sessions_[0]->interval_timer_->invokeCallback();
 
   // Host should stay healthy.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  expectUnchanged(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -2816,11 +2809,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamResetRuntimeDisable
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
   // Unhealthy threshold is 1 so the first reset causes the host to go unhealthy.
-  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  expectUnhealthyTransition(0, true);
   test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2832,10 +2821,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamResetRuntimeDisable
   test_sessions_[0]->interval_timer_->invokeCallback();
 
   // Host should go back to healthy after a successful check.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  expectHealthyTransition(0);
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
