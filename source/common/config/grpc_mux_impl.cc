@@ -289,7 +289,8 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
   drainRequests();
 }
 
-void GrpcMuxImpl::expiryCallback(const std::string& type_url, const std::vector<std::string>& expired) {
+void GrpcMuxImpl::expiryCallback(const std::string& type_url,
+                                 const std::vector<std::string>& expired) {
   // The TtlManager triggers a callback with a list of all the expired elements, which we need
   // to compare against the various watched resources to return the subset that each watch is
   // subscribed to.

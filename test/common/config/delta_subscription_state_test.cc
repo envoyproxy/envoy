@@ -447,7 +447,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
   deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(2)), {}, "debug1",
                            "nonce1");
 
-  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(1);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _));
   EXPECT_CALL(*timer_, disableTimer());
   time_system.setSystemTime(std::chrono::seconds(2));
 
