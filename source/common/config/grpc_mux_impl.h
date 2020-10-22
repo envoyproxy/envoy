@@ -137,6 +137,7 @@ private:
     TtlManager ttl_;
   };
 
+  void expiryCallback(const std::string& type_url, const std::vector<std::string>& expired);
   // Request queue management logic.
   void queueDiscoveryRequest(const std::string& queue_item);
 
