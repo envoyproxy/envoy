@@ -35,7 +35,7 @@ use(
     },
     {
       "owner": "envoyproxy/tls-watchers",
-      "path": "source/extensions/transport_sockets/tls/",
+      "path": "source/common/ssl/",
     },
   ],
 )
