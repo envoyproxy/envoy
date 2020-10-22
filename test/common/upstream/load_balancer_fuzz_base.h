@@ -46,6 +46,10 @@ public:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::unique_ptr<LoadBalancerBase> lb_;
 
+  // Constructor takes in need local cluster and makes local_priority_set_ either a nullptr or a
+  // real constructor This only gets used in zone aware load balancers
+  std::shared_ptr<NiceMock<MockPrioritySet>> local_priority_set_;
+
 private:
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
