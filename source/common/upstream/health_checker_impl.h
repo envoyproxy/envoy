@@ -138,9 +138,7 @@ private:
     const Http::Protocol protocol_;
     Network::Address::InstanceConstSharedPtr local_address_;
     bool expect_reset_{};
-    // If true, we received a GOAWAY (NO_ERROR code) and are deferring closing the connection
-    // until the active probe completes.
-    bool received_no_error_goaway_ = false;
+    bool reuse_connection_ = false;
     bool request_in_flight_ = false;
   };
 

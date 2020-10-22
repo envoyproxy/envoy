@@ -258,7 +258,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
     expect_reset_ = false;
-    received_no_error_goaway_ = false;
+    reuse_connection_ = parent_.reuse_connection_;
   }
 
   Http::RequestEncoder* request_encoder = &client_->newStream(*this);
@@ -285,7 +285,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
   request_in_flight_ = false;
   ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
-  if (client_ && received_no_error_goaway_) {
+  if (client_ && !reuse_connection_) {
     client_->close();
   }
 
@@ -312,7 +312,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
     // The server is starting a graceful shutdown. Allow the in flight request
     // to finish without treating this as a health check error, and then
     // reconnect.
-    received_no_error_goaway_ = true;
+    reuse_connection_ = false;
     return;
   }
 
@@ -386,7 +386,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     return false;
   }
 
-  if (!parent_.reuse_connection_ || received_no_error_goaway_) {
+  if (!reuse_connection_) {
     return true;
   }
 
