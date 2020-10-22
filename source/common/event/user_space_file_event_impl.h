@@ -53,7 +53,7 @@ class DefaultEventListener : public EventListener {
 public:
   ~DefaultEventListener() override = default;
 
-  // Return both read and write if enabled. Note that this implmenetation is inefficient. Read and
+  // Return both read and write if enabled. Note that this implementation is inefficient. Read and
   // write events are supposed to be independent.
   uint32_t triggeredEvents() override { return enabled_events_ & (~Event::FileReadyType::Closed); }
 

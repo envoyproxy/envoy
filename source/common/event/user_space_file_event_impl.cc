@@ -3,18 +3,19 @@
 #include <cstdint>
 
 #include "common/common/assert.h"
+
 namespace Envoy {
 namespace Event {
 
 void DefaultEventListener::onEventEnabled(uint32_t enabled_events) {
   enabled_events_ = enabled_events;
-  // Clear ephermal events to align with FileEventImpl::setEnable().
+  // Clear ephemeral events to align with FileEventImpl::setEnable().
   ephermal_events_ = 0;
 }
 
 void DefaultEventListener::onEventActivated(uint32_t activated_events) {
   // Event owner should not activate any event which is disabled.
-  // Also see onEventEnabled which clears ephermal events.
+  // Also see onEventEnabled which clears ephemeral events.
   // The overall prevents callback on disabled events.
   ASSERT((ephermal_events_ & ~enabled_events_) == 0);
   ephermal_events_ |= activated_events;
@@ -54,10 +55,10 @@ UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t e
   event_listener_.onEventEnabled(events);
 }
 
-std::unique_ptr<UserSpaceFileEventImpl>
-UserSpaceFileEventFactory::createUserSpaceFileEventImpl(Event::Dispatcher&, Event::FileReadyCb cb,
-                                                        Event::FileTriggerType, uint32_t events,
-                                                        SchedulableCallback& scheduable_cb) {
+std::unique_ptr<UserSpaceFileEventImpl> UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
+    Event::Dispatcher&, Event::FileReadyCb cb, Event::FileTriggerType trigger_type, uint32_t events,
+    SchedulableCallback& scheduable_cb) {
+  ASSERT(trigger_type == Event::FileTriggerType::Edge);
   return std::unique_ptr<UserSpaceFileEventImpl>(
       new UserSpaceFileEventImpl(cb, events, scheduable_cb));
 }

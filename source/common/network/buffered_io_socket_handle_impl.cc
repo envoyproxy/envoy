@@ -22,7 +22,7 @@ Api::SysCallIntResult makeInvalidSyscall() {
 } // namespace
 
 BufferedIoSocketHandleImpl::BufferedIoSocketHandleImpl()
-    : owned_buffer_(
+    : pending_received_data_(
           [this]() -> void {
             over_high_watermark_ = false;
             if (writable_peer_) {
@@ -39,15 +39,19 @@ BufferedIoSocketHandleImpl::BufferedIoSocketHandleImpl()
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
   ASSERT(!closed_);
-  if (!write_shutdown_) {
-    ASSERT(writable_peer_);
-    // Notify the peer we won't write more data. shutdown(WRITE).
-    writable_peer_->setWriteEnd();
-    // Notify the peer that we no longer accept data. shutdown(RD).
-    writable_peer_->onPeerDestroy();
-    writable_peer_->maybeSetNewData();
-    writable_peer_ = nullptr;
-    write_shutdown_ = true;
+  if (!closed_) {
+    if (writable_peer_) {
+      ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
+                static_cast<void*>(writable_peer_));
+      // Notify the peer we won't write more data. shutdown(WRITE).
+      writable_peer_->setWriteEnd();
+      // Notify the peer that we no longer accept data. shutdown(RD).
+      writable_peer_->onPeerDestroy();
+      writable_peer_->maybeSetNewData();
+      writable_peer_ = nullptr;
+    } else {
+      ENVOY_LOG(trace, "socket {} close after peer closed.", static_cast<void*>(this));
+    }
   }
   closed_ = true;
   return Api::ioCallUint64ResultNoError();
@@ -63,7 +67,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
             // TODO(lambdai): Add EBADF in IoSocketError and adopt it here.
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
-  if (owned_buffer_.length() == 0) {
+  if (pending_received_data_.length() == 0) {
     if (read_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
@@ -72,20 +76,19 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
     }
   }
   absl::FixedArray<iovec> iov(num_slice);
-  uint64_t bytes_to_read = 0;
-  for (uint64_t num_slices_to_read = 0;
-       num_slices_to_read < num_slice && bytes_to_read < max_length; num_slices_to_read++) {
-    auto bytes_to_write_in_this_slice =
-        std::min(std::min(owned_buffer_.length(), max_length) - bytes_to_read,
-                 uint64_t(slices[num_slices_to_read].len_));
-    owned_buffer_.copyOut(bytes_to_read, bytes_to_write_in_this_slice,
-                          slices[num_slices_to_read].mem_);
-    bytes_to_read += bytes_to_write_in_this_slice;
+  uint64_t bytes_offset = 0;
+  for (uint64_t i = 0; i < num_slice && bytes_offset < max_length; i++) {
+    auto bytes_to_read_in_this_slice =
+        std::min(std::min(pending_received_data_.length(), max_length) - bytes_offset,
+                 uint64_t(slices[i].len_));
+    pending_received_data_.copyOut(bytes_offset, bytes_to_read_in_this_slice, slices[i].mem_);
+    bytes_offset += bytes_to_read_in_this_slice;
   }
-  ASSERT(bytes_to_read <= max_length);
-  owned_buffer_.drain(bytes_to_read);
-  ENVOY_LOG(trace, "socket {} readv {} bytes", static_cast<void*>(this), bytes_to_read);
-  return {bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  auto bytes_read = bytes_offset;
+  ASSERT(bytes_read <= max_length);
+  pending_received_data_.drain(bytes_read);
+  ENVOY_LOG(trace, "socket {} readv {} bytes", static_cast<void*>(this), bytes_read);
+  return {bytes_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffer,
@@ -94,7 +97,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
-  if (owned_buffer_.length() == 0) {
+  if (pending_received_data_.length() == 0) {
     if (read_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
@@ -103,8 +106,8 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
     }
   }
   // TODO(lambdai): Move at slice boundary to move to reduce the copy.
-  uint64_t max_bytes_to_read = std::min(max_length, owned_buffer_.length());
-  buffer.move(owned_buffer_, max_bytes_to_read);
+  uint64_t max_bytes_to_read = std::min(max_length, pending_received_data_.length());
+  buffer.move(pending_received_data_, max_bytes_to_read);
   return {max_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
@@ -131,16 +134,16 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
                                IoSocketError::deleteIoError)};
   }
   // Write along with iteration. Buffer guarantee the fragment is always append-able.
-  uint64_t total_bytes_to_write = 0;
+  uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
       writable_peer_->getWriteBuffer()->add(slices[i].mem_, slices[i].len_);
-      total_bytes_to_write += slices[i].len_;
+      bytes_written += slices[i].len_;
     }
   }
   writable_peer_->maybeSetNewData();
-  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), total_bytes_to_write);
-  return {total_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), bytes_written);
+  return {bytes_written, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buffer) {
@@ -193,7 +196,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t le
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
   // No data and the writer closed.
-  if (owned_buffer_.length() == 0) {
+  if (pending_received_data_.length() == 0) {
     if (read_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
@@ -201,10 +204,10 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t le
                                  IoSocketError::deleteIoError)};
     }
   }
-  auto max_bytes_to_read = std::min(owned_buffer_.length(), length);
-  owned_buffer_.copyOut(0, max_bytes_to_read, buffer);
+  auto max_bytes_to_read = std::min(pending_received_data_.length(), length);
+  pending_received_data_.copyOut(0, max_bytes_to_read, buffer);
   if (!(flags & MSG_PEEK)) {
-    owned_buffer_.drain(max_bytes_to_read);
+    pending_received_data_.drain(max_bytes_to_read);
   }
   return {max_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }

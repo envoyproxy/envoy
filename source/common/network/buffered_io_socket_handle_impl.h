@@ -71,7 +71,7 @@ public:
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
 
-  Buffer::WatermarkBuffer& getBufferForTest() { return owned_buffer_; }
+  Buffer::WatermarkBuffer& getBufferForTest() { return pending_received_data_; }
 
   void scheduleNextEvent() {
     // It's possible there is no pending file event so as no io_callback.
@@ -101,12 +101,14 @@ public:
   }
   void onPeerBufferWritable() override { scheduleNextEvent(); }
   bool isWritable() const override { return !isOverHighWatermark(); }
-  Buffer::Instance* getWriteBuffer() override { return &owned_buffer_; }
+  Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
   // ReadableSource
   bool isPeerShutDownWrite() const override { return read_end_stream_; }
   bool isOverHighWatermark() const override { return over_high_watermark_; }
-  bool isReadable() const override { return isPeerShutDownWrite() || owned_buffer_.length() > 0; }
+  bool isReadable() const override {
+    return isPeerShutDownWrite() || pending_received_data_.length() > 0;
+  }
 
 private:
   // Support isOpen() and close(). IoHandle owner must invoke close() to avoid potential resource
@@ -121,9 +123,10 @@ private:
   // The schedulable handle of the above event.
   Event::SchedulableCallbackPtr io_callback_;
 
-  // True if owned_buffer_ is not addable. Note that owned_buffer_ may have pending data to drain.
+  // True if pending_received_data_ is not addable. Note that pending_received_data_ may have
+  // pending data to drain.
   bool read_end_stream_{false};
-  Buffer::WatermarkBuffer owned_buffer_;
+  Buffer::WatermarkBuffer pending_received_data_;
 
   // Destination of the write().
   WritablePeer* writable_peer_{nullptr};
