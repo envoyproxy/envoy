@@ -5734,8 +5734,7 @@ TEST_P(SslSocketTest, ClientSocketFactoryIsReadyTest) {
   ContextManagerImpl manager(time_system_);
   Stats::TestUtil::TestStore stats_store;
   auto client_cfg = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
-  EXPECT_CALL(*client_cfg, checkTlsCertificateEntityExists()).WillOnce(Return(true));
-  EXPECT_CALL(*client_cfg, checkCertificateValidationContextEntityExists()).WillOnce(Return(true));
+  EXPECT_CALL(*client_cfg, isSecretReady()).WillOnce(Return(true));
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   EXPECT_TRUE(client_ssl_socket_factory.isReady());
 }

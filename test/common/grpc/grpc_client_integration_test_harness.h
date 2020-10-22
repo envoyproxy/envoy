@@ -478,7 +478,6 @@ public:
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
-  Secret::MockSecretManager secret_manager_;
 };
 
 // SSL connection credential validation tests.

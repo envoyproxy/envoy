@@ -113,14 +113,9 @@ public:
   virtual const std::string& signingAlgorithmsForTest() const PURE;
 
   /**
-   * Check whether TLS Certificate entity was being extracted from SDS server.
+   * Check whether TLS certificate entity and certificate validation context entity is available
    */
-  virtual bool checkTlsCertificateEntityExists() const PURE;
-
-  /**
-   * Check whether certificate validation context entity was being extracted from SDS server.
-   */
-  virtual bool checkCertificateValidationContextEntityExists() const PURE;
+  virtual bool isSecretReady() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;

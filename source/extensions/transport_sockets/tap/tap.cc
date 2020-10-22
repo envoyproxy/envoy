@@ -66,7 +66,7 @@ bool TapSocketFactory::implementsSecureTransport() const {
   return transport_socket_factory_->implementsSecureTransport();
 }
 
-bool TapSocketFactory::isReady() const { NOT_REACHED_GCOVR_EXCL_LINE; }
+bool TapSocketFactory::isReady() const { return transport_socket_factory_->isReady(); }
 
 } // namespace Tap
 } // namespace TransportSockets

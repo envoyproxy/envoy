@@ -1623,7 +1623,7 @@ TEST_F(ClientContextConfigImplTest, ValidationContextEntityNotExist) {
   EXPECT_CALL(factory_context_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
 
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
-  EXPECT_FALSE(client_context_config.checkCertificateValidationContextEntityExists());
+  EXPECT_FALSE(client_context_config.isSecretReady());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   client_context_config.setSecretUpdateCallback(
@@ -1652,7 +1652,7 @@ TEST_F(ClientContextConfigImplTest, TlsCertificateEntityNotExist) {
   EXPECT_CALL(factory_context_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
 
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
-  EXPECT_FALSE(client_context_config.checkTlsCertificateEntityExists());
+  EXPECT_FALSE(client_context_config.isSecretReady());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   client_context_config.setSecretUpdateCallback(

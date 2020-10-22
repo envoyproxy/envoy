@@ -169,6 +169,9 @@ ContextConfigImpl::ContextConfigImpl(
     const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : api_(factory_context.api()),
+      tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
+      certificate_validation_context_provider_(
+          getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
@@ -177,10 +180,7 @@ ContextConfigImpl::ContextConfigImpl(
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
-                                                default_max_protocol_version)),
-      tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
-      certificate_validation_context_provider_(
-          getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)) {
+                                                default_max_protocol_version)) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -375,16 +375,12 @@ ClientContextConfigImpl::ClientContextConfigImpl(
   }
 }
 
-bool ClientContextConfigImpl::checkTlsCertificateEntityExists() const {
+bool ClientContextConfigImpl::isSecretReady() const {
   for (const auto& provider : tls_certificate_providers_) {
     if (provider->secret() == nullptr) {
       return false;
     }
   }
-  return true;
-}
-
-bool ClientContextConfigImpl::checkCertificateValidationContextEntityExists() const {
   return certificate_validation_context_provider_->secret() != nullptr;
 }
 

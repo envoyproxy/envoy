@@ -362,10 +362,7 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-bool ClientSslSocketFactory::isReady() const {
-  return config_->checkTlsCertificateEntityExists() &&
-         config_->checkCertificateValidationContextEntityExists();
-}
+bool ClientSslSocketFactory::isReady() const { return config_->isSecretReady(); }
 
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
                                                Envoy::Ssl::ContextManager& manager,
@@ -408,7 +405,7 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-bool ServerSslSocketFactory::isReady() const { NOT_REACHED_GCOVR_EXCL_LINE; }
+bool ServerSslSocketFactory::isReady() const { return true; }
 
 } // namespace Tls
 } // namespace TransportSockets

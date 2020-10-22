@@ -69,6 +69,9 @@ protected:
                     const std::string& default_cipher_suites, const std::string& default_curves,
                     Server::Configuration::TransportSocketFactoryContext& factory_context);
   Api::Api& api_;
+  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
+  Secret::CertificateValidationContextConfigProviderSharedPtr
+      certificate_validation_context_provider_;
 
 private:
   static unsigned tlsVersionFromProto(
@@ -96,11 +99,6 @@ private:
 
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
-
-protected:
-  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
-  Secret::CertificateValidationContextConfigProviderSharedPtr
-      certificate_validation_context_provider_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
@@ -122,8 +120,7 @@ public:
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
   const std::string& signingAlgorithmsForTest() const override { return sigalgs_; }
-  bool checkTlsCertificateEntityExists() const override;
-  bool checkCertificateValidationContextEntityExists() const override;
+  bool isSecretReady() const override;
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;
