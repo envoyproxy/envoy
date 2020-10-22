@@ -2519,6 +2519,8 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   // is reached.
   setupNoServiceValidationHCWithHttp2();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillRepeatedly(Return(false));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -2543,6 +2545,10 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(1);
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2558,6 +2564,10 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2568,6 +2578,8 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
 // Test receiving GOAWAY (no error) is handled gracefully while a check is in progress.
 TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
   setupHCHttp2();
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillRepeatedly(Return(false));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   cluster_->info_->stats().upstream_cx_total_.inc();
@@ -2577,6 +2589,10 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      .WillOnce(Return(true));
   // GOAWAY with NO_ERROR code during check should be handled gracefully.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2605,12 +2621,18 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillRepeatedly(Return(false));
 
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2644,12 +2666,18 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillRepeatedly(Return(false));
 
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2683,12 +2711,18 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillRepeatedly(Return(false));
 
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -2722,6 +2756,8 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillRepeatedly(Return(false));
 
   expectSessionCreate();
   expectStreamCreate(0);
@@ -2734,6 +2770,10 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      .WillOnce(Return(true));
   // GOAWAY should cause a new connection to be created but should not affect health status.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2753,22 +2793,24 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
 
 // Smoke test that receiving GOAWAY (no error) is ignored when GOAWAY handling
 // is disabled via runtime. This is based on the
-// GoAwayProbeInProgressStreamReset test case. More test cases isn't necessary
-// due to the simplicity of the runtime check.
+// GoAwayProbeInProgressStreamReset test case. A single case gives us sufficient
+// coverage due to the simplicity of the runtime check.
 TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamResetRuntimeDisabled) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillRepeatedly(Return(false));
 
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
       .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.disable_goaway_handling", 0))
-      .WillOnce(Return(true));
 
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());

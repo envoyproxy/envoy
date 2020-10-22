@@ -301,9 +301,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
   ENVOY_CONN_LOG(debug, "connection going away health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
 
-  // If GOAWAY handling is explicitly disabled via runtime, go back to the old
-  // behavior of ignoring GOAWAY completely.
-  if (parent_.runtime_.snapshot().featureEnabled("health_check.disable_goaway_handling", 0UL)) {
+  // Runtime guard around graceful handling of NO_ERROR GOAWAY handling. The old behavior is to
+  // ignore GOAWAY completely.
+  if (!parent_.runtime_.snapshot().featureEnabled(
+          "envoy.reloadable_features.health_check.graceful_goaway_handling", 100UL)) {
     return;
   }
 
