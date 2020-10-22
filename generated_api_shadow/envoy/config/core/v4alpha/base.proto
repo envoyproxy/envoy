@@ -13,6 +13,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -131,7 +133,7 @@ message Extension {
 // Identifies a specific Envoy instance. The node identifier is presented to the
 // management server, which may use this identifier to distinguish per Envoy
 // configuration for serving.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.Node";
 
@@ -147,19 +149,24 @@ message Node {
   // :option:`--service-node`.
   string id = 1;
 
-  // Defines the local service cluster name where Envoy is running. Though
-  // optional, it should be set if any of the following features are used:
-  // :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
-  // verification
-  // <envoy_api_field_config.core.v4alpha.HealthCheck.HttpHealthCheck.service_name_matcher>`,
-  // :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v4alpha.Runtime>`,
-  // :ref:`user agent addition
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.add_user_agent>`,
-  // :ref:`HTTP global rate limiting <config_http_filters_rate_limit>`,
-  // :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
-  // <arch_overview_tracing>`, either in this message or via
-  // :option:`--service-cluster`.
-  string cluster = 2;
+  oneof cluster_specifier {
+    // Defines the local service cluster name where Envoy is running. Though
+    // optional, it should be set if any of the following features are used:
+    // :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
+    // verification
+    // <envoy_api_field_config.core.v4alpha.HealthCheck.HttpHealthCheck.service_name_matcher>`,
+    // :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v4alpha.Runtime>`,
+    // :ref:`user agent addition
+    // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.add_user_agent>`,
+    // :ref:`HTTP global rate limiting <config_http_filters_rate_limit>`,
+    // :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
+    // <arch_overview_tracing>`, either in this message or via
+    // :option:`--service-cluster`.
+    string cluster = 2;
+
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator cluster_resource_locator = 12;
+  }
 
   // Opaque metadata extending the node identifier. Envoy will pass this
   // directly to the management server.

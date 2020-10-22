@@ -8,5 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/config/cluster/aggregate/v2alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/core/v1:pkg",
     ],
 )

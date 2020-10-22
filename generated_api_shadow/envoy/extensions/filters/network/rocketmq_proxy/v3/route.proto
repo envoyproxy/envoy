@@ -6,6 +6,9 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -48,7 +51,14 @@ message RouteMatch {
 
 message RouteAction {
   // Indicates the upstream cluster to which the request should be routed.
-  string cluster = 1 [(validate.rules).string = {min_len: 1}];
+  string cluster = 1 [
+    (validate.rules).string = {min_len: 1},
+    (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+  ];
+
+  // [#not-implemented-hide:]
+  udpa.core.v1.ResourceLocator cluster_resource_locator = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
   // Optional endpoint metadata match criteria used by the subset load balancer.
   config.core.v3.Metadata metadata_match = 2;

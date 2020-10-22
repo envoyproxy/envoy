@@ -4,6 +4,8 @@ package envoy.config.core.v4alpha;
 
 import "google/protobuf/duration.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -46,6 +48,9 @@ message HttpUri {
     //    cluster: jwks_cluster
     //
     string cluster = 2 [(validate.rules).string = {min_len: 1}];
+
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator cluster_resource_locator = 4;
   }
 
   // Sets the maximum duration in milliseconds that a response can take to arrive upon request.

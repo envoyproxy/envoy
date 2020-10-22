@@ -7,6 +7,8 @@ import "envoy/config/route/v4alpha/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -81,7 +83,7 @@ message RouteMatch {
   repeated config.route.v4alpha.HeaderMatcher headers = 4;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.thrift_proxy.v3.RouteAction";
@@ -92,6 +94,9 @@ message RouteAction {
     // Indicates a single upstream cluster to which the request should be routed
     // to.
     string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator cluster_resource_locator = 7;
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights

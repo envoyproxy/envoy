@@ -6,6 +6,9 @@ import "envoy/config/core/v3/address.proto";
 
 import "google/protobuf/timestamp.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -31,7 +34,7 @@ enum HealthCheckerType {
   REDIS = 3;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message HealthCheckEvent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckEvent";
@@ -40,7 +43,14 @@ message HealthCheckEvent {
 
   config.core.v3.Address host = 2;
 
-  string cluster_name = 3 [(validate.rules).string = {min_len: 1}];
+  string cluster_name = 3 [
+    (validate.rules).string = {min_len: 1},
+    (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+  ];
+
+  // [#not-implemented-hide:]
+  udpa.core.v1.ResourceLocator cluster_resource_locator = 10
+      [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
   oneof event {
     option (validate.required) = true;

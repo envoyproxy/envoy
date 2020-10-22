@@ -5,6 +5,9 @@ package envoy.extensions.filters.http.squash.v3;
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -18,13 +21,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Squash :ref:`configuration overview <config_http_filters_squash>`.
 // [#extension: envoy.filters.http.squash]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Squash {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.squash.v2.Squash";
 
   // The name of the cluster that hosts the Squash server.
-  string cluster = 1 [(validate.rules).string = {min_len: 1}];
+  string cluster = 1 [
+    (validate.rules).string = {min_len: 1},
+    (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+  ];
+
+  // [#not-implemented-hide:]
+  udpa.core.v1.ResourceLocator cluster_resource_locator = 6
+      [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
   // When the filter requests the Squash server to create a DebugAttachment, it will use this
   // structure as template for the body of the request. It can contain reference to environment

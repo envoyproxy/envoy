@@ -9,5 +9,6 @@ api_proto_package(
         "//envoy/data/dns/v2alpha:pkg",
         "//envoy/type/matcher/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/core/v1:pkg",
     ],
 )

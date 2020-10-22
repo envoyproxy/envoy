@@ -590,6 +590,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing will not be triggered if the primary cluster does not exist.
+  // [#next-free-field: 6]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RouteAction.RequestMirrorPolicy";
@@ -598,9 +599,14 @@ message RouteAction {
 
     reserved "runtime_key";
 
-    // Specifies the cluster that requests will be mirrored to. The cluster must
-    // exist in the cluster manager configuration.
-    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+    oneof cluster_specifier {
+      // Specifies the cluster that requests will be mirrored to. The cluster must
+      // exist in the cluster manager configuration.
+      string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+      // [#not-implemented-hide:]
+      udpa.core.v1.ResourceLocator cluster_resource_locator = 5;
+    }
 
     // If not specified, all requests to the target cluster will be mirrored.
     //

@@ -10,6 +10,8 @@ import "envoy/config/endpoint/v3/endpoint_components.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -124,7 +126,12 @@ message ClusterEndpointsHealth {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.health.v3.ClusterEndpointsHealth";
 
-  string cluster_name = 1;
+  oneof cluster_specifier {
+    string cluster_name = 1;
+
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator cluster_resource_locator = 3;
+  }
 
   repeated LocalityEndpointsHealth locality_endpoints_health = 2;
 }
@@ -164,11 +171,17 @@ message LocalityEndpoints {
 // health checks to support statistics reporting, logging and debugging by the
 // Envoy instance (outside of HDS). For maximum usefulness, it should match the
 // same cluster structure as that provided by EDS.
+// [#next-free-field: 6]
 message ClusterHealthCheck {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.health.v3.ClusterHealthCheck";
 
-  string cluster_name = 1;
+  oneof cluster_specifier {
+    string cluster_name = 1;
+
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator cluster_resource_locator = 5;
+  }
 
   repeated config.core.v4alpha.HealthCheck health_checks = 2;
 

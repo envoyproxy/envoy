@@ -7,6 +7,8 @@ import "envoy/config/endpoint/v3/load_report.proto";
 
 import "google/protobuf/duration.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -74,6 +76,7 @@ message LoadStatsRequest {
 
 // The management server sends envoy a LoadStatsResponse with all clusters it
 // is interested in learning load stats about.
+// [#next-free-field: 6]
 message LoadStatsResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.load_stats.v2.LoadStatsResponse";
@@ -81,6 +84,9 @@ message LoadStatsResponse {
   // Clusters to report stats for.
   // Not populated if *send_all_clusters* is true.
   repeated string clusters = 1;
+
+  // [#not-implemented-hide:]
+  repeated udpa.core.v1.ResourceLocator cluster_resource_locator = 5;
 
   // If true, the client should send all clusters it knows about.
   // Only clients that advertise the "envoy.lrs.supports_send_all_clusters" capability in their

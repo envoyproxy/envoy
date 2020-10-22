@@ -7,6 +7,8 @@ import "envoy/config/core/v3/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/sensitive.proto";
@@ -125,6 +127,7 @@ message RedisProxy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes";
 
+    // [#next-free-field: 6]
     message Route {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route";
@@ -140,7 +143,14 @@ message RedisProxy {
 
         // Specifies the cluster that requests will be mirrored to. The cluster must
         // exist in the cluster manager configuration.
-        string cluster = 1 [(validate.rules).string = {min_len: 1}];
+        string cluster = 1 [
+          (validate.rules).string = {min_len: 1},
+          (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+        ];
+
+        // [#not-implemented-hide:]
+        udpa.core.v1.ResourceLocator cluster_resource_locator = 4
+            [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
         // If not specified or the runtime key is not present, all requests to the target cluster
         // will be mirrored.
@@ -162,7 +172,14 @@ message RedisProxy {
       bool remove_prefix = 2;
 
       // Upstream cluster to forward the command to.
-      string cluster = 3 [(validate.rules).string = {min_len: 1}];
+      string cluster = 3 [
+        (validate.rules).string = {min_len: 1},
+        (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+      ];
+
+      // [#not-implemented-hide:]
+      udpa.core.v1.ResourceLocator cluster_resource_locator = 5
+          [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
       // Indicates that the route has a request mirroring policy.
       repeated RequestMirrorPolicy request_mirror_policy = 4;

@@ -11,5 +11,6 @@ api_proto_package(
         "//envoy/extensions/filters/network/rocketmq_proxy/v3:pkg",
         "//envoy/type/matcher/v4alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/core/v1:pkg",
     ],
 )

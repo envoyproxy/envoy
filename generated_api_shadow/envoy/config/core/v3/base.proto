@@ -13,6 +13,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -132,7 +134,7 @@ message Extension {
 // Identifies a specific Envoy instance. The node identifier is presented to the
 // management server, which may use this identifier to distinguish per Envoy
 // configuration for serving.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Node";
 
@@ -156,7 +158,11 @@ message Node {
   // :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
   // <arch_overview_tracing>`, either in this message or via
   // :option:`--service-cluster`.
-  string cluster = 2;
+  string cluster = 2 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
+
+  // [#not-implemented-hide:]
+  udpa.core.v1.ResourceLocator cluster_resource_locator = 12
+      [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
   // Opaque metadata extending the node identifier. Envoy will pass this
   // directly to the management server.
