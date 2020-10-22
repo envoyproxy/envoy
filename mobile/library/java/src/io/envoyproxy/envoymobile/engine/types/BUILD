@@ -7,6 +7,7 @@ java_library(
     srcs = [
         "EnvoyHTTPCallbacks.java",
         "EnvoyHTTPFilter.java",
+        "EnvoyHTTPFilterCallbacks.java",
         "EnvoyHTTPFilterFactory.java",
         "EnvoyOnEngineRunning.java",
         "EnvoyStatus.java",

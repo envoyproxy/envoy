@@ -79,6 +79,21 @@ envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
   return native_data;
 }
 
+envoy_data* buffer_to_native_data_ptr(JNIEnv* env, jobject j_data) {
+  // Note: This check works for LocalRefs and GlobalRefs, but will not work for WeakGlobalRefs.
+  // Such usage would generally be inappropriate anyways; like C++ weak_ptrs, one should
+  // acquire a new strong reference before attempting to interact with an object held by
+  // a WeakGlobalRef. See:
+  // https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html#weak
+  if (j_data == NULL) {
+    return nullptr;
+  }
+
+  envoy_data* native_data = static_cast<envoy_data*>(safe_malloc(sizeof(envoy_header)));
+  *native_data = buffer_to_native_data(env, j_data);
+  return native_data;
+}
+
 envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_header.
@@ -109,5 +124,20 @@ envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
   }
 
   envoy_headers native_headers = {length / 2, header_array};
+  return native_headers;
+}
+
+envoy_headers* to_native_headers_ptr(JNIEnv* env, jobjectArray headers) {
+  // Note: This check works for LocalRefs and GlobalRefs, but will not work for WeakGlobalRefs.
+  // Such usage would generally be inappropriate anyways; like C++ weak_ptrs, one should
+  // acquire a new strong reference before attempting to interact with an object held by
+  // a WeakGlobalRef. See:
+  // https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html#weak
+  if (headers == NULL) {
+    return nullptr;
+  }
+
+  envoy_headers* native_headers = static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_header)));
+  *native_headers = to_native_headers(env, headers);
   return native_headers;
 }
