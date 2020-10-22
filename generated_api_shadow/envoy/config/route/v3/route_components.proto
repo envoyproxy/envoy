@@ -582,7 +582,7 @@ message HeaderMatchAndRewrite {
   // headers before the given header's value can be re-written.
   // The logical operations supported are AND, OR, and NOT. The values of all the headers present
   // in the upstream response can be checked and the logical operators can be used to specify
-  // complex match criteria. Eg. Before rewriting the Location header the user can check if the
+  // complex match criteria. For example, before rewriting the Location header the user can check if the
   // upstream responded with a 301 or 302 status.
   type.matcher.v3.MatchPredicate response_match_criteria = 2;
 }

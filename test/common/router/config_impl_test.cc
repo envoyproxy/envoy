@@ -1807,8 +1807,6 @@ TEST_F(RouteMatcherTest, TestRewriteResponseHeadersPrefixNotMatched) {
   EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
   EXPECT_EQ("route-override", headers.get_("x-route-header"));
   EXPECT_EQ("global", headers.get_("x-header-rewrite"));
-  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
-              ContainerEq(config.internalOnlyHeaders()));
 }
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
