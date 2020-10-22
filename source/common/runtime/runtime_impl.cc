@@ -457,6 +457,8 @@ void RtdsSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   validateUpdateSize(added_resources.size(), removed_resources.size());
 
+  // This is a singleton subscription, so we can only have the subscribed resource added or removed,
+  // but not both.
   if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());
   } else {
