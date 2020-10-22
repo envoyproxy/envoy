@@ -4,7 +4,6 @@
 
 set -e
 
-FOO=$(pwd)
 
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
