@@ -100,7 +100,7 @@ generate_ca() {
     -config "${1}.cnf" -batch -sha256
   openssl x509 -req \
     -in "${1}_cert.csr" -signkey "${1}_key.pem" -out "${1}_cert.pem" \
-    -extensions v3_ca -extfile "${1}.cnf" -days ${DEFAULT_VALIDITY_DAYS} "${extra_args[@]}"
+    -extensions v3_ca -extfile "${1}.cnf" -days "${DEFAULT_VALIDITY_DAYS}" "${extra_args[@]}"
 }
 
 # $1=<certificate name> $2=<CA name> $3=[req args]
@@ -151,7 +151,7 @@ generate_ca intermediate_ca ca
 # Generate valid cert and OCSP response
 generate_config good ca
 generate_rsa_cert good ca
-generate_ocsp_response good ca good -ndays ${DEFAULT_VALIDITY_DAYS}
+generate_ocsp_response good ca good -ndays "${DEFAULT_VALIDITY_DAYS}"
 dump_ocsp_details good ca
 
 # Generate OCSP response with the responder key hash instead of name
