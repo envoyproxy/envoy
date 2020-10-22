@@ -165,23 +165,6 @@ stages:
             parameters:
               ciTarget: bazel.release
 
-  - stage: linux_arm64
-    dependsOn: ["precheck"]
-    # For post-submit builds, continue even if precheck fails
-    condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
-    jobs:
-      - job: release
-        timeoutInMinutes: 120
-        pool: "arm-large"
-        steps:
-          - template: bazel.yml
-            parameters:
-              managedAgent: false
-              ciTarget: bazel.release.server_only
-              rbe: false
-              artifactSuffix: ".arm64"
-              bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
-
   - stage: check
     dependsOn: ["linux_x64"]
     jobs:
@@ -241,7 +224,7 @@ stages:
     dependsOn: ["linux_x64"]
     jobs:
       - job: docker
-        displayName: "linux multiarch"
+        displayName: "linux x64"
         pool:
           vmImage: "ubuntu-16.04"
         steps:
