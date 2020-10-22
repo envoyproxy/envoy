@@ -111,7 +111,7 @@ message ContinueRequestCommand {
 message ContinueResponseCommand {
 }
 
-// Request that Envoy next send a Body message downstream
+// Request that Envoy next send a Body message
 // containing either the next chunk of the request body available, or an end-of-stream.
 // Once this is returned, it will no longer be possible to modify the
 // message headers.
@@ -137,7 +137,8 @@ message SendBufferedResponseBodyCommand {
 // Request that Envoy will send the HTTP request trailers when they are
 // available. Once trailers have been requested, no more bodies
 // will be delivered, so this must be sent after all desired body chunks are
-// desired.
+// desired. If no trailers are available, a message containing an empty
+// set of trailers will be sent.
 message SendRequestTrailersCommand {
 }
 
@@ -203,56 +204,34 @@ message MutationResponse {
 // first received.
 // [#next-free-field: 9]
 message Request {
-  // A unique ID that will match the one sent in the "Response" message
-  string id = 1;
-
-  // The HTTP request method, such as `GET`, `POST`.
-  string method = 2;
-
   // The HTTP request headers. If multiple headers share the same key, they
   // must be merged according to the HTTP spec. All header keys must be
   // lower-cased, because HTTP header keys are case-insensitive.
-  config.core.v3.HeaderMap headers = 3;
-
-  // The request target, as it appears in the first line of the HTTP request. This includes
-  // the URL path and query-string. No decoding is performed.
-  string path = 4;
-
-  // The HTTP request `Host` or 'Authority` header value.
-  string host = 5;
-
-  // The HTTP URL scheme, such as `http` and `https`.
-  string scheme = 6;
+  config.core.v3.HeaderMap headers = 1;
 
   // Information about the downstream client's connection
-  auth.v3.AttributeContext.Peer client_info = 7;
+  auth.v3.AttributeContext.Peer client_info = 2;
 
   // The values of properties selected by the "request_properties"
   // list in the configuration. Each entry in the map is the
   // value of the specified property.
-  map<string, google.protobuf.Struct> properties = 8;
+  map<string, google.protobuf.Struct> properties = 3;
 }
 
 // This message is sent to the mutation server when the HTTP response is first
 // received.
 // [#next-free-field: 6]
 message Response {
-  // A unique ID that will match the one sent in the "Request" message
-  string id = 1;
-
-  // The HTTP status on the response
-  int32 status_code = 2;
-
   // The HTTP headers
-  config.core.v3.HeaderMap headers = 3;
+  config.core.v3.HeaderMap headers = 1;
 
   // Information about the upstream service's connection
-  auth.v3.AttributeContext.Peer destination_info = 4;
+  auth.v3.AttributeContext.Peer destination_info = 2;
 
   // The values of properties selected by the "response_properties"
   // list in the configuration. Each entry in the map is the
   // value of the specified property.
-  map<string, google.protobuf.Struct> properties = 5;
+  map<string, google.protobuf.Struct> properties = 3;
 }
 
 // This message contains the message body that Envoy sends to the mutation service.
@@ -280,7 +259,7 @@ message CompleteResponse {
 }
 
 // Change all or part of the message body by replacing the portion
-// of the original body denoted by "offset" and "length" with "body."
+// of the last chunk received denoted by "offset" and "length" with "body."
 message BodyMutation {
   uint32 offset = 1;
 
