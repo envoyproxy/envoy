@@ -87,6 +87,16 @@ for how to update or override dependencies.
     available via a package manager, but may not be available in default repositories depending on
     OS version. To build against `libc++` build with the `--config=libc++` instead of the
     `--config=clang` flag.
+    
+    #### Config Flag Choices
+    Different config flags specify the compiler libraries: 
+    https://docs.bazel.build/versions/master/guide.html#--config
+    
+    - --config=libc++ => clang + libc++
+    - no config flag => gcc + libstdc++
+    - --config=clang => clang + libstdc++
+  
+    
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
