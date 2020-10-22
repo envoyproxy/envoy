@@ -18,6 +18,7 @@ USER_GROUP=root
 
 [[ -t 1 ]] && ENVOY_DOCKER_OPTIONS+=" -it"
 [[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=" -v $(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)"
+[[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+="-v ${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK} -e SSH_AUTH_SOCK"
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 
@@ -25,6 +26,7 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm ${ENVOY_DOCKER_OPTIONS} -e HTTP_PROXY=${http_proxy} -e HTTPS_PROXY=${https_proxy} -e NO_PROXY=${no_proxy} \
   -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build -v /var/run/docker.sock:/var/run/docker.sock  \
+  -e AZP_BRANCH \
   -e BAZEL_BUILD_EXTRA_OPTIONS -e BAZEL_EXTRA_TEST_OPTIONS -e BAZEL_REMOTE_CACHE -e ENVOY_STDLIB -e BUILD_REASON \
   -e BAZEL_REMOTE_INSTANCE -e GCP_SERVICE_ACCOUNT_KEY -e NUM_CPUS -e ENVOY_RBE -e FUZZIT_API_KEY -e ENVOY_BUILD_IMAGE \
   -e ENVOY_SRCDIR -e ENVOY_BUILD_TARGET -e SYSTEM_PULLREQUEST_TARGETBRANCH -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \

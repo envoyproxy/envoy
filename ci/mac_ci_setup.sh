@@ -20,9 +20,23 @@ function install {
     fi
 }
 
-if ! brew update; then
-    echo "Failed to update homebrew"
-    exit 1
+function retry () {
+    local returns=1 i=1
+    while ((i<=HOMEBREW_RETRY_ATTEMPTS)); do
+	if "$@"; then
+	    returns=0
+	    break
+	else
+	    sleep "$HOMEBREW_RETRY_INTERVAL";
+	    ((i++))
+	fi
+    done
+    return "$returns"
+}
+
+if ! retry brew update; then
+  # Do not exit early if update fails.
+  echo "Failed to update homebrew"
 fi
 
 DEPS="automake cmake coreutils go libtool wget ninja"
