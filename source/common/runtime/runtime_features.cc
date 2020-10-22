@@ -68,7 +68,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.early_errors_via_hcm",
     "envoy.reloadable_features.enable_deprecated_v2_api_warning",
     "envoy.reloadable_features.enable_dns_cache_circuit_breakers",
-    "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
     "envoy.reloadable_features.fix_upgrade_response",
     "envoy.reloadable_features.fix_wildcard_matching",
     "envoy.reloadable_features.fixed_connection_close",
@@ -79,6 +78,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.listener_in_place_filterchain_update",
+    "envoy.reloadable_features.new_codec_behavior",
     "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
@@ -103,12 +103,13 @@ constexpr const char* disabled_runtime_features[] = {
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
     // v2 url is removed from codebase.
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
-    // TODO(asraa) flip this feature after codec errors are handled
-    "envoy.reloadable_features.new_codec_behavior",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // gRPC Timeout header is missing (#13580)
+    "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
+
 };
 
 RuntimeFeatures::RuntimeFeatures() {

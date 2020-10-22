@@ -70,7 +70,6 @@ stages:
             inputs:
               pathtoPublish: "$(Build.SourcesDirectory)/generated/docs"
               artifactName: docs
-            condition: and(succeeded(), eq(variables['Build.Reason'], 'PullRequest'))
 
           - task: InstallSSHKey@0
             inputs:
@@ -78,7 +77,7 @@ stages:
               sshPublicKey: "$(DocsPublicKey)"
               sshPassphrase: "$(SshDeployKeyPassphrase)"
               sshKeySecureFile: "$(DocsPrivateKey)"
-            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['PostSubmit'], true))
+            condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
 
           - script: docs/publish.sh
             displayName: "Publish to GitHub"
@@ -86,10 +85,25 @@ stages:
             env:
               AZP_BRANCH: $(Build.SourceBranch)
               AZP_SHA1: $(Build.SourceVersion)
-            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['PostSubmit'], true))
+            condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
+
+      - job: dependencies
+        dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+              GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+            displayName: "Verify dependency information"
 
   - stage: sync
-    condition: and(succeeded(), eq(variables['PostSubmit'], true))
+    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
     dependsOn: []
     jobs:
       - job: filter_example
@@ -130,6 +144,8 @@ stages:
 
       - job: go_control_plane
         dependsOn: []
+        pool:
+          vmImage: "ubuntu-18.04"
         steps:
           - task: InstallSSHKey@0
             inputs:
@@ -152,12 +168,11 @@ stages:
 
   - stage: linux_x64
     dependsOn: ["precheck"]
-    # For master builds, continue even if precheck fails
-    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    # For post-submit builds, continue even if precheck fails
+    condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
     jobs:
       - job: release
-        # For master builds, continue even if format fails
-        timeoutInMinutes: 360
+        timeoutInMinutes: 120
         pool:
           vmImage: "ubuntu-18.04"
         steps:
@@ -167,11 +182,11 @@ stages:
 
   - stage: linux_arm64
     dependsOn: ["precheck"]
-    # For master builds, continue even if precheck fails
-    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    # For post-submit builds, continue even if precheck fails
+    condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
     jobs:
       - job: release
-        timeoutInMinutes: 360
+        timeoutInMinutes: 120
         pool: "arm-large"
         steps:
           - template: bazel.yml
@@ -203,7 +218,7 @@ stages:
               CI_TARGET: "bazel.tsan"
             compile_time_options:
               CI_TARGET: "bazel.compile_time_options"
-        timeoutInMinutes: 360
+        timeoutInMinutes: 120
         pool:
           vmImage: "ubuntu-18.04"
         steps:
@@ -214,7 +229,7 @@ stages:
       - job: coverage
         displayName: "linux_x64"
         dependsOn: []
-        timeoutInMinutes: 360
+        timeoutInMinutes: 120
         pool: "x64-large"
         strategy:
           maxParallel: 2
@@ -313,7 +328,7 @@ stages:
     dependsOn: ["precheck"]
     jobs:
       - job: test
-        timeoutInMinutes: 360
+        timeoutInMinutes: 180
         pool:
           vmImage: "macos-latest"
         steps:
@@ -347,7 +362,7 @@ stages:
     dependsOn: ["precheck"]
     jobs:
       - job: release
-        timeoutInMinutes: 360
+        timeoutInMinutes: 120
         pool:
           vmImage: "windows-latest"
         steps:
@@ -368,7 +383,7 @@ stages:
 
       - job: docker
         dependsOn: ["release"]
-        timeoutInMinutes: 360
+        timeoutInMinutes: 120
         pool:
           vmImage: "windows-latest"
         steps:
