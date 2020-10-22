@@ -10,7 +10,7 @@ envoy_package()
 filegroup(
     name = "configs",
     srcs = [
-        "//examples/wasm:configs",
+        "//examples/wasm-cc:configs",
     ] + glob(
         [
             "**/*.yaml",
