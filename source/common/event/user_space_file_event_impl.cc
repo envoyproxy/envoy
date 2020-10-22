@@ -17,7 +17,7 @@ void DefaultEventListener::onEventActivated(uint32_t activated_events) {
   // Event owner should not activate any event which is disabled.
   // Also see onEventEnabled which clears ephemeral events.
   // The overall prevents callback on disabled events.
-  ASSERT((ephermal_events_ & ~enabled_events_) == 0);
+  ASSERT((activated_events & ~enabled_events_) == 0);
   ephermal_events_ |= activated_events;
 }
 
