@@ -87,22 +87,31 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
                                               DnsLookupFamily dns_lookup_family,
                                               ResolveCb callback) {
   ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
-  std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
 
-  DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
-  if (error != kDNSServiceErr_NoError) {
-    ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
+  try {
+    auto address = Utility::parseInternetAddress(dns_name);
+    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API", dns_name, address->asString());
+    callback(DnsResolver::ResolutionStatus::Success, {DnsResponse(address, std::chrono::seconds(60))});
     return nullptr;
-  }
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(debug, "DNS resolver local resolution failed with: {}", e.what());
+    std::unique_ptr<PendingResolution> pending_resolution(
+        new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
 
-  // If the query was synchronously resolved, there is no need to return the query.
-  if (pending_resolution->synchronously_completed_) {
-    return nullptr;
-  }
+    DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
+    if (error != kDNSServiceErr_NoError) {
+      ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
+      return nullptr;
+    }
 
-  pending_resolution->owned_ = true;
-  return pending_resolution.release();
+    // If the query was synchronously resolved, there is no need to return the query.
+    if (pending_resolution->synchronously_completed_) {
+      return nullptr;
+    }
+
+    pending_resolution->owned_ = true;
+    return pending_resolution.release();
+  }
 }
 
 void AppleDnsResolverImpl::addPendingQuery(PendingResolution* query) {
