@@ -527,7 +527,7 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
                    errorDetails(result.errno_));
     return {};
   }
-  return std::chrono::milliseconds(info.tcpi_rtt);
+  return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
 } // namespace Network

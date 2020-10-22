@@ -268,7 +268,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   socklen_t len = sizeof(unix_tcp_info);
   auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &unix_tcp_info, &len);
   if (!SOCKET_FAILURE(result)) {
-    tcp_info->tcpi_rtt = unix_tcp_info.tcpi_rtt;
+    tcp_info->tcpi_rtt = std::chrono::microseconds(unix_tcp_info.tcpi_rtt);
   }
   return {!SOCKET_FAILURE(result), !SOCKET_FAILURE(result) ? 0 : errno};
 #endif

@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <chrono>
 
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
@@ -13,7 +14,7 @@ namespace Envoy {
 namespace Api {
 
 struct EnvoyTcpInfo {
-  uint32_t tcpi_rtt; // Round Trip Time (RTT) in microseconds.
+  std::chrono::microseconds tcpi_rtt;
 };
 
 class OsSysCalls {

@@ -374,7 +374,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
                       sizeof(win_tcpinfo), &bytesReturned, nullptr, nullptr);
 
   if (!SOCKET_FAILURE(rc)) {
-    tcp_info->tcpi_rtt = win_tcpinfo.RttUs;
+    tcp_info->tcpi_rtt = std::chrono::microseconds(win_tcpinfo.RttUs);
   }
   return {!SOCKET_FAILURE(rc), !SOCKET_FAILURE(rc) ? 0 : ::WSAGetLastError()};
 #endif

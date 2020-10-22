@@ -74,24 +74,26 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) 
       .WillOnce(Return(Api::SysCallBoolResult{false, -1}));
 
   IoSocketHandleImpl io_handle;
-  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
+  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::microseconds>{}));
 }
 
 TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
   NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto rtt = std::chrono::microseconds(35);
   auto os_calls =
       std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
           &os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
       .WillOnce(
-          Invoke([](os_fd_t /*sockfd*/, Api::EnvoyTcpInfo* tcp_info) -> Api::SysCallBoolResult {
-            tcp_info->tcpi_rtt = 35;
+          Invoke([rtt](os_fd_t /*sockfd*/, Api::EnvoyTcpInfo* tcp_info) -> Api::SysCallBoolResult {
+            tcp_info->tcpi_rtt = rtt;
             return {true, 0};
           }));
 
   IoSocketHandleImpl io_handle;
-  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{35}));
+  EXPECT_THAT(io_handle.lastRoundTripTime(),
+              Eq(std::chrono::duration_cast<std::chrono::milliseconds>(rtt)));
 }
 } // namespace
 } // namespace Network
