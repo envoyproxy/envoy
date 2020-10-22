@@ -529,3 +529,18 @@ message JwtAuthentication {
   // requirements specified in the rules.
   bool bypass_cors_preflight = 4;
 }
+
+// Specify per-route config.
+// If a route doesn't specify a per-route config, the JwtAuthentication will be used.
+message PerRouteConfig {
+  oneof requirement_specifier {
+    option (validate.required) = true;
+
+    // Bypass Jwt authentication.
+    bool bypass = 1;
+
+    // Specify a Jwt Requirement.
+    // Its providers must be specified in the `providers` field in JwtAuthentication.
+    JwtRequirement requires = 2;
+  }
+}

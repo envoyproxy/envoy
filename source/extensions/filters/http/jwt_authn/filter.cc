@@ -56,12 +56,27 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Verify the JWT token, onComplete() will be called when completed.
-  const auto* verifier =
-      config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
-  if (!verifier) {
+  const Verifier* verifier = nullptr;
+  bool use_per_route = false;
+  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
+  if (route != nullptr && route->routeEntry() != nullptr) {
+    const auto* per_route_config =
+        Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(
+            HttpFilterNames::get().JwtAuthn, route);
+    if (per_route_config != nullptr) {
+      verifier = config_->findPerRouteVerifier(*per_route_config);
+      use_per_route = true;
+    }
+  }
+  if (!use_per_route) {
+    verifier =
+        config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
+  }
+
+  if (verifier == nullptr) {
     onComplete(Status::Ok);
   } else {
+    // Verify the JWT token, onComplete() will be called when completed.
     context_ = Verifier::createContext(headers, decoder_callbacks_->activeSpan(), this);
     verifier->verify(context_);
   }

@@ -31,6 +31,21 @@ void FilterConfigImpl::init() {
   }
 }
 
+const Verifier* FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route){
+  if (per_route.config().bypass()) {
+    return nullptr;
+  }
+
+  auto& cache = getCache();
+  const Verifier* verifier = cache.getHashVerifier(per_route.hash());
+  if (verifier == nullptr) {
+    auto new_verifier = Verifier::create(per_route.config().requires(), proto_config_.providers(), *this);
+    verifier = new_verifier.get();
+    cache.setHashVerifier(per_route.hash(), std::move(new_verifier));
+  }
+  return verifier;
+}
+
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

@@ -34,9 +34,26 @@ public:
   // Get the JwksCache object.
   JwksCache& getJwksCache() { return *jwks_cache_; }
 
+  // Get the verifier from the map keyed by the hash of proto JwtRequirement
+  const Verifier* getHashVerifier(size_t hash) const {
+    const auto it = hash_verifiers_.find(hash);
+    if (it != hash_verifiers_.end()) {
+      return it->second.get();
+    }
+    return nullptr;
+  }
+
+  // Set the verifier to the hash map keyed by the hash of proto JwtRequirement
+  void setHashVerifier(size_t hash, VerifierConstPtr verifier) {
+    hash_verifiers_.emplace(hash, std::move(verifier));
+  }
+
 private:
   // The JwksCache object.
   JwksCachePtr jwks_cache_;
+
+  // The map of hash of proto JwtRequirement to verifier.
+  absl::flat_hash_map<size_t, VerifierConstPtr> hash_verifiers_;
 };
 
 /**
@@ -55,6 +72,23 @@ struct JwtAuthnFilterStats {
 };
 
 /**
+ * The per-route filter config
+ */
+class PerRouteFilterConfig : public Envoy::Router::RouteSpecificFilterConfig {
+ public:
+  PerRouteFilterConfig(const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config)
+      : config_(config), hash_(Envoy::MessageUtil::hash(config_)) {}
+
+  size_t hash() const { return hash_; }
+  const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config() const {
+    return config_; }
+
+ private:
+  const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig config_;
+  const size_t hash_;
+};
+
+/**
  * The filter config interface. It is an interface so that we can mock it in tests.
  */
 class FilterConfig {
@@ -68,6 +102,9 @@ public:
   // Finds the matcher that matched the header
   virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                        const StreamInfo::FilterState& filter_state) const PURE;
+
+  // Finds the verifier based on per-route config.
+  virtual const Verifier* findPerRouteVerifier(const PerRouteFilterConfig& per_route) PURE;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
@@ -122,6 +159,8 @@ public:
     }
     return nullptr;
   }
+
+  const Verifier* findPerRouteVerifier(const PerRouteFilterConfig& per_route) override;
 
   // methods for AuthFactory interface. Factory method to help create authenticators.
   AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
