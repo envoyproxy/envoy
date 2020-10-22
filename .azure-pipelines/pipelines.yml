@@ -217,12 +217,9 @@ stages:
         timeoutInMinutes: 120
         pool: "x64-large"
         strategy:
-          maxParallel: 2
           matrix:
             coverage:
               CI_TARGET: "coverage"
-            fuzz_coverage:
-              CI_TARGET: "fuzz_coverage"
         steps:
           - template: bazel.yml
             parameters:
@@ -255,13 +252,6 @@ stages:
               buildType: current
               artifactName: "bazel.release"
               itemPattern: "bazel.release/envoy_binary.tar.gz"
-              downloadType: single
-              targetPath: $(Build.StagingDirectory)
-          - task: DownloadBuildArtifacts@0
-            inputs:
-              buildType: current
-              artifactName: "bazel.release.arm64"
-              itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
               downloadType: single
               targetPath: $(Build.StagingDirectory)
           - bash: |
@@ -341,8 +331,3 @@ stages:
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathtoPublish: "$(Build.StagingDirectory)/envoy"
-              artifactName: windows.release
-            condition: always()
