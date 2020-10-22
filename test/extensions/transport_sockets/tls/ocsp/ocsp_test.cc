@@ -25,13 +25,9 @@ namespace CertUtility = Envoy::Extensions::TransportSockets::Tls::Utility;
 
 class OcspFullResponseParsingTest : public testing::Test {
 public:
-  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
-    TestEnvironment::exec({TestEnvironment::runfilesPath(
-        "test/extensions/transport_sockets/tls/ocsp/gen_unittest_ocsp_data.sh")});
-  }
-
   std::string fullPath(std::string filename) {
-    return TestEnvironment::substitute("{{ test_tmpdir }}/ocsp_test_data/" + filename);
+    return TestEnvironment::substitute(
+        "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/" + filename);
   }
 
   std::vector<uint8_t> readFile(std::string filename) {
@@ -88,8 +84,8 @@ TEST_F(OcspFullResponseParsingTest, UnknownCertTest) {
 }
 
 TEST_F(OcspFullResponseParsingTest, ExpiredResponseTest) {
-  auto next_week = time_system_.systemTime() + std::chrono::hours(8 * 24);
-  time_system_.setSystemTime(next_week);
+  auto ten_years_forward = time_system_.systemTime() + std::chrono::hours(24 * 365 * 10);
+  time_system_.setSystemTime(ten_years_forward);
   setup("good_ocsp_resp.der");
   // nextUpdate is present but in the past
   EXPECT_TRUE(response_->isExpired());

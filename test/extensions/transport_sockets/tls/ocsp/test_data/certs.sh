@@ -4,22 +4,20 @@
 
 set -e
 
+readonly DEFAULT_VALIDITY_DAYS=${DEFAULT_VALIDITY_DAYS:-730}
+readonly HERE=$(cd "$(dirname "$0")" && pwd)
+
+cd "$HERE" || exit 1
 trap cleanup EXIT
+
 cleanup() {
-  rm -f ./*_index*
-  rm -f ./*.csr
-  rm -f ./*.cnf
-  rm -f ./*_serial*
+    rm -f ./*.cnf
+    rm -f ./*.csr
+    rm -f ./*_index*
+    rm -f ./*_serial*
+    rm -f ./*.srl
+    rm -f ./100*.pem
 }
-
-[[ -z "${TEST_TMPDIR}" ]] && TEST_TMPDIR="$(cd "$(dirname "$0")" && pwd)"
-
-TEST_OCSP_DIR="${TEST_TMPDIR}/ocsp_test_data"
-mkdir -p "${TEST_OCSP_DIR}"
-
-rm -f "${TEST_OCSP_DIR}"/*
-
-cd "$TEST_OCSP_DIR" || exit 1
 
 ##################################################
 # Make the configuration file
@@ -55,17 +53,17 @@ commonName_max  = 64
 default_ca = CA_default
 
 [ CA_default ]
-dir           = ${TEST_OCSP_DIR}
-certs         = ${TEST_OCSP_DIR}
-new_certs_dir = ${TEST_OCSP_DIR}
-serial        = ${TEST_OCSP_DIR}
-database      = ${TEST_OCSP_DIR}/$2_index.txt
-serial        = ${TEST_OCSP_DIR}/$2_serial
+dir           = ${HERE}
+certs         = ${HERE}
+new_certs_dir = ${HERE}
+serial        = ${HERE}
+database      = ${HERE}/$2_index.txt
+serial        = ${HERE}/$2_serial
 
-private_key   = ${TEST_OCSP_DIR}/$2_key.pem
-certificate   = ${TEST_OCSP_DIR}/$2_cert.pem
+private_key   = ${HERE}/$2_key.pem
+certificate   = ${HERE}/$2_cert.pem
 
-default_days  = 375
+default_days  = ${DEFAULT_VALIDITY_DAYS}
 default_md    = sha256
 preserve      = no
 policy        = policy_default
@@ -102,7 +100,7 @@ generate_ca() {
     -config "${1}.cnf" -batch -sha256
   openssl x509 -req \
     -in "${1}_cert.csr" -signkey "${1}_key.pem" -out "${1}_cert.pem" \
-    -extensions v3_ca -extfile "${1}.cnf" "${extra_args[@]}"
+    -extensions v3_ca -extfile "${1}.cnf" -days "${DEFAULT_VALIDITY_DAYS}" "${extra_args[@]}"
 }
 
 # $1=<certificate name> $2=<CA name> $3=[req args]
@@ -153,7 +151,7 @@ generate_ca intermediate_ca ca
 # Generate valid cert and OCSP response
 generate_config good ca
 generate_rsa_cert good ca
-generate_ocsp_response good ca good -ndays 7
+generate_ocsp_response good ca good -ndays "${DEFAULT_VALIDITY_DAYS}"
 dump_ocsp_details good ca
 
 # Generate OCSP response with the responder key hash instead of name
