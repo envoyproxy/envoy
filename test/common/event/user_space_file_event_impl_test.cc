@@ -40,8 +40,8 @@ protected:
   MockReadyCb ready_cb_;
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
-  std::unique_ptr<Event::UserSpaceFileEventImpl> user_file_event_;
   Event::SchedulableCallbackPtr io_callback_;
+  std::unique_ptr<Event::UserSpaceFileEventImpl> user_file_event_;
 };
 
 TEST_F(UserSpaceFileEventImplTest, TestLevelTriggerIsNotSupported) {
