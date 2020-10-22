@@ -18,9 +18,8 @@ public:
   }
 
   SocketPtr duplicate() override {
-    return SocketPtr{new SocketImpl(io_handle_->duplicate(), local_address_)};
+    RELEASE_ASSERT(false, "Socket duplicate function is only for listener sockets.");
   }
-
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
