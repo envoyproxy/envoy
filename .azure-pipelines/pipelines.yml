@@ -264,11 +264,6 @@ stages:
               AZP_SHA1: $(Build.SourceVersion)
               DOCKERHUB_USERNAME: $(DockerUsername)
               DOCKERHUB_PASSWORD: $(DockerPassword)
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathtoPublish: "$(Build.StagingDirectory)/build_images"
-              artifactName: docker
-            condition: always()
 
   - stage: verify
     dependsOn: ["docker"]
@@ -322,10 +317,9 @@ stages:
         pool:
           vmImage: "windows-latest"
         steps:
-          - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
+          - bash: ci/run_envoy_docker_windows.sh ci/windows_ci_steps.sh
             displayName: "Run Windows CI"
             env:
-              ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
               ENVOY_RBE: "true"
               BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
