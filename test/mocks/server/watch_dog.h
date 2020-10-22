@@ -15,7 +15,6 @@ public:
   MOCK_METHOD(void, startWatchdog, (Event::Dispatcher & dispatcher));
   MOCK_METHOD(void, touch, ());
   MOCK_METHOD(Thread::ThreadId, threadId, (), (const));
-  MOCK_METHOD(MonotonicTime, lastTouchTime, (), (const));
 };
 } // namespace Server
 } // namespace Envoy
