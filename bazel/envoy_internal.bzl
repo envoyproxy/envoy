@@ -14,6 +14,7 @@ def envoy_copts(repository, test = False):
         "-Wformat",
         "-Wformat-security",
         "-Wvla",
+        "-Wno-deprecated-declarations",
     ]
 
     # Windows options for cleanest service compilation;
