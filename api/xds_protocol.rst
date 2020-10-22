@@ -286,7 +286,12 @@ given type from multiple xDS servers, each xDS server will have a different noti
 Note that the version for a resource type is not a property of an individual xDS stream but rather
 a property of the resources themselves. If the stream becomes broken and the client creates a new
 stream, the client's initial request on the new stream should indicate the most recent version
-seen by the client on the previous stream.
+seen by the client on the previous stream. Servers may decide to optimize by not resending
+resources that the client had already seen on the previous stream, but only if they know that the
+client is not subscribing to a new resource that it was not previously subscribed to. For example,
+it is generally safe for servers to do this optimization for wildcard LDS and CDS requests, and it
+is safe to do in environments where the clients will always subscribe to exactly the same set of
+resources.
 
 An example EDS request might be:
 
