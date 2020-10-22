@@ -260,7 +260,7 @@ public:
   virtual Address::InstanceConstSharedPtr peerAddress() PURE;
 
   /**
-   * Duplicates the handle. (see man dup)
+   * Duplicates the handle. This is intended to be used only on listener sockets. (see man dup)
    * @return a pointer to the new handle.
    */
   virtual std::unique_ptr<IoHandle> duplicate() PURE;

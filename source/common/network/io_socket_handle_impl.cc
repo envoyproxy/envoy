@@ -483,10 +483,8 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
 
 IoHandlePtr IoSocketHandleImpl::duplicate() {
   auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
-  if (result.rc_ == -1) {
-    throw EnvoyException(fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
-                                     errorDetails(result.errno_)));
-  }
+  RELEASE_ASSERT(result.rc_ != -1, fmt::format("duplicate failed for '{}': ({}) {}", fd_,
+                                               result.errno_, errorDetails(result.errno_)));
   return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
 }
 
@@ -537,9 +535,21 @@ void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Even
   file_event_ = dispatcher.createFileEvent(fd_, cb, trigger, events);
 }
 
-void IoSocketHandleImpl::activateFileEvents(uint32_t events) { file_event_->activate(events); }
+void IoSocketHandleImpl::activateFileEvents(uint32_t events) {
+  if (file_event_) {
+    file_event_->activate(events);
+  } else {
+    ENVOY_BUG(false, "Null file_event_");
+  }
+}
 
-void IoSocketHandleImpl::enableFileEvents(uint32_t events) { file_event_->setEnabled(events); }
+void IoSocketHandleImpl::enableFileEvents(uint32_t events) {
+  if (file_event_) {
+    file_event_->setEnabled(events);
+  } else {
+    ENVOY_BUG(false, "Null file_event_");
+  }
+}
 
 Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);

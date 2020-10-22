@@ -18,8 +18,7 @@ public:
   }
 
   SocketPtr duplicate() override {
-    auto socket = new SocketImpl(io_handle_->duplicate(), local_address_);
-    return SocketPtr{socket};
+    return SocketPtr{new SocketImpl(io_handle_->duplicate(), local_address_)};
   }
 
   IoHandle& ioHandle() override { return *io_handle_; }
