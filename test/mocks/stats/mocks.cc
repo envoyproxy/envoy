@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

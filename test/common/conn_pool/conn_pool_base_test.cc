@@ -11,6 +11,7 @@
 namespace Envoy {
 namespace ConnectionPool {
 
+using testing::AnyNumber;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 
@@ -72,7 +73,6 @@ public:
       return ret;
     }));
   }
-
   ConnPoolImplBaseTest() = default;
 
   uint32_t stream_limit_ = 100;
@@ -90,7 +90,7 @@ public:
 TEST_F(ConnPoolImplBaseTest, BasicPrefetch) {
   initialize();
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // On new stream, create 2 connections.
   EXPECT_CALL(*pool_, instantiateActiveClient).Times(2);
@@ -105,7 +105,7 @@ TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
   testing::InSequence s;
 
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // On new stream, create 2 connections.
   EXPECT_CALL(*pool_, instantiateActiveClient).Times(2);
@@ -126,7 +126,7 @@ TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
 TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
   initialize();
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   host_->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_EQ(host_->health(), Upstream::Host::Health::Unhealthy);
@@ -142,7 +142,7 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
 TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
   initialize();
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   EXPECT_EQ(host_->health(), Upstream::Host::Health::Healthy);
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
@@ -187,6 +187,36 @@ TEST_F(ConnPoolImplBaseTest, TimeoutTest) {
   // Emulate the idle timeout firing and expect our callback to be triggered
   EXPECT_CALL(idle_pool_callback, Call).Times(1);
   timer_ptr->invokeCallback();
+}
+
+TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
+  initialize();
+  // Create more than one connection per new stream.
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+  EXPECT_CALL(*pool_, instantiateActiveClient).Times(AnyNumber());
+
+  // With global prefetch off, we won't prefetch.
+  EXPECT_FALSE(pool_->maybePrefetch(0));
+  // With prefetch ratio of 1.1, we'll prefetch two connections.
+  // Currently, no number of subsequent calls to prefetch will increase that.
+  EXPECT_TRUE(pool_->maybePrefetch(1.1));
+  EXPECT_TRUE(pool_->maybePrefetch(1.1));
+  EXPECT_FALSE(pool_->maybePrefetch(1.1));
+
+  // With a higher prefetch ratio, more connections may be prefetched.
+  EXPECT_TRUE(pool_->maybePrefetch(3));
+
+  pool_->destructAllConnections();
+}
+
+TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
+  initialize();
+  // Create more than one connection per new stream.
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+
+  // Prefetch won't occur if the host is not healthy.
+  host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
+  EXPECT_FALSE(pool_->maybePrefetch(1));
 }
 
 } // namespace ConnectionPool

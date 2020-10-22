@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <tuple>
 #include <vector>
@@ -92,6 +93,13 @@ public:
    * @return requested server name (e.g. SNI in TLS), if any.
    */
   virtual absl::string_view requestedServerName() const PURE;
+
+  /**
+   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  time of the connection. If the platform does not support this, then an empty optional is
+   *  returned.
+   */
+  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
 };
 
 using ConnectionSocketPtr = std::unique_ptr<ConnectionSocket>;

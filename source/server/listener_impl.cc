@@ -19,6 +19,7 @@
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
@@ -171,9 +172,6 @@ Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.ht
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
-Envoy::Random::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
-  return server_.random();
-}
 Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
 Stats::Scope& ListenerFactoryContextBaseImpl::scope() { return *global_scope_; }
 Singleton::Manager& ListenerFactoryContextBaseImpl::singletonManager() {
@@ -325,6 +323,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
+      connection_balancer_(origin.connection_balancer_),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
@@ -376,6 +375,9 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
+
+    udp_listener_worker_router_ =
+        std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
   }
 }
 
@@ -476,24 +478,27 @@ void ListenerImpl::buildFilterChains() {
   Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
+      parent_.server_.stats(), parent_.server_.singletonManager(), parent_.server_.threadLocal(),
+      validation_visitor_, parent_.server_.api());
   transport_factory_context.setInitManager(*dynamic_init_manager_);
-  // The init manager is a little messy. Will refactor when filter chain manager could accept
-  // network filter chain update.
-  // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
-  filter_chain_manager_.addFilterChain(config_.filter_chains(), builder, filter_chain_manager_);
+  filter_chain_manager_.addFilterChains(
+      config_.filter_chains(),
+      config_.has_default_filter_chain() ? &config_.default_filter_chain() : nullptr, builder,
+      filter_chain_manager_);
 }
 
 void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.
-  if (config_.has_connection_balance_config()) {
-    // Currently exact balance is the only supported type and there are no options.
-    ASSERT(config_.connection_balance_config().has_exact_balance());
-    connection_balancer_ = std::make_unique<Network::ExactConnectionBalancerImpl>();
-  } else {
-    connection_balancer_ = std::make_unique<Network::NopConnectionBalancerImpl>();
+  if (connection_balancer_ == nullptr) {
+    // Not in place listener update.
+    if (config_.has_connection_balance_config()) {
+      // Currently exact balance is the only supported type and there are no options.
+      ASSERT(config_.connection_balance_config().has_exact_balance());
+      connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+    } else {
+      connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
+    }
   }
 
   if (config_.has_tcp_fast_open_queue_length()) {
@@ -574,9 +579,6 @@ Http::Context& PerListenerFactoryContextImpl::httpContext() {
 }
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
-}
-Envoy::Random::RandomGenerator& PerListenerFactoryContextImpl::random() {
-  return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {
   return listener_factory_context_base_->runtime();
@@ -741,6 +743,15 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
       callback(*message_and_filter_chain.second);
     }
   }
+  // Filter chain manager maintains an optional default filter chain besides the filter chains
+  // indexed by message.
+  if (auto eq = MessageUtil();
+      filter_chain_manager_.defaultFilterChainMessage().has_value() &&
+      (!another_listener.filter_chain_manager_.defaultFilterChainMessage().has_value() ||
+       !eq(*another_listener.filter_chain_manager_.defaultFilterChainMessage(),
+           *filter_chain_manager_.defaultFilterChainMessage()))) {
+    callback(*filter_chain_manager_.defaultFilterChain());
+  }
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
@@ -750,6 +761,8 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
   differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
   differencer.IgnoreField(
       envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("filter_chains"));
+  differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
+      "default_filter_chain"));
   return differencer.Compare(lhs, rhs);
 }
 

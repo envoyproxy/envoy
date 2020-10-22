@@ -26,6 +26,10 @@ public:
             auto* route = virtual_host->mutable_routes(0)->mutable_route();
             route->mutable_idle_timeout()->set_seconds(0);
             route->mutable_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+
+            auto* header = virtual_host->mutable_response_headers_to_add()->Add()->mutable_header();
+            header->set_key("foo");
+            header->set_value("bar");
           }
           if (enable_request_timeout_) {
             hcm.mutable_request_timeout()->set_seconds(0);
@@ -178,6 +182,9 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("408", response->headers().getStatusValue());
+  auto foo = Http::LowerCaseString("foo");
+  ASSERT_FALSE(response->headers().get(foo).empty());
+  EXPECT_EQ("bar", response->headers().get(foo)[0]->value().getStringView());
   EXPECT_EQ("stream timeout", response->body());
 
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("stream_idle_timeout"));

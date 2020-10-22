@@ -51,6 +51,8 @@ public:
   MOCK_METHOD(bool, cpusetThreadsEnabled, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, disabledExtensions, (), (const));
   MOCK_METHOD(Server::CommandLineOptionsPtr, toCommandLineOptions, (), (const));
+  MOCK_METHOD(const std::string&, socketPath, (), (const));
+  MOCK_METHOD(mode_t, socketMode, (), (const));
 
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
@@ -72,6 +74,8 @@ public:
   bool mutex_tracing_enabled_{};
   bool cpuset_threads_enabled_{};
   std::vector<std::string> disabled_extensions_;
+  std::string socket_path_;
+  mode_t socket_mode_;
 };
 } // namespace Server
 } // namespace Envoy

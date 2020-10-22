@@ -54,7 +54,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -67,7 +67,7 @@ message HealthCheck {
       option (validate.required) = true;
 
       // Hex encoded payload. E.g., "000000FF".
-      string text = 1 [(validate.rules).string = {min_bytes: 1}];
+      string text = 1 [(validate.rules).string = {min_len: 1}];
 
       // [#not-implemented-hide:] Binary payload.
       bytes binary = 2;
@@ -87,9 +87,8 @@ message HealthCheck {
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // */healthcheck*.
-    string path = 2 [
-      (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}
-    ];
+    string path = 2
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
@@ -184,7 +183,7 @@ message HealthCheck {
         "envoy.api.v2.core.HealthCheck.CustomHealthCheck";
 
     // The registered name of the custom health checker.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // A custom health checker specific configuration which depends on the custom health checker
     // being instantiated. See :api:`envoy/config/health_checker` for reference.
@@ -283,6 +282,21 @@ message HealthCheck {
   //
   // The default value for "no traffic interval" is 60 seconds.
   google.protobuf.Duration no_traffic_interval = 12 [(validate.rules).duration = {gt {}}];
+
+  // The "no traffic healthy interval" is a special health check interval that
+  // is used for hosts that are currently passing active health checking
+  // (including new hosts) when the cluster has received no traffic.
+  //
+  // This is useful for when we want to send frequent health checks with
+  // `no_traffic_interval` but then revert to lower frequency `no_traffic_healthy_interval` once
+  // a host in the cluster is marked as healthy.
+  //
+  // Once a cluster has been used for traffic routing, Envoy will shift back to using the
+  // standard health check interval that is defined.
+  //
+  // If no_traffic_healthy_interval is not set, it will default to the
+  // no traffic interval and send that interval regardless of health state.
+  google.protobuf.Duration no_traffic_healthy_interval = 24 [(validate.rules).duration = {gt {}}];
 
   // The "unhealthy interval" is a health check interval that is used for hosts that are marked as
   // unhealthy. As soon as the host is marked as healthy, Envoy will shift back to using the

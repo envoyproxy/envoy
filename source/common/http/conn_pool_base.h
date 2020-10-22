@@ -52,7 +52,11 @@ public:
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks) override;
 
+  bool maybePrefetch(float ratio) override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::maybePrefetch(ratio);
+  }
   bool hasActiveConnections() const override { return hasActiveConnectionsImpl(); }
+
   void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) override {
     addIdlePoolTimeoutCallbackImpl(cb);
   }

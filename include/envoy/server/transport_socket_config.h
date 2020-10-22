@@ -65,11 +65,6 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Envoy::Random::RandomGenerator& random() PURE;
-
-  /**
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;

@@ -123,10 +123,22 @@ public:
     std::array<uint8_t, 256 / 8> aes_key_; // AES256 key size, in bytes
   };
 
+  enum class OcspStaplePolicy {
+    LenientStapling,
+    StrictStapling,
+    MustStaple,
+  };
+
   /**
    * @return True if client certificate is required, false otherwise.
    */
   virtual bool requireClientCertificate() const PURE;
+
+  /**
+   * @return OcspStaplePolicy The rule for determining whether to staple OCSP
+   * responses on new connections.
+   */
+  virtual OcspStaplePolicy ocspStaplePolicy() const PURE;
 
   /**
    * @return The keys to use for encrypting and decrypting session tickets.

@@ -102,6 +102,13 @@ public:
   }
 
   /**
+   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @return a const reference to the stored data.
+   * An exception will be thrown if the data does not exist.
+   */
+  virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
+
+  /**
    * @param data_name the name of the data being looked up (mutable only).
    * @return a non-const reference to the stored data if and only if the
    * underlying data is mutable.
@@ -154,7 +161,6 @@ public:
   virtual FilterStateSharedPtr parent() const PURE;
 
 protected:
-  virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 };
 

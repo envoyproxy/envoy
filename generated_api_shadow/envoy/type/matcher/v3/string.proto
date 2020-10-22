@@ -37,7 +37,7 @@ message StringMatcher {
     // Examples:
     //
     // * *abc* matches the value *abc.xyz*
-    string prefix = 2 [(validate.rules).string = {min_bytes: 1}];
+    string prefix = 2 [(validate.rules).string = {min_len: 1}];
 
     // The input string must have the suffix specified here.
     // Note: empty prefix is not allowed, please use regex instead.
@@ -45,7 +45,7 @@ message StringMatcher {
     // Examples:
     //
     // * *abc* matches the value *xyz.abc*
-    string suffix = 3 [(validate.rules).string = {min_bytes: 1}];
+    string suffix = 3 [(validate.rules).string = {min_len: 1}];
 
     // The input string must match the regular expression specified here.
     RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];
@@ -56,7 +56,7 @@ message StringMatcher {
     // Examples:
     //
     // * *abc* matches the value *xyz.abc.def*
-    string contains = 7 [(validate.rules).string = {min_bytes: 1}];
+    string contains = 7 [(validate.rules).string = {min_len: 1}];
 
     string hidden_envoy_deprecated_regex = 4 [
       deprecated = true,

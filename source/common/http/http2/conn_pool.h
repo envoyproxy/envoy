@@ -18,8 +18,8 @@ namespace Http2 {
  */
 class ConnPoolImpl : public Envoy::Http::HttpConnPoolImplBase {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-               Upstream::ResourcePriority priority,
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+               Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                std::chrono::milliseconds pool_idle_timeout);
@@ -69,6 +69,8 @@ protected:
   // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
   // side we do 2^29.
   static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
+
+  Random::RandomGenerator& random_generator_;
 };
 
 /**
@@ -83,8 +85,8 @@ private:
 };
 
 ConnectionPool::InstancePtr
-allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                 Upstream::ResourcePriority priority,
+allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                 Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                  std::chrono::milliseconds pool_idle_timeout);

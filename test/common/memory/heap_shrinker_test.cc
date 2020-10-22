@@ -25,8 +25,8 @@ protected:
         dispatcher_("test_thread", *api_, time_system_) {}
 
   void step() {
-    time_system_.advanceTimeAsync(std::chrono::milliseconds(10000));
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(10000), dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
   }
 
   Envoy::Stats::TestUtil::TestStore stats_;
@@ -67,7 +67,7 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
 
   const uint64_t physical_mem_after_shrink =
       Stats::totalCurrentlyReserved() - Stats::totalPageHeapUnmapped();
-#ifdef TCMALLOC
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
   EXPECT_GE(physical_mem_before_shrink, physical_mem_after_shrink);
 #else
   EXPECT_EQ(physical_mem_before_shrink, physical_mem_after_shrink);

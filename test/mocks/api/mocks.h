@@ -14,6 +14,7 @@
 #include "common/api/os_sys_calls_impl_linux.h"
 #endif
 
+#include "test/mocks/common.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
@@ -41,11 +42,13 @@ public:
   MOCK_METHOD(Filesystem::Instance&, fileSystem, ());
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
   MOCK_METHOD(const Stats::Scope&, rootScope, ());
+  MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {
@@ -59,6 +62,7 @@ public:
   SysCallIntResult getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                               socklen_t* optlen) override;
 
+  MOCK_METHOD(SysCallSocketResult, accept, (os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen));
   MOCK_METHOD(SysCallIntResult, bind, (os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD(SysCallIntResult, ioctl, (os_fd_t sockfd, unsigned long int request, void* argp));
   MOCK_METHOD(SysCallIntResult, close, (os_fd_t));

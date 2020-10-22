@@ -23,8 +23,8 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                           Upstream::ResourcePriority priority,
+ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                           Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                            std::chrono::milliseconds pool_idle_timeout)
@@ -33,7 +33,8 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
-      })) {}
+      })),
+      random_generator_(random_generator) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
@@ -70,7 +71,6 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
 ConnPoolImpl::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
     : RequestEncoderWrapper(parent.codec_client_->newStream(*this)),
       ResponseDecoderWrapper(response_decoder), parent_(parent) {
-
   RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
 }
 
@@ -133,18 +133,19 @@ RequestEncoder& ConnPoolImpl::ActiveClient::newStreamEncoder(ResponseDecoder& re
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
-                                           data.host_description_, dispatcher_)};
+                                           data.host_description_, dispatcher_, random_generator_)};
   return codec;
 }
 
 ConnectionPool::InstancePtr
-allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                 Upstream::ResourcePriority priority,
+allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                 Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                  std::chrono::milliseconds pool_idle_timeout) {
   return std::make_unique<Http::Http1::ProdConnPoolImpl>(
-      dispatcher, host, priority, options, transport_socket_options, pool_idle_timeout);
+      dispatcher, random_generator, host, priority, options, transport_socket_options,
+      pool_idle_timeout);
 }
 
 } // namespace Http1

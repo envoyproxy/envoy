@@ -39,6 +39,9 @@ private:
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override {
       return host_;
     }
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
 
     const Upstream::HostSharedPtr host_;
   };
