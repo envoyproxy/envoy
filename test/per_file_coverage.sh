@@ -13,8 +13,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api/posix:71.8"
 "source/common/init:96.2"
 "source/common/json:90.6"
-"source/common/filesystem:96.1"
-"source/common/filesystem/posix:94.5"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/thread_local:95.7"
 "source/common/crypto:0.0"

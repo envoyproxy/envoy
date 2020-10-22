@@ -46,14 +46,15 @@ void DirectoryIteratorImpl::nextEntry() {
   } else {
     const std::string current_path(entry->d_name);
     const std::string full_path(directory_path_ + "/" + current_path);
-    entry_ = {current_path, fileType(full_path)};
+    entry_ = {current_path, fileType(full_path, os_sys_calls_)};
   }
 }
 
-FileType DirectoryIteratorImpl::fileType(const std::string& full_path) const {
+FileType DirectoryIteratorImpl::fileType(const std::string& full_path,
+                                         Api::OsSysCallsImpl& os_sys_calls) {
   struct stat stat_buf;
 
-  const Api::SysCallIntResult result = os_sys_calls_.stat(full_path.c_str(), &stat_buf);
+  const Api::SysCallIntResult result = os_sys_calls.stat(full_path.c_str(), &stat_buf);
   if (result.rc_ != 0) {
     if (errno == ENOENT) {
       // Special case. This directory entity is likely to be a symlink,
