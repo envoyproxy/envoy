@@ -54,14 +54,11 @@ public:
   ~DefaultEventListener() override = default;
 
   // Return both read and write if enabled. Note that this implmenetation is inefficient. Read and
-  // write events are supposed to be independent. 
+  // write events are supposed to be independent.
   uint32_t triggeredEvents() override { return enabled_events_ & (~Event::FileReadyType::Closed); }
 
-  void onEventEnabled(uint32_t enabled_events) override { enabled_events_ = enabled_events; }
-
-  void onEventActivated(uint32_t activated_events) override {
-    ephermal_events_ |= activated_events;
-  }
+  void onEventEnabled(uint32_t enabled_events) override;
+  void onEventActivated(uint32_t activated_events) override;
 
   uint32_t getAndClearEphemeralEvents() override { return std::exchange(ephermal_events_, 0); }
 

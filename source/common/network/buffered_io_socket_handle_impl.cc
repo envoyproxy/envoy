@@ -20,6 +20,7 @@ Api::SysCallIntResult makeInvalidSyscall() {
   return Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP};
 }
 } // namespace
+
 BufferedIoSocketHandleImpl::BufferedIoSocketHandleImpl()
     : owned_buffer_(
           [this]() -> void {
@@ -59,6 +60,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
                                                           uint64_t num_slice) {
   if (!isOpen()) {
     return {0,
+            // TODO(lambdai): Add EBADF in IoSocketError and adopt it here.
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
   if (owned_buffer_.length() == 0) {
@@ -70,13 +72,15 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
     }
   }
   absl::FixedArray<iovec> iov(num_slice);
-  uint64_t num_slices_to_read = 0;
   uint64_t bytes_to_read = 0;
-  for (; num_slices_to_read < num_slice && bytes_to_read < max_length; num_slices_to_read++) {
-    auto max_bytes_to_read = std::min(std::min(owned_buffer_.length(), max_length) - bytes_to_read,
-                                      uint64_t(slices[num_slices_to_read].len_));
-    owned_buffer_.copyOut(bytes_to_read, max_bytes_to_read, slices[num_slices_to_read].mem_);
-    bytes_to_read += max_bytes_to_read;
+  for (uint64_t num_slices_to_read = 0;
+       num_slices_to_read < num_slice && bytes_to_read < max_length; num_slices_to_read++) {
+    auto bytes_to_write_in_this_slice =
+        std::min(std::min(owned_buffer_.length(), max_length) - bytes_to_read,
+                 uint64_t(slices[num_slices_to_read].len_));
+    owned_buffer_.copyOut(bytes_to_read, bytes_to_write_in_this_slice,
+                          slices[num_slices_to_read].mem_);
+    bytes_to_read += bytes_to_write_in_this_slice;
   }
   ASSERT(bytes_to_read <= max_length);
   owned_buffer_.drain(bytes_to_read);
@@ -110,15 +114,18 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
+  // Closed peer.
   if (!writable_peer_) {
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
+  // Error: write after close.
   if (writable_peer_->isWriteEndSet()) {
-    // EPIPE or ENOTCONN
+    // TODO(lambdai): EPIPE or ENOTCONN
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
+  // The peer is valid but temporary not accepts new data. Likely due to flow control.
   if (!writable_peer_->isWritable()) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
@@ -146,13 +153,13 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
-  // Write to a shutdown peer.
+  // Error: write after close.
   if (writable_peer_->isWriteEndSet()) {
-    // EPIPE or ENOTCONN
+    // TODO(lambdai): EPIPE or ENOTCONN
     return {0,
             Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
   }
-  // Buffer is full. Cannot write anymore.
+  // The peer is valid but temporary not accepts new data. Likely due to flow control.
   if (!writable_peer_->isWritable()) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};

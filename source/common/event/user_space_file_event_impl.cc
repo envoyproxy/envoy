@@ -6,6 +6,20 @@
 namespace Envoy {
 namespace Event {
 
+void DefaultEventListener::onEventEnabled(uint32_t enabled_events) {
+  enabled_events_ = enabled_events;
+  // Clear ephermal events to align with FileEventImpl::setEnable().
+  ephermal_events_ = 0;
+}
+
+void DefaultEventListener::onEventActivated(uint32_t activated_events) {
+  // Event owner should not activate any event which is disabled.
+  // Also see onEventEnabled which clears ephermal events.
+  // The overall prevents callback on disabled events.
+  ASSERT((ephermal_events_ & ~enabled_events_) == 0);
+  ephermal_events_ |= activated_events;
+}
+
 void UserSpaceFileEventImpl::activate(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);

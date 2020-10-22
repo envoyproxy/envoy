@@ -43,6 +43,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "user_space_file_event_impl_test",
+    srcs = ["user_space_file_event_impl_test.cc"],
+    #tags = ["fails_on_windows"],
+    deps = [
+        "//include/envoy/event:file_event_interface",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks:common_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "scaled_range_timer_manager_test",
     srcs = ["scaled_range_timer_manager_test.cc"],
     deps = [
