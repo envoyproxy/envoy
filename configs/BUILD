@@ -28,6 +28,7 @@ filegroup(
             "**/*.yaml",
         ],
         exclude = [
+            "**/*.template.yaml",
             "freebind/freebind.yaml",
         ],
     ) + select({
