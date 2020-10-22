@@ -91,8 +91,8 @@ public:
     }
   }
 
-  void runFatalActionsOnTrackedObject(
-      std::list<const Server::Configuration::FatalActionPtr>& actions) const override {
+  void
+  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override {
     if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
       return;
     }

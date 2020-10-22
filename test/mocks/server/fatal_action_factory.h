@@ -9,9 +9,6 @@ namespace Server {
 namespace Configuration {
 class MockFatalActionFactory : public FatalActionFactory {
 public:
-  MockFatalActionFactory();
-  ~MockFatalActionFactory() override;
-
   MOCK_METHOD(FatalActionPtr, createFatalActionFromProto,
               (const envoy::config::bootstrap::v3::FatalAction& config, Instance* server),
               (override));

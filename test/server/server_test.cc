@@ -1184,37 +1184,55 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
       "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
 }
 
-class FooFatalAction : public Configuration::FatalAction {
+class SafeFatalAction : public Configuration::FatalAction {
 public:
-  FooFatalAction(bool is_safe) : is_safe_(is_safe) {}
-
   void run(const ScopeTrackedObject* /*current_object*/) {
-    std::cerr << "FooFatalAction isSafe:" << is_safe_ << std::endl;
+    std::cerr << "Called SafeFatalAction" << std::endl;
   }
 
-  bool isSafe() const { return is_safe_; }
+  bool isAsyncSignalSafe() const { return true; }
+};
 
-private:
-  bool is_safe_;
+class UnsafeFatalAction : public Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) {
+    std::cerr << "Called UnsafeFatalAction" << std::endl;
+  }
+
+  bool isAsyncSignalSafe() const { return false; }
 };
 
 TEST_P(ServerInstanceImplTest, WithFatalActions) {
-  NiceMock<Configuration::MockFatalActionFactory> mock_factory;
-  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  // Inject Safe Factory.
+  NiceMock<Configuration::MockFatalActionFactory> mock_safe_factory;
+  EXPECT_CALL(mock_safe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
     return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
   }));
-  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.foo"));
+  EXPECT_CALL(mock_safe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.safe"));
 
-  Registry::InjectFactory<Configuration::FatalActionFactory> registered_factory(mock_factory);
+  Registry::InjectFactory<Configuration::FatalActionFactory> registered_safe_factory(
+      mock_safe_factory);
+
+  // Inject Unsafe Factory
+  NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
+  EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+  }));
+  EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
+
+  Registry::InjectFactory<Configuration::FatalActionFactory> registered_unsafe_factory(
+      mock_unsafe_factory);
 
   EXPECT_DEATH(
       {
-        EXPECT_CALL(mock_factory, createFatalActionFromProto(_, _))
-            .Times(2)
-            .WillRepeatedly(Invoke(
-                [](const envoy::config::bootstrap::v3::FatalAction& config, Instance* /*server*/) {
-                  return std::make_unique<FooFatalAction>(config.safe());
-                }));
+        EXPECT_CALL(mock_safe_factory, createFatalActionFromProto(_, _))
+            .WillOnce(
+                Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
+                          Instance* /*server*/) { return std::make_unique<SafeFatalAction>(); }));
+        EXPECT_CALL(mock_unsafe_factory, createFatalActionFromProto(_, _))
+            .WillOnce(
+                Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
+                          Instance* /*server*/) { return std::make_unique<UnsafeFatalAction>(); }));
         absl::Notification abort_called;
         auto server_thread =
             startTestServer("test/server/test_data/server/fatal_actions.yaml", false);
@@ -1226,7 +1244,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
 
         abort_called.WaitForNotification();
       },
-      "FooFatalAction isSafe:1.*FooFatalAction isSafe:0");
+      "Called SafeFatalAction.*Called UnsafeFatalAction");
 }
 
 // Static configuration validation. We test with both allow/reject settings various aspects of

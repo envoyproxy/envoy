@@ -430,9 +430,6 @@ message Watchdog {
 message FatalAction {
   // Extension specific configuration for the action.
   core.v3.TypedExtensionConfig config = 1;
-
-  // Whether the action is async-signal-safe.
-  bool safe = 2;
 }
 
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).

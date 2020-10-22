@@ -9,22 +9,23 @@
 namespace Envoy {
 namespace FatalAction {
 
+using FatalActionPtrList = std::list<Server::Configuration::FatalActionPtr>;
+
 // A simple class which manages the Fatal Actions registered via the
 // extension point.
 class FatalActionManager {
 public:
-  using FatalActionPtrList = std::list<const Server::Configuration::FatalActionPtr>;
-  FatalActionManager() = delete;
-  FatalActionManager(std::unique_ptr<FatalActionPtrList> safe_actions,
-                     std::unique_ptr<FatalActionPtrList> unsafe_actions)
-      : safe_actions_(std::move(safe_actions)), unsafe_actions_(std::move(unsafe_actions)) {}
+  FatalActionManager(FatalActionPtrList& safe_actions, FatalActionPtrList& unsafe_actions,
+                     Server::Instance* server);
 
-  FatalActionPtrList& getSafeActions() const { return *safe_actions_; }
-  FatalActionPtrList& getUnsafeActions() const { return *unsafe_actions_; }
+  const FatalActionPtrList& getSafeActions() const { return safe_actions_; }
+  const FatalActionPtrList& getUnsafeActions() const { return unsafe_actions_; }
+  Server::Instance* getServer() const { return server_; }
 
 private:
-  std::unique_ptr<FatalActionPtrList> safe_actions_;
-  std::unique_ptr<FatalActionPtrList> unsafe_actions_;
+  FatalActionPtrList safe_actions_;
+  FatalActionPtrList unsafe_actions_;
+  Server::Instance* server_;
 };
 
 } // namespace FatalAction

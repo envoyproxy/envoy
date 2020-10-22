@@ -23,10 +23,7 @@ public:
    */
   virtual void run(const ScopeTrackedObject* current_object) PURE;
 
-  /**
-   *  Whether the action is async-signal-safe.
-   */
-  virtual bool isSafe() const PURE;
+  virtual bool isAsyncSignalSafe() const PURE;
 };
 
 using FatalActionPtr = std::unique_ptr<FatalAction>;

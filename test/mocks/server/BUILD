@@ -38,7 +38,6 @@ envoy_cc_mock(
 
 envoy_cc_mock(
     name = "fatal_action_factory_mocks",
-    srcs = ["fatal_action_factory.cc"],
     hdrs = ["fatal_action_factory.h"],
     deps = [
         "//include/envoy/server:fatal_action_interface",

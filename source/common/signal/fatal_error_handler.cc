@@ -28,13 +28,10 @@ ABSL_CONST_INIT std::atomic<FailureFunctionList*> fatal_error_handlers{nullptr};
 // fatal_action_manager and don't want to have any locks as they aren't
 // async-signal-safe.
 ABSL_CONST_INIT std::atomic<FatalAction::FatalActionManager*> fatal_action_manager{nullptr};
-ABSL_CONST_INIT std::atomic<Envoy::Server::Instance*> server_instance{nullptr};
 ABSL_CONST_INIT std::atomic<int64_t> failure_tid{-1};
 
-using FatalActionPtrList = std::list<const Server::Configuration::FatalActionPtr>;
-
 // Helper function to run fatal actions.
-void runFatalActions(FatalActionPtrList& actions) {
+void runFatalActions(const FatalAction::FatalActionPtrList& actions) {
   FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
   if (list == nullptr) {
     return;
@@ -95,8 +92,8 @@ void callFatalErrorHandlers(std::ostream& os) {
   }
 }
 
-void registerFatalActions(std::unique_ptr<FatalActionPtrList> safe_actions,
-                          std::unique_ptr<FatalActionPtrList> unsafe_actions,
+void registerFatalActions(FatalAction::FatalActionPtrList& safe_actions,
+                          FatalAction::FatalActionPtrList& unsafe_actions,
                           Envoy::Server::Instance* server) {
   static bool registered_actions = false;
   if (registered_actions) {
@@ -106,14 +103,13 @@ void registerFatalActions(std::unique_ptr<FatalActionPtrList> safe_actions,
 
   // Create a FatalActionManager and try to store it. If we fail to store
   // our manager, it'll be deleted due to the unique_ptr.
-  auto mananger = std::make_unique<FatalAction::FatalActionManager>(std::move(safe_actions),
-                                                                    std::move(unsafe_actions));
+  auto mananger =
+      std::make_unique<FatalAction::FatalActionManager>(safe_actions, unsafe_actions, server);
   FatalAction::FatalActionManager* unset_manager = nullptr;
 
   if (fatal_action_manager.compare_exchange_strong(unset_manager, mananger.get(),
                                                    std::memory_order_acq_rel)) {
     registered_actions = true;
-    server_instance.store(server, std::memory_order_release);
     // Our manager is the system singleton, ensure that the unique_ptr does not
     // delete the instance.
     mananger.release();
@@ -124,14 +120,13 @@ bool runSafeActions() {
   // Check that registerFatalActions has already been called.
   FatalAction::FatalActionManager* action_manager =
       fatal_action_manager.load(std::memory_order_acquire);
-  Envoy::Server::Instance* server = server_instance.load(std::memory_order_acquire);
 
-  if (action_manager == nullptr || server == nullptr) {
+  if (action_manager == nullptr) {
     return false;
   }
 
   // Check that we're the thread that gets to run the actions.
-  int64_t my_tid = server->api().threadFactory().currentThreadId().getId();
+  int64_t my_tid = action_manager->getServer()->api().threadFactory().currentThreadId().getId();
   int64_t expected_tid = -1;
 
   if (failure_tid.compare_exchange_strong(expected_tid, my_tid, std::memory_order_release,
@@ -148,14 +143,13 @@ bool runUnsafeActions() {
   // Check that registerFatalActions has already been called.
   FatalAction::FatalActionManager* action_manager =
       fatal_action_manager.load(std::memory_order_acquire);
-  Envoy::Server::Instance* server = server_instance.load(std::memory_order_acquire);
 
-  if (action_manager == nullptr || server == nullptr) {
+  if (action_manager == nullptr) {
     return false;
   }
 
   // Check that we're the thread that gets to run the actions.
-  int64_t my_tid = server->api().threadFactory().currentThreadId().getId();
+  int64_t my_tid = action_manager->getServer()->api().threadFactory().currentThreadId().getId();
 
   if (my_tid == failure_tid.load(std::memory_order_acquire)) {
     // Run the actions

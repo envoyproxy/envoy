@@ -420,22 +420,21 @@ void InstanceImpl::initialize(const Options& options,
 
   // Register the fatal actions.
   {
-    auto safe_actions = std::make_unique<std::list<const Server::Configuration::FatalActionPtr>>();
-    auto unsafe_actions =
-        std::make_unique<std::list<const Server::Configuration::FatalActionPtr>>();
-    auto* server = static_cast<Instance*>(this);
+    FatalAction::FatalActionPtrList safe_actions;
+    FatalAction::FatalActionPtrList unsafe_actions;
     for (const auto& action_config : bootstrap_.fatal_actions()) {
       auto& factory =
           Config::Utility::getAndCheckFactory<Server::Configuration::FatalActionFactory>(
               action_config.config());
-      if (action_config.safe()) {
-        safe_actions->emplace_back(factory.createFatalActionFromProto(action_config, server));
+      auto action = factory.createFatalActionFromProto(action_config, this);
+
+      if (action->isAsyncSignalSafe()) {
+        safe_actions.push_back(std::move(action));
       } else {
-        unsafe_actions->emplace_back(factory.createFatalActionFromProto(action_config, server));
+        unsafe_actions.push_back(std::move(action));
       }
     }
-    Envoy::FatalErrorHandler::registerFatalActions(std::move(safe_actions),
-                                                   std::move(unsafe_actions), server);
+    Envoy::FatalErrorHandler::registerFatalActions(safe_actions, unsafe_actions, this);
   }
 
   if (!bootstrap_.default_socket_interface().empty()) {

@@ -2,18 +2,11 @@
 
 #include <csignal>
 
-#include "envoy/server/fatal_action_config.h"
-
 #include "common/signal/fatal_error_handler.h"
 #include "common/signal/signal_action.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
-
-using testing::ReturnRef;
 
 namespace Envoy {
 #if defined(__has_feature)
@@ -30,13 +23,8 @@ namespace Envoy {
 // signal-safe and a mock might allocate memory.
 class TestFatalErrorHandler : public FatalErrorHandlerInterface {
   void onFatalError(std::ostream& os) const override { os << "HERE!"; }
-  void runFatalActionsOnTrackedObject(
-      std::list<const Server::Configuration::FatalActionPtr>& actions) const override {
-    // Call the Fatal Actions with nullptr
-    for (const auto& action : actions) {
-      action->run(nullptr);
-    }
-  }
+  void runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList&
+                                      /*actions*/) const override {}
 };
 
 // Death tests that expect a particular output are disabled under address sanitizer.
@@ -191,8 +179,8 @@ public:
     allocated_after_call_ = memory_test_.consumedBytes();
   }
 
-  void runFatalActionsOnTrackedObject(
-      std::list<const Server::Configuration::FatalActionPtr>& /*actions*/) const override {}
+  void runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList&
+                                      /*actions*/) const override {}
 
 private:
   const Stats::TestUtil::MemoryTest& memory_test_;
@@ -218,73 +206,6 @@ TEST(FatalErrorHandler, DontAllocateMemory) {
   FatalErrorHandler::callFatalErrorHandlers(os);
 
   EXPECT_MEMORY_EQ(allocated_after_call, allocated_before_call);
-}
-
-TEST(FatalErrorHandler, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
-  EXPECT_DEATH(
-      {
-        auto safe_actions =
-            std::make_unique<std::list<const Server::Configuration::FatalActionPtr>>();
-        auto unsafe_actions =
-            std::make_unique<std::list<const Server::Configuration::FatalActionPtr>>();
-        FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
-                                                nullptr);
-        auto additional_safe_actions =
-            std::make_unique<std::list<const Server::Configuration::FatalActionPtr>>();
-        auto additional_unsafe_actions =
-            std::make_unique<std::list<const Server::Configuration::FatalActionPtr>>();
-        // Subsequent call should trigger Envoy bug. We should only have this run
-        // once.
-        FatalErrorHandler::registerFatalActions(std::move(additional_safe_actions),
-                                                std::move(additional_unsafe_actions), nullptr);
-      },
-      "Details: registerFatalActions called more than once.");
-}
-
-class TestFatalAction : public Server::Configuration::FatalAction {
-public:
-  TestFatalAction(bool is_safe) : is_safe_(is_safe) {}
-
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran; }
-
-  bool isSafe() const override { return is_safe_; }
-
-  int getNumTimesRan() { return times_ran; }
-
-private:
-  bool is_safe_;
-  int times_ran = 0;
-};
-
-TEST(FatalErrorHandler, CanCallRegisteredActions) {
-  // Set up Fatal Handlers
-  TestFatalErrorHandler handler;
-  FatalErrorHandler::registerFatalErrorHandler(handler);
-
-  // Set up Fatal Actions
-  Server::MockInstance instance;
-  auto api_fake = Api::createApiForTest();
-  EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(*api_fake));
-
-  auto safe_actions = std::make_unique<std::list<const Server::Configuration::FatalActionPtr>>();
-  auto safe_fatal_action = std::make_unique<TestFatalAction>(true);
-  auto* raw_safe_action = safe_fatal_action.get();
-  safe_actions->emplace_back(std::move(safe_fatal_action));
-
-  auto unsafe_actions = std::make_unique<std::list<const Server::Configuration::FatalActionPtr>>();
-  auto unsafe_fatal_action = std::make_unique<TestFatalAction>(false);
-  auto* raw_unsafe_action = unsafe_fatal_action.get();
-  unsafe_actions->emplace_back(std::move(unsafe_fatal_action));
-
-  FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
-                                          &instance);
-  // Call the actions
-  EXPECT_TRUE(FatalErrorHandler::runSafeActions());
-  EXPECT_TRUE(FatalErrorHandler::runUnsafeActions());
-
-  // Expect ran once
-  EXPECT_EQ(raw_safe_action->getNumTimesRan(), 1);
-  EXPECT_EQ(raw_unsafe_action->getNumTimesRan(), 1);
 }
 
 } // namespace Envoy

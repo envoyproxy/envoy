@@ -17,8 +17,8 @@ public:
   // particular, it can't allocate memory.
   virtual void onFatalError(std::ostream& os) const PURE;
 
-  virtual void runFatalActionsOnTrackedObject(
-      std::list<const Server::Configuration::FatalActionPtr>& actions) const PURE;
+  virtual void
+  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const PURE;
 };
 
 namespace FatalErrorHandler {
@@ -45,10 +45,9 @@ void callFatalErrorHandlers(std::ostream& os);
  * Creates the singleton FatalActionManager if not already created and
  * registers the specified actions to run on failure.
  */
-void registerFatalActions(
-    std::unique_ptr<std::list<const Server::Configuration::FatalActionPtr>> safe_actions,
-    std::unique_ptr<std::list<const Server::Configuration::FatalActionPtr>> unsafe_actions,
-    Envoy::Server::Instance* server);
+void registerFatalActions(FatalAction::FatalActionPtrList& safe_actions,
+                          FatalAction::FatalActionPtrList& unsafe_actions,
+                          Envoy::Server::Instance* server);
 
 /**
  * Tries to run all of the safe fatal actions. Only one thread will
