@@ -28,6 +28,7 @@ filegroup(
             "**/*.yaml",
         ],
         exclude = [
+            "using_deprecated_config.yaml",
             "**/*.template.yaml",
             "freebind/freebind.yaml",
         ],
