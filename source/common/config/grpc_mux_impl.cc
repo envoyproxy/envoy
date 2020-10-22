@@ -299,6 +299,8 @@ void GrpcMuxImpl::expiryCallback(const std::string& type_url, const std::vector<
   absl::flat_hash_set<std::string> all_expired;
   all_expired.insert(expired.begin(), expired.end());
 
+  // Note: We can blindly dereference the lookup here since the only time we call this is in a
+  // callback that is created at the same time as we insert the ApiState for this type.
   for (auto watch : api_state_.find(type_url)->second->watches_) {
     Protobuf::RepeatedPtrField<std::string> found_resources_for_watch;
 
