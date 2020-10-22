@@ -6,7 +6,7 @@ def _retry_azp(organization, project, build_id, token):
     """Makes an Azure Pipelines Build API request with retry"""
 
     url = "https://dev.azure.com/{organization}/{project}/_apis/build/builds/{buildId}?retry=true&api-version=5.1".format(organization = organization, project = project, buildId = build_id)
-    return http(url = url, method = "PATCH", headers = {
+    return http(url = url, method = "PATCH", secret_headers = {
         "authorization": "Basic " + token,
         "content-type": "application/json;odata=verbose",
     })
@@ -25,7 +25,7 @@ def _get_azp_checks():
     return checks
 
 def _retry(config, comment_id, command):
-    msgs = "Retrying Azure Pipelines, to retry CircleCI checks, use `/retest-circle`.\n"
+    msgs = "Retrying Azure Pipelines.\n"
     checks = _get_azp_checks()
 
     retried_checks = []

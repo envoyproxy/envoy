@@ -184,7 +184,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
     }
     uint64_t new_val = (val * 10) + (cur - '0');
     if (new_val / 8 < val) {
-      // Overflow occurred.
+      // Overflow occurred
       return absl::nullopt;
     }
     val = new_val;
@@ -192,7 +192,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
   }
 
   if (bytes_consumed) {
-    // Consume some digits.
+    // Consume some digits
     str.remove_prefix(bytes_consumed);
     return val;
   }
@@ -215,12 +215,13 @@ void CacheHeadersUtils::getAllMatchingHeaderNames(
 }
 
 std::vector<std::string>
-CacheHeadersUtils::parseCommaDelimitedList(const Http::HeaderEntry* entry) {
-  if (!entry) {
+CacheHeadersUtils::parseCommaDelimitedList(const Http::HeaderMap::GetResult& entry) {
+  if (entry.empty()) {
     return {};
   }
 
-  std::vector<std::string> header_values = absl::StrSplit(entry->value().getStringView(), ',');
+  // TODO(mattklein123): Consider multiple header values?
+  std::vector<std::string> header_values = absl::StrSplit(entry[0]->value().getStringView(), ',');
   for (std::string& value : header_values) {
     // TODO(cbdm): Might be able to improve the performance here by using StringUtil::trim to
     // remove whitespace.
@@ -271,8 +272,9 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
 }
 
 bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
-  const Http::HeaderEntry* vary_header = headers.get(Http::Headers::get().Vary);
-  return vary_header != nullptr && !vary_header->value().empty();
+  // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
+  const auto vary_header = headers.get(Http::Headers::get().Vary);
+  return !vary_header.empty() && !vary_header[0]->value().empty();
 }
 
 namespace {
@@ -286,13 +288,14 @@ constexpr absl::string_view header_separator = "\n";
 constexpr absl::string_view in_value_separator = "\r";
 }; // namespace
 
-std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
+std::string VaryHeader::createVaryKey(const Http::HeaderMap::GetResult& vary_header,
                                       const Http::RequestHeaderMap& entry_headers) {
-  if (vary_header == nullptr) {
+  if (vary_header.empty()) {
     return "";
   }
 
-  ASSERT(vary_header->key() == "vary");
+  // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
+  ASSERT(vary_header[0]->key() == "vary");
 
   std::string vary_key = "vary-key\n";
 
@@ -304,10 +307,11 @@ std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
     // bucket UserAgent values into android/ios/desktop; UserAgent::initializeFromHeaders tries to
     // do that normalization and could be used as an inspiration for some bucketing configuration.
     // The config should enable and control the bucketing wanted.
-    std::vector<absl::string_view> header_values;
-    Http::HeaderUtility::getAllOfHeader(entry_headers, header, header_values);
+    const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
+        entry_headers, Http::LowerCaseString(header), in_value_separator);
     absl::StrAppend(&vary_key, header, in_value_separator,
-                    absl::StrJoin(header_values, in_value_separator), header_separator);
+                    all_values.result().has_value() ? all_values.result().value() : "",
+                    header_separator);
   }
 
   return vary_key;
@@ -322,10 +326,10 @@ VaryHeader::possibleVariedHeaders(const Http::RequestHeaderMap& request_headers)
   CacheHeadersUtils::getAllMatchingHeaderNames(request_headers, allow_list_, header_names);
 
   for (const absl::string_view& header : header_names) {
-    std::vector<absl::string_view> values;
-    Http::HeaderUtility::getAllOfHeader(request_headers, header, values);
-    for (const absl::string_view& value : values) {
-      possible_headers->addCopy(Http::LowerCaseString(std::string{header}), value);
+    const auto lower_case_header = Http::LowerCaseString(std::string{header});
+    const auto value = request_headers.get(lower_case_header);
+    for (size_t i = 0; i < value.size(); i++) {
+      possible_headers->addCopy(lower_case_header, value[i]->value().getStringView());
     }
   }
 
