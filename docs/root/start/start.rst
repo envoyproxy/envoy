@@ -32,7 +32,7 @@ more detailed explanation of the configuration file and execution steps for
 the same configuration.
 
 A very minimal Envoy configuration that can be used to validate basic plain HTTP
-proxying is available in :repo:`configs/google_com_proxy.yaml`. This is not
+proxying is available in :repo:`configs/envoyproxy_io_proxy.yaml`. This is not
 intended to represent a realistic Envoy deployment:
 
 .. substitution-code-block:: none
@@ -43,7 +43,7 @@ intended to represent a realistic Envoy deployment:
 
 The Docker image used will contain the latest version of Envoy
 and a basic Envoy configuration. This basic configuration tells
-Envoy to route incoming requests to \*.google.com.
+Envoy to route incoming requests to www.envoyproxy.io.
 
 Simple Configuration
 --------------------
