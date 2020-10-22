@@ -556,8 +556,9 @@ message HeaderRewriteLiteral {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.HeaderRewriteLiteral";
 
-  // String match can use prefix match and present match. In case of prefix match, the matched prefix part of
+  // String matcher can use prefix match and present match. In case of prefix match, the matched prefix part of
   // the header's value is substituted. In case of present match the whole value of the header is overwritten.
+  // For all other String matcher types, the config will throw an error message.
   type.matcher.v4alpha.StringMatcher string_match = 1 [(validate.rules).message = {required: true}];
 
   // The matched part will be replaced by the value provided in substitution.
@@ -573,6 +574,12 @@ message HeaderMatchAndRewrite {
     HeaderRewriteLiteral value_rewrite_literal = 1;
   }
 
+  // response_match_criteria specifies a logical condition that must be met by the response
+  // headers before the given header's value can be re-written.
+  // The logical operations supported are AND, OR, and NOT. The values of all the headers present
+  // in the upstream response can be checked and the logical operators can be used to specify
+  // complex match criteria. Eg. Before rewriting the Location header the user can check if the
+  // upstream responded with a 301 or 302 status.
   type.matcher.v4alpha.MatchPredicate response_match_criteria = 2;
 }
 
@@ -582,8 +589,11 @@ message UpstreamHeaderRewriter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.UpstreamHeaderRewriter";
 
+  // Name of the header to be re-written
   string header_name = 1;
 
+  // Specifies some match criteria for the upstream response. If the match criteria is met
+  // the given header will be re-written to the value specified.
   HeaderMatchAndRewrite match_and_rewrite = 2;
 }
 
@@ -841,7 +851,7 @@ message RouteAction {
   // In the example below, we rewrite the location header received from the upstream cluster
   // if the location header is present.
   //
-  // If a header is specified in response_headers_to_rewrite section but is not returned from the
+  // If a header is specified in *response_headers_to_rewrite* section but is not returned from the
   // upstream it it simply ignored.
   //
   //   .. code-block:: yaml
