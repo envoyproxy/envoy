@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.EnvoyNativeResourceReleaser;
-import io.envoyproxy.envoymobile.engine.EnvoyNativeResourceWrapper;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks;
 
 final class EnvoyHTTPFilterCallbacksImpl
     implements EnvoyHTTPFilterCallbacks, EnvoyNativeResourceWrapper {

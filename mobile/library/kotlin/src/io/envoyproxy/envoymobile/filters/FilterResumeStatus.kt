@@ -5,7 +5,9 @@ import java.nio.ByteBuffer
 /*
  * Status to be returned by filters after resuming iteration asynchronously.
  */
-sealed class FilterResumeStatus<T : Headers, U : Trailers> {
+sealed class FilterResumeStatus<T : Headers, U : Trailers>(
+  val status: Int
+) {
   /**
    * Resume previously-stopped iteration, potentially forwarding headers, data, and/or trailers
    * that have not yet been passed along the filter chain.
@@ -24,5 +26,5 @@ sealed class FilterResumeStatus<T : Headers, U : Trailers> {
     val headers: T?,
     val data: ByteBuffer?,
     val trailers: U?
-  ) : FilterResumeStatus<T, U>()
+  ) : FilterResumeStatus<T, U>(-1)
 }

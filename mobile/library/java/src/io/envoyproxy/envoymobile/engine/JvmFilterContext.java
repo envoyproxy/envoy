@@ -10,11 +10,13 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter;
  * Wrapper class for EnvoyHTTPFilter for receiving JNI calls.
  */
 class JvmFilterContext {
-  private final JvmBridgeUtility bridgeUtility;
+  private final JvmBridgeUtility headerUtility;
+  private final JvmBridgeUtility trailerUtility;
   private final EnvoyHTTPFilter filter;
 
   public JvmFilterContext(EnvoyHTTPFilter filter) {
-    bridgeUtility = new JvmBridgeUtility();
+    headerUtility = new JvmBridgeUtility();
+    trailerUtility = new JvmBridgeUtility();
     this.filter = filter;
   }
 
@@ -26,7 +28,18 @@ class JvmFilterContext {
    * @param start,      indicates this is the first header pair of the block.
    */
   public void passHeader(byte[] key, byte[] value, boolean start) {
-    bridgeUtility.passHeader(key, value, start);
+    headerUtility.passHeader(key, value, start);
+  }
+
+  /**
+   * Delegates trailer retrieval to the secondary bridge utility.
+   *
+   * @param key,        the name of the HTTP trailer.
+   * @param value,      the value of the HTTP trailer.
+   * @param start,      indicates this is the first trailer pair of the block.
+   */
+  public void passTrailer(byte[] key, byte[] value, boolean start) {
+    trailerUtility.passHeader(key, value, start);
   }
 
   /**
@@ -37,8 +50,8 @@ class JvmFilterContext {
    * @return Object[],   pair of HTTP filter status and optional modified headers.
    */
   public Object onRequestHeaders(long headerCount, boolean endStream) {
-    assert bridgeUtility.validateCount(headerCount);
-    final Map headers = bridgeUtility.retrieveHeaders();
+    assert headerUtility.validateCount(headerCount);
+    final Map headers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(filter.onRequestHeaders(headers, endStream));
   }
 
@@ -61,8 +74,8 @@ class JvmFilterContext {
    * @return Object[],    pair of HTTP filter status and optional modified trailers.
    */
   public Object onRequestTrailers(long trailerCount) {
-    assert bridgeUtility.validateCount(trailerCount);
-    final Map trailers = bridgeUtility.retrieveHeaders();
+    assert headerUtility.validateCount(trailerCount);
+    final Map trailers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(filter.onRequestTrailers(trailers));
   }
 
@@ -74,8 +87,8 @@ class JvmFilterContext {
    * @return Object[],   pair of HTTP filter status and optional modified headers.
    */
   public Object onResponseHeaders(long headerCount, boolean endStream) {
-    assert bridgeUtility.validateCount(headerCount);
-    final Map headers = bridgeUtility.retrieveHeaders();
+    assert headerUtility.validateCount(headerCount);
+    final Map headers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(filter.onResponseHeaders(headers, endStream));
   }
 
@@ -98,9 +111,65 @@ class JvmFilterContext {
    * @return Object[],    pair of HTTP filter status and optional modified trailers.
    */
   public Object onResponseTrailers(long trailerCount) {
-    assert bridgeUtility.validateCount(trailerCount);
-    final Map trailers = bridgeUtility.retrieveHeaders();
+    assert headerUtility.validateCount(trailerCount);
+    final Map trailers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(filter.onResponseTrailers(trailers));
+  }
+
+  /**
+   *
+   */
+  public Object onResumeRequest(long headerCount, byte[] data, long trailerCount,
+                                boolean endStream) {
+    // Headers are optional in this call, and a negative length indicates omission.
+    Map<String, List<String>> headers = null;
+    if (headerCount >= 0) {
+      assert headerUtility.validateCount(headerCount);
+      headers = headerUtility.retrieveHeaders();
+    }
+    ByteBuffer dataBuffer = data == null ? null : ByteBuffer.wrap(data);
+    // Trailers are optional in this call, and a negative length indicates omission.
+    Map<String, List<String>> trailers = null;
+    if (trailerCount >= 0) {
+      assert trailerUtility.validateCount(trailerCount);
+      trailers = trailerUtility.retrieveHeaders();
+    }
+    return filter.onResumeRequest(headers, dataBuffer, trailers, endStream);
+  }
+
+  /**
+   *
+   */
+  public Object onResumeResponse(long headerCount, byte[] data, long trailerCount,
+                                 boolean endStream) {
+    // Headers are optional in this call, and a negative length indicates omission.
+    Map<String, List<String>> headers = null;
+    if (headerCount >= 0) {
+      assert headerUtility.validateCount(headerCount);
+      headers = headerUtility.retrieveHeaders();
+    }
+    ByteBuffer dataBuffer = data == null ? null : ByteBuffer.wrap(data);
+    // Trailers are optional in this call, and a negative length indicates omission.
+    Map<String, List<String>> trailers = null;
+    if (trailerCount >= 0) {
+      assert trailerUtility.validateCount(trailerCount);
+      trailers = trailerUtility.retrieveHeaders();
+    }
+    return filter.onResumeResponse(headers, dataBuffer, trailers, endStream);
+  }
+
+  /**
+   *
+   */
+  public void setRequestFilterCallbacks(long callbackHandle) {
+    filter.setRequestFilterCallbacks(EnvoyHTTPFilterCallbacksImpl.create(callbackHandle));
+  }
+
+  /**
+   *
+   */
+  public void setResponseFilterCallbacks(long callbackHandle) {
+    filter.setResponseFilterCallbacks(EnvoyHTTPFilterCallbacksImpl.create(callbackHandle));
   }
 
   private static byte[][] toJniHeaders(Object headers) {

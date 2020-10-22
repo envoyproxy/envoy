@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import java.nio.ByteBuffer
 
@@ -94,5 +95,47 @@ internal class EnvoyHTTPFilterAdapter(
       }
     }
     return arrayOf(0, trailers)
+  }
+
+  override fun setRequestFilterCallbacks(callbacks: EnvoyHTTPFilterCallbacks) {
+    (filter as? AsyncRequestFilter)?.let { asyncRequestFilter ->
+      asyncRequestFilter.setRequestFilterCallbacks(RequestFilterCallbacksImpl(callbacks))
+    }
+  }
+
+  override fun onResumeRequest(headers: Map<String, List<String>>?, data: ByteBuffer?, trailers: Map<String, List<String>>?, endStream: Boolean): Array<Any?> {
+    (filter as? AsyncRequestFilter)?.let { asyncRequestFilter ->
+      val result = asyncRequestFilter.onResumeRequest(
+        headers?.let(::RequestHeaders),
+        data,
+        trailers?.let(::RequestTrailers),
+        endStream
+      )
+      return when (result) {
+        is FilterResumeStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.headers?.headers, result.data, result.trailers?.headers)
+      }
+    }
+    return arrayOf(-1, headers, data, trailers)
+  }
+
+  override fun setResponseFilterCallbacks(callbacks: EnvoyHTTPFilterCallbacks) {
+    (filter as? AsyncResponseFilter)?.let { asyncResponseFilter ->
+      asyncResponseFilter.setResponseFilterCallbacks(ResponseFilterCallbacksImpl(callbacks))
+    }
+  }
+
+  override fun onResumeResponse(headers: Map<String, List<String>>?, data: ByteBuffer?, trailers: Map<String, List<String>>?, endStream: Boolean): Array<Any?> {
+    (filter as? AsyncResponseFilter)?.let { asyncResponseFilter ->
+      val result = asyncResponseFilter.onResumeResponse(
+        headers?.let(::ResponseHeaders),
+        data,
+        trailers?.let(::ResponseTrailers),
+        endStream
+      )
+      return when (result) {
+        is FilterResumeStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.headers?.headers, result.data, result.trailers?.headers)
+      }
+    }
+    return arrayOf(-1, headers, data, trailers)
   }
 }
