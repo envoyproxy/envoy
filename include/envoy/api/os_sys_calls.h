@@ -2,9 +2,9 @@
 
 #include <sys/stat.h>
 
+#include <chrono>
 #include <memory>
 #include <string>
-#include <chrono>
 
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
