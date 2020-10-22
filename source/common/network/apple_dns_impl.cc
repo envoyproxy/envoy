@@ -92,10 +92,10 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
   try {
     // After production testing with this resolver implementation it became empirically demonstrable
     // that Apple's API issues queries to the DNS server for dns_name that might already be an IP
-    // address. In constrast c-ares synchronously resolves such cases. Moreover, some DNS servers
+    // address. In contrast, c-ares synchronously resolves such cases. Moreover, some DNS servers
     // might not resolve IP addresses and thus result in callback targets that never get a
     // resolution. Therefore, we short circuit here by trying to parse the dns_name into an internet
-    // address and synchrnously issue the ResolveCb; only if the parsing throws an exception the
+    // address and synchronously issue the ResolveCb; only if the parsing throws an exception the
     // resolver issues a call to Apple's API.
     address = Utility::parseInternetAddress(dns_name);
     ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
