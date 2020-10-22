@@ -88,12 +88,20 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
                                               ResolveCb callback) {
   ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
 
+  Address::InstanceConstSharedPtr address{};
   try {
-    auto address = Utility::parseInternetAddress(dns_name);
-    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API", dns_name, address->asString());
-    callback(DnsResolver::ResolutionStatus::Success, {DnsResponse(address, std::chrono::seconds(60))});
-    return nullptr;
+    // After production testing with this resolver implementation it became empirically demonstrable
+    // that Apple's API issues queries to the DNS server for dns_name that might already be an IP
+    // address. In constrast c-ares synchronously resolves such cases. Moreover, some DNS servers
+    // might not resolve IP addresses and thus result in callback targets that never get a
+    // resolution. Therefore, we short circuit here by trying to parse the dns_name into an internet
+    // address and synchrnously issue the ResolveCb; only if the parsing throws an exception the
+    // resolver issues a call to Apple's API.
+    address = Utility::parseInternetAddress(dns_name);
+    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
+              dns_name, address->asString());
   } catch (const EnvoyException& e) {
+    // Resolution via Apple APIs
     ENVOY_LOG(debug, "DNS resolver local resolution failed with: {}", e.what());
     std::unique_ptr<PendingResolution> pending_resolution(
         new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
@@ -104,13 +112,29 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
       return nullptr;
     }
 
-    // If the query was synchronously resolved, there is no need to return the query.
+    // If the query was synchronously resolved in the Apple API call, there is no need to return the
+    // query.
     if (pending_resolution->synchronously_completed_) {
       return nullptr;
     }
 
     pending_resolution->owned_ = true;
     return pending_resolution.release();
+  }
+
+  ASSERT(address != nullptr);
+  // Finish local, synchronous resolution. This needs to happen outside of the exception block above
+  // as the callback itself can throw.
+  try {
+    callback(DnsResolver::ResolutionStatus::Success,
+             {DnsResponse(address, std::chrono::seconds(60))});
+    return nullptr;
+  } catch (const std::exception& e) {
+    ENVOY_LOG(warn, "std::exception in callback with local resolution: {}", e.what());
+    throw EnvoyException(e.what());
+  } catch (...) {
+    ENVOY_LOG(warn, "Unknown exception in callback with local resolution");
+    throw EnvoyException("unknown");
   }
 }
 
