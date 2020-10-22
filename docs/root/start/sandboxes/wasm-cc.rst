@@ -63,16 +63,16 @@ Step 5: Compile the updated filter
 
 There are two source code files provided for the Wasm filter.
 
-:download:`envoy_filter_http_wasm_example.cc <_include/wasm/envoy_filter_http_wasm_example.cc>` provides the source code for
+:download:`envoy_filter_http_wasm_example.cc <_include/wasm-cc/envoy_filter_http_wasm_example.cc>` provides the source code for
 the included prebuilt binary.
 
-:download:`envoy_filter_http_wasm_updated_example.cc <_include/wasm/envoy_filter_http_wasm_updated_example.cc>` makes a few
+:download:`envoy_filter_http_wasm_updated_example.cc <_include/wasm-cc/envoy_filter_http_wasm_updated_example.cc>` makes a few
 changes to the original.
 
 The following diff shows the changes that have been made:
 
-.. literalinclude:: _include/wasm/envoy_filter_http_wasm_updated_example.cc
-    :diff: _include/wasm/envoy_filter_http_wasm_example.cc
+.. literalinclude:: _include/wasm-cc/envoy_filter_http_wasm_updated_example.cc
+    :diff: _include/wasm-cc/envoy_filter_http_wasm_example.cc
 
 .. warning::
 
@@ -103,7 +103,7 @@ Edit the ``Dockerfile-proxy`` recipe provided in the example to use the updated 
 
 Find the ``COPY`` line that adds the Wasm binary to the image:
 
-.. literalinclude:: _include/wasm/Dockerfile-proxy
+.. literalinclude:: _include/wasm-cc/Dockerfile-proxy
    :language: dockerfile
    :emphasize-lines: 3
    :linenos:
