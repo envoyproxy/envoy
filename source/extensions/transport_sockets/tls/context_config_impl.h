@@ -69,6 +69,11 @@ protected:
                     const std::string& default_cipher_suites, const std::string& default_curves,
                     Server::Configuration::TransportSocketFactoryContext& factory_context);
   Api::Api& api_;
+  // If certificate validation context type is combined_validation_context. default_cvc_
+  // holds a copy of CombinedCertificateValidationContext::default_validation_context.
+  // Otherwise, default_cvc_ is nullptr.
+  std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
+      default_cvc_;
   std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
   Secret::CertificateValidationContextConfigProviderSharedPtr
       certificate_validation_context_provider_;
@@ -84,11 +89,6 @@ private:
 
   std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
-  // If certificate validation context type is combined_validation_context. default_cvc_
-  // holds a copy of CombinedCertificateValidationContext::default_validation_context.
-  // Otherwise, default_cvc_ is nullptr.
-  std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
-      default_cvc_;
   // Handle for TLS certificate dynamic secret callback.
   Envoy::Common::CallbackHandle* tc_update_callback_handle_{};
   // Handle for certificate validation context dynamic secret callback.
