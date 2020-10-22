@@ -3,15 +3,31 @@ parameters:
     displayName: "CI target"
     type: string
     default: bazel.release
+  - name: artifactSuffix
+    displayName: "Suffix of artifact"
+    type: string
+    default: ""
+  - name: rbe
+    displayName: "Enable RBE"
+    type: boolean
+    default: true
+  - name: managedAgent
+    type: boolean
+    default: true
+  - name: bazelBuildExtraOptions
+    type: string
+    default: "--flaky_test_attempts=2"
 
 steps:
-  - task: CacheBeta@1
+  - task: Cache@2
     inputs:
       key: '"${{ parameters.ciTarget }}" | ./WORKSPACE | **/*.bzl'
       path: $(Build.StagingDirectory)/repository_cache
+    continueOnError: true
 
   - bash: .azure-pipelines/cleanup.sh
     displayName: "Removing tools from agent"
+    condition: ${{ parameters.managedAgent }}
 
   - bash: |
       echo "disk space at beginning of build:"
@@ -26,6 +42,7 @@ steps:
       }' | sudo tee /etc/docker/daemon.json
       sudo service docker restart
     displayName: "Enable IPv6"
+    condition: ${{ parameters.managedAgent }}
 
   - script: ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ parameters.ciTarget }}'
     workingDirectory: $(Build.SourcesDirectory)
