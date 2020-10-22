@@ -91,8 +91,8 @@ envoy_cmake_external(
         "//conditions:default": [],
     }),
     postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/nameser.h $INSTALLDIR/include/nameser.h",
-        "//conditions:default": "",
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/nameser.h $INSTALLDIR/include/nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+        "//conditions:default": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_dns.h $INSTALLDIR/include/ares_dns.h",
     }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
@@ -346,6 +346,7 @@ envoy_cmake_external(
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "CMAKE_C_COMPILER_FORCED": "on",
         "SKIP_BUILD_EXAMPLES": "on",
+        "BUILD_SHARED_LIBS": "off",
 
         # The following entries are for zlib-ng. Since zlib and zlib-ng are compatible source
         # codes and CMake ignores unknown cache entries, it is fine to combine it into one
@@ -373,7 +374,7 @@ envoy_cmake_external(
         "//conditions:default": "@net_zlib//:all",
     }),
     static_libraries = select({
-        "//bazel:windows_x86_64": ["zlibstatic.lib"],
+        "//bazel:windows_x86_64": ["zlib.lib"],
         "//conditions:default": ["libz.a"],
     }),
 )
