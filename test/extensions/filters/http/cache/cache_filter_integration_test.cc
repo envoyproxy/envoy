@@ -22,6 +22,7 @@ public:
 
   void initializeFilter(const std::string& config) {
     config_helper_.addFilter(config);
+    config_helper_.setBufferLimits(buffer_limit_, buffer_limit_);
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
@@ -34,6 +35,7 @@ public:
            "@type": "type.googleapis.com/envoy.source.extensions.filters.http.cache.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
+  uint64_t buffer_limit_ = 1024;
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, CacheIntegrationTest,
@@ -53,7 +55,10 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
       {":scheme", "http"},
       {":authority", "MissInsertHit"}};
 
-  const std::string response_body(42, 'a');
+  // Use a body arbitrarily greater than the buffer limit to exercise fetching the cached body in
+  // several chunks.
+  const std::string response_body(buffer_limit_ * 3.5, 'a');
+
   Http::TestResponseHeaderMapImpl response_headers = {
       {":status", "200"},
       {"date", formatter_.now(simTime())},
@@ -109,7 +114,10 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
       {":scheme", "http"},
       {":authority", "ExpiredValidated"}};
 
-  const std::string response_body(42, 'a');
+  // Use a body arbitrarily greater than the buffer limit to exercise fetching the cached body in
+  // several chunks.
+  const std::string response_body(buffer_limit_ * 3.5, 'a');
+
   Http::TestResponseHeaderMapImpl response_headers = {
       {":status", "200"},
       {"date", formatter_.now(simTime())},

@@ -90,8 +90,9 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 
   if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
     processSuccessfulValidation(headers);
-    // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
-    return Http::FilterHeadersStatus::StopIteration;
+    // Continue encoding the headers but do not end the stream as the response body is yet to be
+    // injected.
+    return Http::FilterHeadersStatus::ContinueAndDontEndStream;
   }
 
   // Either a cache miss or a cache entry that is no longer valid.
@@ -113,10 +114,6 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     // cached response was found and is being added to the encoding stream -- ignore it.
     return Http::FilterDataStatus::Continue;
   }
-  if (filter_state_ == FilterState::EncodeServingFromCache) {
-    // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
-    return Http::FilterDataStatus::StopIterationAndBuffer;
-  }
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeData inserting body", *encoder_callbacks_);
     // TODO(toddmgreer): Wait for the cache if necessary.
@@ -124,6 +121,17 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
         data, [](bool) {}, end_stream);
   }
   return Http::FilterDataStatus::Continue;
+}
+
+void CacheFilter::onAboveWriteBufferHighWatermark() { ++high_watermark_calls_; }
+
+void CacheFilter::onBelowWriteBufferLowWatermark() {
+  ASSERT(high_watermark_calls_ > 0);
+  --high_watermark_calls_;
+  if (!remaining_ranges_.empty()) {
+    // Fetching the cached response body was stopped, continue if possible.
+    maybeGetBody();
+  }
 }
 
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
@@ -165,9 +173,21 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   });
 }
 
-void CacheFilter::getBody() {
+void CacheFilter::maybeGetBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_ranges_.empty(), "No reason to call getBody when there's no body to get.");
+
+  if (high_watermark_calls_ > 0 || ongoing_fetch_) {
+    return;
+  }
+  ongoing_fetch_ = true;
+
+  // Make sure we are not fetching a chunk of data larger than the encoding buffer limit.
+  uint64_t begin = remaining_ranges_[0].begin();
+  uint64_t end = std::min(remaining_ranges_[0].end(),
+                          remaining_ranges_[0].begin() + encoder_callbacks_->encoderBufferLimit());
+  AdjustedByteRange range_to_fetch = {begin, end};
+
   // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
   // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
   // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
@@ -177,8 +197,8 @@ void CacheFilter::getBody() {
 
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getBody(remaining_ranges_[0], [self, &dispatcher = decoder_callbacks_->dispatcher()](
-                                             Buffer::InstancePtr&& body) {
+  lookup_->getBody(range_to_fetch, [self, &dispatcher = decoder_callbacks_->dispatcher()](
+                                       Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
@@ -302,6 +322,8 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
          "bogus callback.");
   ASSERT(body, "Cache said it had a body, but isn't giving it to us.");
 
+  ongoing_fetch_ = false;
+
   const uint64_t bytes_from_cache = body->length();
   if (bytes_from_cache < remaining_ranges_[0].length()) {
     remaining_ranges_[0].trimFront(bytes_from_cache);
@@ -318,14 +340,12 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 
   filter_state_ == FilterState::DecodeServingFromCache
       ? decoder_callbacks_->encodeData(*body, end_stream)
-      : encoder_callbacks_->addEncodedData(*body, true);
+      : encoder_callbacks_->injectEncodedDataToFilterChain(*body, end_stream);
 
   if (!remaining_ranges_.empty()) {
-    getBody();
+    maybeGetBody();
   } else if (response_has_trailers_) {
     getTrailers();
-  } else {
-    finalizeEncodingCachedResponse();
   }
 }
 
@@ -339,10 +359,12 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   } else {
-    Http::ResponseTrailerMap& response_trailers = encoder_callbacks_->addEncodedTrailers();
-    response_trailers = std::move(*trailers);
+    // The current API does not support this.
+    // TODO(yosrym93): When trailers support is implemented, a function in
+    // StreamEncoderFilterCallbacks will need to be implemented to inject trailers. See
+    // FilterHeadersStatus::ContinueAndDontEndStream docs in filter.h for more details.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  finalizeEncodingCachedResponse();
 }
 
 void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_headers) {
@@ -456,30 +478,24 @@ void CacheFilter::encodeCachedResponse() {
       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
 
   // If the filter is encoding, 304 response headers and cached headers are merged in encodeHeaders.
-  // If the filter is decoding, we need to serve response headers from cache directly.
+  // If the filter is decoding, we need to serve cached response headers directly.
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
                                       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
   }
 
+  // TODO(yosrym93): Make sure this is the right place to add the callbacks.
+  decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+
   if (lookup_result_->content_length_ > 0) {
-    // No range has been added, so we add entire body to the response.
     if (remaining_ranges_.empty()) {
+      // This is not a range request, encode the entire body.
       remaining_ranges_.emplace_back(0, lookup_result_->content_length_);
     }
-    getBody();
+    maybeGetBody();
   } else if (response_has_trailers_) {
     getTrailers();
   }
-}
-
-void CacheFilter::finalizeEncodingCachedResponse() {
-  if (filter_state_ == FilterState::EncodeServingFromCache) {
-    // encodeHeaders returned StopIteration waiting for finishing encoding the cached response --
-    // continue encoding.
-    encoder_callbacks_->continueEncoding();
-  }
-  filter_state_ = FilterState::ResponseServedFromCache;
 }
 
 } // namespace Cache

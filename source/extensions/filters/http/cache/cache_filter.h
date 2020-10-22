@@ -22,26 +22,34 @@ namespace Cache {
  * A filter that caches responses and attempts to satisfy requests from cache.
  */
 class CacheFilter : public Http::PassThroughFilter,
+                    public Http::DownstreamWatermarkCallbacks,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
               HttpCache& http_cache);
+
   // Http::StreamFilterBase
   void onDestroy() override;
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
+
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
 
+  // Http::DownstreamWatermarkCallbacks
+  void onAboveWriteBufferHighWatermark() override;
+  void onBelowWriteBufferLowWatermark() override;
+
 private:
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions
   void getHeaders(Http::RequestHeaderMap& request_headers);
-  void getBody();
+  void maybeGetBody();
   void getTrailers();
 
   // Callbacks for HttpCache to call when headers/body/trailers are ready.
@@ -71,19 +79,13 @@ private:
   // or during encoding if a cache entry was validated successfully.
   void encodeCachedResponse();
 
-  // Precondition: finished adding a response from cache to the response encoding stream.
-  // Updates filter_state_ and continues the encoding stream if necessary.
-  void finalizeEncodingCachedResponse();
-
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
 
-  // Tracks what body bytes still need to be read from the cache. This is
-  // currently only one Range, but will expand when full range support is added. Initialized by
-  // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
+  // Tracks what body bytes still need to be read from the cache.
   std::vector<AdjustedByteRange> remaining_ranges_;
 
   // TODO(#12901): The allow list could be constructed only once directly from the config, instead
@@ -100,6 +102,10 @@ private:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability
   bool request_allows_inserts_ = false;
 
+  // These are used to keep track of whether we should fetch more data from the cache.
+  int high_watermark_calls_ = 0;
+  bool ongoing_fetch_ = false;
+
   enum class FilterState {
     Initial,
 
@@ -111,10 +117,6 @@ private:
 
     // A cached response was successfully validated and it is being added to the encoding stream
     EncodeServingFromCache,
-
-    // The cached response was successfully added to the encoding stream (either during decoding or
-    // encoding).
-    ResponseServedFromCache,
 
     // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered
     // callbacks should be ignored.
