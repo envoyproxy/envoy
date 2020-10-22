@@ -229,5 +229,6 @@ features. The following sandboxes are available:
     sandboxes/load_reporting_service
     sandboxes/lua
     sandboxes/mysql
+    sandboxes/postgres
     sandboxes/redis
     sandboxes/zipkin_tracing
