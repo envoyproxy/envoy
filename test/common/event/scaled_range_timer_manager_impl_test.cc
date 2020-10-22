@@ -3,7 +3,7 @@
 #include "envoy/event/timer.h"
 
 #include "common/event/dispatcher_impl.h"
-#include "common/event/scaled_range_timer_manager.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/wrapped_dispatcher.h"
@@ -46,36 +46,37 @@ public:
   ScopeTrackingDispatcher dispatcher_;
 };
 
-struct TrackedTimer {
-  explicit TrackedTimer(ScaledRangeTimerManager& manager, TimeSystem& time_system)
-      : timer(manager.createTimer([trigger_times = trigger_times.get(), &time_system] {
+struct TrackedRangeTimer {
+  explicit TrackedRangeTimer(ScaledTimerMinimum minimum, ScaledRangeTimerManagerImpl& manager,
+                             TimeSystem& time_system)
+      : timer(manager.createTimer(minimum, [trigger_times = trigger_times.get(), &time_system] {
           trigger_times->push_back(time_system.monotonicTime());
         })) {}
   std::unique_ptr<std::vector<MonotonicTime>> trigger_times{
       std::make_unique<std::vector<MonotonicTime>>()};
-  RangeTimerPtr timer;
+  TimerPtr timer;
 };
 
 TEST_F(ScaledRangeTimerManagerTest, CreateAndDestroy) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 }
 
 TEST_F(ScaledRangeTimerManagerTest, CreateAndDestroyTimer) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   {
     MockFunction<TimerCb> callback;
-    auto timer = manager.createTimer(callback.AsStdFunction());
+    auto timer = manager.createTimer(ScaledMinimum(1.0), callback.AsStdFunction());
   }
 }
 
 TEST_F(ScaledRangeTimerManagerTest, CreateSingleScaledTimer) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(0.5), callback.AsStdFunction());
 
-  timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(10));
+  timer->enableTimer(std::chrono::seconds(10));
   EXPECT_TRUE(timer->enabled());
 
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
@@ -87,12 +88,13 @@ TEST_F(ScaledRangeTimerManagerTest, CreateSingleScaledTimer) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, EnableAndDisableTimer) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback.AsStdFunction());
 
-  timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(30));
+  timer->enableTimer(std::chrono::seconds(30));
   EXPECT_TRUE(timer->enabled());
 
   timer->disableTimer();
@@ -105,10 +107,10 @@ TEST_F(ScaledRangeTimerManagerTest, EnableAndDisableTimer) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableWhileDisabled) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(1.0), callback.AsStdFunction());
 
   EXPECT_FALSE(timer->enabled());
   timer->disableTimer();
@@ -117,11 +119,12 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileDisabled) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableWhileWaitingForMin) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
-  timer->enableTimer(std::chrono::seconds(10), std::chrono::seconds(100));
+  auto timer =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(10)), callback.AsStdFunction());
+  timer->enableTimer(std::chrono::seconds(100));
   EXPECT_TRUE(timer->enabled());
 
   timer->disableTimer();
@@ -129,12 +132,13 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileWaitingForMin) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableWhileScalingMax) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback.AsStdFunction());
 
-  timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(100));
+  timer->enableTimer(std::chrono::seconds(100));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
 
@@ -148,12 +152,12 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileScalingMax) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableWithZeroMinTime) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(0.0), callback.AsStdFunction());
 
-  timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(100));
+  timer->enableTimer(std::chrono::seconds(100));
 
   EXPECT_TRUE(timer->enabled());
 
@@ -165,12 +169,13 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWithZeroMinTime) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, TriggerWithZeroMinTime) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(0)), callback.AsStdFunction());
 
-  timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(10));
+  timer->enableTimer(std::chrono::seconds(10));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(9), dispatcher_, Dispatcher::RunType::Block);
   EXPECT_CALL(callback, Call);
@@ -178,15 +183,17 @@ TEST_F(ScaledRangeTimerManagerTest, TriggerWithZeroMinTime) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableFrontScalingMaxTimer) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback1, callback2;
-  auto timer1 = manager.createTimer(callback1.AsStdFunction());
-  auto timer2 = manager.createTimer(callback2.AsStdFunction());
+  auto timer1 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback1.AsStdFunction());
+  auto timer2 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(10)), callback2.AsStdFunction());
 
   // These timers have the same max-min.
-  timer1->enableTimer(std::chrono::seconds(5), std::chrono::seconds(30));
-  timer2->enableTimer(std::chrono::seconds(10), std::chrono::seconds(35));
+  timer1->enableTimer(std::chrono::seconds(30));
+  timer2->enableTimer(std::chrono::seconds(35));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
@@ -204,15 +211,17 @@ TEST_F(ScaledRangeTimerManagerTest, DisableFrontScalingMaxTimer) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableLaterScalingMaxTimer) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback1, callback2;
-  auto timer1 = manager.createTimer(callback1.AsStdFunction());
-  auto timer2 = manager.createTimer(callback2.AsStdFunction());
+  auto timer1 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback1.AsStdFunction());
+  auto timer2 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(10)), callback2.AsStdFunction());
 
   // These timers have the same max-min.
-  timer1->enableTimer(std::chrono::seconds(5), std::chrono::seconds(30));
-  timer2->enableTimer(std::chrono::seconds(10), std::chrono::seconds(35));
+  timer1->enableTimer(std::chrono::seconds(30));
+  timer2->enableTimer(std::chrono::seconds(35));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
@@ -234,22 +243,23 @@ public:
 };
 
 TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(1)), callback.AsStdFunction());
 
   EXPECT_EQ(dispatcher_.scope_, nullptr);
   {
     InSequence s;
     EXPECT_CALL(callback, Call).WillOnce([&] {
       EXPECT_EQ(dispatcher_.scope_, getScope());
-      timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2), getScope());
+      timer->enableTimer(std::chrono::seconds(2), getScope());
     });
     EXPECT_CALL(callback, Call).WillOnce([&] { EXPECT_EQ(dispatcher_.scope_, getScope()); });
   }
 
-  timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2), getScope());
+  timer->enableTimer(std::chrono::seconds(2), getScope());
   simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
 
   EXPECT_EQ(dispatcher_.scope_, nullptr);
@@ -265,15 +275,16 @@ TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
 };
 
 TEST_P(ScaledRangeTimerManagerTestWithScope, ScheduleWithScalingFactorZero) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(0)), callback.AsStdFunction());
   manager.setScaleFactor(0);
 
   EXPECT_CALL(callback, Call).WillOnce([&] { EXPECT_EQ(dispatcher_.scope_, getScope()); });
 
-  timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(1), getScope());
+  timer->enableTimer(std::chrono::seconds(1), getScope());
   simTime().advanceTimeAndRun(std::chrono::milliseconds(1), dispatcher_,
                               Dispatcher::RunType::Block);
 }
@@ -282,14 +293,15 @@ INSTANTIATE_TEST_SUITE_P(WithAndWithoutScope, ScaledRangeTimerManagerTestWithSco
                          testing::Bool());
 
 TEST_F(ScaledRangeTimerManagerTest, SingleTimerTriggeredNoScaling) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
   bool triggered = false;
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback.AsStdFunction());
   EXPECT_CALL(callback, Call()).WillOnce([&] { triggered = true; });
 
-  timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(9));
+  timer->enableTimer(std::chrono::seconds(9));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
   EXPECT_FALSE(triggered);
@@ -304,31 +316,59 @@ TEST_F(ScaledRangeTimerManagerTest, SingleTimerTriggeredNoScaling) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, SingleTimerSameMinMax) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(1.0), callback.AsStdFunction());
   EXPECT_CALL(callback, Call());
 
-  timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(1));
+  timer->enableTimer(std::chrono::seconds(1));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
   EXPECT_FALSE(timer->enabled());
 }
 
+TEST_F(ScaledRangeTimerManagerTest, ScaledMinimumFactorGreaterThan1) {
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+
+  // If the minimum scale factor is > 1, it should be treated as if it was 1.
+  MockFunction<TimerCb> callback;
+  auto timer = manager.createTimer(ScaledMinimum(2), callback.AsStdFunction());
+
+  timer->enableTimer(std::chrono::seconds(10));
+  EXPECT_CALL(callback, Call);
+  simTime().advanceTimeAndRun(std::chrono::seconds(10), dispatcher_, Dispatcher::RunType::Block);
+  EXPECT_FALSE(timer->enabled());
+}
+
+TEST_F(ScaledRangeTimerManagerTest, AbsoluteMinimumGreaterThanMax) {
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+
+  // If the minimum is greater than the maximum, it should be treated as if it was the same as the
+  // max.
+  MockFunction<TimerCb> callback;
+  auto timer =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(20)), callback.AsStdFunction());
+
+  timer->enableTimer(std::chrono::seconds(10));
+  EXPECT_CALL(callback, Call);
+  simTime().advanceTimeAndRun(std::chrono::seconds(10), dispatcher_, Dispatcher::RunType::Block);
+  EXPECT_FALSE(timer->enabled());
+}
+
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersNoScaling) {
-  ScaledRangeTimerManager manager(dispatcher_);
-  std::vector<TrackedTimer> timers;
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+  std::vector<TrackedRangeTimer> timers;
   timers.reserve(3);
 
   const MonotonicTime start = simTime().monotonicTime();
-  for (int i = 0; i < 3; ++i) {
-    timers.emplace_back(manager, simTime());
-  }
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(1)), manager, simTime());
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(2)), manager, simTime());
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(0)), manager, simTime());
 
-  timers[0].timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(3));
-  timers[1].timer->enableTimer(std::chrono::seconds(2), std::chrono::seconds(6));
-  timers[2].timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(9));
+  timers[0].timer->enableTimer(std::chrono::seconds(3));
+  timers[1].timer->enableTimer(std::chrono::seconds(6));
+  timers[2].timer->enableTimer(std::chrono::seconds(9));
 
   for (int i = 0; i < 10; ++i) {
     simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
@@ -340,19 +380,19 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersNoScaling) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithScaling) {
-  ScaledRangeTimerManager manager(dispatcher_);
-  std::vector<TrackedTimer> timers;
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+  std::vector<TrackedRangeTimer> timers;
   timers.reserve(3);
 
-  for (int i = 0; i < 3; ++i) {
-    timers.emplace_back(manager, simTime());
-  }
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(1)), manager, simTime());
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(2)), manager, simTime());
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(6)), manager, simTime());
 
   const MonotonicTime start = simTime().monotonicTime();
 
-  timers[0].timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(3));
-  timers[1].timer->enableTimer(std::chrono::seconds(2), std::chrono::seconds(6));
-  timers[2].timer->enableTimer(std::chrono::seconds(6), std::chrono::seconds(10));
+  timers[0].timer->enableTimer(std::chrono::seconds(3));
+  timers[1].timer->enableTimer(std::chrono::seconds(6));
+  timers[2].timer->enableTimer(std::chrono::seconds(10));
 
   manager.setScaleFactor(0.5);
 
@@ -381,15 +421,15 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithScaling) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimes) {
-  ScaledRangeTimerManager manager(dispatcher_);
-  std::vector<TrackedTimer> timers;
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+  std::vector<TrackedRangeTimer> timers;
   timers.reserve(3);
 
   const MonotonicTime start = simTime().monotonicTime();
 
   for (int i = 0; i < 3; ++i) {
-    timers.emplace_back(manager, simTime());
-    timers[i].timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2));
+    timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(1)), manager, simTime());
+    timers[i].timer->enableTimer(std::chrono::seconds(2));
   }
 
   simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
@@ -402,15 +442,15 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimes) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimesFastClock) {
-  ScaledRangeTimerManager manager(dispatcher_);
-  std::vector<TrackedTimer> timers;
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+  std::vector<TrackedRangeTimer> timers;
   timers.reserve(3);
 
   const MonotonicTime start = simTime().monotonicTime();
 
   for (int i = 0; i < 3; ++i) {
-    timers.emplace_back(manager, simTime());
-    timers[i].timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2));
+    timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(1)), manager, simTime());
+    timers[i].timer->enableTimer(std::chrono::seconds(2));
   }
 
   simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
@@ -423,14 +463,14 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimesFastClock) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, ScheduledWithScalingFactorZero) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
   manager.setScaleFactor(0);
 
-  TrackedTimer timer(manager, simTime());
+  TrackedRangeTimer timer(AbsoluteMinimum(std::chrono::seconds(4)), manager, simTime());
 
   // The timer should fire at start = 4 since the scaling factor is 0.
   const MonotonicTime start = simTime().monotonicTime();
-  timer.timer->enableTimer(std::chrono::seconds(4), std::chrono::seconds(10));
+  timer.timer->enableTimer(std::chrono::seconds(10));
 
   for (int i = 0; i < 10; ++i) {
     simTime().advanceTimeAndRun(std::chrono::seconds(4), dispatcher_, Dispatcher::RunType::Block);
@@ -442,12 +482,12 @@ TEST_F(ScaledRangeTimerManagerTest, ScheduledWithScalingFactorZero) {
 TEST_F(ScaledRangeTimerManagerTest, ScheduledWithMaxBeforeMin) {
   // When max < min, the timer behaves the same as if max == min. This ensures that min is always
   // respected, and max is respected as much as possible.
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
-  TrackedTimer timer(manager, simTime());
+  TrackedRangeTimer timer(AbsoluteMinimum(std::chrono::seconds(4)), manager, simTime());
 
   const MonotonicTime start = simTime().monotonicTime();
-  timer.timer->enableTimer(std::chrono::seconds(4), std::chrono::seconds(3));
+  timer.timer->enableTimer(std::chrono::seconds(3));
 
   for (int i = 0; i < 10; ++i) {
     simTime().advanceTimeAndRun(std::chrono::seconds(4), dispatcher_, Dispatcher::RunType::Block);
@@ -457,16 +497,19 @@ TEST_F(ScaledRangeTimerManagerTest, ScheduledWithMaxBeforeMin) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersTriggeredInTheSameEventLoopIteration) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback1, callback2, callback3;
-  auto timer1 = manager.createTimer(callback1.AsStdFunction());
-  auto timer2 = manager.createTimer(callback2.AsStdFunction());
-  auto timer3 = manager.createTimer(callback3.AsStdFunction());
+  auto timer1 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback1.AsStdFunction());
+  auto timer2 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback2.AsStdFunction());
+  auto timer3 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback3.AsStdFunction());
 
-  timer1->enableTimer(std::chrono::seconds(5), std::chrono::seconds(10));
-  timer2->enableTimer(std::chrono::seconds(5), std::chrono::seconds(10));
-  timer3->enableTimer(std::chrono::seconds(5), std::chrono::seconds(10));
+  timer1->enableTimer(std::chrono::seconds(10));
+  timer2->enableTimer(std::chrono::seconds(10));
+  timer3->enableTimer(std::chrono::seconds(10));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
 
@@ -510,22 +553,23 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersTriggeredInTheSameEventLoopIte
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithChangeInScalingFactor) {
-  ScaledRangeTimerManager manager(dispatcher_);
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
   const MonotonicTime start = simTime().monotonicTime();
 
-  std::vector<TrackedTimer> timers;
+  std::vector<TrackedRangeTimer> timers;
   timers.reserve(4);
-  for (int i = 0; i < 4; i++) {
-    timers.emplace_back(manager, simTime());
-  }
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(5)), manager, simTime());
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(12)), manager, simTime());
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(7)), manager, simTime());
+  timers.emplace_back(AbsoluteMinimum(std::chrono::seconds(10)), manager, simTime());
 
-  timers[0].timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(15));
-  timers[1].timer->enableTimer(std::chrono::seconds(12), std::chrono::seconds(14));
+  timers[0].timer->enableTimer(std::chrono::seconds(15));
+  timers[1].timer->enableTimer(std::chrono::seconds(14));
 
   manager.setScaleFactor(0.1);
 
-  timers[2].timer->enableTimer(std::chrono::seconds(7), std::chrono::seconds(21));
-  timers[3].timer->enableTimer(std::chrono::seconds(10), std::chrono::seconds(16));
+  timers[2].timer->enableTimer(std::chrono::seconds(21));
+  timers[3].timer->enableTimer(std::chrono::seconds(16));
 
   // Advance to timer 0's min.
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
@@ -551,7 +595,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithChangeInScalingFactor) {
 
   // The time is now start+10. Re-enable timer 0.
   ASSERT_FALSE(timers[0].timer->enabled());
-  timers[0].timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(13));
+  timers[0].timer->enableTimer(std::chrono::seconds(13));
 
   // Fire times are now 0: start+19, 1: start+13, 2: none, 3: start+13.
   manager.setScaleFactor(0.5);
