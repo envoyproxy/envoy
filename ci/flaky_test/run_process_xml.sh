@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export ENVOY_SRCDIR=${ENVOY_SRCDIR:-.}
+
 # shellcheck source=tools/shell_utils.sh
 . "${ENVOY_SRCDIR}"/tools/shell_utils.sh
 

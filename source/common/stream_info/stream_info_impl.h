@@ -14,8 +14,22 @@
 #include "common/http/request_id_extension_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace StreamInfo {
+
+namespace {
+
+using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
+
+const ReplacementMap& emptySpaceReplacement() {
+  CONSTRUCT_ON_FIRST_USE(
+      ReplacementMap,
+      ReplacementMap{{" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}});
+}
+
+} // namespace
 
 struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source,
@@ -118,7 +132,15 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
-    response_code_details_.emplace(rc_details);
+    response_code_details_.emplace(absl::StrReplaceAll(rc_details, emptySpaceReplacement()));
+  }
+
+  const absl::optional<std::string>& connectionTerminationDetails() const override {
+    return connection_termination_details_;
+  }
+
+  void setConnectionTerminationDetails(absl::string_view connection_termination_details) override {
+    connection_termination_details_.emplace(connection_termination_details);
   }
 
   void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }
@@ -284,6 +306,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
