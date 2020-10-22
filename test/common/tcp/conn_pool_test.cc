@@ -1076,27 +1076,30 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
 
 TEST_P(TcpConnPoolImplIdleTimeoutTest, TestIdleTimeout) {
   auto* idle_timer = new Event::MockTimer{&dispatcher_};
-  EXPECT_CALL(*idle_timer, enabled).Times(AnyNumber());
-  EXPECT_CALL(*idle_timer, enableTimer(POOL_IDLE_TIMEOUT, _));
   conn_pool_.initialize();
 
   testing::MockFunction<void()> idle_callback;
   conn_pool_.addIdlePoolTimeoutCallback(idle_callback.AsStdFunction());
 
-  EXPECT_CALL(*idle_timer, disableTimer);
+  EXPECT_CALL(*idle_timer, enabled).Times(AnyNumber());
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 
-  EXPECT_CALL(*idle_timer, enableTimer(POOL_IDLE_TIMEOUT, _));
-  EXPECT_CALL(conn_pool_, onConnReleasedForTest());
-  c1.releaseConn();
+  EXPECT_CALL(*idle_timer, disableTimer).Times(0);
 
-  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-
-  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
-  dispatcher_.clearDeferredDeleteList();
+  {
+    EXPECT_CALL(*idle_timer, enableTimer(POOL_IDLE_TIMEOUT, _));
+    EXPECT_CALL(conn_pool_, onConnReleasedForTest());
+    c1.releaseConn();
+  }
 
   EXPECT_CALL(idle_callback, Call);
   idle_timer->invokeCallback();
+
+  testing::MockFunction<void()> drained_callback;
+  EXPECT_CALL(drained_callback, Call);
+  conn_pool_.addDrainedCallback(drained_callback.AsStdFunction());
+  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  dispatcher_.clearDeferredDeleteList();
 }
 
 // Test that maybePrefetch is passed up to the base class implementation.

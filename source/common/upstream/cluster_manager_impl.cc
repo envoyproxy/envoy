@@ -1401,20 +1401,25 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             cluster_info_->poolIdleTimeout());
-        pool->addIdlePoolTimeoutCallback(
-            [&container, &pool_map = parent_.host_http_conn_pool_map_, host, priority, hash_key]() {
-              ENVOY_LOG(debug, "Hit idle pool timeout, erasing pool");
-              container.pools_->erasePool(priority, hash_key);
-
-              // We want to clean up after ourselves if the host isn't particularly active (i.e. we
-              // hit our configured timeout on the last pool and don't have any other pools for that
-              // host).
-              if (container.pools_->size() == 0) {
-                ENVOY_LOG(debug,
-                          "Pool container empty for host after idle timeout, erasing host entry");
-                pool_map.erase(host); // NOTE: `container` is erased after this point in the lambda.
-              }
-            });
+        pool->addIdlePoolTimeoutCallback([pool_raw = pool.get(), &container,
+                                          &pool_map = parent_.host_http_conn_pool_map_, host,
+                                          priority, hash_key]() {
+          ENVOY_LOG(debug, "Hit idle pool timeout, draining pool");
+          pool_raw->addDrainedCallback([&container, &pool_map, host = std::move(host), priority,
+                                        hash_key = std::move(hash_key)]() {
+            ENVOY_LOG(debug, "Drained after idle pool timeout, erasing pool");
+            bool is_erased = container.pools_->erasePool(priority, hash_key);
+            ASSERT(is_erased);
+            // We want to clean up after ourselves if the host isn't particularly active (i.e. we
+            // hit our configured timeout on the last pool and don't have any other pools for that
+            // host).
+            if (container.pools_->size() == 0) {
+              ENVOY_LOG(debug,
+                        "Pool container empty for host after idle timeout, erasing host entry");
+              pool_map.erase(host); // NOTE: `container` is erased after this point in the lambda.
+            }
+          });
+        });
         return pool;
       });
 
@@ -1471,17 +1476,23 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             cluster_info_->poolIdleTimeout()));
     RELEASE_ASSERT(container.pools_.size() == original_size + 1, "Could not insert element");
-    pool_iter->second->addIdlePoolTimeoutCallback(
-        [&container, &pool_map = parent_.host_tcp_conn_pool_map_, host, hash_key]() {
-          container.pools_.erase(hash_key);
+    pool_iter->second->addIdlePoolTimeoutCallback([pool_raw = pool_iter->second.get(), &container,
+                                                   &pool_map = parent_.host_tcp_conn_pool_map_,
+                                                   host, hash_key]() {
+      ENVOY_LOG(debug, "Hit idle pool timeout, draining pool");
+      pool_raw->addDrainedCallback(
+          [&container, &pool_map, host = std::move(host), hash_key = std::move(hash_key)]() {
+            ENVOY_LOG(debug, "Drained after idle pool timeout, erasing pool");
+            container.pools_.erase(hash_key);
 
-          // We want to clean up after ourselves if the host isn't particularly active (i.e. we
-          // hit our configured timeout on the last pool and don't have any other pools for that
-          // host).
-          if (container.pools_.size() == 0) {
-            pool_map.erase(host); // NOTE: `container` is erased after this point in the lambda.
-          }
-        });
+            // We want to clean up after ourselves if the host isn't particularly active (i.e. we
+            // hit our configured timeout on the last pool and don't have any other pools for that
+            // host).
+            if (container.pools_.size() == 0) {
+              pool_map.erase(host); // NOTE: `container` is erased after this point in the lambda.
+            }
+          });
+    });
   }
 
   return pool_iter->second.get();

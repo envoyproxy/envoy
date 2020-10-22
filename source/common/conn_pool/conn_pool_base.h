@@ -153,6 +153,9 @@ public:
   // See if the drain process has started and/or completed.
   void checkForDrained();
 
+  // See if the pool has gone idle (no active or pending streams).
+  void checkForIdlePool();
+
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
   // Called if this pool is likely to be picked soon, to determine if it's worth

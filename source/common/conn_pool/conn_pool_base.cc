@@ -18,13 +18,9 @@ ConnPoolImplBase::ConnPoolImplBase(
       transport_socket_options_(transport_socket_options), idle_timeout_(pool_idle_timeout) {
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() {
+      ASSERT(!hasActiveConnectionsImpl());
       for (const Instance::IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
         cb();
-      }
-    });
-    addDrainedCallbackImpl([this]() {
-      if (idle_timer_ && !idle_timer_->enabled()) {
-        idle_timer_->enableTimer(*idle_timeout_);
       }
     });
   }
@@ -34,6 +30,7 @@ ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());
   ASSERT(busy_clients_.empty());
   ASSERT(connecting_clients_.empty());
+  ASSERT(!idle_timer_);
 }
 
 void ConnPoolImplBase::destructAllConnections() {
@@ -101,7 +98,6 @@ void ConnPoolImplBase::tryCreateNewConnections() {
   // overwhelming it with connections is not desirable.
   for (int i = 0; i < 3; ++i) {
     if (!tryCreateNewConnection()) {
-      disablePoolIdleTimer();
       return;
     }
   }
@@ -187,10 +183,13 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
     if (!delay_attaching_stream) {
       onUpstreamReady();
     }
+    checkForIdlePool();
   }
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
+  disablePoolIdleTimer();
+
   if (!ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing connection", client);
@@ -274,12 +273,14 @@ bool ConnPoolImplBase::hasActiveConnectionsImpl() const {
 
 void ConnPoolImplBase::addIdlePoolTimeoutCallbackImpl(Instance::IdlePoolTimeoutCb cb) {
   idle_pool_callbacks_.push_back(cb);
-  checkForDrained();
 }
 
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
+
+  // The pool is draining, so we don't ever want to run the idle callbacks after this point
+  idle_timer_.reset();
 
   for (auto& client : ready_clients_) {
     if (client->numActiveStreams() == 0) {
@@ -329,6 +330,12 @@ void ConnPoolImplBase::checkForDrained() {
     for (const Instance::DrainedCb& cb : drained_callbacks_) {
       cb();
     }
+  }
+}
+
+void ConnPoolImplBase::checkForIdlePool() {
+  if (idle_timer_ && !idle_timer_->enabled() && !hasActiveConnectionsImpl()) {
+    idle_timer_->enableTimer(*idle_timeout_);
   }
 }
 

@@ -152,6 +152,9 @@ protected:
   void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
   void checkForDrained();
   void disablePoolIdleTimer();
+  void checkForPoolIdle();
+
+  bool hasActiveConnections() const { return !pending_requests_.empty() || !busy_conns_.empty(); }
 
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
