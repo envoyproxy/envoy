@@ -109,7 +109,7 @@ virtual_hosts:
       - match:
           safe_regex:
             google_re2: {}
-            regex: "/percent-encoded/abc:{3}def/"
+            regex: "/percent-encoded/abc:{3}\\+{3}def/"
             percent_decode_input: true
         route:
           cluster: path-with-ascii-reserved-chars

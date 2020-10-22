@@ -284,7 +284,7 @@
       "test_name": "PercentDecodeInput::AsciiReservedChars",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/percent-encoded/abc%3A%3a:def/",
+        "path": "/percent-encoded/abc%3A%3a:%2B%2b+def/",
         "method": "GET"
       },
       "validate": {"cluster_name": "path-with-ascii-reserved-chars"}
