@@ -239,7 +239,12 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
+#if !defined(ENVOY_CONFIG_COVERAGE)
+  // This doesn't work in coverage build because part of the stacktrace will be overwritten by
+  // __llvm_coverage_mapping
+  // Stack trace under gcc with optimizations on (-c opt) doesn't include the test name
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
+#endif
 }
 
 TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
