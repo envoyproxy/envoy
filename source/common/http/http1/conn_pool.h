@@ -29,7 +29,6 @@ public:
   // ConnPoolImplBase
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
 
-protected:
   class ActiveClient;
 
   struct StreamWrapper : public RequestEncoderWrapper,
@@ -63,7 +62,8 @@ protected:
 
   class ActiveClient : public Envoy::Http::ActiveClient {
   public:
-    ActiveClient(ConnPoolImpl& parent);
+    ActiveClient(HttpConnPoolImplBase& parent);
+    ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data);
 
     ConnPoolImpl& parent() { return *static_cast<ConnPoolImpl*>(&parent_); }
 

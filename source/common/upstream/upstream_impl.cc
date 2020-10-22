@@ -41,6 +41,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
@@ -82,6 +83,10 @@ uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config) {
   }
   if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
     features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
+  } else {
+    if (config.has_http2_protocol_options() && config.has_http_protocol_options()) {
+      features |= ClusterInfoImpl::Features::USE_ALPN;
+    }
   }
   if (config.close_connections_on_host_health_failure()) {
     features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
@@ -787,14 +792,6 @@ ClusterInfoImpl::ClusterInfoImpl(
         name_));
   }
 
-  if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_CONFIGURED_PROTOCOL) {
-    // Make sure multiple protocol configurations are not present
-    if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {
-      throw EnvoyException(fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
-                                       "configured with non-default 'protocol_selection' values"));
-    }
-  }
-
   if (config.common_http_protocol_options().has_idle_timeout()) {
     idle_timeout_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(config.common_http_protocol_options().idle_timeout()));
@@ -875,14 +872,16 @@ void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) 
   }
 }
 
-Http::Protocol
+std::vector<Http::Protocol>
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
   if (downstream_protocol.has_value() &&
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
-    return downstream_protocol.value();
+    return {downstream_protocol.value()};
+  } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
+    return {Http::Protocol::Http2, Http::Protocol::Http11};
   } else {
-    return (features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
-                                                                : Http::Protocol::Http11;
+    return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
+                                                                 : Http::Protocol::Http11};
   }
 }
 

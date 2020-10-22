@@ -421,6 +421,18 @@ FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& addre
             Network::Test::addressVersionAsString(address->ip()->version()), udp_fake_upstream);
 }
 
+FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+                           bool enable_half_close, bool udp_fake_upstream)
+    : FakeUpstream(std::move(transport_socket_factory),
+                   udp_fake_upstream ? makeUdpListenSocket(address) : makeTcpListenSocket(address),
+                   type, time_system, enable_half_close) {
+  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
+            address->ip()->addressAsString(), address->ip()->port(),
+            Network::Test::addressVersionAsString(address->ip()->version()), udp_fake_upstream);
+}
+
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
                            Network::Address::IpVersion version, Event::TestTimeSystem& time_system,
                            bool enable_half_close)
@@ -432,9 +444,10 @@ FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
+                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system,
+                           bool enable_half_close)
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type,
-                   time_system, false) {
+                   time_system, enable_half_close) {
   ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }

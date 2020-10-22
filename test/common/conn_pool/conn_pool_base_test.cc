@@ -22,6 +22,7 @@ public:
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   size_t numActiveStreams() const override { return 1; }
+  virtual absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
 };
 
 class TestPendingStream : public PendingStream {

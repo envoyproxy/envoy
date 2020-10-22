@@ -106,14 +106,47 @@ void BaseIntegrationTest::initialize() {
   createEnvoy();
 }
 
+Network::TransportSocketFactoryPtr BaseIntegrationTest::createUpstreamTlsContext() {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string yaml = absl::StrFormat(
+      R"EOF(
+common_tls_context:
+  tls_certificates:
+  - certificate_chain: { filename: "%s" }
+    private_key: { filename: "%s" }
+  validation_context:
+    trusted_ca: { filename: "%s" }
+)EOF",
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  TestUtility::loadFromYaml(yaml, tls_context);
+  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+  } else if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
+  }
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, factory_context_);
+  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+      std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+}
+
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    Network::TransportSocketFactoryPtr factory =
+        upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
+
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(new AutonomousUpstream(
-          endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
+      ASSERT(!enable_half_close_);
+      fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint,
+                                                          upstream_protocol_, *time_system_,
+                                                          autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
+      fake_upstreams_.emplace_back(new FakeUpstream(std::move(factory), endpoint,
+                                                    upstream_protocol_, *time_system_,
                                                     enable_half_close_, udp_fake_upstream_));
     }
   }

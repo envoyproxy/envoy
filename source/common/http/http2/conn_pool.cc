@@ -77,6 +77,16 @@ ConnPoolImpl::ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& pare
   parent.host()->cluster().stats().upstream_cx_http2_total_.inc();
 }
 
+ConnPoolImpl::ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+                                         Upstream::Host::CreateConnectionData& data)
+    : Envoy::Http::ActiveClient(
+          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
+          parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
+  codec_client_->setCodecClientCallbacks(*this);
+  codec_client_->setCodecConnectionCallbacks(*this);
+  parent.host()->cluster().stats().upstream_cx_http2_total_.inc();
+}
+
 bool ConnPoolImpl::ActiveClient::closingWithIncompleteStream() const {
   return closed_with_active_rq_;
 }

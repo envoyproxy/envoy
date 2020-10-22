@@ -62,9 +62,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
-  if (conn_pool_->protocol().has_value()) {
-    stream_info_.protocol(conn_pool_->protocol().value());
-  }
 }
 
 UpstreamRequest::~UpstreamRequest() {
@@ -362,6 +359,11 @@ void UpstreamRequest::onPoolReady(
     // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
     // here.
     parent_.requestVcluster()->stats().upstream_rq_total_.inc();
+  }
+
+  ASSERT(conn_pool_->protocol().has_value());
+  if (conn_pool_->protocol().has_value()) {
+    stream_info_.protocol(conn_pool_->protocol().value());
   }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);

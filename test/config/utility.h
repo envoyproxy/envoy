@@ -235,6 +235,9 @@ public:
   // Allow a finalized configuration to be edited for generating xDS responses
   void applyConfigModifiers();
 
+  // Configure Envoy to do TLS to upstream.
+  void configureUpstreamTls(bool use_alpn);
+
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }

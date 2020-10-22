@@ -129,9 +129,12 @@ message Cluster {
   }
 
   enum ClusterProtocolSelection {
-    // Cluster can only operate on one of the possible upstream protocols (HTTP1.1, HTTP2).
-    // If :ref:`http2_protocol_options <envoy_api_field_Cluster.http2_protocol_options>` are
-    // present, HTTP2 will be used, otherwise HTTP1.1 will be used.
+    // If both :ref:`http2_protocol_options <envoy_api_field_Cluster.http2_protocol_options>`
+    // and :ref:`http_protocol_options <envoy_api_field_Cluster.http_protocol_options>` are
+    // configured, Envoy will attempt to do ALPN negotiation for TLS connections, failing
+    // over to HTTP/1.1 if ALPN negotiation fails.
+    // If only one protocol option is present it will be used as the hard-coded
+    // protocol. If neither is present, HTTP/1.1 will be used.
     USE_CONFIGURED_PROTOCOL = 0;
 
     // Use HTTP1.1 or HTTP2, depending on which one is used on the downstream connection.

@@ -603,6 +603,26 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
+void ConfigHelper::configureUpstreamTls(bool use_alpn) {
+  addConfigModifier([use_alpn](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
+    cluster_config.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+
+    if (use_alpn) {
+      cluster_config.mutable_http_protocol_options();
+      cluster_config.mutable_http2_protocol_options();
+    }
+
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    auto* validation_context =
+        tls_context.mutable_common_tls_context()->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    cluster_config.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+    cluster_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+  });
+}
+
 void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
   if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
     auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();

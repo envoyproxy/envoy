@@ -31,9 +31,6 @@ void ConnectionImplBase::removeConnectionCallbacks(ConnectionCallbacks& callback
 void ConnectionImplBase::hashKey(std::vector<uint8_t>& hash) const { addIdToHashKey(hash, id()); }
 
 void ConnectionImplBase::setConnectionStats(const ConnectionStats& stats) {
-  ASSERT(!connection_stats_,
-         "Two network filters are attempting to set connection stats. This indicates an issue "
-         "with the configured filter chain.");
   connection_stats_ = std::make_unique<ConnectionStats>(stats);
 }
 

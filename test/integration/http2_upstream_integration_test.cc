@@ -203,6 +203,17 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
 }
 
+TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequestAlpn) {
+  use_alpn_ = true;
+  simultaneousRequest(1024, 512, 1023, 513);
+}
+
+TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimitsAlpn) {
+  use_alpn_ = true;
+  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
+  simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
+}
+
 void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes, uint32_t) {
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;

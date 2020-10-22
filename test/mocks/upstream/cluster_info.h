@@ -142,7 +142,8 @@ public:
               upstreamHttpProtocolOptions, (), (const));
   MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
-  MOCK_METHOD(Http::Protocol, upstreamHttpProtocol, (absl::optional<Http::Protocol>), (const));
+  MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
+              (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;

@@ -48,6 +48,8 @@ public:
     return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
+  // Returns the application protocol, or absl::nullopt for TCP.
+  virtual absl::optional<Http::Protocol> protocol() const PURE;
   // Closes the underlying connection.
   virtual void close() PURE;
   // Returns the ID of the underlying connection.
@@ -177,6 +179,8 @@ public:
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
 protected:
+  virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
+
   // Creates up to 3 connections, based on the prefetch ratio.
   void tryCreateNewConnections();
 
