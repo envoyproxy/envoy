@@ -231,5 +231,5 @@ features. The following sandboxes are available:
     sandboxes/mysql
     sandboxes/postgres
     sandboxes/redis
-    sandboxes/wasm
+    sandboxes/wasm-cc
     sandboxes/zipkin_tracing
