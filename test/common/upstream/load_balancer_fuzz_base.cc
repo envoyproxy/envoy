@@ -14,6 +14,23 @@ constexpr uint32_t MaxNumHostsPerPriorityLevel = 10000;
 
 } // namespace
 
+/*static const std::shared_ptr<MockClusterInfo>& mockClusterInfo() {
+  CONSTRUCT_ON_FIRST_USE(std::shared_ptr<MockClusterInfo>);
+}*/
+
+HostVector initializeHostsForUseInFuzzing() {
+  //const std::shared_ptr<NiceMock<MockClusterInfo>> info_ = std::make_shared<NiceMock<MockClusterInfo>>(mockClusterInfo());
+  //std::shared_ptr<NiceMock<MockClusterInfo>> info_{new NiceMock<MockClusterInfo>()};
+  HostVector hosts;
+  for (uint32_t i = 0; i < 10000; ++i) {
+    hosts.push_back(makeTestHost(LoadBalancerFuzzBase::info_, "tcp://127.0.0.1:" + std::to_string(i)));
+  }
+  return hosts;
+}
+
+std::shared_ptr<MockClusterInfo> LoadBalancerFuzzBase::info_{new NiceMock<MockClusterInfo>()};
+HostVector LoadBalancerFuzzBase::initialized_hosts_ = initializeHostsForUseInFuzzing();
+
 void LoadBalancerFuzzBase::initializeASingleHostSet(
     const test::common::upstream::SetupPriorityLevel& setup_priority_level,
     const uint8_t priority_level, uint16_t& port) {
@@ -25,7 +42,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   // Cap each host set at 256 hosts for efficiency - Leave port clause in for future changes
   while (hosts_made < std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel) &&
          port < 65535) {
-    host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port)));
+    host_set.hosts_.push_back(initialized_hosts_[port - 80]);
     ++port;
     ++hosts_made;
   }
@@ -221,6 +238,21 @@ void LoadBalancerFuzzBase::replay(
       break;
     default:
       break;
+    }
+  }
+}
+
+void LoadBalancerFuzzBase::clearStaticHostsHealthFlags() {
+  // Have to clear the hosts health flags here - how do we know what hosts to clear?
+  // The only outstanding health flags set are those that are set from hosts being placed in degraded
+  // and excluded. Thus, use the priority set pointer to know which flags to clear.
+  for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size(); ++priority_level) {
+    MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
+    for (auto& host : host_set.degraded_hosts_) {
+      host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+    }
+    for (auto& host : host_set.excluded_hosts_) {
+      host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     }
   }
 }

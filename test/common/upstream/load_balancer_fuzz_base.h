@@ -36,6 +36,8 @@ public:
   ~LoadBalancerFuzzBase() = default;
   void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
 
+  void clearStaticHostsHealthFlags();
+
   // These public objects shared amongst all types of load balancers will be used to construct load
   // balancers in specific load balancer fuzz classes
   Stats::IsolatedStoreImpl stats_store_;
@@ -43,7 +45,8 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Random::PsuedoRandomGenerator64 random_;
   NiceMock<MockPrioritySet> priority_set_;
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  //std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  static std::shared_ptr<MockClusterInfo> info_;
   std::unique_ptr<LoadBalancerBase> lb_;
 
 private:
@@ -61,6 +64,10 @@ private:
   // localities Key - index of host within full host list, value - locality level host at index is
   // in
   absl::node_hash_map<uint8_t, uint8_t> locality_indexes_;
+
+  // Will statically initialize 10000? hosts in this vector
+  // Will have to clear flags at the end of each iteration here
+  static HostVector initialized_hosts_;
 };
 
 } // namespace Upstream
