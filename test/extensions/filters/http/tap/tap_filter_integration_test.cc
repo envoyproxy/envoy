@@ -1,8 +1,7 @@
-#include <fstream>
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
+#include "test/extensions/common/tap/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -97,35 +96,6 @@ public:
                                     testing::UnitTest::GetInstance()->current_test_info()->name();
     TestEnvironment::createPath(path_prefix);
     return path_prefix + "/";
-  }
-
-  std::vector<envoy::data::tap::v3::TraceWrapper>
-  readTracesFromFile(const std::string& path_prefix) {
-    // Find the written .pb file and verify it.
-    auto files = TestUtility::listFiles(path_prefix, false);
-    auto pb_file_name = std::find_if(files.begin(), files.end(), [](const std::string& s) {
-      return absl::EndsWith(s, MessageUtil::FileExtensions::get().ProtoBinaryLengthDelimited);
-    });
-    EXPECT_NE(pb_file_name, files.end());
-
-    std::vector<envoy::data::tap::v3::TraceWrapper> traces;
-    std::ifstream pb_file(*pb_file_name, std::ios_base::binary);
-    Protobuf::io::IstreamInputStream stream(&pb_file);
-    Protobuf::io::CodedInputStream coded_stream(&stream);
-    while (true) {
-      uint32_t message_size;
-      if (!coded_stream.ReadVarint32(&message_size)) {
-        break;
-      }
-
-      traces.emplace_back();
-
-      auto limit = coded_stream.PushLimit(message_size);
-      EXPECT_TRUE(traces.back().ParseFromCodedStream(&coded_stream));
-      coded_stream.PopLimit(limit);
-    }
-
-    return traces;
   }
 
   void verifyStaticFilePerTap(const std::string& filter_config) {
@@ -532,7 +502,8 @@ typed_config:
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  std::vector<envoy::data::tap::v3::TraceWrapper> traces = readTracesFromFile(path_prefix);
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromPath(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
   EXPECT_EQ("hello", traces[1].http_streamed_trace_segment().request_body_chunk().as_bytes());
@@ -577,7 +548,8 @@ typed_config:
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  std::vector<envoy::data::tap::v3::TraceWrapper> traces = readTracesFromFile(path_prefix);
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromPath(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
   EXPECT_EQ("hello", traces[1].http_streamed_trace_segment().request_body_chunk().as_bytes());

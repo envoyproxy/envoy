@@ -242,6 +242,54 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "load_balancer_fuzz_lib",
+    srcs = ["load_balancer_fuzz_base.cc"],
+    hdrs = ["load_balancer_fuzz_base.h"],
+    deps = [
+        ":load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+        "//source/common/upstream:load_balancer_lib",
+        "//test/fuzz:random_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:priority_set_mocks",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "load_balancer_fuzz_proto",
+    srcs = ["load_balancer_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg",
+    ],
+)
+
+envoy_proto_library(
+    name = "random_load_balancer_fuzz_proto",
+    srcs = ["random_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:load_balancer_fuzz_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "random_load_balancer_fuzz_test",
+    srcs = ["random_load_balancer_fuzz_test.cc"],
+    corpus = "//test/common/upstream:random_load_balancer_corpus",
+    deps = [
+        ":load_balancer_fuzz_lib",
+        ":load_balancer_fuzz_proto_cc_proto",
+        ":random_load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "load_balancer_simulation_test",
     srcs = ["load_balancer_simulation_test.cc"],
