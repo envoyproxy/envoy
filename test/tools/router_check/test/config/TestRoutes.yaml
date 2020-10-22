@@ -61,12 +61,12 @@ virtual_hosts:
           prefix: /host/rewrite/me
         route:
           cluster: ats
-          host_rewrite: new_host
+          host_rewrite_literal: new_host
       - match:
           prefix: /oldhost/rewrite/me
         route:
           cluster: ats
-          host_rewrite: new_oldhost
+          host_rewrite_literal: new_oldhost
       - match:
           path: /foo
           case_sensitive: true
@@ -84,7 +84,7 @@ virtual_hosts:
           case_sensitive: false
         route:
           cluster: ats
-          host_rewrite: new_host
+          host_rewrite_literal: new_host
       - match:
           path: /FOOD
           case_sensitive: false
@@ -101,11 +101,39 @@ virtual_hosts:
           prefix: /customheaders
         route:
           cluster: ats
-          host_rewrite: new_host
+          host_rewrite_literal: new_host
         request_headers_to_add:
           - header:
               key: X-Client-IP
               value: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/percent-encoded/abc:{3}def/"
+            percent_decode_input: true
+        route:
+          cluster: path-with-ascii-reserved-chars
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/percent-encoded/abc//def/"
+            percent_decode_input: true
+        route:
+          cluster: path-with-encoded-slashes
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/percent-encoded/abc\x1f{2}def/"
+            percent_decode_input: true
+        route:
+          cluster: path-with-ascii-non-printable-chars
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/percent-encoded/abcé{2}def/"
+            percent_decode_input: true
+        route:
+          cluster: path-with-unicode-chars
       - match:
           prefix: /
         route:

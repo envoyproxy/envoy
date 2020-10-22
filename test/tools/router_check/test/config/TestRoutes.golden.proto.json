@@ -69,8 +69,8 @@
       },
       "validate":
         {
-    "cluster_name": "www2",
-    "virtual_host_name": "www2"
+          "cluster_name": "www2",
+          "virtual_host_name": "www2"
         }
     },
     {
@@ -279,6 +279,42 @@
         "method": "GET"
       },
       "validate": {"virtual_cluster_name": "other"}
+    },
+    {
+      "test_name": "PercentDecodeInput::AsciiReservedChars",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/percent-encoded/abc%3A%3a:def/",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "path-with-ascii-reserved-chars"}
+    },
+    {
+      "test_name": "PercentDecodeInput::EncodedSlashes",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/percent-encoded/abc%2F%2fdef/",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "path-with-encoded-slashes"}
+    },
+    {
+      "test_name": "PercentDecodeInput::AsciiNonPrintableChars",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/percent-encoded/abc%1F%1fdef/",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "path-with-ascii-non-printable-chars"}
+    },
+    {
+      "test_name": "PercentDecodeInput::UnicodeChars",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/percent-encoded/abc%c3%a9%c3%a9def/",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "path-with-unicode-chars"}
     },
     {
       "test_name": "RequestHeaderMatches 1",
