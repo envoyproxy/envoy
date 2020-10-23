@@ -27,7 +27,9 @@ public:
     conn_pool_ = cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(),
                                            downstream_protocol, ctx);
   }
-  ~HttpConnPool() { RELEASE_ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null"); }
+  ~HttpConnPool() {
+    RELEASE_ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
+  }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingStream() override;
   absl::optional<Envoy::Http::Protocol> protocol() const override;
