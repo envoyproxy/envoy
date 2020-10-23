@@ -11,7 +11,7 @@ envoy_package()
 
 wasm_rust_binary(
     name = "async_call_rust.wasm",
-    srcs = ["async_call_rust/src/lib.rs"],
+    srcs = ["async_call_rust.rs"],
     deps = [
         "//bazel/external/cargo:log",
         "//bazel/external/cargo:proxy_wasm",
@@ -20,7 +20,7 @@ wasm_rust_binary(
 
 wasm_rust_binary(
     name = "body_rust.wasm",
-    srcs = ["body_rust/src/lib.rs"],
+    srcs = ["body_rust.rs"],
     deps = [
         "//bazel/external/cargo:log",
         "//bazel/external/cargo:proxy_wasm",
@@ -29,7 +29,7 @@ wasm_rust_binary(
 
 wasm_rust_binary(
     name = "headers_rust.wasm",
-    srcs = ["headers_rust/src/lib.rs"],
+    srcs = ["headers_rust.rs"],
     deps = [
         "//bazel/external/cargo:log",
         "//bazel/external/cargo:proxy_wasm",
@@ -38,7 +38,7 @@ wasm_rust_binary(
 
 wasm_rust_binary(
     name = "metadata_rust.wasm",
-    srcs = ["metadata_rust/src/lib.rs"],
+    srcs = ["metadata_rust.rs"],
     deps = [
         "//bazel/external/cargo:log",
         "//bazel/external/cargo:proxy_wasm",
@@ -47,7 +47,7 @@ wasm_rust_binary(
 
 wasm_rust_binary(
     name = "shared_data_rust.wasm",
-    srcs = ["shared_data_rust/src/lib.rs"],
+    srcs = ["shared_data_rust.rs"],
     deps = [
         "//bazel/external/cargo:log",
         "//bazel/external/cargo:proxy_wasm",
@@ -56,7 +56,7 @@ wasm_rust_binary(
 
 wasm_rust_binary(
     name = "shared_queue_rust.wasm",
-    srcs = ["shared_queue_rust/src/lib.rs"],
+    srcs = ["shared_queue_rust.rs"],
     deps = [
         "//bazel/external/cargo:log",
         "//bazel/external/cargo:proxy_wasm",

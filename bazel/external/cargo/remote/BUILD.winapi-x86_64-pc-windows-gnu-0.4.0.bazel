@@ -1,13 +1,20 @@
 """
+@generated
 cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
 
+# buildifier: disable=load
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
+    "rust_binary",
     "rust_library",
+    "rust_test",
 )
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = [
     # Public for visibility by "@raze__crate__version//" targets.
@@ -18,33 +25,30 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # Apache-2.0 from expression "Apache-2.0 OR MIT"
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
 ])
 
-# Unsupported target "bench" with type "bench" omitted
+# Generated Targets
+
 # Unsupported target "build-script-build" with type "custom-build" omitted
 
 rust_library(
-    name = "hashbrown",
+    name = "winapi_x86_64_pc_windows_gnu",
     srcs = glob(["**/*.rs"]),
     crate_features = [
-        "ahash",
-        "inline-more",
     ],
     crate_root = "src/lib.rs",
     crate_type = "lib",
-    edition = "2018",
+    edition = "2015",
     rustc_flags = [
         "--cap-lints=allow",
     ],
-    tags = ["cargo-raze"],
-    version = "0.7.2",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+    version = "0.4.0",
+    # buildifier: leave-alone
     deps = [
-        "@raze__ahash__0_3_8//:ahash",
     ],
 )
-
-# Unsupported target "hasher" with type "test" omitted
-# Unsupported target "rayon" with type "test" omitted
-# Unsupported target "serde" with type "test" omitted
-# Unsupported target "set" with type "test" omitted
