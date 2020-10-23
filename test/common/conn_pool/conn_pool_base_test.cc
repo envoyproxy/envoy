@@ -73,7 +73,6 @@ public:
       return ret;
     }));
   }
-
   ConnPoolImplBaseTest() = default;
 
   ~ConnPoolImplBaseTest() {
@@ -197,6 +196,36 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutTriggered) {
   timer_ptr->invokeCallback();
 }
 
+TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
+  initialize();
+  // Create more than one connection per new stream.
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+  EXPECT_CALL(*pool_, instantiateActiveClient).Times(AnyNumber());
+
+  // With global prefetch off, we won't prefetch.
+  EXPECT_FALSE(pool_->maybePrefetch(0));
+  // With prefetch ratio of 1.1, we'll prefetch two connections.
+  // Currently, no number of subsequent calls to prefetch will increase that.
+  EXPECT_TRUE(pool_->maybePrefetch(1.1));
+  EXPECT_TRUE(pool_->maybePrefetch(1.1));
+  EXPECT_FALSE(pool_->maybePrefetch(1.1));
+
+  // With a higher prefetch ratio, more connections may be prefetched.
+  EXPECT_TRUE(pool_->maybePrefetch(3));
+
+  pool_->destructAllConnections();
+}
+
+TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
+  initialize();
+  // Create more than one connection per new stream.
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+
+  // Prefetch won't occur if the host is not healthy.
+  host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
+  EXPECT_FALSE(pool_->maybePrefetch(1));
+}
+
 TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutNotTriggered) {
   static constexpr std::chrono::milliseconds IDLE_TIMEOUT{5000};
 
@@ -234,38 +263,5 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutNotTriggered) {
   EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
   pool_->onStreamClosed(*clients_.back(), false);
 }
-
-TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
-  initialize();
-
-  // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
-  EXPECT_CALL(*pool_, instantiateActiveClient).Times(AnyNumber());
-
-  // With global prefetch off, we won't prefetch.
-  EXPECT_FALSE(pool_->maybePrefetch(0));
-  // With prefetch ratio of 1.1, we'll prefetch two connections.
-  // Currently, no number of subsequent calls to prefetch will increase that.
-  EXPECT_TRUE(pool_->maybePrefetch(1.1));
-  EXPECT_TRUE(pool_->maybePrefetch(1.1));
-  EXPECT_FALSE(pool_->maybePrefetch(1.1));
-
-  // With a higher prefetch ratio, more connections may be prefetched.
-  EXPECT_TRUE(pool_->maybePrefetch(3));
-
-  pool_->destructAllConnections();
-}
-
-TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
-  initialize();
-
-  // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
-
-  // Prefetch won't occur if the host is not healthy.
-  host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  EXPECT_FALSE(pool_->maybePrefetch(1));
-}
-
 } // namespace ConnectionPool
 } // namespace Envoy
