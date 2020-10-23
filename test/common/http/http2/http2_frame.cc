@@ -151,6 +151,14 @@ Http2Frame Http2Frame::makeEmptyHeadersFrame(uint32_t stream_index, HeadersFlags
   return frame;
 }
 
+Http2Frame Http2Frame::makeHeadersFrameNoStatus(uint32_t stream_index) {
+  Http2Frame frame;
+  frame.buildHeader(Type::Headers, 0, static_cast<uint8_t>(orFlags(HeadersFlags::EndStream,
+              HeadersFlags::EndHeaders)),
+                    makeRequestStreamId(stream_index));
+  return frame;
+}
+
 Http2Frame Http2Frame::makeHeadersFrameWithStatus(std::string status, uint32_t stream_index) {
   Http2Frame frame;
   frame.buildHeader(

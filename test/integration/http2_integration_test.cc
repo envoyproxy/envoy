@@ -1610,7 +1610,64 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   // Expect that the details for the first frame are kept.
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
 }
+// Yan version
+TEST_P(Http2FrameIntegrationTest, OverflowingResponseCode) {
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower outbound frame limits to make tests run faster
+  config_helper_.setOutboundFramesLimits(1000, 100);
+  initialize();
+  auto options = std::make_shared<Network::Socket::Options>();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  FakeRawConnectionPtr fake_upstream_connection;
 
+  Http2Frame::SettingsFlags settings_flags = static_cast<Http2Frame::SettingsFlags>(0);
+  Http2Frame setting_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
+  // Ack settings
+  settings_flags = static_cast<Http2Frame::SettingsFlags>(1); // ack
+  Http2Frame ack_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
+  // setup upstream and settings etc.
+  ASSERT(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                  std::chrono::milliseconds(10)));
+  ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
+  ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
+  Http::Http2::Http2Frame overflowed_status = Http::Http2::Http2Frame::makeHeadersFrameWithStatus(
+      "11111111111111111111111111111111111111111111111111111111111111111", 0);
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(overflowed_status)));
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+// Yan version
+TEST_P(Http2FrameIntegrationTest, MissingStatus) {
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower outbound frame limits to make tests run faster
+  config_helper_.setOutboundFramesLimits(1000, 100);
+  initialize();
+  auto options = std::make_shared<Network::Socket::Options>();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  Http2Frame::SettingsFlags settings_flags = static_cast<Http2Frame::SettingsFlags>(0);
+  Http2Frame setting_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
+  // Ack settings
+  settings_flags = static_cast<Http2Frame::SettingsFlags>(1); // ack
+  Http2Frame ack_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
+  // setup upstream and settings etc.
+  ASSERT(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                  std::chrono::milliseconds(10)));
+  ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
+  ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
+  Http::Http2::Http2Frame missing_status = Http::Http2::Http2Frame::makeHeadersFrameNoStatus(
+      0);
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(missing_status)));
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+/*
 TEST_P(Http2FrameIntegrationTest, OverflowingResponseCode) {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -1654,7 +1711,7 @@ TEST_P(Http2FrameIntegrationTest, OverflowingResponseCode) {
   ASSERT_TRUE(fake_upstream_connection->write(std::string(overflowed_status)));
 
   tcp_client_->close();
-}
+}*/
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

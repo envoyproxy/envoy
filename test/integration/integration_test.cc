@@ -560,8 +560,9 @@ TEST_P(IntegrationTest, OverflowingResponseCode) {
   ASSERT(fake_upstream_connection != nullptr);
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 11111111111111111111111111111111111111111111111111111111111111111 OK\r\n", false));
-  ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 TEST_P(IntegrationTest, BadFirstline) {

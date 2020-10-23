@@ -109,6 +109,7 @@ public:
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
   static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
                                           HeadersFlags flags = HeadersFlags::None);
+  static Http2Frame makeHeadersFrameNoStatus(uint32_t stream_index);
   static Http2Frame makeHeadersFrameWithStatus(
       std::string status,
       uint32_t stream_index); // Want to test overridden int here, so make it string
