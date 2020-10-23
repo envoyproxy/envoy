@@ -1,7 +1,6 @@
 # 1. Fix linking with unbundled toolchain on macOS.
 # 2. Increase VSZ limit to 4TiB (allows us to start up to 409 VMs).
 # 3. Fix MSAN linking.
-# 4. Fix Wasm module deserialization (http://crbug.com/v8/11024).
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -348,6 +348,8 @@ template("gcc_toolchain") {
@@ -54,15 +53,3 @@
 
  if (use_libfuzzer && (is_linux || is_chromeos)) {
    if (is_asan) {
---- wee8/src/wasm/module-compiler.cc
-+++ wee8/src/wasm/module-compiler.cc
-@@ -2901,6 +2901,9 @@ void CompilationStateImpl::InitializeCompilationProgressAfterDeserialization() {
-       RequiredBaselineTierField::encode(ExecutionTier::kTurbofan) |
-       RequiredTopTierField::encode(ExecutionTier::kTurbofan) |
-       ReachedTierField::encode(ExecutionTier::kTurbofan);
-+  finished_events_.Add(CompilationEvent::kFinishedExportWrappers);
-+  finished_events_.Add(CompilationEvent::kFinishedBaselineCompilation);
-+  finished_events_.Add(CompilationEvent::kFinishedTopTierCompilation);
-   compilation_progress_.assign(module->num_declared_functions,
-                                kProgressAfterDeserialization);
- }
