@@ -23,5 +23,6 @@ features. The following sandboxes are available:
     load_reporting_service
     lua
     mysql
+    postgres
     redis
     zipkin_tracing
