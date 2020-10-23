@@ -92,9 +92,9 @@ for how to update or override dependencies.
     Different config flags specify the compiler libraries: 
     https://docs.bazel.build/versions/master/guide.html#--config
     
-    - --config=libc++ => clang + libc++
-    - no config flag => gcc + libstdc++
-    - --config=clang => clang + libstdc++
+    - `--config=libc++` means using `clang` + `libc++`
+    - no config flag means using `gcc` + `libstdc++`
+    - `--config=clang` means using `clang` + `libstdc++`
   
     
 
