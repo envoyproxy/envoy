@@ -25,4 +25,5 @@ features. The following sandboxes are available:
     mysql
     postgres
     redis
+    wasm-cc
     zipkin_tracing
