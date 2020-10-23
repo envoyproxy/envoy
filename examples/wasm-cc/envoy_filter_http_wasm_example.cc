@@ -65,8 +65,9 @@ FilterHeadersStatus ExampleContext::onResponseHeaders(uint32_t, bool) {
   for (auto& p : pairs) {
     LOG_INFO(std::string(p.first) + std::string(" -> ") + std::string(p.second));
   }
-  addResponseHeader("newheader", "newheadervalue");
-  replaceResponseHeader("location", "envoy-wasm");
+  addResponseHeader("X-Wasm-custom", "FOO");
+  replaceResponseHeader("content-type", "text/plain; charset=utf-8");
+  removeResponseHeader("content-length");
   return FilterHeadersStatus::Continue;
 }
 
@@ -79,7 +80,7 @@ FilterDataStatus ExampleContext::onRequestBody(size_t body_buffer_length,
 
 FilterDataStatus ExampleContext::onResponseBody(size_t /* body_buffer_length */,
                                                 bool /* end_of_stream */) {
-  setBuffer(WasmBufferType::HttpResponseBody, 0, 3, "foo");
+  setBuffer(WasmBufferType::HttpResponseBody, 0, 12, "Hello, world");
   return FilterDataStatus::Continue;
 }
 

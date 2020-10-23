@@ -34,7 +34,7 @@ EXCLUDED_PREFIXES = (
     "./test/extensions/common/wasm/test_data",
     "./test/extensions/access_loggers/wasm/test_data",
     "./source/extensions/common/wasm/ext",
-    "./examples/wasm",
+    "./examples/wasm-cc",
 )
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
