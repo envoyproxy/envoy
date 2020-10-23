@@ -1,13 +1,20 @@
 """
+@generated
 cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
 
+# buildifier: disable=load
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
+    "rust_binary",
     "rust_library",
+    "rust_test",
 )
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = [
     # Public for visibility by "@raze__crate__version//" targets.
@@ -18,13 +25,20 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # Apache-2.0 from expression "Apache-2.0 OR MIT"
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
 ])
 
+# Generated Targets
+
+# Unsupported target "build-script-build" with type "custom-build" omitted
+
 rust_library(
-    name = "autocfg",
+    name = "winapi",
     srcs = glob(["**/*.rs"]),
     crate_features = [
+        "memoryapi",
+        "synchapi",
+        "winbase",
     ],
     crate_root = "src/lib.rs",
     crate_type = "lib",
@@ -32,14 +46,12 @@ rust_library(
     rustc_flags = [
         "--cap-lints=allow",
     ],
-    tags = ["cargo-raze"],
-    version = "1.0.0",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+    version = "0.3.9",
+    # buildifier: leave-alone
     deps = [
     ],
 )
-
-# Unsupported target "integers" with type "example" omitted
-# Unsupported target "paths" with type "example" omitted
-# Unsupported target "rustflags" with type "test" omitted
-# Unsupported target "traits" with type "example" omitted
-# Unsupported target "versions" with type "example" omitted
