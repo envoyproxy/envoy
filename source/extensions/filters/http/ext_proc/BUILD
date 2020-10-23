@@ -10,13 +10,13 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "mutation",
-    srcs = ["mutation.cc"],
-    hdrs = ["mutation.h"],
+    name = "ext_proc",
+    srcs = ["ext_proc.cc"],
+    hdrs = ["ext_proc.h"],
     deps = [
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/http:filter_interface",
-        "@envoy_api//envoy/extensions/filters/http/mutation/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -26,9 +26,9 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     security_posture = "unknown",
     deps = [
-        ":mutation",
+        ":ext_proc",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/mutation/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )

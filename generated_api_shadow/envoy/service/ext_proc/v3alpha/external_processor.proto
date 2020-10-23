@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-package envoy.service.mutation.v3alpha;
+package envoy.service.ext_proc.v3alpha;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/extensions/filters/http/mutation/v3alpha/processing_mode.proto";
+import "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.proto";
 import "envoy/service/auth/v3/attribute_context.proto";
 import "envoy/type/v3/http_status.proto";
 
@@ -13,27 +13,28 @@ import "google/protobuf/struct.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.service.mutation.v3alpha";
-option java_outer_classname = "MutationProto";
+option java_package = "io.envoyproxy.envoy.service.ext_proc.v3alpha";
+option java_outer_classname = "ExternalProcessorProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: External Mutation Service]
+// [#protodoc-title: External Processing Service]
 
-// A service that can mutate HTTP requests and responses.
-// The overall mutation protocol works like this:
+// A service that can access and modify HTTP requests and responses
+// as part of a filter chain.
+// The overall external processing protocol works like this:
 //
 // 1. Envoy sends to the service information about the HTTP request.
-// 2. The service sends back a MutationResponse message that directs Envoy
+// 2. The service sends back a ProcessingResponse message that directs Envoy
 //    to either stop processing, continue without it, or send it the
 //    next chunk of the message body.
 // 3. If so requested, Envoy sends the server chunks of the message body,
 //    or the entire body at once. In either case, the server sends back
-//    a MutationResponse after each message it receives.
+//    a ProcessingResponse after each message it receives.
 // 4. If so requested, Envoy sends the server the HTTP trailers,
-//    and the server sends back a MutationResponse.
+//    and the server sends back a ProcessingResponse.
 // 5. At this point, request processing is done, and we pick up again
 //    at step 1 when Envoy receives a response from the upstream server.
 // 6. At any point above, if the server closes the gRPC stream cleanly,
@@ -46,20 +47,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // using a gRPC stream to make it easier for the server to
 // maintain state.
 
-service Mutation {
+service ExternalProcessor {
   // This begins the bidirectional stream that Envoy will use to
   // give the server control over what the filter does. The actual
-  // protocol is described by the MutationRequest and MutationResponse
+  // protocol is described by the ProcessingRequest and ProcessingResponse
   // messages below.
-  rpc Mutate(stream MutationRequest) returns (stream MutationResponse) {
+  rpc Process(stream ProcessingRequest) returns (stream ProcessingResponse) {
   }
 }
 
 // This represents the different types of messages that Envoy can send
-// to a mutation server.
+// to an external processing server.
 // [#next-free-field: 8]
-message MutationRequest {
-  // If true, then the server must either respond with exactly one MutationResponse
+message ProcessingRequest {
+  // If true, then the server must either respond with exactly one ProcessingResponse
   // message or close the stream. If false, the server must not respond with
   // an additional message, although it may still close the stream.
   // How this is set depends on how the ProcessingMode is configured, or if
@@ -101,12 +102,12 @@ message MutationRequest {
   }
 }
 
-// For every MutationRequest received by the server with the "response_required" field
-// set, the server must send back exactly one MutationResponse message.
+// For every ProcessingRequest received by the server with the "response_required" field
+// set, the server must send back exactly one ProcessingResponse message.
 // In addition, the server may send back a message with the "async_mode_change"
 // message at any time.
 // [#next-free-field: 11]
-message MutationResponse {
+message ProcessingResponse {
   oneof response {
     // The server must send back this message in response to a message with the
     // "request_headers" field set.
@@ -146,7 +147,7 @@ message MutationResponse {
   // for the duration of this particular request/response only. Servers
   // may use this to intelligently control how requests are processed
   // based on the headers and other metadata that they see.
-  envoy.extensions.filters.http.mutation.v3alpha.ProcessingMode mode_override = 9;
+  envoy.extensions.filters.http.ext_proc.v3alpha.ProcessingMode mode_override = 9;
 
   // Change how and if the filter waits for responses from the server
   // for future messages. Servers may use this to switch between
@@ -159,7 +160,7 @@ message MutationResponse {
 
 // The following are messages that are sent to the server.
 
-// This message is sent to the mutation server when the HTTP request and responses
+// This message is sent to the external server when the HTTP request and responses
 // are first received.
 message HttpHeaders {
   // The HTTP request headers. If multiple headers share the same key, they
@@ -181,7 +182,7 @@ message HttpHeaders {
   bool no_body = 4;
 }
 
-// This message contains the message body that Envoy sends to the mutation service.
+// This message contains the message body that Envoy sends to the external server.
 message HttpBody {
   bytes body = 1;
 
@@ -244,7 +245,7 @@ message BodyMutation {
 // timeout. (If multiple requests arrive after a timer has been set, then the results
 // may or may not reflect the last one received.)
 message ProcessingModeChange {
-  envoy.extensions.filters.http.mutation.v3alpha.ProcessingMode async_mode = 1;
+  envoy.extensions.filters.http.ext_proc.v3alpha.ProcessingMode async_mode = 1;
 
   // If set, then the change will be reverted back to the configured async_mode
   // after this time. If not set, then the mode change request will be

@@ -1,27 +1,27 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.mutation.v3alpha;
+package envoy.extensions.filters.http.ext_proc.v3alpha;
 
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
-import "envoy/extensions/filters/http/mutation/v3alpha/processing_mode.proto";
+import "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.proto";
 
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.mutation.v3alpha";
-option java_outer_classname = "MutationProto";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3alpha";
+option java_outer_classname = "ExtProcProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Mutation Service]
-// Mutation Service
-// [#extension: envoy.filters.http.mutation]
+// [#protodoc-title: External Processing Filter]
+// External Processing Filter
+// [#extension: envoy.filters.http.ext_proc]
 
-// The Mutation filter allows an external service to act on HTTP traffic in a very flexible way.
+// The External Processing filter allows an external service to act on HTTP traffic in a flexible way.
 // It communicates with an external gRPC service that can use it to do a variety of things
 // with the request and response:
 //
@@ -53,7 +53,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   mode, either permanently or temporarily.
 
 // [#next-free-field: 8]
-message Mutation {
+message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
   config.core.v3.GrpcService grpc_service = 1;

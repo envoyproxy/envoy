@@ -1,20 +1,20 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.mutation.v3alpha;
+package envoy.extensions.filters.http.ext_proc.v3alpha;
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.mutation.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3alpha";
 option java_outer_classname = "ProcessingModeProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Mutation Service]
-// Mutation Service Processing Mode
-// [#extension: envoy.filters.http.mutation]
+// [#protodoc-title: External Processing Filter]
+// External Processing Filter Processing Mode
+// [#extension: envoy.filters.http.ext_proc]
 
-// This configuration describes how a mutation filter processes the HTTP
+// This configuration describes how an external processing filter processes the HTTP
 // request or response, including how requests and responses are
 // sent to the remote server.
 

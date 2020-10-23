@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/mutation/v3alpha/mutation.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/http/filter.h"
 
@@ -11,11 +11,11 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Mutation {
+namespace ExternalProcessing {
 
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::mutation::v3alpha::Mutation& config)
+  FilterConfig(const envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor& config)
       : failure_mode_allow_(config.failure_mode_allow()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -55,7 +55,7 @@ private:
   Grpc::RawAsyncClientPtr grpc_client_;
 };
 
-} // namespace Mutation
+} // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

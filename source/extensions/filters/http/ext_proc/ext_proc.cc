@@ -1,9 +1,9 @@
-#include "extensions/filters/http/mutation/mutation.h"
+#include "extensions/filters/http/ext_proc/ext_proc.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Mutation {
+namespace ExternalProcessing {
 
 void Filter::onDestroy() {}
 
@@ -43,7 +43,7 @@ Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) {}
 
-} // namespace Mutation
+} // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

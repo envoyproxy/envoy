@@ -1,16 +1,16 @@
-#include "extensions/filters/http/mutation/config.h"
+#include "extensions/filters/http/ext_proc/config.h"
 
 #include <string>
 
-#include "extensions/filters/http/mutation/mutation.h"
+#include "extensions/filters/http/ext_proc/ext_proc.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Mutation {
+namespace ExternalProcessing {
 
-Http::FilterFactoryCb MutationFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::mutation::v3alpha::Mutation& proto_config,
+Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   const auto filter_config = std::make_shared<FilterConfig>(proto_config);
 
@@ -26,10 +26,10 @@ Http::FilterFactoryCb MutationFilterConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-REGISTER_FACTORY(MutationFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.mutation"};
+REGISTER_FACTORY(ExternalProcessingFilterConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.ext_proc"};
 
-} // namespace Mutation
+} // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
