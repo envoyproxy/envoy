@@ -3,8 +3,12 @@
 Installing Envoy
 ================
 
-The `Get Envoy <https://www.getenvoy.io/>`__ project maintains a number of binaries
+The Envoy project :ref:`provides a number of pre-built Docker images <install_binaries>` for both ``amd64`` and ``arm64`` architectures.
+
+The `Get Envoy <https://www.getenvoy.io/>`__ project also maintains a number of binaries
 and repositories to accommodate many popular distributions.
+
+If you are :ref:`installing on Mac OSX <start_install_macos>`, you can install natively with ``brew``.
 
 Once you have installed Envoy, check out the :ref:`quick start <start_quick_start>` guide for more information on
 getting your Envoy proxy up and running.
@@ -92,6 +96,8 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
 
       $ sudo yum-config-manager --enable tetrate-getenvoy-nightly
       $ sudo yum-config-manager --disable tetrate-getenvoy-nightly
+
+.. _start_install_macosx:
 
 Install Envoy on Mac OSX
 ~~~~~~~~~~~~~~~~~~~~~~~~
