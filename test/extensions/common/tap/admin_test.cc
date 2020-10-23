@@ -23,7 +23,7 @@ public:
   MOCK_METHOD(const absl::string_view, adminId, ());
   MOCK_METHOD(void, clearTapConfig, ());
   MOCK_METHOD(void, newTapConfig,
-              (envoy::config::tap::v3::TapConfig && proto_config, Sink* admin_streamer));
+              (const envoy::config::tap::v3::TapConfig& proto_config, Sink* admin_streamer));
 };
 
 class AdminHandlerTest : public testing::Test {

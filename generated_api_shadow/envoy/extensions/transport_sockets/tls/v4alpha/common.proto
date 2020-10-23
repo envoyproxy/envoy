@@ -299,8 +299,8 @@ message CertificateValidationContext {
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated = {items {string {min_len: 64 max_bytes: 95}}}];
 
-  // An optional list of Subject Alternative name matchers. Envoy will verify that the
-  // Subject Alternative Name of the presented certificate matches one of the specified matches.
+  // An optional list of Subject Alternative name matchers. If specified, Envoy will verify that the
+  // Subject Alternative Name of the presented certificate matches one of the specified matchers.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
   // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.v4alpha.StringMatcher>`.

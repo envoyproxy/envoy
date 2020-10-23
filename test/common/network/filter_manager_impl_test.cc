@@ -403,7 +403,7 @@ stat_prefix: name
   EXPECT_CALL(*rl_client, limit(_, "foo",
                                 testing::ContainerEq(
                                     std::vector<RateLimit::Descriptor>{{{{"hello", "world"}}}}),
-                                testing::A<Tracing::Span&>()))
+                                testing::A<Tracing::Span&>(), _))
       .WillOnce(WithArgs<0>(
           Invoke([&](Extensions::Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks = &callbacks;
