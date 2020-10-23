@@ -30,6 +30,7 @@ public:
    * @param api reference to the Api object
    * @return std::shared_ptr<grpc::ChannelCredentials> to be used to authenticate a Google gRPC
    * channel.
+   * @throws EnvoyException when grpc_service_config validation fails.
    */
   virtual std::shared_ptr<grpc::ChannelCredentials>
   getChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
