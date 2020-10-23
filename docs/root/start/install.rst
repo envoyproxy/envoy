@@ -165,6 +165,8 @@ The following table shows the available Docker images
 
 .. note::
 
+   In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
+
    In the above *dev* repositories, the *latest* tag points to a container including the last
    Envoy build on master that passed tests.
 

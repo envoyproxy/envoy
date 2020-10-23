@@ -26,6 +26,8 @@ For more information on building and different build targets, please refer to :r
    `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags>`_ image.
    You will need 4-5GB of disk space to accommodate this image.
 
+   This script runs as effective root on your host system.
+
 **Step 2: Build image with only Envoy binary**
 
 In this step we'll build an image that only has the Envoy binary, and none
