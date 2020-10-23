@@ -772,7 +772,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 1.39.6-upstream && ./emsdk activate --embedded 1.39.6-upstream || true",
+            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7 || true",
         ],
     )
 
