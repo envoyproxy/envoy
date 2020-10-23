@@ -131,7 +131,7 @@ public:
   void onAccept(ConnectionSocketPtr&& socket) override { onAccept_(socket); }
 
   MOCK_METHOD(void, onAccept_, (ConnectionSocketPtr & socket));
-  MOCK_METHOD(void, onReject, ());
+  MOCK_METHOD(void, onReject, (RejectCause), (override));
 };
 
 class MockUdpListenerCallbacks : public UdpListenerCallbacks {
@@ -391,6 +391,7 @@ public:
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, setRejectFraction, (float));
 };
 
 class MockConnectionHandler : public ConnectionHandler {
@@ -412,6 +413,7 @@ public:
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
+  MOCK_METHOD(void, setListenerRejectFraction, (float), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
 };
 
@@ -501,6 +503,7 @@ public:
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, setRejectFraction, (float), (override));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));

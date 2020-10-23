@@ -10,7 +10,6 @@ involved and how Envoy plays a role, read the CNCF
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
 [![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=master)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=master)
-[![CircleCI](https://circleci.com/gh/envoyproxy/envoy/tree/master.svg?style=shield)](https://circleci.com/gh/envoyproxy/envoy/tree/master)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
 [![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
 

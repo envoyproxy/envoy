@@ -1,8 +1,7 @@
-#include <fstream>
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
+#include "test/extensions/common/tap/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -97,35 +96,6 @@ public:
                                     testing::UnitTest::GetInstance()->current_test_info()->name();
     TestEnvironment::createPath(path_prefix);
     return path_prefix + "/";
-  }
-
-  std::vector<envoy::data::tap::v3::TraceWrapper>
-  readTracesFromFile(const std::string& path_prefix) {
-    // Find the written .pb file and verify it.
-    auto files = TestUtility::listFiles(path_prefix, false);
-    auto pb_file_name = std::find_if(files.begin(), files.end(), [](const std::string& s) {
-      return absl::EndsWith(s, MessageUtil::FileExtensions::get().ProtoBinaryLengthDelimited);
-    });
-    EXPECT_NE(pb_file_name, files.end());
-
-    std::vector<envoy::data::tap::v3::TraceWrapper> traces;
-    std::ifstream pb_file(*pb_file_name, std::ios_base::binary);
-    Protobuf::io::IstreamInputStream stream(&pb_file);
-    Protobuf::io::CodedInputStream coded_stream(&stream);
-    while (true) {
-      uint32_t message_size;
-      if (!coded_stream.ReadVarint32(&message_size)) {
-        break;
-      }
-
-      traces.emplace_back();
-
-      auto limit = coded_stream.PushLimit(message_size);
-      EXPECT_TRUE(traces.back().ParseFromCodedStream(&coded_stream));
-      coded_stream.PopLimit(limit);
-    }
-
-    return traces;
   }
 
   void verifyStaticFilePerTap(const std::string& filter_config) {
@@ -286,6 +256,9 @@ tap_config:
 
   // Second request/response with no tap.
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  // The above admin tap close can race with the request that follows and we don't have any way
+  // to synchronize it, so just count the number of taps after the request for use below.
+  const auto current_tapped = test_server_->counter("http.config_test.tap.rq_tapped")->value();
 
   // Setup the tap again and leave it open.
   startAdminRequest(admin_request_yaml);
@@ -358,8 +331,57 @@ tap_config:
   TestUtility::loadFromYaml(admin_response_->body(), trace);
 
   admin_client_->close();
-  EXPECT_EQ(3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+  EXPECT_EQ(current_tapped + 3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
   test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
+}
+
+// Make sure that an admin tap works correctly across an LDS reload.
+TEST_P(TapIntegrationTest, AdminLdsReload) {
+  initializeFilter(admin_filter_config_);
+
+  const std::string admin_request_yaml =
+      R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    and_match:
+      rules:
+        - http_request_trailers_match:
+            headers:
+              - name: foo_trailer
+                exact_match: bar
+        - http_response_trailers_match:
+            headers:
+              - name: bar_trailer
+                exact_match: baz
+  output_config:
+    sinks:
+      - streaming_admin: {}
+)EOF";
+
+  startAdminRequest(admin_request_yaml);
+
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  new_config_helper.addFilter(admin_filter_config_);
+  new_config_helper.renameListener("foo");
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_no_tap_, {}, &request_trailers_, response_headers_no_tap_, {},
+              &response_trailers_);
+
+  envoy::data::tap::v3::TraceWrapper trace;
+  admin_response_->waitForBodyData(1);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
+  EXPECT_EQ("bar",
+            findHeader("foo_trailer", trace.http_buffered_trace().request().trailers())->value());
+  EXPECT_EQ("baz",
+            findHeader("bar_trailer", trace.http_buffered_trace().response().trailers())->value());
+
+  admin_client_->close();
 }
 
 // Verify both request and response trailer matching works.
@@ -532,7 +554,8 @@ typed_config:
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  std::vector<envoy::data::tap::v3::TraceWrapper> traces = readTracesFromFile(path_prefix);
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromPath(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
   EXPECT_EQ("hello", traces[1].http_streamed_trace_segment().request_body_chunk().as_bytes());
@@ -577,7 +600,8 @@ typed_config:
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  std::vector<envoy::data::tap::v3::TraceWrapper> traces = readTracesFromFile(path_prefix);
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromPath(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
   EXPECT_EQ("hello", traces[1].http_streamed_trace_segment().request_body_chunk().as_bytes());

@@ -125,7 +125,7 @@ if is_windows; then
   BUILD_COMMAND=("build")
 else
   # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-  BUILD_TYPES=("" "-debug" "-alpine" "-alpine-debug" "-google-vrp")
+  BUILD_TYPES=("" "-debug" "-alpine" "-google-vrp")
 
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
