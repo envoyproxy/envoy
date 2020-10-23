@@ -7,9 +7,6 @@ services:
       dockerfile: Dockerfile-proxy
     networks:
       - envoymesh
-    expose:
-      - "8000"
-      - "8001"
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -19,11 +16,7 @@ services:
       context: .
       dockerfile: Dockerfile-web-service
     networks:
-      envoymesh:
-        aliases:
-          - web_service
-    expose:
-      - "80"
+      - envoymesh
     ports:
       - "8080:80"
 

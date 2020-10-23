@@ -7,8 +7,6 @@ services:
     image: envoyproxy/example-kv-server
     build:
       context: server
-    expose:
-      - "8081"
     ports:
       - "8081:8081"
     networks:
@@ -24,9 +22,6 @@ services:
       envoymesh:
         aliases:
           - kv-backend-proxy
-    expose:
-      - "8811"
-      - "8881"
     ports:
       - "8811:8811"
       - "8881:8881"
@@ -39,9 +34,7 @@ services:
     environment:
       - CLIENT_PROXY=http://kv-client-proxy:9911
     networks:
-      envoymesh:
-        aliases:
-          - grpc-client
+      - envoymesh
 
   grpc-client-proxy:
     build:
@@ -51,9 +44,6 @@ services:
       envoymesh:
         aliases:
           - kv-client-proxy
-    expose:
-      - "9911"
-      - "9991"
     ports:
       - "9911:9911"
       - "9991:9991"

@@ -13,9 +13,6 @@ services:
       #- /tmp/envoy-docker-build/envoy/source/exe/envoy:/usr/local/bin/envoy
     networks:
       - envoymesh
-    expose:
-      - "80"
-      - "8001"
     ports:
       - "18000:80"
       - "18001:8001"
@@ -28,8 +25,6 @@ services:
       envoymesh:
         aliases:
           - web_service
-    expose:
-      - "80"
     ports:
       - "18080:80"
 
