@@ -75,7 +75,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       To specify a custom configuration you can mount the config into the container, and specify the path with ``-c``.
 
-      .. code-block:: console
+      .. substitution-code-block:: console
 
 	 $ docker run --rm -d -v envoy-custom.yaml:/envoy-custom.yaml -p 9901:9901 -p 10000:10000 envoyproxy/|envoy_docker_image| -c /envoy-custom.yaml
 
@@ -128,7 +128,7 @@ Envoy should now be proxying on http://localhost:20000
 
 .. code-block:: console
 
-   $ curl -v localhost:10000
+   $ curl -v localhost:20000
 
 The Envoy admin endpoint should also be available at http://localhost:9901
 
