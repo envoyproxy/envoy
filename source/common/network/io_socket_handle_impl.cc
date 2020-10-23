@@ -529,16 +529,12 @@ Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
 }
 
 absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
-#ifdef TCP_INFO
-  struct tcp_info ti;
-  socklen_t len = sizeof(ti);
-  if (!SOCKET_FAILURE(
-          Api::OsSysCallsSingleton::get().getsockopt(fd_, IPPROTO_TCP, TCP_INFO, &ti, &len).rc_)) {
-    return std::chrono::milliseconds(ti.tcpi_rtt);
+  Api::EnvoyTcpInfo info;
+  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
+  if (!result.rc_) {
+    return {};
   }
-#endif
-
-  return {};
+  return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
 } // namespace Network

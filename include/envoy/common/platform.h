@@ -18,6 +18,7 @@
 // These must follow afterwards
 #include <mswsock.h>
 #include <ws2tcpip.h>
+#include <mstcpip.h>
 
 // This is introduced in Windows SDK 10.0.17063.0 which is required
 // to build Envoy on Windows (we will reevaluate whether earlier builds
@@ -26,6 +27,7 @@
 
 // <windows.h> defines some frequently used symbols, so we need to undef these
 // interfering symbols.
+#undef ASSERT
 #undef DELETE
 #undef ERROR
 #undef GetMessage

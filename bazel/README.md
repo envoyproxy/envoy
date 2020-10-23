@@ -116,6 +116,8 @@ for how to update or override dependencies.
 
     ### Windows
 
+    > Note: These instructions apply to **Windows 10 SDK, version 1803 (10.0.17134.12)**. Earlier versions will not compile because the `afunix.h` header is not available. **The recommended Windows version is equal or later than Windows 10 SDK, version 1903 (10.0.18362.1)**
+
     Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
 
     When building Envoy, Bazel creates very long path names. One way to work around these excessive path
