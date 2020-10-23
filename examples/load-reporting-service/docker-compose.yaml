@@ -13,7 +13,6 @@ services:
       - envoymesh
     ports:
       - "80-81:80"
-      - "8081-8082:8081"
 
   lrs_server:
     build:

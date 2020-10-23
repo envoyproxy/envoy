@@ -9,7 +9,6 @@ services:
       - envoymesh
     ports:
       - "8000:8000"
-      - "8001:8001"
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -49,7 +48,6 @@ services:
     networks:
       - envoymesh
     ports:
-      - "9411:9411"
       - "16686:16686"
 
 networks:

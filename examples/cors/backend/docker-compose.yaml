@@ -9,7 +9,6 @@ services:
       - envoymesh
     ports:
       - "8002:8000"
-      - "8003:8001"
 
   backend-service:
     build:

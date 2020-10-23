@@ -19,8 +19,6 @@ services:
       envoymesh:
         aliases:
           - redis_server
-    ports:
-      - "6379:6379"
 
 networks:
   envoymesh: {}

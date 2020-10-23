@@ -15,7 +15,6 @@ services:
       - envoymesh
     ports:
       - "18000:80"
-      - "18001:8001"
 
   web_service:
     build:

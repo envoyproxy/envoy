@@ -24,7 +24,6 @@ services:
           - kv-backend-proxy
     ports:
       - "8811:8811"
-      - "8881:8881"
 
   # Requires the build of the stubs first
   grpc-client:
@@ -46,7 +45,6 @@ services:
           - kv-client-proxy
     ports:
       - "9911:9911"
-      - "9991:9991"
 
 networks:
   envoymesh: {}
