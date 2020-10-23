@@ -10,6 +10,7 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+load("@envoy_large_machine_exec_property//:constants.bzl", "LARGE_MACHINE")
 
 licenses(["notice"])  # Apache 2
 
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
+    exec_properties = LARGE_MACHINE,
     extension_name = "envoy.filters.http.wasm",
     shard_count = 50,
     deps = [
@@ -47,8 +49,9 @@ envoy_extension_cc_test(
     data = envoy_select_wasm([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
+    exec_properties = LARGE_MACHINE,
     extension_name = "envoy.filters.http.wasm",
-    shard_count = 5,
+    shard_count = 50,
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",

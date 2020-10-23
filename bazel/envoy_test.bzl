@@ -165,6 +165,7 @@ def envoy_cc_test(
         args = [],
         copts = [],
         shard_count = None,
+        exec_properties = None,
         coverage = True,
         local = False,
         size = "medium",
@@ -188,6 +189,7 @@ def envoy_cc_test(
         tags = coverage_tags,
         local = local,
         shard_count = shard_count,
+        exec_properties = exec_properties,
         size = size,
         flaky = flaky,
     )
