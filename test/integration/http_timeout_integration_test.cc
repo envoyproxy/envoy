@@ -4,6 +4,8 @@
 
 namespace Envoy {
 
+using testing::HasSubstr;
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, HttpTimeoutIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -497,6 +499,61 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Starts a request with a header timeout specified, sleeps for longer than the
+// timeout, and ensures that a timeout is received.
+TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* request_headers_timeout = hcm.mutable_request_headers_timeout();
+        request_headers_timeout->set_seconds(1);
+        request_headers_timeout->set_nanos(0);
+      });
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
+  initialize();
+
+  auto raw_connection = makeClientConnection(lookupPort("http"));
+  raw_connection->connect();
+
+  Buffer::OwnedImpl send_buffer("GET / HTTP/1.1\r\n"
+                           // Omit trailing \r\n that would indicate the end of headers.
+                           "Host: localhost\r\n");
+  // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
+  uint64_t bytes_to_send = send_buffer.length();
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->write(send_buffer, false);
+
+  Buffer::OwnedImpl recv_buffer;
+  struct SaveToBufferReadFilter : public Network::ReadFilterBaseImpl {
+    SaveToBufferReadFilter(Buffer::Instance& buffer) : buffer_(buffer) {}
+
+    // Network::ReadFilter
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
+      buffer_.add(data);
+      return Network::FilterStatus::Continue;
+    }
+
+    Buffer::Instance& buffer_;
+  };
+  raw_connection->addReadFilter(std::make_shared<SaveToBufferReadFilter>(recv_buffer));
+
+  // Loop until all bytes are sent.
+  while (bytes_to_send > 0 && raw_connection->state() == Network::Connection::State::Open) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  ASSERT_EQ(raw_connection->state(), Network::Connection::State::Open);
+
+  test_server_->waitForGaugeGe("http.config_test.downstream_rq_active", 1);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1001));
+  while (raw_connection->state() == Network::Connection::State::Open) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // The upstream should send a 40x response and send a local reply.
+  EXPECT_EQ(raw_connection->state(), Network::Connection::State::Closed);
+  EXPECT_THAT(recv_buffer.toString(), HasSubstr("408"));
 }
 
 } // namespace Envoy
