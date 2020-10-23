@@ -397,7 +397,7 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
           throw EnvoyException("Invalid env configuration, key cannot be empty.");
         }
 
-        formatters.push_back(std::make_unique<EnvFormatter>(key));
+        formatters.emplace_back(FormatterProviderPtr{new EnvFormatter(key)});
       } else {
         formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
       }
@@ -1157,8 +1157,9 @@ EnvFormatter::EnvFormatter(const std::string& key) {
   const char* value = std::getenv(key.c_str());
   if (value == nullptr) {
     value_ = absl::nullopt;
+  } else {
+    value_ = std::string(value);
   }
-  value_ = value;
 }
 
 absl::optional<std::string> EnvFormatter::format(const Http::RequestHeaderMap&,
