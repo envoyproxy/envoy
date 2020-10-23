@@ -2336,8 +2336,8 @@ TEST_F(EnvFormatterTest, NonExistingEnvVars) {
 
     FormatterImpl formatter(format, true);
 
-    EXPECT_EQ("-", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                    body));
+    EXPECT_EQ(
+        "", formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 
   {
@@ -2345,8 +2345,8 @@ TEST_F(EnvFormatterTest, NonExistingEnvVars) {
 
     FormatterImpl formatter(format, false);
 
-    EXPECT_EQ(
-        "", formatter.format(request_header, response_header, response_trailer, stream_info, body));
+    EXPECT_EQ("-", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                    body));
   }
 }
 
