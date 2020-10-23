@@ -214,6 +214,7 @@ for how to update or override dependencies.
     setx MSYS2_ARG_CONV_EXCL "%MSYS2_ARG_CONV_EXCL%"
     setx BAZEL_VC "%BAZEL_VC%"
     setx TMPDIR "%TMPDIR%"
+    setx MSYS2_PATH_TYPE "%MSYS2_PATH_TYPE%"
     ```
     > On Windows the supported/recommended shell to interact with bazel is MSYS2. This means that all the bazel commands (i.e. build, test) should be executed from MSYS2.
 
