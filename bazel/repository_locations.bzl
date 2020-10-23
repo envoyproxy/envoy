@@ -860,14 +860,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "fb90a7484800157fbb8a5904fbeb608dc1effc0c",
-        sha256 = "cbb253b8c5ab1a3c1787790f900e7d6774e95ba038714fc0f710935e62f30f5f",
-        # Last commit where "out_binary = True" works.
-        # See: https://github.com/bazelbuild/rules_rust/issues/386
+        version = "7b8219a1955ebd599c275bd292d8153e5616d6a4",
+        sha256 = "426a7712af597d90301dcc29e63d62de5c2e09fb347692e89abb775ec97c74fe",
         strip_prefix = "rules_rust-{version}",
         urls = ["https://github.com/bazelbuild/rules_rust/archive/{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2020-10-15",
+        release_date = "2020-10-21",
     ),
     rules_antlr = dict(
         project_name = "ANTLR Rules for Bazel",
