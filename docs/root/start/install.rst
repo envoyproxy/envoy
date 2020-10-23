@@ -173,3 +173,6 @@ The following table shows the available Docker images
    The Envoy project considers master to be release candidate quality at all times, and many
    organizations track and deploy master in production. We encourage you to do the same so that
    issues can be reported as early as possible in the development process.
+
+   The ``envoy-build-ubuntu`` image does not contain a working Envoy server, but can be used for
+   building Envoy and related containers. This image requires 4-5GB of available disk space to use.
