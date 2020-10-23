@@ -33,10 +33,6 @@ use(
       "label": "deps",
       "github_status_label": "any dependency change",
     },
-    {
-      "owner": "envoyproxy/tls-watchers",
-      "path": "source/common/ssl/",
-    },
   ],
 )
 
