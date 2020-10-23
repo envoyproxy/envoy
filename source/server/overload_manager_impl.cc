@@ -81,13 +81,13 @@ private:
 class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
 public:
   ThreadLocalOverloadStateImpl(
-      Event::ScaledRangeTimerManagerPtr scaled_timer_manager_,
+      Event::ScaledRangeTimerManagerPtr scaled_timer_manager,
       const NamedOverloadActionSymbolTable& action_symbol_table,
       const absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum>& timer_minimums)
       : action_symbol_table_(action_symbol_table), timer_minimums_(timer_minimums),
         actions_(action_symbol_table.size(), OverloadActionState(0)),
         scaled_timer_action_(action_symbol_table.lookup(OverloadActionNames::get().ReduceTimeouts)),
-        scaled_timer_manager_(std::move(scaled_timer_manager_)) {}
+        scaled_timer_manager_(std::move(scaled_timer_manager)) {}
 
   const OverloadActionState& getState(const std::string& action) override {
     if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {

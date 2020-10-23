@@ -1,7 +1,8 @@
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/overload_manager.h"
 
 #include <string>
+
+#include "test/mocks/event/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,7 +20,8 @@ MockThreadLocalOverloadState::MockThreadLocalOverloadState()
   ON_CALL(*this, createScaledTimer_).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
 }
 
-Event::TimerPtr MockThreadLocalOverloadState::createScaledTimer(OverloadTimerType timer_type, Event::TimerCb callback) {
+Event::TimerPtr MockThreadLocalOverloadState::createScaledTimer(OverloadTimerType timer_type,
+                                                                Event::TimerCb callback) {
   return Event::TimerPtr{createScaledTimer_(timer_type, std::move(callback))};
 }
 
