@@ -142,14 +142,14 @@ The following commands will pull and show the Envoy version of current images.
       .. substitution-code-block:: console
 
 	 $ docker pull envoyproxy/|envoy_docker_image|
-	 $ docker run envoyproxy/|envoy_docker_image| --version
+	 $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
    .. tab:: Get Envoy
 
       .. code-block:: console
 
 	 $ docker pull getenvoy/envoy:stable
-	 $ docker run getenvoy/envoy:stable --version
+	 $ docker run --rm getenvoy/envoy:stable --version
 
       .. tip::
 
