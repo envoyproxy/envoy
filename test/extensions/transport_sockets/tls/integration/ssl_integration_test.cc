@@ -678,7 +678,7 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   std::vector<envoy::data::tap::v3::TraceWrapper> traces =
       Extensions::Common::Tap::readTracesFromFile(
           fmt::format("{}_{}.pb_length_delimited", path_prefix_, id));
-  ASSERT_EQ(4, traces.size());
+  ASSERT_GE(traces.size(), 4);
 
   // The initial connection message has no local address, but has a remote address (not connected
   // yet).

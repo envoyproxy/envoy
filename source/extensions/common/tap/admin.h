@@ -68,10 +68,12 @@ private:
   };
 
   struct AttachedRequest {
-    AttachedRequest(std::string config_id, Server::AdminStream* admin_stream)
-        : config_id_(std::move(config_id)), admin_stream_(admin_stream) {}
+    AttachedRequest(std::string config_id, const envoy::config::tap::v3::TapConfig& config,
+                    Server::AdminStream* admin_stream)
+        : config_id_(std::move(config_id)), config_(config), admin_stream_(admin_stream) {}
 
     const std::string config_id_;
+    const envoy::config::tap::v3::TapConfig config_;
     const Server::AdminStream* admin_stream_;
   };
 

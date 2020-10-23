@@ -101,7 +101,7 @@ public:
   bool streaming() const override { return streaming_; }
 
 protected:
-  TapConfigBaseImpl(envoy::config::tap::v3::TapConfig&& proto_config,
+  TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                     Common::Tap::Sink* admin_streamer);
 
 private:

@@ -65,7 +65,7 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
                               tap_request.config_id()));
   }
   for (auto config : config_id_map_[tap_request.config_id()]) {
-    config->newTapConfig(std::move(*tap_request.mutable_tap_config()), this);
+    config->newTapConfig(tap_request.tap_config(), this);
   }
 
   admin_stream.setEndStreamOnComplete(false);
@@ -74,10 +74,10 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
       ENVOY_LOG(debug, "detach tap admin request for config_id={}",
                 attached_request_.value().config_id_);
       config->clearTapConfig();
-      attached_request_ = absl::nullopt;
     }
+    attached_request_ = absl::nullopt;
   });
-  attached_request_.emplace(tap_request.config_id(), &admin_stream);
+  attached_request_.emplace(tap_request.config_id(), tap_request.tap_config(), &admin_stream);
   return Http::Code::OK;
 }
 
@@ -91,6 +91,9 @@ void AdminHandler::registerConfig(ExtensionConfig& config, const std::string& co
   ASSERT(!config_id.empty());
   ASSERT(config_id_map_[config_id].count(&config) == 0);
   config_id_map_[config_id].insert(&config);
+  if (attached_request_.has_value() && attached_request_.value().config_id_ == config_id) {
+    config.newTapConfig(attached_request_.value().config_, this);
+  }
 }
 
 void AdminHandler::unregisterConfig(ExtensionConfig& config) {
