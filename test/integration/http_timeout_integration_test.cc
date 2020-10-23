@@ -518,8 +518,8 @@ TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
   raw_connection->connect();
 
   Buffer::OwnedImpl send_buffer("GET / HTTP/1.1\r\n"
-                           // Omit trailing \r\n that would indicate the end of headers.
-                           "Host: localhost\r\n");
+                                // Omit trailing \r\n that would indicate the end of headers.
+                                "Host: localhost\r\n");
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
   uint64_t bytes_to_send = send_buffer.length();
   raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
