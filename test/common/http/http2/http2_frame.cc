@@ -153,9 +153,10 @@ Http2Frame Http2Frame::makeEmptyHeadersFrame(uint32_t stream_index, HeadersFlags
 
 Http2Frame Http2Frame::makeHeadersFrameNoStatus(uint32_t stream_index) {
   Http2Frame frame;
-  frame.buildHeader(Type::Headers, 0, static_cast<uint8_t>(orFlags(HeadersFlags::EndStream,
-              HeadersFlags::EndHeaders)),
-                    makeRequestStreamId(stream_index));
+  frame.buildHeader(
+      Type::Headers, 0,
+      static_cast<uint8_t>(orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders)),
+      makeNetworkOrderStreamId(stream_index));
   return frame;
 }
 
@@ -165,7 +166,7 @@ Http2Frame Http2Frame::makeHeadersFrameWithStatus(std::string status, uint32_t s
       Type::Headers, 0,
       orFlags(HeadersFlags::EndStream,
               HeadersFlags::EndHeaders), // TODO: Support not hardcoding these two flags
-      makeRequestStreamId(stream_index));
+      makeNetworkOrderStreamId(stream_index));
   if (status == "200") {
     frame.appendStaticHeader(StaticHeaderIndex::Status200);
   } else if (status == "204") {
