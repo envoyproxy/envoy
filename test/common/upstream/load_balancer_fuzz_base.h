@@ -44,11 +44,12 @@ public:
   Random::PsuedoRandomGenerator64 random_;
   NiceMock<MockPrioritySet> priority_set_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  std::unique_ptr<LoadBalancerBase> lb_;
 
   // If fuzzing Zone Aware Load Balancers, local priority set will get constructed sometimes. If not
   // constructed, a local_priority_set_.get() call will return a nullptr.
   std::shared_ptr<NiceMock<MockPrioritySet>> local_priority_set_;
+
+  std::unique_ptr<LoadBalancer> lb_;
 
 private:
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
