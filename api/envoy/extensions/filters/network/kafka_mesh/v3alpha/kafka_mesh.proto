@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.network.kafka_mesh]
 
 message KafkaMesh {
-  string advertised_host = 1 [(validate.rules).string = {min_bytes: 1}];
+  string advertised_host = 1 [(validate.rules).string = {min_len: 1}];
 
   int32 advertised_port = 2 [(validate.rules).int32 = {gt: 0}];
 
@@ -28,9 +28,9 @@ message KafkaMesh {
 }
 
 message KafkaClusterDefinition {
-  string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
 
-  string bootstrap_servers = 2 [(validate.rules).string = {min_bytes: 1}];
+  string bootstrap_servers = 2 [(validate.rules).string = {min_len: 1}];
 
   int32 partition_count = 3 [(validate.rules).int32 = {gt: 0}];
 
