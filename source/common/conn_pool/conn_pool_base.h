@@ -245,8 +245,8 @@ private:
   std::list<PendingStreamPtr> pending_streams_to_purge_;
 
   // After the pool enters a state in which it has no active connections, the idle timeout callbacks
-  // will be called after `idle_timeout_` milliseconds. A value of
-  // `std::chrono::milliseconds::max()` is used to disable the timeout
+  // will be called after `idle_timeout_` milliseconds. When this is `absl::nullopt`, there is no
+  // idle timeout
   absl::optional<std::chrono::milliseconds> idle_timeout_;
 
   // The timer that fires to trigger the idle timeout callbacks
