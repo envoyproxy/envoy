@@ -18,7 +18,6 @@ feature of the API, which is most useful for simple requirements. For more compl
     install
     quick-start
     docker
-    tools/tools
     building
 
 .. toctree::

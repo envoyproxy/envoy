@@ -9,6 +9,7 @@ Operations and administration
   cli
   hot_restarter
   admin
+  tools/tools
   stats_overview
   runtime
   fs_flags
