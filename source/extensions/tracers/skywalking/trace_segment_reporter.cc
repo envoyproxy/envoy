@@ -52,7 +52,9 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
     tags.Reserve(span_store->tags().size());
 
     for (auto& span_tag : span_store->tags()) {
-      tags.Add(std::move(const_cast<Tag&>(span_tag)));
+      KeyStringValuePair* new_tag = tags.Add();
+      new_tag->set_key(span_tag.first);
+      new_tag->set_value(span_tag.second);
     }
 
     SpanContext* previous_span_context = segment_context.previousSpanContext();

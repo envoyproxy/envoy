@@ -37,12 +37,18 @@ message SkyWalkingConfig {
 message ClientConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v3.ClientConfig";
 
-  // Service name for SkyWalking tracer. If service_name is empty, then cluster name of Envoy will
-  // be used as service name.
+  // Service name for SkyWalking tracer. If this field is empty, then local service cluster name 
+  // that configured by :ref:`Bootstrap node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` 
+  // message's :ref:`cluster <envoy_v3_api_field_config.core.v3.Node.cluster>` field or command line 
+  // option :option:`--service-cluster` will be used. If both this field and local service cluster
+  // name are empty, ``EnvoyProxy`` is used as the service name by default.
   string service_name = 1;
 
-  // Service instance name for SkyWalking tracer. If instance_name is empty, the node name of Envoy
-  // will be used as service instance name.
+  // Service instance name for SkyWalking tracer. If this field is empty, then local service node
+  // that configured by :ref:`Bootstrap node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` 
+  // message's :ref:`id <envoy_v3_api_field_config.core.v3.Node.id>` field or command line  option 
+  // :option:`--service-node` will be used. If both this field and local service node are empty, 
+  // ``EnvoyProxy`` is used as the instance name by default.
   string instance_name = 2;
 
   // Authentication token config for SkyWalking. SkyWalking can use token authentication to secure

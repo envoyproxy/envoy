@@ -138,7 +138,7 @@ private:
   std::vector<SpanStorePtr> span_list_;
 };
 
-using Tag = KeyStringValuePair;
+using Tag = std::pair<std::string, std::string>;
 
 /*
  * A helper class for the SkyWalking span and is used to store all span-related data, including span
@@ -252,12 +252,7 @@ public:
   /*
    * Add a new tag entry to current span.
    */
-  void addTag(absl::string_view name, absl::string_view value) {
-    Tag tag;
-    tag.set_key(name.data(), name.size());
-    tag.set_value(value.data(), value.size());
-    tags_.emplace_back(std::move(tag));
-  }
+  void addTag(absl::string_view name, absl::string_view value) { tags_.emplace_back(name, value); }
 
   /*
    * Add a new log entry to current span. Due to different data formats, log is temporarily not

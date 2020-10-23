@@ -75,6 +75,15 @@ TEST_F(SkyWalkingClientConfigTest, WithProtoClientConfigTest) {
   EXPECT_EQ(client_config_->authentication(), "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE");
 }
 
+// Test whether the client config can get default value for service name and instance name.
+TEST_F(SkyWalkingClientConfigTest, BothLocalInfoAndClientConfigEmptyTest) {
+  test_string = "";
+  setupSkyWalkingClientConfig(SKYWALKING_CONFIG_NO_CLIENT_CONFIG);
+
+  EXPECT_EQ(client_config_->service(), "EnvoyProxy");
+  EXPECT_EQ(client_config_->serviceInstance(), "EnvoyProxy");
+}
+
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions

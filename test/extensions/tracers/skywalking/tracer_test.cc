@@ -114,24 +114,24 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   // Test whether the tag can be set correctly.
   span->setTag("TestTagKeyA", "TestTagValueA");
   span->setTag("TestTagKeyB", "TestTagValueB");
-  EXPECT_EQ("TestTagValueA", span->spanStore()->tags().at(0).value());
-  EXPECT_EQ("TestTagValueB", span->spanStore()->tags().at(1).value());
+  EXPECT_EQ("TestTagValueA", span->spanStore()->tags().at(0).second);
+  EXPECT_EQ("TestTagValueB", span->spanStore()->tags().at(1).second);
 
   // When setting the status code tag, the corresponding tag name will be rewritten as
   // 'status_code'.
   span->setTag(Tracing::Tags::get().HttpStatusCode, "200");
-  EXPECT_EQ("status_code", span->spanStore()->tags().at(2).key());
-  EXPECT_EQ("200", span->spanStore()->tags().at(2).value());
+  EXPECT_EQ("status_code", span->spanStore()->tags().at(2).first);
+  EXPECT_EQ("200", span->spanStore()->tags().at(2).second);
 
   // When setting the error tag, the SpanStore object will also mark itself as an error.
   span->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-  EXPECT_EQ(Tracing::Tags::get().Error, span->spanStore()->tags().at(3).key());
-  EXPECT_EQ(Tracing::Tags::get().True, span->spanStore()->tags().at(3).value());
+  EXPECT_EQ(Tracing::Tags::get().Error, span->spanStore()->tags().at(3).first);
+  EXPECT_EQ(Tracing::Tags::get().True, span->spanStore()->tags().at(3).second);
   EXPECT_EQ(true, span->spanStore()->isError());
 
   // When setting http url tag, the corresponding tag name will be rewritten as 'url'.
   span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
-  EXPECT_EQ("url", span->spanStore()->tags().at(4).key());
+  EXPECT_EQ("url", span->spanStore()->tags().at(4).first);
 
   Envoy::Tracing::SpanPtr org_first_child_span =
       span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
