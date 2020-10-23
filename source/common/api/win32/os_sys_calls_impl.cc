@@ -364,5 +364,22 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
   return {rc, 0};
 }
 
+SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
+                                                [[maybe_unused]] EnvoyTcpInfo* tcp_info) {
+#ifdef SIO_TCP_INFO
+  TCP_INFO_v0 win_tcpinfo;
+  DWORD infoVersion = 0;
+  DWORD bytesReturned = 0;
+  int rc = ::WSAIoctl(sockfd, SIO_TCP_INFO, &infoVersion, sizeof(infoVersion), &win_tcpinfo,
+                      sizeof(win_tcpinfo), &bytesReturned, nullptr, nullptr);
+
+  if (!SOCKET_FAILURE(rc)) {
+    tcp_info->tcpi_rtt = std::chrono::microseconds(win_tcpinfo.RttUs);
+  }
+  return {!SOCKET_FAILURE(rc), !SOCKET_FAILURE(rc) ? 0 : ::WSAGetLastError()};
+#endif
+  return {false, WSAEOPNOTSUPP};
+}
+
 } // namespace Api
 } // namespace Envoy
