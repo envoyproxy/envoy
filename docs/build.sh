@@ -135,14 +135,6 @@ generate_api_rst v3
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
 
-copy_example_configs () {
-    mkdir -p "${GENERATED_RST_DIR}/start/sandboxes/_include/wasm-cc"
-    cp -a "${SRC_DIR}"/examples/wasm-cc/*.cc "${GENERATED_RST_DIR}/start/sandboxes/_include/wasm-cc"
-    cp -a "${SRC_DIR}"/examples/wasm-cc/Dockerfile-proxy "${GENERATED_RST_DIR}/start/sandboxes/_include/wasm-cc"
-}
-
-copy_example_configs
-
 # xDS protocol spec.
 mkdir -p ${GENERATED_RST_DIR}/api-docs
 cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
