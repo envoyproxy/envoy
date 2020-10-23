@@ -75,7 +75,7 @@ public:
   }
   ConnPoolImplBaseTest() = default;
 
-  ~ConnPoolImplBaseTest() {
+  ~ConnPoolImplBaseTest() override {
     // Force drain before removal
     if (pool_) {
       pool_->addDrainedCallbackImpl([]() {});

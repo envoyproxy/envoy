@@ -1488,7 +1488,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
             // We want to clean up after ourselves if the host isn't particularly active (i.e. we
             // hit our configured timeout on the last pool and don't have any other pools for that
             // host).
-            if (container.pools_.size() == 0) {
+            if (container.pools_.empty()) {
               pool_map.erase(host); // NOTE: `container` is erased after this point in the lambda.
             }
           });
