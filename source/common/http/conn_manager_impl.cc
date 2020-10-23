@@ -226,12 +226,6 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
   stream.filter_manager_.disarmRequestTimeout();
 
-  stream.completeRequest();
-  stream.filter_manager_.onStreamComplete();
-  stream.filter_manager_.log();
-
-  stream.filter_manager_.destroyFilters();
-
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
 
   if (connection_idle_timer_ && streams_.empty()) {
@@ -654,6 +648,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   filter_manager_.streamInfo().setRequestedServerName(
       connection_manager_.read_callbacks_->connection().requestedServerName());
+}
+
+ConnectionManagerImpl::ActiveStream::~ActiveStream() {
+  completeRequest();
+  filter_manager_.onStreamComplete();
+  filter_manager_.log();
+
+  filter_manager_.destroyFilters();
 }
 
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
