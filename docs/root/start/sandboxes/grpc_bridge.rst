@@ -81,7 +81,7 @@ To build this sandbox example and start the example services, run the following 
 
 
 Step 5: Send requests to the Key/Value store
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+********************************************
 
 To use the Python service and send gRPC requests:
 
