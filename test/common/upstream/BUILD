@@ -749,17 +749,9 @@ envoy_cc_test_library(
     srcs = ["zone_aware_load_balancer_fuzz_base.cc"],
     hdrs = ["zone_aware_load_balancer_fuzz_base.h"],
     deps = [
-        #Remove everything here that needs to
-        ":zone_aware_load_balancer_fuzz_proto_cc_proto",
-        ":utility_lib",
         ":load_balancer_fuzz_lib",
-        "//source/common/upstream:load_balancer_lib",
-        "//test/fuzz:random_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
+        ":zone_aware_load_balancer_fuzz_proto_cc_proto",
         "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
     ],
 )
@@ -777,7 +769,6 @@ envoy_cc_fuzz_test(
     srcs = ["round_robin_load_balancer_fuzz_test.cc"],
     corpus = "//test/common/upstream:round_robin_load_balancer_corpus",
     deps = [
-        ":load_balancer_fuzz_proto_cc_proto",
         ":round_robin_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",

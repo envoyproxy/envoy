@@ -1,5 +1,7 @@
 #include "zone_aware_load_balancer_fuzz_base.h"
 
+#include "test/mocks/upstream/host_set.h"
+
 namespace Envoy {
 namespace Upstream {
 
