@@ -8,7 +8,7 @@ The Envoy project :ref:`provides a number of pre-built Docker images <install_bi
 The `Get Envoy <https://www.getenvoy.io/>`__ project also maintains a number of binaries
 and repositories to accommodate many popular distributions.
 
-If you are :ref:`installing on Mac OSX <start_install_macos>`, you can install natively with ``brew``.
+If you are :ref:`installing on Mac OSX <start_install_macosx>`, you can install natively with ``brew``.
 
 Once you have installed Envoy, check out the :ref:`quick start <start_quick_start>` guide for more information on
 getting your Envoy proxy up and running.
