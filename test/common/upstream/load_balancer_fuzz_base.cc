@@ -53,12 +53,6 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   }
 
   host_set.hosts_per_locality_ = makeHostsPerLocality({locality_a, locality_b, locality_c});
-
-  // Update local priority set if it exists - will mean load balancer is zone aware
-  if (priority_level == 0 && local_priority_set_.get() != nullptr) {
-    local_priority_set_->getMockHostSet(0)->hosts_ = host_set.hosts_;
-    local_priority_set_->getMockHostSet(0)->hosts_per_locality_ = host_set.hosts_per_locality_;
-  }
 }
 
 // Initializes random and fixed host sets
@@ -192,20 +186,6 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   // in LoadBalancerBase constructor) This won't have any hosts added or removed, as untrusted
   // upstreams cannot do that.
   host_set.runCallbacks({}, {});
-
-  // Update local priority set if it exists - will mean load balancer is zone aware
-  if (priority_of_host_set == 0 && local_priority_set_.get() != nullptr) {
-    local_priority_set_->getMockHostSet(0)->healthy_hosts_ = host_set.healthy_hosts_;
-    local_priority_set_->getMockHostSet(0)->degraded_hosts_ = host_set.degraded_hosts_;
-    local_priority_set_->getMockHostSet(0)->excluded_hosts_ = host_set.excluded_hosts_;
-    local_priority_set_->getMockHostSet(0)->healthy_hosts_per_locality_ =
-        host_set.healthy_hosts_per_locality_;
-    local_priority_set_->getMockHostSet(0)->degraded_hosts_per_locality_ =
-        host_set.degraded_hosts_per_locality_;
-    local_priority_set_->getMockHostSet(0)->excluded_hosts_per_locality_ =
-        host_set.excluded_hosts_per_locality_;
-    local_priority_set_->getMockHostSet(0)->runCallbacks({}, {});
-  }
 }
 
 void LoadBalancerFuzzBase::prefetch() {

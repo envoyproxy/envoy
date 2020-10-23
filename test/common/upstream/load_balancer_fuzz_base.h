@@ -44,14 +44,9 @@ public:
   Random::PsuedoRandomGenerator64 random_;
   NiceMock<MockPrioritySet> priority_set_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-
-  // If fuzzing Zone Aware Load Balancers, local priority set will get constructed sometimes. If not
-  // constructed, a local_priority_set_.get() call will return a nullptr.
-  std::shared_ptr<NiceMock<MockPrioritySet>> local_priority_set_;
-
   std::unique_ptr<LoadBalancer> lb_;
 
-private:
+protected:
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
   void
@@ -62,6 +57,7 @@ private:
   // random uint64 against this number.
   uint8_t num_priority_levels_ = 0;
 
+private:
   // This map used when updating health flags - making sure the health flags are updated hosts in
   // localities Key - index of host within full host list, value - locality level host at index is
   // in
