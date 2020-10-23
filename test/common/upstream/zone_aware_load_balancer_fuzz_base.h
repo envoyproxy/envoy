@@ -15,6 +15,14 @@ public:
     // If you call local_priority_set_.get() and it's not constructed yet, it'll return a nullptr
   }
 
+  ~ZoneAwareLoadBalancerFuzzBase() {
+    // This deletes the load balancer first. If constructed with a local priority set, load balancer
+    // with reference local priority set on destruction. Since local priority set is in a base
+    // class, it will be initialized second and thus destructed first. Thus, in order to avoid a use
+    // after free, you must delete the load balancer before deleting the priority set.
+    lb_.reset();
+  }
+
   // These extend base class logic in order to handle local_priority_set_ if applicable.
   void
   initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
