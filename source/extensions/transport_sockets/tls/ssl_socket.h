@@ -109,8 +109,6 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
-  void addReadyCb(std::function<void()> callback) override;
-
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
@@ -121,7 +119,6 @@ private:
   Envoy::Ssl::ClientContextConfigPtr config_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
-  std::list<std::function<void()>> secrets_ready_callbacks_;
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
@@ -136,8 +133,6 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 
-  void addReadyCb(std::function<void()> callback) override;
-
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
@@ -149,7 +144,6 @@ private:
   const std::vector<std::string> server_names_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
-  std::list<std::function<void()>> secrets_ready_callbacks_;
 };
 
 } // namespace Tls

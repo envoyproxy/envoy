@@ -18,6 +18,8 @@ public:
   }
 
   SocketPtr duplicate() override {
+    // Implementing the functionality here for all sockets is tricky because it leads
+    // into object slicing issues.
     RELEASE_ASSERT(false, "Socket duplicate function is only for listener sockets.");
   }
   IoHandle& ioHandle() override { return *io_handle_; }
