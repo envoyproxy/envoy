@@ -34,7 +34,7 @@ services:
     volumes:
       - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     networks:
-      - envoymesh:
+      - envoymesh
     environment:
       - SERVICE_NAME=2
     dns:
