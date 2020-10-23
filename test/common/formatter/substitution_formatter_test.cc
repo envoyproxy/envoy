@@ -17,6 +17,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -2297,6 +2298,55 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
 
   for (const std::string& test_case : test_cases) {
     EXPECT_NO_THROW(parser.parse(test_case));
+  }
+}
+
+class EnvFormatterTest : public testing::Test {
+public:
+  ~EnvFormatterTest() override { TestEnvironment::unsetEnvVar("TEST_KEY"); }
+};
+
+TEST_F(EnvFormatterTest, ExistingEnvVars) {
+  TestEnvironment::setEnvVar("TEST_KEY", "test", 1);
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{};
+  Http::TestResponseHeaderMapImpl response_header{};
+  Http::TestResponseTrailerMapImpl response_trailer{};
+  std::string body;
+
+  {
+    const std::string format = "%ENV(TEST_KEY)%";
+
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ("test", formatter.format(request_header, response_header, response_trailer,
+                                       stream_info, body));
+  }
+}
+
+TEST_F(EnvFormatterTest, NonExistingEnvVars) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{};
+  Http::TestResponseHeaderMapImpl response_header{};
+  Http::TestResponseTrailerMapImpl response_trailer{};
+  std::string body;
+
+  {
+    const std::string format = "%ENV(NONEXISTING_KEY)%";
+
+    FormatterImpl formatter(format, true);
+
+    EXPECT_EQ("-", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                    body));
+  }
+
+  {
+    const std::string format = "%ENV(NONEXISTING_KEY)%";
+
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ(
+        "", formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 }
 
