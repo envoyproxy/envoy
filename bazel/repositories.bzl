@@ -348,7 +348,12 @@ def _com_github_zlib_ng_zlib_ng():
     )
 
 def _com_google_cel_cpp():
-    external_http_archive("com_google_cel_cpp")
+    external_http_archive(
+        "com_google_cel_cpp",
+        patch_args = ["-p1"],
+        # Patches to remove "fast" protobuf-internal access
+        patches = ["@envoy//bazel:cel-cpp.patch"],
+    )
     external_http_archive("rules_antlr")
 
     # Parser dependencies
