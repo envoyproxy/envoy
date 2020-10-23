@@ -1,0 +1,22 @@
+# Pipeline for running Envoy's CVE scanner on an hourly basis.
+
+# This pipeline only uses scheduled triggers.
+trigger: none
+pr: none
+
+schedules:
+- cron: "0 * * * *"
+  displayName: Hourly CVE scan
+  branches:
+    include:
+    - master
+  always: true
+
+pool:
+  vmImage: "ubuntu-18.04"
+steps:
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh cve_scan'
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+    displayName: "Scan for CVEs in dependencies"
