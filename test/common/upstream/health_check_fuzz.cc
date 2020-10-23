@@ -90,6 +90,64 @@ makeBufferListToRespondWith(test::common::upstream::GrpcRespondBytes grpc_respon
 
 } // namespace
 
+void HttpHealthCheckFuzz::expectSessionCreate(const HostWithHealthCheckMap& health_check_map) {
+  // Expectations are in LIFO order.
+  // Refresh test session.
+  test_session_->timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  test_session_->interval_timer_ = new Event::MockTimer(&dispatcher_);
+  test_session_->request_encoder_.stream_.callbacks_.clear();
+  expectClientCreate(0, health_check_map);
+}
+
+void HttpHealthCheckFuzz::expectClientCreate(size_t index,
+                                             const HostWithHealthCheckMap& health_check_map) {
+  TestSession& test_session = *test_session_;
+  test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+  ON_CALL(*test_session.codec_, protocol()).WillByDefault(testing::Return(Http::Protocol::Http11));
+  test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
+  connection_index_.push_back(index);
+  codec_index_.push_back(index);
+
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(testing::InvokeWithoutArgs([&]() -> Network::ClientConnection* {
+        connection_index_.pop_front();
+        return test_session_->client_connection_;
+      }));
+  EXPECT_CALL(*health_checker_, createCodecClient_(_))
+      .WillRepeatedly(
+          Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+            if (!health_check_map.empty()) {
+              const auto& health_check_config =
+                  health_check_map.at(conn_data.host_description_->address()->asString());
+              // To make sure health checker checks the correct port.
+              EXPECT_EQ(health_check_config.port_value(),
+                        conn_data.host_description_->healthCheckAddress()->ip()->port());
+            }
+            codec_index_.pop_front();
+            TestSession& test_session = *test_session_;
+            std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                new NiceMock<Upstream::MockClusterInfo>()};
+            Event::MockDispatcher dispatcher_;
+            return new CodecClientForTest(
+                Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
+                test_session.codec_, nullptr,
+                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+          }));
+}
+
+void HttpHealthCheckFuzz::expectStreamCreate(size_t) {
+  test_session_->request_encoder_.stream_.callbacks_.clear();
+  EXPECT_CALL(*test_session_->codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&test_session_->stream_response_callbacks_),
+                      ReturnRef(test_session_->request_encoder_)));
+}
+
+void HttpHealthCheckFuzz::expectSessionCreate() { expectSessionCreate(health_checker_map_); }
+void HttpHealthCheckFuzz::expectClientCreate(size_t index) {
+  expectClientCreate(index, health_checker_map_);
+}
+
 void HttpHealthCheckFuzz::allocHttpHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
@@ -100,6 +158,7 @@ void HttpHealthCheckFuzz::allocHttpHealthCheckerFromProto(
 
 void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
   allocHttpHealthCheckerFromProto(input.health_check_config());
+  test_session_ = std::make_unique<TestSession>();
   ON_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillByDefault(testing::Return(input.http_verify_cluster()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -116,7 +175,7 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
       .WillByDefault(testing::Return(45000));
   // If has an initial jitter, this calls onIntervalBase and finishes startup
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
-    test_sessions_[0]->interval_timer_->invokeCallback();
+    test_session_->interval_timer_->invokeCallback();
   }
   reuse_connection_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(input.health_check_config(), reuse_connection, true);
@@ -125,7 +184,7 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
 void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool last_action) {
   // Timeout timer needs to be explicitly enabled, usually by onIntervalBase() (Callback on interval
   // timer).
-  if (!test_sessions_[0]->timeout_timer_->enabled_) {
+  if (!test_session_->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
   }
@@ -152,7 +211,7 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   }
 
   ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
-  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+  test_session_->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
 
   // Interval timer gets turned on from decodeHeaders()
   if ((!reuse_connection_ || client_will_close) && !last_action) {
@@ -163,7 +222,7 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
 
 void HttpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   // Interval timer needs to be explicitly enabled, usually by decodeHeaders.
-  if (!test_sessions_[0]->interval_timer_->enabled_) {
+  if (!test_session_->interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
   }
@@ -172,18 +231,18 @@ void HttpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   }
   expectStreamCreate(0);
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
-  test_sessions_[0]->interval_timer_->invokeCallback();
+  test_session_->interval_timer_->invokeCallback();
 }
 
 void HttpHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
   // Timeout timer needs to be explicitly enabled, usually by a call to onIntervalBase().
-  if (!test_sessions_[0]->timeout_timer_->enabled_) {
+  if (!test_session_->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping trigger timeout timer.");
     return;
   }
   ENVOY_LOG_MISC(trace, "Triggered timeout timer");
-  test_sessions_[0]->timeout_timer_->invokeCallback(); // This closes the client, turns off timeout
-                                                       // and enables interval
+  test_session_->timeout_timer_->invokeCallback(); // This closes the client, turns off timeout
+                                                   // and enables interval
   if (!last_action) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
     triggerIntervalTimer(true);
@@ -191,7 +250,7 @@ void HttpHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
 }
 
 void HttpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
-  test_sessions_[0]->client_connection_->raiseEvent(event_type);
+  test_session_->client_connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
     triggerIntervalTimer(

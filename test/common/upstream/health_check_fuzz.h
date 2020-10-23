@@ -9,6 +9,18 @@
 namespace Envoy {
 namespace Upstream {
 
+class HealthCheckFuzzBase {
+public:
+  std::shared_ptr<MockClusterMockPrioritySet> cluster_{
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>()};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  std::unique_ptr<MockHealthCheckEventLogger> event_logger_storage_{
+      std::make_unique<MockHealthCheckEventLogger>()};
+  MockHealthCheckEventLogger& event_logger_{*event_logger_storage_};
+  NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Runtime::MockLoader> runtime_;
+};
+
 class HealthCheckFuzz {
 public:
   HealthCheckFuzz() = default;
@@ -39,6 +51,21 @@ private:
 
 class HttpHealthCheckFuzz : public HealthCheckFuzz, HttpHealthCheckerImplTestBase {
 public:
+  struct TestSession {
+    NiceMock<Event::MockTimer>* interval_timer_{};
+    NiceMock<Event::MockTimer>* timeout_timer_{};
+    Http::MockClientConnection* codec_{};
+    Stats::IsolatedStoreImpl stats_store_;
+    Network::MockClientConnection* client_connection_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
+  };
+
+  using TestSessionPtr = std::unique_ptr<TestSession>;
+  using HostWithHealthCheckMap =
+      absl::node_hash_map<std::string,
+                          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
+
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
   void respond(test::common::upstream::Respond respond, bool last_action) override;
@@ -49,6 +76,23 @@ public:
 
   // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
+
+  // State
+  TestSessionPtr test_session_;
+  std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
+  std::list<uint32_t> connection_index_{};
+  std::list<uint32_t> codec_index_{};
+  const HostWithHealthCheckMap health_checker_map_{};
+
+private:
+  void expectSessionCreate(const HostWithHealthCheckMap& health_check_map);
+
+  void expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map);
+
+  void expectStreamCreate(size_t index);
+
+  void expectSessionCreate();
+  void expectClientCreate(size_t index);
 };
 
 class TcpHealthCheckFuzz : public HealthCheckFuzz, TcpHealthCheckerImplTestBase {
