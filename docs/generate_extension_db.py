@@ -34,6 +34,8 @@ def IsMissing(value):
 
 
 def GetExtensionMetadata(target):
+  if not BUILDOZER_PATH:
+    raise ExtensionDbError('Buildozer not found!')
   r = subprocess.run(
       [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented', target],
       stdout=subprocess.PIPE,
