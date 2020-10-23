@@ -13,11 +13,7 @@ envoy_cc_test(
     size = "medium",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
-    # TODO(envoyproxy/windows-dev): diagnose msvc-cl build test failure
-    tags = [
-        "fails_on_windows",
-        "nofips",
-    ],
+    tags = ["nofips"],
     deps = [
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
