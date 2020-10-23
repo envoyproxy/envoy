@@ -92,7 +92,7 @@ public:
   MOCK_METHOD(void, onRequestDataTooLarge, ());
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
   MOCK_METHOD(void, onLocalReply, (Code code));
-  MOCK_METHOD(Tracing::Config&, tracingConfig, ());
+  MOCK_METHOD(Tracing::Config*, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
 
   ResponseHeaderMapPtr response_headers_;
@@ -194,7 +194,7 @@ public:
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
-  MOCK_METHOD(Tracing::Config&, tracingConfig, ());
+  MOCK_METHOD(Tracing::Config*, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
@@ -278,7 +278,7 @@ public:
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
-  MOCK_METHOD(Tracing::Config&, tracingConfig, ());
+  MOCK_METHOD(Tracing::Config*, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, onEncoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onEncoderFilterBelowWriteBufferLowWatermark, ());

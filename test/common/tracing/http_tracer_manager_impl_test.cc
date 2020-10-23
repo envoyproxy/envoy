@@ -22,7 +22,7 @@ namespace {
 
 class SampleTracer : public HttpTracer {
 public:
-  SpanPtr startSpan(const Config&, Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+  SpanPtr startSpan(const Config*, Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                     const Tracing::Decision) override {
     return nullptr;
   }

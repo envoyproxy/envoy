@@ -244,9 +244,9 @@ public:
   virtual Tracing::Span& activeSpan() PURE;
 
   /**
-   * @return tracing configuration.
+   * @return tracing configuration. May be nullptr if there's no tracing configuration.
    */
-  virtual const Tracing::Config& tracingConfig() PURE;
+  virtual const Tracing::Config* tracingConfig() PURE;
 
   /**
    * @return the ScopeTrackedObject for this stream.

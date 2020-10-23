@@ -118,7 +118,7 @@ public:
                                      const Http::ResponseHeaderMap* response_headers,
                                      const Http::ResponseTrailerMap* response_trailers,
                                      const StreamInfo::StreamInfo& stream_info,
-                                     const Config& tracing_config);
+                                     const Config* tracing_config);
 
   /**
    * Adds information obtained from the upstream request headers as tags to the active span.
@@ -127,7 +127,7 @@ public:
   static void finalizeUpstreamSpan(Span& span, const Http::ResponseHeaderMap* response_headers,
                                    const Http::ResponseTrailerMap* response_trailers,
                                    const StreamInfo::StreamInfo& stream_info,
-                                   const Config& tracing_config);
+                                   const Config* tracing_config);
 
   /**
    * Create a custom tag according to the configuration.
@@ -139,7 +139,7 @@ private:
   static void setCommonTags(Span& span, const Http::ResponseHeaderMap* response_headers,
                             const Http::ResponseTrailerMap* response_trailers,
                             const StreamInfo::StreamInfo& stream_info,
-                            const Config& tracing_config);
+                            const Config* tracing_config);
 
   static const std::string IngressOperation;
   static const std::string EgressOperation;
@@ -180,7 +180,7 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config&, Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+  SpanPtr startSpan(const Config*, Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                     const Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
   }
@@ -191,7 +191,7 @@ public:
   HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info);
 
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+  SpanPtr startSpan(const Config* config, Http::RequestHeaderMap& request_headers,
                     const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override;
 

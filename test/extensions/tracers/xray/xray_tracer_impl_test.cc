@@ -39,7 +39,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
   Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+  auto span = driver.startSpan(&tracing_config_, request_headers_, operation_name_, start_time,
                                tracing_decision);
   ASSERT_NE(span, nullptr);
   auto* xray_span = static_cast<XRay::Span*>(span.get());
@@ -55,7 +55,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
   Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+  auto span = driver.startSpan(&tracing_config_, request_headers_, operation_name_, start_time,
                                tracing_decision);
   ASSERT_NE(span, nullptr);
 }
@@ -69,7 +69,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
   Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+  auto span = driver.startSpan(&tracing_config_, request_headers_, operation_name_, start_time,
                                tracing_decision);
   // sampling should fall back to the default manifest since:
   // a) there is sampling decision in the X-Ray header
@@ -85,7 +85,7 @@ TEST_F(XRayDriverTest, NoXRayTracerHeader) {
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
   Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+  auto span = driver.startSpan(&tracing_config_, request_headers_, operation_name_, start_time,
                                tracing_decision);
   // sampling should fall back to the default manifest since:
   // a) there is no X-Ray header to determine the sampling decision

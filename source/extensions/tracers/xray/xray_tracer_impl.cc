@@ -61,7 +61,7 @@ Driver::Driver(const XRayConfiguration& config,
   });
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config* config,
                                    Http::RequestHeaderMap& request_headers,
                                    const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {

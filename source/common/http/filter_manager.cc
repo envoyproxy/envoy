@@ -223,7 +223,7 @@ const ScopeTrackedObject& ActiveStreamFilterBase::scope() {
   return parent_.filter_manager_callbacks_.scope();
 }
 
-Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
+Tracing::Config* ActiveStreamFilterBase::tracingConfig() {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
 

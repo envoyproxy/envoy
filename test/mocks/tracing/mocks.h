@@ -54,14 +54,14 @@ public:
   MockHttpTracer();
   ~MockHttpTracer() override;
 
-  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+  SpanPtr startSpan(const Config* config, Http::RequestHeaderMap& request_headers,
                     const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override {
     return SpanPtr{startSpan_(config, request_headers, stream_info, tracing_decision)};
   }
 
   MOCK_METHOD(Span*, startSpan_,
-              (const Config& config, Http::HeaderMap& request_headers,
+              (const Config* config, Http::HeaderMap& request_headers,
                const StreamInfo::StreamInfo& stream_info,
                const Tracing::Decision tracing_decision));
 };
@@ -71,7 +71,7 @@ public:
   MockDriver();
   ~MockDriver() override;
 
-  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+  SpanPtr startSpan(const Config* config, Http::RequestHeaderMap& request_headers,
                     const std::string& operation_name, SystemTime start_time,
                     const Tracing::Decision tracing_decision) override {
     return SpanPtr{
@@ -79,7 +79,7 @@ public:
   }
 
   MOCK_METHOD(Span*, startSpan_,
-              (const Config& config, Http::HeaderMap& request_headers,
+              (const Config* config, Http::HeaderMap& request_headers,
                const std::string& operation_name, SystemTime start_time,
                const Tracing::Decision tracing_decision));
 };

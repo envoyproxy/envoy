@@ -186,7 +186,7 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config* config, Http::RequestHeaderMap& request_headers,
                             const std::string& operation_name, SystemTime start_time,
                             const Tracing::Decision tracing_decision) PURE;
 };
@@ -201,7 +201,7 @@ class HttpTracer {
 public:
   virtual ~HttpTracer() = default;
 
-  virtual SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config* config, Http::RequestHeaderMap& request_headers,
                             const StreamInfo::StreamInfo& stream_info,
                             const Tracing::Decision tracing_decision) PURE;
 };

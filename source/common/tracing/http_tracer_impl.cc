@@ -157,14 +157,16 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                                                const Http::ResponseHeaderMap* response_headers,
                                                const Http::ResponseTrailerMap* response_trailers,
                                                const StreamInfo::StreamInfo& stream_info,
-                                               const Config& tracing_config) {
+                                               const Config* tracing_config) {
   // Pre response data.
   if (request_headers) {
     if (request_headers->RequestId()) {
       span.setTag(Tracing::Tags::get().GuidXRequestId, request_headers->getRequestIdValue());
     }
-    span.setTag(Tracing::Tags::get().HttpUrl,
-                buildUrl(*request_headers, tracing_config.maxPathTagLength()));
+    if (tracing_config) {
+      span.setTag(Tracing::Tags::get().HttpUrl,
+                  buildUrl(*request_headers, tracing_config->maxPathTagLength()));
+    }
     span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
@@ -193,10 +195,12 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   }
   CustomTagContext ctx{request_headers, stream_info};
 
-  const CustomTagMap* custom_tag_map = tracing_config.customTags();
-  if (custom_tag_map) {
-    for (const auto& it : *custom_tag_map) {
-      it.second->apply(span, ctx);
+  if (tracing_config) {
+    const CustomTagMap* custom_tag_map = tracing_config->customTags();
+    if (custom_tag_map) {
+      for (const auto& it : *custom_tag_map) {
+        it.second->apply(span, ctx);
+      }
     }
   }
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
@@ -211,7 +215,7 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
                                              const Http::ResponseHeaderMap* response_headers,
                                              const Http::ResponseTrailerMap* response_trailers,
                                              const StreamInfo::StreamInfo& stream_info,
-                                             const Config& tracing_config) {
+                                             const Config* tracing_config) {
   span.setTag(
       Tracing::Tags::get().HttpProtocol,
       Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
@@ -229,7 +233,7 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
 void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap* response_headers,
                                       const Http::ResponseTrailerMap* response_trailers,
                                       const StreamInfo::StreamInfo& stream_info,
-                                      const Config& tracing_config) {
+                                      const Config* tracing_config) {
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
@@ -249,7 +253,7 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
     addGrpcResponseTags(span, *response_headers);
   }
 
-  if (tracing_config.verbose()) {
+  if (tracing_config && tracing_config->verbose()) {
     annotateVerbose(span, stream_info);
   }
 
@@ -277,12 +281,16 @@ HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& ta
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
-SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+SpanPtr HttpTracerImpl::startSpan(const Config* config, Http::RequestHeaderMap& request_headers,
                                   const StreamInfo::StreamInfo& stream_info,
                                   const Tracing::Decision tracing_decision) {
-  std::string span_name = HttpTracerUtility::toString(config.operationName());
+  if (!config) {
+    return nullptr;
+  }
 
-  if (config.operationName() == OperationName::Egress) {
+  std::string span_name = HttpTracerUtility::toString(config->operationName());
+
+  if (config->operationName() == OperationName::Egress) {
     span_name.append(" ");
     span_name.append(std::string(request_headers.getHostValue()));
   }

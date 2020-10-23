@@ -6,6 +6,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -375,11 +376,15 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
       ::opencensus::trace::ProbabilitySampler(probability)});
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config* config,
                                    Http::RequestHeaderMap& request_headers,
                                    const std::string& operation_name, SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
-  return std::make_unique<Span>(config, oc_config_, request_headers, operation_name, start_time,
+  if (!config) {
+    return std::make_unique<Tracing::NullSpan>();
+  }
+
+  return std::make_unique<Span>(*config, oc_config_, request_headers, operation_name, start_time,
                                 tracing_decision);
 }
 

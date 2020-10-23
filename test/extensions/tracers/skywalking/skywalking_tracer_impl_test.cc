@@ -96,7 +96,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   Tracing::Decision decision;
   decision.traced = true;
 
-  Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, request_headers, "TEST_OP",
+  Tracing::SpanPtr org_span = driver_->startSpan(&mock_tracing_config_, request_headers, "TEST_OP",
                                                  time_system_.systemTime(), decision);
   EXPECT_NE(nullptr, org_span.get());
 
@@ -121,7 +121,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   Http::TestRequestHeaderMapImpl new_request_headers{
       {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
 
-  Tracing::SpanPtr org_new_span = driver_->startSpan(mock_tracing_config_, new_request_headers, "",
+  Tracing::SpanPtr org_new_span = driver_->startSpan(&mock_tracing_config_, new_request_headers, "",
                                                      time_system_.systemTime(), decision);
 
   Span* new_span = dynamic_cast<Span*>(org_new_span.get());
@@ -141,7 +141,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
                                                        {":authority", "test.com"},
                                                        {"sw8", "xxxxxx-error-propagation-header"}};
   Tracing::SpanPtr org_null_span = driver_->startSpan(
-      mock_tracing_config_, error_request_headers, "TEST_OP", time_system_.systemTime(), decision);
+      &mock_tracing_config_, error_request_headers, "TEST_OP", time_system_.systemTime(), decision);
 
   EXPECT_EQ(nullptr, dynamic_cast<Span*>(org_null_span.get()));
 
@@ -161,7 +161,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
 
-  Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, request_headers, "TEST_OP",
+  Tracing::SpanPtr org_span = driver_->startSpan(&mock_tracing_config_, request_headers, "TEST_OP",
                                                  time_system_.systemTime(), Tracing::Decision());
   EXPECT_NE(nullptr, org_span.get());
 

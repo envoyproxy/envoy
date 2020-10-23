@@ -152,7 +152,6 @@ private:
                         public Event::DeferredDeletable,
                         public StreamCallbacks,
                         public RequestDecoder,
-                        public Tracing::Config,
                         public ScopeTrackedObject,
                         public FilterManagerCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
@@ -190,12 +189,6 @@ private:
     // Http::RequestDecoder
     void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
-
-    // Tracing::TracingConfig
-    Tracing::OperationName operationName() const override;
-    const Tracing::CustomTagMap* customTags() const override;
-    bool verbose() const override;
-    uint32_t maxPathTagLength() const override;
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override {
@@ -275,7 +268,7 @@ private:
     void onRequestDataTooLarge() override;
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
     void onLocalReply(Code code) override;
-    Tracing::Config& tracingConfig() override;
+    Tracing::Config* tracingConfig() override;
     const ScopeTrackedObject& scope() override;
 
     void traceRequest();

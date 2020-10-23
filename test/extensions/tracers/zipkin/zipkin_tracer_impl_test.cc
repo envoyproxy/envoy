@@ -103,12 +103,14 @@ public:
     EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
         .WillOnce(Return(5000U));
 
-    Tracing::SpanPtr first_span = driver_->startSpan(
-        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    Tracing::SpanPtr first_span =
+        driver_->startSpan(&config_, request_headers_, operation_name_, start_time_,
+                           {Tracing::Reason::Sampling, true});
     first_span->finishSpan();
 
-    Tracing::SpanPtr second_span = driver_->startSpan(
-        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    Tracing::SpanPtr second_span =
+        driver_->startSpan(&config_, request_headers_, operation_name_, start_time_,
+                           {Tracing::Reason::Sampling, true});
     second_span->finishSpan();
 
     Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
@@ -238,7 +240,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
@@ -280,7 +282,7 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
 
@@ -304,7 +306,7 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
 
@@ -330,7 +332,7 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
 
@@ -359,7 +361,7 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
 
@@ -401,22 +403,22 @@ TEST_F(ZipkinDriverTest, CancelInflightRequestsOnDestruction) {
 
   // Trigger 1st report request.
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   // Trigger 2nd report request.
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   // Trigger 3rd report request.
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   // Trigger 4th report request.
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
 
@@ -447,7 +449,7 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
       .WillOnce(Return(5));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
@@ -471,7 +473,7 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
   EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).empty());
   EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).empty());
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -485,7 +487,7 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
   EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).empty());
   EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).empty());
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -501,7 +503,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
                                    Hex::uint64ToHex(generateRandom64()));
   EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).empty());
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -517,7 +519,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
                                    Hex::uint64ToHex(generateRandom64()));
   EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).empty());
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -532,7 +534,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
 
   // Only context header set is B3 sampled to indicate trace should not be sampled
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, NOT_SAMPLED);
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED);
@@ -555,7 +557,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
   // 'false' value)
   const std::string sampled = "false";
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, sampled);
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED);
@@ -577,7 +579,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
   // 'true' value)
   const std::string sampled = "true";
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, sampled);
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED);
@@ -598,7 +600,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
                                    Hex::uint64ToHex(generateRandom64()));
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, NOT_SAMPLED);
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -615,7 +617,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
 
   // New span will have a CS annotation
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -638,7 +640,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   request_headers_.setCopy(Http::CustomHeaders::get().OtSpanContext, context);
 
   // New span will have an SR annotation
-  Tracing::SpanPtr span2 = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span2 = driver_->startSpan(&config_, request_headers_, operation_name_,
                                               start_time_, {Tracing::Reason::Sampling, true});
 
   ZipkinSpanPtr zipkin_span2(dynamic_cast<ZipkinSpan*>(span2.release()));
@@ -652,7 +654,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   // ====
   // Test setTag() with empty annotations vector
   // ====
-  Tracing::SpanPtr span3 = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span3 = driver_->startSpan(&config_, request_headers_, operation_name_,
                                               start_time_, {Tracing::Reason::Sampling, true});
   ZipkinSpanPtr zipkin_span3(dynamic_cast<ZipkinSpan*>(span3.release()));
   Span& zipkin_zipkin_span3 = zipkin_span3->span();
@@ -669,7 +671,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   // Test effective log()
   // ====
 
-  Tracing::SpanPtr span4 = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span4 = driver_->startSpan(&config_, request_headers_, operation_name_,
                                               start_time_, {Tracing::Reason::Sampling, true});
   const auto timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
@@ -686,7 +688,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   // ====
   // Test baggage noop
   // ====
-  Tracing::SpanPtr span5 = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span5 = driver_->startSpan(&config_, request_headers_, operation_name_,
                                               start_time_, {Tracing::Reason::Sampling, true});
   span5->setBaggage("baggage_key", "baggage_value");
   EXPECT_EQ("", span5->getBaggage("baggage_key"));
@@ -705,7 +707,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
 
   // New span will have an SR annotation - so its span and parent ids will be
   // the same as the supplied span context (i.e. shared context)
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -729,7 +731,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
   const std::string parent_span_id = "";
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_span_id);
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -751,7 +753,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
 
   // New span will have an SR annotation - so its span and parent ids will be
   // the same as the supplied span context (i.e. shared context)
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
@@ -773,7 +775,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
                                    Hex::uint64ToHex(generateRandom64()));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(nullptr, dynamic_cast<Tracing::NullSpan*>(span.get()));
 }
@@ -787,7 +789,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
                                    Hex::uint64ToHex(generateRandom64()));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(nullptr, dynamic_cast<Tracing::NullSpan*>(span.get()));
 }
@@ -802,7 +804,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
                                    std::string("xyz"));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(nullptr, dynamic_cast<Tracing::NullSpan*>(span.get()));
 }
@@ -810,7 +812,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
 TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
   setupValidDriver("HTTP_JSON");
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   span->setSampled(false);
@@ -827,7 +829,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
 TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
   setupValidDriver("HTTP_JSON");
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
   span->setSampled(true);
@@ -849,7 +851,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
                                    Hex::uint64ToHex(generateRandom64()));
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
                                    Hex::uint64ToHex(generateRandom64()));
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
   using DupCallback = std::function<bool(absl::string_view key)>;

@@ -161,7 +161,7 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
             return &request;
           }));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
@@ -203,7 +203,7 @@ TEST_F(DatadogDriverTest, NoBody) {
             return &request;
           }));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
@@ -247,7 +247,7 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
     timer_->invokeCallback();
@@ -273,7 +273,7 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
     timer_->invokeCallback();
@@ -301,7 +301,7 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
     timer_->invokeCallback();
@@ -332,7 +332,7 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
     timer_->invokeCallback();
@@ -372,25 +372,25 @@ TEST_F(DatadogDriverTest, CancelInflightRequestsOnDestruction) {
 
   // Trigger 1st report request.
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   timer_->invokeCallback();
   // Trigger 2nd report request.
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   timer_->invokeCallback();
   // Trigger 3rd report request.
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   timer_->invokeCallback();
   // Trigger 4th report request.
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   timer_->invokeCallback();

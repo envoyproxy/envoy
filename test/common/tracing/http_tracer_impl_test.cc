@@ -179,7 +179,7 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
@@ -213,7 +213,7 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, Connect) {
@@ -245,7 +245,7 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
@@ -286,7 +286,7 @@ metadata:
   metadata_key: { key: m.host, path: [ {key: not-found } ] })EOF",
                         false, ""}});
 
-  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
@@ -321,7 +321,7 @@ TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
   EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LastDownstreamTxByteSent));
 
   EXPECT_CALL(config, verbose).WillOnce(Return(true));
-  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, UpstreamClusterTagSet) {
@@ -341,7 +341,7 @@ TEST_F(HttpConnManFinalizerImplTest, UpstreamClusterTagSet) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
 
-  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
@@ -385,7 +385,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
@@ -407,7 +407,7 @@ TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
               setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(remote_address->logicalName())));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, SpanCustomTags) {
@@ -526,7 +526,7 @@ metadata:
         false, ""}});
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
-                                            config);
+                                            &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
@@ -581,7 +581,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
@@ -631,7 +631,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
@@ -677,7 +677,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
@@ -722,7 +722,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
-                                            &response_trailers, stream_info, config);
+                                            &response_trailers, stream_info, &config);
 }
 
 TEST(HttpTracerUtilityTest, operationTypeToString) {
@@ -739,7 +739,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   Http::TestResponseTrailerMapImpl response_trailers;
 
   SpanPtr span_ptr =
-      null_tracer.startSpan(config, request_headers, stream_info, {Reason::Sampling, true});
+      null_tracer.startSpan(&config, request_headers, stream_info, {Reason::Sampling, true});
   EXPECT_TRUE(dynamic_cast<NullSpan*>(span_ptr.get()) != nullptr);
 
   span_ptr->setOperation("foo");
@@ -776,7 +776,7 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
   const std::string operation_name = "ingress";
   EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, stream_info_.start_time_, _))
       .WillOnce(Return(nullptr));
-  tracer_->startSpan(config_, request_headers_, stream_info_, {Reason::Sampling, true});
+  tracer_->startSpan(&config_, request_headers_, stream_info_, {Reason::Sampling, true});
 }
 
 TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
@@ -791,7 +791,7 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag(Eq(Tracing::Tags::get().NodeId), Eq("node_name")));
 
-  tracer_->startSpan(config_, request_headers_, stream_info_, {Reason::Sampling, true});
+  tracer_->startSpan(&config_, request_headers_, stream_info_, {Reason::Sampling, true});
 }
 
 } // namespace

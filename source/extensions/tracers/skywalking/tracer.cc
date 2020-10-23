@@ -18,7 +18,7 @@ uint64_t getTimestamp(SystemTime time) {
 
 } // namespace
 
-Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, SystemTime start_time,
+Tracing::SpanPtr Tracer::startSpan(const Tracing::Config*, SystemTime start_time,
                                    const std::string& operation,
                                    SegmentContextSharedPtr segment_context, Span* parent) {
   SpanStore* span_store = segment_context->createSpanStore(parent ? parent->spanStore() : nullptr);
@@ -67,7 +67,7 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,
                                   SystemTime start_time) {
   // The new child span will share the same context with the parent span.
-  return tracer_.startSpan(config, start_time, operation_name, segment_context_, this);
+  return tracer_.startSpan(&config, start_time, operation_name, segment_context_, this);
 }
 
 void Span::setSampled(bool sampled) { span_store_->setSampled(sampled ? 1 : 0); }

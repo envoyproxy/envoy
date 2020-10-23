@@ -113,7 +113,7 @@ TEST(OpenCensusTracerTest, Span) {
   SystemTime start_time;
 
   {
-    Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
+    Tracing::SpanPtr span = driver->startSpan(&config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, true});
     span->setOperation("different_name");
     span->setTag("my_key", "my_value");
@@ -213,7 +213,7 @@ void testIncomingHeaders(
   SystemTime start_time;
   Http::TestRequestHeaderMapImpl injected_headers;
   {
-    Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
+    Tracing::SpanPtr span = driver->startSpan(&config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, false});
     span->injectContext(injected_headers);
     span->finishSpan();

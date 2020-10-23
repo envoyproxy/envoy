@@ -53,7 +53,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
-        parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
+        *parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
         parent.timeSource().systemTime());
     if (parent.attemptCount() != 1) {
       // This is a retry request, add this metadata to span.
@@ -71,7 +71,7 @@ UpstreamRequest::~UpstreamRequest() {
   if (span_ != nullptr) {
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
                                                      upstream_trailers_.get(), stream_info_,
-                                                     Tracing::EgressConfig::get());
+                                                     &Tracing::EgressConfig::get());
   }
 
   if (per_try_timeout_ != nullptr) {

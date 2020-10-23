@@ -82,7 +82,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSource()),
-      tracing_config_(Tracing::EgressConfig::get()),
+      tracing_config_(&Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout,
                                          options.hash_policy)),
       send_xff_(options.send_xff) {
@@ -271,7 +271,7 @@ void AsyncRequestImpl::onComplete() {
 
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
                                                    response_->trailers(), streamInfo(),
-                                                   Tracing::EgressConfig::get());
+                                                   &Tracing::EgressConfig::get());
 
   callbacks_.onSuccess(*this, std::move(response_));
 }
@@ -302,9 +302,10 @@ void AsyncRequestImpl::onReset() {
                                           remoteClosed() ? &response_->headers() : nullptr);
 
   // Finalize the span based on whether we received a response or not.
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(
-      *child_span_, remoteClosed() ? &response_->headers() : nullptr,
-      remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_,
+                                                   remoteClosed() ? &response_->headers() : nullptr,
+                                                   remoteClosed() ? response_->trailers() : nullptr,
+                                                   streamInfo(), &Tracing::EgressConfig::get());
 
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.

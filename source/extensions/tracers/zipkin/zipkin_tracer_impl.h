@@ -117,7 +117,7 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::RequestHeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config*, Http::RequestHeaderMap& request_headers,
                              const std::string&, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 

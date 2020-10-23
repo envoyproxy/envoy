@@ -354,6 +354,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
       throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
                            "): " + json);
     }
+
     // We know it's an unknown field at this point. If we're at the latest
     // version, then it's definitely an unknown field, otherwise we try to
     // load again at a later version.

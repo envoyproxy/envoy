@@ -154,11 +154,15 @@ Tracing::SpanPtr OpenTracingSpan::spawnChild(const Tracing::Config&, const std::
 OpenTracingDriver::OpenTracingDriver(Stats::Scope& scope)
     : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.opentracing."))} {}
 
-Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
+Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config* config,
                                               Http::RequestHeaderMap& request_headers,
                                               const std::string& operation_name,
                                               SystemTime start_time,
                                               const Tracing::Decision tracing_decision) {
+  if (!config) {
+    return std::make_unique<Tracing::NullSpan>();
+  }
+
   const PropagationMode propagation_mode = this->propagationMode();
   const opentracing::Tracer& tracer = this->tracer();
   std::unique_ptr<opentracing::Span> active_span;
@@ -206,7 +210,7 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   active_span = tracer.StartSpanWithOptions(operation_name, options);
   RELEASE_ASSERT(active_span != nullptr, "");
   active_span->SetTag(opentracing::ext::span_kind,
-                      config.operationName() == Tracing::OperationName::Egress
+                      config->operationName() == Tracing::OperationName::Egress
                           ? opentracing::ext::span_kind_rpc_client
                           : opentracing::ext::span_kind_rpc_server);
   return Tracing::SpanPtr{new OpenTracingSpan{*this, std::move(active_span)}};

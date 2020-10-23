@@ -50,7 +50,7 @@ public:
    *
    * @return The unique ptr to the newly created span.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config& config, SystemTime start_time,
+  Tracing::SpanPtr startSpan(const Tracing::Config* config, SystemTime start_time,
                              const std::string& operation, SegmentContextSharedPtr segment_context,
                              Span* parent);
 

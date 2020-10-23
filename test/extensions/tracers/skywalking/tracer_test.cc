@@ -89,7 +89,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
       SkyWalkingTestHelper::createSegmentContext(true, "CURR", "", mock_random_generator_);
 
   Envoy::Tracing::SpanPtr org_span = tracer_->startSpan(
-      mock_tracing_config_, mock_time_source_.systemTime(), "TEST_OP", segment_context, nullptr);
+      &mock_tracing_config_, mock_time_source_.systemTime(), "TEST_OP", segment_context, nullptr);
   Span* span = dynamic_cast<Span*>(org_span.get());
 
   EXPECT_EQ(true, span->spanStore()->isEntrySpan());

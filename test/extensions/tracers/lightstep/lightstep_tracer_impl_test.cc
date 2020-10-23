@@ -256,7 +256,7 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr first_span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, true});
 
   // Currently not possible to access the operation from the span, but this
@@ -264,11 +264,11 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   first_span->setOperation("myOperation");
   first_span->finishSpan();
 
-  Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr second_span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                                     start_time_, {Tracing::Reason::Sampling, true});
   second_span->finishSpan();
 
-  Tracing::SpanPtr third_span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr third_span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, true});
   third_span->finishSpan();
 
@@ -308,7 +308,7 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
     driver_->flush();
@@ -331,7 +331,7 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
     driver_->flush();
@@ -356,7 +356,7 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
     driver_->flush();
@@ -384,7 +384,7 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
     // Trigger flush of a span.
     driver_
-        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+        ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                     {Tracing::Reason::Sampling, true})
         ->finishSpan();
     driver_->flush();
@@ -426,12 +426,12 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr first_span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, true});
 
   first_span->finishSpan();
 
-  Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr second_span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                                     start_time_, {Tracing::Reason::Sampling, true});
 
   second_span->finishSpan();
@@ -474,13 +474,13 @@ TEST_F(LightStepDriverTest, FlushWithActiveReport) {
       .WillOnce(Return(5000U));
 
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   driver_->flush();
 
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   driver_->flush();
@@ -519,17 +519,17 @@ TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
       .WillOnce(Return(5000U));
 
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   driver_->flush();
 
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
 
@@ -558,7 +558,7 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
             return &request;
           }));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
@@ -597,12 +597,12 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
   driver_
-      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+      ->startSpan(&config_, request_headers_, operation_name_, start_time_,
                   {Tracing::Reason::Sampling, true})
       ->finishSpan();
 
@@ -621,7 +621,7 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
     const std::string invalid_context = "notvalidcontext";
     request_headers_.setCopy(Http::CustomHeaders::get().OtSpanContext, invalid_context);
     stats_.counter("tracing.opentracing.span_context_extraction_error").reset();
-    driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+    driver_->startSpan(&config_, request_headers_, operation_name_, start_time_,
                        {Tracing::Reason::Sampling, true});
     EXPECT_EQ(1U, stats_.counter("tracing.opentracing.span_context_extraction_error").value());
 
@@ -630,7 +630,7 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
 
     // Supply empty context.
     request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
-    Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+    Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                                start_time_, {Tracing::Reason::Sampling, true});
 
     EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
@@ -646,8 +646,9 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
     EXPECT_TRUE(tracer.Extract(iss));
 
     // Supply parent context, request_headers has properly populated x-ot-span-context.
-    Tracing::SpanPtr span_with_parent = driver_->startSpan(
-        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    Tracing::SpanPtr span_with_parent =
+        driver_->startSpan(&config_, request_headers_, operation_name_, start_time_,
+                           {Tracing::Reason::Sampling, true});
     request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
     span_with_parent->injectContext(request_headers_);
     injected_ctx = std::string(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
@@ -682,7 +683,7 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
 
   setup(lightstep_config, true);
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
@@ -696,12 +697,12 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
 TEST_F(LightStepDriverTest, SpawnChild) {
   setupValidDriver();
 
-  Tracing::SpanPtr parent = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr parent = driver_->startSpan(&config_, request_headers_, operation_name_,
                                                start_time_, {Tracing::Reason::Sampling, true});
   parent->injectContext(request_headers_);
 
   Tracing::SpanPtr childViaHeaders = driver_->startSpan(
-      config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+      &config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
   Tracing::SpanPtr childViaSpawn = parent->spawnChild(config_, operation_name_, start_time_);
 
   Http::TestRequestHeaderMapImpl base1{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
@@ -721,7 +722,7 @@ TEST_F(LightStepDriverTest, SpawnChild) {
 
 TEST_F(LightStepDriverTest, GetAndSetBaggage) {
   setupValidDriver();
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+  Tracing::SpanPtr span = driver_->startSpan(&config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   std::string key = "key1";

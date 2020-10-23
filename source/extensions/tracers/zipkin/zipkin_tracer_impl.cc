@@ -104,10 +104,14 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   });
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config* config,
                                    Http::RequestHeaderMap& request_headers, const std::string&,
                                    SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
+  if (!config) {
+    return std::make_unique<Tracing::NullSpan>();
+  }
+
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
   SpanContextExtractor extractor(request_headers);
@@ -117,10 +121,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
       new_zipkin_span =
-          tracer.startSpan(config, std::string(request_headers.getHostValue()), start_time);
+          tracer.startSpan(*config, std::string(request_headers.getHostValue()), start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span = tracer.startSpan(config, std::string(request_headers.getHostValue()),
+      new_zipkin_span = tracer.startSpan(*config, std::string(request_headers.getHostValue()),
                                          start_time, ret_span_context.first);
     }
 

@@ -20,7 +20,7 @@ public:
   explicit Driver(const envoy::config::trace::v3::SkyWalkingConfig& config,
                   Server::Configuration::TracerFactoryContext& context);
 
-  Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::RequestHeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config* config, Http::RequestHeaderMap& request_headers,
                              const std::string& operation, Envoy::SystemTime start_time,
                              const Tracing::Decision decision) override;
 

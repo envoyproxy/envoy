@@ -120,7 +120,7 @@ struct ConnectionManagerTracingStats {
  * Http Tracing can be enabled/disabled on a per connection manager basis.
  * Here we specify some specific for connection manager settings.
  */
-struct TracingConnectionManagerConfig {
+struct TracingConnectionManagerConfig : public Tracing::Config {
   Tracing::OperationName operation_name_;
   Tracing::CustomTagMap custom_tags_;
   envoy::type::v3::FractionalPercent client_sampling_;
@@ -128,6 +128,23 @@ struct TracingConnectionManagerConfig {
   envoy::type::v3::FractionalPercent overall_sampling_;
   bool verbose_;
   uint32_t max_path_tag_length_;
+
+  TracingConnectionManagerConfig(Tracing::OperationName operation_name,
+                                 const Tracing::CustomTagMap& custom_tags,
+                                 envoy::type::v3::FractionalPercent client_sampling,
+                                 envoy::type::v3::FractionalPercent random_sampling,
+                                 envoy::type::v3::FractionalPercent overall_sampling, bool verbose,
+                                 uint32_t max_path_tag_length)
+      : operation_name_(operation_name), custom_tags_(custom_tags),
+        client_sampling_(client_sampling), random_sampling_(random_sampling),
+        overall_sampling_(overall_sampling), verbose_(verbose),
+        max_path_tag_length_(max_path_tag_length) {}
+
+  TracingConnectionManagerConfig() {}
+  Tracing::OperationName operationName() const override { return operation_name_; }
+  const Tracing::CustomTagMap* customTags() const override { return &custom_tags_; }
+  bool verbose() const override { return verbose_; }
+  uint32_t maxPathTagLength() const override { return max_path_tag_length_; }
 };
 
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;

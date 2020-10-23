@@ -702,10 +702,10 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     connection_manager_.config_.tracingStats().health_check_.inc();
   }
 
-  if (active_span_) {
+  if (active_span_ && connection_manager_.config_.tracingConfig()) {
     Tracing::HttpTracerUtility::finalizeDownstreamSpan(
         *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-        filter_manager_.streamInfo(), *this);
+        filter_manager_.streamInfo(), connection_manager_.config_.tracingConfig());
   }
   if (state_.successful_upgrade_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
@@ -1092,7 +1092,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
                                             connection_manager_.config_.tracingStats());
 
   active_span_ = connection_manager_.tracer().startSpan(
-      *this, *request_headers_, filter_manager_.streamInfo(), tracing_decision);
+      connection_manager_.config_.tracingConfig(), *request_headers_, filter_manager_.streamInfo(),
+      tracing_decision);
 
   if (!active_span_) {
     return;
@@ -1565,22 +1566,6 @@ void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
   filter_manager_.callLowWatermarkCallbacks();
 }
 
-Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
-  return connection_manager_.config_.tracingConfig()->operation_name_;
-}
-
-const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
-  return tracing_custom_tags_.get();
-}
-
-bool ConnectionManagerImpl::ActiveStream::verbose() const {
-  return connection_manager_.config_.tracingConfig()->verbose_;
-}
-
-uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
-  return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
-}
-
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {
   // We must check if the 'cached_route_' optional is populated since this function can be called
   // early via sendLocalReply(), before the cached route is populated.
@@ -1599,7 +1584,11 @@ Tracing::Span& ConnectionManagerImpl::ActiveStream::activeSpan() {
   }
 }
 
-Tracing::Config& ConnectionManagerImpl::ActiveStream::tracingConfig() { return *this; }
+Tracing::Config* ConnectionManagerImpl::ActiveStream::tracingConfig() {
+  TracingConnectionManagerConfig* result =
+      const_cast<TracingConnectionManagerConfig*>(connection_manager_.config_.tracingConfig());
+  return static_cast<Envoy::Tracing::Config*>(result);
+}
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 
