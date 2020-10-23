@@ -8,19 +8,6 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class RecordExtractorImpl : public RecordExtractor {
-public:
-  std::vector<RecordFootmark>
-  computeFootmarks(const std::vector<TopicProduceData>& data) const override;
-
-private:
-  std::vector<RecordFootmark> computeFootmarksForTopic(const std::string& topic,
-                                                       const int32_t partition,
-                                                       const Bytes& records) const;
-  std::vector<RecordFootmark> processMagic2(const std::string& topic, const int32_t partition,
-                                            absl::string_view sv) const;
-};
-
 std::vector<RecordFootmark>
 RecordExtractorImpl::computeFootmarks(const std::vector<TopicProduceData>& data) const {
   std::vector<RecordFootmark> result;
@@ -38,108 +25,136 @@ RecordExtractorImpl::computeFootmarks(const std::vector<TopicProduceData>& data)
 
 std::vector<RecordFootmark>
 RecordExtractorImpl::computeFootmarksForTopic(const std::string& topic, const int32_t partition,
-                                              const Bytes& records) const {
+                                              const Bytes& bytes) const {
+
+  // Reference implementation:
   // org.apache.kafka.common.record.DefaultRecordBatch.writeHeader(ByteBuffer, long, int, int, byte,
   // CompressionType, TimestampType, long, long, long, short, int, boolean, boolean, int, int)
-  const char* ptr = reinterpret_cast<const char*>(records.data());
-  absl::string_view sv = {ptr, records.size()};
+  absl::string_view data = { reinterpret_cast<const char*>(bytes.data()) , bytes.size()};
 
-  unsigned int step = /* BaseOffset */ 8 + /* Length */ 4 + /* PartitionLeaderEpoch */ 4;
-  if (sv.length() < step) {
-    return {};
+  // Fields common to any records payload. Magic will follow.
+  const unsigned int common_fields_size = /* BaseOffset */ 8 + /* Length */ 4 + /* PartitionLeaderEpoch */ 4;
+  if (data.length() < common_fields_size) {
+    throw EnvoyException(fmt::format("record batch for [{}-{}] is too short (no common fields): {}", topic, partition, data.length()));
   }
-  sv = {sv.data() + step, sv.length() - step};
+  // Let's skip these common fields, because we are not using them.
+  data = {data.data() + common_fields_size, data.length() - common_fields_size};
 
-  /* Magic */
+  // Extract magic.
+  // Magic tells us what is the format of records present in the byte array.
   Int8Deserializer magic_deserializer;
-  magic_deserializer.feed(sv);
-
+  magic_deserializer.feed(data);
   if (magic_deserializer.ready()) {
     int8_t magic = magic_deserializer.get();
-    switch (magic) {
-    case 0:
-    case 1:
-      return {};
-    case 2:
-      return processMagic2(topic, partition, sv);
-    default:
-      return {};
+    if (2 == magic) {
+      // Magic format introduced around Kafka 1.0.0 and still used with Kafka 2.4.
+      // We can extract the records out of the record batch.
+      return extractRecordsOutOfBatchWithMagicEqualTo2(topic, partition, data);
+    } else {
+      // Old client sending old magic, or Apache Kafka introducing new magic.
+      throw EnvoyException(fmt::format("unknown magic value in record batch for [{}-{}]: {}", topic, partition, magic));
     }
+  } else {
+    throw EnvoyException(fmt::format("magic byte is not present in record batch for [{}-{}]", topic, partition));
   }
-  return {};
+}
+
+std::vector<RecordFootmark> RecordExtractorImpl::extractRecordsOutOfBatchWithMagicEqualTo2(const std::string& topic,
+                                                               const int32_t partition,
+                                                               absl::string_view data) const {
+
+  // Not going to reuse the information in these fields, because we are going to republish.
+  unsigned int ignored_fields_size = /* CRC */ 4 + /* Attributes */ 2 + /* LastOffsetDelta */ 4 +
+                       /* FirstTimestamp */ 8 + /* MaxTimestamp */ 8 + /* ProducerId */ 8 +
+                       /* ProducerEpoch */ 2 + /* BaseSequence */ 4 + /* RecordCount */ 4;
+
+  if (data.length() < ignored_fields_size) {
+    throw EnvoyException(fmt::format("record batch for [{}-{}] is too short (no attribute fields): {}", topic, partition, data.length()));
+  }
+  data = {data.data() + ignored_fields_size, data.length() - ignored_fields_size};
+
+  // We have managed to consume all the fancy bytes, now it's time to get to records.
+
+  std::vector<RecordFootmark> result;
+  while (!data.empty()) {
+    const RecordFootmark record = extractRecord(topic, partition, data);
+    result.push_back(record);
+  }
+  return result;
 }
 
 // Helper function to get the data (key, value) out of record.
-absl::string_view comsumeBytes(absl::string_view& input) {
+static absl::string_view comsumeBytes(absl::string_view& input) {
   VarInt32Deserializer length_deserializer;
   length_deserializer.feed(input);
+  if (!length_deserializer.ready()) {
+    throw EnvoyException("byte array length not present");
+  }
   const int32_t length = length_deserializer.get();
+  // Length can be negative (null value was published by client).
+  if (-1 == length) {
+    return {};
+  }
+
   if (length >= 0) {
-    const absl::string_view result = {input.data(),
-                                      static_cast<absl::string_view::size_type>(length)};
+    if (length > input.size()) {
+      throw EnvoyException(fmt::format("byte array length larger than data provided: {} vs {}", length, input.size()));
+    }
+    const absl::string_view result = {input.data(), static_cast<absl::string_view::size_type>(length)};
     input = {input.data() + length, input.length() - length};
     return result;
   } else {
-    return {};
+    throw EnvoyException(fmt::format("byte array length less than -1: {}", length));
   }
 }
 
-std::vector<RecordFootmark> RecordExtractorImpl::processMagic2(const std::string& topic,
-                                                               const int32_t partition,
-                                                               absl::string_view sv) const {
+RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, const int32_t partition, absl::string_view& data) const {
+  // The reference implementation is:
+  // org.apache.kafka.common.record.DefaultRecord.writeTo(DataOutputStream, int, long, ByteBuffer, ByteBuffer, Header[])
 
-  unsigned int step2 = /* CRC */ 4 + /* Attributes */ 2 + /* LastOffsetDelta */ 4 +
-                       /* FirstTimestamp */ 8 + /* MaxTimestamp */ 8 + /* ProducerId */ 8 +
-                       /* ProducerEpoch */ 2 + /* BaseSequence */ 4;
-  if (sv.length() < step2) {
-    return {};
+  VarInt32Deserializer length;
+  length.feed(data);
+  if (!length.ready()) {
+    throw EnvoyException(fmt::format("record for [{}-{}] is too short (no length)", topic, partition));
   }
-  sv = {sv.data() + step2, sv.length() - step2};
+  const int32_t len = length.get();
 
-  Int32Deserializer count_des;
-  count_des.feed(sv);
+  const absl::string_view expected_end_of_record = {data.data() + len, data.length() - len};
 
-  std::vector<RecordFootmark> result;
-  while (!sv.empty()) {
-
-    // org.apache.kafka.common.record.DefaultRecord.writeTo(DataOutputStream, int, long, ByteBuffer,
-    // ByteBuffer, Header[])
-
-    VarInt32Deserializer length;
-    length.feed(sv);
-    const int32_t len = length.get();
-    // ENVOY_LOG(trace, "record len = {}", len);
-
-    const absl::string_view expected_end_of_record = {sv.data() + len, sv.length() - len};
-
-    Int8Deserializer attributes;
-    attributes.feed(sv);
-    VarInt64Deserializer tsDelta;
-    tsDelta.feed(sv);
-    VarUInt32Deserializer offsetDelta;
-    offsetDelta.feed(sv);
-
-    absl::string_view key = comsumeBytes(sv);
-    absl::string_view value = comsumeBytes(sv);
-
-    VarInt32Deserializer headers_count_deserializer;
-    headers_count_deserializer.feed(sv);
-    const int32_t headers_count = headers_count_deserializer.get();
-    if (headers_count < 0) {
-      // boom
-    }
-    for (int32_t i = 0; i < headers_count; ++i) {
-      comsumeBytes(sv); // header key
-      comsumeBytes(sv); // header value
-    }
-
-    if (sv != expected_end_of_record) {
-      return {};
-    }
-
-    result.emplace_back(topic, partition, key, value);
+  Int8Deserializer attributes;
+  attributes.feed(data);
+  VarInt64Deserializer tsDelta;
+  tsDelta.feed(data);
+  VarUInt32Deserializer offsetDelta;
+  offsetDelta.feed(data);
+  if (!attributes.ready() || !tsDelta.ready() || !offsetDelta.ready()) {
+    throw EnvoyException(fmt::format("attributes not present in record for [{}-{}]", topic, partition));
   }
-  return result;
+
+  absl::string_view key = comsumeBytes(data);
+  absl::string_view value = comsumeBytes(data);
+
+  VarInt32Deserializer headers_count_deserializer;
+  headers_count_deserializer.feed(data);
+  if (!headers_count_deserializer.ready()) {
+    throw EnvoyException(fmt::format("header count not present in record for [{}-{}]", topic, partition));
+  }
+  const int32_t headers_count = headers_count_deserializer.get();
+  if (headers_count < 0) {
+    throw EnvoyException(fmt::format("invalid header count in record for [{}-{}]: {}", topic, partition, headers_count));
+  }
+  for (int32_t i = 0; i < headers_count; ++i) {
+    comsumeBytes(data); // header key
+    comsumeBytes(data); // header value
+  }
+
+  if (data == expected_end_of_record) {
+    // We have consumed everything nicely.
+    return RecordFootmark{ topic, partition, key, value };
+  } else {
+    // Bad data - there are bytes left.
+    throw EnvoyException(fmt::format("data left after consuming record for [{}-{}]: {}", topic, partition, data.length()));
+  }
 }
 
 ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,

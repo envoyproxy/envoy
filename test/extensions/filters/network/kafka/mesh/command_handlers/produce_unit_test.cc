@@ -1,12 +1,18 @@
+#include "extensions/filters/network/kafka/external/requests.h"
 #include "extensions/filters/network/kafka/external/responses.h"
 #include "extensions/filters/network/kafka/mesh/command_handlers/produce.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include <set>
+
+#include "test/test_common/utility.h"
+
 using testing::_;
 using testing::Return;
 using testing::ReturnRef;
+using testing::Not;
 
 namespace Envoy {
 namespace Extensions {
@@ -202,6 +208,154 @@ TEST_F(ProduceUnitTest, ShouldIgnoreMementoFromAnotherRequest) {
   const DeliveryMemento dm = {nullptr, RdKafka::ERR_NO_ERROR, 42};
   EXPECT_FALSE(testee->accept(dm));
   EXPECT_FALSE(testee->finished());
+}
+
+// Tests for record extractor.
+
+MATCHER_P3(HasRecords, topic, partition, expected, "") {
+  size_t expected_count = expected;
+  std::set<absl::string_view> saved_key_pointers = {};
+  std::set<absl::string_view> saved_value_pointers = {};
+  size_t count = 0;
+
+  for (const auto record : arg) {
+    if (record.topic_ == topic && record.partition_ == partition) {
+      saved_key_pointers.insert(record.key_);
+      saved_value_pointers.insert(record.value_);
+      ++count;
+    }
+  }
+
+  if (expected_count != count) {
+    return false;
+  }
+  if (expected_count != saved_key_pointers.size()) {
+    return false;
+  }
+  return saved_key_pointers.size() == saved_value_pointers.size();
+}
+
+Bytes makeGoodRecordBatch() {
+  // Record batch bytes get ignored (apart from magic field), so we can put 0 there.
+  Bytes result = Bytes(16 + 1 + 44);
+  result[16] = 2; // Record batch magic value.
+  // 61
+  Bytes real_data = {
+    /* len = 36 as varint32 */ 72,
+    /* attr */ 0,
+    /* tsdelta */ 0,
+    /* offsetdelta */ 0,
+    /* key_len = 5 as varint32 */ 10, 107, 107, 107, 107, 107,
+    /* value len = 5 as varint32 */ 10, 118, 118, 118, 118, 118,
+    /* headers_count = 2 as varint32 */ 4,
+    /* header_k len = 3 as varint32 */ 6, 49, 49, 49,
+    /* header_v len = 5 as varint32 */ 10, 97, 97, 97, 97, 97,
+    /* header_k len = 3 as varint32 */ 6, 50, 50, 50,
+    /* header_v len = 5 as varint32 */ 10, 98, 98, 98, 98, 98
+  };
+  result.insert(result.end(), real_data.begin(), real_data.end());
+  return result;
+}
+
+TEST(RecordExtractor, shouldProcessRecordData) {
+  // given
+  const RecordExtractorImpl testee;
+
+  const PartitionProduceData t1_ppd1 = { 0, makeGoodRecordBatch() };
+  const PartitionProduceData t1_ppd2 = { 1, makeGoodRecordBatch() };
+  const PartitionProduceData t1_ppd3 = { 2, makeGoodRecordBatch() };
+  const TopicProduceData tpd1 = { "topic1", { t1_ppd1, t1_ppd2, t1_ppd3 } };
+
+  // Weird input from client, protocol allows sending null value as bytes array.
+  const PartitionProduceData t2_ppd = { 20, absl::nullopt };
+  const TopicProduceData tpd2 = { "topic2", { t2_ppd } };
+
+  const std::vector<TopicProduceData> input = { tpd1, tpd2 };
+
+  // when
+  const auto result = testee.computeFootmarks(input);
+
+  // then
+  EXPECT_THAT(result, HasRecords("topic1", 0, 1));
+  EXPECT_THAT(result, HasRecords("topic1", 1, 1));
+  EXPECT_THAT(result, HasRecords("topic1", 2, 1));
+  EXPECT_THAT(result, HasRecords("topic2", 20, 0));
+}
+
+/**
+ * Helper function to make record batch (batch contains 1+ records).
+ * We use 'stage' parameter to make it a single function with various failure modes.
+ */
+const std::vector<TopicProduceData> makeTopicProduceData(const unsigned int stage) {
+  Bytes bytes = makeGoodRecordBatch();
+  if (1 == stage) {
+    // No common fields before magic.
+    bytes.erase(bytes.begin(), bytes.end());
+  }
+  if (2 == stage) {
+    // No magic.
+    bytes.erase(bytes.begin() + 16, bytes.end());
+  }
+  if (3 == stage) {
+    // Bad magic.
+    bytes[16] = 42;
+  }
+  if (4 == stage) {
+    // No common fields after magic.
+    bytes.erase(bytes.begin() + 17, bytes.end());
+  }
+  if (5 == stage) {
+    // No record length after common fields.
+    bytes[61] = 128;
+    bytes.erase(bytes.begin() + 62, bytes.end());
+  }
+  if (6 == stage) {
+    // Attributes fields missing.
+    bytes.erase(bytes.begin() + 62, bytes.end());
+  }
+  if (7 == stage) {
+    bytes[77] = 128;
+    bytes.erase(bytes.begin() + 77, bytes.end());
+  }
+  if (8 == stage) {
+    // Negative variable length integer.
+    bytes[77] = 17;
+  }
+  if (9 == stage) {
+    // Last header value is going to be shorter, so there will be one unconsumed byte.
+    bytes[92] = 8;
+  }
+  if (10 == stage) {
+    bytes[92] = 128;
+    bytes.erase(bytes.begin() + 92, bytes.end());
+  }
+  if (11 == stage) {
+    // Data length is said to be 16, while there will be only 5 bytes in last header.
+    bytes[92] = 32;
+  }
+  if (12 == stage) {
+    // Negative variable length integer.
+    bytes[92] = 17;
+  }
+  const PartitionProduceData ppd = { 0, bytes };
+  const TopicProduceData tpd = { "topic", { ppd }};
+  return { tpd };
+}
+
+TEST(RecordExtractor, shouldHandleFailureScenarios) {
+  const RecordExtractorImpl testee;
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(1)), EnvoyException, "no common fields");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(2)), EnvoyException, "magic byte is not present");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(3)), EnvoyException, "unknown magic value");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(4)), EnvoyException, "no attribute fields");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(5)), EnvoyException, "no length");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(6)), EnvoyException, "attributes not present");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(7)), EnvoyException, "header count not present");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(8)), EnvoyException, "invalid header count");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(9)), EnvoyException, "data left after consuming record");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(10)), EnvoyException, "byte array length not present");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(11)), EnvoyException, "byte array length larger than data provided");
+  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(12)), EnvoyException, "byte array length less than -1");
 }
 
 } // namespace
