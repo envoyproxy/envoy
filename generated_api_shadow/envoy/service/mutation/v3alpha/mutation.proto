@@ -43,10 +43,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    was configured to ignore errors.
 //
 // In other words, the process is a request/response conversation, but
-// using a gRPC stream to make it easier for the client and server to
-// maintain state. The exception is the "SEND_BODY_ASYNC" command,
-// which requests that the server keep sending body chunks without waiting
-// for a response.
+// using a gRPC stream to make it easier for the server to
+// maintain state.
 
 service Mutation {
   // This begins the bidirectional stream that Envoy will use to
@@ -61,215 +59,167 @@ service Mutation {
 // to a mutation server.
 // [#next-free-field: 8]
 message MutationRequest {
-  // If true, then Envoy requires that the server send one MutationResponse message
-  // back up the stream in response to this message -- otherwise, Envoy will
-  // never resume processing the filter chain. In practice, this will always
-  // be "true" unless the server or the user has configured the filter
-  // to run in "async mode."
+  // If true, then the server must either respond with exactly one MutationResponse
+  // message or close the stream. If false, the server must not respond with
+  // an additional message, although it may still close the stream.
+  // How this is set depends on how the ProcessingMode is configured, or if
+  // the server requests a change in the processing mode.
   bool response_required = 1;
 
-  // Information about the HTTP request, sent when the decodeHeaders callback
-  // is invoked on the Envoy filter.
-  Request request = 2;
-
-  // Information about the HTTP response, sent when the encodeHeaders callback
-  // is invoked on the Envoy filter.
-  Response response = 3;
-
-  // A chunk of the HTTP request body. This is only sent if the server
-  // requested it.
-  Body request_body = 4;
-
-  // A chunk of the HTTP response body, if the server requested it.
-  Body response_body = 5;
-
-  // The HTTP trailers for the request path. These are only sent if
-  // the server requested them.
-  config.core.v3.HeaderMap request_trailers = 6;
-
-  // The HTTP trailers for the response path, sent if the server
-  // requested them.
-  config.core.v3.HeaderMap response_trailers = 7;
-}
-
-// The following are commands that the external server can send back to
-// the proxy to direct the next phase of processing.
-
-// The server is done with the request and response, and no further
-// filters should be invoked. This is typically used with the
-// "CompleteResponse" to return an error.
-message StopCommand {
-}
-
-// The server is done with the request. Continue processing
-// and do not consult the server again for this request.
-message ContinueRequestCommand {
-}
-
-// The server is done with the response. Do not consult the server
-// again.
-message ContinueResponseCommand {
-}
-
-// Request that Envoy next send a Body message downstream
-// containing either the next chunk of the request body available, or an end-of-stream.
-// Once this is returned, it will no longer be possible to modify the
-// message headers.
-message SendRequestBodyChunkCommand {
-}
-
-// Send the next chunk of the response body.
-message SendResponseBodyChunkCommand {
-}
-
-// Request that Envoy will buffer the entire request message body in memory
-// subject to the currently-configured body buffer limit, and send a
-// single Body message downstream containing the entire message body.
-// It is still possible for the server to modify the message headers
-// with the next upstream message.
-message SendBufferedRequestBodyCommand {
-}
-
-// Request that Envoy buffer and send the response body in a single chunk.
-message SendBufferedResponseBodyCommand {
-}
-
-// Request that Envoy will send the HTTP request trailers when they are
-// available. Once trailers have been requested, no more bodies
-// will be delivered, so this must be sent after all desired body chunks are
-// desired.
-message SendRequestTrailersCommand {
-}
-
-// Request that Envoy send the response trailers when available.
-message SendResponseTrailersCommand {
-}
-
-// The mutation server may respond with zero or more of these responses
-// before closing the stream.
-// [#next-free-field: 16]
-message MutationResponse {
-  oneof command {
+  oneof request {
     option (validate.required) = true;
 
-    StopCommand stop = 1;
+    // Information about the HTTP request headers, as well as peer info and additional
+    // properties. If "response_required" is set, the server must send back a
+    // HeaderResponse message, an ImmediateResponse message, or close the stream.
+    HttpHeaders request_headers = 2;
 
-    ContinueRequestCommand continue_request = 2;
+    // Information about the HTTP response headers, as well as peer info and additional
+    // properties. If "response_required" is set, the server must send back a
+    // HeaderResponse message or close the stream.
+    HttpHeaders response_headers = 3;
 
-    ContinueResponseCommand continue_response = 3;
+    // A chunk of the HTTP request body. This is only sent if the server
+    // requested it. If "response_required" is set, the server must send back
+    // a BodyResponse message, an ImmediateResponse message, or close the stream.
+    HttpBody request_body = 4;
 
-    SendRequestBodyChunkCommand send_request_body_chunk = 4;
+    // A chunk of the HTTP request body. This is only sent if the server
+    // requested it. If "response_required" is set, the server must send back
+    // a BodyResponse message or close the stream.
+    HttpBody response_body = 5;
 
-    SendResponseBodyChunkCommand send_response_body_chunk = 5;
+    // The HTTP trailers for the request path. These are only sent if
+    // the server requested them. If "response_required" is set, the server
+    // must send back a TrailerResponse message or close the stream.
+    HttpTrailers request_trailers = 6;
 
-    SendBufferedRequestBodyCommand send_buffered_request_body = 6;
-
-    SendBufferedResponseBodyCommand send_buffered_response_body = 7;
-
-    SendRequestTrailersCommand send_request_trailers = 8;
-
-    SendResponseTrailersCommand send_response_trailers = 9;
+    // The HTTP trailers for the response path. These are only sent if
+    // the server requested them. If "response_required" is set, the server
+    // must send back a TrailerResponse message or close the stream.
+    HttpTrailers response_trailers = 7;
   }
-
-  // Replace the entire HTTP response (whether on the request or on the
-  // response path) with the contents of the CompleteResponse message.
-  // If a StopCommand command is set, then send this response back immediately
-  // to the client with no additional filter processing.
-  CompleteResponse complete_response = 10;
-
-  // Add or replace HTTP headers. This will be ignored after SendXXXBodyChunkCommand has
-  // been sent. If SendXXXTrailers was previously sent, then
-  // modify the trailers instead.
-  repeated config.core.v3.HeaderValueOption set_headers = 11;
-
-  // Remove these HTTP headers. This will be ignored after SendXXXBodyChunk
-  // has been sent. If SendXXXTrailers was previously sent, then
-  // modify the trailers instead.
-  repeated string remove_headers = 12;
-
-  // Replace some or all of the last message body received with a new
-  // set of bytes. This will be ignored unless the previous message sent
-  // by the client is a "Body" request.
-  BodyMutation body_mutation = 13;
-
-  // Add new metadata to the Envoy context
-  google.protobuf.Struct new_metadata = 14;
-
-  // Change how and if the filter waits for responses from the server
-  ProcessingModeChange async_mode_change = 15;
 }
 
-// This message is sent to the mutation server when the HTTP request is
-// first received.
-// [#next-free-field: 9]
-message Request {
-  // A unique ID that will match the one sent in the "Response" message
-  string id = 1;
+// For every MutationRequest received by the server with the "response_required" field
+// set, the server must send back exactly one MutationResponse message.
+// In addition, the server may send back a message with the "async_mode_change"
+// message at any time.
+// [#next-free-field: 11]
+message MutationResponse {
+  oneof response {
+    // The server must send back this message in response to a message with the
+    // "request_headers" field set.
+    HeaderResponse request_header_response = 1;
 
-  // The HTTP request method, such as `GET`, `POST`.
-  string method = 2;
+    // The server must send back this message in response to a message with the
+    // "response_headers" field set.
+    HeaderResponse response_header_response = 2;
 
+    // The server must send back this message in response to a message with
+    // the "request_body" field set.
+    BodyResponse request_body_response = 3;
+
+    // The server must send back this message in response to a message with
+    // the "response_body" field set.
+    BodyResponse response_body_response = 4;
+
+    // The server must send back this message in response to a message with
+    // the "request_trailers" field set.
+    HeaderResponse request_trailer_response = 5;
+
+    // The server must send back this message in response to a message with
+    // the "response_trailers" field set.
+    HeaderResponse response_trailer_response = 6;
+
+    // The server can respond with this message instead of one of the above
+    // after a "request_headers" or "request_body" message. It causes an error
+    // to be immediately sent to the client. It is ignored after
+    // other message types.
+    ImmediateResponse immediate_response = 7;
+  }
+
+  // Add new metadata to the Envoy context
+  google.protobuf.Struct new_metadata = 8;
+
+  // Override how parts of the HTTP request and response are processed
+  // for the duration of this particular request/response only. Servers
+  // may use this to intelligently control how requests are processed
+  // based on the headers and other metadata that they see.
+  envoy.extensions.filters.http.mutation.v3alpha.ProcessingMode mode_override = 9;
+
+  // Change how and if the filter waits for responses from the server
+  // for future messages. Servers may use this to switch between
+  // synchronous and asynchronous processing modes based on what they see.
+  // A message with this field may be sent even if none of the "oneof" fields
+  // have been sent, and it may be sent out-of-band with respect to
+  // the other messages if desired.
+  ProcessingModeChange mode_change = 10;
+}
+
+// The following are messages that are sent to the server.
+
+// This message is sent to the mutation server when the HTTP request and responses
+// are first received.
+message HttpHeaders {
   // The HTTP request headers. If multiple headers share the same key, they
   // must be merged according to the HTTP spec. All header keys must be
   // lower-cased, because HTTP header keys are case-insensitive.
-  config.core.v3.HeaderMap headers = 3;
+  config.core.v3.HeaderMap headers = 1;
 
-  // The request target, as it appears in the first line of the HTTP request. This includes
-  // the URL path and query-string. No decoding is performed.
-  string path = 4;
-
-  // The HTTP request `Host` or 'Authority` header value.
-  string host = 5;
-
-  // The HTTP URL scheme, such as `http` and `https`.
-  string scheme = 6;
-
-  // Information about the downstream client's connection
-  auth.v3.AttributeContext.Peer client_info = 7;
+  // Information about the client's connection -- downstream if this is
+  // a request and upstream if it is a response.
+  auth.v3.AttributeContext.Peer client_info = 2;
 
   // The values of properties selected by the "request_properties"
   // list in the configuration. Each entry in the map is the
   // value of the specified property.
-  map<string, google.protobuf.Struct> properties = 8;
-}
+  map<string, google.protobuf.Struct> properties = 3;
 
-// This message is sent to the mutation server when the HTTP response is first
-// received.
-// [#next-free-field: 6]
-message Response {
-  // A unique ID that will match the one sent in the "Request" message
-  string id = 1;
-
-  // The HTTP status on the response
-  int32 status_code = 2;
-
-  // The HTTP headers
-  config.core.v3.HeaderMap headers = 3;
-
-  // Information about the upstream service's connection
-  auth.v3.AttributeContext.Peer destination_info = 4;
-
-  // The values of properties selected by the "response_properties"
-  // list in the configuration. Each entry in the map is the
-  // value of the specified property.
-  map<string, google.protobuf.Struct> properties = 5;
+  // If true, then there is no message body associated with this
+  // request or response.
+  bool no_body = 4;
 }
 
 // This message contains the message body that Envoy sends to the mutation service.
-message Body {
+message HttpBody {
   bytes body = 1;
 
   bool end_of_stream = 2;
 }
 
+// This message contains the trailers.
+message HttpTrailers {
+  config.core.v3.HeaderMap trailers = 1;
+}
+
+// The following are messages that may be sent back by the server.
+
+// This message must be sent in response to a RequestHeaders or ResponseHeaders
+// message.
+message HeaderResponse {
+  // Add or replace HTTP headers.
+  repeated config.core.v3.HeaderValueOption set_headers = 1;
+
+  // Remove these HTTP headers.
+  repeated string remove_headers = 2;
+}
+
+message BodyResponse {
+  // Add or replace HTTP headers.
+  repeated config.core.v3.HeaderValueOption set_headers = 1;
+
+  // Remove these HTTP headers.
+  repeated string remove_headers = 2;
+
+  // Request that the last body chunk delivered be modified.
+  BodyMutation body_mutation = 3;
+}
+
 // This message completely replaces the response.
-// If a STOP was also returned, then short-circuit the
-// rest of the filter processing, and if on the request path,
-// return this response directly back to the client.
-//
-// Otherwise, replace everything
-// and let other filters run as they would like.
-message CompleteResponse {
+// It will immediately return the data specified here to the downstream
+// system and stop further filter processing.
+message ImmediateResponse {
   type.v3.HttpStatus status = 1 [(validate.rules).message = {required: true}];
 
   repeated config.core.v3.HeaderValue headers = 2;
@@ -280,7 +230,7 @@ message CompleteResponse {
 }
 
 // Change all or part of the message body by replacing the portion
-// of the original body denoted by "offset" and "length" with "body."
+// of the last chunk received denoted by "offset" and "length" with "body."
 message BodyMutation {
   uint32 offset = 1;
 
@@ -297,6 +247,7 @@ message ProcessingModeChange {
   envoy.extensions.filters.http.mutation.v3alpha.ProcessingMode async_mode = 1;
 
   // If set, then the change will be reverted back to the configured async_mode
-  // after this time.
+  // after this time. If not set, then the mode change request will be
+  // permanent.
   google.protobuf.Duration duration = 2;
 }

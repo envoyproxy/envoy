@@ -6,6 +6,8 @@ import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/extensions/filters/http/mutation/v3alpha/processing_mode.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -50,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   headers, bodies, or both, and then decide to switch to a synchronous processing
 //   mode, either permanently or temporarily.
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Mutation {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -73,8 +75,15 @@ message Mutation {
   // response message.
   repeated string response_properties = 5;
 
-  // Specifies whether the filter waits for a response from the server after
-  // sending each part of the HTTP request and response data. By default,
-  // the filter runs in "SYNC" mode.
+  // Specifies which parts of the HTTP request and response are sent to the remote
+  // server by default, whether they are sent synchronously or asynchronously,
+  // and whether the body is sent in chunks or buffers. The default processing
+  // mode sends request and response headers synchronously and nothing else.
   ProcessingMode processing_mode = 6;
+
+  // Specifies the timeout for each individual message sent on the stream. Whenever
+  // the proxy sends a message on the stream that requires a response, it will
+  // reset this timer, and will stop processing and return an error (subject
+  // to the processing mode) if the timer expires. Default is 200 ms.
+  google.protobuf.Duration message_timeout = 7;
 }

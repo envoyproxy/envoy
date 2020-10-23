@@ -15,49 +15,66 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.mutation]
 
 // This configuration describes how a mutation filter processes the HTTP
-// request or response -- specifically, whether it is done synchronously
-// or asynchronously.
+// request or response, including how requests and responses are
+// sent to the remote server.
 
+// [#next-free-field: 9]
 message ProcessingMode {
-  enum Mode {
-    // In the default "sync" mode, a message is sent to the filter server
-    // as soon as decodeHeaders is called, and the filter waits for a response
-    // from the server before continuing.
-    SYNC = 0;
+  enum SyncMode {
+    // The default SyncMode depends on which part of the message is being set.
+    SYNC_DEFAULT = 0;
 
-    // In "async" mode, messages are sent to the filter server and the filter
-    // does not wait for a response. By default the request and response headers,
-    // all body chunks, and trailers are sent. An AsyncParams object can be used
-    // to customize this behavior.
-    ASYNC = 1;
+    // Send the header and wait for a response before continuing with
+    // the filter chain.
+    SYNC = 1;
+
+    // Send the header but to not expect a response, continuing immediately
+    // with the filter chain.
+    ASYNC = 2;
+
+    // Do not send the header.
+    SKIP = 3;
   }
 
-  Mode mode = 1;
+  enum BodyMode {
+    // The default SyncMode depends on which part of the message is being set.
+    BODY_DEFAULT = 0;
 
-  // The optional AsyncParams object controls how data is delivered
-  // to the server in ASYNC mode. It is ignored in SYNC mode.
-  // If this is not set, then in ASYNC mode the filter behaves as if
-  // all flags on AsyncParameters are "true."
-  AsyncParams params = 2;
-}
+    // Send each chunk of the body separately to the server.
+    CHUNKED = 1;
 
-// [#next-free-field: 7]
-message AsyncParams {
-  // If true, send request headers asynchronously
-  bool request_headers = 1;
+    // Buffer the message body in memory and send the entire body in one
+    // chunk. If the body exceeds the configured buffer limit, then the
+    // downstream system will receive an error.
+    BUFFERED = 2;
 
-  // If true, send request body chunks asynchronously
-  bool request_body_chunks = 2;
+    // Buffer the message body in memory and send the entire body in one
+    // chunk. If the body exceeds the configured buffer limit, then the body contents
+    // up to the buffer limit will be sent.
+    BUFFERED_PARTIAL = 3;
+  }
 
-  // If true, send request trailers asynchronously
-  bool request_trailers = 3;
+  // How to handle the request header. Default is "SYNC".
+  ProcessingMode request_header_mode = 1;
 
-  // If true, send response headers asynchronously
-  bool response_headers = 4;
+  // How to handle the response header. Default is "SYNC".
+  ProcessingMode response_header_mode = 2;
 
-  // If true, send response body chunks asynchronously
-  bool response_body_chunks = 5;
+  // How to handle the request body. Default is "SKIP".
+  ProcessingMode request_body_mode = 3;
 
-  // If true, send response trailers asynchronously
-  bool response_trailers = 6;
+  // How to send request body chunks if mode is not "SKIP".
+  BodyMode request_body_chunk_mode = 4;
+
+  // How do handle the response body. Default is "SKIP".
+  ProcessingMode response_body_mode = 5;
+
+  // How to send response body chunks if the mode is not "SKIP".
+  BodyMode response_body_chunk_mode = 6;
+
+  // How to handle the request trailers. Default is "SKIP".
+  ProcessingMode request_trailer_mode = 7;
+
+  // How to handle the response trailers. Default is "SKIP".
+  ProcessingMode response_trailer_mode = 8;
 }
