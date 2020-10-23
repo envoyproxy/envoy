@@ -10,6 +10,7 @@
 #include "common/grpc/common.h"
 #include "common/grpc/google_grpc_creds_impl.h"
 #include "common/grpc/google_grpc_utils.h"
+#include "common/router/header_parser.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "grpcpp/support/proto_buffer_reader.h"
@@ -79,15 +80,18 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              const envoy::config::core::v3::GrpcService& config,
                                              Api::Api& api, const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
-      initial_metadata_(config.initial_metadata()), scope_(scope),
+      scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)) {
+          config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
+      metadata_parser_(
+          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
   std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
   stub_ = stub_factory.createStub(channel);
+  scope_->counterFromStatName(stat_names.google_grpc_client_creation_).inc();
   // Initialize client stats.
   // TODO(jmarantz): Capture these names in async_client_manager_impl.cc and
   // pass in a struct of StatName objects so we don't have to take locks here.
@@ -166,12 +170,8 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
           : gpr_inf_future(GPR_CLOCK_REALTIME);
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
-  for (const auto& header_value : parent_.initial_metadata_) {
-    ctxt_.AddMetadata(header_value.key(), header_value.value());
-  }
-  // Due to the different HTTP header implementations, we effectively double
-  // copy headers here.
   auto initial_metadata = Http::RequestHeaderMapImpl::create();
+  parent_.metadata_parser_->evaluateHeaders(*initial_metadata, options_.parent_context.stream_info);
   callbacks_.onCreateInitialMetadata(*initial_metadata);
   initial_metadata->iterate([this](const Http::HeaderEntry& header) {
     ctxt_.AddMetadata(std::string(header.key().getStringView()),

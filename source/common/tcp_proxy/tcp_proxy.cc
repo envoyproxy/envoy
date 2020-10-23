@@ -22,6 +22,7 @@
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/application_protocol.h"
+#include "common/network/proxy_protocol_filter_state.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
@@ -122,7 +123,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
-      random_generator_(context.random()) {
+      random_generator_(context.api().randomGenerator()) {
 
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
@@ -224,7 +225,7 @@ Filter::~Filter() {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
 
-  ASSERT(upstream_handle_ == nullptr);
+  ASSERT(generic_conn_pool_ == nullptr);
   ASSERT(upstream_ == nullptr);
 }
 
@@ -414,6 +415,18 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (downstreamConnection()) {
+    if (!read_callbacks_->connection()
+             .streamInfo()
+             .filterState()
+             ->hasData<Network::ProxyProtocolFilterState>(
+                 Network::ProxyProtocolFilterState::key())) {
+      read_callbacks_->connection().streamInfo().filterState()->setData(
+          Network::ProxyProtocolFilterState::key(),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              downstreamConnection()->remoteAddress(), downstreamConnection()->localAddress()}),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
   }
@@ -429,24 +442,17 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
 bool Filter::maybeTunnel(const std::string& cluster_name) {
   if (!config_->tunnelingConfig()) {
-    Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-        cluster_name, Upstream::ResourcePriority::Default, this);
-    if (conn_pool) {
+    generic_conn_pool_ =
+        std::make_unique<TcpConnPool>(cluster_name, cluster_manager_, this, *upstream_callbacks_);
+    if (generic_conn_pool_->valid()) {
       connecting_ = true;
       connect_attempts_++;
-
-      // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
-      // valid connection handle. If newConnection fails inline it may result in attempting to
-      // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
-      // first call to newConnection will return null and the inner call will persist.
-      Tcp::ConnectionPool::Cancellable* handle = conn_pool->newConnection(*this);
-      if (handle) {
-        ASSERT(upstream_handle_.get() == nullptr);
-        upstream_handle_ = std::make_shared<TcpConnectionHandle>(handle);
-      }
+      generic_conn_pool_->newStream(this);
       // Because we never return open connections to the pool, this either has a handle waiting on
       // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
       return true;
+    } else {
+      generic_conn_pool_.reset();
     }
   } else {
     auto* cluster = cluster_manager_.get(cluster_name);
@@ -461,28 +467,23 @@ bool Filter::maybeTunnel(const std::string& cluster_name) {
                        "http2_protocol_options on the cluster.");
       return false;
     }
-    Http::ConnectionPool::Instance* conn_pool = cluster_manager_.httpConnPoolForCluster(
-        cluster_name, Upstream::ResourcePriority::Default, absl::nullopt, this);
-    if (conn_pool) {
-      upstream_ = std::make_unique<HttpUpstream>(*upstream_callbacks_,
-                                                 config_->tunnelingConfig()->hostname());
-      HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-      Http::ConnectionPool::Cancellable* cancellable =
-          conn_pool->newStream(http_upstream->responseDecoder(), *this);
-      if (cancellable) {
-        ASSERT(upstream_handle_.get() == nullptr);
-        upstream_handle_ = std::make_shared<HttpConnectionHandle>(cancellable);
-      }
+
+    generic_conn_pool_ = std::make_unique<HttpConnPool>(cluster_name, cluster_manager_, this,
+                                                        config_->tunnelingConfig()->hostname(),
+                                                        *upstream_callbacks_);
+    if (generic_conn_pool_->valid()) {
+      generic_conn_pool_->newStream(this);
       return true;
+    } else {
+      generic_conn_pool_.reset();
     }
   }
 
   return false;
 }
-void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                           Upstream::HostDescriptionConstSharedPtr host) {
-  upstream_handle_.reset();
-
+void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                  Upstream::HostDescriptionConstSharedPtr host) {
+  generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   getStreamInfo().onUpstreamHostSelected(host);
 
@@ -505,44 +506,22 @@ void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   }
 }
 
-void Filter::onPoolReadyBase(Upstream::HostDescriptionConstSharedPtr& host,
-                             const Network::Address::InstanceConstSharedPtr& local_address,
-                             Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  upstream_handle_.reset();
+void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
+                                std::unique_ptr<GenericUpstream>&& upstream,
+                                Upstream::HostDescriptionConstSharedPtr& host,
+                                const Network::Address::InstanceConstSharedPtr& local_address,
+                                Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+  upstream_ = std::move(upstream);
+  generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   getStreamInfo().onUpstreamHostSelected(host);
   getStreamInfo().setUpstreamLocalAddress(local_address);
   getStreamInfo().setUpstreamSslConnection(ssl_info);
   onUpstreamConnection();
   read_callbacks_->continueReading();
-}
-
-void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                         Upstream::HostDescriptionConstSharedPtr host) {
-  Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
-
-  upstream_ = std::make_unique<TcpUpstream>(std::move(conn_data), *upstream_callbacks_);
-  onPoolReadyBase(host, latched_data->connection().localAddress(),
-                  latched_data->connection().streamInfo().downstreamSslConnection());
-  read_callbacks_->connection().streamInfo().setUpstreamFilterState(
-      latched_data->connection().streamInfo().filterState());
-}
-
-void Filter::onPoolFailure(ConnectionPool::PoolFailureReason failure, absl::string_view,
-                           Upstream::HostDescriptionConstSharedPtr host) {
-  onPoolFailure(failure, host);
-}
-
-void Filter::onPoolReady(Http::RequestEncoder& request_encoder,
-                         Upstream::HostDescriptionConstSharedPtr host,
-                         const StreamInfo::StreamInfo& info) {
-  Http::RequestEncoder* latched_encoder = &request_encoder;
-  HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-  http_upstream->setRequestEncoder(request_encoder,
-                                   host->transportSocketFactory().implementsSecureTransport());
-
-  onPoolReadyBase(host, latched_encoder->getStream().connectionLocalAddress(),
-                  info.downstreamSslConnection());
+  if (info) {
+    read_callbacks_->connection().streamInfo().setUpstreamFilterState(info->filterState());
+  }
 }
 
 const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
@@ -611,12 +590,11 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
       disableIdleTimer();
     }
   }
-  if (upstream_handle_) {
+  if (generic_conn_pool_) {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
       // Cancel the conn pool request and close any excess pending requests.
-      upstream_handle_->cancel();
-      upstream_handle_.reset();
+      generic_conn_pool_.reset();
     }
   }
 }

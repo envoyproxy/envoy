@@ -166,6 +166,23 @@ void HttpConnectionManagerImplTest::setUpEncoderAndDecoder(bool request_with_dat
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 }
 
+void HttpConnectionManagerImplTest::startRequest(bool end_stream,
+                                                 absl::optional<std::string> body) {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), end_stream && !body.has_value());
+    if (body.has_value()) {
+      Buffer::OwnedImpl fake_data(body.value());
+      decoder_->decodeData(fake_data, end_stream);
+    }
+    return Http::okStatus();
+  }));
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
 Event::MockTimer* HttpConnectionManagerImplTest::setUpTimer() {
   // this timer belongs to whatever by whatever next creates a timer.
   // See Envoy::Event::MockTimer for details.
@@ -205,13 +222,24 @@ HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& respon
 
 void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
   for (auto filter : decoder_filters_) {
-    EXPECT_CALL(*filter, onDestroy());
+    EXPECT_CALL(*filter, onStreamComplete());
+  }
+  {
+    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+      EXPECT_CALL(*filter, onStreamComplete());
+    };
+    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
   }
 
-  auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+  for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onDestroy());
-  };
-  std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  }
+  {
+    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+      EXPECT_CALL(*filter, onDestroy());
+    };
+    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  }
 
   if (deferred) {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));

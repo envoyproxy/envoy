@@ -10,217 +10,404 @@ trigger:
 # PR build config is manually overridden in Azure pipelines UI with different secrets
 pr: none
 
-jobs:
-  - job: format
-    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-      - task: Cache@2
-        inputs:
-          key: "format | ./WORKSPACE | **/*.bzl"
-          path: $(Build.StagingDirectory)/repository_cache
-        continueOnError: true
+stages:
+  - stage: precheck
+    jobs:
+      - job: format
+        dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - task: Cache@2
+            inputs:
+              key: "format | ./WORKSPACE | **/*.bzl"
+              path: $(Build.StagingDirectory)/repository_cache
+            continueOnError: true
 
-      - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
-        workingDirectory: $(Build.SourcesDirectory)
-        env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-        displayName: "Run check format scripts"
+          - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+            displayName: "Run check format scripts"
 
-      - task: PublishBuildArtifacts@1
-        inputs:
-          pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
-          artifactName: format
-        condition: failed()
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+              artifactName: format
+            condition: failed()
 
-  - job: release
-    displayName: "Linux-x64 release"
-    dependsOn: ["format"]
-    # For master builds, continue even if format fails
-    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
-    timeoutInMinutes: 360
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-      - template: bazel.yml
-        parameters:
-          ciTarget: bazel.release
+      - job: docs
+        dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - task: Cache@2
+            inputs:
+              key: "docs | ./WORKSPACE | **/*.bzl"
+              path: $(Build.StagingDirectory)/repository_cache
+            continueOnError: true
 
-  - job: release_arm64
-    displayName: "Linux-arm64 release"
-    dependsOn: ["format"]
-    # For master builds, continue even if format fails
-    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
-    timeoutInMinutes: 360
-    pool: "arm-large"
-    steps:
-      - template: bazel.yml
-        parameters:
-          managedAgent: false
-          ciTarget: bazel.release
-          rbe: false
-          artifactSuffix: ".arm64"
-          bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+          - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+            displayName: "Generate docs"
 
-  - job: bazel
-    displayName: "Linux-x64"
-    dependsOn: ["release"]
-    # For master builds, continue even if format fails
-    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
-    strategy:
-      maxParallel: 3
-      matrix:
-        gcc:
-          CI_TARGET: "bazel.gcc"
-        clang_tidy:
-          CI_TARGET: "bazel.clang_tidy"
-        asan:
-          CI_TARGET: "bazel.asan"
-        tsan:
-          CI_TARGET: "bazel.tsan"
-        compile_time_options:
-          CI_TARGET: "bazel.compile_time_options"
-    timeoutInMinutes: 360
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-      - template: bazel.yml
-        parameters:
-          ciTarget: $(CI_TARGET)
+          - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+            displayName: "Upload Docs to GCS"
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+              GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
-  - job: coverage
-    displayName: "Linux-x64"
-    dependsOn: ["release"]
-    timeoutInMinutes: 360
-    pool: "x64-large"
-    strategy:
-      maxParallel: 2
-      matrix:
-        coverage:
-          CI_TARGET: "coverage"
-        fuzz_coverage:
-          CI_TARGET: "fuzz_coverage"
-    steps:
-      - template: bazel.yml
-        parameters:
-          managedAgent: false
-          ciTarget: bazel.$(CI_TARGET)
-          rbe: false
-          # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
-          bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathtoPublish: "$(Build.SourcesDirectory)/generated/docs"
+              artifactName: docs
 
-      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
-        displayName: "Upload $(CI_TARGET) Report to GCS"
-        env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-          GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-        condition: always()
+          - task: InstallSSHKey@0
+            inputs:
+              hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+              sshPublicKey: "$(DocsPublicKey)"
+              sshPassphrase: "$(SshDeployKeyPassphrase)"
+              sshKeySecureFile: "$(DocsPrivateKey)"
+            condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
 
-  - job: docker
-    displayName: "Linux multi-arch docker"
-    dependsOn: ["release", "release_arm64"]
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-      - bash: .azure-pipelines/cleanup.sh
-        displayName: "Removing tools from agent"
-      - task: DownloadBuildArtifacts@0
-        inputs:
-          buildType: current
-          artifactName: "bazel.release"
-          itemPattern: "bazel.release/envoy_binary.tar.gz"
-          downloadType: single
-          targetPath: $(Build.StagingDirectory)
-      - task: DownloadBuildArtifacts@0
-        inputs:
-          buildType: current
-          artifactName: "bazel.release.arm64"
-          itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
-          downloadType: single
-          targetPath: $(Build.StagingDirectory)
-      - bash: |
-          set -e
-          mkdir -p linux/amd64 && tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
-          mkdir -p linux/arm64 && tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
-          ci/docker_ci.sh
-        workingDirectory: $(Build.SourcesDirectory)
-        env:
-          AZP_BRANCH: $(Build.SourceBranch)
-          AZP_SHA1: $(Build.SourceVersion)
-          DOCKERHUB_USERNAME: $(DockerUsername)
-          DOCKERHUB_PASSWORD: $(DockerPassword)
-      - task: PublishBuildArtifacts@1
-        inputs:
-          pathtoPublish: "$(Build.StagingDirectory)/build_images"
-          artifactName: docker
-        condition: always()
+          - script: docs/publish.sh
+            displayName: "Publish to GitHub"
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              AZP_BRANCH: $(Build.SourceBranch)
+              AZP_SHA1: $(Build.SourceVersion)
+            condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
 
-  - job: examples
+      - job: dependencies
+        dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+              GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+            displayName: "Verify dependency information"
+
+  - stage: sync
+    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
+    dependsOn: []
+    jobs:
+      - job: filter_example
+        dependsOn: []
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - task: InstallSSHKey@0
+            inputs:
+              hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+              sshPublicKey: "$(FilterExamplePublicKey)"
+              sshPassphrase: "$(SshDeployKeyPassphrase)"
+              sshKeySecureFile: "$(FilterExamplePrivateKey)"
+
+          - bash: ci/filter_example_mirror.sh
+            displayName: "Sync envoy-filter-example"
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              AZP_BRANCH: $(Build.SourceBranch)
+
+      - job: data_plane_api
+        dependsOn: []
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - task: InstallSSHKey@0
+            inputs:
+              hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+              sshPublicKey: "$(DataPlaneApiPublicKey)"
+              sshPassphrase: "$(SshDeployKeyPassphrase)"
+              sshKeySecureFile: "$(DataPlaneApiPrivateKey)"
+
+          - bash: ci/api_mirror.sh
+            displayName: "Sync data-plane-api"
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              AZP_BRANCH: $(Build.SourceBranch)
+
+      - job: go_control_plane
+        dependsOn: []
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - task: InstallSSHKey@0
+            inputs:
+              hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+              sshPublicKey: "$(GoControlPlanePublicKey)"
+              sshPassphrase: "$(SshDeployKeyPassphrase)"
+              sshKeySecureFile: "$(GoControlPlanePrivateKey)"
+
+          - bash: |
+              cp -a ~/.ssh $(Build.StagingDirectory)/
+              ci/run_envoy_docker.sh 'ci/go_mirror.sh'
+            displayName: "Sync go-control-plane"
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+              AZP_BRANCH: $(Build.SourceBranch)
+
+  - stage: linux_x64
+    dependsOn: ["precheck"]
+    # For post-submit builds, continue even if precheck fails
+    condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
+    jobs:
+      - job: release
+        timeoutInMinutes: 120
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - template: bazel.yml
+            parameters:
+              ciTarget: bazel.release
+
+  - stage: linux_arm64
+    dependsOn: ["precheck"]
+    # For post-submit builds, continue even if precheck fails
+    condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
+    jobs:
+      - job: release
+        timeoutInMinutes: 120
+        pool: "arm-large"
+        steps:
+          - template: bazel.yml
+            parameters:
+              managedAgent: false
+              ciTarget: bazel.release
+              rbe: false
+              artifactSuffix: ".arm64"
+              bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+
+  - stage: check
+    dependsOn: ["linux_x64"]
+    jobs:
+      - job: bazel
+        displayName: "linux_x64"
+        dependsOn: []
+        strategy:
+          maxParallel: 3
+          matrix:
+            api:
+              CI_TARGET: "bazel.api"
+            gcc:
+              CI_TARGET: "bazel.gcc"
+            clang_tidy:
+              CI_TARGET: "bazel.clang_tidy"
+            asan:
+              CI_TARGET: "bazel.asan"
+            tsan:
+              CI_TARGET: "bazel.tsan"
+            compile_time_options:
+              CI_TARGET: "bazel.compile_time_options"
+        timeoutInMinutes: 120
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - template: bazel.yml
+            parameters:
+              ciTarget: $(CI_TARGET)
+
+      - job: coverage
+        displayName: "linux_x64"
+        dependsOn: []
+        timeoutInMinutes: 120
+        pool: "x64-large"
+        strategy:
+          maxParallel: 2
+          matrix:
+            coverage:
+              CI_TARGET: "coverage"
+            fuzz_coverage:
+              CI_TARGET: "fuzz_coverage"
+        steps:
+          - template: bazel.yml
+            parameters:
+              managedAgent: false
+              ciTarget: bazel.$(CI_TARGET)
+              rbe: false
+              # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
+              bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+
+          - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
+            displayName: "Upload $(CI_TARGET) Report to GCS"
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+              GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+            condition: always()
+
+  - stage: docker
+    dependsOn: ["linux_x64", "linux_arm64"]
+    jobs:
+      - job: docker
+        displayName: "linux multiarch"
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - bash: .azure-pipelines/cleanup.sh
+            displayName: "Removing tools from agent"
+          - bash: |
+              echo "disk space at beginning of build:"
+              df -h
+            displayName: "Check disk space at beginning"
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: current
+              artifactName: "bazel.release"
+              itemPattern: "bazel.release/envoy_binary.tar.gz"
+              downloadType: single
+              targetPath: $(Build.StagingDirectory)
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: current
+              artifactName: "bazel.release.arm64"
+              itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
+              downloadType: single
+              targetPath: $(Build.StagingDirectory)
+          - bash: |
+              set -e
+              mkdir -p linux/amd64 && tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+              mkdir -p linux/arm64 && tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+              ci/docker_ci.sh
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              AZP_BRANCH: $(Build.SourceBranch)
+              AZP_SHA1: $(Build.SourceVersion)
+              DOCKERHUB_USERNAME: $(DockerUsername)
+              DOCKERHUB_PASSWORD: $(DockerPassword)
+          - bash: |
+              echo "disk space at end of build:"
+              df -h
+            displayName: "Check disk space at end"
+            condition: always()
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathtoPublish: "$(Build.StagingDirectory)/build_images"
+              artifactName: docker
+            condition: always()
+
+  - stage: verify
     dependsOn: ["docker"]
-    displayName: "Verify examples run as documented"
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-      - task: DownloadBuildArtifacts@0
-        inputs:
-          buildType: current
-          artifactName: "docker"
-          itemPattern: "docker/envoy-docker-images.tar.xz"
-          downloadType: single
-          targetPath: $(Build.StagingDirectory)
-      - bash: ./ci/do_ci.sh verify_examples
-        env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          NO_BUILD_SETUP: 1
+    jobs:
+      - job: examples
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: current
+              artifactName: "docker"
+              itemPattern: "docker/envoy-docker-images.tar.xz"
+              downloadType: single
+              targetPath: $(Build.StagingDirectory)
+          - bash: ./ci/do_ci.sh verify_examples
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              NO_BUILD_SETUP: 1
 
-  - job: macOS
-    dependsOn: ["format"]
-    timeoutInMinutes: 360
-    pool:
-      vmImage: "macos-latest"
-    steps:
-      - script: ./ci/mac_ci_setup.sh
-        displayName: "Install dependencies"
+  - stage: macos
+    dependsOn: ["precheck"]
+    jobs:
+      - job: test
+        timeoutInMinutes: 180
+        pool:
+          vmImage: "macos-latest"
+        steps:
+          - script: ./ci/mac_ci_setup.sh
+            displayName: "Install dependencies"
 
-      - script: ./ci/mac_ci_steps.sh
-        displayName: "Run Mac CI"
-        env:
-          BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel --flaky_test_attempts=2"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          - script: ./ci/mac_ci_steps.sh
+            displayName: "Run Mac CI"
+            env:
+              BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel --flaky_test_attempts=2"
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
 
-      - task: PublishTestResults@2
-        inputs:
-          testResultsFiles: "**/bazel-testlogs/**/test.xml"
-          testRunTitle: "macOS"
-        condition: always()
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFiles: "**/bazel-testlogs/**/test.xml"
+              testRunTitle: "macOS"
+            condition: always()
 
-      - script: ./ci/flaky_test/run_process_xml_mac.sh
-        displayName: "Process Test Results"
-        env:
-          TEST_TMPDIR: $(Build.SourcesDirectory)
-          SLACK_TOKEN: $(SLACK_TOKEN)
-          CI_TARGET: "MacOS"
-          REPO_URI: $(Build.Repository.Uri)
-          BUILD_URI: $(Build.BuildUri)
+          - script: ./ci/flaky_test/run_process_xml.sh
+            displayName: "Process Test Results"
+            env:
+              TEST_TMPDIR: $(Build.SourcesDirectory)
+              SLACK_TOKEN: $(SLACK_TOKEN)
+              CI_TARGET: "MacOS"
+              REPO_URI: $(Build.Repository.Uri)
+              BUILD_URI: $(Build.BuildUri)
 
-  - job: Windows
-    dependsOn: ["format"]
-    timeoutInMinutes: 360
-    pool:
-      vmImage: "windows-latest"
-    steps:
-      - bash: ci/run_envoy_docker_windows.sh ci/windows_ci_steps.sh
-        displayName: "Run Windows CI"
-        env:
-          ENVOY_RBE: "true"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+  - stage: windows
+    dependsOn: ["precheck"]
+    jobs:
+      - job: release
+        timeoutInMinutes: 120
+        pool:
+          vmImage: "windows-latest"
+        steps:
+          - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
+            displayName: "Run Windows CI"
+            env:
+              ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
+              ENVOY_RBE: "true"
+              BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathtoPublish: "$(Build.StagingDirectory)/envoy"
+              artifactName: windows.release
+            condition: always()
+
+      - job: docker
+        dependsOn: ["release"]
+        timeoutInMinutes: 120
+        pool:
+          vmImage: "windows-latest"
+        steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: current
+              artifactName: "windows.release"
+              itemPattern: "windows.release/envoy_binary.tar.gz"
+              downloadType: single
+              targetPath: $(Build.StagingDirectory)
+          - bash: |
+              set -e
+              # Convert to Unix-style path so tar doesn't think drive letter is a hostname
+              STAGING_DIR="/$(echo '$(Build.StagingDirectory)' | tr -d ':' | tr '\\' '/')"
+              mkdir -p windows/amd64 && tar zxf "${STAGING_DIR}/windows.release/envoy_binary.tar.gz" -C ./windows/amd64
+              ci/docker_ci.sh
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              AZP_BRANCH: $(Build.SourceBranch)
+              AZP_SHA1: $(Build.SourceVersion)
+              DOCKERHUB_USERNAME: $(DockerUsername)
+              DOCKERHUB_PASSWORD: $(DockerPassword)
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathtoPublish: "$(Build.StagingDirectory)/build_images"
+              artifactName: docker_windows
+            condition: always()

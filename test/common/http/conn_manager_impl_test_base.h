@@ -53,6 +53,9 @@ public:
   // StopAllIterationAndBuffer.
   void setUpEncoderAndDecoder(bool request_with_data_and_trailers, bool decode_headers_stop_all);
 
+  // Sends request headers, and stashes the new stream in decoder_;
+  void startRequest(bool end_stream = false, absl::optional<std::string> body = absl::nullopt);
+
   Event::MockTimer* setUpTimer();
   void sendRequestHeadersAndData();
   ResponseHeaderMap* sendResponseHeaders(ResponseHeaderMapPtr&& response_headers);
@@ -172,6 +175,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  RequestDecoder* decoder_{};
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_connection_;
   std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> tracer_{
       std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
@@ -200,7 +204,7 @@ public:
   const LocalReply::LocalReplyPtr local_reply_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
-  MockResponseEncoder response_encoder_;
+  NiceMock<MockResponseEncoder> response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;

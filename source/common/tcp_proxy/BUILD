@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:hash_policy_lib",
+        "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:upstream_server_name_lib",
         "//source/common/network:utility_lib",

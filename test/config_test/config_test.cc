@@ -61,9 +61,9 @@ public:
   ConfigTest(const OptionsImpl& options)
       : api_(Api::createApiForTest(time_system_)), options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
-    ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
+    ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
     ON_CALL(file_system_, fileReadToEnd(StrEq("/etc/envoy/lightstep_access_token")))
         .WillByDefault(Return("access_token"));
     ON_CALL(file_system_, fileReadToEnd(StrNe("/etc/envoy/lightstep_access_token")))
@@ -91,10 +91,10 @@ public:
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-        server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
-        server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
-        server_.httpContext(), server_.grpcContext(), server_.accessLogManager(),
-        server_.singletonManager(), time_system_);
+        server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
+        server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
+        server_.grpcContext(), server_.accessLogManager(), server_.singletonManager(),
+        time_system_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -160,7 +160,7 @@ void testMerge() {
   Api::ApiPtr api = Api::createApiForTest();
 
   const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
-  OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v2.yaml", overlay,
+  OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,

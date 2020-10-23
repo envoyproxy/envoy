@@ -3,10 +3,10 @@
 # Bazel doesn't need more than 200MB of memory for local build based on memory profiling:
 # https://docs.bazel.build/versions/master/skylark/performance.html#memory-profiling
 # The default JVM max heapsize is 1/4 of physical memory up to 32GB which could be large
-# enough to consume all memory constrained by cgroup in large host, which is the case in CircleCI.
+# enough to consume all memory constrained by cgroup in large host.
 # Limiting JVM heapsize here to let it do GC more when approaching the limit to
 # leave room for compiler/linker.
-# The number 2G is choosed heuristically to both support in CircleCI and large enough for RBE.
+# The number 2G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx2g
 
@@ -19,7 +19,8 @@ build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
 
-# Enable position independent code, this option is not supported on Windows and default on on macOS.
+# Enable position independent code (this is the default on macOS and Windows)
+# (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
 build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
@@ -34,9 +35,6 @@ build --action_env=CC
 build --action_env=CXX
 build --action_env=LLVM_CONFIG
 build --action_env=PATH
-
-# Skip system ICU linking.
-build --@com_googlesource_googleurl//build_config:system_icu=0
 
 # Common flags for sanitizers
 build:sanitizer --define tcmalloc=disabled
@@ -64,6 +62,9 @@ build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
 build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
 build:asan --test_env=ASAN_SYMBOLIZER_PATH
+# ASAN needs -O1 to get reasonable performance.
+build:asan --copt -O1
+build:asan --copt -fno-optimize-sibling-calls
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
@@ -112,7 +113,8 @@ build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
+build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.
@@ -141,7 +143,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
+build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
 coverage:test-coverage --test_arg="-l trace"
 coverage:fuzz-coverage --config=plain-fuzzer
 coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
@@ -165,6 +167,16 @@ build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ 
 build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
+
+# Do not inherit from "clang-asan" to avoid picking up flags from local clang.bazelrc.
+build:rbe-toolchain-asan --config=asan
+build:rbe-toolchain-asan --linkopt -fuse-ld=lld
+build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
+build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
+build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
+build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/10.0.0/lib/linux
+build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
+build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
 
 build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
@@ -216,6 +228,10 @@ build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
 build:remote-gcc --config=remote
 build:remote-gcc --config=rbe-toolchain-gcc
 
+build:remote-asan --config=remote
+build:remote-asan --config=rbe-toolchain-clang-libc++
+build:remote-asan --config=rbe-toolchain-asan
+
 build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
@@ -230,7 +246,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:e7ea4e81bbd5028abb9d3a2f2c0afe063d9b62c0
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:b480535e8423b5fd7c102fd30c92f4785519e33a
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -287,27 +303,27 @@ build:windows --define signal_trace=disabled
 build:windows --define hot_restart=disabled
 build:windows --define tcmalloc=disabled
 build:windows --define manual_stamp=manual_stamp
+build:windows --cxxopt="/std:c++17"
 
-# Should not be required after upstream fix to bazel,
-# and already a no-op to linux/macos builds
-# see issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
+# TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
+# See issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
 build:windows --copt="-DCARES_STATICLIB"
 build:windows --copt="-DNGHTTP2_STATICLIB"
 build:windows --copt="-DCURL_STATICLIB"
-build:windows --cxxopt="/std:c++17"
 
-# Required to work around build defects on Windows MSVC cl
-# Unguarded gcc pragmas in quiche are not recognized by MSVC
-build:msvc-cl --copt="/wd4068"
-# Allows 'nodiscard' function return values to be discarded
-build:msvc-cl --copt="/wd4834"
-# Allows inline functions to be undefined
-build:msvc-cl --copt="/wd4506"
-build:msvc-cl --copt="-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
+# Override any clang preference if building msvc-cl
+# Drop the determinism feature (-DDATE etc are a no-op in msvc-cl)
+build:msvc-cl --action_env=USE_CLANG_CL=""
+build:msvc-cl --define clang_cl=0
+build:msvc-cl --features=-determinism
+
+# Windows build behaviors when using clang-cl
+build:clang-cl --action_env=USE_CLANG_CL=1
+build:clang-cl --define clang_cl=1
 
 # Required to work around Windows clang-cl build defects
 # Ignore conflicting definitions of _WIN32_WINNT
-# Overriding __TIME__ etc is problematic (and is actually an invalid no-op)
+# Override determinism flags (DATE etc) is valid on clang-cl compiler
 build:clang-cl --copt="-Wno-macro-redefined"
 build:clang-cl --copt="-Wno-builtin-macro-redefined"
 build:clang-cl --action_env=USE_CLANG_CL=1

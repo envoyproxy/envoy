@@ -120,6 +120,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
+  constexpr uint64_t MaxSlices = 16;
+  Buffer::RawSliceVector slices = buffer.getRawSlices(MaxSlices);
+  Api::IoCallUint64Result result = writev(slices.begin(), slices.size());
+  if (result.ok() && result.rc_ > 0) {
+    buffer.drain(static_cast<uint64_t>(result.rc_));
+  }
+  return result;
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
                                                     const Address::Ip* self_ip,
@@ -519,16 +529,12 @@ Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
 }
 
 absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
-#ifdef TCP_INFO
-  struct tcp_info ti;
-  socklen_t len = sizeof(ti);
-  if (!SOCKET_FAILURE(
-          Api::OsSysCallsSingleton::get().getsockopt(fd_, IPPROTO_TCP, TCP_INFO, &ti, &len).rc_)) {
-    return std::chrono::milliseconds(ti.tcpi_rtt);
+  Api::EnvoyTcpInfo info;
+  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
+  if (!result.rc_) {
+    return {};
   }
-#endif
-
-  return {};
+  return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
 } // namespace Network

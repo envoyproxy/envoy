@@ -45,13 +45,16 @@ Dependency declarations must:
   version is being used.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
   or control plane implications of the dependency.
-* Reflect the date (YYYY-MM-DD) at which they were last updated in the `last_updated` field. This
-  date is preferably the date at which the PR is created.
+* Reflect the UTC date (YYYY-MM-DD format) for the dependency release. This is when
+  the dependency was updated in its repository. For dependencies that have
+  releases, this is the date of the release. For dependencies without releases
+  or for scenarios where we temporarily need to use a commit, this date should
+  be the date of the commit in UTC.
 * CPEs are compulsory for all dependencies that are not purely build/test.
   [CPEs](https://en.wikipedia.org/wiki/Common_Platform_Enumeration) provide metadata that allow us
   to correlate with related CVEs in dashboards and other tooling, and also provide a machine
-  consumable join key. You can consult the latest [CPE
-  dictionary](https://nvd.nist.gov/products/cpe) to find a CPE for a dependency.`"N/A"` should only
+  consumable join key. You can consult [CPE
+  search](https://nvd.nist.gov/products/cpe/search) to find a CPE for a dependency.`"N/A"` should only
   be used if no CPE for the project is available in the CPE database. CPEs should be _versionless_
   with a `:*` suffix, since the version can be computed from `version`.
 
@@ -96,6 +99,14 @@ basis:
 
 Where possible, we prefer the latest release version for external dependencies, rather than master
 branch GitHub SHA tarballs.
+
+## Dependency shepherds
+
+Sign-off from the [dependency
+shepherds](https://github.com/orgs/envoyproxy/teams/dependency-shepherds) is
+required for every PR that modifies external dependencies. The shepherds will
+look to see that the policy in this document is enforced and that metadata is
+kept up-to-date.
 
 ## Dependency patches
 

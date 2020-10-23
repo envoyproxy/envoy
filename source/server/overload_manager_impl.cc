@@ -75,21 +75,28 @@ private:
  */
 class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
 public:
+  ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table)
+      : action_symbol_table_(action_symbol_table),
+        actions_(action_symbol_table.size(), OverloadActionState(0)) {}
+
   const OverloadActionState& getState(const std::string& action) override {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      it = actions_.insert(std::make_pair(action, OverloadActionState::inactive())).first;
+    if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
+      return actions_[symbol->index()];
     }
-    return it->second;
+    return always_inactive_;
   }
 
-  void setState(const std::string& action, OverloadActionState state) {
-    actions_.insert_or_assign(action, state);
+  void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
+    actions_[action.index()] = state;
   }
 
 private:
-  absl::node_hash_map<std::string, OverloadActionState> actions_;
+  static const OverloadActionState always_inactive_;
+  const NamedOverloadActionSymbolTable& action_symbol_table_;
+  std::vector<OverloadActionState> actions_;
 };
+
+const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{0.0};
 
 Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
   Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
@@ -105,6 +112,37 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
 }
 
 } // namespace
+
+NamedOverloadActionSymbolTable::Symbol
+NamedOverloadActionSymbolTable::get(absl::string_view string) {
+  if (auto it = table_.find(string); it != table_.end()) {
+    return Symbol(it->second);
+  }
+
+  size_t index = table_.size();
+
+  names_.emplace_back(string);
+  table_.emplace(std::make_pair(string, index));
+
+  return Symbol(index);
+}
+
+absl::optional<NamedOverloadActionSymbolTable::Symbol>
+NamedOverloadActionSymbolTable::lookup(absl::string_view string) const {
+  if (auto it = table_.find(string); it != table_.end()) {
+    return Symbol(it->second);
+  }
+  return absl::nullopt;
+}
+
+const absl::string_view NamedOverloadActionSymbolTable::name(Symbol symbol) const {
+  return names_.at(symbol.index());
+}
+
+bool operator==(const NamedOverloadActionSymbolTable::Symbol& lhs,
+                const NamedOverloadActionSymbolTable::Symbol& rhs) {
+  return lhs.index() == rhs.index();
+}
 
 OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
                                Stats::Scope& stats_scope)
@@ -191,13 +229,14 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
 
   for (const auto& action : config.actions()) {
     const auto& name = action.name();
+    const auto symbol = action_symbol_table_.get(name);
     ENVOY_LOG(debug, "Adding overload action {}", name);
     // TODO: use in place construction once https://github.com/abseil/abseil-cpp/issues/388 is
     // addressed
     // We cannot currently use in place construction as the OverloadAction constructor may throw,
     // causing an inconsistent internal state of the actions_ map, which on destruction results in
     // an invalid free.
-    auto result = actions_.try_emplace(name, OverloadAction(action, stats_scope));
+    auto result = actions_.try_emplace(symbol, OverloadAction(action, stats_scope));
     if (!result.second) {
       throw EnvoyException(absl::StrCat("Duplicate overload action ", name));
     }
@@ -210,7 +249,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
             fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
       }
 
-      resource_to_actions_.insert(std::make_pair(resource, name));
+      resource_to_actions_.insert(std::make_pair(resource, symbol));
     }
   }
 }
@@ -219,8 +258,8 @@ void OverloadManagerImpl::start() {
   ASSERT(!started_);
   started_ = true;
 
-  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalOverloadStateImpl>();
+  tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_);
   });
 
   if (resources_.empty()) {
@@ -259,13 +298,14 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
                                             Event::Dispatcher& dispatcher,
                                             OverloadActionCb callback) {
   ASSERT(!started_);
+  const auto symbol = action_symbol_table_.get(action);
 
-  if (actions_.find(action) == actions_.end()) {
+  if (actions_.find(symbol) == actions_.end()) {
     ENVOY_LOG(debug, "No overload action is configured for {}.", action);
     return false;
   }
 
-  action_to_callbacks_.emplace(std::piecewise_construct, std::forward_as_tuple(action),
+  action_to_callbacks_.emplace(std::piecewise_construct, std::forward_as_tuple(symbol),
                                std::forward_as_tuple(dispatcher, callback));
   return true;
 }
@@ -279,7 +319,7 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
   auto [start, end] = resource_to_actions_.equal_range(resource);
 
   std::for_each(start, end, [&](ResourceToActionMap::value_type& entry) {
-    const std::string& action = entry.second;
+    const NamedOverloadActionSymbolTable::Symbol action = entry.second;
     auto action_it = actions_.find(action);
     ASSERT(action_it != actions_.end());
     const OverloadActionState old_state = action_it->second.getState();
@@ -287,7 +327,7 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
       const auto state = action_it->second.getState();
 
       if (old_state.isSaturated() != state.isSaturated()) {
-        ENVOY_LOG(debug, "Overload action {} became {}", action,
+        ENVOY_LOG(debug, "Overload action {} became {}", action_symbol_table_.name(action),
                   (state.isSaturated() ? "saturated" : "scaling"));
       }
 
@@ -320,14 +360,18 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
 
 void OverloadManagerImpl::flushResourceUpdates() {
   if (!state_updates_to_flush_.empty()) {
-    auto shared_updates = std::make_shared<absl::flat_hash_map<std::string, OverloadActionState>>();
+    auto shared_updates = std::make_shared<
+        absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>>();
     std::swap(*shared_updates, state_updates_to_flush_);
 
-    tls_->runOnAllThreads([this, updates = std::move(shared_updates)] {
-      for (const auto& [action, state] : *updates) {
-        tls_->getTyped<ThreadLocalOverloadStateImpl>().setState(action, state);
-      }
-    });
+    tls_->runOnAllThreads(
+        [updates = std::move(shared_updates)](ThreadLocal::ThreadLocalObjectSharedPtr object)
+            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+          for (const auto& [action, state] : *updates) {
+            object->asType<ThreadLocalOverloadStateImpl>().setState(action, state);
+          }
+          return object;
+        });
   }
 
   for (const auto& [cb, state] : callbacks_to_flush_) {
