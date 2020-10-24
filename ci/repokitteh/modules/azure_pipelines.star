@@ -37,7 +37,7 @@ def _retry(config, comment_id, command):
     retried_checks = []
     for check_id in check_ids:
         subchecks = [c for c in checks if c["external_id"] == check_id]
-        if len(subchecks):
+        if len(subchecks) == 0:
             continue
 
         name_with_link = "[{}]({})".format(subchecks[0]["name"].split(" ")[0], _get_azp_link(check_id))
