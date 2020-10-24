@@ -53,6 +53,8 @@ public:
   MOCK_METHOD(ssize_t, fileSize, (const std::string&));
   MOCK_METHOD(std::string, fileReadToEnd, (const std::string&));
   MOCK_METHOD(PathSplitResult, splitPathFromFilename, (absl::string_view));
+  MOCK_METHOD(std::string, joinPath, (absl::string_view, absl::string_view));
+  MOCK_METHOD(std::string, readSymlink, (absl::string_view));
   MOCK_METHOD(bool, illegalPath, (const std::string&));
 };
 

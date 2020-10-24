@@ -23,6 +23,7 @@
 #include "common/common/cleanup.h"
 #include "common/config/subscription_base.h"
 #include "common/config/utility.h"
+#include "common/config/watched_directory.h"
 #include "common/init/target_impl.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
@@ -62,6 +63,8 @@ public:
 protected:
   // Creates new secrets.
   virtual void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
+  // Refresh secrets, e.g. re-resolve symlinks in secret paths.
+  virtual void resolveSecret(){};
   virtual void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
   Common::CallbackManager<> update_callback_manager_;
 
@@ -74,13 +77,18 @@ protected:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   virtual std::vector<std::string> getDataSourceFilenames() PURE;
+  virtual Config::WatchedDirectory* getWatchedDirectory() PURE;
 
   Init::TargetImpl init_target_;
+  Event::Dispatcher& dispatcher_;
+  Api::Api& api_;
 
 private:
   void validateUpdateSize(int num_resources);
   void initialize();
   uint64_t getHashForFiles();
+  // Invoked for filesystem watches on update.
+  void onWatchUpdate();
 
   Stats::Store& stats_;
 
@@ -94,8 +102,6 @@ private:
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;
   SecretData secret_data_;
-  Event::Dispatcher& dispatcher_;
-  Api::Api& api_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   bool registered_init_target_{false};
 };
@@ -142,7 +148,7 @@ public:
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
-    return tls_certificate_secrets_.get();
+    return resolved_tls_certificate_secrets_.get();
   }
   Common::CallbackHandle* addValidationCallback(
       std::function<void(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>)
@@ -158,15 +164,39 @@ public:
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    tls_certificate_secrets_ =
+    sds_tls_certificate_secrets_ =
         std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>(
             secret.tls_certificate());
+    if (secret.tls_certificate().has_watched_directory()) {
+      watched_directory_ = std::make_unique<Config::WatchedDirectory>(
+          secret.tls_certificate().watched_directory(), dispatcher_, api_.fileSystem());
+    } else {
+      watched_directory_.reset();
+    }
+    resolveSecret();
+  }
+  void resolveSecret() override {
+    resolved_tls_certificate_secrets_ =
+        std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>(
+            *sds_tls_certificate_secrets_);
+    if (watched_directory_ != nullptr) {
+      watched_directory_->resolveDataSourcePath(
+          *resolved_tls_certificate_secrets_->mutable_certificate_chain());
+      watched_directory_->resolveDataSourcePath(
+          *resolved_tls_certificate_secrets_->mutable_private_key());
+    }
   }
   void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
   std::vector<std::string> getDataSourceFilenames() override;
+  Config::WatchedDirectory* getWatchedDirectory() override { return watched_directory_.get(); }
 
 private:
-  TlsCertificatePtr tls_certificate_secrets_;
+  // Directory to watch for symlink rotation.
+  Config::WatchedDirectoryPtr watched_directory_;
+  // TlsCertificate according to SDS source.
+  TlsCertificatePtr sds_tls_certificate_secrets_;
+  // TlsCertificate after resolving paths via WatchedDirectory.
+  TlsCertificatePtr resolved_tls_certificate_secrets_;
 };
 
 /**
@@ -205,7 +235,7 @@ public:
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
   secret() const override {
-    return certificate_validation_context_secrets_.get();
+    return resolved_certificate_validation_context_secrets_.get();
   }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
     if (secret()) {
@@ -223,9 +253,25 @@ public:
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    certificate_validation_context_secrets_ = std::make_unique<
+    sds_certificate_validation_context_secrets_ = std::make_unique<
         envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
         secret.validation_context());
+    if (secret.validation_context().has_watched_directory()) {
+      watched_directory_ = std::make_unique<Config::WatchedDirectory>(
+          secret.validation_context().watched_directory(), dispatcher_, api_.fileSystem());
+    } else {
+      watched_directory_.reset();
+    }
+    resolveSecret();
+  }
+  void resolveSecret() override {
+    resolved_certificate_validation_context_secrets_ = std::make_unique<
+        envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
+        *sds_certificate_validation_context_secrets_);
+    if (watched_directory_ != nullptr) {
+      watched_directory_->resolveDataSourcePath(
+          *resolved_certificate_validation_context_secrets_->mutable_trusted_ca());
+    }
   }
 
   void
@@ -233,9 +279,15 @@ protected:
     validation_callback_manager_.runCallbacks(secret.validation_context());
   }
   std::vector<std::string> getDataSourceFilenames() override;
+  Config::WatchedDirectory* getWatchedDirectory() override { return watched_directory_.get(); }
 
 private:
-  CertificateValidationContextPtr certificate_validation_context_secrets_;
+  // Directory to watch for symlink rotation.
+  Config::WatchedDirectoryPtr watched_directory_;
+  // CertificateValidationContext according to SDS source;
+  CertificateValidationContextPtr sds_certificate_validation_context_secrets_;
+  // CertificateValidationContext after resolving paths via WatchedDirectory.
+  CertificateValidationContextPtr resolved_certificate_validation_context_secrets_;
   Common::CallbackManager<
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&>
       validation_callback_manager_;
@@ -306,6 +358,7 @@ protected:
     validation_callback_manager_.runCallbacks(secret.session_ticket_keys());
   }
   std::vector<std::string> getDataSourceFilenames() override;
+  Config::WatchedDirectory* getWatchedDirectory() override { return nullptr; }
 
 private:
   Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
@@ -367,6 +420,7 @@ protected:
     validation_callback_manager_.runCallbacks(secret.generic_secret());
   }
   std::vector<std::string> getDataSourceFilenames() override;
+  Config::WatchedDirectory* getWatchedDirectory() override { return nullptr; }
 
 private:
   GenericSecretPtr generic_secret;

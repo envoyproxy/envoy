@@ -311,6 +311,17 @@ message HeaderMap {
   repeated HeaderValue headers = 1;
 }
 
+// A directory that is watched for changes, e.g. by inotify on Linux.
+message WatchedDirectory {
+  // Path to watch. Any move events in this directory will trigger an update.
+  string root = 1 [(validate.rules).string = {min_len: 1}];
+
+  // A subdirectory from *root* containing watched files. This will be resolved
+  // via readlink(2) of *root*/*subdirectory* on an inotify event prior to
+  // reading files.
+  string subdirectory = 2;
+}
+
 // Data source consisting of either a file or an inline value.
 message DataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.DataSource";

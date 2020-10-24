@@ -39,6 +39,8 @@ public:
   ssize_t fileSize(const std::string& path) override;
   std::string fileReadToEnd(const std::string& path) override;
   PathSplitResult splitPathFromFilename(absl::string_view path) override;
+  std::string joinPath(absl::string_view path1, absl::string_view path2) override;
+  std::string readSymlink(absl::string_view path) override;
   bool illegalPath(const std::string& path) override;
 
 private:

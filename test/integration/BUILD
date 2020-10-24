@@ -1139,6 +1139,7 @@ envoy_cc_test(
         "sds_dynamic_integration_test.cc",
     ],
     data = [
+        "sds_dynamic_key_rotation_setup.sh",
         "//test/config/integration/certs",
     ],
     deps = [

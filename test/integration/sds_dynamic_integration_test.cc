@@ -64,6 +64,9 @@ protected:
                       const std::string& secret_name) {
     secret_config->set_name(secret_name);
     auto* config_source = secret_config->mutable_sds_config();
+    if (v3_resource_api_) {
+      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    }
     auto* api_config_source = config_source->mutable_api_config_source();
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     auto* grpc_service = api_config_source->add_grpc_services();
@@ -122,8 +125,14 @@ protected:
   void sendSdsResponse(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info("1");
-    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(API_DOWNGRADE(secret));
+    if (!v3_resource_api_) {
+      discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+      discovery_response.add_resources()->PackFrom(API_DOWNGRADE(secret));
+    } else {
+      discovery_response.set_type_url(
+          "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret");
+      discovery_response.add_resources()->PackFrom(secret);
+    }
 
     xds_stream_->sendGrpcMessage(discovery_response);
   }
@@ -138,6 +147,7 @@ protected:
   const std::string server_cert_;
   const std::string validation_secret_;
   const std::string client_cert_;
+  bool v3_resource_api_{false};
 };
 
 // Downstream SDS integration test: static Listener with ssl cert from SDS
@@ -199,6 +209,60 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
+
+class SdsDynamicKeyRotationIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
+protected:
+  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerSecret() {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    secret.set_name(server_cert_);
+    auto* tls_certificate = secret.mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::temporaryPath("root/current/servercert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    auto* watched_dir = tls_certificate->mutable_watched_directory();
+    watched_dir->set_root(TestEnvironment::temporaryPath("root"));
+    watched_dir->set_subdirectory("current");
+    return secret;
+  }
+};
+
+// We don't care about multiple gRPC types here, Envoy gRPC is fine, the
+// interest is on the filesystem.
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientType, SdsDynamicKeyRotationIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(Grpc::ClientType::EnvoyGrpc)));
+
+TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
+  v3_resource_api_ = true;
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+
+  on_server_init_function_ = [this]() {
+    createSdsStream(*(fake_upstreams_[1]));
+    sendSdsResponse(getCurrentServerSecret());
+  };
+  initialize();
+
+  // Initial update from filesystem.
+  test_server_->waitForCounterGe(
+      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  // First request with server{cert,key}.pem.
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+  cleanupUpstreamAndDownstream();
+  // Rotate.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/new"),
+                              TestEnvironment::temporaryPath("root/current"));
+  test_server_->waitForCounterGe(
+      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 2);
+  // First request with server_ecda{cert,key}.pem.
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+}
 
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
