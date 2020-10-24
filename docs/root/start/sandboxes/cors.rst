@@ -41,8 +41,8 @@ Switch to the ``frontend`` directory in the ``cors`` example, and start the cont
   $ docker-compose up --build -d
   $ docker-compose ps
 
-            Name                          Command              State                            Ports
-  ------------------------------------------------------------------------------------------------------------------------------
+            Name                          Command              State               Ports
+  ------------------------------------------------------------------------------------------------------
   frontend_front-envoy_1        /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
   frontend_frontend-service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
 
