@@ -9,3 +9,4 @@ Developer documentation
   testing/index
   extensions/index
   docs/index
+  standards/index
