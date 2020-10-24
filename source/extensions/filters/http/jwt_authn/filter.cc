@@ -64,8 +64,18 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(
             HttpFilterNames::get().JwtAuthn, route);
     if (per_route_config != nullptr) {
-      verifier = config_->findPerRouteVerifier(*per_route_config);
       use_per_route = true;
+      std::string error_msg;
+      std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config);
+      if (!error_msg.empty()) {
+        stats_.denied_.inc();
+        state_ = Responded;
+        decoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
+                                           absl::StrCat("Failed JWT authentication: ", error_msg),
+                                           nullptr, absl::nullopt,
+                                           absl::StrCat(kRcDetailJwtAuthnPrefix, "{", error_msg, "}"));
+        return Http::FilterHeadersStatus::StopIteration;
+      }
     }
   }
   if (!use_per_route) {

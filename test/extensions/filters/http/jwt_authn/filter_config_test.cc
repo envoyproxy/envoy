@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -157,6 +158,65 @@ filter_state_rules:
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(Http::TestRequestHeaderMapImpl(), filter_state4) !=
               nullptr);
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, FindByRequiremenMap) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+  provider2:
+    issuer: issuer2
+    local_jwks:
+      inline_string: jwks
+requirement_map:
+  r1:
+    provider_name: provider1
+  r2:
+    provider_name: provider2
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+
+  PerRouteConfig per_route;
+  const Verifier* verifier;
+  std::string error_msg;
+
+  per_route.Clear();
+  per_route.set_bypass(true);
+  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_EQ(verifier, nullptr);
+  EXPECT_EQ(error_msg, EMPTY_STRING);
+
+  per_route.Clear();
+  per_route.set_requirement_name("r1");
+  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_NE(verifier, nullptr);
+  EXPECT_EQ(error_msg, EMPTY_STRING);
+
+  per_route.Clear();
+  per_route.set_requirement_name("r2");
+  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_NE(verifier, nullptr);
+  EXPECT_EQ(error_msg, EMPTY_STRING);
+
+  per_route.Clear();
+  per_route.set_requirement_name("wrong-name");
+  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_EQ(verifier, nullptr);
+  EXPECT_EQ(error_msg, "Wrong requirement_name: wrong-name");
+
+  // Empty requirement_name
+  per_route.Clear();
+  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_EQ(verifier, nullptr);
+  EXPECT_EQ(error_msg, "Wrong requirement_name: ");
 }
 
 } // namespace

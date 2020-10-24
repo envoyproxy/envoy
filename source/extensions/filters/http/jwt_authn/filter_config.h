@@ -34,26 +34,9 @@ public:
   // Get the JwksCache object.
   JwksCache& getJwksCache() { return *jwks_cache_; }
 
-  // Get the verifier from the map keyed by the hash of proto JwtRequirement
-  const Verifier* getHashVerifier(size_t hash) const {
-    const auto it = hash_verifiers_.find(hash);
-    if (it != hash_verifiers_.end()) {
-      return it->second.get();
-    }
-    return nullptr;
-  }
-
-  // Set the verifier to the hash map keyed by the hash of proto JwtRequirement
-  void setHashVerifier(size_t hash, VerifierConstPtr verifier) {
-    hash_verifiers_.emplace(hash, std::move(verifier));
-  }
-
 private:
   // The JwksCache object.
   JwksCachePtr jwks_cache_;
-
-  // The map of hash of proto JwtRequirement to verifier.
-  absl::flat_hash_map<size_t, VerifierConstPtr> hash_verifiers_;
 };
 
 /**
@@ -77,15 +60,13 @@ struct JwtAuthnFilterStats {
 class PerRouteFilterConfig : public Envoy::Router::RouteSpecificFilterConfig {
  public:
   PerRouteFilterConfig(const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config)
-      : config_(config), hash_(Envoy::MessageUtil::hash(config_)) {}
+      : config_(config) {}
 
-  size_t hash() const { return hash_; }
   const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config() const {
     return config_; }
 
  private:
   const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig config_;
-  const size_t hash_;
 };
 
 /**
@@ -103,8 +84,8 @@ public:
   virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                        const StreamInfo::FilterState& filter_state) const PURE;
 
-  // Finds the verifier based on per-route config.
-  virtual const Verifier* findPerRouteVerifier(const PerRouteFilterConfig& per_route) PURE;
+  // Finds the verifier based on per-route config. If fail, pair.second has the error message.
+  virtual std::pair<const Verifier*, std::string> findPerRouteVerifier(const PerRouteFilterConfig& per_route) const PURE;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
@@ -160,7 +141,7 @@ public:
     return nullptr;
   }
 
-  const Verifier* findPerRouteVerifier(const PerRouteFilterConfig& per_route) override;
+  std::pair<const Verifier*, std::string> findPerRouteVerifier(const PerRouteFilterConfig& per_route) const override;
 
   // methods for AuthFactory interface. Factory method to help create authenticators.
   AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
@@ -207,6 +188,8 @@ private:
   std::string filter_state_name_;
   // The filter state verifier map from filter_state_rules.
   absl::flat_hash_map<std::string, VerifierConstPtr> filter_state_verifiers_;
+  // The requirement_name to verifier map.
+  absl::flat_hash_map<std::string, VerifierConstPtr> name_verifiers_;
   TimeSource& time_source_;
   Api::Api& api_;
 };

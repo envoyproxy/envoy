@@ -1,5 +1,7 @@
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 
+#include "common/common/empty_string.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -29,21 +31,24 @@ void FilterConfigImpl::init() {
           it.first, Verifier::create(it.second, proto_config_.providers(), *this));
     }
   }
+
+  for (const auto& it : proto_config_.requirement_map()) {
+    name_verifiers_.emplace(
+        it.first, Verifier::create(it.second, proto_config_.providers(), *this));
+  }
 }
 
-const Verifier* FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route){
+std::pair<const Verifier*, std::string> FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) const {
   if (per_route.config().bypass()) {
-    return nullptr;
+    return std::make_pair(nullptr, EMPTY_STRING);
   }
 
-  auto& cache = getCache();
-  const Verifier* verifier = cache.getHashVerifier(per_route.hash());
-  if (verifier == nullptr) {
-    auto new_verifier = Verifier::create(per_route.config().requires(), proto_config_.providers(), *this);
-    verifier = new_verifier.get();
-    cache.setHashVerifier(per_route.hash(), std::move(new_verifier));
+  const auto& it = name_verifiers_.find(per_route.config().requirement_name());
+  if (it != name_verifiers_.end()) {
+    return std::make_pair(it->second.get(), EMPTY_STRING);
   }
-  return verifier;
+
+  return std::make_pair(nullptr, absl::StrCat("Wrong requirement_name: ", per_route.config().requirement_name()));
 }
 
 } // namespace JwtAuthn

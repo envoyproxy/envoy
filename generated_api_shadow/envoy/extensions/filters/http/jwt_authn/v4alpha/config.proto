@@ -462,6 +462,7 @@ message FilterStateRule {
 //              - provider_name: provider1
 //              - provider_name: provider2
 //
+// [#next-free-field: 6]
 message JwtAuthentication {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication";
@@ -528,6 +529,12 @@ message JwtAuthentication {
   // <http://www.w3.org/TR/cors/#cross-origin-request-with-preflight>`_ regardless of JWT
   // requirements specified in the rules.
   bool bypass_cors_preflight = 4;
+
+  // A map of unique requirement_names as string to JwtRequirements.
+  // With this map, each JwtRequirement can be indexed by a string requirement_name.
+  // PerRouteConfig, or other places in the future, could use a requirement_name
+  // to specify a JwtRequirement.
+  map<string, JwtRequirement> requirement_map = 5;
 }
 
 // Specify per-route config.
@@ -542,8 +549,10 @@ message PerRouteConfig {
     // Bypass Jwt authentication.
     bool bypass = 1;
 
-    // Specify a Jwt Requirement.
-    // Its providers must be specified in the `providers` field in JwtAuthentication.
-    JwtRequirement requires = 2;
+    // Use requirement_name to specify a JwtRequirement.
+    // This requirement_name MUST be specified at the `requirement_map` in the
+    // `JwtAuthentication`. If no, or there is a typo, the requests using this route
+    // will be rejected with 401.
+    string requirement_name = 2;
   }
 }
