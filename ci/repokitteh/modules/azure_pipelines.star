@@ -31,7 +31,7 @@ def _get_azp_link(check_id):
     return "https://dev.azure.com/{organization}/{project}/_build/results?buildId={buildId}&view=results".format(organization = _azp_organization, project = project, buildId = build_id)
 
 def _retry(config, comment_id, command):
-    msgs = "Retrying Azure Pipelines.\n"
+    msgs = "Retrying Azure Pipelines:\n"
     check_ids, checks = _get_azp_checks()
 
     retried_checks = []
@@ -45,9 +45,9 @@ def _retry(config, comment_id, command):
         has_running = False
         has_failure = False
         for check in subchecks:
-            if subchecks["conclusion"] != None and subchecks["conclusion"] != "success":
+            if check["conclusion"] != None and check["conclusion"] != "success":
                 has_failure = True
-            if subchecks["status"] != "in_progress":
+            if check["status"] != "in_progress":
                 has_running = True
 
         if not has_failure:
