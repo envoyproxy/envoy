@@ -15,3 +15,4 @@ Operations and administration
   traffic_tapping
   certificates
   performance
+  tools/tools

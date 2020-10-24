@@ -1,18 +1,4 @@
-.. _install_ref_configs:
-
-Reference configurations
-========================
-
-The source distribution includes a set of example configuration templates for each of the three
-major Envoy deployment types:
-
-* :ref:`Service to service <deployment_type_service_to_service>`
-* :ref:`Front proxy <deployment_type_front_proxy>`
-* :ref:`Double proxy <deployment_type_double_proxy>`
-
-The goal of this set of example configurations is to demonstrate the full capabilities of Envoy in
-a complex deployment. All features will not be applicable to all use cases. For full documentation
-see the :ref:`configuration reference <config>`.
+.. _start_tools_configuration_generator:
 
 Configuration generator
 -----------------------

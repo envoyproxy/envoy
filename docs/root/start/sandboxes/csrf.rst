@@ -27,9 +27,6 @@ enforcement. The CSRF enforcement choices are:
   * Ignored: CSRF is enabled but the request type is a GET. This should bypass
     the CSRF filter and return successfully.
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers

@@ -22,9 +22,6 @@ Cached responses can be identified by having an ``age`` header. Validated respon
 as when a response is validated the ``date`` header is updated, while the body stays the same. Validated responses do not have an ``age`` header.
 Responses served from the backend service have no ``age`` header, and their ``date`` header is the same as their generation date.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers

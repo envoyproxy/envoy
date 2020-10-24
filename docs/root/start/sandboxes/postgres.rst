@@ -3,13 +3,9 @@
 Postgres Filter
 ===============
 
-In this example, we show how the :ref:`Postgres filter <config_network_filters_postgres_proxy>` 
+In this example, we show how the :ref:`Postgres filter <config_network_filters_postgres_proxy>`
 can be used with the Envoy proxy. The Envoy proxy configuration includes a Postgres filter that
 parses queries and collects Postgres-specific metrics.
-
-
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
@@ -25,9 +21,9 @@ Step 3: Build the sandbox
   $ docker-compose up --build -d
   $ docker-compose ps
 
-         Name                      Command             State                             Ports                          
+         Name                      Command             State                             Ports
   ----------------------------------------------------------------------------------------------------------------------
-  postgres_postgres_1   docker-entrypoint.sh postgres  Up      0.0.0.0:5432->5432/tcp                                   
+  postgres_postgres_1   docker-entrypoint.sh postgres  Up      0.0.0.0:5432->5432/tcp
   postgres_proxy_1      /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
 
 
@@ -46,14 +42,14 @@ filter can't decode encrypted sessions.
 
   postgres=# CREATE DATABASE testdb;
   CREATE DATABASE
-  postgres=# \c testdb 
+  postgres=# \c testdb
   You are now connected to database "testdb" as user "postgres".
   testdb=# CREATE TABLE tbl ( f SERIAL PRIMARY KEY );
   CREATE TABLE
   testdb=# INSERT INTO tbl VALUES (DEFAULT);
   INSERT 0 1
   testdb=# SELECT * FROM tbl;
-   f 
+   f
   ---
    1
   (1 row)

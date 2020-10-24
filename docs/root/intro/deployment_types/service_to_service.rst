@@ -64,4 +64,4 @@ load balancing, statistics gathering, etc.
 Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The source distribution includes :ref:`an example service-to-service configuration<install_ref_configs>`.
+The source distribution includes :ref:`an example service-to-service configuration<intro_deployment_types>`.

@@ -14,10 +14,6 @@ In this example, all incoming requests are routed via Envoy to a simple goLang w
 We scale up two containers and randomly send requests to each. Envoy is configured to initiate the connection with LRS Server.
 LRS Server enables the stats by sending LoadStatsResponse. Sending requests to http_server will be counted towards successful requests and will be visible in LRS Server logs.
 
-
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Build the sandbox

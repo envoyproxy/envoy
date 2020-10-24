@@ -8,9 +8,6 @@ and updates some headers.
 
 It also takes you through the steps required to build your own C++ Wasm filter, and run it with Envoy.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers

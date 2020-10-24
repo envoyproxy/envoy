@@ -9,9 +9,6 @@ filter that contains two functions namely
 ``envoy_on_request(request_handle)`` and
 ``envoy_on_response(response_handle)`` as documented :ref:`here <config_http_filters_lua>`.
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Build the sandbox

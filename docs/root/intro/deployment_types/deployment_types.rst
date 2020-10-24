@@ -1,3 +1,5 @@
+.. _intro_deployment_types:
+
 Deployment types
 ================
 
