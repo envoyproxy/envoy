@@ -36,7 +36,7 @@ public:
     testing::Mock::AllowLeak(&printer_);
   }
 
-  void TearDown() override {testing::Mock::VerifyAndClear(&printer_); }
+  void TearDown() override { testing::Mock::VerifyAndClear(&printer_); }
 
   void start(const std::string& method) {
     coroutine_->start(state_->getGlobalRef(state_->registerGlobal(method)), 1, yield_callback_);
