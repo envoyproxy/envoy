@@ -190,31 +190,36 @@ requirement_map:
 
   per_route.Clear();
   per_route.set_bypass(true);
-  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_EQ(verifier, nullptr);
   EXPECT_EQ(error_msg, EMPTY_STRING);
 
   per_route.Clear();
   per_route.set_requirement_name("r1");
-  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_NE(verifier, nullptr);
   EXPECT_EQ(error_msg, EMPTY_STRING);
 
   per_route.Clear();
   per_route.set_requirement_name("r2");
-  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_NE(verifier, nullptr);
   EXPECT_EQ(error_msg, EMPTY_STRING);
 
   per_route.Clear();
   per_route.set_requirement_name("wrong-name");
-  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_EQ(verifier, nullptr);
   EXPECT_EQ(error_msg, "Wrong requirement_name: wrong-name");
 
   // Empty requirement_name
   per_route.Clear();
-  std::tie(verifier, error_msg) = filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_EQ(verifier, nullptr);
   EXPECT_EQ(error_msg, "Wrong requirement_name: ");
 }

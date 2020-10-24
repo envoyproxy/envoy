@@ -43,8 +43,7 @@ public:
               (const Http::RequestHeaderMap& headers, const StreamInfo::FilterState& filter_state),
               (const));
   MOCK_METHOD((std::pair<const Verifier*, std::string>), findPerRouteVerifier,
-              (const PerRouteFilterConfig& per_route),
-              (const));
+              (const PerRouteFilterConfig& per_route), (const));
   MOCK_METHOD(bool, bypassCorsPreflightRequest, (), (const));
   MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
 
@@ -371,15 +370,15 @@ TEST_F(FilterTest, TestNoPerRouteConfig) {
 
 // Test bypass requirement from per-route config
 TEST_F(FilterTest, TestPerRouteBypass) {
-  EXPECT_CALL(filter_callbacks_, route())
-      .WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
   EXPECT_CALL(mock_route_->route_entry_, perFilterConfig(HttpFilterNames::get().JwtAuthn))
       .WillOnce(Return(per_route_config_.get()));
 
   // findVerifier is not called.
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).Times(0);
   // If findPerRouteVerifier is called, and return nullptr, it means bypass
-  EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_)).WillOnce(Return(std::make_pair(nullptr, EMPTY_STRING)));
+  EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_))
+      .WillOnce(Return(std::make_pair(nullptr, EMPTY_STRING)));
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -392,15 +391,15 @@ TEST_F(FilterTest, TestPerRouteBypass) {
 
 // Test per-route config with wrong requirement_name
 TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
-  EXPECT_CALL(filter_callbacks_, route())
-      .WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
   EXPECT_CALL(mock_route_->route_entry_, perFilterConfig(HttpFilterNames::get().JwtAuthn))
       .WillOnce(Return(per_route_config_.get()));
 
   // findVerifier is not called.
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).Times(0);
   // If findPerRouteVerifier is called, and return error message.
-  EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_)).WillOnce(Return(std::make_pair(nullptr, "Wrong requirement_name: abc")));
+  EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_))
+      .WillOnce(Return(std::make_pair(nullptr, "Wrong requirement_name: abc")));
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -414,15 +413,15 @@ TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
 
 // Test verifier from per-route config
 TEST_F(FilterTest, TestPerRouteVerifierOK) {
-  EXPECT_CALL(filter_callbacks_, route())
-      .WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
   EXPECT_CALL(mock_route_->route_entry_, perFilterConfig(HttpFilterNames::get().JwtAuthn))
       .WillOnce(Return(per_route_config_.get()));
 
   // findVerifier is not called.
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).Times(0);
   // If findPerRouteVerifier is called
-  EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_)).WillOnce(Return(std::make_pair(mock_verifier_.get(), EMPTY_STRING)));
+  EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_))
+      .WillOnce(Return(std::make_pair(mock_verifier_.get(), EMPTY_STRING)));
 
   // A successful authentication
   EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {

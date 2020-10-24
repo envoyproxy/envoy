@@ -58,14 +58,16 @@ struct JwtAuthnFilterStats {
  * The per-route filter config
  */
 class PerRouteFilterConfig : public Envoy::Router::RouteSpecificFilterConfig {
- public:
-  PerRouteFilterConfig(const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config)
+public:
+  PerRouteFilterConfig(
+      const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config)
       : config_(config) {}
 
   const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config() const {
-    return config_; }
+    return config_;
+  }
 
- private:
+private:
   const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig config_;
 };
 
@@ -85,7 +87,8 @@ public:
                                        const StreamInfo::FilterState& filter_state) const PURE;
 
   // Finds the verifier based on per-route config. If fail, pair.second has the error message.
-  virtual std::pair<const Verifier*, std::string> findPerRouteVerifier(const PerRouteFilterConfig& per_route) const PURE;
+  virtual std::pair<const Verifier*, std::string>
+  findPerRouteVerifier(const PerRouteFilterConfig& per_route) const PURE;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
@@ -141,7 +144,8 @@ public:
     return nullptr;
   }
 
-  std::pair<const Verifier*, std::string> findPerRouteVerifier(const PerRouteFilterConfig& per_route) const override;
+  std::pair<const Verifier*, std::string>
+  findPerRouteVerifier(const PerRouteFilterConfig& per_route) const override;
 
   // methods for AuthFactory interface. Factory method to help create authenticators.
   AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,

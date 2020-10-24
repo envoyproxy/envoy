@@ -70,17 +70,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       if (!error_msg.empty()) {
         stats_.denied_.inc();
         state_ = Responded;
-        decoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
-                                           absl::StrCat("Failed JWT authentication: ", error_msg),
-                                           nullptr, absl::nullopt,
-                                           absl::StrCat(kRcDetailJwtAuthnPrefix, "{", error_msg, "}"));
+        decoder_callbacks_->sendLocalReply(
+            Http::Code::Forbidden, absl::StrCat("Failed JWT authentication: ", error_msg), nullptr,
+            absl::nullopt, absl::StrCat(kRcDetailJwtAuthnPrefix, "{", error_msg, "}"));
         return Http::FilterHeadersStatus::StopIteration;
       }
     }
   }
   if (!use_per_route) {
-    verifier =
-        config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
+    verifier = config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
   }
 
   if (verifier == nullptr) {

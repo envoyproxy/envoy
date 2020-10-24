@@ -33,12 +33,13 @@ void FilterConfigImpl::init() {
   }
 
   for (const auto& it : proto_config_.requirement_map()) {
-    name_verifiers_.emplace(
-        it.first, Verifier::create(it.second, proto_config_.providers(), *this));
+    name_verifiers_.emplace(it.first,
+                            Verifier::create(it.second, proto_config_.providers(), *this));
   }
 }
 
-std::pair<const Verifier*, std::string> FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) const {
+std::pair<const Verifier*, std::string>
+FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) const {
   if (per_route.config().bypass()) {
     return std::make_pair(nullptr, EMPTY_STRING);
   }
@@ -48,7 +49,8 @@ std::pair<const Verifier*, std::string> FilterConfigImpl::findPerRouteVerifier(c
     return std::make_pair(it->second.get(), EMPTY_STRING);
   }
 
-  return std::make_pair(nullptr, absl::StrCat("Wrong requirement_name: ", per_route.config().requirement_name()));
+  return std::make_pair(
+      nullptr, absl::StrCat("Wrong requirement_name: ", per_route.config().requirement_name()));
 }
 
 } // namespace JwtAuthn
