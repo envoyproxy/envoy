@@ -17,8 +17,7 @@ filegroup(
             "root/**/*.pb",
         ],
         exclude = [
-            "root/tutorial/**/*",
-            "root/intro/_include/life-of-a-request.yaml",
+            "root/start/tutorial/**/*",
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
