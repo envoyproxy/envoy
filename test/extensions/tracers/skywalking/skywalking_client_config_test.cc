@@ -42,7 +42,7 @@ static const std::string SKYWALKING_CONFIG_WITH_CLIENT_CONFIG = R"EOF(
     envoy_grpc:
       cluster_name: fake_cluster
   client_config:
-    authentication: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
+    backend_token: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
     service_name: "FAKE_FAKE_FAKE"
     instance_name: "FAKE_FAKE_FAKE"
     max_cache_size: 2333
@@ -62,7 +62,7 @@ TEST_F(SkyWalkingClientConfigTest, NoProtoClientConfigTest) {
   EXPECT_EQ(client_config_->service(), test_string);
   EXPECT_EQ(client_config_->serviceInstance(), test_string);
   EXPECT_EQ(client_config_->maxCacheSize(), 1024);
-  EXPECT_EQ(client_config_->authentication(), "");
+  EXPECT_EQ(client_config_->backendToken(), "");
 }
 
 // Test whether the client config can work correctly when the proto client config is provided.
@@ -72,7 +72,7 @@ TEST_F(SkyWalkingClientConfigTest, WithProtoClientConfigTest) {
   EXPECT_EQ(client_config_->service(), "FAKE_FAKE_FAKE");
   EXPECT_EQ(client_config_->serviceInstance(), "FAKE_FAKE_FAKE");
   EXPECT_EQ(client_config_->maxCacheSize(), 2333);
-  EXPECT_EQ(client_config_->authentication(), "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE");
+  EXPECT_EQ(client_config_->backendToken(), "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE");
 }
 
 // Test whether the client config can get default value for service name and instance name.

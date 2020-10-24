@@ -81,7 +81,7 @@ protected:
 // Test whether the reporter can correctly add metadata according to the configuration.
 TEST_F(TraceSegmentReporterTest, TraceSegmentReporterInitialMetadata) {
   const std::string yaml_string = R"EOF(
-    authentication: "FakeStringForAuthenticaion"
+    backend_token: "FakeStringForAuthenticaion"
   )EOF";
 
   setupTraceSegmentReporter(yaml_string);

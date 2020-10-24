@@ -22,14 +22,14 @@ public:
   const std::string& service() const { return service_; }
   const std::string& serviceInstance() const { return service_instance_; }
 
-  const std::string& authentication() const;
+  const std::string& backendToken() const;
 
 private:
   uint16_t max_cache_size_{0};
   std::string service_;
   std::string service_instance_;
 
-  std::string authentication_token_;
+  std::string backend_token_;
 
   Server::Configuration::ServerFactoryContext& factory_context_;
 };

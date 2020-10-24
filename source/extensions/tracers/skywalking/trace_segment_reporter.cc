@@ -97,8 +97,8 @@ TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory
 }
 
 void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  if (!client_config_.authentication().empty()) {
-    metadata.setReferenceKey(authenticationTokenKey(), client_config_.authentication());
+  if (!client_config_.backendToken().empty()) {
+    metadata.setReferenceKey(authenticationTokenKey(), client_config_.backendToken());
   }
 }
 

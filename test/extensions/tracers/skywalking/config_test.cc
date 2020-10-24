@@ -66,7 +66,7 @@ TEST(SkyWalkingTracerConfigTest, SkyWalkingHttpTracerWithClientConfig) {
         envoy_grpc:
           cluster_name: fake_cluster
       client_config:
-        authentication: "A fake auth string for SkyWalking test"
+        backend_token: "A fake auth string for SkyWalking test"
         service_name: "Test Service"
         instance_name: "Test Instance"
         max_cache_size: 2333

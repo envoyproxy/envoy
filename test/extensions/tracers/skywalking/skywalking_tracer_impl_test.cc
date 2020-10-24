@@ -57,7 +57,7 @@ static const std::string SKYWALKING_CONFIG_WITH_CLIENT_CONFIG = R"EOF(
     envoy_grpc:
       cluster_name: fake_cluster
   client_config:
-    authentication: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
+    backend_token: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
     service_name: "FAKE_FAKE_FAKE"
     instance_name: "FAKE_FAKE_FAKE"
     max_cache_size: 2333

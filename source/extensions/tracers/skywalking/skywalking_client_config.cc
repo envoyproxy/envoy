@@ -32,18 +32,18 @@ SkyWalkingClientConfig::SkyWalkingClientConfig(Server::Configuration::TracerFact
                                 : factory_context_.localInfo().nodeName()
                           : config.instance_name();
 
-  if (config.authentication_specifier_case() ==
-          envoy::config::trace::v3::ClientConfig::AuthenticationSpecifierCase::kAuthentication ||
-      config.authentication_specifier_case() ==
-          envoy::config::trace::v3::ClientConfig::AuthenticationSpecifierCase::
-              AUTHENTICATION_SPECIFIER_NOT_SET) {
-    authentication_token_ = config.authentication();
+  if (config.backend_token_specifier_case() ==
+          envoy::config::trace::v3::ClientConfig::BackendTokenSpecifierCase::kBackendToken ||
+      config.backend_token_specifier_case() ==
+          envoy::config::trace::v3::ClientConfig::BackendTokenSpecifierCase::
+              BACKEND_TOKEN_SPECIFIER_NOT_SET) {
+    backend_token_ = config.backend_token();
   }
 }
 
-// TODO(wbpcode): currently, authentication token can only be configured with inline string. It
-// will be possible to get authentication through the SDS API later.
-const std::string& SkyWalkingClientConfig::authentication() const { return authentication_token_; }
+// TODO(wbpcode): currently, backend authentication token can only be configured with inline string.
+// It will be possible to get authentication through the SDS API later.
+const std::string& SkyWalkingClientConfig::backendToken() const { return backend_token_; }
 
 } // namespace SkyWalking
 } // namespace Tracers
