@@ -1,4 +1,4 @@
-.. _install_sandboxes_wasm_filter:
+.. _install_sandboxes_dynamic_configuration:
 
 Dynamic configuration
 =====================
