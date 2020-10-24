@@ -4,9 +4,9 @@ This directory contains tools which is useful for developers using VSCode.
 
 ## Recommended VSCode setup
 
-It is recommended to use [devcontainer](../.devcontainer/README.md), or setting up an equivalent
+It is recommended to use [devcontainer](../../.devcontainer/README.md), or setting up an equivalent
 environment. Recommended extensions and settings are listed in
-[devcontainer.json](../.devcontainer/devcontainer.json).
+[devcontainer.json](../../.devcontainer/devcontainer.json).
 
 ## Refresh compilation database
 
