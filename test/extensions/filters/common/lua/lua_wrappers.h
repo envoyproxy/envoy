@@ -22,7 +22,7 @@ public:
   MOCK_METHOD(void, testPrint, (const std::string&), (const));
 };
 
-const Printer& getPrinter() { CONSTRUCT_ON_FIRST_USE(Printer); }
+Printer& getPrinter() { MUTABLE_CONSTRUCT_ON_FIRST_USE(Printer); }
 
 template <class T> class LuaWrappersTestBase : public testing::Test {
 public:
@@ -34,6 +34,10 @@ public:
     lua_pushcclosure(coroutine_->luaState(), luaTestPrint, 1);
     lua_setglobal(coroutine_->luaState(), "testPrint");
     testing::Mock::AllowLeak(&printer_);
+  }
+
+  void TearDown() override {
+    testing::Mock::VerifyAndClear(&printer_);
   }
 
   void start(const std::string& method) {
@@ -50,7 +54,7 @@ public:
   ThreadLocalStatePtr state_;
   std::function<void()> yield_callback_;
   CoroutinePtr coroutine_;
-  const Printer& printer_{getPrinter()};
+  Printer& printer_{getPrinter()};
 };
 
 } // namespace Lua
