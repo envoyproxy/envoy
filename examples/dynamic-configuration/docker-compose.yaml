@@ -9,7 +9,6 @@ services:
       - go-control-plane
       - service1
       - service2
-    command: "/usr/local/bin/envoy -c /etc/envoy.yaml -l debug"
     ports:
       - 10000:10000
       - 19000:19000
@@ -24,6 +23,4 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-control-plane
-    volumes:
-      - ./go-control-plane:/go/go-control-plane
-    command: bash -c "cd go-control-plane && bin/example"
+    command: make example
