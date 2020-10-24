@@ -14,9 +14,6 @@ service behind the proxy will be checked by an external HTTP or gRPC service. In
 for every authorized call, the external authorization service adds additional ``x-current-user``
 header entry to the original request headers to be forwarded to the upstream service.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers
