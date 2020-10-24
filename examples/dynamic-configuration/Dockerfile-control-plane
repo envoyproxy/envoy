@@ -1,0 +1,4 @@
+FROM golang
+
+RUN git clone https://github.com/envoyproxy/go-control-plane
+RUN cd go-control-plane && make bin/example
