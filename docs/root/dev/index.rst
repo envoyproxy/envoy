@@ -8,4 +8,4 @@ Developer documentation
   build/index
   testing/index
   extensions/index
-  sandbox/index
+  docs/index
