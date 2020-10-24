@@ -160,8 +160,6 @@ envoy_cc_library(
     name = "watchdog_interface",
     hdrs = ["watchdog.h"],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/network:address_interface",
         "//include/envoy/thread:thread_interface",
     ],
 )

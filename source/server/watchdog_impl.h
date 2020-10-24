@@ -1,9 +1,7 @@
 #pragma once
 
 #include <atomic>
-#include <chrono>
 
-#include "envoy/common/time.h"
 #include "envoy/server/watchdog.h"
 
 namespace Envoy {
@@ -34,7 +32,6 @@ public:
 private:
   const Thread::ThreadId thread_id_;
   std::atomic<bool> touched_{false};
-  Event::TimerPtr timer_;
 };
 
 } // namespace Server
