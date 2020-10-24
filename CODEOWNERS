@@ -37,7 +37,7 @@ extensions/filters/common/original_src @snowp @klarose
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # tls transport socket extension
-/*/extensions/transport_sockets/tls @PiotrSikora @lizan
+/*/extensions/transport_sockets/tls @PiotrSikora @lizan @asraa
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
 # common transport socket
@@ -93,7 +93,7 @@ extensions/filters/common/original_src @snowp @klarose
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 # common crypto extension
-/*/extensions/common/crypto @lizan @PiotrSikora @bdecoste
+/*/extensions/common/crypto @lizan @PiotrSikora @bdecoste @asraa
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
 /*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
@@ -108,7 +108,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/squash @yuval-k @alyssawilk
 /*/extensions/filters/common/ext_authz @gsagula @dio
 /*/extensions/filters/common/original_src @klarose @snowp
-/*/extensions/filters/listener/tls_inspector @piotrsikora @htuch
+/*/extensions/filters/listener/tls_inspector @piotrsikora @htuch @asraa
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
 /*/extensions/internal_redirect @alyssawilk @penguingao
