@@ -47,7 +47,7 @@ def _retry(config, comment_id, command):
         for check in subchecks:
             if check["conclusion"] != None and check["conclusion"] != "success":
                 has_failure = True
-            if check["status"] != "in_progress":
+            if check["status"] == "in_progress":
                 has_running = True
 
         if not has_failure:
