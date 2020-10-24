@@ -8,6 +8,9 @@ Envoy documentation
     This is pre-release documentation. There is risk of it not being consistent with what is
     currently implemented in Envoy, though we try to make things consistent as quickly as possible.
 
+User documentation
+------------------
+
 .. toctree::
   :maxdepth: 2
 
@@ -20,3 +23,15 @@ Envoy documentation
   api/api
   faq/overview
   version_history/version_history
+
+Developer documentation
+-----------------------
+
+.. toctree::
+  :maxdepth: 2
+
+  community/index
+  build/index
+  testing/index
+  extensions/index
+  sandbox/index
