@@ -19,6 +19,7 @@
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
+#include "zlib.h"
 
 using Envoy::Server::ServerLifecycleNotifier;
 using StageCallbackWithCompletion =
@@ -348,44 +349,6 @@ TEST_P(WasmCommonTest, DivByZero) {
   wasm->start(plugin);
 }
 
-TEST_P(WasmCommonTest, EmscriptenVersion) {
-  if (GetParam() != "v8") {
-    return;
-  }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
-  Upstream::MockClusterManager cluster_manager;
-  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  auto name = "";
-  auto root_id = "";
-  auto vm_id = "";
-  auto vm_configuration = "";
-  auto plugin_configuration = "";
-  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
-  EXPECT_FALSE(code.empty());
-  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      name, root_id, vm_id, GetParam(), plugin_configuration, false,
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
-  EXPECT_NE(wasm, nullptr);
-  auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
-
-  uint32_t major = 9, minor = 9, abi_major = 9, abi_minor = 9;
-  EXPECT_TRUE(wasm->getEmscriptenVersion(&major, &minor, &abi_major, &abi_minor));
-  EXPECT_EQ(major, 0);
-  EXPECT_LE(minor, 3);
-  // Up to (at least) emsdk 1.39.6.
-  EXPECT_EQ(abi_major, 0);
-  EXPECT_LE(abi_minor, 20);
-}
-
 TEST_P(WasmCommonTest, IntrinsicGlobals) {
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
@@ -569,8 +532,13 @@ TEST_P(WasmCommonTest, Foreign) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
+#ifdef ZLIBNG_VERSION
+        EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 22")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 22 -> 2000")));
+#else
         EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 23")));
         EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 23 -> 2000")));
+#endif
         return root_context;
       });
   wasm->start(plugin);
