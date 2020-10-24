@@ -69,7 +69,7 @@ public:
   bool empty_response_ = true;
 };
 
-class GrpcHealthCheckFuzz : public HealthCheckFuzz, GrpcHealthCheckerImplTestBaseUtils {
+class GrpcHealthCheckFuzz : public HealthCheckFuzz, public HealthCheckerTestBase {
 public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
@@ -87,6 +87,33 @@ public:
   // Determines whether a client closes after responds and timeouts. Exactly maps to
   // received_no_error_goaway_ in source code.
   bool received_no_error_goaway_ = false;
+
+  // In order to not affect unit tests, move state here. Since only one test session, we don't need
+  // a vector. Also, we should make Timers NiceMocks.
+  struct TestSession {
+    TestSession() = default;
+
+    NiceMock<Event::MockTimer>* interval_timer_{};
+    NiceMock<Event::MockTimer>* timeout_timer_{};
+    Http::MockClientConnection* codec_{};
+    Stats::IsolatedStoreImpl stats_store_;
+    Network::MockClientConnection* client_connection_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
+    CodecClientForTest* codec_client_{};
+  };
+
+  using TestSessionPtr = std::unique_ptr<TestSession>;
+  TestSessionPtr test_session_;
+
+  void expectSessionCreate();
+  void expectClientCreate(size_t index);
+  void expectStreamCreate();
+
+  std::vector<TestSessionPtr> test_sessions_;
+  std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
+  std::list<uint32_t> connection_index_{};
+  std::list<uint32_t> codec_index_{};
 };
 
 } // namespace Upstream
