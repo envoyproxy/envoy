@@ -17,7 +17,7 @@ curl -s http://localhost:19000/config_dump \
 run_log "Bring up go-control-plane"
 docker-compose up --build -d go-control-plane
 
-sleep 20
+wait_for 30 sh -c "docker-compose ps go-control-plane | grep healthy | grep -v unhealthy"
 
 run_log "Check for response from service1 backend"
 responds_with \
