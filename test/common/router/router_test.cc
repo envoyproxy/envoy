@@ -641,7 +641,7 @@ TEST_F(RouterTest, AddCookie) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -676,6 +676,7 @@ TEST_F(RouterTest, AddCookie) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
+
   EXPECT_EQ(callbacks_.details(), "via_upstream");
   // When the router filter gets reset we should cancel the pool request.
   router_.onDestroy();
@@ -693,7 +694,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -744,7 +745,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
