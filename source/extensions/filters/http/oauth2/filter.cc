@@ -327,7 +327,9 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   validator_->setParams(headers, config_->tokenSecret());
   if (validator_->isValid()) {
     config_->stats().oauth_success_.inc();
-    setBearerToken(headers, validator_->token());
+    if (config_->forwardBearerToken() && !validator_->token().empty()) {
+      setBearerToken(headers, validator_->token());
+    }
     return true;
   }
 
@@ -373,7 +375,6 @@ void OAuth2Filter::finishFlow() {
   // We have fully completed the entire OAuth flow, whether through Authorization header or from
   // user redirection to the auth server.
   if (found_bearer_token_) {
-    setBearerToken(*request_headers_, access_token_);
     config_->stats().oauth_success_.inc();
     decoder_callbacks_->continueDecoding();
     return;
@@ -419,6 +420,7 @@ void OAuth2Filter::finishFlow() {
   if (config_->forwardBearerToken()) {
     response_headers->addReferenceKey(Http::Headers::get().SetCookie,
                                       absl::StrCat("BearerToken=", access_token_, cookie_tail));
+    setBearerToken(*request_headers_, access_token_);
   }
 
   response_headers->setLocation(state_);
