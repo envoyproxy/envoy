@@ -205,7 +205,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
 
   // Sanitized return reference mocking
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(mock_request_headers, false));
@@ -414,7 +414,7 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
@@ -447,7 +447,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
@@ -485,7 +485,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));

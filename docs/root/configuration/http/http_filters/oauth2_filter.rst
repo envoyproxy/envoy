@@ -7,6 +7,19 @@ OAuth2
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.oauth2.v3alpha.OAuth2>`
 * This filter should be configured with the name *envoy.filters.http.oauth2*.
 
+The OAuth filter's flow involves:
+
+* An unauthenticated user arrives at myapp.com, and the oauth filter redirects them to the authorization_endpoint for login. The client ID is sent in the query string in this first redirect.
+* After a successful login, the authn server should be configured to redirect the user back to myapp.com/callback, assuming you have chosen /callback as your match path inside the Envoy config. An "authorization grant" is included in the query string for this second redirect.
+* Using this new grant and the token_secret, the filter then attempts to retrieve an access token from the token_endpoint. The filter knows to do this instead of reinitiating another login because the incoming request has a path that matches the redirect_path_matcher criteria.
+* Upon receiving an access token, the filter sets cookies so that subseqeuent requests can skip the full flow. These cookies are calculated using the hmac_secret to assist in encoding.
+* The filter calls continueDecoding().
+
+When the authn server validates the client and returns an authorization token back to the OAuth filter,
+no matter what format that token is, if `forward_bearer_token` is set to true the filter will send over a 
+cookie named `BearerToken` to the upstream. Additionally, the `Authorization` header will be populated
+with the same value.
+
 .. attention::
 
   The OAuth2 filter is currently under active development.
@@ -86,10 +99,31 @@ And the below code block is an example of how we employ it as one of
                     sds_config:
                       path: "/etc/envoy/hmac.yaml"
           - name: envoy.router
+          route_config:
+            virtual_hosts:
+            - name: service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: service
+                  timeout: 5s
 
   clusters:
   - name: service
-    # ...
+    connect_timeout: 5s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080
   - name: auth
     connect_timeout: 5s
     type: LOGICAL_DNS
@@ -109,10 +143,15 @@ And the below code block is an example of how we employ it as one of
 Notes
 -----
 
-This module does not currently provide much Cross-Site-Request-Forgery protection for the redirect
-loop to the OAuth server and back.
+When enabled, the OAuth filter does not protect against Cross-Site-Request-Forgery attacks on domains with
+cached authentication (in the form of cookies.)
+It is recommended to pair the OAuth filter with the CSRF filter to prevent malicious social engineering.
 
-The service must be served over HTTPS for this filter to work, as the cookies use `;secure`.
+The service must be served over HTTPS for this filter to work properly, as the cookies use `;secure`.
+
+The signout path will redirect the current user to '/', and clear all authentication cookies related to
+the HMAC validation. Consequently, the OAuth filter will then restart the full OAuth flow at the root path,
+sending the user to the configured auth endpoint.
 
 Statistics
 ----------
