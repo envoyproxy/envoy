@@ -7,6 +7,7 @@ Developer documentation
   community/index
   build/index
   testing/index
+  core/index
   extensions/index
   docs/index
   standards/index
