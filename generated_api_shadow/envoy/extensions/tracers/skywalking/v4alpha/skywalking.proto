@@ -60,8 +60,8 @@ message ClientConfig {
     string backend_token = 3 [(udpa.annotations.sensitive) = true];
   }
 
-  // Envoy caches the segment in memory when the backend service is temporarily unavailable. This
-  // field specifies the maximum number of segments that can be cached. If not specified, the
+  // Envoy caches the segment in memory when the SkyWakking backend service is temporarily unavailable.
+  // This field specifies the maximum number of segments that can be cached. If not specified, the
   // default is 1024.
   google.protobuf.UInt32Value max_cache_size = 4;
 }
