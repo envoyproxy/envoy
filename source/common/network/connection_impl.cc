@@ -495,6 +495,9 @@ void ConnectionImpl::onWriteBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
   ASSERT(write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = false;
+  if (Event::optimizeLevelEvents && Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    ioHandle().enableFileEvents(ioHandle().getEnabledFileEvents() & ~Event::FileReadyType::Write);
+  }
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback) {
       callback->onBelowWriteBufferLowWatermark();
@@ -506,6 +509,9 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
   ASSERT(!write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = true;
+  if (Event::optimizeLevelEvents && Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    ioHandle().enableFileEvents(ioHandle().getEnabledFileEvents() | Event::FileReadyType::Write);
+  }
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback) {
       callback->onAboveWriteBufferHighWatermark();
@@ -541,12 +547,18 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 
   if (events & Event::FileReadyType::Write) {
+    if (Event::optimizeLevelEvents && Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+      ioHandle().enableFileEvents(ioHandle().getEnabledFileEvents() & ~Event::FileReadyType::Write);
+    }
     onWriteReady();
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore write event processing.
   if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
+    if (Event::optimizeLevelEvents && Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+      ioHandle().enableFileEvents(ioHandle().getEnabledFileEvents() & ~Event::FileReadyType::Read);
+    }
     onReadReady();
   }
 }

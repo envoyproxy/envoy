@@ -84,8 +84,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
     num_bytes_to_read += slice_length;
   }
   ASSERT(num_bytes_to_read <= max_length);
-  return sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
+  auto result = sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
+  if (Event::optimizeLevelEvents &&
+      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      enableFileEvents(file_event_->getEnabled() | Event::FileReadyType::Read);
+    }
+  }
+
+  return result;
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint64_t max_length) {
@@ -103,6 +111,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint6
     bytes_to_commit -= slices[i].len_;
   }
   buffer.commit(slices, num_slices);
+
+  if (Event::optimizeLevelEvents &&
+      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      enableFileEvents(file_event_->getEnabled() | Event::FileReadyType::Read);
+    }
+  }
   return result;
 }
 
@@ -120,8 +135,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   if (num_slices_to_write == 0) {
     return Api::ioCallUint64ResultNoError();
   }
-  return sysCallResultToIoCallResult(
+  auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
+
+  if (Event::optimizeLevelEvents &&
+      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      enableFileEvents(file_event_->getEnabled() | Event::FileReadyType::Write);
+    }
+  }
+  return result;
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
@@ -130,6 +153,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
   Api::IoCallUint64Result result = writev(slices.begin(), slices.size());
   if (result.ok() && result.rc_ > 0) {
     buffer.drain(static_cast<uint64_t>(result.rc_));
+  }
+
+  if (Event::optimizeLevelEvents &&
+      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      enableFileEvents(file_event_->getEnabled() | Event::FileReadyType::Write);
+    }
   }
   return result;
 }
@@ -545,6 +575,7 @@ void IoSocketHandleImpl::activateFileEvents(uint32_t events) {
 
 void IoSocketHandleImpl::enableFileEvents(uint32_t events) {
   if (file_event_) {
+    ENVOY_LOG_MISC(debug, "Changing event mask for fd {} from {} -> {}", fd_, getEnabledFileEvents(), events);
     file_event_->setEnabled(events);
   } else {
     ENVOY_BUG(false, "Null file_event_");

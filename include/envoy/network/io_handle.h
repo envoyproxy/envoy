@@ -292,6 +292,11 @@ public:
   virtual void enableFileEvents(uint32_t events) PURE;
 
   /**
+   * Get the currently enabled events of the underlying fd.
+   */
+  virtual uint32_t getEnabledFileEvents() PURE;
+
+  /**
    * Resets the file event.
    */
   virtual void resetFileEvents() PURE;

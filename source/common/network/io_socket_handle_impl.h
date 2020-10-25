@@ -74,6 +74,14 @@ public:
 
   void resetFileEvents() override { file_event_.reset(); }
 
+  uint32_t getEnabledFileEvents() override {
+    if (file_event_) {
+      return file_event_->getEnabled();
+    } else {
+      ENVOY_BUG(false, "Null file_event_");
+      return 0;
+    }
+  }
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
 

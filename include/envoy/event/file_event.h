@@ -18,10 +18,13 @@ struct FileReadyType {
   static const uint32_t Closed = 0x4;
 };
 
+// #define FORCE_LEVEL 0
 enum class FileTriggerType { Level, Edge };
 
+static constexpr bool optimizeLevelEvents = true;
+
 static constexpr FileTriggerType PlatformDefaultTriggerType
-#ifdef WIN32
+#if defined(WIN32) || defined(FORCE_LEVEL_EVENTS)
     // Libevent only supports Level trigger on Windows.
     {FileTriggerType::Level};
 #else
@@ -53,6 +56,11 @@ public:
    * registered events and fire callbacks when they are active.
    */
   virtual void setEnabled(uint32_t events) PURE;
+
+  /**
+   * Gets the currently enabled events.
+   */
+  virtual uint32_t getEnabled() PURE;
 };
 
 using FileEventPtr = std::unique_ptr<FileEvent>;

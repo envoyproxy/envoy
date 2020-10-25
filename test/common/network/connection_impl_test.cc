@@ -1098,6 +1098,18 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  if (Event::optimizeLevelEvents &&
+      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    EXPECT_CALL(os_sys_calls, readv(_, _, _))
+        .WillOnce(Invoke([&](os_fd_t fd, const iovec* vec, int l) -> Api::SysCallSizeResult {
+          return os_calls.get_latched_instance()->readv(fd, vec, l);
+        }))
+        .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+          return {-1, SOCKET_ERROR_AGAIN};
+        }));
+  }
+
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
@@ -1832,7 +1844,7 @@ public:
           return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));
 
-    file_event_ = new Event::MockFileEvent;
+    file_event_ = new NiceMock<Event::MockFileEvent>;
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
     transport_socket_ = new NiceMock<MockTransportSocket>;
@@ -2419,7 +2431,12 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Closed));
+  int times_enabled_called = 1;
+  if (Event::optimizeLevelEvents &&
+      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    times_enabled_called = 2;
+  }
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(times_enabled_called);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().
@@ -2446,7 +2463,12 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
   EXPECT_CALL(dispatcher_, createTimer_(_));
   // With half-close semantics enabled we will not wait for early close notification.
   // See the `Envoy::Network::ConnectionImpl::readDisable()' method for more details.
-  EXPECT_CALL(*file_event_, setEnabled(0));
+  int times_enabled_called = 1;
+  if (Event::optimizeLevelEvents &&
+      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    times_enabled_called = 2;
+  }
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(times_enabled_called);
   connection_->enableHalfClose(true);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
@@ -2479,7 +2501,12 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredCanFlush
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed));
+  int times_enabled_called = 1;
+  if (Event::optimizeLevelEvents &&
+      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+    times_enabled_called = 2;
+  }
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(times_enabled_called);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().

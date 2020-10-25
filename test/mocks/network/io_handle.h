@@ -58,6 +58,7 @@ public:
   MOCK_METHOD(void, activateFileEvents, (uint32_t events));
   MOCK_METHOD(void, enableFileEvents, (uint32_t events));
   MOCK_METHOD(void, resetFileEvents, ());
+  MOCK_METHOD(uint32_t, getEnabledFileEvents, ());
   MOCK_METHOD(Api::SysCallIntResult, shutdown, (int how));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
 };

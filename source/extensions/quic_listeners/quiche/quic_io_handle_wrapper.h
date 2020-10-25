@@ -126,6 +126,7 @@ public:
   void activateFileEvents(uint32_t events) override { io_handle_.activateFileEvents(events); }
   void enableFileEvents(uint32_t events) override { io_handle_.enableFileEvents(events); }
   void resetFileEvents() override { return io_handle_.resetFileEvents(); };
+  uint32_t getEnabledFileEvents() override { return io_handle_.getEnabledFileEvents(); }
 
   Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
