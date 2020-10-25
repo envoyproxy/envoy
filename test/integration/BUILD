@@ -874,6 +874,7 @@ envoy_cc_test(
     ],
     shard_count = 2,
     # Times out on Windows
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
