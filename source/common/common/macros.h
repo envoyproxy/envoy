@@ -3,6 +3,15 @@
 namespace Envoy {
 
 /**
+ * Assert memory bounds to avoid copy errors.
+*/
+#define SAFE_MEMCPY(dst, src)  \
+  do { \
+    static_assert(sizeof(*(src)) == sizeof(*(dst))); \
+    memcpy(dst, src, sizeof(*(src))); \
+  } while (0)
+
+/**
  * @return the size of a C array.
  */
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
