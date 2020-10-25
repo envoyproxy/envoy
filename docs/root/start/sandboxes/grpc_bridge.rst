@@ -3,9 +3,6 @@
 gRPC Bridge
 ===========
 
-Envoy gRPC
-~~~~~~~~~~
-
 The gRPC bridge sandbox is an example usage of Envoy's
 :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>`.
 
@@ -18,10 +15,6 @@ The client send messages through a proxy that upgrades the HTTP requests from ``
 
 Another Envoy feature demonstrated in this example is Envoy's ability to do authority
 base routing via its route configuration.
-
-
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
@@ -87,8 +80,8 @@ To build this sandbox example and start the example services, run the following 
     grpc-bridge_grpc-server_1              /bin/sh -c /bin/server         Up      0.0.0.0:8081->8081/tcp
 
 
-Sending requests to the Key/Value store
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 5: Send requests to the Key/Value store
+********************************************
 
 To use the Python service and send gRPC requests:
 
