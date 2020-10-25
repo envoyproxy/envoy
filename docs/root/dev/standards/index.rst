@@ -1,6 +1,6 @@
 
-Code standards and style guides
-===============================
+Code standards, linting, and style guides
+=========================================
 
 c++
 ---
