@@ -23,9 +23,11 @@ First lets build our containers and start the proxy container, and two backend H
     $ docker-compose up -d proxy
     $ docker-compose ps
 
-	Name                     Command                State             Ports
-    -----------------------------------------------------------------------------------------------
-
+	      Name                            Command                 State                     Ports
+    ------------------------------------------------------------------------------------------------------------------------------
+    dynamic-configuration_proxy_1      /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp, 0.0.0.0:19000->19000/tcp
+    dynamic-configuration_service1_1   /bin/echo-server               Up      8080/tcp
+    dynamic-configuration_service2_1   /bin/echo-server               Up      8080/tcp
 
 Step 4: Check web response
 **************************
@@ -36,7 +38,6 @@ Nothing is listening on 10000
 
    $ curl http://localhost:10000
    curl: (56) Recv failure: Connection reset by peer
-
 
 If we config dump the clusters we just see the ``xds_cluster`` we configured for the control
 plane
@@ -56,9 +57,12 @@ Step 5: Start the go-control-plane
     $ docker-compose up -d go-control-plane
     $ docker-compose ps
 
-	Name                     Command                State             Ports
-    -----------------------------------------------------------------------------------------------
-
+		Name                                Command                  State                    Ports
+    -----------------------------------------------------------------------------------------------------------------------------------------
+    dynamic-configuration_go-control-plane_1  bin/example -debug             Up (healthy)
+    dynamic-configuration_proxy_1             /docker-entrypoint.sh /usr ... Up            0.0.0.0:10000->10000/tcp, 0.0.0.0:19000->19000/tcp
+    dynamic-configuration_service1_1          /bin/echo-server               Up            8080/tcp
+    dynamic-configuration_service2_1          /bin/echo-server               Up            8080/tcp
 
 Step 5: Query the proxy
 ***********************
