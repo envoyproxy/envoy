@@ -54,8 +54,8 @@ public:
 
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
-  Context* getRootContext(absl::string_view root_id) {
-    return static_cast<Context*>(WasmBase::getRootContext(root_id));
+  Context* getRootContext(const std::shared_ptr<PluginBase>& plugin, bool allow_closed) {
+    return static_cast<Context*>(WasmBase::getRootContext(plugin, allow_closed));
   }
   void setTimerPeriod(uint32_t root_context_id, std::chrono::milliseconds period) override;
   virtual void tickHandler(uint32_t root_context_id);
@@ -72,12 +72,13 @@ public:
   void getFunctions() override;
 
   // AccessLog::Instance
-  void log(absl::string_view root_id, const Http::RequestHeaderMap* request_headers,
+  void log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info);
 
-  void onStatsUpdate(absl::string_view root_id, Envoy::Stats::MetricSnapshot& snapshot);
+  void onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot);
+
   virtual std::string buildVersion() { return BUILD_VERSION_NUMBER; }
 
   void initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifier);

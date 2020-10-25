@@ -23,8 +23,6 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
       proto_config, context.messageValidationVisitor());
-  auto access_log =
-      std::make_shared<WasmAccessLog>(config.config().root_id(), nullptr, std::move(filter));
 
   // Create a base WASM to verify that the code loads before setting/cloning the for the
   // individual threads.
@@ -34,6 +32,8 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
       Common::Wasm::anyToBytes(config.config().configuration()), config.config().fail_open(),
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(),
       nullptr /* listener_metadata */);
+
+  auto access_log = std::make_shared<WasmAccessLog>(plugin, nullptr, std::move(filter));
 
   auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     auto tls_slot = context.threadLocal().allocateSlot();

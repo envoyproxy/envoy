@@ -82,7 +82,7 @@ public:
     }
     setupBase(std::get<0>(GetParam()), code, createContextFn(), root_id, vm_configuration);
   }
-  void setupFilter(const std::string root_id = "") { setupFilterBase<TestFilter>(root_id); }
+  void setupFilter() { setupFilterBase<TestFilter>(); }
 
   void setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& callbacks);
 
@@ -291,7 +291,7 @@ TEST_P(WasmHttpFilterTest, HeadersStopAndWatermark) {
 // Script that reads the body.
 TEST_P(WasmHttpFilterTest, BodyRequestReadBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"x-test-operation", "ReadBody"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
@@ -303,7 +303,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestReadBody) {
 // Script that prepends and appends to the body.
 TEST_P(WasmHttpFilterTest, BodyRequestPrependAndAppendToBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
   EXPECT_CALL(filter(),
               log_(spdlog::level::err, Eq(absl::string_view("onBody prepend.hello.append"))));
   EXPECT_CALL(filter(), log_(spdlog::level::err,
@@ -327,7 +327,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestPrependAndAppendToBody) {
 // Script that replaces the body.
 TEST_P(WasmHttpFilterTest, BodyRequestReplaceBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody replace")))).Times(2);
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
                                                  {"x-test-operation", "ReplaceBody"}};
@@ -348,7 +348,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestReplaceBody) {
 // Script that removes the body.
 TEST_P(WasmHttpFilterTest, BodyRequestRemoveBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody "))));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
                                                  {"x-test-operation", "RemoveBody"}};
@@ -361,7 +361,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestRemoveBody) {
 // Script that buffers the body.
 TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
                                                  {"x-test-operation", "BufferBody"}};
@@ -404,7 +404,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
 // Script that prepends and appends to the buffered body.
 TEST_P(WasmHttpFilterTest, BodyRequestPrependAndAppendToBufferedBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
   EXPECT_CALL(filter(),
               log_(spdlog::level::err, Eq(absl::string_view("onBody prepend.hello.append"))));
   Http::TestRequestHeaderMapImpl request_headers{
@@ -418,7 +418,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestPrependAndAppendToBufferedBody) {
 // Script that replaces the buffered body.
 TEST_P(WasmHttpFilterTest, BodyRequestReplaceBufferedBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody replace"))));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
                                                  {"x-test-operation", "ReplaceBufferedBody"}};
@@ -431,7 +431,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestReplaceBufferedBody) {
 // Script that removes the buffered body.
 TEST_P(WasmHttpFilterTest, BodyRequestRemoveBufferedBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody "))));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
                                                  {"x-test-operation", "RemoveBufferedBody"}};
@@ -444,7 +444,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestRemoveBufferedBody) {
 // Script that buffers the first part of the body and streams the rest
 TEST_P(WasmHttpFilterTest, BodyRequestBufferThenStreamBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
@@ -494,7 +494,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferThenStreamBody) {
 // Script that buffers the first part of the body and streams the rest
 TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
   setupTest("body");
-  setupFilter("body");
+  setupFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
@@ -577,7 +577,7 @@ TEST_P(WasmHttpFilterTest, AccessLogCreate) {
 
 TEST_P(WasmHttpFilterTest, AsyncCall) {
   setupTest("async_call");
-  setupFilter("async_call");
+  setupFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
@@ -624,7 +624,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallBadCall) {
     return;
   }
   setupTest("async_call");
-  setupFilter("async_call");
+  setupFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
@@ -644,7 +644,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallBadCall) {
 
 TEST_P(WasmHttpFilterTest, AsyncCallFailure) {
   setupTest("async_call");
-  setupFilter("async_call");
+  setupFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
@@ -685,7 +685,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallFailure) {
 
 TEST_P(WasmHttpFilterTest, AsyncCallAfterDestroyed) {
   setupTest("async_call");
-  setupFilter("async_call");
+  setupFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
@@ -735,7 +735,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     return;
   }
   setupTest("grpc_call");
-  setupFilter("grpc_call");
+  setupFilter();
   NiceMock<Grpc::MockAsyncRequest> request;
   Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
   Grpc::MockAsyncClientManager client_manager;
@@ -790,7 +790,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
     return;
   }
   setupTest("grpc_call");
-  setupFilter("grpc_call");
+  setupFilter();
   Grpc::MockAsyncClientManager client_manager;
   auto client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
   auto async_client = std::make_unique<Grpc::MockAsyncClient>();
@@ -819,7 +819,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
     return;
   }
   setupTest("grpc_call");
-  setupFilter("grpc_call");
+  setupFilter();
   NiceMock<Grpc::MockAsyncRequest> request;
   Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
   Grpc::MockAsyncClientManager client_manager;
@@ -881,7 +881,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
     return;
   }
   setupTest("grpc_call");
-  setupFilter("grpc_call");
+  setupFilter();
   NiceMock<Grpc::MockAsyncRequest> request;
   Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
   Grpc::MockAsyncClientManager client_manager;
@@ -925,7 +925,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
     return;
   }
   setupTest("grpc_call");
-  setupFilter("grpc_call");
+  setupFilter();
   NiceMock<Grpc::MockAsyncRequest> request;
   Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
   Grpc::MockAsyncClientManager client_manager;
@@ -969,7 +969,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
     return;
   }
   setupTest("grpc_call");
-  setupFilter("grpc_call");
+  setupFilter();
   Grpc::MockAsyncRequest request;
   Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
   Grpc::MockAsyncClientManager client_manager;
@@ -1026,7 +1026,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
 
 void WasmHttpFilterTest::setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& callbacks) {
   setupTest("grpc_stream");
-  setupFilter("grpc_stream");
+  setupFilter();
 
   EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, _))
       .WillRepeatedly(
@@ -1381,7 +1381,7 @@ TEST_P(WasmHttpFilterTest, SharedData) {
 
 TEST_P(WasmHttpFilterTest, SharedQueue) {
   setupTest("shared_queue");
-  setupFilter("shared_queue");
+  setupFilter();
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("onRequestHeaders enqueue Ok"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn,
@@ -1420,7 +1420,7 @@ TEST_P(WasmHttpFilterTest, RootId1) {
     return;
   }
   setupTest("context1");
-  setupFilter("context1");
+  setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders1 2"))));
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
@@ -1433,7 +1433,7 @@ TEST_P(WasmHttpFilterTest, RootId2) {
     return;
   }
   setupTest("context2");
-  setupFilter("context2");
+  setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders2 2"))));
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));

@@ -12,13 +12,15 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Wasm {
 
+using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 using Envoy::Extensions::Common::Wasm::WasmHandle;
 
 class WasmAccessLog : public AccessLog::Instance {
 public:
-  WasmAccessLog(absl::string_view root_id, ThreadLocal::SlotPtr tls_slot,
+  WasmAccessLog(const PluginSharedPtr& plugin, ThreadLocal::SlotPtr tls_slot,
                 AccessLog::FilterPtr filter)
-      : root_id_(root_id), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
+      : plugin_(plugin), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
+
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
@@ -31,7 +33,7 @@ public:
     }
 
     if (tls_slot_->get()) {
-      tls_slot_->getTyped<WasmHandle>().wasm()->log(root_id_, request_headers, response_headers,
+      tls_slot_->getTyped<WasmHandle>().wasm()->log(plugin_, request_headers, response_headers,
                                                     response_trailers, stream_info);
     }
   }
@@ -41,8 +43,18 @@ public:
     tls_slot_ = std::move(tls_slot);
   }
 
+  ~WasmAccessLog() {
+    if (tls_slot_->get()) {
+      tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                                     -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        object->asType<WasmHandle>().wasm()->startShutdown(plugin);
+        return object;
+      });
+    }
+  }
+
 private:
-  std::string root_id_;
+  Common::Wasm::PluginSharedPtr plugin_;
   ThreadLocal::SlotPtr tls_slot_;
   AccessLog::FilterPtr filter_;
 };

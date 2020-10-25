@@ -114,9 +114,9 @@ public:
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {
 public:
-  template <typename TestFilter> void setupFilterBase(const std::string root_id = "") {
+  template <typename TestFilter> void setupFilterBase() {
     auto wasm = WasmTestBase<Base>::wasm_ ? WasmTestBase<Base>::wasm_->wasm().get() : nullptr;
-    int root_context_id = wasm ? wasm->getRootContext(root_id)->id() : 0;
+    int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
     context_ = std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_);
     context_->setDecoderFilterCallbacks(decoder_callbacks_);
     context_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -131,9 +131,9 @@ public:
 template <typename Base = testing::Test>
 class WasmNetworkFilterTestBase : public WasmTestBase<Base> {
 public:
-  template <typename TestFilter> void setupFilterBase(const std::string root_id = "") {
+  template <typename TestFilter> void setupFilterBase() {
     auto wasm = WasmTestBase<Base>::wasm_ ? WasmTestBase<Base>::wasm_->wasm().get() : nullptr;
-    int root_context_id = wasm ? wasm->getRootContext(root_id)->id() : 0;
+    int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
     context_ = std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_);
     context_->initializeReadFilterCallbacks(read_filter_callbacks_);
     context_->initializeWriteFilterCallbacks(write_filter_callbacks_);

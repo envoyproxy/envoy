@@ -19,9 +19,21 @@ namespace Wasm {
 class WasmService {
 public:
   WasmService(Common::Wasm::WasmHandleSharedPtr singleton) : singleton_(std::move(singleton)) {}
-  WasmService(ThreadLocal::SlotPtr tls_slot) : tls_slot_(std::move(tls_slot)) {}
+  WasmService(Common::Wasm::PluginSharedPtr plugin, ThreadLocal::SlotPtr tls_slot)
+      : plugin_(plugin), tls_slot_(std::move(tls_slot)) {}
+
+  ~WasmService() {
+    if (tls_slot_ && tls_slot_->get()) {
+      tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                                     -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        object->asType<Common::Wasm::WasmHandle>().wasm()->startShutdown(plugin);
+        return object;
+      });
+    }
+  }
 
 private:
+  Common::Wasm::PluginSharedPtr plugin_;
   Common::Wasm::WasmHandleSharedPtr singleton_;
   ThreadLocal::SlotPtr tls_slot_;
 };

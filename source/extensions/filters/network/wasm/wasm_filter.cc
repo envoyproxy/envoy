@@ -1,9 +1,5 @@
 #include "extensions/filters/network/wasm/wasm_filter.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -38,6 +34,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::
           context.lifecycleNotifier(), remote_data_provider_, std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm network filter {}", plugin->name_));
+  }
+}
+
+FilterConfig::~FilterConfig() {
+  if (tls_slot_->get()) {
+    tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                                   -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      object->asType<WasmHandle>().wasm()->startShutdown(plugin);
+      return object;
+    });
   }
 }
 

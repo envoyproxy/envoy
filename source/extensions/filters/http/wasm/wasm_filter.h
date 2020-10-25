@@ -23,6 +23,7 @@ class FilterConfig : Logger::Loggable<Logger::Id::wasm> {
 public:
   FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config,
                Server::Configuration::FactoryContext& context);
+  ~FilterConfig();
 
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
@@ -33,7 +34,7 @@ public:
       return nullptr;
     }
     if (wasm && !root_context_id_) {
-      root_context_id_ = wasm->getRootContext(plugin_->root_id_)->id();
+      root_context_id_ = wasm->getRootContext(plugin_, false)->id();
     }
     return std::make_shared<Context>(wasm, root_context_id_, plugin_);
   }

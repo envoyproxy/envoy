@@ -243,16 +243,16 @@ ContextBase* Wasm::createRootContext(const std::shared_ptr<PluginBase>& plugin) 
 
 ContextBase* Wasm::createVmContext() { return new Context(this); }
 
-void Wasm::log(absl::string_view root_id, const Http::RequestHeaderMap* request_headers,
+void Wasm::log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
                const Http::ResponseHeaderMap* response_headers,
                const Http::ResponseTrailerMap* response_trailers,
                const StreamInfo::StreamInfo& stream_info) {
-  auto context = getRootContext(root_id);
+  auto context = getRootContext(plugin, true);
   context->log(request_headers, response_headers, response_trailers, stream_info);
 }
 
-void Wasm::onStatsUpdate(absl::string_view root_id, Envoy::Stats::MetricSnapshot& snapshot) {
-  auto context = getRootContext(root_id);
+void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot) {
+  auto context = getRootContext(plugin, true);
   context->onStatsUpdate(snapshot);
 }
 

@@ -48,7 +48,7 @@ void WasmFactory::createWasm(const envoy::extensions::wasm::v3::WasmService& con
       return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(
           Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher));
     });
-    cb(std::make_unique<WasmService>(std::move(tls_slot)));
+    cb(std::make_unique<WasmService>(plugin, std::move(tls_slot)));
   };
 
   if (!Common::Wasm::createWasm(

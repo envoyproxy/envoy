@@ -1,14 +1,5 @@
 #include "extensions/filters/http/wasm/wasm_filter.h"
 
-#include "envoy/http/codes.h"
-
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -43,6 +34,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
           context.lifecycleNotifier(), remote_data_provider_, std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm HTTP filter {}", plugin->name_));
+  }
+}
+
+FilterConfig::~FilterConfig() {
+  if (tls_slot_->get()) {
+    tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                                   -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      object->asType<WasmHandle>().wasm()->startShutdown(plugin);
+      return object;
+    });
   }
 }
 
