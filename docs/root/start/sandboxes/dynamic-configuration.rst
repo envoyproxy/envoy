@@ -44,38 +44,9 @@ plane
 .. code-block:: console
 
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].static_clusters'
-   [
-     {
-       "cluster": {
-	 "@type": "type.googleapis.com/envoy.api.v2.Cluster",
-	 "name": "xds_cluster",
-	 "type": "STRICT_DNS",
-	 "connect_timeout": "1s",
-	 "http2_protocol_options": {},
-	 "load_assignment": {
-	   "cluster_name": "xds_cluster",
-	   "endpoints": [
-	     {
-	       "lb_endpoints": [
-		 {
-		   "endpoint": {
-		     "address": {
-		       "socket_address": {
-			 "address": "go-control-plane",
-			 "port_value": 18000
-		       }
-		     }
-		   }
-		 }
-	       ]
-	     }
-	   ]
-	 }
-       },
-       "last_updated": "2020-10-24T18:30:55.458Z"
-     }
-   ]
 
+.. literalinclude:: _include/dynamic-configuration/response-config-cluster.json
+   :language: json
 
 Step 5: Start the go-control-plane
 **********************************
