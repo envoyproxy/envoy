@@ -37,14 +37,14 @@ To build this sandbox example, and start the example apps run the following comm
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                Name                            Command                State                                Ports
-    ---------------------------------------------------------------------------------------------------------------------------------------------
-    elasticsearch                      /tini -- /usr/local/bin/do ... Up (healthy)   0.0.0.0:9200->9200/tcp, 9300/tcp
-    oap                                bash docker-entrypoint.sh      Up (healthy)   0.0.0.0:11800->11800/tcp, 1234/tcp, 0.0.0.0:12800->12800/tcp
-    skywalking-tracing_front-envoy_1   /docker-entrypoint.sh /bin ... Up             10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
-    skywalking-tracing_service1_1      /bin/sh -c /usr/local/bin/ ... Up             10000/tcp, 8000/tcp
-    skywalking-tracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up             10000/tcp, 8000/tcp
-    ui                                 bash docker-entrypoint.sh      Up             0.0.0.0:8080->8080/tcp
+                Name                              Command                State                                  Ports
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    skywalking-tracing_elasticsearch_1    /tini -- /usr/local/bin/do ... Up (healthy)   0.0.0.0:9200->9200/tcp, 9300/tcp
+    skywalking-tracing_front-envoy_1      /docker-entrypoint.sh /bin ... Up             10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+    skywalking-tracing_service1_1         /bin/sh /usr/local/bin/sta ... Up             10000/tcp
+    skywalking-tracing_service2_1         /bin/sh /usr/local/bin/sta ... Up             10000/tcp
+    skywalking-tracing_skywalking-oap_1   bash docker-entrypoint.sh      Up (healthy)   0.0.0.0:11800->11800/tcp, 1234/tcp, 0.0.0.0:12800->12800/tcp
+    skywalking-tracing_skywalking-ui_1    bash docker-entrypoint.sh      Up             0.0.0.0:8080->8080/tcp
 
 Step 4: Generate some load
 **************************
@@ -71,6 +71,16 @@ You can now send a request to service1 via the front-envoy as follows:
     <
     Hello from behind Envoy (service 1)! hostname: 1a2ba43d6d84 resolvedhostname: 172.19.0.6
     * Connection #0 to host localhost left intact
+
+You can get SkyWalking stats of front-envoy after some requests as follows:
+
+.. code-block:: console
+
+    $ curl -s localhost:8001/stats | grep tracing.skywalking
+    tracing.skywalking.cache_flushed: 0
+    tracing.skywalking.segments_dropped: 0
+    tracing.skywalking.segments_flushed: 0
+    tracing.skywalking.segments_sent: 13
 
 Step 5: View the traces in SkyWalking UI
 ****************************************

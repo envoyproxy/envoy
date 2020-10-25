@@ -1,21 +1,19 @@
 version: "3.7"
 services:
-
   # Front envoy.
   front-envoy:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
+    restart: on-failure:3
     networks:
       - envoymesh
-    expose:
-      - "8000"
-      - "8001"
     ports:
       - "8000:8000"
       - "8001:8001"
     depends_on:
-      - skywalking-oap
+      skywalking-oap:
+        condition: service_healthy
   # First service.
   service1:
     build:
@@ -27,30 +25,28 @@ services:
       - envoymesh
     environment:
       - SERVICE_NAME=1
-    expose:
-      - "8000"
+    restart: on-failure:3
     depends_on:
-      - skywalking-oap
+      skywalking-oap:
+        condition: service_healthy
   # Second service.
   service2:
     build:
       context: ../front-proxy
       dockerfile: Dockerfile-service
+    restart: on-failure:3
     volumes:
       - ./service2-envoy-skywalking.yaml:/etc/service-envoy.yaml
     networks:
       - envoymesh
     environment:
       - SERVICE_NAME=2
-    expose:
-      - "8000"
     depends_on:
-      - skywalking-oap
+      skywalking-oap:
+        condition: service_healthy
   # Skywalking components.
   elasticsearch:
     image: elasticsearch:7.9.2
-    container_name: elasticsearch
-    restart: always
     networks:
       - envoymesh
     ports:
@@ -61,52 +57,48 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    restart: on-failure:3
     environment:
       discovery.type: single-node
-    expose:
-      - "9200"
     ulimits:
       memlock:
         soft: -1
         hard: -1
   skywalking-oap:
     image: apache/skywalking-oap-server:8.1.0-es7
-    container_name: oap
     networks:
       - envoymesh
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     links:
       - elasticsearch
-    restart: always
     ports:
       - 11800:11800
       - 12800:12800
     environment:
       SW_STORAGE: elasticsearch7
       SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
-    expose:
-      - "11800"
-      - "12800" 
     healthcheck:
       test: ["CMD-SHELL", "/skywalking/bin/swctl"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    restart: on-failure:3
   skywalking-ui:
     image: apache/skywalking-ui:8.1.0
-    container_name: ui
     networks:
       - envoymesh
     depends_on:
-      - skywalking-oap
+      skywalking-oap:
+        condition: service_healthy
     links:
       - skywalking-oap
-    restart: always
     ports:
       - 8080:8080
     environment:
       SW_OAP_ADDRESS: skywalking-oap:12800
+    restart: on-failure:3
 networks:
   envoymesh: {}
