@@ -12,7 +12,7 @@ dynamic_resources:
     grpc_services:
     - envoy_grpc:
         cluster_name: xds_cluster
-    set_node_on_first_message_only: true
+    set_node_on_first_message_only: false
   cds_config:
     resource_api_version: V3
     ads: {}

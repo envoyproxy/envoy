@@ -14,14 +14,16 @@ services:
 
   service1:
     image: jmalloc/echo-server
+    hostname: service1
 
   service2:
     image: jmalloc/echo-server
+    hostname: service2
 
   go-control-plane:
     build:
       context: .
       dockerfile: Dockerfile-control-plane
-    command: make example
+    command: bin/example -debug
     healthcheck:
       test: nc -zv localhost 18000
