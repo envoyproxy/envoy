@@ -12,7 +12,6 @@ dynamic_resources:
     grpc_services:
     - envoy_grpc:
         cluster_name: xds_cluster
-    set_node_on_first_message_only: false
   cds_config:
     resource_api_version: V3
     ads: {}
@@ -45,9 +44,3 @@ layered_runtime:
           resource_api_version: V3
           ads: {}
         name: runtime-0
-    - name: runtime-1
-      rtds_layer:
-        rtds_config:
-          resource_api_version: V3
-          ads: {}
-        name: runtime-1

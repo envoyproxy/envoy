@@ -9,6 +9,11 @@ export UPARGS=" proxy"
 run_log "Check port 10000 is not open (still shows as succeeded)"
 nc -zv localhost 10000 |& grep -v open
 
+run_log "Check the static cluster"
+curl -s http://localhost:19000/config_dump \
+    | jq -r '.configs[1].static_clusters' \
+    | grep 'go-control-plane'
+
 run_log "Check there is no config for dynamic clusters"
 curl -s http://localhost:19000/config_dump \
     | jq -r '.configs[1].dynamic_active_clusters // "NO_CLUSTERS"' \
