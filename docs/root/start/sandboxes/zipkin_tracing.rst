@@ -29,10 +29,6 @@ calls to other services. In the sandbox we have provided, the simple flask app
 (see trace function in :repo:`/examples/front-proxy/service.py`) acting as service1 propagates
 the trace headers while making an outbound call to service2.
 
-
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Build the sandbox

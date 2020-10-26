@@ -26,9 +26,6 @@ The CORS enforcement choices are:
   * Restricted: CORS is enabled on the route requested and the only allowed
     origin is ``envoyproxy.io``. This will result in a client-side CORS error.
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers

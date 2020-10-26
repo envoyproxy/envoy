@@ -57,6 +57,15 @@ tapping and debugging of HTTP traffic. It works as follows:
    <envoy_v3_api_msg_data.tap.v3.HttpBufferedTrace>` messages (serialized to JSON) until the admin
    request is terminated.
 
+.. attention::
+
+  If using HTTP/1.1 to communicate with the admin endpoint, it is important to not use Unix Domain
+  Sockets (UDS) as the underlying transport. This is because UDS do not support "early close
+  detection" which means that when the client is disconnected it may take a substantial amount of
+  time for Envoy to realize the connection has been terminated (typically when the next streamed
+  message is written). During this time period it is currently impossible to connect a new tap. To
+  work around this either use HTTP/2 or use TCP.
+
 An example POST body:
 
 .. code-block:: yaml
