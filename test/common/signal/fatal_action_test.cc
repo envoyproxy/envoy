@@ -1,7 +1,6 @@
 #include "envoy/server/fatal_action_config.h"
 
 #include "common/signal/fatal_error_handler.h"
-#include "common/signal/signal_action.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
@@ -68,7 +67,7 @@ TEST_F(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
   FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
                                           Thread::threadFactoryForTest());
 
-  EXPECT_DEATH(
+  EXPECT_DEBUG_DEATH(
       {
         // We've already set this up when we set up the test suite, so this
         // subsequent call should trigger Envoy bug.

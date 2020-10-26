@@ -11,6 +11,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/signal/fatal_error_handler.h"
 #include "common/thread_local/thread_local_impl.h"
 #include "common/version/version.h"
 
@@ -48,6 +49,10 @@ using testing::SaveArg;
 using testing::StrictMock;
 
 namespace Envoy {
+namespace FatalErrorHandler {
+
+extern void resetFatalActionState();
+} // namespace FatalErrorHandler
 namespace Server {
 namespace {
 
@@ -176,6 +181,9 @@ public:
 
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTestBase {
+public:
+  ServerInstanceImplTestBase() { FatalErrorHandler::resetFatalActionState(); }
+
 protected:
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
