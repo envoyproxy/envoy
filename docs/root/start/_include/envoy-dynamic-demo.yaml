@@ -9,7 +9,6 @@ dynamic_resources:
     grpc_services:
     - envoy_grpc:
         cluster_name: xds_cluster
-    set_node_on_first_message_only: false
   cds_config:
     resource_api_version: V3
     ads: {}
@@ -21,6 +20,8 @@ static_resources:
   clusters:
   - connect_timeout: 1s
     type: strict_dns
+    http2_protocol_options: {}
+    name: xds_cluster
     load_assignment:
       cluster_name: xds_cluster
       endpoints:
@@ -28,25 +29,17 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: go-control-plane
+                address: my-control-plane
                 port_value: 18000
-    http2_protocol_options: {}
-    name: xds_cluster
 
 layered_runtime:
   layers:
-    - name: runtime-0
-      rtds_layer:
-        rtds_config:
-          resource_api_version: V3
-          ads: {}
-        name: runtime-0
-    - name: runtime-1
-      rtds_layer:
-        rtds_config:
-          resource_api_version: V3
-          ads: {}
-        name: runtime-1
+  - name: runtime-0
+    rtds_layer:
+      name: runtime-0
+      rtds_config:
+        resource_api_version: V3
+        ads: {}
 
 admin:
   access_log_path: /dev/null
