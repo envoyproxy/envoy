@@ -35,7 +35,7 @@ curl -s http://localhost:19000/config_dump \
 run_log "Bring down the control plane"
 docker-compose stop go-control-plane
 
-sleep 5
+sleep 2
 
 run_log "Check for continued response from service1 backend"
 responds_with \
@@ -56,7 +56,7 @@ sed -i s/\"1\",/\"2\",/ resource.go
 
 run_log "Bring back up the control plane"
 docker-compose up --build -d go-control-plane
-sleep 20
+wait_for 30 sh -c "docker-compose ps go-control-plane | grep healthy | grep -v unhealthy"
 
 run_log "Check for response from service2 backend"
 responds_with \
