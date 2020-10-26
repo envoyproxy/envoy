@@ -211,14 +211,14 @@ to provide Envoy with its configuration.
 One example of a control plane compatible with Envoy is Istio's Pilot.
 
 You may also wish to explore implementing your own control plane, in which case the
-`Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_ reference implementation is a good place
-to start.
+`Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_ provides a reference implementation
+that is a good place to start.
 
-At a minimum, you will need to start Envoy with ``node``, a ``dynamic_resources`` section to tell Envoy which
-configurations should be updated dynamically, and a ``static_resources`` section to specify where Envoy should
-retrieve its configuration from.
-
-You will also need to add a ``layered_runtime`` section to persist dynamically-provided configurations.
+At a minimum, you will need to start Envoy configured with the following sections:
+- ``node`` information, to uniquely identify the proxy node.
+- ``dynamic_resources`` to tell Envoy which configurations should be updated dynamically
+- ``static_resources`` to specify where Envoy should retrieve its configuration from.
+- ``layered_runtime`` to persist dynamically-provided configurations.
 
 You can also add an ``admin`` section if you wish to monitor Envoy or retrieve stats or configuration information.
 
@@ -228,15 +228,58 @@ The following sections walk through the dynamic configuration provided in the
 Dynamic configuration: node
 ***************************
 
-The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
-as opposed to the means of configuring resources dynamically when Envoy is running.
+The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should specify...
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 1-3
-    :emphasize-lines: 1
+    :lines: 1-5
+    :emphasize-lines: 1-3
 
+
+Dynamic configuration: dynamic_resources
+****************************************
+
+The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` should specify...
+
+.. literalinclude:: _include/envoy-dynamic-demo.yaml
+    :language: yaml
+    :linenos:
+    :lines: 3-20
+    :emphasize-lines: 3-15
+
+Dynamic configuration: static_resources
+***************************************
+
+The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` should specify...
+
+.. literalinclude:: _include/envoy-dynamic-demo.yaml
+    :language: yaml
+    :linenos:
+    :lines: 18-36
+    :emphasize-lines: 3-11
+
+Dynamic configuration: layered_runtime
+**************************************
+
+The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime>` should specify...
+
+.. literalinclude:: _include/envoy-dynamic-demo.yaml
+    :language: yaml
+    :linenos:
+    :lines: 34-51
+    :emphasize-lines: 3-10
+
+Dynamic configuration: admin
+****************************
+
+The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` should specify...
+
+.. literalinclude:: _include/envoy-dynamic-demo.yaml
+    :language: yaml
+    :linenos:
+    :lines: 51-56
+    :emphasize-lines: 1-4
 
 
 Next steps
