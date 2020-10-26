@@ -129,8 +129,6 @@ void DnsSrvRecord::addTarget(const absl::string_view target, const DnsTargetAttr
 
 DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& client_request,
                                                         DnsParserCounters& counters) {
-  ENVOY_LOG(trace, "Creating context for {} -> {}", client_request.addresses_.peer_->asStringView(),
-            client_request.addresses_.local_->asStringView());
   DnsQueryContextPtr query_context = std::make_unique<DnsQueryContext>(
       client_request.addresses_.local_, client_request.addresses_.peer_, counters, retry_count_);
 
