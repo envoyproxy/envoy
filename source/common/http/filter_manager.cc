@@ -1263,12 +1263,14 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
     return false;
   }
 
-  if (headers != nullptr) {
-    parent_.filter_manager_callbacks_.chargeStats(*headers);
-  }
-
   parent_.stream_info_.setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
+
+  if (headers != nullptr) {
+    ResponseHeaderMapPtr headers_copy = createHeaderMap<ResponseHeaderMapImpl>(*headers);
+    parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers_copy));
+    parent_.filter_manager_callbacks_.chargeStats(*headers);
+  }
 
   parent_.filter_manager_callbacks_.recreateStream(parent_.stream_info_.filter_state_);
 
