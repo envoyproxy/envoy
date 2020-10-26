@@ -240,24 +240,26 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 Dynamic configuration: dynamic_resources
 ****************************************
 
-The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` should specify...
+The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` should specify...
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
     :linenos:
     :lines: 3-20
-    :emphasize-lines: 3-15
+    :lineno-start: 3
+    :emphasize-lines: 3-16
 
 Dynamic configuration: static_resources
 ***************************************
 
-The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` should specify...
+The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` should specify...
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
     :linenos:
     :lines: 18-36
-    :emphasize-lines: 3-11
+    :lineno-start: 18
+    :emphasize-lines: 3-17
 
 Dynamic configuration: layered_runtime
 **************************************
@@ -268,7 +270,8 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime
     :language: yaml
     :linenos:
     :lines: 34-51
-    :emphasize-lines: 3-10
+    :lineno-start: 34
+    :emphasize-lines: 3-16
 
 Dynamic configuration: admin
 ****************************
@@ -279,8 +282,8 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` should 
     :language: yaml
     :linenos:
     :lines: 51-56
-    :emphasize-lines: 1-4
-
+    :lineno-start: 51
+    :emphasize-lines: 1-6
 
 Next steps
 ----------
