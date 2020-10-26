@@ -24,7 +24,7 @@ namespace HttpFilters {
 namespace Cache {
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                             const absl::flat_hash_set<std::string>& allowed_vary_headers)
+                             const VaryHeader& vary_allow_list)
     : timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
@@ -54,7 +54,7 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   key_.set_path(std::string(request_headers.getPathValue()));
   key_.set_clear_http(forwarded_proto == scheme_values.Http);
 
-  vary_headers_ = VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers);
+  vary_headers_ = vary_allow_list.possibleVariedHeaders(request_headers);
 }
 
 // Unless this API is still alpha, calls to stableHashKey() must always return
@@ -214,15 +214,13 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
 
   // Multiple instances of range headers are invalid.
   // https://tools.ietf.org/html/rfc7230#section-3.2.2
-  std::vector<absl::string_view> range_headers;
-  Http::HeaderUtility::getAllOfHeader(request_headers, Http::Headers::get().Range.get(),
-                                      range_headers);
+  const auto range_header = request_headers.get(Http::Headers::get().Range);
 
   absl::string_view header_value;
-  if (range_headers.size() == 1) {
-    header_value = range_headers.front();
+  if (range_header.size() == 1) {
+    header_value = range_header[0]->value().getStringView();
   } else {
-    if (range_headers.size() > 1) {
+    if (range_header.size() > 1) {
       ENVOY_LOG(debug, "Multiple range headers provided in request. Ignoring all range headers.");
     }
     return {};

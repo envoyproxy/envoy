@@ -9,6 +9,9 @@
  *
  */
 
+// Modified from https://raw.githubusercontent.com/sphinx-doc/sphinx/3.x/sphinx/themes/basic/static/searchtools.js
+// to have renderApiVersionLabel to render the API version for each search result item.
+
 if (!Scorer) {
   /**
    * Simple result scoring code.
@@ -249,6 +252,16 @@ var Search = {
     //Search.lastresults = results.slice();  // a copy
     //console.info('search results:', Search.lastresults);
 
+    // renderApiVersionLabel renders API version for each search result item.
+    function renderApiVersionLabel(linkUrl) {
+      const filtered = linkUrl
+        .split("/")
+        .filter((part) => part.startsWith("api-v"));
+      return filtered.length === 1
+        ? '&nbsp;<sup class="api-version-label">' + filtered.pop() + "</sup>"
+        : "";
+    }
+
     // print the results
     var resultCount = results.length;
     function displayNextItem() {
@@ -281,6 +294,10 @@ var Search = {
             .attr("href", linkUrl + highlightstring + item[2])
             .html(item[1])
         );
+        var apiVersion = renderApiVersionLabel(linkUrl);
+        if (apiVersion !== "") {
+          listItem.append(apiVersion);
+        }
         if (item[3]) {
           listItem.append($("<span> (" + item[3] + ")</span>"));
           Search.output.append(listItem);

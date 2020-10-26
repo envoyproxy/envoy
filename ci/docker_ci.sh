@@ -4,6 +4,10 @@
 # CI logs.
 set -e
 
+function is_windows() {
+  [[ "$(uname -s)" == *NT* ]]
+}
+
 ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIRECTORY:-.}/build_images}"
 
 # Setting environments for buildx tools
@@ -12,7 +16,7 @@ config_env() {
   docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
   # Remove older build instance
-  docker buildx rm multi-builder | true
+  docker buildx rm multi-builder || :
   docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
 }
 
@@ -20,10 +24,12 @@ build_platforms() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
 
-  if [[ -z "${FILE_SUFFIX}" ]]; then
-    echo "linux/arm64,linux/amd64"
+  if is_windows; then
+    echo "windows/amd64"
+  elif [[ -z "${FILE_SUFFIX}" ]]; then
+      echo "linux/arm64,linux/amd64"
   else
-    echo "linux/amd64"
+      echo "linux/amd64"
   fi
 }
 
@@ -31,56 +37,67 @@ build_args() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
 
-  echo "-f ci/Dockerfile-envoy${FILE_SUFFIX}"
-  [[ "${TYPE}" == *-debug ]] && echo "--build-arg ENVOY_BINARY_SUFFIX="
-  if [[ "${TYPE}" == "-google-vrp" ]]; then
-    echo "--build-arg ENVOY_VRP_BASE_IMAGE=${VRP_BASE_IMAGE}"
+  printf ' -f ci/Dockerfile-envoy%s' "${FILE_SUFFIX}"
+  if [[ "${TYPE}" == *-debug ]]; then
+      printf ' --build-arg ENVOY_BINARY_SUFFIX='
+  elif [[ "${TYPE}" == "-google-vrp" ]]; then
+      printf ' --build-arg ENVOY_VRP_BASE_IMAGE=%s' "${VRP_BASE_IMAGE}"
   fi
 }
 
 use_builder() {
-  TYPE=$1
-  if [[ "${TYPE}" == "-google-vrp" ]]; then
-    docker buildx use default
-  else
-    docker buildx use multi-builder
+  # BuildKit is not available for Windows images, skip this
+  if ! is_windows; then
+    TYPE=$1
+    if [[ "${TYPE}" == "-google-vrp" ]]; then
+      docker buildx use default
+    else
+      docker buildx use multi-builder
+    fi
   fi
 }
 
 IMAGES_TO_SAVE=()
 
 build_images() {
+  local _args args=()
   TYPE=$1
   BUILD_TAG=$2
 
   use_builder "${TYPE}"
-  ARGS="$(build_args ${TYPE})"
-  PLATFORM="$(build_platforms ${TYPE})"
+  _args=$(build_args "${TYPE}")
+  read -ra args <<< "$_args"
+  PLATFORM="$(build_platforms "${TYPE}")"
 
-  docker buildx build --platform "${PLATFORM}" ${ARGS} -t "${BUILD_TAG}" .
+  docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" .
 
-  PLATFORM="$(build_platforms ${TYPE} | tr ',' ' ')"
-  # docker buildx load cannot have multiple platform, load individually
+  PLATFORM="$(build_platforms "${TYPE}" | tr ',' ' ')"
   for ARCH in ${PLATFORM}; do
-    if [[ "${ARCH}" == "linux/amd64" ]]; then
+    if [[ "${ARCH}" == "linux/amd64" ]] || [[ "${ARCH}" == "windows/amd64" ]]; then
       IMAGE_TAG="${BUILD_TAG}"
     else
       IMAGE_TAG="${BUILD_TAG}-${ARCH/linux\//}"
     fi
-    docker buildx build --platform "${ARCH}" ${ARGS} -t "${IMAGE_TAG}" . --load
     IMAGES_TO_SAVE+=("${IMAGE_TAG}")
+
+    # docker buildx load cannot have multiple platform, load individually
+    if ! is_windows; then
+      docker "${BUILD_COMMAND[@]}" --platform "${ARCH}" "${args[@]}" -t "${IMAGE_TAG}" . --load
+    fi
   done
 }
 
 push_images() {
+  local _args args=()
   TYPE=$1
   BUILD_TAG=$2
 
   use_builder "${TYPE}"
-  ARGS="$(build_args ${TYPE})"
-  PLATFORM="$(build_platforms ${TYPE})"
+  _args=$(build_args "${TYPE}")
+  read -ra args <<< "$_args"
+  PLATFORM="$(build_platforms "${TYPE}")"
   # docker buildx doesn't do push with default builder
-  docker buildx build --platform "${PLATFORM}" ${ARGS} -t ${BUILD_TAG} . --push || \
+  docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push || \
     docker push "${BUILD_TAG}"
 }
 
@@ -90,7 +107,7 @@ RELEASE_TAG_REGEX="^refs/tags/v.*"
 
 # For master builds and release branch builds use the dev repo. Otherwise we assume it's a tag and
 # we push to the primary repo.
-if [[ "${AZP_BRANCH}" =~ "${RELEASE_TAG_REGEX}" ]]; then
+if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
   IMAGE_POSTFIX=""
   IMAGE_NAME="${AZP_BRANCH/refs\/tags\//}"
 else
@@ -101,14 +118,22 @@ fi
 # This prefix is altered for the private security images on setec builds.
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
-# "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-BUILD_TYPES=("" "-debug" "-alpine" "-alpine-debug" "-google-vrp")
 
-# Configure docker-buildx tools
-config_env
+if is_windows; then
+  BUILD_TYPES=("-windows")
+  # BuildKit is not available for Windows images, use standard build command
+  BUILD_COMMAND=("build")
+else
+  # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
+  BUILD_TYPES=("" "-debug" "-alpine" "-google-vrp")
 
-# VRP base image is only for amd64
-VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}"
+  # Configure docker-buildx tools
+  BUILD_COMMAND=("buildx" "build")
+  config_env
+
+  # VRP base image is only for Linux amd64
+  VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}"
+fi
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.

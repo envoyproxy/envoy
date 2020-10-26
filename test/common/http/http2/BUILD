@@ -40,10 +40,6 @@ CODEC_TEST_DEPS = [
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    # The default codec is the legacy codec. Override runtime flag for testing new codec.
-    args = [
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.new_codec_behavior",
-    ],
     shard_count = 5,
     deps = CODEC_TEST_DEPS,
 )
@@ -51,7 +47,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_legacy_test",
     srcs = ["codec_impl_test.cc"],
-    # The default codec is the legacy codec. Verify the runtime flag for the new codec is disabled.
+    # The default codec is the new codec. Disable runtime flag for testing old codec.
     args = [
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.new_codec_behavior",
     ],
@@ -162,6 +158,16 @@ envoy_cc_test(
         "//include/envoy/http:metadata_interface",
         "//source/common/http/http2:metadata_encoder_lib",
         "//test/common/http/http2:http2_frame",
+    ],
+)
+
+envoy_cc_test(
+    name = "protocol_constraints_test",
+    srcs = ["protocol_constraints_test.cc"],
+    deps = [
+        "//source/common/http/http2:protocol_constraints_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

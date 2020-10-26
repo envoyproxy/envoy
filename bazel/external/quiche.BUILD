@@ -53,23 +53,21 @@ genrule(
 
 # These options are only used to suppress errors in brought-in QUICHE tests.
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
+quiche_common_copts = [
+    "-Wno-unused-function",
+    # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
+    "-Wno-invalid-offsetof",
+    "-Wno-range-loop-analysis",
+]
+
 quiche_copts = select({
-    "@envoy//bazel:windows_x86_64": [],
-    "//conditions:default": [
-        # Remove these after upstream fix.
-        "-Wno-unused-parameter",
-        "-Wno-unused-function",
-        "-Wno-return-type",
-        "-Wno-unknown-warning-option",
-        "-Wno-deprecated-copy",
-        "-Wno-ignored-qualifiers",
+    # Ignore unguarded #pragma GCC statements in QUICHE sources
+    "@envoy//bazel:windows_x86_64": ["-wd4068"],
+    # Remove these after upstream fix.
+    "@envoy//bazel:gcc_build": [
         "-Wno-sign-compare",
-        "-Wno-inconsistent-missing-override",
-        # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
-        "-Wno-invalid-offsetof",
-        # to suppress errors re: size_t vs. int comparisons
-        "-Wno-sign-compare",
-    ],
+    ] + quiche_common_copts,
+    "//conditions:default": quiche_common_copts,
 })
 
 test_suite(
@@ -2247,6 +2245,12 @@ envoy_cc_library(
         "quiche/quic/core/frames/quic_window_update_frame.h",
     ],
     copts = quiche_copts,
+    # TODO: Work around initializer in anonymous union in fastbuild build.
+    # Remove this after upstream fix.
+    defines = select({
+        "@envoy//bazel:windows_x86_64": ["QUIC_FRAME_DEBUG=0"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
@@ -3534,6 +3538,23 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_library(
+    name = "quic_test_tools_flow_controller_peer_lib",
+    srcs = [
+        "quiche/quic/test_tools/quic_flow_controller_peer.cc",
+    ],
+    hdrs = [
+        "quiche/quic/test_tools/quic_flow_controller_peer.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_packets_lib",
+        ":quic_core_session_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "quic_test_tools_framer_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_framer_peer.cc"],
@@ -3667,6 +3688,7 @@ envoy_cc_test_library(
         ":quic_core_session_lib",
         ":quic_core_stream_send_buffer_lib",
         ":quic_platform_base",
+        ":quic_test_tools_flow_controller_peer_lib",
         ":quic_test_tools_stream_send_buffer_peer_lib",
     ],
 )
@@ -3831,7 +3853,6 @@ envoy_cc_library(
     hdrs = [
         "quiche/common/platform/api/quiche_arraysize.h",
         "quiche/common/platform/api/quiche_logging.h",
-        "quiche/common/platform/api/quiche_map_util.h",
         "quiche/common/platform/api/quiche_optional.h",
         "quiche/common/platform/api/quiche_ptr_util.h",
         "quiche/common/platform/api/quiche_str_cat.h",

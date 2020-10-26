@@ -192,6 +192,12 @@ void WatchMap::onConfigUpdate(
     }
     cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info);
   }
+  // notify empty update
+  if (added_resources.empty() && removed_resources.empty()) {
+    for (auto& cur_watch : wildcard_watches_) {
+      cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info);
+    }
+  }
 }
 
 void WatchMap::onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) {

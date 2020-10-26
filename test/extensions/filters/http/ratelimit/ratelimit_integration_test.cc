@@ -31,8 +31,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void initialize() override {
@@ -47,6 +46,7 @@ public:
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       proto_config_.set_failure_mode_deny(failure_mode_deny_);
       proto_config_.set_enable_x_ratelimit_headers(enable_x_ratelimit_headers_);
+      proto_config_.set_disable_x_envoy_ratelimited_header(disable_x_envoy_ratelimited_header_);
       setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
                      "ratelimit", fake_upstreams_.back()->localAddress());
       proto_config_.mutable_rate_limit_service()->set_transport_api_version(apiVersion());
@@ -193,6 +193,7 @@ public:
   bool failure_mode_deny_ = false;
   envoy::extensions::filters::http::ratelimit::v3::RateLimit::XRateLimitHeadersRFCVersion
       enable_x_ratelimit_headers_ = envoy::extensions::filters::http::ratelimit::v3::RateLimit::OFF;
+  bool disable_x_envoy_ratelimited_header_ = false;
   envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config_{};
   const std::string base_filter_config_ = R"EOF(
     domain: some_domain
@@ -215,11 +216,23 @@ public:
   }
 };
 
+// Test verifies that disabling X-Envoy-RateLimited response header works.
+class RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest
+    : public RatelimitIntegrationTest {
+public:
+  RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest() {
+    disable_x_envoy_ratelimited_header_ = true;
+  }
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,
                          VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
                          VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFilterHeadersEnabledIntegrationTest,
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType,
+                         RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
                          VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RatelimitIntegrationTest, Ok) { basicFlow(); }
@@ -238,14 +251,14 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   ratelimit_response_headers.iterate(
       [response = response_.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-        EXPECT_EQ(entry.value(), response->headers().get(lower_key)->value().getStringView());
+        EXPECT_EQ(entry.value(), response->headers().get(lower_key)[0]->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       });
 
   request_headers_to_add.iterate([upstream = upstream_request_.get()](
                                      const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
     Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-    EXPECT_EQ(entry.value(), upstream->headers().get(lower_key)->value().getStringView());
+    EXPECT_EQ(entry.value(), upstream->headers().get(lower_key)[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
 
@@ -262,6 +275,11 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
                         Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
+
+  EXPECT_THAT(response_.get()->headers(),
+              Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited,
+                                  Http::Headers::get().EnvoyRateLimitedValues.True));
+
   cleanup();
 
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
@@ -281,9 +299,13 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   ratelimit_response_headers.iterate(
       [response = response_.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-        EXPECT_EQ(entry.value(), response->headers().get(lower_key)->value().getStringView());
+        EXPECT_EQ(entry.value(), response->headers().get(lower_key)[0]->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       });
+
+  EXPECT_THAT(response_.get()->headers(),
+              Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited,
+                                  Http::Headers::get().EnvoyRateLimitedValues.True));
 
   cleanup();
 
@@ -429,6 +451,24 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
       response_.get()->headers(),
       Http::HeaderValueOf(
           Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitReset, "3"));
+
+  cleanup();
+
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+}
+
+TEST_P(RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
+       OverLimitWithoutEnvoyRatelimitedHeader) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
+                        Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
+  waitForFailedUpstreamResponse(429);
+
+  EXPECT_THAT(response_.get()->headers(),
+              ::testing::Not(Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited, _)));
 
   cleanup();
 

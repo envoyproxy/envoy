@@ -30,11 +30,11 @@ message ClientSSLAuth {
   // of principals. The service must support the expected :ref:`REST API
   // <config_network_filters_client_ssl_auth_rest_api>`.
   string auth_api_cluster = 1
-      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // The prefix to use when emitting :ref:`statistics
   // <config_network_filters_client_ssl_auth_stats>`.
-  string stat_prefix = 2 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
 
   // Time in milliseconds between principal refreshes from the
   // authentication service. Default is 60000 (60s). The actual fetch time

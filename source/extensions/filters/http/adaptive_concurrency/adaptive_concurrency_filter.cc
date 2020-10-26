@@ -38,8 +38,8 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::Request
   }
 
   if (controller_->forwardingDecision() == Controller::RequestForwardingAction::Block) {
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
-                                       "reached concurrency limit");
+    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "reached concurrency limit",
+                                       nullptr, absl::nullopt, "reached_concurrency_limit");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
+#include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/strings/match.h"
@@ -178,6 +179,48 @@ template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString
   return key.get().c_str()[0] == ':';
 }
 
+bool HeaderMapImpl::HeaderList::maybeMakeMap() {
+  if (lazy_map_.empty()) {
+    if (headers_.size() < lazy_map_min_size_) {
+      return false;
+    }
+    // Add all entries from the list into the map.
+    for (auto node = headers_.begin(); node != headers_.end(); ++node) {
+      HeaderNodeVector& v = lazy_map_[node->key().getStringView()];
+      v.push_back(node);
+    }
+  }
+  return true;
+}
+
+size_t HeaderMapImpl::HeaderList::remove(absl::string_view key) {
+  size_t removed_bytes = 0;
+  if (maybeMakeMap()) {
+    auto iter = lazy_map_.find(key);
+    if (iter != lazy_map_.end()) {
+      // Erase from the map, and all same key entries from the list.
+      HeaderNodeVector header_nodes = std::move(iter->second);
+      lazy_map_.erase(iter);
+      for (const HeaderNode& node : header_nodes) {
+        ASSERT(node->key() == key);
+        removed_bytes += node->key().size() + node->value().size();
+        erase(node, false /* remove_from_map */);
+      }
+    }
+  } else {
+    // Erase all same key entries from the list.
+    for (auto i = headers_.begin(); i != headers_.end();) {
+      if (i->key() == key) {
+        removed_bytes += i->key().size() + i->value().size();
+        i = erase(i, false /* remove_from_map */);
+      } else {
+        ++i;
+      }
+    }
+  }
+  return removed_bytes;
+}
+
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key) : key_(key) {}
 
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key, HeaderString&& value)
@@ -326,7 +369,7 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     }
   } else {
     addSize(key.size() + value.size());
-    std::list<HeaderEntryImpl>::iterator i = headers_.insert(std::move(key), std::move(value));
+    HeaderNode i = headers_.insert(std::move(key), std::move(value));
     i->entry_ = i;
   }
 }
@@ -383,9 +426,9 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
 
 void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view value) {
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
-  auto* entry = getExisting(key);
-  if (entry) {
-    const uint64_t added_size = appendToHeader(entry->value(), value);
+  auto entry = getExisting(key);
+  if (!entry.empty()) {
+    const uint64_t added_size = appendToHeader(entry[0]->value(), value);
     addSize(added_size);
   } else {
     addCopy(key, value);
@@ -393,29 +436,27 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
 }
 
 void HeaderMapImpl::setReference(const LowerCaseString& key, absl::string_view value) {
-  HeaderString ref_key(key);
-  HeaderString ref_value(value);
   remove(key);
-  insertByKey(std::move(ref_key), std::move(ref_value));
+  addReference(key, value);
 }
 
 void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_view value) {
-  HeaderString ref_key(key);
-  HeaderString new_value;
-  new_value.setCopy(value);
   remove(key);
-  insertByKey(std::move(ref_key), std::move(new_value));
-  ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+  addReferenceKey(key, value);
 }
 
 void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value) {
-  // Replaces the first occurrence of a header if it exists, otherwise adds by copy.
-  // TODO(#9221): converge on and document a policy for coalescing multiple headers.
-  auto* entry = getExisting(key);
-  if (entry) {
-    updateSize(entry->value().size(), value.size());
-    entry->value(value);
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_set_copy_replace_all_headers")) {
+    auto entry = getExisting(key);
+    if (!entry.empty()) {
+      updateSize(entry[0]->value().size(), value.size());
+      entry[0]->value(value);
+    } else {
+      addCopy(key, value);
+    }
   } else {
+    remove(key);
     addCopy(key, value);
   }
 }
@@ -432,33 +473,49 @@ void HeaderMapImpl::verifyByteSizeInternalForTest() const {
   ASSERT(cached_byte_size_ == byte_size);
 }
 
-const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
-  return const_cast<HeaderMapImpl*>(this)->getExisting(key);
+HeaderMap::GetResult HeaderMapImpl::get(const LowerCaseString& key) const {
+  return HeaderMap::GetResult(const_cast<HeaderMapImpl*>(this)->getExisting(key));
 }
 
-HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
+HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& key) {
   // Attempt a trie lookup first to see if the user is requesting an O(1) header. This may be
   // relatively common in certain header matching / routing patterns.
   // TODO(mattklein123): Add inline handle support directly to the header matcher code to support
   // this use case more directly.
+  HeaderMap::NonConstGetResult ret;
   auto lookup = staticLookup(key.get());
   if (lookup.has_value()) {
-    return *lookup.value().entry_;
+    if (*lookup.value().entry_ != nullptr) {
+      ret.push_back(*lookup.value().entry_);
+    }
+    return ret;
   }
 
-  // If the requested header is not an O(1) header we do a full scan. Doing the trie lookup is
-  // wasteful in the miss case, but is present for code consistency with other functions that do
-  // similar things.
-  // TODO(mattklein123): The full scan here and in remove() are the biggest issues with this
-  // implementation for certain use cases. We can either replace this with a totally different
-  // implementation or potentially create a lazy map if the size of the map is above a threshold.
+  // If the requested header is not an O(1) header try using the lazy map to
+  // search for it instead of iterating the headers list.
+  if (headers_.maybeMakeMap()) {
+    HeaderList::HeaderLazyMap::iterator iter = headers_.mapFind(key.get());
+    if (iter != headers_.mapEnd()) {
+      const HeaderList::HeaderNodeVector& v = iter->second;
+      ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
+      for (const auto& values_it : v) {
+        // Convert the iterated value to a HeaderEntry*.
+        ret.push_back(&(*values_it));
+      }
+    }
+    return ret;
+  }
+
+  // If the requested header is not an O(1) header and the lazy map is not in use, we do a full
+  // scan. Doing the trie lookup is wasteful in the miss case, but is present for code consistency
+  // with other functions that do similar things.
   for (HeaderEntryImpl& header : headers_) {
     if (header.key() == key.get().c_str()) {
-      return &header;
+      ret.push_back(&header);
     }
   }
 
-  return nullptr;
+  return ret;
 }
 
 void HeaderMapImpl::iterate(HeaderMap::ConstIterateCb cb) const {
@@ -485,7 +542,7 @@ void HeaderMapImpl::clear() {
 
 size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate) {
   const size_t old_size = headers_.size();
-  headers_.remove_if([&predicate, this](const HeaderEntryImpl& entry) {
+  headers_.removeIf([&predicate, this](const HeaderEntryImpl& entry) {
     const bool to_remove = predicate(entry);
     if (to_remove) {
       // If this header should be removed, make sure any references in the
@@ -508,17 +565,14 @@ size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate)
 }
 
 size_t HeaderMapImpl::remove(const LowerCaseString& key) {
+  const size_t old_size = headers_.size();
   auto lookup = staticLookup(key.get());
   if (lookup.has_value()) {
-    const size_t old_size = headers_.size();
     removeInline(lookup.value().entry_);
-    return old_size - headers_.size();
   } else {
-    // TODO(mattklein123): When the lazy map is implemented we can stop using removeIf() here.
-    return HeaderMapImpl::removeIf([&key](const HeaderEntry& entry) -> bool {
-      return key.get() == entry.key().getStringView();
-    });
+    subtractSize(headers_.remove(key.get()));
   }
+  return old_size - headers_.size();
 }
 
 size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
@@ -543,7 +597,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   }
 
   addSize(key.get().size());
-  std::list<HeaderEntryImpl>::iterator i = headers_.insert(key);
+  HeaderNode i = headers_.insert(key);
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
@@ -558,7 +612,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   }
 
   addSize(key.get().size() + value.size());
-  std::list<HeaderEntryImpl>::iterator i = headers_.insert(key, std::move(value));
+  HeaderNode i = headers_.insert(key, std::move(value));
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
@@ -573,7 +627,7 @@ size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   const uint64_t size_to_subtract = entry->entry_->key().size() + entry->entry_->value().size();
   subtractSize(size_to_subtract);
   *ptr_to_entry = nullptr;
-  headers_.erase(entry->entry_);
+  headers_.erase(entry->entry_, true);
   return 1;
 }
 

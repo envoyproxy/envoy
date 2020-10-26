@@ -77,8 +77,8 @@ the extension.
 When compression is *applied*:
 
 - The *content-length* is removed from response headers.
-- Response headers contain "*transfer-encoding: chunked*" and do not contain
-  "*content-encoding*" header.
+- Response headers contain "*transfer-encoding: chunked*", and
+  "*content-encoding*" with the compression scheme used (e.g., ``gzip``).
 - The "*vary: accept-encoding*" header is inserted on every response.
 
 Also the "*vary: accept-encoding*" header may be inserted even if compression is *not*

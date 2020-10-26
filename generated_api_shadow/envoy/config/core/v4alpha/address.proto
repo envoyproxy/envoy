@@ -24,10 +24,25 @@ message Pipe {
   // abstract namespace. The starting '@' is replaced by a null byte by Envoy.
   // Paths starting with '@' will result in an error in environments other than
   // Linux.
-  string path = 1 [(validate.rules).string = {min_bytes: 1}];
+  string path = 1 [(validate.rules).string = {min_len: 1}];
 
   // The mode for the Pipe. Not applicable for abstract sockets.
   uint32 mode = 2 [(validate.rules).uint32 = {lte: 511}];
+}
+
+// [#not-implemented-hide:] The address represents an envoy internal listener.
+// TODO(lambdai): Make this address available for listener and endpoint.
+// TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.
+message EnvoyInternalAddress {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.EnvoyInternalAddress";
+
+  oneof address_name_specifier {
+    option (validate.required) = true;
+
+    // [#not-implemented-hide:] The :ref:`listener name <envoy_api_field_config.listener.v4alpha.Listener.name>` of the destination internal listener.
+    string server_listener_name = 1;
+  }
 }
 
 // [#next-free-field: 7]
@@ -52,7 +67,7 @@ message SocketAddress {
   // address must be an IP (*STATIC* or *EDS* clusters) or a hostname resolved by DNS
   // (*STRICT_DNS* or *LOGICAL_DNS* clusters). Address resolution can be customized
   // via :ref:`resolver_name <envoy_api_field_config.core.v4alpha.SocketAddress.resolver_name>`.
-  string address = 2 [(validate.rules).string = {min_bytes: 1}];
+  string address = 2 [(validate.rules).string = {min_len: 1}];
 
   oneof port_specifier {
     option (validate.required) = true;
@@ -129,6 +144,9 @@ message Address {
     SocketAddress socket_address = 1;
 
     Pipe pipe = 2;
+
+    // [#not-implemented-hide:]
+    EnvoyInternalAddress envoy_internal_address = 3;
   }
 }
 
@@ -138,7 +156,7 @@ message CidrRange {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.CidrRange";
 
   // IPv4 or IPv6 address, e.g. ``192.0.0.0`` or ``2001:db8::``.
-  string address_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string address_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // Length of prefix, e.g. 0, 32.
   google.protobuf.UInt32Value prefix_len = 2 [(validate.rules).uint32 = {lte: 128}];

@@ -103,6 +103,25 @@ absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {
   return ret;
 }
 
+absl::optional<const DnsHostInfoSharedPtr> DnsCacheImpl::getHost(absl::string_view host_name) {
+  // Find a host with the given name.
+  auto it = primary_hosts_.find(host_name);
+  if (it == primary_hosts_.end()) {
+    return {};
+  }
+
+  // Extract host info.
+  auto&& host_info = it->second->host_info_;
+
+  // Only include hosts that have ever resolved to an address.
+  if (host_info->address_ == nullptr) {
+    return {};
+  }
+
+  // Return host info.
+  return host_info;
+}
+
 DnsCacheImpl::AddUpdateCallbacksHandlePtr
 DnsCacheImpl::addUpdateCallbacks(UpdateCallbacks& callbacks) {
   return std::make_unique<AddUpdateCallbacksHandleImpl>(update_callbacks_, callbacks);
@@ -257,8 +276,10 @@ void DnsCacheImpl::updateTlsHostsMap() {
     }
   }
 
-  tls_slot_->runOnAllThreads([this, new_host_map]() {
-    tls_slot_->getTyped<ThreadLocalHostInfo>().updateHostMap(new_host_map);
+  tls_slot_->runOnAllThreads([new_host_map](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                                 -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    object->asType<ThreadLocalHostInfo>().updateHostMap(new_host_map);
+    return object;
   });
 }
 

@@ -1,5 +1,7 @@
 #include "common/tcp_proxy/upstream.h"
 
+#include "envoy/upstream/cluster_manager.h"
+
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -150,6 +152,100 @@ void HttpUpstream::doneWriting() {
   if (read_half_closed_) {
     resetEncoder(Network::ConnectionEvent::LocalClose);
   }
+}
+
+TcpConnPool::TcpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+                         Upstream::LoadBalancerContext* context,
+                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
+    : upstream_callbacks_(upstream_callbacks) {
+  conn_pool_ = cluster_manager.tcpConnPoolForCluster(cluster_name,
+                                                     Upstream::ResourcePriority::Default, context);
+}
+
+TcpConnPool::~TcpConnPool() {
+  if (upstream_handle_ != nullptr) {
+    upstream_handle_->cancel(ConnectionPool::CancelPolicy::CloseExcess);
+  }
+}
+
+bool TcpConnPool::valid() const { return conn_pool_ != nullptr; }
+
+void TcpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
+  callbacks_ = callbacks;
+  // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
+  // valid connection handle. If newConnection fails inline it may result in attempting to
+  // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
+  // first call to newConnection will return null and the inner call will persist.
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_->newConnection(*this);
+  if (handle) {
+    ASSERT(upstream_handle_ == nullptr);
+    upstream_handle_ = handle;
+  }
+}
+
+void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                Upstream::HostDescriptionConstSharedPtr host) {
+  upstream_handle_ = nullptr;
+  callbacks_->onGenericPoolFailure(reason, host);
+}
+
+void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                              Upstream::HostDescriptionConstSharedPtr host) {
+  upstream_handle_ = nullptr;
+  Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
+  Network::Connection& connection = conn_data->connection();
+
+  auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
+  callbacks_->onGenericPoolReady(&connection.streamInfo(), std::move(upstream), host,
+                                 latched_data->connection().localAddress(),
+                                 latched_data->connection().streamInfo().downstreamSslConnection());
+}
+
+HttpConnPool::HttpConnPool(const std::string& cluster_name,
+                           Upstream::ClusterManager& cluster_manager,
+                           Upstream::LoadBalancerContext* context, std::string hostname,
+                           Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
+    : hostname_(hostname), upstream_callbacks_(upstream_callbacks) {
+  conn_pool_ = cluster_manager.httpConnPoolForCluster(
+      cluster_name, Upstream::ResourcePriority::Default, absl::nullopt, context);
+}
+
+HttpConnPool::~HttpConnPool() {
+  if (upstream_handle_ != nullptr) {
+    // Because HTTP connections are generally shorter lived and have a higher probability of use
+    // before going idle, they are closed with Default rather than CloseExcess.
+    upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
+  }
+}
+
+bool HttpConnPool::valid() const { return conn_pool_ != nullptr; }
+
+void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
+  callbacks_ = callbacks;
+  upstream_ = std::make_unique<HttpUpstream>(upstream_callbacks_, hostname_);
+  Tcp::ConnectionPool::Cancellable* handle =
+      conn_pool_->newStream(upstream_->responseDecoder(), *this);
+  if (handle != nullptr) {
+    upstream_handle_ = handle;
+  }
+}
+
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+                                 Upstream::HostDescriptionConstSharedPtr host) {
+  upstream_handle_ = nullptr;
+  callbacks_->onGenericPoolFailure(reason, host);
+}
+
+void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
+                               Upstream::HostDescriptionConstSharedPtr host,
+                               const StreamInfo::StreamInfo& info) {
+  upstream_handle_ = nullptr;
+  Http::RequestEncoder* latched_encoder = &request_encoder;
+  upstream_->setRequestEncoder(request_encoder,
+                               host->transportSocketFactory().implementsSecureTransport());
+  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
+                                 latched_encoder->getStream().connectionLocalAddress(),
+                                 info.downstreamSslConnection());
 }
 
 } // namespace TcpProxy

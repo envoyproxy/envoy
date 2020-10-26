@@ -48,21 +48,23 @@ const int DISABLE_MEGAMISS = 1000000;
 class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
 public:
   // GuardDogImpl::TestInterlockHook
-  void signalFromImpl(MonotonicTime time) override {
-    impl_reached_ = time;
+  void signalFromImpl() override {
+    waiting_for_signal_ = false;
     impl_.notifyAll();
   }
 
-  void waitFromTest(Thread::MutexBasicLockable& mutex, MonotonicTime time) override
+  void waitFromTest(Thread::MutexBasicLockable& mutex) override
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    while (impl_reached_ < time) {
+    ASSERT(!waiting_for_signal_);
+    waiting_for_signal_ = true;
+    while (waiting_for_signal_) {
       impl_.wait(mutex);
     }
   }
 
 private:
   Thread::CondVar impl_;
-  MonotonicTime impl_reached_;
+  bool waiting_for_signal_ = false;
 };
 
 // We want to make sure guard-dog is tested with both simulated time and real
@@ -84,7 +86,7 @@ protected:
   }
 
   void initGuardDog(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config) {
-    guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_,
+    guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_, "server",
                                                 std::make_unique<DebugTestInterlock>());
   }
 
@@ -307,6 +309,7 @@ TEST_P(GuardDogMissTest, MissTest) {
   initGuardDog(stats_store_, config_miss_);
   auto unpet_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  guard_dog_->forceCheckForTest();
   // We'd better start at 0:
   checkMiss(0, "MissTest check 1");
   // At 300ms we shouldn't have hit the timeout yet:
@@ -332,6 +335,7 @@ TEST_P(GuardDogMissTest, MegaMissTest) {
   initGuardDog(stats_store_, config_mega_);
   auto unpet_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  guard_dog_->forceCheckForTest();
   // We'd better start at 0:
   checkMegaMiss(0, "MegaMissTest check 1");
   // This shouldn't be enough to increment the stat:
@@ -358,6 +362,7 @@ TEST_P(GuardDogMissTest, MissCountTest) {
   initGuardDog(stats_store_, config_miss_);
   auto sometimes_pet_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  guard_dog_->forceCheckForTest();
   // These steps are executed once without ever touching the watchdog.
   // Then the last step is to touch the watchdog and repeat the steps.
   // This verifies that the behavior is reset back to baseline after a touch.
@@ -380,9 +385,11 @@ TEST_P(GuardDogMissTest, MissCountTest) {
     // When we finally touch the dog we should get one more increment once the
     // timeout value expires:
     sometimes_pet_dog->touch();
+    guard_dog_->forceCheckForTest();
   }
   time_system_->advanceTimeWait(std::chrono::milliseconds(1000));
   sometimes_pet_dog->touch();
+  guard_dog_->forceCheckForTest();
   // Make sure megamiss still works:
   checkMegaMiss(0UL, "MissCountTest check 5");
   time_system_->advanceTimeWait(std::chrono::milliseconds(1500));
@@ -445,15 +452,15 @@ public:
   RecordGuardDogAction(std::vector<std::string>& events) : events_(events) {}
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
            MonotonicTime /*now*/) override {
     std::string event_string =
         envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent_Name(event);
     absl::StrAppend(&event_string, " : ");
     std::vector<std::string> output_string_parts;
-    output_string_parts.reserve(thread_ltt_pairs.size());
+    output_string_parts.reserve(thread_last_checkin_pairs.size());
 
-    for (const auto& thread_ltt_pair : thread_ltt_pairs) {
+    for (const auto& thread_ltt_pair : thread_last_checkin_pairs) {
       output_string_parts.push_back(thread_ltt_pair.first.debugString());
     }
 
@@ -470,9 +477,10 @@ class AssertGuardDogAction : public Configuration::GuardDogAction {
 public:
   AssertGuardDogAction() = default;
 
-  void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& /*thread_ltt_pairs*/,
-           MonotonicTime /*now*/) override {
+  void
+  run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
+      const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& /*thread_last_checkin_pairs*/,
+      MonotonicTime /*now*/) override {
     RELEASE_ASSERT(false, "ASSERT_GUARDDOG_ACTION");
   }
 };
@@ -655,6 +663,7 @@ TEST_P(GuardDogActionsTest, MissShouldSaturateOnMissEvent) {
 
   // Touch the watchdog, which should allow the event to trigger again.
   first_dog_->touch();
+  guard_dog_->forceCheckForTest();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -717,6 +726,7 @@ TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
 
   // Touch the watchdog, which should allow the event to trigger again.
   first_dog_->touch();
+  guard_dog_->forceCheckForTest();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -732,6 +742,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
     initGuardDog(fake_stats_, config);
     auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
     auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+    guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };
@@ -746,6 +757,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
     initGuardDog(fake_stats_, config);
     auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
     auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+    guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };

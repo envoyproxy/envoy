@@ -4,7 +4,7 @@ set -e
 
 ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"
 
-if [[ `uname` == "Darwin" ]]; then
+if [[ $(uname) == "Darwin" ]]; then
   echo "Skipping on macOS."
   exit 0
 fi
