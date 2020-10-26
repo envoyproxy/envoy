@@ -28,7 +28,7 @@ public:
                                            downstream_protocol, ctx);
   }
   ~HttpConnPool() override {
-    RELEASE_ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
+    ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingStream() override;
