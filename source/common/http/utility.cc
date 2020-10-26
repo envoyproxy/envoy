@@ -31,7 +31,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
@@ -409,18 +408,10 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
-  absl::StatusOr<uint64_t> response_status_or_absl_status = getResponseStatusOr(headers);
-  if (!response_status_or_absl_status.ok()) {
-    throw CodecClientException(response_status_or_absl_status.status().message().data());
-  }
-  return response_status_or_absl_status.value();
-}
-
-absl::StatusOr<uint64_t> Utility::getResponseStatusOr(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    return absl::InvalidArgumentError(":status must be specified and a valid unsigned long");
+    throw CodecClientException(":status must be specified and a valid unsigned long");
   }
   return response_code;
 }
