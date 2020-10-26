@@ -280,7 +280,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "boringssl=fips"
     "--define" "log_debug_assert_in_release=enabled"
     "--define" "quiche=enabled"
-    "--define" "wasm=disabled"
+    "--define" "wasm=wavm"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
     "--define" "use_new_codecs_in_integration_tests=false"

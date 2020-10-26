@@ -29,6 +29,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.filters.http.wasm",
+    shard_count = 50,
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/wasm:wasm_filter_lib",
@@ -47,6 +48,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.filters.http.wasm",
+    shard_count = 50,
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
