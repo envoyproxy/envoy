@@ -30,6 +30,7 @@ Below are the list of reasons the HttpConnectionManager or Router filter may sen
    low_version, The HTTP/1.0 or HTTP/0.9 request was rejected due to HTTP/1.0 support not being configured.
    maintenance_mode, The request was rejected by the router filter because the cluster was in maintenance mode.
    max_duration_timeout, The per-stream max duration timeout was exceeded.
+   missing_headers_after_filter_chain, The request was rejected by the router filter because configured filters removed required headers.
    missing_host_header, The request was rejected due to a missing Host: or :authority field.
    missing_path_rejected, The request was rejected due to a missing Path or :path header field.
    no_healthy_upstream, The request was rejected by the router filter because there was no healthy upstream found.

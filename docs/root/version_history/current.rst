@@ -19,6 +19,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* http: reject requests with missing required headers after filter chain processing.
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
 
 Removed Config or Runtime

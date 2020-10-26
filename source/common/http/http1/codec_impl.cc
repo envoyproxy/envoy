@@ -372,8 +372,9 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   const HeaderEntry* host = headers.Host();
   bool is_connect = HeaderUtility::isConnect(headers);
 
-  // Headers must be present. This would only happen from downstream traffic (in which case
-  // downstream codecs would reject) or a faulty filter (in which case the router would reject).
+  // Headers must be present. If downstream traffic is missing headers, downstream codecs will
+  // reject the request. If a faulty filter removes these headers, the router will reject before
+  // forwarding the request headers here.
   ASSERT(method, ":method must be specified.");
   ASSERT(path || is_connect, "path must be specified");
   ASSERT(host || !is_connect, "host must be specified for a CONNECT request");
@@ -390,7 +391,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
 
   connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
-  if (is_connect) { // Maybe add && host?
+  if (is_connect) {
     connection_.copyToBuffer(host->value().getStringView().data(), host->value().size());
   } else {
     connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());

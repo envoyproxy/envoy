@@ -124,7 +124,10 @@ public:
 
   /* Does a common header check ensuring required headers are present before request headers are
    * forwarded. This will only fail if configured filters erroneously removes required headers.
-   * @return Status containing the result along with a message if false.
+   * Required request headers include :method header, :path for non-CONNECT requests, and
+   * host/authority for CONNECT requests.
+   * @return Status containing the result. If failed, message includes details on which header was
+   * missing.
    */
   static Http::Status checkHeaderMap(const Http::RequestHeaderMap& headers);
 

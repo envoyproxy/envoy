@@ -20,10 +20,10 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     // Remove method when there is a "remove-method" header.
-    if (headers.get(Http::LowerCaseString("remove-method"))) {
+    if (!headers.get(Http::LowerCaseString("remove-method")).empty()) {
       headers.removeMethod();
     }
-    if (headers.get(Http::LowerCaseString("remove-path"))) {
+    if (!headers.get(Http::LowerCaseString("remove-path")).empty()) {
       headers.removePath();
     }
     if (Http::HeaderUtility::isConnect(headers)) {

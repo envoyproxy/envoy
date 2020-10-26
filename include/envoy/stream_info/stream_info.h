@@ -172,6 +172,8 @@ struct ResponseCodeDetailValues {
   const std::string AdminFilterResponse = "admin_filter_response";
   // The original stream was replaced with an internal redirect.
   const std::string InternalRedirect = "internal_redirect";
+  // The request was rejected because configured filters erroneously removed required headers.
+  const std::string MissingHeadersAfterFilterChain = "missing_headers_after_filter_chain";
   // Changes or additions to details should be reflected in
   // docs/root/configuration/http/http_conn_man/response_code_details_details.rst
 };

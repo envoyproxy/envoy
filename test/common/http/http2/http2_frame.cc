@@ -287,26 +287,6 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
   return frame;
 }
 
-Http2Frame Http2Frame::makeMalformedRequestWithMissingHeaders(uint32_t stream_index, bool method,
-                                                              absl::string_view host,
-                                                              absl::string_view path) {
-  Http2Frame frame;
-  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
-                    makeNetworkOrderStreamId(stream_index));
-  if (method) {
-    frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
-  }
-  frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
-  if (!path.empty()) {
-    frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
-  }
-  if (!host.empty()) {
-    frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
-  }
-  frame.adjustPayloadSize();
-  return frame;
-}
-
 Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host,
                                    absl::string_view path) {
   Http2Frame frame;

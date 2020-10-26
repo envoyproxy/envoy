@@ -350,8 +350,6 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
-        "//test/common/http/http2:http2_frame",
-        "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
