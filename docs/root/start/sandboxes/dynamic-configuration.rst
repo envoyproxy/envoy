@@ -3,20 +3,24 @@
 Dynamic configuration
 =====================
 
-This example walks through configuring Envoy using the `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`
+This example walks through configuring Envoy using the `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_
 reference implementation.
 
 It demonstrates how configuration provided to Envoy persists, even when the control plane is not available,
-and a trivial example of how to update Envoy's configuration dynamically.
+and provides a trivial example of how to update Envoy's configuration dynamically.
 
 .. include:: _include/docker-env-setup.rst
+
+Change directory to ``examples/dynamic-configuration`` in the Envoy repository.
 
 Step 3: Start the proxy container
 *********************************
 
-First lets build our containers and start the proxy container, and two backend HTTP echo servers.
+First build the containers and start the ``proxy`` container.
 
-The go-control-plane has not yet been started.
+This should also start two backend ``HTTP`` echo servers, ``service1`` and ``service2``.
+
+The control plane has not yet been started.
 
 .. code-block:: console
 
@@ -35,15 +39,15 @@ The go-control-plane has not yet been started.
 Step 4: Check initial config and web response
 *********************************************
 
-As we have not yet started the control plane, nothing should be responding on port 10000
+As we have not yet started the control plane, nothing should be responding on port ``10000``.
 
 .. code-block:: console
 
    $ curl http://localhost:10000
    curl: (56) Recv failure: Connection reset by peer
 
-If you config dump the ``static_clusters`` you should see the ``xds_cluster`` configured for the control
-plane:
+Dump the proxy's ``static_clusters`` configuration and you should see the ``xds_cluster``
+configured for the control plane:
 
 .. code-block:: console
 
@@ -55,9 +59,9 @@ plane:
 Step 5: Start the control plane
 *******************************
 
-Let's start up the control plane.
+Start up the ``go-control-plane`` service.
 
-You may need to wait a moment or two for the service to become ``healthy``.
+You may need to wait a moment or two for it to become ``healthy``.
 
 .. code-block:: console
 
@@ -74,8 +78,8 @@ You may need to wait a moment or two for the service to become ``healthy``.
 Step 6: Query the proxy
 ***********************
 
-Once the control plane has started, you should be able to make a request to port ``10000``, which will be
-served by ``service1``.
+Once the control plane has started and is ``healthy``, you should be able to make a request to port ``10000``,
+which will be served by ``service1``.
 
 .. code-block:: console
 
@@ -95,8 +99,8 @@ served by ``service1``.
 Step 5: Dump Envoy's ``dynamic_active_clusters`` config
 *******************************************************
 
-If you now ``config_dump`` the ``dynamic_active_clusters`` you should see Envoy is configured
-with the cluster endpoint pointing to ``service1``
+If you now dump the proxy's ``dynamic_active_clusters`` configuration, you should see it is configured
+with the cluster pointing to ``service1``
 
 .. code-block:: console
 
@@ -114,7 +118,7 @@ Stop the go-control-plane:
 
     $ docker-compose stop go-control-plane
 
-The Envoy proxy should continue proxying responses from ``service1``
+The Envoy proxy should continue proxying responses from ``service1``.
 
 .. code-block:: console
 
@@ -128,7 +132,10 @@ The example setup starts `go-control-plane <https://github.com/envoyproxy/go-con
 with a custom :download:`resource.go <_include/dynamic-configuration/resource.go>` file which
 specifies the configuration provided to Envoy.
 
-If you edit this file and change the ``UpstreamHost`` from ``service1`` to ``service2``:
+Let's update this to have Envoy proxy instead to ``service2``.
+
+Edit ``resource.go`` in the dynamic configuration example folder and change the ``UpstreamHost``
+from ``service1`` to ``service2``:
 
 .. literalinclude:: _include/dynamic-configuration/resource.go
    :language: go
@@ -137,7 +144,7 @@ If you edit this file and change the ``UpstreamHost`` from ``service1`` to ``ser
    :linenos:
 
 Further down in this file you must also change the configuration snapshot version number from
-``"1"`` to ``"2"`` to ensure Envoy sees the new configuration as newer:
+``"1"`` to ``"2"`` to ensure Envoy sees the configuration as newer:
 
 .. literalinclude:: _include/dynamic-configuration/resource.go
    :language: go
@@ -174,5 +181,12 @@ Now when you make a request to the proxy it should be served by the ``service2``
    Content-Length: 0
    User-Agent: curl/7.72.0
 
+Dumping the ``dynamic_active_clusters`` you should see the cluster is now configured with
+``service2``:
 
-Add config dump...
+.. code-block:: console
+
+   $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
+
+.. literalinclude:: _include/dynamic-configuration/response-config-active-clusters.json
+   :language: json
