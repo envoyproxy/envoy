@@ -5,15 +5,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
-    restart: on-failure:3
     networks:
       - envoymesh
     ports:
       - "8000:8000"
       - "8001:8001"
     depends_on:
-      skywalking-oap:
-        condition: service_healthy
+      - skywalking-oap
   # First service.
   service1:
     build:
@@ -25,16 +23,13 @@ services:
       - envoymesh
     environment:
       - SERVICE_NAME=1
-    restart: on-failure:3
     depends_on:
-      skywalking-oap:
-        condition: service_healthy
+      - skywalking-oap
   # Second service.
   service2:
     build:
       context: ../front-proxy
       dockerfile: Dockerfile-service
-    restart: on-failure:3
     volumes:
       - ./service2-envoy-skywalking.yaml:/etc/service-envoy.yaml
     networks:
@@ -42,8 +37,7 @@ services:
     environment:
       - SERVICE_NAME=2
     depends_on:
-      skywalking-oap:
-        condition: service_healthy
+      - skywalking-oap
   # Skywalking components.
   elasticsearch:
     image: elasticsearch:7.9.2
@@ -57,7 +51,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    restart: on-failure:3
     environment:
       discovery.type: single-node
     ulimits:
@@ -69,8 +62,7 @@ services:
     networks:
       - envoymesh
     depends_on:
-      elasticsearch:
-        condition: service_healthy
+      - elasticsearch
     links:
       - elasticsearch
     ports:
@@ -85,20 +77,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    restart: on-failure:3
   skywalking-ui:
     image: apache/skywalking-ui:8.1.0
     networks:
       - envoymesh
     depends_on:
-      skywalking-oap:
-        condition: service_healthy
+      - skywalking-oap
     links:
       - skywalking-oap
     ports:
       - 8080:8080
     environment:
       SW_OAP_ADDRESS: skywalking-oap:12800
-    restart: on-failure:3
 networks:
   envoymesh: {}
