@@ -56,6 +56,13 @@ configured for the control plane:
 .. literalinclude:: _include/dynamic-configuration/response-config-cluster.json
    :language: json
 
+No ``dynamic_active_clusters`` have been configured yet:
+
+.. code-block:: console
+
+   $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
+   null
+
 Step 5: Start the control plane
 *******************************
 
@@ -112,7 +119,7 @@ with the cluster pointing to ``service1``
 Step 6: Stop the control plane
 ******************************
 
-Stop the go-control-plane:
+Stop the ``go-control-plane`` service:
 
 .. code-block:: console
 
@@ -188,5 +195,5 @@ Dumping the ``dynamic_active_clusters`` you should see the cluster is now config
 
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
 
-.. literalinclude:: _include/dynamic-configuration/response-config-active-clusters.json
+.. literalinclude:: _include/dynamic-configuration/response-config-active-clusters-updated.json
    :language: json
