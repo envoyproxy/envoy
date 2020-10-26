@@ -540,22 +540,24 @@ TEST_F(DnsFilterTest, RepeatedTypeAQuerySuccess) {
   setup(forward_query_off_config);
   constexpr size_t loopCount = 5;
   const std::string domain("www.foo3.com");
-  size_t total_query_bytes = 0;
 
-  std::list<uint16_t> query_id{};
+  std::list<uint16_t> query_id_list{};
 
-  query_id.resize(loopCount);
+  query_id_list.resize(loopCount);
   for (size_t i = 0; i < loopCount; i++) {
+
+    // Generate a changing, non-zero query ID for each lookup
+    const uint16_t query_id = (random_.random() + i) & 0xFFFF;
     const std::string query =
-        Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
-    total_query_bytes += query.size();
+        Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN, query_id);
     ASSERT_FALSE(query.empty());
     sendQueryFromClient("10.0.0.1:1000", query);
 
     query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
 
-    auto iter = std::find(query_id.begin(), query_id.end(), query_ctx_->header_.id);
-    EXPECT_EQ(iter, query_id.end());
+    const uint16_t response_id = query_ctx_->header_.id;
+    auto iter = std::find(query_id_list.begin(), query_id_list.end(), query_id);
+    EXPECT_EQ(iter, query_id_list.end());
     EXPECT_TRUE(query_ctx_->parse_status_);
 
     EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
@@ -565,8 +567,8 @@ TEST_F(DnsFilterTest, RepeatedTypeAQuerySuccess) {
     const DnsAnswerRecordPtr& answer = query_ctx_->answers_.find(domain)->second;
 
     // Verify that the Query ID matches the Response ID
-    EXPECT_EQ(query_ctx_->header_.id, query_ctx_->response_header_.id);
-    query_id.emplace_back(query_ctx_->header_.id);
+    EXPECT_EQ(query_id, response_id);
+    query_id_list.emplace_back(query_id);
 
     // Verify the address returned
     std::list<std::string> expected{"10.0.3.1"};
