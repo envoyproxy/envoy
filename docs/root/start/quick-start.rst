@@ -146,10 +146,12 @@ The Envoy admin endpoint should also be available at http://localhost:9901
 Static configuration
 --------------------
 
-To start Envoy with static configuration, you will need to specify `listeners <start_quick_start_static_listeners>` and
-`clusters <start_quick_start_static_clusters>` as `static_resources <start_quick_start_static_static_resources>`.
+To start Envoy with static configuration, you will need to specify :ref:`listeners <start_quick_start_static_listeners>`
+and :ref:`clusters <start_quick_start_static_clusters>` as
+:ref:`static_resources <start_quick_start_static_static_resources>`.
 
-You can also add an `admin <start_quick_start_static_admin>` section if you wish to monitor Envoy or retrieve stats.
+You can also add an :ref:`admin <start_quick_start_static_admin>` section if you wish to monitor Envoy
+or retrieve stats.
 
 The following sections walk through the static configuration provided in the
 :download:`demo configuration file <_include/envoy-demo.yaml>`.
@@ -232,12 +234,13 @@ that is a good place to start.
 
 At a minimum, you will need to start Envoy configured with the following sections:
 
-- `node <start_quick_start_dynamic_node>` information, to uniquely identify the proxy node.
-- `dynamic_resources <start_quick_start_dynamic_dynamic_resources>` to tell Envoy which configurations should be updated dynamically
-- `static_resources <start_quick_start_dynamic_static_resources>` to specify where Envoy should retrieve its configuration from.
-- `layered_runtime <start_quick_start_dynamic_layered_runtime>` to persist dynamically-provided configurations.
+- :ref:`node <start_quick_start_dynamic_node>` information, to uniquely identify the proxy node.
+- :ref:`dynamic_resources <start_quick_start_dynamic_dynamic_resources>` to tell Envoy which configurations should be updated dynamically
+- :ref:`static_resources <start_quick_start_dynamic_static_resources>` to specify where Envoy should retrieve its configuration from.
+- :ref:`layered_runtime <start_quick_start_dynamic_layered_runtime>` to persist dynamically-provided configurations.
 
-You can also add an `admin <start_quick_start_dynamic_admin>` section if you wish to monitor Envoy or retrieve stats or configuration information.
+You can also add an :ref:`admin <start_quick_start_dynamic_admin>` section if you wish to monitor Envoy or
+retrieve stats or configuration information.
 
 The following sections walk through the dynamic configuration provided in the
 :download:`demo dynamic configuration file <_include/envoy-dynamic-demo.yaml>`.
@@ -303,10 +306,11 @@ Dynamic configuration: ``admin``
 ********************************
 
 Configuring the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` section is
-the same as for static configuration.
+the same as for :ref:`static configuration <start_quick_start_static_admin>`.
 
-Enabling the ``admin`` interface with dynamic configuration, allows you to see how Envoy is
-currently configured by using the ``config_dump`` endpoint.
+Enabling the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` interface with
+dynamic configuration, allows you to see how Envoy is currently configured by using the
+:ref:`config_dump <operations_admin_interface_config_dump>` endpoint.
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
