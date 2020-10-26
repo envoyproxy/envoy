@@ -8,8 +8,6 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
-using testing::ReturnRef;
-
 namespace Envoy {
 namespace FatalErrorHandler {
 
@@ -34,15 +32,15 @@ class TestFatalAction : public Server::Configuration::FatalAction {
 public:
   TestFatalAction(bool is_safe) : is_safe_(is_safe) {}
 
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran; }
+  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran_; }
 
   bool isAsyncSignalSafe() const override { return is_safe_; }
 
-  int getNumTimesRan() { return times_ran; }
+  int getNumTimesRan() { return times_ran_; }
 
 private:
   bool is_safe_;
-  int times_ran = 0;
+  int times_ran_ = 0;
 };
 
 class FatalActionTest : public ::testing::Test {
@@ -63,18 +61,28 @@ protected:
   FatalAction::FatalActionPtrList unsafe_actions_;
 };
 
+TEST_F(FatalActionTest, ShouldNotBeAbleToRunActionsBeforeRegistration) {
+  // Call the actions
+  EXPECT_FALSE(FatalErrorHandler::runSafeActions());
+  EXPECT_FALSE(FatalErrorHandler::runUnsafeActions());
+}
+
 TEST_F(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
+  // Register empty list of actions
+  FatalErrorHandler::registerFatalActions(FatalAction::FatalActionPtrList(),
+                                          FatalAction::FatalActionPtrList(),
+                                          Thread::threadFactoryForTest());
+
+  // Try to override the registration
+  safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true));
+  auto* safe_action = dynamic_cast<TestFatalAction*>(safe_actions_.front().get());
+  ASSERT_EQ(safe_action->getNumTimesRan(), 0);
+
   FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
                                           Thread::threadFactoryForTest());
 
-  EXPECT_DEBUG_DEATH(
-      {
-        // We've already set this up when we set up the test suite, so this
-        // subsequent call should trigger Envoy bug.
-        FatalErrorHandler::registerFatalActions(
-            std::move(safe_actions_), std::move(unsafe_actions_), Thread::threadFactoryForTest());
-      },
-      "Details: registerFatalActions called more than once.");
+  EXPECT_TRUE(FatalErrorHandler::runSafeActions());
+  EXPECT_EQ(safe_action->getNumTimesRan(), 0);
 }
 
 TEST_F(FatalActionTest, CanCallRegisteredActions) {

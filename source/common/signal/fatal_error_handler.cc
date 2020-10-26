@@ -107,8 +107,6 @@ void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
     // Our manager is the system's singleton, ensure that the unique_ptr does not
     // delete the instance.
     mananger.release();
-  } else {
-    ENVOY_BUG(false, "registerFatalActions called more than once.");
   }
 }
 

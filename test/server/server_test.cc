@@ -181,9 +181,6 @@ public:
 
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTestBase {
-public:
-  ServerInstanceImplTestBase() { FatalErrorHandler::resetFatalActionState(); }
-
 protected:
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
@@ -1194,20 +1191,20 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
 
 class SafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) {
+  void run(const ScopeTrackedObject* /*current_object*/) override {
     std::cerr << "Called SafeFatalAction" << std::endl;
   }
 
-  bool isAsyncSignalSafe() const { return true; }
+  bool isAsyncSignalSafe() const override { return true; }
 };
 
 class UnsafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) {
+  void run(const ScopeTrackedObject* /*current_object*/) override {
     std::cerr << "Called UnsafeFatalAction" << std::endl;
   }
 
-  bool isAsyncSignalSafe() const { return false; }
+  bool isAsyncSignalSafe() const override { return false; }
 };
 
 TEST_P(ServerInstanceImplTest, WithFatalActions) {
@@ -1252,7 +1249,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
 
         abort_called.WaitForNotification();
       },
-      "Called SafeFatalAction.*Called UnsafeFatalAction");
+      "(AddressSanitizer:DEADLYSIGNAL|Called SafeFatalAction.*Called UnsafeFatalAction)");
 }
 
 // Static configuration validation. We test with both allow/reject settings various aspects of
