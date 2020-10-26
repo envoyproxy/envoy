@@ -15,6 +15,8 @@ Step 4: Start the proxy container
 
 First lets build our containers and start the proxy container, and two backend HTTP echo servers.
 
+The go-control-plane has not yet been started.
+
 .. code-block:: console
 
     $ pwd
@@ -32,14 +34,14 @@ First lets build our containers and start the proxy container, and two backend H
 Step 4: Check web response
 **************************
 
-Nothing is listening on 10000
+Nothing is responding on port 10000
 
 .. code-block:: console
 
    $ curl http://localhost:10000
    curl: (56) Recv failure: Connection reset by peer
 
-If we config dump the clusters we just see the ``xds_cluster`` we configured for the control
+If we config dump the ``static_clusters`` we should see the ``xds_cluster`` we configured for the control
 plane
 
 .. code-block:: console
@@ -51,6 +53,8 @@ plane
 
 Step 5: Start the go-control-plane
 **********************************
+
+Let's start up the go-control-plane. You may need to wait a moment or two for the service to become "healthy"
 
 .. code-block:: console
 
@@ -67,10 +71,36 @@ Step 5: Start the go-control-plane
 Step 5: Query the proxy
 ***********************
 
+Once the control plane has started, we should be able to make a request to port ``10000``, which will be
+served by ``service1``.
+
+.. code-block:: console
+
+   $ curl http://localhost:10000
+   Request served by service1
+
+   HTTP/1.1 GET /
+
+   Host: service1
+   Accept: */*
+   X-Forwarded-Proto: http
+   X-Request-Id: 1d93050e-f39c-4602-90f8-a124d6e78d26
+   X-Envoy-Expected-Rq-Timeout-Ms: 15000
+   Content-Length: 0
+   User-Agent: curl/7.72.0
 
 Step 5: Dump the proxy config again
 ***********************************
 
+If we now ``config_dump`` the ``dynamic_active_clusters`` we should see the endpoint pointing
+to ``service1``
+
+.. code-block:: console
+
+   curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
+
+.. literalinclude:: _include/dynamic-configuration/response-config-active-clusters.json
+   :language: json
 
 Step 5: Stop the go-control-plane
 *********************************
