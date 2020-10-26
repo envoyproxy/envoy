@@ -161,7 +161,7 @@ The following sections walk through the static configuration provided in the
 Static configuration: ``static_resources``
 ******************************************
 
-The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains
+The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contain
 everything that is configured statically when Envoy starts, as opposed to dynamically at runtime.
 
 .. literalinclude:: _include/envoy-demo.yaml
@@ -268,7 +268,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 Dynamic configuration: ``dynamic_resources``
 ********************************************
 
-The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` specifies
+The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` specify
 the configuration to load dynamically, and the :ref:`cluster <start_quick_start_dynamic_static_resources>`
 to connect to for dynamic configuration updates.
 
@@ -304,8 +304,8 @@ Dynamic configuration: ``layered_runtime``
 ******************************************
 
 A :ref:`layered_runtime <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime>` is
-required with a :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
-is required to persist configuration provided by the control plane.
+required with an :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
+to persist configuration provided by the control plane.
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
@@ -323,7 +323,7 @@ Configuring the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ad
 the same as for :ref:`static configuration <start_quick_start_static_admin>`.
 
 Enabling the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` interface with
-dynamic configuration, allows you to see use the :ref:`config_dump <operations_admin_interface_config_dump>`
+dynamic configuration, allows you to use the :ref:`config_dump <operations_admin_interface_config_dump>`
 endpoint to see how Envoy is currently configured.
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
