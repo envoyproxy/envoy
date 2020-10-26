@@ -28,7 +28,7 @@ void ContextManagerImpl::removeOldContext(std::shared_ptr<Envoy::Ssl::Context> o
   if (old_context) {
     contexts_.remove_if([old_context](const std::weak_ptr<Envoy::Ssl::Context>& n) {
       std::shared_ptr<Envoy::Ssl::Context> sp = n.lock();
-      if (old_context && sp) {
+      if (sp) {
         return old_context == sp;
       }
       return false;
