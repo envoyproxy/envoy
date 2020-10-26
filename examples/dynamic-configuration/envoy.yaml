@@ -20,6 +20,8 @@ static_resources:
   clusters:
     - connect_timeout: 1s
       type: strict_dns
+      http2_protocol_options: {}
+      name: xds_cluster
       load_assignment:
         cluster_name: xds_cluster
         endpoints:
@@ -29,8 +31,7 @@ static_resources:
                     socket_address:
                       address: go-control-plane
                       port_value: 18000
-    http2_protocol_options: {}
-    name: xds_cluster
+
 layered_runtime:
   layers:
     - name: runtime-0
