@@ -46,7 +46,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: www.envoyproy.io
+                address: www.envoyproxy.io
                 port_value: 443
     transport_socket:
       name: envoy.transport_sockets.tls
