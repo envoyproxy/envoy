@@ -9,6 +9,8 @@ Dynamic configuration
 Step 3: Take a look at the proxy config
 ***************************************
 
+.. literalinclude:: _include/dynamic-configuration/envoy.yaml
+   :language: yaml
 
 Step 4: Start the proxy container
 *********************************
@@ -42,7 +44,7 @@ Nothing is responding on port 10000
    curl: (56) Recv failure: Connection reset by peer
 
 If we config dump the ``static_clusters`` we should see the ``xds_cluster`` we configured for the control
-plane
+plane:
 
 .. code-block:: console
 
@@ -54,11 +56,13 @@ plane
 Step 5: Start the go-control-plane
 **********************************
 
-Let's start up the go-control-plane. You may need to wait a moment or two for the service to become "healthy"
+Let's start up the go-control-plane.
+
+You may need to wait a moment or two for the service to become ``healthy``.
 
 .. code-block:: console
 
-    $ docker-compose up -d go-control-plane
+    $ docker-compose up --build -d go-control-plane
     $ docker-compose ps
 
 		Name                                Command                  State                    Ports
@@ -97,7 +101,7 @@ to ``service1``
 
 .. code-block:: console
 
-   curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
+   $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
 
 .. literalinclude:: _include/dynamic-configuration/response-config-active-clusters.json
    :language: json
@@ -124,25 +128,36 @@ Step 5: Edit resource.go and restart the go-control-plane
 The example go-control-plane is started with a custom resource.go file which
 specifies the configuration provided to Envoy.
 
-If you edit this file and change the ``UpstreamHost``:
+If you edit this file and change the ``UpstreamHost`` from ``service1`` to ``service2``:
 
 .. literalinclude:: _include/dynamic-configuration/resource.go
    :language: go
    :lines: 33-40
-   :emphasize-lines: 5
+   :emphasize-lines: 6
    :linenos:
 
 Further down in this file you must also change the configuration snapshot
-version number:
+version number from ``"1"`` to ``"2"``:
 
 .. literalinclude:: _include/dynamic-configuration/resource.go
    :language: go
+   :lineno-start: 167
    :lines: 167-177
-   :emphasize-lines: 2
+   :emphasize-lines: 3
    :linenos:
+
+Now rebuild and restart the go-control-plane:
+
+.. code-block:: console
+
+    $ docker-compose up --build -d go-control-plane
+
+You may need to wait a moment or two for the go-control-plane to become ``healthy``.
 
 Step 5: Query the proxy
 ***********************
+
+When you make
 
 .. code-block:: console
 
