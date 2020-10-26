@@ -6,6 +6,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 
+#include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/router/upstream_request.h"
@@ -25,6 +26,9 @@ public:
     ASSERT(!is_connect);
     conn_pool_ = cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(),
                                            downstream_protocol, ctx);
+  }
+  ~HttpConnPool() override {
+    ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingStream() override;

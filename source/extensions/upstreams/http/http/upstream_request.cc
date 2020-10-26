@@ -10,7 +10,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -55,6 +54,7 @@ absl::optional<Envoy::Http::Protocol> HttpConnPool::protocol() const {
 void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                  absl::string_view transport_failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
+  conn_pool_stream_handle_ = nullptr;
   callbacks_->onPoolFailure(reason, transport_failure_reason, host);
 }
 
