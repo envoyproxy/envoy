@@ -209,8 +209,8 @@ which in the demo configuration is ``0.0.0.0:9901``.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 50
-    :lines: 50-57
+    :lineno-start: 48
+    :lines: 48-55
     :emphasize-lines: 3-8
 
 .. warning::
