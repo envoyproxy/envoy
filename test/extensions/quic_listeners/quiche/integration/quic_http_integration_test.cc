@@ -10,19 +10,22 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
@@ -109,6 +112,8 @@ public:
         injected_resource_filename_2_(TestEnvironment::temporaryPath("injected_resource_2")),
         file_updater_1_(injected_resource_filename_1_),
         file_updater_2_(injected_resource_filename_2_) {}
+
+  ~QuicHttpIntegrationTest() override { cleanupUpstreamAndDownstream(); }
 
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
@@ -233,6 +238,48 @@ public:
             timeSystem()));
   }
 
+  void testMultipleQuicConnections() {
+    concurrency_ = 8;
+    set_reuse_port_ = true;
+    initialize();
+    std::vector<IntegrationCodecClientPtr> codec_clients;
+    for (size_t i = 1; i <= concurrency_; ++i) {
+      // The BPF filter and ActiveQuicListener::destination() look at the 1st word of connection id
+      // in the packet header. And currently all QUIC versions support 8 bytes connection id. So
+      // create connections with the first 4 bytes of connection id different from each
+      // other so they should be evenly distributed.
+      designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
+      codec_clients.push_back(makeHttpConnection(lookupPort("http")));
+    }
+    constexpr auto timeout_first = std::chrono::seconds(15);
+    constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
+    if (GetParam().first == Network::Address::IpVersion::v4) {
+      test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u, timeout_first);
+    } else {
+      test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u, timeout_first);
+    }
+    for (size_t i = 0; i < concurrency_; ++i) {
+      if (GetParam().first == Network::Address::IpVersion::v4) {
+        test_server_->waitForGaugeEq(
+            fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i), 1u,
+            timeout_subsequent);
+        test_server_->waitForCounterEq(
+            fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_total", i), 1u,
+            timeout_subsequent);
+      } else {
+        test_server_->waitForGaugeEq(
+            fmt::format("listener.[__]_0.worker_{}.downstream_cx_active", i), 1u,
+            timeout_subsequent);
+        test_server_->waitForCounterEq(
+            fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i), 1u,
+            timeout_subsequent);
+      }
+    }
+    for (size_t i = 0; i < concurrency_; ++i) {
+      codec_clients[i]->close();
+    }
+  }
+
 protected:
   quic::QuicConfig quic_config_;
   quic::QuicServerId server_id_{"lyft.com", 443, false};
@@ -344,100 +391,15 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
             1);
 }
 
-TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
-  concurrency_ = 8;
-  set_reuse_port_ = true;
-  initialize();
-  std::vector<IntegrationCodecClientPtr> codec_clients;
-  for (size_t i = 1; i <= concurrency_; ++i) {
-    // The BPF filter looks at the 1st word of connection id in the packet
-    // header. And currently all QUIC versions support 8 bytes connection id. So
-    // create connections with the first 4 bytes of connection id different from each
-    // other so they should be evenly distributed.
-    designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
-    codec_clients.push_back(makeHttpConnection(lookupPort("http")));
-  }
-  if (GetParam().first == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u);
-  } else {
-    test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
-  }
-  for (size_t i = 0; i < concurrency_; ++i) {
-    if (GetParam().first == Network::Address::IpVersion::v4) {
-      test_server_->waitForGaugeEq(
-          fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i), 1u);
-      test_server_->waitForCounterEq(
-          fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_total", i), 1u);
-    } else {
-      test_server_->waitForGaugeEq(fmt::format("listener.[__]_0.worker_{}.downstream_cx_active", i),
-                                   1u);
-      test_server_->waitForCounterEq(
-          fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i), 1u);
-    }
-  }
-  for (size_t i = 0; i < concurrency_; ++i) {
-    codec_clients[i]->close();
-  }
-#endif
+TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsWithBPF) { testMultipleQuicConnections(); }
+
+TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing", "false");
+
+  testMultipleQuicConnections();
 }
 
-#ifndef __APPLE__
-TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
-  concurrency_ = 8;
-  set_reuse_port_ = true;
-  initialize();
-#ifdef SO_ATTACH_REUSEPORT_CBPF
-#define SO_ATTACH_REUSEPORT_CBPF_TMP SO_ATTACH_REUSEPORT_CBPF
-#undef SO_ATTACH_REUSEPORT_CBPF
-#endif
-  std::vector<IntegrationCodecClientPtr> codec_clients;
-  for (size_t i = 1; i <= concurrency_; ++i) {
-    // The BPF filter looks at the 1st byte of connection id in the packet
-    // header. And currently all QUIC versions support 8 bytes connection id. So
-    // create connections with the first 4 bytes of connection id different from each
-    // other so they should be evenly distributed.
-    designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
-    codec_clients.push_back(makeHttpConnection(lookupPort("http")));
-  }
-  if (GetParam().first == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u);
-  } else {
-    test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
-  }
-  // Even without BPF support, these connections should more or less distributed
-  // across different workers.
-  for (size_t i = 0; i < concurrency_; ++i) {
-    if (GetParam().first == Network::Address::IpVersion::v4) {
-      EXPECT_LT(
-          test_server_->gauge(fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i))
-              ->value(),
-          8u);
-      EXPECT_LT(
-          test_server_->counter(fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_total", i))
-              ->value(),
-          8u);
-    } else {
-      EXPECT_LT(
-          test_server_->gauge(fmt::format("listener.[__]_0.worker_{}.downstream_cx_active", i))
-              ->value(),
-          8u);
-      EXPECT_LT(
-          test_server_->counter(fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i))
-              ->value(),
-          8u);
-    }
-  }
-  for (size_t i = 0; i < concurrency_; ++i) {
-    codec_clients[i]->close();
-  }
-#ifdef SO_ATTACH_REUSEPORT_CBPF_TMP
-#define SO_ATTACH_REUSEPORT_CBPF SO_ATTACH_REUSEPORT_CBPF_TMP
-#endif
-}
-#endif
-
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
 TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
   concurrency_ = 2;
   set_reuse_port_ = true;
@@ -475,7 +437,6 @@ TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
   cleanupUpstreamAndDownstream();
 }
-#endif
 
 TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   initialize();

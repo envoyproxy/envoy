@@ -10,7 +10,7 @@
 #
 #  python tools/deprecate_version/deprecate_version.py
 #
-# A GitHub access token must be set in GH_ACCESS_TOKEN. To create one, go to
+# A GitHub access token must be set in GITHUB_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create
 # a token with public_repo scope. Keep this safe, it's broader than it needs to
 # be thanks to GH permission model
@@ -183,10 +183,9 @@ if __name__ == '__main__':
     print('No code is deprecated.')
     sys.exit(0)
 
-  access_token = os.getenv('GH_ACCESS_TOKEN')
+  access_token = os.getenv('GITHUB_TOKEN')
   if not access_token:
-    print(
-        'Missing GH_ACCESS_TOKEN: see instructions in tools/deprecate_version/deprecate_version.py')
+    print('Missing GITHUB_TOKEN: see instructions in tools/deprecate_version/deprecate_version.py')
     sys.exit(1)
 
   CreateIssues(access_token, runtime_and_pr)

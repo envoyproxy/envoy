@@ -498,6 +498,15 @@ private:
   NullHistogramImpl null_histogram_;
   NullTextReadoutImpl null_text_readout_;
 
+  Thread::ThreadSynchronizer sync_;
+  std::atomic<uint64_t> next_scope_id_{};
+  uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
+
+  StatNameSetPtr well_known_tags_;
+
+  mutable Thread::MutexBasicLockable hist_mutex_;
+  StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
+
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats
   // are held by reference in code that expects them to be there, we can't
@@ -510,15 +519,6 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
   std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
-
-  Thread::ThreadSynchronizer sync_;
-  std::atomic<uint64_t> next_scope_id_{};
-  uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
-
-  StatNameSetPtr well_known_tags_;
-
-  mutable Thread::MutexBasicLockable hist_mutex_;
-  StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;

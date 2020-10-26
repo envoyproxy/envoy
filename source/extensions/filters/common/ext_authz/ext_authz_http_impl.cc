@@ -31,10 +31,15 @@ const Http::HeaderMap& lengthZeroHeader() {
 
 // Static response used for creating authorization ERROR responses.
 const Response& errorResponse() {
-  CONSTRUCT_ON_FIRST_USE(Response,
-                         Response{CheckStatus::Error, ErrorKind::Other, Http::HeaderVector{},
-                                  Http::HeaderVector{}, Http::HeaderVector{}, EMPTY_STRING,
-                                  Http::Code::Forbidden, ProtobufWkt::Struct{}});
+  CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
+                                            ErrorKind::Other,
+                                            Http::HeaderVector{},
+                                            Http::HeaderVector{},
+                                            Http::HeaderVector{},
+                                            {{}},
+                                            EMPTY_STRING,
+                                            Http::Code::Forbidden,
+                                            ProtobufWkt::Struct{}});
 }
 
 // SuccessResponse used for creating either DENIED or OK authorization responses.
@@ -70,40 +75,11 @@ struct SuccessResponse {
   ResponsePtr response_;
 };
 
-envoy::type::matcher::v3::StringMatcher
-ignoreCaseStringMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) {
-  const auto& match_pattern_case = matcher.match_pattern_case();
-  if (match_pattern_case == envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex ||
-      match_pattern_case ==
-          envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
-    return matcher;
-  }
-
-  envoy::type::matcher::v3::StringMatcher ignore_case;
-  ignore_case.set_ignore_case(true);
-  switch (matcher.match_pattern_case()) {
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
-    ignore_case.set_exact(matcher.exact());
-    break;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
-    ignore_case.set_prefix(matcher.prefix());
-    break;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
-    ignore_case.set_suffix(matcher.suffix());
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  return ignore_case;
-}
-
 std::vector<Matchers::StringMatcherPtr>
-createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                     const bool disable_lowercase_string_matcher) {
+createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(
-        disable_lowercase_string_matcher ? matcher : ignoreCaseStringMatcher(matcher)));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
   }
   return matchers;
 }
@@ -127,20 +103,14 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            uint32_t timeout, absl::string_view path_prefix)
-    : enable_case_sensitive_string_matcher_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher")),
-      request_header_matchers_(
-          toRequestMatchers(config.http_service().authorization_request().allowed_headers(),
-                            enable_case_sensitive_string_matcher_)),
-      client_header_matchers_(
-          toClientMatchers(config.http_service().authorization_response().allowed_client_headers(),
-                           enable_case_sensitive_string_matcher_)),
+    : request_header_matchers_(
+          toRequestMatchers(config.http_service().authorization_request().allowed_headers())),
+      client_header_matchers_(toClientMatchers(
+          config.http_service().authorization_response().allowed_client_headers())),
       upstream_header_matchers_(toUpstreamMatchers(
-          config.http_service().authorization_response().allowed_upstream_headers(),
-          enable_case_sensitive_string_matcher_)),
+          config.http_service().authorization_response().allowed_upstream_headers())),
       upstream_header_to_append_matchers_(toUpstreamMatchers(
-          config.http_service().authorization_response().allowed_upstream_headers_to_append(),
-          enable_case_sensitive_string_matcher_)),
+          config.http_service().authorization_response().allowed_upstream_headers_to_append())),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
@@ -148,14 +118,12 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_request().headers_to_add(), false)) {}
 
 MatcherSharedPtr
-ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                                const bool disable_lowercase_string_matcher) {
+ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
   const std::vector<Http::LowerCaseString> keys{
       {Http::CustomHeaders::get().Authorization, Http::Headers::get().Method,
        Http::Headers::get().Path, Http::Headers::get().Host}};
 
-  std::vector<Matchers::StringMatcherPtr> matchers(
-      createStringMatchers(list, disable_lowercase_string_matcher));
+  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
@@ -166,10 +134,8 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatche
 }
 
 MatcherSharedPtr
-ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                               const bool disable_lowercase_string_matcher) {
-  std::vector<Matchers::StringMatcherPtr> matchers(
-      createStringMatchers(list, disable_lowercase_string_matcher));
+ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
+  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
 
   // If list is empty, all authorization response headers, except Host, should be added to
   // the client response.
@@ -197,10 +163,8 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
 }
 
 MatcherSharedPtr
-ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                                 const bool disable_lowercase_string_matcher) {
-  return std::make_unique<HeaderKeyMatcher>(
-      createStringMatchers(list, disable_lowercase_string_matcher));
+ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
+  return std::make_unique<HeaderKeyMatcher>(createStringMatchers(list));
 }
 
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
@@ -253,8 +217,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& di
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   if (request_length > 0) {
-    message->body() =
-        std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
+    message->body().add(request.attributes().request().http().body());
   }
 
   const std::string& cluster = config_->cluster();
@@ -331,22 +294,53 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
     return std::make_unique<Response>(errorResponse());
   }
 
+  // Extract headers-to-remove from the storage header coming from the
+  // authorization server.
+  const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
+  // If we are going to construct an Ok response we need to save the
+  // headers_to_remove in a variable first.
+  std::vector<Http::LowerCaseString> headers_to_remove;
+  if (status_code == enumToInt(Http::Code::OK)) {
+    const auto& get_result = message->headers().get(storage_header_name);
+    for (size_t i = 0; i < get_result.size(); ++i) {
+      const Http::HeaderEntry* entry = get_result[i];
+      if (entry != nullptr) {
+        absl::string_view storage_header_value = entry->value().getStringView();
+        std::vector<absl::string_view> header_names = StringUtil::splitToken(
+            storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
+        headers_to_remove.reserve(headers_to_remove.size() + header_names.size());
+        for (const auto& header_name : header_names) {
+          headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
+        }
+      }
+    }
+  }
+  // Now remove the storage header from the authz server response headers before
+  // we reuse them to construct an Ok/Denied authorization response below.
+  message->headers().remove(storage_header_name);
+
   // Create an Ok authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
                        config_->upstreamHeaderToAppendMatchers(),
                        Response{CheckStatus::OK, ErrorKind::Other, Http::HeaderVector{},
-                                Http::HeaderVector{}, Http::HeaderVector{}, EMPTY_STRING,
-                                Http::Code::OK, ProtobufWkt::Struct{}}};
+                                Http::HeaderVector{}, Http::HeaderVector{},
+                                std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
+                                ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
   // Create a Denied authorization response.
   SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
-                         Response{CheckStatus::Denied, ErrorKind::Other, Http::HeaderVector{},
-                                  Http::HeaderVector{}, Http::HeaderVector{},
-                                  message->bodyAsString(), static_cast<Http::Code>(status_code),
+                         Response{CheckStatus::Denied,
+                                  ErrorKind::Other,
+                                  Http::HeaderVector{},
+                                  Http::HeaderVector{},
+                                  Http::HeaderVector{},
+                                  {{}},
+                                  message->bodyAsString(),
+                                  static_cast<Http::Code>(status_code),
                                   ProtobufWkt::Struct{}}};
   return std::move(denied.response_);
 }

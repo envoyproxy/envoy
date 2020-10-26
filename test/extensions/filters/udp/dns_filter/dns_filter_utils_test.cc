@@ -49,9 +49,6 @@ TEST_F(DnsFilterUtilsTest, ServiceNameSynthesisTest) {
       {"name2", "_proto2", "test2.com", "_name2._proto2.test2.com"},
       {"_name3", "proto3", "test3.com", "_name3._proto3.test3.com"},
       {"name4", "proto4", "_sites.test4.com", "_name4._proto4._sites.test4.com"},
-      {"_name5", "", "test5.com", ""},
-      {"", "proto6", "test6.com", ""},
-      {"name7", "proto7", "", ""},
   };
 
   for (auto& ptr : service_data) {

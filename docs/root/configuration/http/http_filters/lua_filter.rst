@@ -643,6 +643,26 @@ protocol()
 Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
 used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
 
+downstreamLocalAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamLocalAddress()
+
+Returns the string representation of :repo:`downstream remote address <include/envoy/stream_info/stream_info.h>`
+used by the current request.
+
+downstreamDirectRemoteAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamDirectRemoteAddress()
+
+Returns the string representation of :repo:`downstream directly connected address <include/envoy/stream_info/stream_info.h>`
+used by the current request. This is equivalent to the address of the physical connection.
+
 dynamicMetadata()
 ^^^^^^^^^^^^^^^^^
 

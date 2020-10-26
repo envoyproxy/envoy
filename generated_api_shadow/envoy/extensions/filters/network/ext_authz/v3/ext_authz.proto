@@ -4,6 +4,7 @@ package envoy.extensions.filters.network.ext_authz.v3;
 
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -23,13 +24,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC Authorization API defined by
 // :ref:`CheckRequest <envoy_api_msg_service.auth.v3.CheckRequest>`.
 // A failed check will cause this filter to close the TCP connection.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.ext_authz.v2.ExtAuthz";
 
   // The prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The external authorization gRPC service configuration.
   // The default timeout is set to 200ms by this filter.
@@ -51,4 +52,8 @@ message ExtAuthz {
   // version of Check{Request,Response} used on the wire.
   config.core.v3.ApiVersion transport_api_version = 5
       [(validate.rules).enum = {defined_only: true}];
+
+  // Specifies if the filter is enabled with metadata matcher.
+  // If this field is not specified, the filter will be enabled for all requests.
+  type.matcher.v3.MetadataMatcher filter_enabled_metadata = 6;
 }

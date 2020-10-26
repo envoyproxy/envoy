@@ -29,17 +29,18 @@ To generate a protobuf descriptor set for the gRPC service, you'll also need to 
 googleapis repository from GitHub before running protoc, as you'll need annotations.proto
 in your include path, to define the HTTP mapping.
 
-.. code-block:: bash
+.. code-block:: console
 
-  git clone https://github.com/googleapis/googleapis
-  GOOGLEAPIS_DIR=<your-local-googleapis-folder>
+  $ git clone https://github.com/googleapis/googleapis
+  $ GOOGLEAPIS_DIR=<your-local-googleapis-folder>
 
-Then run protoc to generate the descriptor set from bookstore.proto:
+Then run protoc to generate the descriptor set. For example using the test
+:repo:`bookstore.proto <test/proto/bookstore.proto>` provided in the Envoy repository:
 
-.. code-block:: bash
+.. code-block:: console
 
-  protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
-    --descriptor_set_out=proto.pb test/proto/bookstore.proto
+  $ protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
+      --descriptor_set_out=proto.pb test/proto/bookstore.proto
 
 If you have more than one proto source files, you can pass all of them in one command.
 
@@ -56,19 +57,17 @@ For example, with the following proto example, the router will process `/hellowo
 as the path, so the route config prefix `/say` won't match requests to `SayHello`. If you want to
 match the incoming request path, set `match_incoming_request_route` to true.
 
-.. code-block:: proto
+.. literalinclude:: _include/helloworld.proto
+    :language: proto
 
-  package helloworld;
+Assuming you have checked out the google APIs as described above, and have saved the proto file as
+``protos/helloworld.proto`` you can build it with:
 
-  // The greeting service definition.
-  service Greeter {
-    // Sends a greeting
-    rpc SayHello (HelloRequest) returns (HelloReply) {
-      option (google.api.http) = {
-        get: "/say"
-      };
-    }
-  }
+.. code-block:: console
+
+  $ protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
+      --descriptor_set_out=protos/helloworld.pb protos/helloworld.proto
+
 
 Sending arbitrary content
 -------------------------
@@ -103,65 +102,5 @@ Here's a sample Envoy configuration that proxies to a gRPC server running on loc
 gRPC requests and uses the gRPC-JSON transcoder filter to provide the RESTful JSON mapping. I.e., you can make either
 gRPC or RESTful JSON requests to localhost:51051.
 
-.. code-block:: yaml
-
-  admin:
-    access_log_path: /tmp/admin_access.log
-    address:
-      socket_address: { address: 0.0.0.0, port_value: 9901 }
-
-  static_resources:
-    listeners:
-    - name: listener1
-      address:
-        socket_address: { address: 0.0.0.0, port_value: 51051 }
-      filter_chains:
-      - filters:
-        - name: envoy.filters.network.http_connection_manager
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-            stat_prefix: grpc_json
-            codec_type: AUTO
-            route_config:
-              name: local_route
-              virtual_hosts:
-              - name: local_service
-                domains: ["*"]
-                routes:
-                # NOTE: by default, matching happens based on the gRPC route, and not on the incoming request path.
-                # Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
-                - match: { prefix: "/helloworld.Greeter" }
-                  route: { cluster: grpc, timeout: { seconds: 60 } }
-            http_filters:
-            - name: envoy.filters.http.grpc_json_transcoder
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
-                proto_descriptor: "/tmp/envoy/proto.pb"
-                services: ["helloworld.Greeter"]
-                print_options:
-                  add_whitespace: true
-                  always_print_primitive_fields: true
-                  always_print_enums_as_ints: false
-                  preserve_proto_field_names: false
-            - name: envoy.filters.http.router
-
-    clusters:
-    - name: grpc
-      connect_timeout: 1.25s
-      type: logical_dns
-      lb_policy: round_robin
-      dns_lookup_family: V4_ONLY
-      http2_protocol_options: {}
-      load_assignment:
-        cluster_name: grpc
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  # WARNING: "docker.for.mac.localhost" has been deprecated from Docker v18.03.0.
-                  # If you're running an older version of Docker, please use "docker.for.mac.localhost" instead.
-                  # Reference: https://docs.docker.com/docker-for-mac/release-notes/#docker-community-edition-18030-ce-mac59-2018-03-26
-                  address: host.docker.internal
-                  port_value: 50051
-
+.. literalinclude:: _include/grpc-transcoder-filter.yaml
+    :language: yaml

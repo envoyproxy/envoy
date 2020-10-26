@@ -26,7 +26,6 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
@@ -118,7 +117,9 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   TimeoutData timeout;
   if (grpc_request && route.maxGrpcTimeout()) {
     const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
-    std::chrono::milliseconds grpc_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    auto header_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    std::chrono::milliseconds grpc_timeout =
+        header_timeout ? header_timeout.value() : std::chrono::milliseconds(0);
     if (route.grpcTimeoutOffset()) {
       // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
       // setting it to 0 means infinity and a negative timeout makes no sense.
@@ -740,7 +741,7 @@ void Filter::maybeDoShadowing() {
     Http::RequestMessagePtr request(new Http::RequestMessageImpl(
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_)));
     if (callbacks_->decodingBuffer()) {
-      request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
+      request->body().add(*callbacks_->decodingBuffer());
     }
     if (downstream_trailers_) {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*downstream_trailers_));
@@ -967,6 +968,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
                              absl::string_view body, bool dropped, absl::string_view details) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
+  callbacks_->streamInfo().setResponseFlag(response_flags);
   if (downstream_response_started_ &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     // This will destroy any created retry timers.
@@ -976,9 +978,6 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
   } else {
     // This will destroy any created retry timers.
     cleanup();
-
-    callbacks_->streamInfo().setResponseFlag(response_flags);
-
     // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         code, body,
@@ -1091,6 +1090,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::UpstreamOverflow;
   case Http::StreamResetReason::RemoteReset:
   case Http::StreamResetReason::RemoteRefusedStreamReset:
+  case Http::StreamResetReason::ConnectError:
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
   }
 

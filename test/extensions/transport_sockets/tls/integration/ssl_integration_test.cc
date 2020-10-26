@@ -19,6 +19,7 @@
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include "test/extensions/common/tap/common.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -34,7 +35,10 @@ namespace Ssl {
 void SslIntegrationTestBase::initialize() {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(server_rsa_cert_)
+                                  .setRsaCertOcspStaple(server_rsa_cert_ocsp_staple_)
                                   .setEcdsaCert(server_ecdsa_cert_)
+                                  .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
+                                  .setOcspStapleRequired(ocsp_staple_required_)
                                   .setTlsV13(server_tlsv1_3_)
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_));
   HttpIntegrationTest::initialize();
@@ -347,6 +351,60 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
   checkStats();
 }
 
+// Server has an RSA certificate with an OCSP response works.
+TEST_P(SslCertficateIntegrationTest, ServerRsaOnlyOcspResponse) {
+  server_rsa_cert_ = true;
+  server_rsa_cert_ocsp_staple_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(rsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has an ECDSA certificate with an OCSP response works.
+TEST_P(SslCertficateIntegrationTest, ServerEcdsaOnlyOcspResponse) {
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_ocsp_staple_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has two certificates one with and one without OCSP response works under optional policy.
+TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaOnlyRsaOcspResponse) {
+  server_rsa_cert_ = true;
+  server_rsa_cert_ocsp_staple_ = true;
+  server_ecdsa_cert_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has ECDSA and RSA certificates with OCSP responses and stapling required policy works.
+TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaWithOcspResponseStaplingRequired) {
+  server_rsa_cert_ = true;
+  server_rsa_cert_ocsp_staple_ = true;
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_ocsp_staple_ = true;
+  ocsp_staple_required_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// TODO(zuercher): write an additional OCSP integration test that validates behavior with an
+// expired OCSP response. (Requires OCSP client-side support in upstream TLS.)
+
 // TODO(mattklein123): Move this into a dedicated integration test for the tap transport socket as
 // well as add more tests.
 class SslTapIntegrationTest : public SslIntegrationTest {
@@ -406,6 +464,7 @@ public:
     if (max_tx_bytes_.has_value()) {
       output_config->mutable_max_buffered_tx_bytes()->set_value(max_tx_bytes_.value());
     }
+    output_config->set_streaming(streaming_tap_);
 
     auto* output_sink = output_config->mutable_sinks()->Add();
     output_sink->set_format(format_);
@@ -420,6 +479,7 @@ public:
   absl::optional<uint64_t> max_rx_bytes_;
   absl::optional<uint64_t> max_tx_bytes_;
   bool upstream_tap_{};
+  bool streaming_tap_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslTapIntegrationTest,
@@ -592,6 +652,45 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
   EXPECT_EQ(trace.socket_buffered_trace().events(1).read().data().as_string(), "HTTP/");
   EXPECT_TRUE(trace.socket_buffered_trace().read_truncated());
   EXPECT_TRUE(trace.socket_buffered_trace().write_truncated());
+}
+
+// Validate a single request with length delimited binary proto output. This test uses an upstream
+// tap.
+TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
+  upstream_tap_ = true;
+  streaming_tap_ = true;
+  max_rx_bytes_ = 5;
+  max_tx_bytes_ = 4;
+
+  format_ = envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
+  testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_.reset();
+
+  // This must be done after server shutdown so that connection pool connections are closed and
+  // the tap written.
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromFile(
+          fmt::format("{}_{}.pb_length_delimited", path_prefix_, id));
+  ASSERT_GE(traces.size(), 4);
+
+  // The initial connection message has no local address, but has a remote address (not connected
+  // yet).
+  EXPECT_TRUE(traces[0].socket_streamed_trace_segment().has_connection());
+  EXPECT_FALSE(traces[0].socket_streamed_trace_segment().connection().has_local_address());
+  EXPECT_TRUE(traces[0].socket_streamed_trace_segment().connection().has_remote_address());
+
+  // Verify truncated request/response data.
+  EXPECT_EQ(traces[1].socket_streamed_trace_segment().event().write().data().as_bytes(), "POST");
+  EXPECT_TRUE(traces[1].socket_streamed_trace_segment().event().write().data().truncated());
+  EXPECT_EQ(traces[2].socket_streamed_trace_segment().event().read().data().as_bytes(), "HTTP/");
+  EXPECT_TRUE(traces[2].socket_streamed_trace_segment().event().read().data().truncated());
 }
 
 } // namespace Ssl

@@ -29,10 +29,10 @@ to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` en
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
-dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements) are typically
+dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements) are typically
 independently sourced, the following steps should be followed:
 
-1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
+1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements).
 1. `bazel build -c opt //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
@@ -116,6 +116,8 @@ for how to update or override dependencies.
 
     ### Windows
 
+    > Note: These instructions apply to **Windows 10 SDK, version 1803 (10.0.17134.12)**. Earlier versions will not compile because the `afunix.h` header is not available. **The recommended Windows version is equal or later than Windows 10 SDK, version 1903 (10.0.18362.1)**
+
     Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
 
     When building Envoy, Bazel creates very long path names. One way to work around these excessive path
@@ -127,9 +129,9 @@ for how to update or override dependencies.
     startup --output_base=C:/_eb
     ```
 
-    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support 
+    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
     using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
-    For other common issues, see the 
+    For other common issues, see the
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
 
     [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
@@ -166,10 +168,10 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
 
-    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32. 
-    
-    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe` 
-    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value 
+    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32.
+
+    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
+    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
     of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
     ```
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
@@ -236,7 +238,7 @@ From a Windows host with Docker installed, the Windows containers feature enable
 MSYS2 or Git bash), run:
 
 ```
-./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
+./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
@@ -607,7 +609,8 @@ The following optional features can be disabled on the Bazel build command-line:
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
-* tcmalloc with `--define tcmalloc=disabled`
+* tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
+  tcmalloc with `--define tcmalloc=gperftools` which is the default for non-x86 builds.
 * deprecated features with `--define deprecated_features=disabled`
 
 
@@ -626,7 +629,8 @@ The following optional features can be enabled on the Bazel build command-line:
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
-  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
+  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL and
+  tcmalloc is built from the sources of Gperftools.
 * Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
   `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
 * Manual stamping via VersionInfo with `--define manual_stamp=manual_stamp`.

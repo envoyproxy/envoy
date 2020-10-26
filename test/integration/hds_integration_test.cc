@@ -33,8 +33,7 @@ public:
   HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     hds_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }
@@ -60,14 +59,12 @@ public:
     // Endpoint connections
     if (tls_hosts_) {
       host_upstream_ =
-          std::make_unique<FakeUpstream>(HttpIntegrationTest::createUpstreamTlsContext(), 0,
-                                         http_conn_type_, version_, timeSystem());
+          createFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
       host2_upstream_ =
-          std::make_unique<FakeUpstream>(HttpIntegrationTest::createUpstreamTlsContext(), 0,
-                                         http_conn_type_, version_, timeSystem());
+          createFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
     } else {
-      host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
-      host2_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
+      host_upstream_ = createFakeUpstream(http_conn_type_);
+      host2_upstream_ = createFakeUpstream(http_conn_type_);
     }
   }
 
@@ -186,6 +183,31 @@ transport_socket_matches:
           TestUtility::parseYaml<envoy::service::health::v3::ClusterHealthCheck>(match_yaml));
     }
     return server_health_check_specifier_;
+  }
+
+  envoy::service::health::v3::ClusterHealthCheck createSecondCluster(std::string name) {
+    // Add endpoint
+    envoy::service::health::v3::ClusterHealthCheck health_check;
+
+    health_check.set_cluster_name(name);
+    Network::Utility::addressToProtobufAddress(
+        *host2_upstream_->localAddress(),
+        *health_check.add_locality_endpoints()->add_endpoints()->mutable_address());
+    health_check.mutable_locality_endpoints(0)->mutable_locality()->set_region("kounopetra");
+    health_check.mutable_locality_endpoints(0)->mutable_locality()->set_zone("emplisi");
+    health_check.mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
+
+    health_check.add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
+    health_check.mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
+    health_check.mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
+    health_check.mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
+    health_check.mutable_health_checks(0)->mutable_grpc_health_check();
+    health_check.mutable_health_checks(0)
+        ->mutable_http_health_check()
+        ->set_hidden_envoy_deprecated_use_http2(false);
+    health_check.mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+
+    return health_check;
   }
 
   // Creates a basic HealthCheckSpecifier message containing one endpoint and
@@ -697,26 +719,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
 
-  // Add endpoint
-  auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
-
-  health_check->set_cluster_name("cat");
-  Network::Utility::addressToProtobufAddress(
-      *host2_upstream_->localAddress(),
-      *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("kounopetra");
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("emplisi");
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
-
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
-  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
-  health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
-  health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-  health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-  health_check->mutable_health_checks(0)
-      ->mutable_http_health_check()
-      ->set_hidden_envoy_deprecated_use_http2(false);
-  health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+  // Add Second Cluster
+  server_health_check_specifier_.add_cluster_health_checks()->MergeFrom(createSecondCluster("cat"));
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -1039,6 +1043,125 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
   checkCounters(1, 2, 0, 1);
 
   // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+TEST_P(HdsIntegrationTest, UpdateEndpoints) {
+  initialize();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+
+  // Add Second Cluster.
+  server_health_check_specifier_.add_cluster_health_checks()->MergeFrom(createSecondCluster("cat"));
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+
+  // Server asks for health checking
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy sends health check messages to two endpoints
+  healthcheckEndpoints("cat");
+
+  // Endpoint responds to the health check
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, false);
+  host_stream_->encodeData(1024, true);
+  host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  host2_stream_->encodeData(1024, true);
+
+  // Receive updates until the one we expect arrives
+  ASSERT_TRUE(waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY,
+                                           host2_upstream_->localAddress(), 1, 0, 0));
+
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 2);
+
+  // store cluster response info for easier reference.
+  const auto& cluster_resp0 = response_.endpoint_health_response().cluster_endpoints_health(0);
+  const auto& cluster_resp1 = response_.endpoint_health_response().cluster_endpoints_health(1);
+
+  // check cluster info and sizes.
+  EXPECT_EQ(cluster_resp0.cluster_name(), "anna");
+  ASSERT_EQ(cluster_resp0.locality_endpoints_health_size(), 1);
+  EXPECT_EQ(cluster_resp1.cluster_name(), "cat");
+  ASSERT_EQ(cluster_resp1.locality_endpoints_health_size(), 1);
+
+  // store locality response info for easier reference.
+  const auto& locality_resp0 = cluster_resp0.locality_endpoints_health(0);
+  const auto& locality_resp1 = cluster_resp1.locality_endpoints_health(0);
+
+  // check locality info and sizes.
+  EXPECT_EQ(locality_resp0.locality().sub_zone(), "hobbiton");
+  ASSERT_EQ(locality_resp0.endpoints_health_size(), 1);
+  EXPECT_EQ(locality_resp1.locality().sub_zone(), "paris");
+  ASSERT_EQ(locality_resp1.endpoints_health_size(), 1);
+
+  // Check endpoints.
+  EXPECT_TRUE(checkEndpointHealthResponse(locality_resp0.endpoints_health(0),
+                                          envoy::config::core::v3::UNHEALTHY,
+                                          host_upstream_->localAddress()));
+
+  checkCounters(1, 2, 0, 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cat.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cat.health_check.failure")->value());
+
+  // Create new specifier that removes the second cluster, and adds an endpoint to the first.
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  Network::Utility::addressToProtobufAddress(
+      *host2_upstream_->localAddress(),
+      *server_health_check_specifier_.mutable_cluster_health_checks(0)
+           ->mutable_locality_endpoints(0)
+           ->add_endpoints()
+           ->mutable_address());
+
+  // Reset second endpoint for usage in our cluster.
+  ASSERT_TRUE(host2_fake_connection_->close());
+  ASSERT_TRUE(host2_fake_connection_->waitForDisconnect());
+
+  // Send new specifier.
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  // TODO: add stats reporting and verification for Clusters added/removed/reused and Endpoints
+  // added/removed/reused.
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Set up second endpoint again.
+  ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
+  ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
+  ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(host2_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(host2_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(host2_stream_->headers().getHostValue(), "anna");
+
+  // Endpoints respond to the health check
+  host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  host2_stream_->encodeData(1024, true);
+
+  // Receive updates until the one we expect arrives
+  ASSERT_TRUE(waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY,
+                                           host2_upstream_->localAddress(), 0, 0, 1));
+
+  // Ensure we have at least one cluster before trying to read it.
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
+
+  // store cluster response info for easier reference.
+  const auto& cluster_response = response_.endpoint_health_response().cluster_endpoints_health(0);
+
+  // Check cluster has correct name and number of localities (1)
+  EXPECT_EQ(cluster_response.cluster_name(), "anna");
+  ASSERT_EQ(cluster_response.locality_endpoints_health_size(), 1);
+
+  // check the only locality and its endpoints.
+  const auto& locality_response = cluster_response.locality_endpoints_health(0);
+  EXPECT_EQ(locality_response.locality().sub_zone(), "hobbiton");
+  ASSERT_EQ(locality_response.endpoints_health_size(), 2);
+  EXPECT_TRUE(checkEndpointHealthResponse(locality_response.endpoints_health(0),
+                                          envoy::config::core::v3::UNHEALTHY,
+                                          host_upstream_->localAddress()));
+
   cleanupHostConnections();
   cleanupHdsConnection();
 }

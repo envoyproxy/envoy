@@ -7,6 +7,7 @@ EXTENSIONS = {
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
+    "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
 
     #
     # Clusters
@@ -31,6 +32,11 @@ EXTENSIONS = {
     "envoy.grpc_credentials.aws_iam":                   "//source/extensions/grpc_credentials/aws_iam:config",
 
     #
+    # WASM
+    #
+    "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
+
+    #
     # Health checkers
     #
 
@@ -46,6 +52,7 @@ EXTENSIONS = {
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
+    "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
     "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
@@ -64,6 +71,7 @@ EXTENSIONS = {
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
+    "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
     "envoy.filters.http.oauth2":                         "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
@@ -73,6 +81,7 @@ EXTENSIONS = {
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
     "envoy.filters.http.squash":                        "//source/extensions/filters/http/squash:config",
     "envoy.filters.http.tap":                           "//source/extensions/filters/http/tap:config",
+    "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
 
     #
     # Listener filters
@@ -112,6 +121,7 @@ EXTENSIONS = {
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
     "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
     "envoy.filters.network.sni_dynamic_forward_proxy":  "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
+    "envoy.filters.network.wasm":                       "//source/extensions/filters/network/wasm:config",
     "envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
 
     #
@@ -136,6 +146,7 @@ EXTENSIONS = {
     "envoy.stat_sinks.hystrix":                         "//source/extensions/stat_sinks/hystrix:config",
     "envoy.stat_sinks.metrics_service":                 "//source/extensions/stat_sinks/metrics_service:config",
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
+    "envoy.stat_sinks.wasm":                            "//source/extensions/stat_sinks/wasm:config",
 
     #
     # Thrift filters
@@ -161,7 +172,7 @@ EXTENSIONS = {
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
-    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_proxy_protocol",
+    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_factory_lib",
@@ -203,7 +214,6 @@ EXTENSIONS = {
     # Watchdog actions
     #
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
-    "envoy.watchdog.abort_action":                      "//source/extensions/watchdog/abort_action:config",
 
 }
 

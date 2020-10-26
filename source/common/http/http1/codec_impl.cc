@@ -18,7 +18,6 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -265,9 +264,6 @@ void StreamEncoderImpl::endEncode() {
 }
 
 void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) {
-  if (!flood_protection_) {
-    return;
-  }
   // It's messy and complicated to try to tag the final write of an HTTP response for response
   // tracking for flood protection. Instead, write an empty buffer fragment after the response,
   // to allow for tracking.
@@ -282,9 +278,6 @@ void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffe
 
 Status ServerConnectionImpl::doFloodProtectionChecks() const {
   ASSERT(dispatching_);
-  if (!flood_protection_) {
-    return okStatus();
-  }
   // Before processing another request, make sure that we are below the response flood protection
   // threshold.
   if (outbound_responses_ >= max_outbound_responses_) {
@@ -860,8 +853,6 @@ ServerConnectionImpl::ServerConnectionImpl(
       // maintainer team as it will otherwise be removed entirely soon.
       max_outbound_responses_(
           Runtime::getInteger("envoy.do_not_use_going_away_max_http2_outbound_responses", 2)),
-      flood_protection_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")),
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {

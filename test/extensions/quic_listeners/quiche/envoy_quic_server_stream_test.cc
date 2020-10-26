@@ -1,14 +1,17 @@
 #include <string>
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"
@@ -199,8 +202,8 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
       .WillOnce(Invoke([](const Http::RequestTrailerMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
-        EXPECT_EQ("value1", headers->get(key1)->value().getStringView());
-        EXPECT_EQ(nullptr, headers->get(key2));
+        EXPECT_EQ("value1", headers->get(key1)[0]->value().getStringView());
+        EXPECT_TRUE(headers->get(key2).empty());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
@@ -236,8 +239,8 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
       .WillOnce(Invoke([](const Http::RequestTrailerMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
-        EXPECT_EQ("value1", headers->get(key1)->value().getStringView());
-        EXPECT_EQ(nullptr, headers->get(key2));
+        EXPECT_EQ("value1", headers->get(key1)[0]->value().getStringView());
+        EXPECT_TRUE(headers->get(key2).empty());
       }));
   quic_stream_->OnStreamFrame(frame);
 }

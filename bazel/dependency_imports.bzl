@@ -5,6 +5,8 @@ load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@upb//bazel:repository_defs.bzl", upb_bazel_version_repository = "bazel_version_repository")
+load("@io_bazel_rules_rust//rust:repositories.bzl", "rust_repositories")
+load("@io_bazel_rules_rust//:workspace.bzl", "bazel_version")
 load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
 load("@configs_pip3//:requirements.bzl", configs_pip_install = "pip_install")
 load("@headersplit_pip3//:requirements.bzl", headersplit_pip_install = "pip_install")
@@ -23,8 +25,10 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     rbe_toolchains_config()
     gazelle_dependencies()
     apple_rules_dependencies()
+    rust_repositories()
+    bazel_version(name = "bazel_version")
     upb_bazel_version_repository(name = "upb_bazel_version")
-    antlr_dependencies(471)
+    antlr_dependencies(472)
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",
@@ -33,6 +37,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         },
     )
 
+    # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(
         name = "org_golang_google_grpc",
         build_file_proto_mode = "disable",
@@ -40,14 +45,12 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         sum = "h1:EC2SB8S04d2r73uptxphDSUG+kTKVgjRPF+N3xpxRB4=",
         version = "v1.29.1",
     )
-
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
         sum = "h1:fHDIZ2oxGnUZRN6WgWFCbYBjH9uqVPRCUVUDhs0wnbA=",
         version = "v0.0.0-20190813141303-74dc4d7220e7",
     )
-
     go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",

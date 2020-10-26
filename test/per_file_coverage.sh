@@ -3,7 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common/network:94.0"
+"source/common/network:95.6"
 "source/common/http/http3:50.0"
 "source/common/tracing:94.9"
 "source/common/protobuf:94.3"
@@ -13,13 +13,13 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api/posix:71.8"
 "source/common/init:96.2"
 "source/common/json:90.6"
-"source/common/filesystem:96.1"
-"source/common/filesystem/posix:93.7"
+"source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/thread_local:95.7"
 "source/common/crypto:0.0"
 "source/common/common:96.1"
 "source/common/common/posix:94.1"
-"source/common/signal:85.1"
+"source/common/signal:90.4"
+"source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:93.7"
 "source/extensions:96.3"
 "source/extensions/common:94.4"
@@ -35,9 +35,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/common:96.1"
 "source/extensions/filters/network/common/redis:96.2"
-"source/extensions/filters/network/http_connection_manager:95.4"
-"source/extensions/filters/http/cache:80.7"
-"source/extensions/filters/http/cache/simple_http_cache:84.5"
+"source/extensions/filters/network/http_connection_manager:95.2"
+"source/extensions/filters/http/cache:92.4"
+"source/extensions/filters/http/cache/simple_http_cache:95.2"
 "source/extensions/filters/http/dynamic_forward_proxy:94.9"
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/grpc_json_transcoder:93.3"
@@ -46,7 +46,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/listener/tls_inspector:92.4"
 "source/extensions/filters/listener/http_inspector:93.3"
 "source/extensions/filters/udp:91.1"
-"source/extensions/filters/udp/dns_filter:89.2"
+"source/extensions/filters/udp/dns_filter:96.9"
 "source/extensions/filters/common:94.7"
 "source/extensions/filters/common/expr:92.2"
 "source/extensions/filters/common/rbac:87.1"
@@ -60,17 +60,16 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers:96.0"
 "source/extensions/tracers/opencensus:91.2"
 "source/extensions/tracers/xray:94.0"
-"source/extensions/transport_sockets:94.9"
+"source/extensions/transport_sockets:95.3"
 "source/extensions/transport_sockets/tap:95.6"
 "source/extensions/transport_sockets/tls:94.2"
 "source/extensions/transport_sockets/tls/ocsp:95.3"
 "source/extensions/transport_sockets/tls/private_key:76.9"
 "source/extensions/watchdog:69.6" # Death tests within extensions
 "source/extensions/watchdog/profile_action:84.9"
-"source/extensions/watchdog/abort_action:42.9" # Death tests don't report LCOV
 "source/server:94.6"
-"source/server/config_validation:76.8"
-"source/server/admin:95.5"
+"source/server/config_validation:76.6"
+"source/server/admin:95.3"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

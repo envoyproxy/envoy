@@ -3,7 +3,7 @@
 # Example usage:
 #
 # bazel run //tools/config_validation:validate_fragment -- \
-#   envoy.config.bootstrap.v3.Bootstrap $PWD/configs/google_com_proxy.v2.yaml
+#   envoy.config.bootstrap.v3.Bootstrap $PWD/configs/envoyproxy_io_proxy.yaml
 
 import json
 import pathlib
