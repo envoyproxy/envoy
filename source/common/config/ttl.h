@@ -16,7 +16,7 @@ namespace Config {
  * We use a combination of two data structures here: a std::set that ensures that we can iterate
  * over the pending TTLs in sorted over, and a map from resource name to the set iterator which
  * allows us to efficiently clear or update TTLs. As iterator stability is required to track the
- * iterators, we use std::set over something like ``absl::btree_set.
+ * iterators, we use std::set over something like ``absl::btree_set``.
  *
  * As a result of these two data structures, all lookups and modifications can be performed in
  * O(log (number of TTL entries)). This comes at the cost of a higher memory overhead versus just
