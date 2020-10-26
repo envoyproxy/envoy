@@ -7,8 +7,8 @@ dynamic_resources:
     api_type: GRPC
     transport_api_version: V3
     grpc_services:
-    - envoy_grpc:
-        cluster_name: xds_cluster
+      - envoy_grpc:
+          cluster_name: xds_cluster
   cds_config:
     resource_api_version: V3
     ads: {}
@@ -18,17 +18,17 @@ dynamic_resources:
 
 static_resources:
   clusters:
-  - connect_timeout: 1s
-    type: strict_dns
-    load_assignment:
-      cluster_name: xds_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: go-control-plane
-                port_value: 18000
+    - connect_timeout: 1s
+      type: strict_dns
+      load_assignment:
+        cluster_name: xds_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: go-control-plane
+                      port_value: 18000
     http2_protocol_options: {}
     name: xds_cluster
 layered_runtime:
