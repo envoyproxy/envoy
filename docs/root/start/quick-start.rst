@@ -192,9 +192,9 @@ The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 25
-    :lines: 25-52
-    :emphasize-lines: 4-24
+    :lineno-start: 28
+    :lines: 28-52
+    :emphasize-lines: 3-22
 
 .. _start_quick_start_static_admin:
 
