@@ -103,7 +103,7 @@ public:
   } CORSValues;
 
   struct {
-    const std::string Default{"identity,deflate,gzip"};
+    const std::string Default{"identity"};
   } GrpcAcceptEncodingValues;
 
   struct {

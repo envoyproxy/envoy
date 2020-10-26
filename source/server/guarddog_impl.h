@@ -18,6 +18,8 @@
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
 
+#include "server/watchdog_impl.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -45,16 +47,17 @@ public:
     virtual ~TestInterlockHook() = default;
 
     /**
-     * Called from GuardDogImpl to indicate that it has evaluated all watch-dogs
-     * up to a particular point in time.
+     * Called from GuardDogImpl to indicate that it has evaluated all watch-dogs up to a particular
+     * point in time. Called while the GuardDog mutex is held.
      */
-    virtual void signalFromImpl(MonotonicTime) {}
+    virtual void signalFromImpl() {}
 
     /**
-     * Called from GuardDog tests to block until the implementation has reached
-     * the desired point in time.
+     * Called from GuardDog tests to block until the implementation has reached the desired
+     * condition. Called while the GuardDog mutex is held.
+     * @param mutex The GuardDog's mutex for use by Thread::CondVar::wait.
      */
-    virtual void waitFromTest(Thread::MutexBasicLockable&, MonotonicTime) {}
+    virtual void waitFromTest(Thread::MutexBasicLockable& /*mutex*/) {}
   };
 
   /**
@@ -79,15 +82,13 @@ public:
   const std::chrono::milliseconds loopIntervalForTest() const { return loop_interval_; }
 
   /**
-   * Test hook to force a step() to catch up with the current simulated
-   * time. This is inlined so that it does not need to be present in the
-   * production binary.
+   * Test hook to force a step() to catch up with the current watchdog state and simulated time.
+   * This is inlined so that it does not need to be present in the production binary.
    */
   void forceCheckForTest() {
     Thread::LockGuard guard(mutex_);
-    MonotonicTime now = time_source_.monotonicTime();
     loop_timer_->enableTimer(std::chrono::milliseconds(0));
-    test_interlock_hook_->waitFromTest(mutex_, now);
+    test_interlock_hook_->waitFromTest(mutex_);
   }
 
   // Server::GuardDog
@@ -111,11 +112,13 @@ private:
       std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_last_checkin_pairs,
       MonotonicTime now);
 
+  using WatchDogImplSharedPtr = std::shared_ptr<WatchDogImpl>;
   struct WatchedDog {
     WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
-               const WatchDogSharedPtr& watch_dog);
+               const WatchDogImplSharedPtr& watch_dog);
 
-    const WatchDogSharedPtr dog_;
+    const WatchDogImplSharedPtr dog_;
+    MonotonicTime last_checkin_;
     absl::optional<MonotonicTime> last_alert_time_;
     bool miss_alerted_{};
     bool megamiss_alerted_{};

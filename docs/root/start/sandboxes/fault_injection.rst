@@ -5,9 +5,6 @@ Fault Injection Filter
 
 This simple example demonstrates Envoy's :ref:`fault injection <config_http_filters_fault_injection>` capability using Envoy's :ref:`runtime support <config_runtime>` to control the feature.
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers

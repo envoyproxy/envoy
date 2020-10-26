@@ -113,15 +113,6 @@ public:
                               const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
-   * Register a callback to be invoked when secrets are ready for the transport socket that
-   * corresponds to the provided metadata.
-   * @param callback supplies the callback to be invoked.
-   * @param metadata supplies the metadata to be used for resolving transport socket matches.
-   */
-  virtual void addReadyCb(std::function<void()> callback,
-                          const envoy::config::core::v3::Metadata* metadata) const PURE;
-
-  /**
    * @return host specific gauges.
    */
   virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
