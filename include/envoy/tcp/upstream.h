@@ -29,7 +29,7 @@ public:
    *
    * @param callbacks callbacks to communicate stream failure or creation on.
    */
-  virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
+  virtual void newStream(GenericConnectionPoolCallbacks& callbacks) PURE;
 };
 
 // An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
@@ -47,11 +47,11 @@ public:
    * @param upstream_local_address supplies the local address of the upstream connection.
    * @param ssl_info supplies the ssl information of the upstream connection.
    */
-  virtual void onGenericPoolReady(StreamInfo::StreamInfo* info,
-                                  std::unique_ptr<GenericUpstream>&& upstream,
-                                  Upstream::HostDescriptionConstSharedPtr& host,
-                                  const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                                  Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
+  virtual void
+  onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<GenericUpstream>&& upstream,
+                     Upstream::HostDescriptionConstSharedPtr& host,
+                     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                     Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
 
   /**
    * Called to indicate a failure for GenericConnPool::newStream to establish a stream.
@@ -121,7 +121,7 @@ public:
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(const std::string& cluster_name, Upstream::ClusterManager& cm,
-                        absl::optional<std::string> hostname,
+                        const absl::optional<std::reference_wrapper<const std::string>> hostname,
                         Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;
 };

@@ -454,7 +454,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::strin
     return false;
   }
 
-  absl::optional<std::string> hostname =
+  const absl::optional<std::reference_wrapper<const std::string>> hostname =
       (config_->tunnelingConfig() ? absl::optional(config_->tunnelingConfig()->hostname())
                                   : absl::nullopt);
 
@@ -463,7 +463,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::strin
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
-    generic_conn_pool_->newStream(this);
+    generic_conn_pool_->newStream(*this);
     // Because we never return open connections to the pool, this either has a handle waiting on
     // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
     return true;

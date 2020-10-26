@@ -213,8 +213,8 @@ public:
    * Get a Factory from the registry with a particular name (and templated type) with error checking
    * to ensure the name and factory are valid.
    * @param name string identifier for the particular implementation. Note: this is a proto string
-   * @return factory the factory requested or nullptr if it does not exist.
    * because it is assumed that this value will be pulled directly from the configuration proto.
+   * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {

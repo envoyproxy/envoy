@@ -20,7 +20,7 @@ public:
   bool valid() const { return conn_pool_ != nullptr; }
 
   // GenericConnPool
-  void newStream(GenericConnectionPoolCallbacks* callbacks) override;
+  void newStream(GenericConnectionPoolCallbacks& callbacks) override;
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -47,7 +47,7 @@ public:
   bool valid() const { return conn_pool_ != nullptr; }
 
   // GenericConnPool
-  void newStream(GenericConnectionPoolCallbacks* callbacks) override;
+  void newStream(GenericConnectionPoolCallbacks& callbacks) override;
 
   // Http::ConnectionPool::Callbacks,
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,

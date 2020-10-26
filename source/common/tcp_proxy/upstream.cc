@@ -168,8 +168,8 @@ TcpConnPool::~TcpConnPool() {
   }
 }
 
-void TcpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
-  callbacks_ = callbacks;
+void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
+  callbacks_ = &callbacks;
   // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
   // valid connection handle. If newConnection fails inline it may result in attempting to
   // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
@@ -216,8 +216,8 @@ HttpConnPool::~HttpConnPool() {
   }
 }
 
-void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
-  callbacks_ = callbacks;
+void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
+  callbacks_ = &callbacks;
   upstream_ = std::make_unique<HttpUpstream>(upstream_callbacks_, hostname_);
   Tcp::ConnectionPool::Cancellable* handle =
       conn_pool_->newStream(upstream_->responseDecoder(), *this);

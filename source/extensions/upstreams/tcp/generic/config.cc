@@ -12,7 +12,8 @@ namespace Generic {
 
 TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
-    absl::optional<std::string> tunneling_hostname, Upstream::LoadBalancerContext* context,
+    const absl::optional<std::reference_wrapper<const std::string>> tunneling_hostname,
+    Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const {
   if (tunneling_hostname.has_value()) {
     auto* cluster = cluster_manager.get(cluster_name);
