@@ -309,8 +309,8 @@ Configuring the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ad
 the same as for :ref:`static configuration <start_quick_start_static_admin>`.
 
 Enabling the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` interface with
-dynamic configuration, allows you to see how Envoy is currently configured by using the
-:ref:`config_dump <operations_admin_interface_config_dump>` endpoint.
+dynamic configuration, allows you to see use the :ref:`config_dump <operations_admin_interface_config_dump>`
+endpoint to see how Envoy is currently configured.
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
