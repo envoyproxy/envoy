@@ -7,6 +7,8 @@ Quick start
 The following instructions walk through starting Envoy as a system daemon or using
 the Envoy Docker image.
 
+.. _start_quick_start_version:
+
 Check your Envoy version
 ------------------------
 
@@ -26,6 +28,7 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
 
 	 $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
+.. _start_quick_start_help:
 
 View the Envoy command line options
 -----------------------------------
@@ -47,6 +50,7 @@ flag:
 
 	 $ docker run --rm envoyproxy/|envoy_docker_image| --help
 
+.. _start_quick_start_config:
 
 Run Envoy with the demo configuration
 -------------------------------------
@@ -91,6 +95,7 @@ The Envoy admin endpoint should also be available at http://localhost:9901
 
    $ curl -v localhost:9901
 
+.. _start_quick_start_override:
 
 Override the default configuration by merging a config file
 -----------------------------------------------------------
@@ -136,28 +141,34 @@ The Envoy admin endpoint should also be available at http://localhost:9901
 
    $ curl -v localhost:9901
 
+.. _start_quick_start_static:
 
 Static configuration
 --------------------
 
-To start Envoy with static configuration, you will need to specify ``listeners`` and ``clusters``
-as ``static_resources``.
+To start Envoy with static configuration, you will need to specify `listeners <start_quick_start_static_listeners>` and
+`clusters <start_quick_start_static_clusters>` as `static_resources <start_quick_start_static_static_resources>`.
 
-You can also add an ``admin`` section if you wish to monitor Envoy or retrieve stats.
+You can also add an `admin <start_quick_start_static_admin>` section if you wish to monitor Envoy or retrieve stats.
 
-The following sections walk through the static configuration provided in the :download:`demo configuration file <_include/envoy-demo.yaml>`.
+The following sections walk through the static configuration provided in the
+:download:`demo configuration file <_include/envoy-demo.yaml>`.
+
+.. _start_quick_start_static_static_resources:
 
 Static configuration: ``static_resources``
 ******************************************
 
-The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
-as opposed to the means of configuring resources dynamically when Envoy is running.
+The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains
+everything that is configured statically when Envoy starts, as opposed to dynamically at runtime.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :linenos:
     :lines: 1-3
     :emphasize-lines: 1
+
+.. _start_quick_start_static_listeners:
 
 Static configuration: ``listeners``
 ***********************************
@@ -170,6 +181,7 @@ The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listene
     :lines: 1-25
     :emphasize-lines: 3-23
 
+.. _start_quick_start_static_clusters:
 
 Static configuration: ``clusters``
 **********************************
@@ -181,6 +193,8 @@ The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster
     :lineno-start: 22
     :lines: 22-47
     :emphasize-lines: 4-24
+
+.. _start_quick_start_static_admin:
 
 Static configuration: ``admin``
 *******************************
@@ -201,6 +215,7 @@ which in the demo configuration is ``0.0.0.0:9901``.
 
    You may wish to restrict the network address the admin server listens to in your own deployment.
 
+.. _start_quick_start_dynamic:
 
 Dynamic configuration
 ---------------------
@@ -217,15 +232,17 @@ that is a good place to start.
 
 At a minimum, you will need to start Envoy configured with the following sections:
 
-- ``node`` information, to uniquely identify the proxy node.
-- ``dynamic_resources`` to tell Envoy which configurations should be updated dynamically
-- ``static_resources`` to specify where Envoy should retrieve its configuration from.
-- ``layered_runtime`` to persist dynamically-provided configurations.
+- `node <start_quick_start_dynamic_node>` information, to uniquely identify the proxy node.
+- `dynamic_resources <start_quick_start_dynamic_dynamic_resources>` to tell Envoy which configurations should be updated dynamically
+- `static_resources <start_quick_start_dynamic_static_resources>` to specify where Envoy should retrieve its configuration from.
+- `layered_runtime <start_quick_start_dynamic_layered_runtime>` to persist dynamically-provided configurations.
 
-You can also add an ``admin`` section if you wish to monitor Envoy or retrieve stats or configuration information.
+You can also add an `admin <start_quick_start_dynamic_admin>` section if you wish to monitor Envoy or retrieve stats or configuration information.
 
 The following sections walk through the dynamic configuration provided in the
 :download:`demo dynamic configuration file <_include/envoy-dynamic-demo.yaml>`.
+
+.. _start_quick_start_dynamic_node:
 
 Dynamic configuration: ``node``
 *******************************
@@ -238,6 +255,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
     :lines: 1-5
     :emphasize-lines: 1-3
 
+.. _start_quick_start_dynamic_dynamic_resources:
 
 Dynamic configuration: ``dynamic_resources``
 ********************************************
@@ -251,6 +269,8 @@ The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dy
     :lineno-start: 3
     :emphasize-lines: 3-16
 
+.. _start_quick_start_dynamic_static_resources:
+
 Dynamic configuration: ``static_resources``
 *******************************************
 
@@ -263,6 +283,8 @@ The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.sta
     :lineno-start: 18
     :emphasize-lines: 3-17
 
+.. _start_quick_start_dynamic_layered_runtime:
+
 Dynamic configuration: ``layered_runtime``
 ******************************************
 
@@ -274,6 +296,8 @@ The :ref:`layered_runtime <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.laye
     :lines: 34-51
     :lineno-start: 34
     :emphasize-lines: 3-16
+
+.. _start_quick_start_dynamic_admin:
 
 Dynamic configuration: ``admin``
 ********************************
