@@ -268,9 +268,9 @@ The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dy
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 3-20
+    :lines: 3-19
     :lineno-start: 3
-    :emphasize-lines: 3-16
+    :emphasize-lines: 3-15
 
 .. _start_quick_start_dynamic_static_resources:
 
@@ -282,9 +282,9 @@ The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.sta
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 18-36
-    :lineno-start: 18
-    :emphasize-lines: 3-17
+    :lines: 17-34
+    :lineno-start: 17
+    :emphasize-lines: 3-15
 
 .. _start_quick_start_dynamic_layered_runtime:
 
@@ -317,7 +317,7 @@ endpoint to see how Envoy is currently configured.
     :linenos:
     :lines: 42-49
     :lineno-start: 42
-    :emphasize-lines: 2-7
+    :emphasize-lines: 3-8
 
 .. warning::
 
