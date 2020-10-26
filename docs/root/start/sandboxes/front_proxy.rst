@@ -26,9 +26,6 @@ address (routes setup in :repo:`/examples/front-proxy/service-envoy.yaml`). This
 setup illustrates the advantage of running service Envoys collocated with your services: all
 requests are handled by the service Envoy, and efficiently routed to your services.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers
@@ -214,7 +211,7 @@ requests by doing a round robin of the three ``service1`` machines:
     <
     Hello from behind Envoy (service 1)! hostname: 36418bc3c824 resolvedhostname: 192.168.160.4
 
-Step 6: enter containers and curl services
+Step 6: Enter containers and curl services
 ******************************************
 
 In addition of using ``curl`` from your host machine, you can also enter the
@@ -234,7 +231,7 @@ enter the ``front-envoy`` container, and ``curl`` for services locally:
     root@81288499f9d7:/# curl localhost:8080/service/2
     Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
 
-Step 7: enter container and curl admin
+Step 7: Enter container and curl admin
 **************************************
 
 When Envoy runs it also attaches an ``admin`` to your desired port.
