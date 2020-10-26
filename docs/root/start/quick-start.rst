@@ -180,8 +180,8 @@ The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listene
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 1-25
-    :emphasize-lines: 3-23
+    :lines: 1-30
+    :emphasize-lines: 3-28
 
 .. _start_quick_start_static_clusters:
 
@@ -192,8 +192,8 @@ The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 22
-    :lines: 22-47
+    :lineno-start: 25
+    :lines: 25-52
     :emphasize-lines: 4-24
 
 .. _start_quick_start_static_admin:
@@ -209,9 +209,9 @@ which in the demo configuration is ``0.0.0.0:9901``.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 45
-    :lines: 45-50
-    :emphasize-lines: 3-6
+    :lineno-start: 50
+    :lines: 50-57
+    :emphasize-lines: 3-8
 
 .. warning::
 
