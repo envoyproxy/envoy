@@ -13,6 +13,7 @@
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -2309,6 +2310,9 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
 TEST_F(ClusterManagerImplTest,
        DynamicAddedAndKeepWarmingWithoutCertificateValidationContextEntity) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.cluser_keep_warming_no_secret_entity", "true"}});
   create(defaultConfig());
 
   ReadyWatcher initialized;
@@ -2344,6 +2348,9 @@ TEST_F(ClusterManagerImplTest,
 }
 
 TEST_F(ClusterManagerImplTest, DynamicAddedAndKeepWarmingWithoutTlsCertificateEntity) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.cluser_keep_warming_no_secret_entity", "true"}});
   create(defaultConfig());
 
   ReadyWatcher initialized;
