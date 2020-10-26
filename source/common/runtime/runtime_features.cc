@@ -110,7 +110,7 @@ constexpr const char* disabled_runtime_features[] = {
     // gRPC Timeout header is missing (#13580)
     "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
     // The cluster which can't extract secret entity by SDS to be warming and never activate.
-    "envoy.reloadable_features.cluser_keep_warming_no_secret_entity",
+    "envoy.reloadable_features.cluster_keep_warming_no_secret_entity",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

@@ -430,9 +430,9 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     // which failed to initialize at once.
     // TODO(shikugawa): To implement to be available by keeping warming after no-available secret
     // entity behavior occurred. And remove
-    // `envoy.reloadable_features.cluser_keep_warming_no_secret_entity` runtime feature flag.
-    auto keep_warming_enabled = Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.cluser_keep_warming_no_secret_entity");
+    // `envoy.reloadable_features.cluster_keep_warming_no_secret_entity` runtime feature flag.
+    const bool keep_warming_enabled = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.cluster_keep_warming_no_secret_entity");
     if (!factory.isReady() && keep_warming_enabled) {
       ENVOY_LOG(warn, "Failed to activate {}", cluster.info()->name());
       return;
