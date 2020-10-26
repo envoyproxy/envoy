@@ -39,6 +39,11 @@ void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8
   if (alpn_fallback.has_value()) {
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(*alpn_fallback), key);
   }
+  const auto& proxy_protocol_options = options.proxyProtocolOptions();
+  if (proxy_protocol_options.has_value()) {
+    pushScalarToByteVector(
+        StringUtil::CaseInsensitiveHash()(proxy_protocol_options.value().asStringForHash()), key);
+  }
 }
 } // namespace
 
