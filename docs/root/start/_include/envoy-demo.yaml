@@ -12,7 +12,6 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
-          codec_type: AUTO
           http_filters:
           - name: envoy.filters.http.router
           route_config:
@@ -31,7 +30,8 @@ static_resources:
   - name: service_envoyproxy_io
     connect_timeout: 30s
     type: LOGICAL_DNS
-    lb_policy: ROUND_ROBIN
+    # Comment out the following line to test on v6 networks
+    dns_lookup_family: V4_ONLY
     load_assignment:
       cluster_name: service_envoyproxy_io
       endpoints:
@@ -39,7 +39,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: service_envoyproxy_io
+                address: www.envoyproxy.io
                 port_value: 443
     transport_socket:
       name: envoy.transport_sockets.tls
@@ -48,7 +48,7 @@ static_resources:
         sni: www.envoyproxy.io
 
 admin:
-  access_log_path: /tmp/admin_access.log
+  access_log_path: /dev/null
   address:
     socket_address:
       address: 0.0.0.0
