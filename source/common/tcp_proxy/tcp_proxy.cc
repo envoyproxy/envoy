@@ -442,7 +442,6 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 }
 
 bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::string& cluster_name) {
-  std::cerr << " HERE\n";
   GenericConnPoolFactory* factory = nullptr;
   if (cluster.info()->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(

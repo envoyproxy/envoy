@@ -50,7 +50,7 @@ public:
   virtual void onGenericPoolReady(StreamInfo::StreamInfo* info,
                                   std::unique_ptr<GenericUpstream>&& upstream,
                                   Upstream::HostDescriptionConstSharedPtr& host,
-                                  const Network::Address::InstanceConstSharedPtr& local_address,
+                                  const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                                   Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
 
   /**
