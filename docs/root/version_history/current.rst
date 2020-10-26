@@ -19,7 +19,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* dnsfilter: Correctly associate DNS response IDs when multiple queries are received.
+* dns: correctly associate DNS response IDs when multiple queries are received.
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
 
 Removed Config or Runtime
