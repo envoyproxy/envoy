@@ -107,13 +107,11 @@ public:
   TestSessionPtr test_session_;
 
   void expectSessionCreate();
-  void expectClientCreate(size_t index);
+  void expectClientCreate();
   void expectStreamCreate();
 
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
-  std::list<uint32_t> connection_index_{};
-  std::list<uint32_t> codec_index_{};
 };
 
 } // namespace Upstream

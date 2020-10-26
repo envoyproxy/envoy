@@ -313,11 +313,29 @@ void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
 }
 
 void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
-  allocGrpcHealthCheckerFromProto(input.health_check_config());
   test_session_ = std::make_unique<TestSession>();
+  allocGrpcHealthCheckerFromProto(input.health_check_config());
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
+  ON_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillByDefault(testing::InvokeWithoutArgs(
+          [&]() -> Network::ClientConnection* { return test_session_->client_connection_; }));
+
+  ON_CALL(*health_checker_, createCodecClient_(_))
+      .WillByDefault(
+          Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+            TestSession& test_session = *test_session_;
+            std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                new NiceMock<Upstream::MockClusterInfo>()};
+            Event::MockDispatcher dispatcher_;
+
+            test_session.codec_client_ = new CodecClientForTest(
+                Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
+                test_session.codec_, nullptr,
+                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+            return test_session.codec_client_;
+          }));
   expectStreamCreate();
   health_checker_->start();
   ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
@@ -416,7 +434,7 @@ void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
     return;
   }
   if (expect_client_create) {
-    expectClientCreate(0);
+    expectClientCreate();
     ENVOY_LOG_MISC(trace, "Created client");
   }
   expectStreamCreate();
@@ -468,40 +486,13 @@ void GrpcHealthCheckFuzz::expectSessionCreate() {
   test_session_->timeout_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   test_session_->interval_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   test_session_->request_encoder_.stream_.callbacks_.clear();
-  expectClientCreate(0);
+  expectClientCreate();
 }
 
-void GrpcHealthCheckFuzz::expectClientCreate(size_t index) {
+void GrpcHealthCheckFuzz::expectClientCreate() {
   TestSession& test_session = *test_session_;
   test_session.codec_ = new NiceMock<Http::MockClientConnection>();
   test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
-  connection_index_.push_back(index);
-  codec_index_.push_back(index);
-
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .Times(testing::AnyNumber())
-      .WillRepeatedly(testing::InvokeWithoutArgs([&]() -> Network::ClientConnection* {
-        connection_index_.front();
-        connection_index_.pop_front();
-        return test_session_->client_connection_;
-      }));
-
-  EXPECT_CALL(*health_checker_, createCodecClient_(_))
-      .WillRepeatedly(
-          Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-            codec_index_.front();
-            codec_index_.pop_front();
-            TestSession& test_session = *test_session_;
-            std::shared_ptr<Upstream::MockClusterInfo> cluster{
-                new NiceMock<Upstream::MockClusterInfo>()};
-            Event::MockDispatcher dispatcher_;
-
-            test_session.codec_client_ = new CodecClientForTest(
-                Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                test_session.codec_, nullptr,
-                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-            return test_session.codec_client_;
-          }));
 }
 
 void GrpcHealthCheckFuzz::expectStreamCreate() {
