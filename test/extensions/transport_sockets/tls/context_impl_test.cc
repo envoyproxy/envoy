@@ -332,7 +332,7 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   Envoy::Ssl::ClientContextSharedPtr new_context(
       manager_.createSslClientContext(store_, expiring_cfg, context));
 
-  // Validate that when the context is uppdated, daysUntilFirstCertExpires reflects the current
+  // Validate that when the context is updated, daysUntilFirstCertExpires reflects the current
   // context expiry.
   auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
   int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
