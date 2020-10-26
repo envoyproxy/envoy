@@ -199,7 +199,7 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
     :language: yaml
     :lineno-start: 27
     :lines: 27-50
-    :emphasize-lines: 3-21
+    :emphasize-lines: 3-22
 
 .. _start_quick_start_static_admin:
 
@@ -255,7 +255,7 @@ The following sections walk through the dynamic configuration provided in the
 Dynamic configuration: ``node``
 *******************************
 
-The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should specify...
+The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should specify ``cluster`` and ``id``.
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
@@ -268,21 +268,28 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 Dynamic configuration: ``dynamic_resources``
 ********************************************
 
-The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` should specify...
+The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` specifies
+the configuration to load dynamically, and the :ref:`cluster <start_quick_start_dynamic_static_resources>`
+to connect to for dynamic configuration updates.
+
+In this example, the configuration is provided by the ``xds_cluster`` configured below.
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
     :linenos:
     :lines: 3-19
     :lineno-start: 3
-    :emphasize-lines: 3-14
+    :emphasize-lines: 3-15
 
 .. _start_quick_start_dynamic_static_resources:
 
 Dynamic configuration: ``static_resources``
 *******************************************
 
-The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` should specify...
+Here we specify the :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>`
+to retrieve dynamic configuration from.
+
+The ``xds_cluster`` is configured to query a control plane at http://my-control-plane:18000 .
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
@@ -296,7 +303,9 @@ The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.sta
 Dynamic configuration: ``layered_runtime``
 ******************************************
 
-The :ref:`layered_runtime <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime>` should specify...
+A :ref:`layered_runtime <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime>` is
+required with a :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
+is required to persist configuration provided by the control plane.
 
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
