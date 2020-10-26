@@ -1,5 +1,6 @@
 #include "common/signal/fatal_error_handler.h"
 
+#include <atomic>
 #include <list>
 
 #include "envoy/event/dispatcher.h"
@@ -92,27 +93,22 @@ void callFatalErrorHandlers(std::ostream& os) {
   }
 }
 
-void registerFatalActions(FatalAction::FatalActionPtrList& safe_actions,
-                          FatalAction::FatalActionPtrList& unsafe_actions,
-                          Envoy::Server::Instance* server) {
-  static bool registered_actions = false;
-  if (registered_actions) {
-    ENVOY_BUG(false, "registerFatalActions called more than once.");
-    return;
-  }
-
+void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
+                          FatalAction::FatalActionPtrList unsafe_actions,
+                          Thread::ThreadFactory& thread_factory) {
   // Create a FatalActionManager and try to store it. If we fail to store
   // our manager, it'll be deleted due to the unique_ptr.
-  auto mananger =
-      std::make_unique<FatalAction::FatalActionManager>(safe_actions, unsafe_actions, server);
+  auto mananger = std::make_unique<FatalAction::FatalActionManager>(
+      std::move(safe_actions), std::move(unsafe_actions), thread_factory);
   FatalAction::FatalActionManager* unset_manager = nullptr;
 
   if (fatal_action_manager.compare_exchange_strong(unset_manager, mananger.get(),
                                                    std::memory_order_acq_rel)) {
-    registered_actions = true;
-    // Our manager is the system singleton, ensure that the unique_ptr does not
+    // Our manager is the system's singleton, ensure that the unique_ptr does not
     // delete the instance.
     mananger.release();
+  } else {
+    ENVOY_BUG(false, "registerFatalActions called more than once.");
   }
 }
 
@@ -126,7 +122,7 @@ bool runSafeActions() {
   }
 
   // Check that we're the thread that gets to run the actions.
-  int64_t my_tid = action_manager->getServer()->api().threadFactory().currentThreadId().getId();
+  int64_t my_tid = action_manager->getThreadFactory().currentThreadId().getId();
   int64_t expected_tid = -1;
 
   if (failure_tid.compare_exchange_strong(expected_tid, my_tid, std::memory_order_release,
@@ -149,7 +145,7 @@ bool runUnsafeActions() {
   }
 
   // Check that we're the thread that gets to run the actions.
-  int64_t my_tid = action_manager->getServer()->api().threadFactory().currentThreadId().getId();
+  int64_t my_tid = action_manager->getThreadFactory().currentThreadId().getId();
 
   if (my_tid == failure_tid.load(std::memory_order_acquire)) {
     // Run the actions
@@ -157,6 +153,20 @@ bool runUnsafeActions() {
     return true;
   }
   return false;
+}
+
+// Only call this from tests!
+// This resets the internal state of Fatal Action for the module.
+// This is necessary as it allows us to have multiple test cases invoke the
+// fatal actions without state from other tests leaking in.
+void resetFatalActionState() {
+  // Free the memory of the Fatal Action, since it's not managed by a smart
+  // pointer. This prevents memory leaks in tests.
+  auto* raw_ptr = fatal_action_manager.exchange(nullptr, std::memory_order_relaxed);
+  if (raw_ptr != nullptr) {
+    delete raw_ptr;
+  }
+  failure_tid.store(-1, std::memory_order_release);
 }
 
 } // namespace FatalErrorHandler

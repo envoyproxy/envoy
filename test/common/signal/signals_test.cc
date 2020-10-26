@@ -46,6 +46,11 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
   TestFatalErrorHandler handler;
   FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  FatalAction::FatalActionPtrList safe_actions;
+  FatalAction::FatalActionPtrList unsafe_actions;
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
+                                          Thread::threadFactoryForTest());
   SignalAction actions;
   // Make sure the fatal error log "HERE" registered above is logged on fatal error.
   EXPECT_DEATH(

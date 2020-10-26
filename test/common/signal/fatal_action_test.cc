@@ -6,11 +6,16 @@
 #include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::ReturnRef;
 
 namespace Envoy {
+namespace FatalErrorHandler {
+
+extern void resetFatalActionState();
+} // namespace FatalErrorHandler
 namespace FatalAction {
 
 // Use this test handler instead of a mock, because fatal error handlers must be
@@ -25,20 +30,6 @@ class TestFatalErrorHandler : public FatalErrorHandlerInterface {
     }
   }
 };
-
-TEST(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
-  EXPECT_DEATH(
-      {
-        FatalAction::FatalActionPtrList safe_actions;
-        FatalAction::FatalActionPtrList unsafe_actions;
-        FatalErrorHandler::registerFatalActions(safe_actions, unsafe_actions, nullptr);
-
-        // Subsequent call should trigger Envoy bug. We should only have this run
-        // once.
-        FatalErrorHandler::registerFatalActions(safe_actions, unsafe_actions, nullptr);
-      },
-      "Details: registerFatalActions called more than once.");
-}
 
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
@@ -55,33 +46,94 @@ private:
   int times_ran = 0;
 };
 
-TEST(FatalActionTest, CanCallRegisteredActions) {
-  // Set up Fatal Handlers
-  TestFatalErrorHandler handler;
-  FatalErrorHandler::registerFatalErrorHandler(handler);
+class FatalActionTest : public ::testing::Test {
+public:
+  FatalActionTest() : handler_(std::make_unique<TestFatalErrorHandler>()) {
+    FatalErrorHandler::registerFatalErrorHandler(*handler_);
+  }
 
+protected:
+  void TearDown() override {
+    // Reset module state
+    FatalErrorHandler::resetFatalActionState();
+    FatalErrorHandler::removeFatalErrorHandler(*handler_);
+  }
+
+  std::unique_ptr<TestFatalErrorHandler> handler_;
+  FatalAction::FatalActionPtrList safe_actions_;
+  FatalAction::FatalActionPtrList unsafe_actions_;
+};
+
+TEST_F(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
+                                          Thread::threadFactoryForTest());
+
+  EXPECT_DEATH(
+      {
+        // We've already set this up when we set up the test suite, so this
+        // subsequent call should trigger Envoy bug.
+        FatalErrorHandler::registerFatalActions(
+            std::move(safe_actions_), std::move(unsafe_actions_), Thread::threadFactoryForTest());
+      },
+      "Details: registerFatalActions called more than once.");
+}
+
+TEST_F(FatalActionTest, CanCallRegisteredActions) {
   // Set up Fatal Actions
-  Server::MockInstance instance;
-  FatalAction::FatalActionPtrList safe_actions;
-  FatalAction::FatalActionPtrList unsafe_actions;
-  auto api_fake = Api::createApiForTest();
-  EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(*api_fake));
+  safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true));
+  auto* safe_action = dynamic_cast<TestFatalAction*>(safe_actions_.front().get());
 
-  safe_actions.emplace_back(std::make_unique<TestFatalAction>(true));
-  auto* raw_safe_action = dynamic_cast<TestFatalAction*>(safe_actions.front().get());
+  unsafe_actions_.emplace_back(std::make_unique<TestFatalAction>(false));
+  auto* unsafe_action = dynamic_cast<TestFatalAction*>(unsafe_actions_.front().get());
 
-  unsafe_actions.emplace_back(std::make_unique<TestFatalAction>(false));
-  auto* raw_unsafe_action = dynamic_cast<TestFatalAction*>(unsafe_actions.front().get());
-
-  FatalErrorHandler::registerFatalActions(safe_actions, unsafe_actions, &instance);
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
+                                          Thread::threadFactoryForTest());
 
   // Call the actions
   EXPECT_TRUE(FatalErrorHandler::runSafeActions());
   EXPECT_TRUE(FatalErrorHandler::runUnsafeActions());
 
   // Expect ran once
-  EXPECT_EQ(raw_safe_action->getNumTimesRan(), 1);
-  EXPECT_EQ(raw_unsafe_action->getNumTimesRan(), 1);
+  EXPECT_EQ(safe_action->getNumTimesRan(), 1);
+  EXPECT_EQ(unsafe_action->getNumTimesRan(), 1);
+}
+
+TEST_F(FatalActionTest, CanOnlyRunSafeActionsOnce) {
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
+                                          Thread::threadFactoryForTest());
+  ASSERT_TRUE(FatalErrorHandler::runSafeActions());
+
+  // This should return false since they've ran already.
+  EXPECT_FALSE(FatalErrorHandler::runSafeActions());
+}
+
+TEST_F(FatalActionTest, ShouldOnlyBeAbleToRunUnsafeActionsFromThreadThatRanSafeActions) {
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
+                                          Thread::threadFactoryForTest());
+
+  // Jump to run unsafe actions, without running safe actions.
+  ASSERT_FALSE(FatalErrorHandler::runUnsafeActions());
+
+  absl::Notification run_unsafe_actions;
+  absl::Notification ran_safe_actions;
+  auto fatal_action_thread =
+      Thread::threadFactoryForTest().createThread([&run_unsafe_actions, &ran_safe_actions]() {
+        // Run Safe Actions and notify
+        EXPECT_TRUE(FatalErrorHandler::runSafeActions());
+        ran_safe_actions.Notify();
+
+        run_unsafe_actions.WaitForNotification();
+        EXPECT_TRUE(FatalErrorHandler::runUnsafeActions());
+      });
+
+  // Wait for other thread to run safe actions, then try to run safe and
+  // unsafe actions, they should both not run for this thread.
+  ran_safe_actions.WaitForNotification();
+  ASSERT_FALSE(FatalErrorHandler::runSafeActions());
+  ASSERT_FALSE(FatalErrorHandler::runUnsafeActions());
+  run_unsafe_actions.Notify();
+
+  fatal_action_thread->join();
 }
 
 } // namespace FatalAction

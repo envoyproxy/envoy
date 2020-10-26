@@ -434,7 +434,8 @@ void InstanceImpl::initialize(const Options& options,
         unsafe_actions.push_back(std::move(action));
       }
     }
-    Envoy::FatalErrorHandler::registerFatalActions(safe_actions, unsafe_actions, this);
+    Envoy::FatalErrorHandler::registerFatalActions(
+        std::move(safe_actions), std::move(unsafe_actions), this->api_->threadFactory());
   }
 
   if (!bootstrap_.default_socket_interface().empty()) {

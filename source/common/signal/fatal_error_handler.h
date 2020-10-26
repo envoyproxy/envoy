@@ -45,9 +45,9 @@ void callFatalErrorHandlers(std::ostream& os);
  * Creates the singleton FatalActionManager if not already created and
  * registers the specified actions to run on failure.
  */
-void registerFatalActions(FatalAction::FatalActionPtrList& safe_actions,
-                          FatalAction::FatalActionPtrList& unsafe_actions,
-                          Envoy::Server::Instance* server);
+void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
+                          FatalAction::FatalActionPtrList unsafe_actions,
+                          Thread::ThreadFactory& thread_factory);
 
 /**
  * Tries to run all of the safe fatal actions. Only one thread will

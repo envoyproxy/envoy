@@ -35,10 +35,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "fatal_action_lib",
-    srcs = ["fatal_action.cc"],
     hdrs = ["fatal_action.h"],
     deps = [
         "//include/envoy/server:fatal_action_interface",
-        "//include/envoy/server:instance_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )
