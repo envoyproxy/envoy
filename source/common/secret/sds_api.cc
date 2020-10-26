@@ -35,9 +35,30 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   // each init manager has a chance to initialize its targets.
 }
 
+void SdsApi::resolveDataSource(const FileContentMap& files,
+                               envoy::config::core::v3::DataSource& data_source) {
+  if (data_source.specifier_case() ==
+      envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
+    const std::string& content = files.at(data_source.filename());
+    data_source.set_inline_bytes(content);
+  }
+}
+
 void SdsApi::onWatchUpdate() {
-  const uint64_t new_hash = getHashForFiles();
+  // Obtain a stable set of files. If a rotation happens while we're eading,
+  // then we need to try again.
+  uint64_t prev_hash = 0;
+  FileContentMap files = loadFiles();
+  uint64_t next_hash = getHashForFiles(files);
+  // TODO(htuch): bound this so we don't run forever. DO NOT SUBMIT until fixed.
+  while (next_hash != prev_hash) {
+    files = loadFiles();
+    prev_hash = next_hash;
+    next_hash = getHashForFiles(files);
+  }
+  const uint64_t new_hash = next_hash;
   if (new_hash != files_hash_) {
+    resolveSecret(files);
     update_callback_manager_.runCallbacks();
     files_hash_ = new_hash;
   }
@@ -60,18 +81,17 @@ void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resou
     validateConfig(secret);
     secret_hash_ = new_hash;
     setSecret(secret);
+    const auto files = loadFiles();
+    files_hash_ = getHashForFiles(files);
+    resolveSecret(files);
     update_callback_manager_.runCallbacks();
 
-    auto* watched_directory = getWatchedDirectory();
-    files_hash_ = getHashForFiles();
-    // Either we have a watched directory and can defer the watch monitoring to
-    // a WatchedDirectory object, or we need to implement per-file watches
-    // in the else clause.
-    if (watched_directory != nullptr) {
-      watched_directory->setCallback([this]() {
-        resolveSecret();
-        onWatchUpdate();
-      });
+    auto* watched_path = getWatchedPath();
+    // Either we have a watched path and can defer the watch monitoring to a
+    // WatchedPath object, or we need to implement per-file watches in the else
+    // clause.
+    if (watched_path != nullptr) {
+      watched_path->setCallback([this]() { onWatchUpdate(); });
     } else {
       // List DataSources that refer to files
       auto files = getDataSourceFilenames();
@@ -127,37 +147,44 @@ void SdsApi::initialize() {
 
 SdsApi::SecretData SdsApi::secretData() { return secret_data_; }
 
-uint64_t SdsApi::getHashForFiles() {
-  uint64_t hash = 0;
+SdsApi::FileContentMap SdsApi::loadFiles() {
+  FileContentMap files;
   for (auto const& filename : getDataSourceFilenames()) {
-    hash = HashUtil::xxHash64(api_.fileSystem().fileReadToEnd(filename), hash);
+    files[filename] = api_.fileSystem().fileReadToEnd(filename);
+  }
+  return files;
+}
+
+uint64_t SdsApi::getHashForFiles(const FileContentMap& files) {
+  uint64_t hash = 0;
+  for (const auto& it : files) {
+    hash = HashUtil::xxHash64(it.second, hash);
   }
   return hash;
 }
 
 std::vector<std::string> TlsCertificateSdsApi::getDataSourceFilenames() {
   std::vector<std::string> files;
-  if (resolved_tls_certificate_secrets_ &&
-      resolved_tls_certificate_secrets_->has_certificate_chain() &&
-      resolved_tls_certificate_secrets_->certificate_chain().specifier_case() ==
+  if (sds_tls_certificate_secrets_ && sds_tls_certificate_secrets_->has_certificate_chain() &&
+      sds_tls_certificate_secrets_->certificate_chain().specifier_case() ==
           envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
-    files.push_back(resolved_tls_certificate_secrets_->certificate_chain().filename());
+    files.push_back(sds_tls_certificate_secrets_->certificate_chain().filename());
   }
-  if (resolved_tls_certificate_secrets_ && resolved_tls_certificate_secrets_->has_private_key() &&
-      resolved_tls_certificate_secrets_->private_key().specifier_case() ==
+  if (sds_tls_certificate_secrets_ && sds_tls_certificate_secrets_->has_private_key() &&
+      sds_tls_certificate_secrets_->private_key().specifier_case() ==
           envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
-    files.push_back(resolved_tls_certificate_secrets_->private_key().filename());
+    files.push_back(sds_tls_certificate_secrets_->private_key().filename());
   }
   return files;
 }
 
 std::vector<std::string> CertificateValidationContextSdsApi::getDataSourceFilenames() {
   std::vector<std::string> files;
-  if (resolved_certificate_validation_context_secrets_ &&
-      resolved_certificate_validation_context_secrets_->has_trusted_ca() &&
-      resolved_certificate_validation_context_secrets_->trusted_ca().specifier_case() ==
+  if (sds_certificate_validation_context_secrets_ &&
+      sds_certificate_validation_context_secrets_->has_trusted_ca() &&
+      sds_certificate_validation_context_secrets_->trusted_ca().specifier_case() ==
           envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
-    files.push_back(resolved_certificate_validation_context_secrets_->trusted_ca().filename());
+    files.push_back(sds_certificate_validation_context_secrets_->trusted_ca().filename());
   }
   return files;
 }

@@ -202,6 +202,7 @@ public:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
   void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
   std::vector<std::string> getDataSourceFilenames() override { return {}; }
+  Config::WatchedPath* getWatchedPath() override { return nullptr; }
 
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };

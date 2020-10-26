@@ -220,9 +220,8 @@ protected:
         TestEnvironment::temporaryPath("root/current/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    auto* watched_dir = tls_certificate->mutable_watched_directory();
-    watched_dir->set_root(TestEnvironment::temporaryPath("root"));
-    watched_dir->set_subdirectory("current");
+    auto* watched_path = tls_certificate->mutable_watched_path();
+    watched_path->set_path(TestEnvironment::temporaryPath("root/"));
     return secret;
   }
 };

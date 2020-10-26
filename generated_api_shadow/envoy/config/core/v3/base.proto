@@ -311,15 +311,22 @@ message HeaderMap {
   repeated HeaderValue headers = 1;
 }
 
-// A directory that is watched for changes, e.g. by inotify on Linux.
-message WatchedDirectory {
-  // Path to watch. Any move events in this directory will trigger an update.
-  string root = 1 [(validate.rules).string = {min_len: 1}];
+// A path that is watched for changes, e.g. by inotify on Linux.
+message WatchedPath {
+  enum Event {
+    // Generated for the directory containing the new filename when a file is
+    // renamed.
+    MOVED_TO = 0;
 
-  // A subdirectory from *root* containing watched files. This will be resolved
-  // via readlink(2) of *root*/*subdirectory* on an inotify event prior to
-  // reading files.
-  string subdirectory = 2;
+    // File was modified, e.g. write(2), truncate(2).
+    MODIFIED = 1;
+  }
+
+  // Path to watch.
+  string path = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Event to watch on *path*.
+  Event event = 2 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Data source consisting of either a file or an inline value.
