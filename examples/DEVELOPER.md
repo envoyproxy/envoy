@@ -111,10 +111,10 @@ responds_without_header \
 
 #### Utility functions: `wait_for`
 
-You can wait for some amount of time for a command to return 0
+You can wait for some amount of time (specified in seconds) for a command to return `0`.
 
-The following example will wait for 20 seconds for a service ``my-service`` to become
-healthy.
+For example, the following example will wait for 20 seconds for a service ``my-service``
+to become healthy.
 
 ```bash
 wait_for 20 sh -c "docker-compose ps my-service | grep healthy | grep -v unhealthy"
