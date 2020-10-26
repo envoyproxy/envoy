@@ -1561,33 +1561,6 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
 }
 
-TEST_P(Http2FrameIntegrationTest, MissingHeaders) {
-  config_helper_.addFilter(R"EOF(
-  name: invalid-header-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
-  )EOF");
-
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void {
-        hcm.mutable_http2_protocol_options()
-            ->mutable_override_stream_error_on_invalid_http_message()
-            ->set_value(true);
-      });
-
-  beginSession();
-
-  uint32_t stream_index = 0;
-  auto request = Http::Http2::Http2Frame::makeMalformedRequestWithMissingHeaders(
-      Http2Frame::makeClientStreamId(stream_index), false, "host", "/");
-  sendFrame(request);
-  auto response = readFrame();
-  // Make sure we've got RST_STREAM from the server
-  EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
-  tcp_client_->close();
-}
-
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

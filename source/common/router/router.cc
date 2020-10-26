@@ -353,7 +353,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
     const std::string body = fmt::format("missing required header: {}", header_status.message());
     const std::string details =
-        absl::StrCat(StreamInfo::ResponseCodeDetails::get().MissingHeadersAfterFilterChain, "{",
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
                      header_status.message(), "}");
     callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, body, nullptr, absl::nullopt,
                                details);

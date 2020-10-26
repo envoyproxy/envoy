@@ -363,7 +363,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_headers_after_filter_chain"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("filter_removed_required_headers"));
 
   // Missing path for non-CONNECT
   response =
@@ -375,7 +375,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_headers_after_filter_chain"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("filter_removed_required_headers"));
 
   // Missing host for CONNECT
   response = codec_client_->makeHeaderOnlyRequest(
@@ -386,7 +386,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_headers_after_filter_chain"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("filter_removed_required_headers"));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
