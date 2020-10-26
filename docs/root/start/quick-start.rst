@@ -296,9 +296,9 @@ The :ref:`layered_runtime <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.laye
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 34-51
-    :lineno-start: 34
-    :emphasize-lines: 3-16
+    :lines: 33-44
+    :lineno-start: 33
+    :emphasize-lines: 3-9
 
 .. _start_quick_start_dynamic_admin:
 
@@ -315,9 +315,9 @@ endpoint to see how Envoy is currently configured.
 .. literalinclude:: _include/envoy-dynamic-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 51-56
-    :lineno-start: 51
-    :emphasize-lines: 1-6
+    :lines: 42-49
+    :lineno-start: 42
+    :emphasize-lines: 2-7
 
 .. warning::
 
