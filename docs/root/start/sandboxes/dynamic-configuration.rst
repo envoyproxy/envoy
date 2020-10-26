@@ -105,14 +105,56 @@ to ``service1``
 Step 5: Stop the go-control-plane
 *********************************
 
+Let's stop the go-control-plane:
 
-Step 5: Query the proxy
-***********************
+.. code-block:: console
 
+    $ docker-compose stop go-control-plane
+
+The Envoy proxy should continue proxying responses from ``service1``
+
+.. code-block:: console
+
+   $ curl http://localhost:10000 | grep "served by"
+   Request served by service1
 
 Step 5: Edit resource.go and restart the go-control-plane
 *********************************************************
 
+The example go-control-plane is started with a custom resource.go file which
+specifies the configuration provided to Envoy.
+
+If you edit this file and change the ``UpstreamHost``:
+
+.. literalinclude:: _include/dynamic-configuration/resource.go
+   :language: go
+   :lines: 33-40
+   :emphasize-lines: 5
+   :linenos:
+
+Further down in this file you must also change the configuration snapshot
+version number:
+
+.. literalinclude:: _include/dynamic-configuration/resource.go
+   :language: go
+   :lines: 167-177
+   :emphasize-lines: 2
+   :linenos:
 
 Step 5: Query the proxy
 ***********************
+
+.. code-block:: console
+
+   $ curl http://localhost:10000
+   Request served by service2
+
+   HTTP/1.1 GET /
+
+   Host: service1
+   Accept: */*
+   X-Forwarded-Proto: http
+   X-Request-Id: 1d93050e-f39c-4602-90f8-a124d6e78d26
+   X-Envoy-Expected-Rq-Timeout-Ms: 15000
+   Content-Length: 0
+   User-Agent: curl/7.72.0
