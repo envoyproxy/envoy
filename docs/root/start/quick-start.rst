@@ -154,7 +154,7 @@ You can also add an :ref:`admin <start_quick_start_static_admin>` section if you
 or retrieve stats.
 
 The following sections walk through the static configuration provided in the
-:download:`demo configuration file <_include/envoy-demo.yaml>`.
+:download:`demo configuration file <_include/envoy-demo.yaml>` used as the default in the Envoy Docker container.
 
 .. _start_quick_start_static_static_resources:
 
@@ -175,7 +175,11 @@ everything that is configured statically when Envoy starts, as opposed to dynami
 Static configuration: ``listeners``
 ***********************************
 
-The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
+The example configures a :ref:`listener <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`
+on port ``10000``.
+
+All paths are matched and routed to the ``service_envoyproxy_io``
+:ref:`cluster <start_quick_start_static_clusters>`.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
@@ -188,20 +192,21 @@ The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listene
 Static configuration: ``clusters``
 **********************************
 
-The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`.
+The ``service_envoyproxy_io`` :ref:`cluster <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
+proxies over ``TLS`` to https://www.envoyproxy.io.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :lineno-start: 27
-    :lines: 27-49
-    :emphasize-lines: 3-19
+    :lines: 27-50
+    :emphasize-lines: 3-21
 
 .. _start_quick_start_static_admin:
 
 Static configuration: ``admin``
 *******************************
 
-The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is required to configure
+The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is required to enable and configure
 the administration server.
 
 The ``address`` key specifies the listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
