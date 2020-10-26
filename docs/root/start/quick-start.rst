@@ -147,8 +147,8 @@ You can also add an ``admin`` section if you wish to monitor Envoy or retrieve s
 
 The following sections walk through the static configuration provided in the :download:`demo configuration file <_include/envoy-demo.yaml>`.
 
-Configuration: static_resources
-*******************************
+Static configuration: static_resources
+**************************************
 
 The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
 as opposed to the means of configuring resources dynamically when Envoy is running.
@@ -159,8 +159,8 @@ as opposed to the means of configuring resources dynamically when Envoy is runni
     :lines: 1-3
     :emphasize-lines: 1
 
-Configuration: listeners
-************************
+Static configuration: listeners
+*******************************
 
 The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
 
@@ -171,8 +171,8 @@ The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listene
     :emphasize-lines: 3-23
 
 
-Configuration: clusters
-***********************
+Static configuration: clusters
+******************************
 
 The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`.
 
@@ -182,8 +182,8 @@ The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster
     :lines: 22-47
     :emphasize-lines: 4-24
 
-Configuration: admin
-********************
+Static configuration: admin
+***************************
 
 The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is required to configure
 the administration server.
@@ -205,7 +205,38 @@ which in the demo configuration is ``0.0.0.0:9901``.
 Dynamic configuration
 ---------------------
 
-See the :ref:`configuration overview <config_overview>` for further information on configuring Envoy with static and dynamic configuration.
+Setting up Envoy with dynamic configuration is slightly more complex as you must also set up a control plane
+to provide Envoy with its configuration.
+
+One example of a control plane compatible with Envoy is Istio's Pilot.
+
+You may also wish to explore implementing your own control plane, in which case the
+`Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_ reference implementation is a good place
+to start.
+
+At a minimum, you will need to start Envoy with ``node``, a ``dynamic_resources`` section to tell Envoy which
+configurations should be updated dynamically, and a ``static_resources`` section to specify where Envoy should
+retrieve its configuration from.
+
+You will also need to add a ``layered_runtime`` section to persist dynamically-provided configurations.
+
+You can also add an ``admin`` section if you wish to monitor Envoy or retrieve stats or configuration information.
+
+The following sections walk through the dynamic configuration provided in the
+:download:`demo dynamic configuration file <_include/envoy-dynamic-demo.yaml>`.
+
+Dynamic configuration: node
+***************************
+
+The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
+as opposed to the means of configuring resources dynamically when Envoy is running.
+
+.. literalinclude:: _include/envoy-dynamic-demo.yaml
+    :language: yaml
+    :linenos:
+    :lines: 1-3
+    :emphasize-lines: 1
+
 
 
 Next steps
