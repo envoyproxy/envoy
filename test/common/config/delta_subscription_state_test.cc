@@ -26,11 +26,11 @@ namespace {
 
 const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 
-class DeltaSubscriptionStateTest : public testing::Test {
+class DeltaSubscriptionStateTestBase : public testing::Test {
 protected:
-  DeltaSubscriptionStateTest()
+  DeltaSubscriptionStateTestBase(const std::string& type_url)
       : timer_(new Event::MockTimer(&dispatcher_)),
-        state_(TypeUrl, callbacks_, local_info_, dispatcher_) {
+        state_(type_url, callbacks_, local_info_, dispatcher_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
         state_.getNextRequestAckless();
@@ -91,6 +91,11 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
   }
   return add_to;
 }
+
+class DeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
+public:
+  DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl) {}
+};
 
 // Basic gaining/losing interest in resources should lead to subscription updates.
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
@@ -474,6 +479,52 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
 
   // Invoke the TTL.
   timer_->invokeCallback();
+}
+
+class VhdsDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
+public:
+  VhdsDeltaSubscriptionStateTest()
+      : DeltaSubscriptionStateTestBase("envoy.config.route.v3.VirtualHost") {}
+};
+
+TEST_F(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+
+  TestScopedRuntime scoped_runtime;
+
+  auto create_resource_with_ttl = [](bool include_resource) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    auto* resource = added_resources.Add();
+    resource->set_name("name1");
+    resource->set_version("version1A");
+
+    if (include_resource) {
+      resource->mutable_resource();
+    }
+
+    ProtobufWkt::Duration ttl;
+    ttl.set_seconds(1);
+    resource->mutable_ttl()->CopyFrom(ttl);
+
+    return added_resources;
+  };
+
+  EXPECT_CALL(*timer_, enabled());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  deliverDiscoveryResponse(create_resource_with_ttl(true), {}, "debug1", "nonce1", true, 1);
+
+  // Heartbeat update should not be propagated to the subscription callback.
+  EXPECT_CALL(*timer_, enabled());
+  deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 0);
+
+  // When runtime flag is disabled, maintain old behavior where we do propagate
+  // the update to the subscription callback.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.vhds_heartbeats", "false"}});
+
+  EXPECT_CALL(*timer_, enabled());
+  deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 1);
 }
 
 } // namespace

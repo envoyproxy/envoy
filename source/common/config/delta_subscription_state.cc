@@ -76,7 +76,8 @@ UpdateAck DeltaSubscriptionState::handleResponse(
 
 bool DeltaSubscriptionState::isHeartbeatResponse(
     const envoy::service::discovery::v3::Resource& resource) const {
-  if (!supports_heartbeats_) {
+  if (!supports_heartbeats_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_heartbeats")) {
     return false;
   }
   const auto itr = resource_state_.find(resource.name());
