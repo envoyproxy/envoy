@@ -1,7 +1,7 @@
-.. _install_sandboxes_dynamic_configuration:
+.. _install_sandboxes_dynamic_config_cp:
 
-Dynamic configuration
-=====================
+Dynamic configuration using a control plane
+===========================================
 
 This example walks through configuring Envoy using the `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_
 reference implementation.
@@ -30,8 +30,8 @@ The control plane has not yet been started.
     $ docker-compose up -d proxy
     $ docker-compose ps
 
-	      Name                            Command                 State                     Ports
-    ------------------------------------------------------------------------------------------------------------------------------
+           Name                            Command                State                     Ports
+    ------------------------------------------------------------------------------------------------------------------------
     dynamic-config-cp_proxy_1      /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp, 0.0.0.0:19000->19000/tcp
     dynamic-config-cp_service1_1   /bin/echo-server               Up      8080/tcp
     dynamic-config-cp_service2_1   /bin/echo-server               Up      8080/tcp
@@ -75,8 +75,8 @@ You may need to wait a moment or two for it to become ``healthy``.
     $ docker-compose up --build -d go-control-plane
     $ docker-compose ps
 
-		Name                                Command                  State                    Ports
-    -----------------------------------------------------------------------------------------------------------------------------------------
+            Name                                Command                  State                    Ports
+    -------------------------------------------------------------------------------------------------------------------------------------
     dynamic-config-cp_go-control-plane_1  bin/example -debug             Up (healthy)
     dynamic-config-cp_proxy_1             /docker-entrypoint.sh /usr ... Up            0.0.0.0:10000->10000/tcp, 0.0.0.0:19000->19000/tcp
     dynamic-config-cp_service1_1          /bin/echo-server               Up            8080/tcp
