@@ -79,6 +79,8 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       To specify a custom configuration you can mount the config into the container, and specify the path with ``-c``.
 
+      Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``:
+
       .. substitution-code-block:: console
 
 	 $ docker run --rm -d -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml -p 9901:9901 -p 10000:10000 envoyproxy/|envoy_docker_image| -c /envoy-custom.yaml
