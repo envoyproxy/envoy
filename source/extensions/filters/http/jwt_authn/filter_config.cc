@@ -8,8 +8,8 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-// The maximum size for this variable.
-constexpr size_t TopRequirementNameForDebugSize = 100;
+// The maximum number of characters for storing requirement_names for debug.
+constexpr size_t TopRequirementNameForDebugMaxChars = 100;
 
 } // namespace
 
@@ -39,7 +39,7 @@ void FilterConfigImpl::init() {
   }
 
   for (const auto& it : proto_config_.requirement_map()) {
-    if (top_requirement_names_for_debug_.size() < TopRequirementNameForDebugSize) {
+    if (top_requirement_names_for_debug_.size() < TopRequirementNameForDebugMaxChars) {
       if (top_requirement_names_for_debug_.empty()) {
         top_requirement_names_for_debug_ = it.first;
       } else {
