@@ -840,7 +840,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   filter_manager_.requestHeadersInitialized();
   if (request_header_timer_ != nullptr) {
     request_header_timer_->disableTimer();
-    request_header_timer_.reset();
   }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host =
