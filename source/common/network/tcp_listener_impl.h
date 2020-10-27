@@ -17,6 +17,7 @@ public:
   TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
                   SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
                   uint32_t backlog_size);
+  ~TcpListenerImpl() override { socket_->ioHandle().resetFileEvents(); }
   void disable() override;
   void enable() override;
   void setRejectFraction(float reject_fraction) override;
@@ -37,7 +38,6 @@ private:
   static bool rejectCxOverGlobalLimit();
 
   Random::RandomGenerator& random_;
-  Event::FileEventPtr file_event_;
   float reject_fraction_;
 };
 

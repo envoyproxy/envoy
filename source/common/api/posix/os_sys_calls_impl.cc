@@ -242,6 +242,11 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallSocketResult OsSysCallsImpl::duplicate(os_fd_t oldfd) {
+  const int rc = ::dup(oldfd);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
 SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
   os_fd_t rc;
 

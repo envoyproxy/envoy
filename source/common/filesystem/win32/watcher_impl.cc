@@ -13,15 +13,15 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
   Api::SysCallIntResult result = os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
   ASSERT(result.rc_ == 0);
 
-  event_read_ = socks[0];
-  event_write_ = socks[1];
-  result = os_sys_calls_.setsocketblocking(event_read_, false);
+  read_handle_ = std::make_unique<Network::IoSocketHandleImpl>(socks[0], false, AF_INET);
+  result = read_handle_->setBlocking(false);
   ASSERT(result.rc_ == 0);
-  result = os_sys_calls_.setsocketblocking(event_write_, false);
+  write_handle_ = std::make_unique<Network::IoSocketHandleImpl>(socks[1], false, AF_INET);
+  result = write_handle_->setBlocking(false);
   ASSERT(result.rc_ == 0);
 
-  directory_event_ = dispatcher.createFileEvent(
-      event_read_,
+  read_handle_->initializeFileEvent(
+      dispatcher,
       [this](uint32_t events) -> void {
         ASSERT(events == Event::FileReadyType::Read);
         onDirectoryEvent();
@@ -48,8 +48,6 @@ WatcherImpl::~WatcherImpl() {
     ::CloseHandle(entry.second->overlapped_.hEvent);
   }
   ::CloseHandle(thread_exit_event_);
-  ::closesocket(event_read_);
-  ::closesocket(event_write_);
 }
 
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
@@ -113,13 +111,13 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
 void WatcherImpl::onDirectoryEvent() {
   while (true) {
     char data = 0;
-    const int rc = ::recv(event_read_, &data, sizeof(data), 0);
-    const int err = ::WSAGetLastError();
-    if (rc == SOCKET_ERROR && err == WSAEWOULDBLOCK) {
+    const auto result = read_handle_->recv(&data, sizeof(data), 0);
+
+    if (result.err_ && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       return;
     }
-    RELEASE_ASSERT(rc != SOCKET_ERROR, fmt::format("recv errored: {}", err));
 
+    RELEASE_ASSERT(result.err_ == nullptr, fmt::format("recv errored: {}", result.err_));
     if (data == 0) {
       // no callbacks to run; this is just a notification that a DirectoryWatch exited
       return;
@@ -148,14 +146,16 @@ void WatcherImpl::issueFirstRead(ULONG_PTR param) {
   ASSERT(rc);
 }
 
-void WatcherImpl::endDirectoryWatch(os_fd_t sock, HANDLE event_handle) {
+void WatcherImpl::endDirectoryWatch(Network::IoHandle& io_handle, HANDLE event_handle) {
   const BOOL rc = ::SetEvent(event_handle);
   ASSERT(rc);
   // let libevent know that a ReadDirectoryChangesW call returned
-  const char data = 0;
-  const int bytes_written = ::send(sock, &data, sizeof(data), 0);
-  RELEASE_ASSERT(bytes_written == sizeof(data),
-                 fmt::format("failed to write 1 byte: {}", ::WSAGetLastError()));
+  Buffer::OwnedImpl buffer;
+  constexpr absl::string_view data{"a"};
+  buffer.add(data);
+  auto result = io_handle.write(buffer);
+  RELEASE_ASSERT(result.rc_ == 1,
+                 fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
 }
 
 void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLAPPED overlapped) {
@@ -165,16 +165,16 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
 
   if (err == ERROR_OPERATION_ABORTED) {
     ENVOY_LOG(debug, "ReadDirectoryChangesW aborted, exiting");
-    endDirectoryWatch(watcher->event_write_, dir_watch->overlapped_.hEvent);
+    endDirectoryWatch(*watcher->write_handle_, dir_watch->overlapped_.hEvent);
     return;
   } else if (err != 0) {
     ENVOY_LOG(error, "ReadDirectoryChangesW errored: {}, exiting", err);
-    endDirectoryWatch(watcher->event_write_, dir_watch->overlapped_.hEvent);
+    endDirectoryWatch(*watcher->write_handle_, dir_watch->overlapped_.hEvent);
     return;
   } else if (num_bytes < sizeof(_FILE_NOTIFY_INFORMATION)) {
     ENVOY_LOG(error, "ReadDirectoryChangesW returned {} bytes, expected {}, exiting", num_bytes,
               sizeof(_FILE_NOTIFY_INFORMATION));
-    endDirectoryWatch(watcher->event_write_, dir_watch->overlapped_.hEvent);
+    endDirectoryWatch(*watcher->write_handle_, dir_watch->overlapped_.hEvent);
     return;
   }
 
@@ -194,6 +194,7 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
       events |= Events::Modified;
     }
 
+    constexpr absl::string_view data{"a"};
     for (FileWatch& watch : dir_watch->watches_) {
       if (watch.file_ == file && (watch.events_ & events)) {
         ENVOY_LOG(debug, "matched callback: file: {}", watcher->wstring_converter_.to_bytes(file));
@@ -204,10 +205,11 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
         // this tells the libevent callback to pull this callback off the active_callbacks_
         // queue. We do this so that the callbacks are executed in the main libevent loop,
         // not in this completion routine
-        const char data = 1;
-        const int bytes_written = ::send(watcher->event_write_, &data, sizeof(data), 0);
-        RELEASE_ASSERT(bytes_written == sizeof(data),
-                       fmt::format("failed to write 1 byte: {}", ::WSAGetLastError()));
+        Buffer::OwnedImpl buffer;
+        buffer.add(data);
+        auto result = watcher->write_handle_->write(buffer);
+        RELEASE_ASSERT(result.rc_ == 1,
+                       fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
       }
     }
 
@@ -216,7 +218,7 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
 
   if (!watcher->keep_watching_.load()) {
     ENVOY_LOG(debug, "ending watch on directory: handle: {}", dir_watch->dir_handle_);
-    endDirectoryWatch(watcher->event_write_, dir_watch->overlapped_.hEvent);
+    endDirectoryWatch(*watcher->write_handle_, dir_watch->overlapped_.hEvent);
     return;
   }
 

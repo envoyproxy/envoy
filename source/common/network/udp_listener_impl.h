@@ -60,7 +60,6 @@ private:
   void disableEvent();
 
   TimeSource& time_source_;
-  Event::FileEventPtr file_event_;
 };
 
 class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {

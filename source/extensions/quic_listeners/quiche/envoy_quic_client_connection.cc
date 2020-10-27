@@ -78,7 +78,7 @@ uint64_t EnvoyQuicClientConnection::maxPacketSize() const {
 
 void EnvoyQuicClientConnection::setUpConnectionSocket() {
   if (connectionSocket()->ioHandle().isOpen()) {
-    file_event_ = connectionSocket()->ioHandle().createFileEvent(
+    connectionSocket()->ioHandle().initializeFileEvent(
         dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); },
         Event::PlatformDefaultTriggerType,
         Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -99,9 +99,6 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle()));
-  // Destroy the old file_event before closing the old socket. Otherwise the socket might be picked
-  // up by another socket() call while file_event is still operating on it.
-  file_event_.reset();
   // The old socket is closed in this call.
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket();

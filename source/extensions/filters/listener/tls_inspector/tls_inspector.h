@@ -86,7 +86,6 @@ private:
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_;
-  Event::FileEventPtr file_event_;
 
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};

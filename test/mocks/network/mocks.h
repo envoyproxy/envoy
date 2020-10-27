@@ -224,6 +224,7 @@ public:
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(void, setLocalAddress, (const Address::InstanceConstSharedPtr&));
   MOCK_METHOD(IoHandle&, ioHandle, ());
+  MOCK_METHOD(SocketPtr, duplicate, ());
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
@@ -285,6 +286,7 @@ public:
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr&));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr&));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, options, (), (const));
+  MOCK_METHOD(SocketPtr, duplicate, ());
   MOCK_METHOD(IoHandle&, ioHandle, ());
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));

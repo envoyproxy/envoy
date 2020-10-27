@@ -94,6 +94,7 @@ public:
   absl::optional<Network::Address::IpVersion> ipVersion() const override {
     return Network::Address::IpVersion::v4;
   }
+  Network::SocketPtr duplicate() override { return nullptr; }
   void setLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void setRemoteAddress(const Network::Address::InstanceConstSharedPtr&) override {}
