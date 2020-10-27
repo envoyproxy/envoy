@@ -1,17 +1,13 @@
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 
+#include <algorithm> // std::sort
+
 #include "common/common/empty_string.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-namespace {
-
-// The maximum number of characters for storing requirement_names for debug.
-constexpr size_t TopRequirementNameForDebugMaxChars = 100;
-
-} // namespace
 
 void FilterConfigImpl::init() {
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
@@ -38,17 +34,15 @@ void FilterConfigImpl::init() {
     }
   }
 
+  std::vector<std::string> names;
   for (const auto& it : proto_config_.requirement_map()) {
-    if (top_requirement_names_for_debug_.size() < TopRequirementNameForDebugMaxChars) {
-      if (top_requirement_names_for_debug_.empty()) {
-        top_requirement_names_for_debug_ = it.first;
-      } else {
-        absl::StrAppend(&top_requirement_names_for_debug_, ",", it.first);
-      }
-    }
+    names.push_back(it.first);
     name_verifiers_.emplace(it.first,
                             Verifier::create(it.second, proto_config_.providers(), *this));
   }
+  // sort is just for unit-test since protobuf map order is not deterministic.
+  std::sort(names.begin(), names.end());
+  all_requirement_names_ = absl::StrJoin(names, ",");
 }
 
 std::pair<const Verifier*, std::string>
@@ -64,7 +58,7 @@ FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) co
 
   return std::make_pair(
       nullptr, absl::StrCat("Wrong requirement_name: ", per_route.config().requirement_name(),
-                            ". Correct names are: ", top_requirement_names_for_debug_));
+                            ". It should be one of [", all_requirement_names_, "]"));
 }
 
 } // namespace JwtAuthn
