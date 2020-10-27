@@ -95,6 +95,10 @@ void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
   filter_manager_.addReadFilter(filter);
 }
 
+void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
+  filter_manager_.removeReadFilter(filter);
+}
+
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
@@ -484,7 +488,9 @@ void ConnectionImpl::onWriteBufferLowWatermark() {
   ASSERT(write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = false;
   for (ConnectionCallbacks* callback : callbacks_) {
-    callback->onBelowWriteBufferLowWatermark();
+    if (callback) {
+      callback->onBelowWriteBufferLowWatermark();
+    }
   }
 }
 
@@ -493,7 +499,9 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
   ASSERT(!write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = true;
   for (ConnectionCallbacks* callback : callbacks_) {
-    callback->onAboveWriteBufferHighWatermark();
+    if (callback) {
+      callback->onAboveWriteBufferHighWatermark();
+    }
   }
 }
 

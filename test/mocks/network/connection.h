@@ -52,10 +52,12 @@ public:
 
   // Network::Connection
   MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));
+  MOCK_METHOD(void, removeConnectionCallbacks, (ConnectionCallbacks & cb));
   MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));
   MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));
   MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(void, enableHalfClose, (bool enabled));
   MOCK_METHOD(void, close, (ConnectionCloseType type));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
@@ -76,6 +78,7 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
+  MOCK_METHOD(bool, connecting, (), (const));
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));
@@ -100,10 +103,12 @@ public:
 
   // Network::Connection
   MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));
+  MOCK_METHOD(void, removeConnectionCallbacks, (ConnectionCallbacks & cb));
   MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));
   MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));
   MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(void, enableHalfClose, (bool enabled));
   MOCK_METHOD(void, close, (ConnectionCloseType type));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
@@ -124,6 +129,7 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
+  MOCK_METHOD(bool, connecting, (), (const));
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));
@@ -151,10 +157,12 @@ public:
 
   // Network::Connection
   MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));
+  MOCK_METHOD(void, removeConnectionCallbacks, (ConnectionCallbacks & cb));
   MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));
   MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));
   MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(void, enableHalfClose, (bool enabled));
   MOCK_METHOD(void, close, (ConnectionCloseType type));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
@@ -175,6 +183,7 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
+  MOCK_METHOD(bool, connecting, (), (const));
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));
