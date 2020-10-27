@@ -1413,7 +1413,7 @@ void Http2RawFrameIntegrationTest::beginSession() {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   // set lower outbound frame limits to make tests run faster
-  config_helper_.setOutboundFramesLimits(1000, 100);
+  config_helper_.setDownstreamOutboundFramesLimits(1000, 100);
   initialize();
   // Set up a raw connection to easily send requests without reading responses.
   auto options = std::make_shared<Network::Socket::Options>();
