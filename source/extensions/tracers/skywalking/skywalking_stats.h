@@ -6,10 +6,10 @@ namespace Tracers {
 namespace SkyWalking {
 
 #define SKYWALKING_TRACER_STATS(COUNTER)                                                           \
-  COUNTER(segments_sent)                                                                           \
-  COUNTER(segments_dropped)                                                                        \
   COUNTER(cache_flushed)                                                                           \
-  COUNTER(segments_flushed)
+  COUNTER(segments_dropped)                                                                        \
+  COUNTER(segments_flushed)                                                                        \
+  COUNTER(segments_sent)
 
 struct SkyWalkingTracerStats {
   SKYWALKING_TRACER_STATS(GENERATE_COUNTER_STRUCT)

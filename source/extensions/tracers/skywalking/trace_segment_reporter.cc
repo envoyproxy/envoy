@@ -106,7 +106,7 @@ void TraceSegmentReporter::report(const SegmentContext& segment_context) {
   sendTraceSegment(toSegmentObject(segment_context));
 }
 
-void TraceSegmentReporter::sendTraceSegment(TraceSegmentPtr&& request) {
+void TraceSegmentReporter::sendTraceSegment(TraceSegmentPtr request) {
   ASSERT(request);
   ENVOY_LOG(trace, "Try to report segment to SkyWalking Server:\n{}", request->DebugString());
 

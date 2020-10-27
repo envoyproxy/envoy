@@ -20,18 +20,19 @@ public:
   uint32_t maxCacheSize() const { return max_cache_size_; }
 
   const std::string& service() const { return service_; }
-  const std::string& serviceInstance() const { return service_instance_; }
+  const std::string& serviceInstance() const { return instance_; }
 
   const std::string& backendToken() const;
 
 private:
-  uint16_t max_cache_size_{0};
-  std::string service_;
-  std::string service_instance_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+
+  const uint32_t max_cache_size_{0};
+
+  const std::string service_;
+  const std::string instance_;
 
   std::string backend_token_;
-
-  Server::Configuration::ServerFactoryContext& factory_context_;
 };
 
 using SkyWalkingClientConfigPtr = std::unique_ptr<SkyWalkingClientConfig>;

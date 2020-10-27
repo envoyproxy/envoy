@@ -53,7 +53,7 @@ public:
 private:
   void flushTraceSegments();
 
-  void sendTraceSegment(TraceSegmentPtr&& request);
+  void sendTraceSegment(TraceSegmentPtr request);
   void establishNewStream();
   void handleFailure();
   void setRetryTimer();

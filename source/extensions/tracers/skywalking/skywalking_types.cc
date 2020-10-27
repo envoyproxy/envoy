@@ -107,7 +107,7 @@ SegmentContext::SegmentContext(SpanContextPtr&& previous_span_context, Tracing::
   }
   trace_segment_id_ = generateId(random_generator);
 
-  // Some detailed log for debug.
+  // Some detailed log for debugging.
   ENVOY_LOG(trace, "{} and create new SkyWalking segment:",
             previous_span_context_ ? "Has previous span context" : "No previous span context");
 
