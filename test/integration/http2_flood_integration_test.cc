@@ -1167,13 +1167,6 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
   auto* upstream = fake_upstreams_.front().get();
   auto buf = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0), Http2Frame::HeadersFlags::None);
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
-
-  // Upstream connection should be disconnected
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  // Downstream client should receive 503 since upstream did not send response headers yet
-  response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
 }
 
 } // namespace Envoy
