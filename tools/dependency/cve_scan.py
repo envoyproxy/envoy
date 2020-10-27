@@ -193,11 +193,9 @@ def CpeMatch(cpe, dep_metadata):
   # An exact version match is a hit.
   if cpe.version == dep_version:
     return True
-  # Allow the 'last_updated' dependency metadata to substitute for date.
-  # TODO(htuch): Make a finer grained distinction between Envoy update date and dependency
-  # release date in 'last_updated'.
+  # Allow the 'release_date' dependency metadata to substitute for date.
   # TODO(htuch): Consider fuzzier date ranges.
-  if cpe.version == dep_metadata['last_updated']:
+  if cpe.version == dep_metadata['release_date']:
     return True
   # Try a fuzzy date match to deal with versions like fips-20190304 in dependency version.
   if RegexGroupsMatch(FUZZY_DATE_RE, dep_version, cpe.version):
@@ -234,7 +232,7 @@ def CveMatch(cve, dep_metadata):
   if wildcard_version_match:
     # If the CVE was published after the dependency was last updated, it's a
     # potential match.
-    last_dep_update = dt.date.fromisoformat(dep_metadata['last_updated'])
+    last_dep_update = dt.date.fromisoformat(dep_metadata['release_date'])
     if last_dep_update <= cve.published_date:
       return True
   return False
