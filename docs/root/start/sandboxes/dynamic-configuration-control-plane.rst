@@ -1,7 +1,7 @@
 .. _install_sandboxes_dynamic_config_cp:
 
-Dynamic configuration using a control plane
-===========================================
+Dynamic configuration (control plane)
+=====================================
 
 This example walks through configuring Envoy using the `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_
 reference implementation.
