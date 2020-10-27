@@ -40,7 +40,7 @@ public:
   virtual size_t daysUntilFirstCertExpires() const PURE;
 
   /**
-   * Iterate through all currently allocated contexts.
+   * Iterates through the contexts currently attached to a listener.
    */
   virtual void iterateContexts(std::function<void(const Context&)> callback) PURE;
 
