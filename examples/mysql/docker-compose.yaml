@@ -6,12 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     networks:
-      envoymesh:
-        aliases:
-          - envoy
-    expose:
-      - "1999"
-      - "8001"
+      - envoymesh
     ports:
       - "1999:1999"
       - "8001:8001"
@@ -21,15 +16,9 @@ services:
       context: .
       dockerfile: Dockerfile-mysql
     networks:
-      envoymesh:
-        aliases:
-          - mysql
+      - envoymesh
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
-    expose:
-      - "3306"
-    ports:
-      - "3306:3306"
 
 networks:
   envoymesh:

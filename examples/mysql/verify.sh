@@ -8,7 +8,7 @@ export DELAY=10
 
 _mysql () {
     local mysql_client
-    mysql_client=(docker run --network envoymesh mysql:5.5 mysql -h envoy -P 1999 -u root)
+    mysql_client=(docker run --network envoymesh mysql:5.5 mysql -h proxy -P 1999 -u root)
     "${mysql_client[@]}" "${@}"
 }
 

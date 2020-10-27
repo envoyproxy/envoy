@@ -23,9 +23,8 @@ Terminal 1
 
       Name                   Command               State                             Ports
   ------------------------------------------------------------------------------------------------------------------
-  mysql_mysql_1   docker-entrypoint.sh mysqld      Up      0.0.0.0:3306->3306/tcp
+  mysql_mysql_1   docker-entrypoint.sh mysqld      Up      3306/tcp
   mysql_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
-
 
 Step 4: Issue commands using mysql
 **********************************
