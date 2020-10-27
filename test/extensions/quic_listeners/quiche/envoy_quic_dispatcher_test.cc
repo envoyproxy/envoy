@@ -23,6 +23,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/environment.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/network_utility.h"
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
@@ -78,7 +79,7 @@ public:
         per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
-        connection_handler_(*dispatcher_, absl::nullopt),
+        connection_handler_(*dispatcher_, overload_manager_, absl::nullopt),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
@@ -217,6 +218,7 @@ protected:
   Event::SimulatedTimeSystemHelper time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   Network::SocketPtr listen_socket_;
   EnvoyQuicConnectionHelper connection_helper_;
   TestProofSource* proof_source_;

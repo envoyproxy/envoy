@@ -12,6 +12,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection_handler.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
@@ -48,7 +49,8 @@ public:
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo& stream_info) override;
+                         StreamInfo::StreamInfo& stream_info,
+                         Server::ThreadLocalOverloadState& overload_state) override;
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,

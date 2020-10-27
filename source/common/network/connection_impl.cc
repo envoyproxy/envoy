@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -708,11 +709,13 @@ void ConnectionImpl::flushWriteBuffer() {
 }
 
 ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
+                                           Server::ThreadLocalOverloadState& overload_state,
                                            ConnectionSocketPtr&& socket,
                                            TransportSocketPtr&& transport_socket,
                                            StreamInfo::StreamInfo& stream_info, bool connected)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
-                     connected) {}
+                     connected),
+      overload_state_(overload_state) {}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
   if (!transport_connect_pending_) {
@@ -720,7 +723,8 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
   }
   if (transport_socket_connect_timer_ == nullptr) {
     transport_socket_connect_timer_ =
-        dispatcher_.createTimer([this] { onTransportSocketConnectTimeout(); });
+        overload_state_.createScaledTimer(Server::OverloadTimerType::TransportSocketConnectTimeout,
+                                          [this] { onTransportSocketConnectTimeout(); });
   }
   transport_socket_connect_timer_->enableTimer(timeout);
 }

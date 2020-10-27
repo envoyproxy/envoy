@@ -4,6 +4,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -38,6 +39,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Server::MockThreadLocalOverloadState overload_state_;
 };
 
 } // namespace Network

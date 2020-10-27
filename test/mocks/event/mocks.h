@@ -16,6 +16,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/ssl/context.h"
 
 #include "common/common/scope_tracker.h"
@@ -39,8 +40,8 @@ public:
   TimeSource& timeSource() override { return time_system_; }
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo&) override {
+                         Network::TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo&,
+                         Server::ThreadLocalOverloadState&) override {
     // The caller expects both the socket and the transport socket to be moved.
     socket.reset();
     transport_socket.reset();

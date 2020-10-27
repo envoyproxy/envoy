@@ -75,6 +75,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",

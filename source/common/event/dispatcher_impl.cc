@@ -9,6 +9,7 @@
 #include "envoy/api/api.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/lock_guard.h"
@@ -103,13 +104,12 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ServerConnectionPtr
-DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                       Network::TransportSocketPtr&& transport_socket,
-                                       StreamInfo::StreamInfo& stream_info) {
+Network::ServerConnectionPtr DispatcherImpl::createServerConnection(
+    Network::ConnectionSocketPtr&& socket, Network::TransportSocketPtr&& transport_socket,
+    StreamInfo::StreamInfo& stream_info, Server::ThreadLocalOverloadState& overload_state) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::ServerConnectionImpl>(
-      *this, std::move(socket), std::move(transport_socket), stream_info, true);
+      *this, overload_state, std::move(socket), std::move(transport_socket), stream_info, true);
 }
 
 Network::ClientConnectionPtr

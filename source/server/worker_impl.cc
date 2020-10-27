@@ -17,9 +17,10 @@ namespace Server {
 WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overload_manager,
                                           const std::string& worker_name) {
   Event::DispatcherPtr dispatcher(api_.allocateDispatcher(worker_name));
-  return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher),
-                                      std::make_unique<ConnectionHandlerImpl>(*dispatcher, index),
-                                      overload_manager, api_);
+  return std::make_unique<WorkerImpl>(
+      tls_, hooks_, std::move(dispatcher),
+      std::make_unique<ConnectionHandlerImpl>(*dispatcher, overload_manager, index),
+      overload_manager, api_);
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,

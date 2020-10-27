@@ -49,6 +49,7 @@
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
 #include "server/listener_hooks.h"
+#include "server/overload_manager_impl.h"
 #include "server/ssl_context_manager.h"
 
 namespace Envoy {
@@ -73,7 +74,6 @@ InstanceImpl::InstanceImpl(
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
       listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
@@ -435,6 +435,9 @@ void InstanceImpl::initialize(const Options& options,
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
+
+  handler_ =
+      std::make_unique<ConnectionHandlerImpl>(*dispatcher_, *overload_manager_, absl::nullopt);
 
   // It's now safe to start writing stats from the main thread's dispatcher.
   if (bootstrap_.enable_dispatcher_stats()) {

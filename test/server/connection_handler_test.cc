@@ -21,6 +21,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -45,7 +46,7 @@ class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<L
 public:
   ConnectionHandlerTest()
       : socket_factory_(std::make_shared<Network::MockListenSocketFactory>()),
-        handler_(new ConnectionHandlerImpl(dispatcher_, 0)),
+        handler_(new ConnectionHandlerImpl(dispatcher_, overload_manager_, 0)),
         filter_chain_(std::make_shared<NiceMock<Network::MockFilterChain>>()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()),
         access_log_(std::make_shared<AccessLog::MockInstance>()) {
@@ -251,6 +252,7 @@ public:
   Network::Address::InstanceConstSharedPtr local_address_{
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   std::list<TestListenerPtr> listeners_;
   Network::ConnectionHandlerPtr handler_;
   NiceMock<Network::MockFilterChainManager> manager_;

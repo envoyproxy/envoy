@@ -15,6 +15,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
@@ -301,7 +302,8 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           upstream_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_,
+              overload_state_);
           upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
 
           expected_callbacks--;
@@ -347,6 +349,7 @@ public:
 protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Server::MockThreadLocalOverloadState overload_state_;
   Network::ListenerPtr upstream_listener_;
   Network::MockTcpListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;

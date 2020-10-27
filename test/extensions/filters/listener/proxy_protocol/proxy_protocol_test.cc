@@ -24,6 +24,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/listener_factory_context.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -60,7 +61,8 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+        connection_handler_(
+            new Server::ConnectionHandlerImpl(*dispatcher_, overload_manager_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
@@ -191,6 +193,7 @@ public:
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
   Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
   Network::NopConnectionBalancerImpl connection_balancer_;
@@ -1288,7 +1291,8 @@ public:
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_->localAddress()->ip()->port())),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+        connection_handler_(
+            new Server::ConnectionHandlerImpl(*dispatcher_, overload_manager_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
@@ -1390,6 +1394,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   BasicResourceLimitImpl open_connections_;
   Network::MockListenSocketFactory socket_factory_;
   std::shared_ptr<Network::TcpListenSocket> socket_;

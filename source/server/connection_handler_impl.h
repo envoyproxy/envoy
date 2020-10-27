@@ -14,6 +14,7 @@
 #include "envoy/network/listener.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
@@ -66,7 +67,9 @@ class ConnectionHandlerImpl : public Network::ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
+                        OverloadManager& overload_manager,
+                        absl::optional<uint32_t> worker_index);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
@@ -359,6 +362,7 @@ private:
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
+  Server::OverloadManager& overload_manager_;
   const std::string per_handler_stat_prefix_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
   std::atomic<uint64_t> num_handler_connections_{};

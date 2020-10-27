@@ -81,7 +81,7 @@ protected:
       : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, absl::nullopt), quic_version_([]() {
+        connection_handler_(*dispatcher_, overload_manager_, absl::nullopt), quic_version_([]() {
           if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
@@ -270,6 +270,7 @@ protected:
   Event::SimulatedTimeSystemHelper simulated_time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   EnvoyQuicClock clock_;
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::SocketSharedPtr listen_socket_;

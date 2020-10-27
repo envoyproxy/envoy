@@ -35,6 +35,7 @@
 #include "server/active_raw_udp_listener_config.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -734,6 +735,7 @@ private:
   Api::ApiPtr api_;
   Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
+  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to

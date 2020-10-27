@@ -29,8 +29,9 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 } // namespace
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
+                                             Server::OverloadManager& overload_manager,
                                              absl::optional<uint32_t> worker_index)
-    : worker_index_(worker_index), dispatcher_(dispatcher),
+    : worker_index_(worker_index), dispatcher_(dispatcher), overload_manager_(overload_manager),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
@@ -480,7 +481,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
-      std::move(socket), std::move(transport_socket), *stream_info);
+      std::move(socket), std::move(transport_socket), *stream_info,
+      parent_.overload_manager_.getThreadLocalOverloadState());
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();
       timeout != std::chrono::milliseconds::zero()) {
     server_conn_ptr->setTransportSocketConnectTimeout(timeout);

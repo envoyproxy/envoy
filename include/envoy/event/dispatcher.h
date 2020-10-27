@@ -19,6 +19,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
@@ -90,12 +91,12 @@ public:
    *        connection. Takes ownership of the socket.
    * @param transport_socket supplies a transport socket to be used by the connection.
    * @param stream_info info object for the server connection
+   * @param overload_state the overload state for this dispatcher.
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
-  virtual Network::ServerConnectionPtr
-  createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo& stream_info) PURE;
+  virtual Network::ServerConnectionPtr createServerConnection(
+      Network::ConnectionSocketPtr&& socket, Network::TransportSocketPtr&& transport_socket,
+      StreamInfo::StreamInfo& stream_info, Server::ThreadLocalOverloadState& overload_state) PURE;
 
   /**
    * Creates an instance of Envoy's Network::ClientConnection. Does NOT initiate the connection;

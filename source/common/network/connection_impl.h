@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/network/transport_socket.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/event/libevent.h"
@@ -199,9 +200,10 @@ private:
 
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
 public:
-  ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
-                       bool connected);
+  ServerConnectionImpl(Event::Dispatcher& dispatcher,
+                       Server::ThreadLocalOverloadState& overload_state,
+                       ConnectionSocketPtr&& socket, TransportSocketPtr&& transport_socket,
+                       StreamInfo::StreamInfo& stream_info, bool connected);
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) override;
@@ -210,6 +212,7 @@ public:
 private:
   void onTransportSocketConnectTimeout();
 
+  Server::ThreadLocalOverloadState& overload_state_;
   bool transport_connect_pending_{true};
   // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
   // call to setTransportSocketConnectTimeout and is reset when the connection is established.

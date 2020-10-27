@@ -44,6 +44,10 @@ enum class OverloadTimerType {
   // The amount of time an HTTP connection to a downstream client can remain idle (no streams). This
   // corresponds to the HTTP_DOWNSTREAM_CONNECTION_IDLE TimerType in overload.proto.
   HttpDownstreamIdleConnectionTimeout,
+  // The amount of time a connection to a downstream client can spend waiting for the transport to
+  // report connection establishment before the connection is closed.
+  // This corresponds to the TRANSPORT_SOCKET_CONNECT_TIMEOUT TimerType in overload.proto.
+  TransportSocketConnectTimeout,
 };
 
 /**

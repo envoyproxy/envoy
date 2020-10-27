@@ -20,6 +20,7 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -275,7 +276,7 @@ public:
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
-        std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+        std::move(socket), Network::Test::createRawBufferSocket(), stream_info_, overload_state_);
     TestDnsServerQuery* query = new TestDnsServerQuery(std::move(new_connection), hosts_a_,
                                                        hosts_aaaa_, cnames_, record_ttl_, refused_);
     queries_.emplace_back(query);
@@ -300,6 +301,7 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
+  Server::MockThreadLocalOverloadState overload_state_;
 
   HostMap hosts_a_;
   HostMap hosts_aaaa_;

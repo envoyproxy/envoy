@@ -31,6 +31,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   // test in the forked process to avoid confusion when the fork happens.
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  Server::MockThreadLocalOverloadState overload_state;
 
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
@@ -48,7 +49,8 @@ static void errorCallbackTest(Address::IpVersion version) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::ConnectionPtr conn = dispatcher->createServerConnection(
-            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info);
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info,
+            overload_state);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         socket->close();
@@ -142,7 +144,8 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   EXPECT_CALL(listener_callbacks1, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
-            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info);
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info,
+            overload_state_);
         EXPECT_EQ(*conn->localAddress(), *socket->localAddress());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
@@ -171,7 +174,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
-            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info,
+            overload_state_));
         dispatcher_->exit();
       }));
 
@@ -242,7 +246,8 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info);
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info,
+            overload_state_);
         EXPECT_EQ(*conn->localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
@@ -288,7 +293,8 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info);
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info,
+            overload_state_);
         EXPECT_EQ(conn->localAddress()->ip()->version(), conn->remoteAddress()->ip()->version());
         EXPECT_EQ(conn->localAddress()->asString(), local_dst_address->asString());
         EXPECT_EQ(*conn->localAddress(), *local_dst_address);
