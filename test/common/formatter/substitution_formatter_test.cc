@@ -2340,40 +2340,35 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
 class EnvFormatterTest : public testing::Test {
 public:
   ~EnvFormatterTest() override { TestEnvironment::unsetEnvVar("TEST_KEY"); }
+
+  StreamInfo::MockStreamInfo stream_info_;
+  Http::TestRequestHeaderMapImpl request_header_{};
+  Http::TestResponseHeaderMapImpl response_header_{};
+  Http::TestResponseTrailerMapImpl response_trailer_{};
+  std::string body_;
 };
 
 TEST_F(EnvFormatterTest, ExistingEnvVars) {
   TestEnvironment::setEnvVar("TEST_KEY", "test", 1);
-  StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header{};
-  Http::TestResponseHeaderMapImpl response_header{};
-  Http::TestResponseTrailerMapImpl response_trailer{};
-  std::string body;
 
   {
     const std::string format = "%ENV(TEST_KEY)%";
 
     FormatterImpl formatter(format, false);
 
-    EXPECT_EQ("test", formatter.format(request_header, response_header, response_trailer,
-                                       stream_info, body));
+    EXPECT_EQ("test", formatter.format(request_header_, response_header_, response_trailer_,
+                                       stream_info_, body_));
   }
 }
 
 TEST_F(EnvFormatterTest, NonExistingEnvVars) {
-  StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header{};
-  Http::TestResponseHeaderMapImpl response_header{};
-  Http::TestResponseTrailerMapImpl response_trailer{};
-  std::string body;
-
   {
     const std::string format = "%ENV(NONEXISTING_KEY)%";
 
     FormatterImpl formatter(format, true);
 
-    EXPECT_EQ(
-        "", formatter.format(request_header, response_header, response_trailer, stream_info, body));
+    EXPECT_EQ("", formatter.format(request_header_, response_header_, response_trailer_,
+                                   stream_info_, body_));
   }
 
   {
@@ -2381,8 +2376,8 @@ TEST_F(EnvFormatterTest, NonExistingEnvVars) {
 
     FormatterImpl formatter(format, false);
 
-    EXPECT_EQ("-", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                    body));
+    EXPECT_EQ("-", formatter.format(request_header_, response_header_, response_trailer_,
+                                    stream_info_, body_));
   }
 }
 
