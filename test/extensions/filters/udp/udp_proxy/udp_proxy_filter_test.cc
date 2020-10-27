@@ -207,7 +207,7 @@ public:
     EXPECT_CALL(
         *new_session.socket_->io_handle_,
         createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
-        .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
+        .WillOnce(SaveArg<1>(&new_session.file_event_cb_));
     // Internal Buffer is Empty, flush will be a no-op
     ON_CALL(callbacks_.udp_listener_, flush())
         .WillByDefault(

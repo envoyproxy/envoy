@@ -36,9 +36,11 @@ using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Optional;
 using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
@@ -125,7 +127,7 @@ protected:
   ConnectionImplTest() : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_) {}
 
   void setUpBasicConnection() {
-    if (dispatcher_.get() == nullptr) {
+    if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
     socket_ = std::make_shared<Network::TcpListenSocket>(
@@ -257,7 +259,7 @@ protected:
   Network::ListenerPtr listener_;
   Network::ClientConnectionPtr client_connection_;
   StrictMock<MockConnectionCallbacks> client_callbacks_;
-  Network::ConnectionPtr server_connection_;
+  Network::ServerConnectionPtr server_connection_;
   StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
@@ -330,8 +332,67 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Verify that also the immediate connect errors generate a remote close event.
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
+  ConnectionMocks mocks = createConnectionMocks(false);
+  MockTransportSocket* transport_socket = mocks.transport_socket_.get();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
+  auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
+
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+  EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose));
+  mock_timer->invokeCallback();
+  EXPECT_THAT(stream_info_.connectionTerminationDetails(),
+              Optional(HasSubstr("transport socket timeout")));
+}
+
+TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
+  ConnectionMocks mocks = createConnectionMocks(false);
+  MockTransportSocket* transport_socket = mocks.transport_socket_.get();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+
+  auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
+
+  transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
+  // This should be a no-op. No timer should be created.
+  EXPECT_CALL(*mocks.dispatcher_, createTimer_(_)).Times(0);
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+
+  server_connection->close(ConnectionCloseType::NoFlush);
+}
+
+TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
+  ConnectionMocks mocks = createConnectionMocks(false);
+  MockTransportSocket* transport_socket = mocks.transport_socket_.get();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
+  auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
+
+  bool timer_destroyed = false;
+  mock_timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
+
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+
+  transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
+  EXPECT_TRUE(timer_destroyed);
+
+  server_connection->close(ConnectionCloseType::NoFlush);
 }
 
 TEST_P(ConnectionImplTest, SocketOptions) {

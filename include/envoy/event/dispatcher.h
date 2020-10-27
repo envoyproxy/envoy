@@ -92,7 +92,7 @@ public:
    * @param stream_info info object for the server connection
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
-  virtual Network::ConnectionPtr
+  virtual Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
                          StreamInfo::StreamInfo& stream_info) PURE;

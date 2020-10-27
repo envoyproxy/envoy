@@ -106,7 +106,7 @@ public:
   IoHandle& ioHandle() final { return socket_->ioHandle(); }
   const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
-  void raiseEvent(ConnectionEvent event) final;
+  void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
@@ -118,7 +118,7 @@ public:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() override {
     transport_wants_read_ = true;
-    file_event_->activate(Event::FileReadyType::Read);
+    ioHandle().activateFileEvents(Event::FileReadyType::Read);
   }
   void flushWriteBuffer() override;
 
@@ -161,7 +161,6 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
-  Event::FileEventPtr file_event_;
 
 private:
   friend class Envoy::RandomPauseFilter;
@@ -203,6 +202,25 @@ private:
   // readDisable must schedule read resumption when read_disable_count_ == 0 to ensure that read
   // resumption happens when remaining bytes are held in transport socket internal buffers.
   bool transport_wants_read_ : 1;
+};
+
+class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
+public:
+  ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
+                       bool connected);
+
+  // ServerConnection impl
+  void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) override;
+  void raiseEvent(ConnectionEvent event) override;
+
+private:
+  void onTransportSocketConnectTimeout();
+
+  bool transport_connect_pending_{true};
+  // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
+  // call to setTransportSocketConnectTimeout and is reset when the connection is established.
+  Event::TimerPtr transport_socket_connect_timer_;
 };
 
 /**
