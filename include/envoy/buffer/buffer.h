@@ -180,6 +180,16 @@ public:
   virtual void* linearize(uint32_t size) PURE;
 
   /**
+   * Get a pointer to a linear chunk of this buffer. The chunk may be smaller than max_size, even if
+   * the length of the buffer is larger. The function will heuristically determine how much data to
+   * copy based on `desired_min_size`, in order to avoid patterns in which all the data is copied
+   * when it doesn't need to be. For example, if the buffer contains a slice containing 1 byte,
+   * followed by 100 slices containing ``max_size``, repeatedly calling this function would avoid
+   * repeatedly copying ``max_size - 1`` bytes to make chunks of ``max_size``.
+   */
+  virtual RawSlice maybeLinearize(uint32_t max_size, uint32_t desired_min_size) PURE;
+
+  /**
    * Move a buffer into this buffer. As little copying is done as possible.
    * @param rhs supplies the buffer to move.
    */

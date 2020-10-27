@@ -133,6 +133,10 @@ public:
     return mutableStart();
   }
 
+  Buffer::RawSlice maybeLinearize(uint32_t max_size, uint32_t /*desired_min_size*/) override {
+    return {mutableStart(), std::min(size_, max_size)};
+  }
+
   Buffer::SliceDataPtr extractMutableFrontSlice() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }

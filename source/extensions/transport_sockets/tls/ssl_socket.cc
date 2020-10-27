@@ -248,15 +248,17 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
   while (bytes_to_write > 0) {
     // TODO(mattklein123): As it relates to our fairness efforts, we might want to limit the number
     // of iterations of this loop, either by pure iterations, bytes written, etc.
+    const auto slice = write_buffer.maybeLinearize(16384, 4096);
+    if (slice.len_ == 0) {
+      break;
+    }
 
-    // SSL_write() requires that if a previous call returns SSL_ERROR_WANT_WRITE, we need to call
-    // it again with the same parameters. This is done by tracking last write size, but not write
-    // data, since linearize() will return the same undrained data anyway.
-    ASSERT(bytes_to_write <= write_buffer.length());
-    int rc = SSL_write(rawSsl(), write_buffer.linearize(bytes_to_write), bytes_to_write);
+    ASSERT(slice.mem_ != nullptr);
+    int rc = SSL_write(rawSsl(), slice.mem_, slice.len_);
     ENVOY_CONN_LOG(trace, "ssl write returns: {}", callbacks_->connection(), rc);
     if (rc > 0) {
-      ASSERT(rc == static_cast<int>(bytes_to_write));
+      ASSERT(rc == static_cast<int>(slice.len_));
+      ctx_->stats().write_size_.recordValue(rc);
       total_bytes_written += rc;
       write_buffer.drain(rc);
       bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));

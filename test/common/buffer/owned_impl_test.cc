@@ -786,6 +786,60 @@ TEST_F(OwnedImplTest, LinearizeDrainTracking) {
   expectSlices({}, buffer);
 }
 
+TEST_F(OwnedImplTest, MaybeLinearizeEmpty) {
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(0, empty.maybeLinearize(1024, 1024).len_);
+}
+
+// Test that the correct value is returned in both the case where
+// the slice has a larger and a smaller length than `desired_min_size`.
+TEST_F(OwnedImplTest, MaybeLinearizeSingleSlice) {
+  Buffer::OwnedImpl buffer;
+  buffer.add(std::string(100, 'a'));
+  EXPECT_EQ(100, buffer.maybeLinearize(1024, 512).len_);
+  EXPECT_EQ(100, buffer.maybeLinearize(1024, 1).len_);
+}
+
+TEST_F(OwnedImplTest, MaybeLinearizeDesiredMinSize) {
+  Buffer::OwnedImpl buffer;
+  buffer.add(std::string(10000, 'a'));
+  Buffer::OwnedImpl other;
+  other.add(std::string(10000, 'b'));
+  buffer.move(other);
+
+  // Verify test slices are as expected
+  const auto slices = buffer.getRawSlices();
+  ASSERT_EQ(2, slices.size());
+  ASSERT_EQ(10000, slices[0].len_);
+  ASSERT_EQ(10000, slices[1].len_);
+
+  // Ask for the entire buffer size. This should return only the first slice because
+  // `desired_min_size` is less than the size of that slice.
+  EXPECT_EQ(slices[0], buffer.maybeLinearize(20000, 9999));
+
+  // Ask for the entire buffer size, but with a desired_min_size greater than the first
+  // slice. This should get fully linearized into a single slice.
+  EXPECT_EQ(20000, buffer.maybeLinearize(20000, 10001).len_);
+}
+
+// Test that a smaller slice than `desired_min_size` is returned if the next slice
+// after it is full-sized.
+TEST_F(OwnedImplTest, MaybeLinearizePreferNextSlice) {
+  Buffer::OwnedImpl buffer;
+  buffer.add("a");
+  Buffer::OwnedImpl other;
+  other.add(std::string(10000, 'b'));
+  buffer.move(other);
+
+  // Verify test slices are as expected
+  const auto slices = buffer.getRawSlices();
+  ASSERT_EQ(2, slices.size());
+  ASSERT_EQ(1, slices[0].len_);
+  ASSERT_EQ(10000, slices[1].len_);
+
+  EXPECT_EQ(1, buffer.maybeLinearize(10000, 1024).len_);
+}
+
 TEST_F(OwnedImplTest, ReserveCommit) {
   // This fragment will later be added to the buffer. It is declared in an enclosing scope to
   // ensure it is not destructed until after the buffer is.

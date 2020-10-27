@@ -526,6 +526,8 @@ public:
   MOCK_METHOD(Buffer::SliceDataPtr, extractMutableFrontSlice, (), (override));
   MOCK_METHOD(uint64_t, length, (), (const, override));
   MOCK_METHOD(void*, linearize, (uint32_t), (override));
+  MOCK_METHOD(Buffer::RawSlice, maybeLinearize, (uint32_t max_size, uint32_t desired_min_size),
+              (override));
   MOCK_METHOD(void, move, (Instance&), (override));
   MOCK_METHOD(void, move, (Instance&, uint64_t), (override));
   MOCK_METHOD(uint64_t, reserve, (uint64_t, Buffer::RawSlice*, uint64_t), (override));

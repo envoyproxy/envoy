@@ -266,6 +266,30 @@ void* OwnedImpl::linearize(uint32_t size) {
   return slices_.front()->data();
 }
 
+RawSlice OwnedImpl::maybeLinearize(uint32_t max_size, uint32_t desired_min_size) {
+  while (!slices_.empty() && slices_[0]->dataSize() == 0) {
+    slices_.pop_front();
+  }
+
+  if (slices_.empty()) {
+    return {nullptr, 0};
+  }
+
+  const uint64_t slice_size = std::min<uint64_t>(slices_[0]->dataSize(), max_size);
+  if (slice_size >= desired_min_size) {
+    return {slices_[0]->data(), slice_size};
+  }
+
+  // The next slice will already be of the desired size, so don't copy and
+  // return the front slice.
+  if (slices_.size() >= 2 && slices_[1]->dataSize() >= max_size) {
+    return {slices_[0]->data(), slice_size};
+  }
+
+  auto size = std::min<size_t>(max_size, length_);
+  return {linearize(size), size};
+}
+
 void OwnedImpl::coalesceOrAddSlice(SlicePtr&& other_slice) {
   const uint64_t slice_size = other_slice->dataSize();
   // The `other_slice` content can be coalesced into the existing slice IFF:

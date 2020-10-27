@@ -567,6 +567,7 @@ public:
   SliceDataPtr extractMutableFrontSlice() override;
   uint64_t length() const override;
   void* linearize(uint32_t size) override;
+  RawSlice maybeLinearize(uint32_t max_size, uint32_t desired_min_size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;

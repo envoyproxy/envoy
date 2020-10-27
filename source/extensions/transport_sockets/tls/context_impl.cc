@@ -84,6 +84,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
+    constexpr uint32_t mode = SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER;
+    rc = SSL_CTX_set_mode(ctx.ssl_ctx_.get(), mode);
+    RELEASE_ASSERT((rc & mode) == mode, Utility::getLastCryptoError().value_or(""));
+
     rc = SSL_CTX_set_min_proto_version(ctx.ssl_ctx_.get(), config.minProtocolVersion());
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
