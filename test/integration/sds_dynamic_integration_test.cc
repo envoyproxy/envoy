@@ -259,7 +259,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
                               TestEnvironment::temporaryPath("root/current"));
   test_server_->waitForCounterGe(
       listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 2);
-  // First request with server_ecda{cert,key}.pem.
+  // First request with server_ecdsa{cert,key}.pem.
   testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 

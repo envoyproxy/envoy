@@ -45,16 +45,21 @@ void SdsApi::resolveDataSource(const FileContentMap& files,
 }
 
 void SdsApi::onWatchUpdate() {
-  // Obtain a stable set of files. If a rotation happens while we're eading,
+  // Obtain a stable set of files. If a rotation happens while we're reading,
   // then we need to try again.
   uint64_t prev_hash = 0;
   FileContentMap files = loadFiles();
   uint64_t next_hash = getHashForFiles(files);
-  // TODO(htuch): bound this so we don't run forever. DO NOT SUBMIT until fixed.
-  while (next_hash != prev_hash) {
+  const uint64_t MaxBoundedRetries = 5;
+  for (uint64_t bounded_retries = MaxBoundedRetries; next_hash != prev_hash && bounded_retries > 0;
+       --bounded_retries) {
     files = loadFiles();
     prev_hash = next_hash;
     next_hash = getHashForFiles(files);
+  }
+  if (next_hash != prev_hash) {
+    ENVOY_LOG_MISC(warn, "Unable to refresh secrets due to > {} non-atomic rotations observed",
+                   MaxBoundedRetries);
   }
   const uint64_t new_hash = next_hash;
   if (new_hash != files_hash_) {

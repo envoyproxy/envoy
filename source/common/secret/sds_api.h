@@ -187,10 +187,8 @@ protected:
         std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>(
             *sds_tls_certificate_secrets_);
     // We replace path based secrets with inlined secrets on update.
-    if (watched_path_ != nullptr) {
-      resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_certificate_chain());
-      resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_private_key());
-    }
+    resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_certificate_chain());
+    resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_private_key());
   }
   void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
   std::vector<std::string> getDataSourceFilenames() override;
@@ -278,10 +276,8 @@ protected:
         envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
         *sds_certificate_validation_context_secrets_);
     // We replace path based secrets with inlined secrets on update.
-    if (watched_path_ != nullptr) {
-      resolveDataSource(files,
-                        *resolved_certificate_validation_context_secrets_->mutable_trusted_ca());
-    }
+    resolveDataSource(files,
+                      *resolved_certificate_validation_context_secrets_->mutable_trusted_ca());
   }
 
   void
