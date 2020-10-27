@@ -21,6 +21,12 @@
 
 namespace Envoy {
 namespace Network {
+namespace {
+
+constexpr absl::string_view kTransportSocketConnectTimeoutTerminationDetails =
+    "transport socket timeout was reached";
+
+}
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
@@ -736,8 +742,8 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 }
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
+  stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
-  stream_info_.setConnectionTerminationDetails("transport socket timeout was reached");
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
