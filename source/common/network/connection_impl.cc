@@ -552,7 +552,8 @@ void ConnectionImpl::onReadReady() {
   // 2) The consumer of connection data called readDisable(true), and instead of reading from the
   //    socket we simply need to dispatch already read data.
   if (read_disable_count_ != 0) {
-    // Do not clear want_read_ when returning early, skipping the transport socket doRead call.
+    // Do not clear want_read_ when returning early; the early return skips the transport socket
+    // doRead call.
     if (latched_dispatch_buffered_data && consumerWantsToRead()) {
       onRead(read_buffer_.length());
     }
