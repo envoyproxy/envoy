@@ -108,7 +108,7 @@ Step 5: Dump Envoy's ``dynamic_active_clusters`` config
 *******************************************************
 
 If you now dump the proxy's ``dynamic_active_clusters`` configuration, you should see it is configured
-with the ``example_proxy-cluster`` pointing to ``service1``
+with the ``example_proxy_cluster`` pointing to ``service1``
 
 .. code-block:: console
 
