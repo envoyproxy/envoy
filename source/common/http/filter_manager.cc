@@ -1263,6 +1263,10 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
     return false;
   }
 
+  if (headers != nullptr) {
+    parent_.filter_manager_callbacks_.chargeStats(*headers);
+  }
+
   parent_.stream_info_.setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
 
