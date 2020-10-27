@@ -116,7 +116,7 @@ public:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+  void setReadBufferReady() override { ioHandle().activateFileEvents(Event::FileReadyType::Read); }
   void flushWriteBuffer() override;
 
   // Obtain global next connection ID. This should only be used in tests.
@@ -159,7 +159,6 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
-  Event::FileEventPtr file_event_;
 
 private:
   friend class Envoy::RandomPauseFilter;
