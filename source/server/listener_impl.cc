@@ -126,6 +126,9 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
   if (!reuse_port_) {
+    // We want to maintain the invariance that listeners do not share the same
+    // underlying socket. For that reason we return a socket based on a duplicated
+    // file descriptor.
     return socket_->duplicate();
   }
 

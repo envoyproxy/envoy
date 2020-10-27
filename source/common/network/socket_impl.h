@@ -20,8 +20,9 @@ public:
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
     // into object slicing issues.
-    RELEASE_ASSERT(false, "Socket duplicate function is only for listener sockets.");
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
