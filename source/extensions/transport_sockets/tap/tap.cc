@@ -66,6 +66,8 @@ bool TapSocketFactory::implementsSecureTransport() const {
   return transport_socket_factory_->implementsSecureTransport();
 }
 
+bool TapSocketFactory::isReady() const { return transport_socket_factory_->isReady(); }
+
 } // namespace Tap
 } // namespace TransportSockets
 } // namespace Extensions

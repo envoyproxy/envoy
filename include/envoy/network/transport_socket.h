@@ -226,6 +226,11 @@ public:
    */
   virtual TransportSocketPtr
   createTransportSocket(TransportSocketOptionsSharedPtr options) const PURE;
+
+  /**
+   * Check whether matched transport socket which required to use secret information is available.
+   */
+  virtual bool isReady() const PURE;
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

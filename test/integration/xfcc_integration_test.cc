@@ -46,7 +46,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_names: 
+    match_subject_alt_names:
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -57,7 +57,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_names: 
+    match_subject_alt_names:
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"

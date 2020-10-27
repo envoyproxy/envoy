@@ -422,6 +422,21 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // We have a situation that clusters will be immediately active, such as static and primary
   // cluster. So we must have this prevention logic here.
   if (cluster_data != warming_clusters_.end()) {
+    Network::TransportSocketFactory& factory =
+        cluster.info()->transportSocketMatcher().resolve(&cluster.info()->metadata()).factory_;
+    // If there is no secret entity, currently supports only TLS Certificate and Validation
+    // Context, when it failed to extract them via SDS, it will fail to change cluster status from
+    // warming to active. In current implementation, there is no strategy to activate clusters
+    // which failed to initialize at once.
+    // TODO(shikugawa): To implement to be available by keeping warming after no-available secret
+    // entity behavior occurred. And remove
+    // `envoy.reloadable_features.cluster_keep_warming_no_secret_entity` runtime feature flag.
+    const bool keep_warming_enabled = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.cluster_keep_warming_no_secret_entity");
+    if (!factory.isReady() && keep_warming_enabled) {
+      ENVOY_LOG(warn, "Failed to activate {}", cluster.info()->name());
+      return;
+    }
     clusterWarmingToActive(cluster.info()->name());
     updateClusterCounts();
   }

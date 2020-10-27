@@ -469,6 +469,13 @@ TEST_F(ProxyProtocolSocketFactoryTest, ImplementsSecureTransportCallInnerFactory
   ASSERT_TRUE(factory_->implementsSecureTransport());
 }
 
+// Test isReady calls inner factory
+TEST_F(ProxyProtocolSocketFactoryTest, IsReadyCallInnerFactory) {
+  initialize();
+  EXPECT_CALL(*inner_factory_, isReady()).WillOnce(Return(true));
+  ASSERT_TRUE(factory_->isReady());
+}
+
 } // namespace
 } // namespace ProxyProtocol
 } // namespace TransportSockets
