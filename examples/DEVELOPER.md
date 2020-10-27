@@ -109,6 +109,16 @@ responds_without_header \
 
 `responds_without_header` can accept additional curl arguments like `responds_with`
 
+#### Utility functions: `wait_for`
+
+You can wait for some amount of time (specified in seconds) for a command to return `0`.
+
+The following example will wait for 20 seconds for a service ``my-service`` to become healthy.
+
+```bash
+wait_for 20 sh -c "docker-compose ps my-service | grep healthy | grep -v unhealthy"
+```
+
 ### Slow starting `docker` compositions
 
 Unless your example provides a way for ensuring that all containers are healthy by
