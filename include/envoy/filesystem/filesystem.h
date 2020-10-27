@@ -112,28 +112,11 @@ public:
   virtual std::string fileReadToEnd(const std::string& path) PURE;
 
   /**
-   * @param path file path to split
+   * @path file path to split
    * @return PathSplitResult containing the parent directory of the input path and the file name
    * @note will throw an exception if path does not contain any path separator character
    */
   virtual PathSplitResult splitPathFromFilename(absl::string_view path) PURE;
-
-  /**
-   * @param path1 first path component.
-   * @param path2 second path component.
-   * @return composite path with the second path component joined to the first.
-   */
-  virtual std::string joinPath(absl::string_view path1, absl::string_view path2) PURE;
-
-  /**
-   * Resolve a symlink path.
-   * @param path to resolve.
-   * @return resolved path. If there is an error, an exception is thrown, unless
-   *         the error is a result of path not being a symlink, in which case
-   *         the supplied path is returned.
-   * @throw EnvoyException if the path can't be resolved.
-   */
-  virtual std::string readSymlink(absl::string_view path) PURE;
 
   /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This

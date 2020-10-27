@@ -131,29 +131,6 @@ PathSplitResult InstanceImplPosix::splitPathFromFilename(absl::string_view path)
   return {path.substr(0, last_slash), name};
 }
 
-std::string InstanceImplPosix::joinPath(absl::string_view path1, absl::string_view path2) {
-  if (path2.empty()) {
-    return std::string(path1);
-  }
-  return absl::StrCat(path1, "/", path2);
-}
-
-std::string InstanceImplPosix::readSymlink(absl::string_view path) {
-  std::string null_terminated_path{path};
-  char resolved_path[PATH_MAX];
-  const ssize_t result = ::readlink(null_terminated_path.data(), resolved_path, PATH_MAX);
-  if (result == -1) {
-    // If it's not a symlink, just return it, e.g. it might be simply
-    // directory.
-    if (errno == EINVAL) {
-      return std::string(path);
-    }
-    throw EnvoyException(
-        fmt::format("Unable to resolve symlink {}: {}", path, errorDetails(errno)));
-  }
-  return std::string(resolved_path, result);
-}
-
 bool InstanceImplPosix::illegalPath(const std::string& path) {
   // Special case, allow /dev/fd/* access here so that config can be passed in a
   // file descriptor from a bootstrap script via exec. The reason we do this
