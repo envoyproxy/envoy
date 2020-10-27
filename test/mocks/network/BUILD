@@ -9,6 +9,18 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_mock(
+    name = "dns_service_mocks",
+    hdrs = select({
+        "//bazel:apple": ["dns_service.h"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "//bazel:apple": ["//source/common/network:apple_dns_lib"],
+        "//conditions:default": [],
+    }),
+)
+
+envoy_cc_mock(
     name = "connection_mocks",
     srcs = ["connection.cc"],
     hdrs = ["connection.h"],
