@@ -68,22 +68,33 @@ PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr c
   ASSERT(platform_filter_.instance_context,
          fmt::format("init_filter unsuccessful for {}", filter_name_));
   iteration_state_ = IterationState::Ongoing;
+}
+
+void PlatformBridgeFilter::setDecoderFilterCallbacks(
+    Http::StreamDecoderFilterCallbacks& callbacks) {
+  decoder_callbacks_ = &callbacks;
 
   if (platform_filter_.set_request_callbacks) {
     platform_request_callbacks_.resume_iteration = envoy_filter_callback_resume_decoding;
     platform_request_callbacks_.release_callbacks = envoy_filter_release_callbacks;
     // We use a weak_ptr wrapper for the filter to ensure presence before dispatching callbacks.
     platform_request_callbacks_.callback_context =
-        new PlatformBridgeFilterWeakPtr{weak_from_this()};
+        new PlatformBridgeFilterWeakPtr{shared_from_this()};
     platform_filter_.set_request_callbacks(platform_request_callbacks_,
                                            platform_filter_.instance_context);
   }
+}
+
+void PlatformBridgeFilter::setEncoderFilterCallbacks(
+    Http::StreamEncoderFilterCallbacks& callbacks) {
+  encoder_callbacks_ = &callbacks;
 
   if (platform_filter_.set_response_callbacks) {
     platform_response_callbacks_.resume_iteration = envoy_filter_callback_resume_encoding;
     platform_response_callbacks_.release_callbacks = envoy_filter_release_callbacks;
+    // We use a weak_ptr wrapper for the filter to ensure presence before dispatching callbacks.
     platform_response_callbacks_.callback_context =
-        new PlatformBridgeFilterWeakPtr{weak_from_this()};
+        new PlatformBridgeFilterWeakPtr{shared_from_this()};
     platform_filter_.set_response_callbacks(platform_response_callbacks_,
                                             platform_filter_.instance_context);
   }
