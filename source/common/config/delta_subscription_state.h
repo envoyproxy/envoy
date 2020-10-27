@@ -53,6 +53,7 @@ public:
   DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
 
 private:
+  bool isHeartbeatResponse(const envoy::service::discovery::v3::Resource& resource) const;
   void handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
 
@@ -90,6 +91,11 @@ private:
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
   absl::node_hash_map<std::string, ResourceState> resource_state_;
+
+  // Not all xDS resources supports heartbeats due to there being specific information encoded in
+  // an empty response, which is indisinguishable from a heartbeat in some cases. For now we just
+  // disable heartbeats for these resources (currently only VHDS).
+  const bool supports_heartbeats_;
   TtlManager ttl_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
   // iterator into just its keys, e.g. for use in std::set_difference.

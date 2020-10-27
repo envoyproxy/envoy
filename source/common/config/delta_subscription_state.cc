@@ -15,7 +15,8 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info,
                                                Event::Dispatcher& dispatcher)
-    : ttl_(
+    : supports_heartbeats_(!absl::StrContains(type_url, "VirtualHost")),
+      ttl_(
           [this](const auto& expired) {
             Protobuf::RepeatedPtrField<std::string> removed_resources;
             for (const auto& resource : expired) {
@@ -71,14 +72,33 @@ UpdateAck DeltaSubscriptionState::handleResponse(
   return ack;
 }
 
+bool DeltaSubscriptionState::isHeartbeatResponse(
+    const envoy::service::discovery::v3::Resource& resource) const {
+  if (!supports_heartbeats_) {
+    return false;
+  }
+  const auto itr = resource_state_.find(resource.name());
+  if (itr == resource_state_.end()) {
+    return false;
+  }
+
+  return !resource.has_resource() && !itr->second.waitingForServer() &&
+         resource.version() == itr->second.version();
+}
+
 void DeltaSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   absl::flat_hash_set<std::string> names_added_removed;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
     }
+    if (isHeartbeatResponse(resource)) {
+      continue;
+    }
+    non_heartbeat_resources.Add()->CopyFrom(resource);
     // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
     if (!resource.has_resource() && resource.aliases_size() > 0) {
       continue;
@@ -96,14 +116,16 @@ void DeltaSubscriptionState::handleGoodResponse(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }
-  watch_map_.onConfigUpdate(message.resources(), message.removed_resources(),
-                            message.system_version_info());
+
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     for (const auto& resource : message.resources()) {
       addResourceState(resource);
     }
   }
+
+  watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
+                            message.system_version_info());
 
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to
   // provide to the server upon stream reconnect: either it will continue to not exist, in which

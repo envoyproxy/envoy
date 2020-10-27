@@ -42,7 +42,7 @@ protected:
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
       const std::string& version_info, absl::optional<std::string> nonce = absl::nullopt,
-      bool expect_config_update_call = true) {
+      bool expect_config_update_call = true, absl::optional<uint64_t> updated_resources = {}) {
     envoy::service::discovery::v3::DeltaDiscoveryResponse message;
     *message.mutable_resources() = added_resources;
     *message.mutable_removed_resources() = removed_resources;
@@ -50,7 +50,13 @@ protected:
     if (nonce.has_value()) {
       message.set_nonce(nonce.value());
     }
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(expect_config_update_call ? 1 : 0);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _))
+        .Times(expect_config_update_call ? 1 : 0)
+        .WillRepeatedly(Invoke([updated_resources](const auto& added, const auto&, const auto&) {
+          if (updated_resources) {
+            EXPECT_EQ(added.size(), *updated_resources);
+          }
+        }));
     return state_.handleResponse(message);
   }
 
@@ -204,6 +210,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
         populateRepeatedResource(
             {{"name1", "version1C"}, {"name2", "version2C"}, {"name3", "version3B"}});
+    EXPECT_CALL(*timer_, disableTimer());
     UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug3", "nonce3", "oh no");
     EXPECT_EQ("nonce3", ack.nonce_);
     EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
@@ -224,6 +231,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
         populateRepeatedResource(
             {{"name1", "version1D"}, {"name2", "version2D"}, {"name3", "version3D"}});
+    EXPECT_CALL(*timer_, disableTimer());
     UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug5", "nonce5",
                                                 very_large_error_message);
     EXPECT_EQ("nonce5", ack.nonce_);
@@ -407,11 +415,16 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
-  auto create_resource_with_ttl = [](absl::optional<std::chrono::seconds> ttl_s) {
+  auto create_resource_with_ttl = [](absl::optional<std::chrono::seconds> ttl_s,
+                                     bool include_resource) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
     auto* resource = added_resources.Add();
     resource->set_name("name1");
     resource->set_version("version1A");
+
+    if (include_resource) {
+      resource->mutable_resource();
+    }
 
     if (ttl_s) {
       ProtobufWkt::Duration ttl;
@@ -424,27 +437,35 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
 
   {
     EXPECT_CALL(*timer_, enabled());
-    EXPECT_CALL(*timer_, enableTimer(_, _));
-    deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(1)), {}, "debug1",
+    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _));
+    deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(1), true), {}, "debug1",
                              "nonce1");
   }
 
   {
     // Increase the TTL.
     EXPECT_CALL(*timer_, enabled());
-    EXPECT_CALL(*timer_, enableTimer(_, _));
-    deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(2)), {}, "debug1",
-                             "nonce1");
+    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(2000), _));
+    deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(2), true), {}, "debug1",
+                             "nonce1", true, 1);
+  }
+
+  {
+    // Refresh the TTL with a heartbeat. The resource should not be passed to the update callbacks.
+    EXPECT_CALL(*timer_, enabled());
+    deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(2), false), {}, "debug1",
+                             "nonce1", true, 0);
   }
 
   // Remove the TTL.
   EXPECT_CALL(*timer_, disableTimer());
-  deliverDiscoveryResponse(create_resource_with_ttl(absl::nullopt), {}, "debug1", "nonce1");
+  deliverDiscoveryResponse(create_resource_with_ttl(absl::nullopt, true), {}, "debug1", "nonce1",
+                           true, 1);
 
   // Add back the TTL.
   EXPECT_CALL(*timer_, enabled());
   EXPECT_CALL(*timer_, enableTimer(_, _));
-  deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(2)), {}, "debug1",
+  deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(2), true), {}, "debug1",
                            "nonce1");
 
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _));
