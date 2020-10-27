@@ -399,7 +399,8 @@ TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).Times(0);
   // If findPerRouteVerifier is called, and return error message.
   EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_))
-      .WillOnce(Return(std::make_pair(nullptr, "Wrong requirement_name: abc")));
+      .WillOnce(
+          Return(std::make_pair(nullptr, "Wrong requirement_name: abc. Correct names are: r1,r2")));
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -408,7 +409,8 @@ TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
-  EXPECT_EQ(filter_callbacks_.details(), "jwt_authn_access_denied{Wrong requirement_name: abc}");
+  EXPECT_EQ(filter_callbacks_.details(),
+            "jwt_authn_access_denied{Wrong requirement_name: abc. Correct names are: r1,r2}");
 }
 
 // Test verifier from per-route config

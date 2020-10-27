@@ -6,6 +6,12 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
+
+// The maximum size for this variable.
+constexpr size_t TopRequirementNameForDebugSize = 100;
+
+} // namespace
 
 void FilterConfigImpl::init() {
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
@@ -33,6 +39,13 @@ void FilterConfigImpl::init() {
   }
 
   for (const auto& it : proto_config_.requirement_map()) {
+    if (top_requirement_names_for_debug_.size() < TopRequirementNameForDebugSize) {
+      if (top_requirement_names_for_debug_.empty()) {
+        top_requirement_names_for_debug_ = it.first;
+      } else {
+        absl::StrAppend(&top_requirement_names_for_debug_, ",", it.first);
+      }
+    }
     name_verifiers_.emplace(it.first,
                             Verifier::create(it.second, proto_config_.providers(), *this));
   }
@@ -50,7 +63,8 @@ FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) co
   }
 
   return std::make_pair(
-      nullptr, absl::StrCat("Wrong requirement_name: ", per_route.config().requirement_name()));
+      nullptr, absl::StrCat("Wrong requirement_name: ", per_route.config().requirement_name(),
+                            ". Correct names are: ", top_requirement_names_for_debug_));
 }
 
 } // namespace JwtAuthn

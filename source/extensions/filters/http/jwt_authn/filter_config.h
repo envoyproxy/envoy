@@ -194,6 +194,8 @@ private:
   absl::flat_hash_map<std::string, VerifierConstPtr> filter_state_verifiers_;
   // The requirement_name to verifier map.
   absl::flat_hash_map<std::string, VerifierConstPtr> name_verifiers_;
+  // top requirement_names for debug
+  std::string top_requirement_names_for_debug_;
   TimeSource& time_source_;
   Api::Api& api_;
 };

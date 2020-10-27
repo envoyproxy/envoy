@@ -214,14 +214,14 @@ requirement_map:
   std::tie(verifier, error_msg) =
       filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_EQ(verifier, nullptr);
-  EXPECT_EQ(error_msg, "Wrong requirement_name: wrong-name");
+  EXPECT_EQ(error_msg, "Wrong requirement_name: wrong-name. Correct names are: r1,r2");
 
   // Empty requirement_name
   per_route.Clear();
   std::tie(verifier, error_msg) =
       filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_EQ(verifier, nullptr);
-  EXPECT_EQ(error_msg, "Wrong requirement_name: ");
+  EXPECT_EQ(error_msg, "Wrong requirement_name: . Correct names are: r1,r2");
 }
 
 } // namespace
