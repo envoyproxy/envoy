@@ -358,6 +358,13 @@ public:
   virtual const TransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
+   * @return std::chrono::milliseconds the amount of time to wait for the transport socket to report
+   * that a connection has been established. If the timeout is reached, the connection is closed. 0
+   * specifies a disabled timeout.
+   */
+  virtual std::chrono::milliseconds transportSocketConnectTimeout() const PURE;
+
+  /**
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;

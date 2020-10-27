@@ -311,6 +311,24 @@ filter_chains:
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, TransportSocketConnectTimeout) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  transport_socket_connect_timeout: 3s
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->transportSocketConnectTimeout(), std::chrono::seconds(3));
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);

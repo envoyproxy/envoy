@@ -106,7 +106,7 @@ public:
   IoHandle& ioHandle() final { return socket_->ioHandle(); }
   const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
-  void raiseEvent(ConnectionEvent event) final;
+  void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
@@ -195,6 +195,25 @@ private:
   bool write_end_stream_ : 1;
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
+};
+
+class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
+public:
+  ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
+                       bool connected);
+
+  // ServerConnection impl
+  void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) override;
+  void raiseEvent(ConnectionEvent event) override;
+
+private:
+  void onTransportSocketConnectTimeout();
+
+  bool transport_connect_pending_{true};
+  // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
+  // call to setTransportSocketConnectTimeout and is reset when the connection is established.
+  Event::TimerPtr transport_socket_connect_timer_;
 };
 
 /**

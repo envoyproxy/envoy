@@ -180,7 +180,7 @@ message FilterChainMatch {
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
 // various other parameters.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message FilterChain {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.FilterChain";
@@ -233,6 +233,11 @@ message FilterChain {
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
   core.v4alpha.TransportSocket transport_socket = 6;
+
+  // If present and nonzero, the amount of time to allow incoming connections to complete any
+  // transport socket negotiations. If this expires before the transport reports connection
+  // establishment, the connection is summarily closed.
+  google.protobuf.Duration transport_socket_connect_timeout = 9;
 
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
   // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter

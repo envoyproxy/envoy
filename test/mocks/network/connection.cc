@@ -82,6 +82,14 @@ MockConnection::MockConnection() {
 }
 MockConnection::~MockConnection() = default;
 
+MockServerConnection::MockServerConnection() {
+  remote_address_ = Utility::resolveUrl("tcp://10.0.0.1:443");
+  local_address_ = Utility::resolveUrl("tcp://10.0.0.2:40000");
+  initializeMockConnection(*this);
+}
+
+MockServerConnection::~MockServerConnection() = default;
+
 MockClientConnection::MockClientConnection() {
   remote_address_ = Utility::resolveUrl("tcp://10.0.0.1:443");
   local_address_ = Utility::resolveUrl("tcp://10.0.0.2:40000");
