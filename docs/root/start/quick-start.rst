@@ -81,7 +81,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d -v envoy-custom.yaml:/envoy-custom.yaml -p 9901:9901 -p 10000:10000 envoyproxy/|envoy_docker_image| -c /envoy-custom.yaml
+	 $ docker run --rm -d -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml -p 9901:9901 -p 10000:10000 envoyproxy/|envoy_docker_image| -c /envoy-custom.yaml
 
 Check Envoy is proxying on http://localhost:10000
 
@@ -127,7 +127,7 @@ Next, start the Envoy server using the override configuration.
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d -v envoy-override.yaml:/envoy-override.yaml -p 20000:20000 envoyproxy/|envoy_docker_image| --config-yaml /envoy-override.yaml
+	 $ docker run --rm -d -v $(pwd)/envoy-override.yaml:/envoy-override.yaml -p 20000:20000 envoyproxy/|envoy_docker_image| --config-yaml /envoy-override.yaml
 
 Envoy should now be proxying on http://localhost:20000
 
