@@ -5,7 +5,8 @@ private let kCellID = "cell-id"
 private let kRequestAuthority = "api.lyft.com"
 private let kRequestPath = "/ping"
 private let kRequestScheme = "https"
-private let kFilteredHeaders = ["server", "filter-demo", "x-envoy-upstream-service-time"]
+private let kFilteredHeaders =
+  ["server", "filter-demo", "async-filter-demo", "x-envoy-upstream-service-time"]
 
 final class ViewController: UITableViewController {
   private var results = [Result<Response, RequestError>]()
@@ -18,6 +19,7 @@ final class ViewController: UITableViewController {
       NSLog("starting Envoy...")
       self.client = try EngineBuilder()
         .addFilter(factory: DemoFilter.init)
+        .addFilter(factory: AsyncDemoFilter.init)
         .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
         .build()
         .streamClient()
@@ -71,6 +73,9 @@ final class ViewController: UITableViewController {
         NSLog(message)
         if let filterDemoValue = headers.value(forName: "filter-demo")?.first {
           NSLog("filter-demo: \(filterDemoValue)")
+        }
+        if let asyncFilterDemoValue = headers.value(forName: "async-filter-demo")?.first {
+          NSLog("async-filter-demo: \(asyncFilterDemoValue)")
         }
 
         let response = Response(message: message,
