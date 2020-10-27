@@ -53,10 +53,9 @@ FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_
 
 Envoy::Router::RouteSpecificFilterConfigConstSharedPtr
 FilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig&
-    per_route,
+    const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& per_route,
     Envoy::Server::Configuration::ServerFactoryContext&,
-    Envoy::ProtobufMessage::ValidationVisitor&){
+    Envoy::ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<PerRouteFilterConfig>(per_route);
 }
 

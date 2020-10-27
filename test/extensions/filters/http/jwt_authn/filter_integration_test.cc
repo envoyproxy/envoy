@@ -519,7 +519,7 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigWrongRequireName) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // So the request with a goot Jwt token is rejected.
+  // So the request with a good Jwt token is rejected.
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
