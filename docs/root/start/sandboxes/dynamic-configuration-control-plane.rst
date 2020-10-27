@@ -96,7 +96,7 @@ which will be served by ``service1``.
 
    HTTP/1.1 GET /
 
-   Host: service1
+   Host: localhost:10000
    Accept: */*
    X-Forwarded-Proto: http
    X-Request-Id: 1d93050e-f39c-4602-90f8-a124d6e78d26
