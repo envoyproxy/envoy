@@ -137,6 +137,10 @@ private:
     TtlManager ttl_;
   };
 
+  bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
+    return !resource.hasResource() &&
+           resource.version() == apiStateFor(type_url).request_.version_info();
+  }
   void expiryCallback(const std::string& type_url, const std::vector<std::string>& expired);
   // Request queue management logic.
   void queueDiscoveryRequest(const std::string& queue_item);

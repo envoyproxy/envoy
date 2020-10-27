@@ -281,6 +281,16 @@ TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
   expectSendMessage("foo", {}, "");
 }
 
+envoy::service::discovery::v3::Resource heartbeatResource(std::chrono::milliseconds ttl,
+                                                          const std::string& name) {
+  envoy::service::discovery::v3::Resource resource;
+
+  resource.mutable_ttl()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(ttl.count()));
+  resource.set_name(name);
+
+  return resource;
+}
+
 envoy::service::discovery::v3::Resource
 resourceWithTtl(std::chrono::milliseconds ttl,
                 envoy::config::endpoint::v3::ClusterLoadAssignment& cla) {
@@ -345,6 +355,21 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
         }));
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
+    // No update, just a change in TTL.
+    expectSendMessage(type_url, {"x"}, "1");
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+  }
+
+  // Refresh the TTL with a heartbeat response.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("1");
+    auto wrapped_resource = heartbeatResource(std::chrono::milliseconds(10000), "x");
+    response->add_resources()->PackFrom(wrapped_resource);
+
+    EXPECT_CALL(*ttl_timer, enabled());
+
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));

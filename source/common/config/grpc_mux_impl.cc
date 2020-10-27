@@ -194,6 +194,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
         apiStateFor(type_url).watches_.front()->resource_decoder_;
 
     const auto scoped_ttl_update = apiStateFor(type_url).ttl_.scopedTtlUpdate();
+
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
       if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
@@ -202,15 +203,20 @@ void GrpcMuxImpl::onDiscoveryResponse(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                         resource.type_url(), message->type_url(), message->DebugString()));
       }
-      resources.emplace_back(
-          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info()));
-      all_resource_refs.emplace_back(*resources.back());
-      resource_ref_map.emplace(resources.back()->name(), *resources.back());
 
-      if (resources.back()->ttl()) {
-        apiStateFor(type_url).ttl_.add(*resources.back()->ttl(), resources.back()->name());
+      auto decoded_resource =
+          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info());
+
+      if (decoded_resource->ttl()) {
+        apiStateFor(type_url).ttl_.add(*decoded_resource->ttl(), decoded_resource->name());
       } else {
-        apiStateFor(type_url).ttl_.clear(resources.back()->name());
+        apiStateFor(type_url).ttl_.clear(decoded_resource->name());
+      }
+
+      if (!isHeartbeatResource(type_url, *decoded_resource)) {
+        resources.emplace_back(std::move(decoded_resource));
+        all_resource_refs.emplace_back(*resources.back());
+        resource_ref_map.emplace(resources.back()->name(), *resources.back());
       }
     }
 
