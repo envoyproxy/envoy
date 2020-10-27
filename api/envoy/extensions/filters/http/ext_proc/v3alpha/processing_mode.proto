@@ -21,37 +21,38 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 9]
 message ProcessingMode {
   enum SyncMode {
-    // The default SyncMode depends on which part of the message is being set.
-    SYNC_DEFAULT = 0;
+    // The default SyncMode depends on which part of the message is being
+    // processed. By default, request and response headers are processed
+    // in SYNC mode, while the body and trailers are skipped.
+    DEFAULT = 0;
 
-    // Send the header and wait for a response before continuing with
+    // Send the header, trailer, or body and wait for a response before continuing with
     // the filter chain.
     SYNC = 1;
 
-    // Send the header but to not expect a response, continuing immediately
+    // Send the header, trailer, or body, but do not expect a response, continuing immediately
     // with the filter chain.
     ASYNC = 2;
 
-    // Do not send the header.
+    // Do not send the header, trailer, or body.
     SKIP = 3;
   }
 
-  enum BodyMode {
-    // The default SyncMode depends on which part of the message is being set.
-    BODY_DEFAULT = 0;
+  // Control how the request and response bodies are handled
+  enum BodySendMode {
+    // Stream the body to the server in pieces as they arrive at the
+    // proxy. This is the default.
+    STREAMED = 0;
 
-    // Send each chunk of the body separately to the server.
-    CHUNKED = 1;
-
-    // Buffer the message body in memory and send the entire body in one
-    // chunk. If the body exceeds the configured buffer limit, then the
+    // Buffer the message body in memory and send the entire body at once.
+    // If the body exceeds the configured buffer limit, then the
     // downstream system will receive an error.
-    BUFFERED = 2;
+    BUFFERED = 1;
 
     // Buffer the message body in memory and send the entire body in one
     // chunk. If the body exceeds the configured buffer limit, then the body contents
     // up to the buffer limit will be sent.
-    BUFFERED_PARTIAL = 3;
+    BUFFERED_PARTIAL = 2;
   }
 
   // How to handle the request header. Default is "SYNC".
@@ -64,13 +65,13 @@ message ProcessingMode {
   ProcessingMode request_body_mode = 3;
 
   // How to send request body chunks if mode is not "SKIP".
-  BodyMode request_body_chunk_mode = 4;
+  BodySendMode request_body_send_mode = 4;
 
   // How do handle the response body. Default is "SKIP".
   ProcessingMode response_body_mode = 5;
 
   // How to send response body chunks if the mode is not "SKIP".
-  BodyMode response_body_chunk_mode = 6;
+  BodySendMode response_body_send_mode = 6;
 
   // How to handle the request trailers. Default is "SKIP".
   ProcessingMode request_trailer_mode = 7;

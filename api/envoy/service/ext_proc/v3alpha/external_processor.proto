@@ -207,14 +207,16 @@ message HeaderResponse {
 }
 
 message BodyResponse {
-  // Add or replace HTTP headers.
-  repeated config.core.v3.HeaderValueOption set_headers = 1;
-
-  // Remove these HTTP headers.
-  repeated string remove_headers = 2;
-
   // Request that the last body chunk delivered be modified.
-  BodyMutation body_mutation = 3;
+  BodyMutation body_mutation = 1;
+
+  // If set, manipulate HTTP headers along with the body. Note that
+  // this is only possible if the headers have not been sent down
+  // the filter chain yet. Practically, then, this field will be ignored
+  // unless the request or response BodySendMode is BUFFERED or
+  // BUFFERED_PARTIAL, which means that Envoy is buffering the body
+  // in memory while waiting for this response.
+  HeaderResponse header_mutation = 2;
 }
 
 // This message completely replaces the response.

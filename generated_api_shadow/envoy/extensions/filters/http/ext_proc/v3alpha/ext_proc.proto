@@ -2,14 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_proc.v3alpha;
 
-import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.proto";
 
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3alpha";
 option java_outer_classname = "ExtProcProto";
@@ -52,38 +50,32 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   headers, bodies, or both, and then decide to switch to a synchronous processing
 //   mode, either permanently or temporarily.
 
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
   config.core.v3.GrpcService grpc_service = 1;
 
-  // The version of the API supported by the gRPC service.
-  config.core.v3.ApiVersion transport_api_version = 2
-      [(validate.rules).enum = {defined_only: true}];
-
   // If true, then do nothing if the remote service RPC fails.
   // Otherwise, return a 500 error if the gRPC call fails.
-  bool failure_mode_allow = 3;
+  bool failure_mode_allow = 2;
 
   // For each property name, select a matching property value to attach to the
   // request message. Property names are the same ones supported in the WebAssembly
   // runtime.
-  repeated string request_properties = 4;
+  repeated string request_properties = 3;
 
   // For each property name, select a matching property value to attach to the
   // response message.
-  repeated string response_properties = 5;
+  repeated string response_properties = 4;
 
-  // Specifies which parts of the HTTP request and response are sent to the remote
-  // server by default, whether they are sent synchronously or asynchronously,
-  // and whether the body is sent in chunks or buffers. The default processing
-  // mode sends request and response headers synchronously and nothing else.
-  ProcessingMode processing_mode = 6;
+  // Specifies default options for how HTTP headers, trailers, and bodies are
+  // sent. See ProcessingMode for details.
+  ProcessingMode processing_mode = 5;
 
   // Specifies the timeout for each individual message sent on the stream. Whenever
   // the proxy sends a message on the stream that requires a response, it will
   // reset this timer, and will stop processing and return an error (subject
   // to the processing mode) if the timer expires. Default is 200 ms.
-  google.protobuf.Duration message_timeout = 7;
+  google.protobuf.Duration message_timeout = 6;
 }
