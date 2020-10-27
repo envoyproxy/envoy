@@ -22,4 +22,4 @@ Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^
 
 The source distribution includes an example double proxy configuration. See
-:ref:`here <install_ref_configs>` for more information.
+:ref:`here <intro_deployment_types>` for more information.

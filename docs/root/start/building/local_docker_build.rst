@@ -1,3 +1,4 @@
+
 .. _install_sandboxes_local_docker_build:
 
 Building an Envoy Docker image
@@ -18,6 +19,14 @@ This image has all software needed to build Envoy. From your Envoy directory::
 That command will take some time to run because it is compiling an Envoy binary and running tests.
 
 For more information on building and different build targets, please refer to :repo:`ci/README.md`.
+
+.. warning::
+
+   These instructions for building Envoy use
+   `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags>`_ image.
+   You will need 4-5GB of disk space to accommodate this image.
+
+   This script runs as effective root on your host system.
 
 **Step 2: Build image with only Envoy binary**
 

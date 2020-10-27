@@ -32,7 +32,7 @@ Changes
   level options if desired.
 * HTTP routes can now add request headers on a per route and per virtual host basis via the
   :ref:`request_headers_to_add <config_http_conn_man_headers_custom_request_headers>` option.
-* The :ref:`example configurations <install_ref_configs>` have been refreshed to demonstrate the
+* The :ref:`example configurations <intro_deployment_types>` have been refreshed to demonstrate the
   latest features.
 * `per_try_timeout_ms` can now be configured in
   a route's retry policy in addition to via the :ref:`x-envoy-upstream-rq-per-try-timeout-ms

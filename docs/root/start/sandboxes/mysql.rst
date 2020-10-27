@@ -6,10 +6,6 @@ MySQL Filter
 In this example, we show how the :ref:`MySQL filter <config_network_filters_mysql_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a MySQL filter that parses queries and collects MySQL-specific
 metrics.
 
-
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Build the sandbox
