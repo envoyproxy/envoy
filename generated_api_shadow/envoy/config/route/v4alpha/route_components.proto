@@ -986,8 +986,8 @@ message RouteAction {
   // upstream response header has been received, otherwise a stream reset
   // occurs.
   //
-  // If the overload action "envoy.overload_actions.reduce_timeouts" is configured, this timeout
-  // is scaled according to the value for
+  // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
+  // is configured, this timeout is scaled according to the value for
   // :ref:`HTTP_DOWNSTREAM_CONNECTION_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_IDLE>`.
   google.protobuf.Duration idle_timeout = 24;
 

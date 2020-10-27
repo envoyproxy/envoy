@@ -32,17 +32,6 @@ requests when heap memory usage reaches 99%.
          - name: "envoy.resource_monitors.fixed_heap"
            threshold:
              value: 0.99
-     - name: "envoy.overload_actions.reduce_timeouts"
-       triggers:
-         - name: "envoy.resource_monitors.fixed_heap"
-           scaled:
-             scaling_threshold: 0.85
-             saturation_threshold: 0.95
-       typed_config:
-         "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
-         timer_scale_factors:
-           - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
-             min_timeout: 2s
 
 Resource monitors
 -----------------
@@ -50,6 +39,8 @@ Resource monitors
 The overload manager uses Envoy's :ref:`extension <extending>` framework for defining
 resource monitors. Envoy's builtin resource monitors are listed
 :ref:`here <config_resource_monitors>`.
+
+.. _config_overload_manager_triggers:
 
 Triggers
 --------
@@ -117,11 +108,36 @@ triggering resource monitor detects saturation. The minimum value for each timeo
 either by providing a scale factor to apply to the configured maximum, or as a concrete duration
 value.
 
-The example fragment above configures the `reduce_timeouts` action to affect the downstream HTTP
-connection idle timeout. If the `fixed_heap` resource pressure is between the scaling and
-threshold values, the time that downstream HTTP connections are allowed to remain idle scales from
-the maximum (configured elsewhere) down to the specified minimum of 2 seconds. For a complete list
-of the timeouts that can be reduced, see the :ref:`configuration reference<envoy_v3_api_enum_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType>`.
+As an example, here is a single overload action entry that enables timeout reduction:
+
+.. code-block:: yaml
+
+  name: "envoy.overload_actions.reduce_timeouts"
+  triggers:
+    - name: "envoy.resource_monitors.fixed_heap"
+      scaled:
+        scaling_threshold: 0.85
+        saturation_threshold: 0.95
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+    timer_scale_factors:
+      - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+        min_timeout: 2s
+
+It configures the overload manager to change the amount of time that HTTP connections are allowed
+to remain idle before being closed in response to heap size. When the heap usage is less than 85%,
+idle connections will time out at their usual time, which is configured through
+:ref:`RouteAction.idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>`.
+When the heap usage is at or above 95%, idle connections will be closed after the specified
+`min_timeout`, here 2 seconds. If the heap usage is between 85% and 95%, the idle connection timeout
+will vary between those two based on the formula for the :ref:`scaled trigger <config_overload_manager_triggers>`
+So if `RouteAction.idle_timeout = 600 seconds` and heap usage is at 92%, idle connections will time
+out after :math:`2s + (600s - 2s) \cdot (95\% - 92\%) / (95\% - 85\%) = 181.4s`.
+
+Note in the example that the minimum idle time is specified as an absolute duration. If, instead,
+`min_timeout: 2s` were to be replaced with `min_scale: { value: 10 }`, the minimum timer value
+would be computed based on the maximum (specified elsewhere). So if `RouteAction.idle_timeout` is
+again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
 Limiting Active Connections
 ---------------------------
