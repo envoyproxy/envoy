@@ -19,9 +19,6 @@ in :repo:`/examples/skywalking-tracing/front-envoy-skywalking.yaml`).
 When service1 accepts the request forwarded from front envoy, it will makes an API call to service2 before
 returning a response.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Build the sandbox

@@ -8,8 +8,8 @@ services:
     networks:
       - envoymesh
     ports:
-      - "8000:8000"
-      - "8001:8001"
+      - 8000:8000
+      - 8001:8001
     depends_on:
       - skywalking-oap
   # First service.
@@ -43,8 +43,6 @@ services:
     image: elasticsearch:7.9.2
     networks:
       - envoymesh
-    ports:
-      - 9200:9200
     healthcheck:
       test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
       interval: 30s
@@ -63,11 +61,6 @@ services:
       - envoymesh
     depends_on:
       - elasticsearch
-    links:
-      - elasticsearch
-    ports:
-      - 11800:11800
-      - 12800:12800
     environment:
       SW_STORAGE: elasticsearch7
       SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
@@ -77,13 +70,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    restart: on-failure
   skywalking-ui:
     image: apache/skywalking-ui:8.1.0
     networks:
       - envoymesh
     depends_on:
-      - skywalking-oap
-    links:
       - skywalking-oap
     ports:
       - 8080:8080
