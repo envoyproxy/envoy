@@ -57,7 +57,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
-      write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
+      write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
+      want_read_(false) {
 
   if (!connected) {
     connecting_ = true;
@@ -349,13 +350,16 @@ void ConnectionImpl::readDisable(bool disable) {
       file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
     }
 
-    if (consumerWantsToRead() && read_buffer_.length() > 0) {
-      // If the connection has data buffered there's no guarantee there's also data in the kernel
-      // which will kick off the filter chain. Alternately if the read buffer has data the fd could
-      // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
-      // processed regardless and ensure that we dispatch it via onRead.
+    if ((consumerWantsToRead() && read_buffer_.length() > 0) ||
+        (read_disable_count_ == 0 && want_read_)) {
+      // If the read_buffer_ is not empty or want_read_ is true, the connection may be able to
+      // process additional bytes even if there is no data in the kernel to kick off the filter
+      // chain. Alternately if the read buffer has data the fd could be read disabled. To handle
+      // these cases, fake an event to make sure the buffered data in the read buffer or in
+      // transport socket internal buffers gets processed regardless and ensure that we dispatch it
+      // via onRead.
       dispatch_buffered_data_ = true;
-      setReadBufferReady();
+      file_event_->activate(Event::FileReadyType::Read);
     }
   }
 }
@@ -554,6 +558,7 @@ void ConnectionImpl::onReadReady() {
     return;
   }
 
+  want_read_ = false;
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
