@@ -124,6 +124,7 @@ void TraceSegmentReporter::sendTraceSegment(TraceSegmentPtr request) {
 }
 
 void TraceSegmentReporter::flushTraceSegments() {
+  ENVOY_LOG(debug, "Flush segments in cache to SkyWalking backend service");
   while (!delayed_segments_cache_.empty() && stream_ != nullptr) {
     tracing_stats_.segments_sent_.inc();
     tracing_stats_.segments_flushed_.inc();
@@ -140,17 +141,24 @@ void TraceSegmentReporter::closeStream() {
   }
 }
 
-void TraceSegmentReporter::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
+void TraceSegmentReporter::onRemoteClose(Grpc::Status::GrpcStatus status,
+                                         const std::string& message) {
+  ENVOY_LOG(debug, "{} gRPC stream closed: {}, {}", service_method_.name(), status, message);
   stream_ = nullptr;
   handleFailure();
 }
 
 void TraceSegmentReporter::establishNewStream() {
+  ENVOY_LOG(debug, "Try to create new {} gRPC stream for reporter", service_method_.name());
   stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
-    handleFailure();
+    ENVOY_LOG(debug, "Failed to create {} gRPC stream", service_method_.name());
     return;
   }
+  // TODO(wbpcode): Even if stream_ is not empty, there is no guarantee that the connection will be
+  // established correctly. If there is a connection failure, the onRemoteClose method will be
+  // called. Currently, we lack a way to determine whether the connection is truly available. This
+  // may cause partial data loss.
   if (!delayed_segments_cache_.empty()) {
     flushTraceSegments();
   }
