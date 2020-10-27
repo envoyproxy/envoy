@@ -7,8 +7,8 @@ namespace Envoy {
 */
 #define SAFE_MEMCPY(dst, src)  \
   do { \
-    static_assert(sizeof(*(src)) == sizeof(*(dst))); \
-    memcpy(dst, src, sizeof(*(src))); \
+    static_assert(src != nullptr && dst != nullptr); \
+    memmove(dst, src, std::min(sizeof(*(src)), sizeof(*(dst)))); \
   } while (0)
 
 /**

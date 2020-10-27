@@ -1,6 +1,7 @@
 #include "server/hot_restarting_base.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/mem_block_builder.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/stats/utility.h"
@@ -36,8 +37,11 @@ sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std:
   initDomainSocketAddress(&address);
   Network::Address::PipeInstance addr(fmt::format(socket_path + "_{}_{}", role, base_id_ + id),
                                       socket_mode, nullptr);
-  memcpy(&address, addr.sockAddr(), addr.sockAddrLen());
+  MemBlockBuilder<decltype(addr.sockAddr())> mem_builder(addr.sockAddrLen());
+  mem_builder.appendOne(addr.sockAddr()); 
+  SAFE_MEMCPY(&address, mem_builder.release());
   fchmod(my_domain_socket_, socket_mode);
+
   return address;
 }
 
