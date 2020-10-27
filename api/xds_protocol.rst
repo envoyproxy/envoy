@@ -672,12 +672,18 @@ handling such an expiry.
 To update the TTL associated with a *Resource*, the management server resends the resource with a
 new TTL. To remove the TTL, the management server resends the resource with the TTL field unset.
 
+To allow for lightweight TTL updates ("heartbeats"), a response can be sent that provides a
+:ref:`Resource <envoy_api_msg_Resource>` with the resource unset and version matching the
+clients version can be used to update the TTL. These resources will not be treated as resource
+updates, but only as TTL updates.
+
 SotW TTL
 ^^^^^^^^
 
 In order to use TTL with SotW xDS, the relevant resources must be wrapped in a
 :ref:`Resource <envoy_api_msg_Resource>`. This allows setting the same TTL field that is used for
-Delta xDS with SotW, without changing the SotW API.
+Delta xDS with SotW, without changing the SotW API. Heartbeats are supported for SotW as well:
+any resource within the response that look like a heartbeat resource will only be used to update the TTL.
 
 This feature is gated by the *xds.config.supports-resource-in-sotw* client feature.
 
