@@ -239,7 +239,7 @@ that is a good place to start.
 
 At a minimum, you will need to start Envoy configured with the following sections:
 
-- :ref:`node <start_quick_start_dynamic_node>` information, to uniquely identify the proxy node.
+- :ref:`node <start_quick_start_dynamic_node>` to uniquely identify the proxy node.
 - :ref:`dynamic_resources <start_quick_start_dynamic_dynamic_resources>` to tell Envoy which configurations should be updated dynamically
 - :ref:`static_resources <start_quick_start_dynamic_static_resources>` to specify where Envoy should retrieve its configuration from.
 - :ref:`layered_runtime <start_quick_start_dynamic_layered_runtime>` to persist dynamically-provided configurations.
