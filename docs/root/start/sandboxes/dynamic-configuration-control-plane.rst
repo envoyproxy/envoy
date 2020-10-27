@@ -191,8 +191,8 @@ Now when you make a request to the proxy it should be served by the ``service2``
    Content-Length: 0
    User-Agent: curl/7.72.0
 
-Dumping the ``dynamic_active_clusters`` you should see the cluster is now configured with
-``service2``, and has a version of ``2``:
+Dumping the ``dynamic_active_clusters`` you should see the cluster configuration now has a version
+of ``2`` is configured to proxy to ``service2``:
 
 .. code-block:: console
 
