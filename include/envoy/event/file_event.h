@@ -18,7 +18,7 @@ struct FileReadyType {
   static const uint32_t Closed = 0x4;
 };
 
-// #define FORCE_LEVEL 0
+#define FORCE_LEVEL 0
 enum class FileTriggerType { Level, Edge };
 
 static constexpr bool optimizeLevelEvents = true;

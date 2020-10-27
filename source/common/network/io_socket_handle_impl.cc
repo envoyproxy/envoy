@@ -575,7 +575,8 @@ void IoSocketHandleImpl::activateFileEvents(uint32_t events) {
 
 void IoSocketHandleImpl::enableFileEvents(uint32_t events) {
   if (file_event_) {
-    ENVOY_LOG_MISC(debug, "Changing event mask for fd {} from {} -> {}", fd_, getEnabledFileEvents(), events);
+    ENVOY_LOG_MISC(debug, "Changing event mask for fd {} from {} -> {}", fd_,
+                   getEnabledFileEvents(), events);
     file_event_->setEnabled(events);
   } else {
     ENVOY_BUG(false, "Null file_event_");
