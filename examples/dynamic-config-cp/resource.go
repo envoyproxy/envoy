@@ -35,7 +35,7 @@ const (
 	RouteName    = "local_route"
 	ListenerName = "listener_0"
 	ListenerPort = 10000
-	UpstreamHost = "service2"
+	UpstreamHost = "service1"
 	UpstreamPort = 8080
 )
 
@@ -166,7 +166,7 @@ func makeConfigSource() *core.ConfigSource {
 
 func GenerateSnapshot() cache.Snapshot {
 	return cache.NewSnapshot(
-		"2",
+		"1",
 		[]types.Resource{}, // endpoints
 		[]types.Resource{makeCluster(ClusterName)},
 		[]types.Resource{makeRoute(RouteName, ClusterName)},
