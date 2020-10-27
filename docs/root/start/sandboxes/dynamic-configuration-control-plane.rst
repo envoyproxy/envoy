@@ -158,8 +158,8 @@ Further down in this file you must also change the configuration snapshot versio
 
 .. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
-   :lineno-start: 167
-   :lines: 167-177
+   :lineno-start: 164
+   :lines: 164-174
    :emphasize-lines: 3
    :linenos:
 
