@@ -7,6 +7,8 @@ Quick start
 The following instructions walk through starting Envoy as a system daemon or using
 the Envoy Docker image.
 
+.. _start_quick_start_version:
+
 Check your Envoy version
 ------------------------
 
@@ -26,6 +28,7 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
 
 	 $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
+.. _start_quick_start_help:
 
 View the Envoy command line options
 -----------------------------------
@@ -47,6 +50,7 @@ flag:
 
 	 $ docker run --rm envoyproxy/|envoy_docker_image| --help
 
+.. _start_quick_start_config:
 
 Run Envoy with the demo configuration
 -------------------------------------
@@ -75,9 +79,11 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       To specify a custom configuration you can mount the config into the container, and specify the path with ``-c``.
 
+      Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``:
+
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d -v envoy-custom.yaml:/envoy-custom.yaml -p 9901:9901 -p 10000:10000 envoyproxy/|envoy_docker_image| -c /envoy-custom.yaml
+	 $ docker run --rm -d -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml -p 9901:9901 -p 10000:10000 envoyproxy/|envoy_docker_image| -c /envoy-custom.yaml
 
 Check Envoy is proxying on http://localhost:10000
 
@@ -91,6 +97,7 @@ The Envoy admin endpoint should also be available at http://localhost:9901
 
    $ curl -v localhost:9901
 
+.. _start_quick_start_override:
 
 Override the default configuration by merging a config file
 -----------------------------------------------------------
@@ -122,7 +129,7 @@ Next, start the Envoy server using the override configuration.
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d -v envoy-override.yaml:/envoy-override.yaml -p 20000:20000 envoyproxy/|envoy_docker_image| --config-yaml /envoy-override.yaml
+	 $ docker run --rm -d -v $(pwd)/envoy-override.yaml:/envoy-override.yaml -p 20000:20000 envoyproxy/|envoy_docker_image| --config-yaml /envoy-override.yaml
 
 Envoy should now be proxying on http://localhost:20000
 
@@ -136,22 +143,28 @@ The Envoy admin endpoint should also be available at http://localhost:9901
 
    $ curl -v localhost:9901
 
+.. _start_quick_start_static:
 
 Static configuration
 --------------------
 
-To start Envoy with static configuration, you will need to specify ``listeners`` and ``clusters``
-as ``static_resources``.
+To start Envoy with static configuration, you will need to specify :ref:`listeners <start_quick_start_static_listeners>`
+and :ref:`clusters <start_quick_start_static_clusters>` as
+:ref:`static_resources <start_quick_start_static_static_resources>`.
 
-You can also add an ``admin`` section if you wish to monitor Envoy or retrieve stats.
+You can also add an :ref:`admin <start_quick_start_static_admin>` section if you wish to monitor Envoy
+or retrieve stats.
 
-The following sections walk through the static configuration provided in the :download:`demo configuration file <_include/envoy-demo.yaml>`.
+The following sections walk through the static configuration provided in the
+:download:`demo configuration file <_include/envoy-demo.yaml>` used as the default in the Envoy Docker container.
 
-Configuration: static_resources
-*******************************
+.. _start_quick_start_static_static_resources:
 
-The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
-as opposed to the means of configuring resources dynamically when Envoy is running.
+Static configuration: ``static_resources``
+******************************************
+
+The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contain
+everything that is configured statically when Envoy starts, as opposed to dynamically at runtime.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
@@ -159,33 +172,43 @@ as opposed to the means of configuring resources dynamically when Envoy is runni
     :lines: 1-3
     :emphasize-lines: 1
 
-Configuration: listeners
-************************
+.. _start_quick_start_static_listeners:
 
-The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
+Static configuration: ``listeners``
+***********************************
+
+The example configures a :ref:`listener <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`
+on port ``10000``.
+
+All paths are matched and routed to the ``service_envoyproxy_io``
+:ref:`cluster <start_quick_start_static_clusters>`.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 1-25
-    :emphasize-lines: 3-23
+    :lines: 1-29
+    :emphasize-lines: 3-27
 
+.. _start_quick_start_static_clusters:
 
-Configuration: clusters
-***********************
+Static configuration: ``clusters``
+**********************************
 
-The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`.
+The ``service_envoyproxy_io`` :ref:`cluster <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
+proxies over ``TLS`` to https://www.envoyproxy.io.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 22
-    :lines: 22-47
-    :emphasize-lines: 4-24
+    :lineno-start: 27
+    :lines: 27-50
+    :emphasize-lines: 3-22
 
-Configuration: admin
-********************
+.. _start_quick_start_static_admin:
 
-The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is required to configure
+Static configuration: ``admin``
+*******************************
+
+The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is required to enable and configure
 the administration server.
 
 The ``address`` key specifies the listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
@@ -193,20 +216,20 @@ which in the demo configuration is ``0.0.0.0:9901``.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 45
-    :lines: 45-50
-    :emphasize-lines: 3-6
+    :lineno-start: 48
+    :lines: 48-55
+    :emphasize-lines: 3-8
 
 .. warning::
 
    You may wish to restrict the network address the admin server listens to in your own deployment.
 
+.. _start_quick_start_dynamic:
 
 Dynamic configuration
 ---------------------
 
 See the :ref:`configuration overview <config_overview>` for further information on configuring Envoy with static and dynamic configuration.
-
 
 Next steps
 ----------
