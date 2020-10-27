@@ -26,26 +26,26 @@ responds_with \
     "getEndpoints" \
     http://localhost:8080/graphql \
     -X POST \
-    -H 'Content-Type:application/json' \
-    -d '{ "query": "query queryEndpoints($serviceId: ID!, $keyword: String!) {
-            getEndpoints: searchEndpoint(serviceId: $serviceId, keyword: $keyword, limit: 100) {
+    -H "Content-Type:application/json" \
+    -d "{ \"query\": \"query queryEndpoints(\$serviceId: ID!, \$keyword: String!) {
+            getEndpoints: searchEndpoint(serviceId: \$serviceId, keyword: \$keyword, limit: 100) {
                 key: id
                 label: name
             }
-          }",
-          "variables": { "serviceId": "", "keyword": "" }
-        }'
+          }\",
+          \"variables\": { \"serviceId\": \"\", \"keyword\": \"\" }
+        }"
 
 responds_with \
     "currentTimestamp" \
     http://localhost:8080/graphql \
     -X POST \
-    -H 'Content-Type:application/json' \
-    -d '{ "query": "query queryOAPTimeInfo {
+    -H "Content-Type:application/json" \
+    -d "{ \"query\": \"query queryOAPTimeInfo {
             getTimeInfo {
                 timezone
                 currentTimestamp
             }
-          }",
-          "variables": {}
-        }'
+          }\",
+          \"variables\": {}
+        }"
