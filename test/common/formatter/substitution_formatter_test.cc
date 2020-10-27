@@ -2339,7 +2339,11 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
 
 class EnvFormatterTest : public testing::Test {
 public:
-  ~EnvFormatterTest() override { TestEnvironment::unsetEnvVar("TEST_KEY"); }
+  ~EnvFormatterTest() override {
+    TestEnvironment::unsetEnvVar("TEST_KEY_FOO");
+    TestEnvironment::unsetEnvVar("TEST_KEY_BAR");
+    TestEnvironment::unsetEnvVar("TEST_KEY_BAZ");
+  }
 
   StreamInfo::MockStreamInfo stream_info_;
   Http::TestRequestHeaderMapImpl request_header_{};
@@ -2349,35 +2353,39 @@ public:
 };
 
 TEST_F(EnvFormatterTest, ExistingEnvVars) {
-  TestEnvironment::setEnvVar("TEST_KEY", "test", 1);
+  TestEnvironment::setEnvVar("TEST_KEY_FOO", "foo", 1);
+  TestEnvironment::setEnvVar("TEST_KEY_BAR", "bar", 1);
+  TestEnvironment::setEnvVar("TEST_KEY_BAZ", "baz", 1);
 
   {
-    const std::string format = "%ENV(TEST_KEY)%";
+    const std::string format = "%ENV(TEST_KEY_FOO)%|%ENV(TEST_KEY_BAR)%|%ENV(TEST_KEY_BAZ)%";
 
     FormatterImpl formatter(format, false);
 
-    EXPECT_EQ("test", formatter.format(request_header_, response_header_, response_trailer_,
-                                       stream_info_, body_));
+    EXPECT_EQ("foo|bar|baz", formatter.format(request_header_, response_header_, response_trailer_,
+                                              stream_info_, body_));
   }
 }
 
 TEST_F(EnvFormatterTest, NonExistingEnvVars) {
   {
-    const std::string format = "%ENV(NONEXISTING_KEY)%";
+    const std::string format =
+        "%ENV(NONEXISTING_KEY)%|%ENV(NONEXISTING_KEY)%|%ENV(NONEXISTING_KEY)%";
 
     FormatterImpl formatter(format, true);
 
-    EXPECT_EQ("", formatter.format(request_header_, response_header_, response_trailer_,
-                                   stream_info_, body_));
+    EXPECT_EQ("||", formatter.format(request_header_, response_header_, response_trailer_,
+                                     stream_info_, body_));
   }
 
   {
-    const std::string format = "%ENV(NONEXISTING_KEY)%";
+    const std::string format =
+        "%ENV(NONEXISTING_KEY)%|%ENV(NONEXISTING_KEY)%|%ENV(NONEXISTING_KEY)%";
 
     FormatterImpl formatter(format, false);
 
-    EXPECT_EQ("-", formatter.format(request_header_, response_header_, response_trailer_,
-                                    stream_info_, body_));
+    EXPECT_EQ("-|-|-", formatter.format(request_header_, response_header_, response_trailer_,
+                                        stream_info_, body_));
   }
 }
 
