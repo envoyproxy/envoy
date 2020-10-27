@@ -80,7 +80,9 @@ message Trigger {
   }
 }
 
-// Typed configuration for the "envoy.overload_actions.reduce_timeouts" action.
+// Typed configuration for the "envoy.overload_actions.reduce_timeouts" action. See
+// :ref:`the docs <config_overload_manager_reducing_timeouts>` for an example of how to configure
+// the action with different timeouts and minimum values.
 message ScaleTimersOverloadActionConfig {
   enum TimerType {
     // Unsupported value; users must explicitly specify the timer they want scaled.
