@@ -352,6 +352,9 @@ def _com_google_cel_cpp():
         "com_google_cel_cpp",
         patch_args = ["-p1"],
         # Patches to remove "fast" protobuf-internal access
+        # The patch can be removed when the "fast" access is safe to be enabled back.
+        # This requires public visibility of Reflection::LookupMapValue in protobuf and
+        # any release of cel-cpp after 10/27/2020.
         patches = ["@envoy//bazel:cel-cpp.patch"],
     )
     external_http_archive("rules_antlr")
