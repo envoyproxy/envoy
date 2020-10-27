@@ -21,6 +21,12 @@
 
 namespace Envoy {
 namespace Network {
+namespace {
+
+constexpr absl::string_view kTransportSocketConnectTimeoutTerminationDetails =
+    "transport socket timeout was reached";
+
+}
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
@@ -699,6 +705,40 @@ void ConnectionImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {
     onWriteReady();
   }
+}
+
+ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
+                                           ConnectionSocketPtr&& socket,
+                                           TransportSocketPtr&& transport_socket,
+                                           StreamInfo::StreamInfo& stream_info, bool connected)
+    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
+                     connected) {}
+
+void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
+  if (!transport_connect_pending_) {
+    return;
+  }
+  if (transport_socket_connect_timer_ == nullptr) {
+    transport_socket_connect_timer_ =
+        dispatcher_.createTimer([this] { onTransportSocketConnectTimeout(); });
+  }
+  transport_socket_connect_timer_->enableTimer(timeout);
+}
+
+void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
+  switch (event) {
+  case ConnectionEvent::Connected:
+  case ConnectionEvent::RemoteClose:
+  case ConnectionEvent::LocalClose:
+    transport_connect_pending_ = false;
+    transport_socket_connect_timer_.reset();
+  }
+  ConnectionImpl::raiseEvent(event);
+}
+
+void ServerConnectionImpl::onTransportSocketConnectTimeout() {
+  stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
+  closeConnectionImmediately();
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
