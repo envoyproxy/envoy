@@ -311,22 +311,11 @@ message HeaderMap {
   repeated HeaderValue headers = 1;
 }
 
-// A path that is watched for changes, e.g. by inotify on Linux.
-message WatchedPath {
-  enum Event {
-    // Generated for the directory containing the new filename when a file is
-    // renamed.
-    MOVED_TO = 0;
-
-    // File was modified, e.g. write(2), truncate(2).
-    MODIFIED = 1;
-  }
-
-  // Path to watch.
+// A directory that is watched for changes, e.g. by inotify on Linux. Move/rename
+// events inside this directory trigger the watch.
+message WatchedDirectory {
+  // Directory path to watch.
   string path = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Event to watch on *path*.
-  Event event = 2 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Data source consisting of either a file or an inline value.

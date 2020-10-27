@@ -7,12 +7,13 @@
 namespace Envoy {
 namespace Config {
 
-// Implement the common functionality of envoy::config::core::v3::WatchedPath.
-class WatchedPath {
+// Implement the common functionality of envoy::config::core::v3::WatchedDirectory.
+class WatchedDirectory {
 public:
   using Callback = std::function<void()>;
 
-  WatchedPath(const envoy::config::core::v3::WatchedPath& config, Event::Dispatcher& dispatcher);
+  WatchedDirectory(const envoy::config::core::v3::WatchedDirectory& config,
+                   Event::Dispatcher& dispatcher);
 
   void setCallback(Callback cb) { cb_ = cb; }
 
@@ -21,7 +22,7 @@ private:
   Callback cb_;
 };
 
-using WatchedPathPtr = std::unique_ptr<WatchedPath>;
+using WatchedDirectoryPtr = std::unique_ptr<WatchedDirectory>;
 
 } // namespace Config
 } // namespace Envoy

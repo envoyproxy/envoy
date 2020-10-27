@@ -91,12 +91,12 @@ void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resou
     resolveSecret(files);
     update_callback_manager_.runCallbacks();
 
-    auto* watched_path = getWatchedPath();
+    auto* watched_directory = getWatchedDirectory();
     // Either we have a watched path and can defer the watch monitoring to a
-    // WatchedPath object, or we need to implement per-file watches in the else
+    // WatchedDirectory object, or we need to implement per-file watches in the else
     // clause.
-    if (watched_path != nullptr) {
-      watched_path->setCallback([this]() { onWatchUpdate(); });
+    if (watched_directory != nullptr) {
+      watched_directory->setCallback([this]() { onWatchUpdate(); });
     } else {
       // List DataSources that refer to files
       auto files = getDataSourceFilenames();

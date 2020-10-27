@@ -445,9 +445,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "watched_path_lib",
-    srcs = ["watched_path.cc"],
-    hdrs = ["watched_path.h"],
+    name = "watched_directory_lib",
+    srcs = ["watched_directory.cc"],
+    hdrs = ["watched_directory.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/filesystem:watcher_interface",
