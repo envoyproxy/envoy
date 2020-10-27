@@ -5,6 +5,7 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(":envoy_library.bzl", "tcmalloc_external_deps")
+load(":envoy_pch.bzl", "envoy_pch_copts")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -37,10 +38,10 @@ def _envoy_cc_test_infrastructure_library(
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = envoy_copts(repository, test = True) + copts,
+        copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            envoy_external_dep_path("googletest"),
+            repository + "//test:test_pch",
         ],
         tags = tags,
         include_prefix = include_prefix,
@@ -115,6 +116,7 @@ def envoy_cc_fuzz_test(
         data = [corpus_name],
         # No fuzzing on macOS or Windows
         deps = select({
+            # TODO remove for incompatible target skipping
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],
             "@envoy//bazel:windows_x86_64": [repository + "//test:dummy_main"],
             "//conditions:default": [
@@ -159,11 +161,12 @@ def envoy_cc_test(
         name = name,
         srcs = srcs,
         data = data,
-        copts = envoy_copts(repository, test = True) + copts,
+        copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
+        deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
+            repository + "//test:test_pch",
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
         ],

@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_pch_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -35,4 +36,17 @@ envoy_cc_test_library(
         "//test/test_common:global_lib",
         "//test/test_common:printers_lib",
     ],
+)
+
+envoy_pch_library(
+    name = "test_pch",
+    external_deps = [
+        "googletest",
+    ],
+    includes = [
+        "gmock/gmock.h",
+        "gtest/gtest.h",
+    ],
+    visibility = ["//test:__subpackages__"],
+    deps = [],
 )
