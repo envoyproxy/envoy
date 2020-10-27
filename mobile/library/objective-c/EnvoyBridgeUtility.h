@@ -3,7 +3,7 @@
 #import "library/common/types/c_types.h"
 
 static inline envoy_data toNativeData(NSData *data) {
-  if (data == nil) {
+  if (data == nil || [data isEqual:[NSNull null]]) {
     return envoy_nodata;
   }
 
@@ -14,7 +14,7 @@ static inline envoy_data toNativeData(NSData *data) {
 }
 
 static inline envoy_data *toNativeDataPtr(NSData *data) {
-  if (data == nil) {
+  if (data == nil || [data isEqual:[NSNull null]]) {
     return NULL;
   }
 
@@ -32,7 +32,7 @@ static inline envoy_data toManagedNativeString(NSString *s) {
 }
 
 static inline envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
-  if (headers == nil) {
+  if (headers == nil || [headers isEqual:[NSNull null]]) {
     return envoy_noheaders;
   }
 
@@ -56,7 +56,7 @@ static inline envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
 }
 
 static inline envoy_headers *toNativeHeadersPtr(EnvoyHeaders *headers) {
-  if (headers == nil) {
+  if (headers == nil || [headers isEqual:[NSNull null]]) {
     return NULL;
   }
 
