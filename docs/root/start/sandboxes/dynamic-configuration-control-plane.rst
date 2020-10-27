@@ -178,18 +178,8 @@ Now when you make a request to the proxy it should be served by the ``service2``
 
 .. code-block:: console
 
-   $ curl http://localhost:10000
+   $ curl http://localhost:10000 | grep "served by"
    Request served by service2
-
-   HTTP/1.1 GET /
-
-   Host: service1
-   Accept: */*
-   X-Forwarded-Proto: http
-   X-Request-Id: 1d93050e-f39c-4602-90f8-a124d6e78d26
-   X-Envoy-Expected-Rq-Timeout-Ms: 15000
-   Content-Length: 0
-   User-Agent: curl/7.72.0
 
 Dumping the ``dynamic_active_clusters`` you should see the cluster configuration now has a version
 of ``2``, and ``example_proxy_cluster`` is configured to proxy to ``service2``:
