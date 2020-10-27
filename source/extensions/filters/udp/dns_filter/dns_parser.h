@@ -133,15 +133,6 @@ struct DnsParserCounters {
         query_parsing_failure(query_parsing) {}
 };
 
-enum class DnsQueryParseState {
-  Init,
-  Flags,     // 2 bytes
-  Questions, // 2 bytes
-  Answers,   // 2 bytes
-  Authority, // 2 bytes
-  Authority2 // 2 bytes
-};
-
 // The flags have been verified with dig and this structure should not be modified. The flag
 // order here does not match the RFC, but takes byte ordering into account so that serialization
 // does not bitwise operations.
@@ -376,6 +367,15 @@ public:
   bool parseDnsObject(DnsQueryContextPtr& context, const Buffer::InstancePtr& buffer);
 
 private:
+  enum class DnsQueryParseState {
+    Init,
+    Flags,     // 2 bytes
+    Questions, // 2 bytes
+    Answers,   // 2 bytes
+    Authority, // 2 bytes
+    Authority2 // 2 bytes
+  };
+
   /**
    * @brief Adds a new DNS SRV Answer record for a given service to the service map
    *
