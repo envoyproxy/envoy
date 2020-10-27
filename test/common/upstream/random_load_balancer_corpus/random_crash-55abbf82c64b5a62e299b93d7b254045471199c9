@@ -6,7 +6,7 @@ actions {
     update_health_flags {
         host_priority: 0
         num_healthy_hosts: 2
-        random_bytestring: "aergteawthgrstyhaersgeasrgreasg"
+        random_bytestring: "aegrkiyuttkyumfae"
     }
 }
 actions {
@@ -30,12 +30,12 @@ actions {
     }
 }
 setup_priority_levels {
-    num_hosts_in_priority_level: 2
-    random_bytestring: "aergagerageraegr"
+    num_hosts_in_priority_level: 250
+    random_bytestring: "ukjyrkjyrujaegregaeagr"
 }
 setup_priority_levels {
-    num_hosts_in_priority_level: 0
-    random_bytestring: "agreaergvaergaegr"
+    num_hosts_in_priority_level: 250
+    random_bytestring: "aerhyytjtyukytufagfe"
 }
-seed_for_prng: 1
+seed_for_prng: 4
 }

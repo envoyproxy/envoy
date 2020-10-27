@@ -84,9 +84,14 @@ private:
 
     for (uint32_t i = 0; i < number_of_elements_in_subset && !(num_elements_left_ == 0); i++) {
       // Index of bytestring will wrap around if it "overflows" past the random bytestring's length.
-      uint32_t* bytes_from_bytestring = reinterpret_cast<uint32_t*>(
-          &random_bytestring_ + (index_of_random_bytestring_ % random_bytestring_.length()));
-      uint32_t index_of_index_vector = *bytes_from_bytestring % num_elements_left_;
+      // uint32_t* bytes_from_bytestring = reinterpret_cast<uint32_t*>(
+      //    &random_bytestring_[index_of_random_bytestring_ % random_bytestring_.length()]);
+      std::string bytes_from_bytestring =
+          random_bytestring_.substr(index_of_random_bytestring_ % random_bytestring_.length(), 4);
+      /*uint32_t random_32_bits;
+      absl::SimpleAtoi(bytes_from_bytestring, &random_32_bits);*/
+      uint32_t index_of_index_vector =
+          *reinterpret_cast<uint32_t*>(&bytes_from_bytestring) % num_elements_left_;
       uint32_t index = index_vector.at(index_of_index_vector);
       subset.push_back(index);
       // Move the index chosen to the end of the vector - will not be chosen again

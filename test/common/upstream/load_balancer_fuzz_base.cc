@@ -6,30 +6,19 @@ namespace Envoy {
 namespace Upstream {
 
 namespace {
-// TODO(zasweq): This will be relaxed in the future in order to fully represent the state space
-// possible within Load Balancing. In it's current state, it is too slow (particularly due to calls
-// to makeTestHost()) to scale up hosts. Once this is made more efficient, this number will be
-// increased.
-constexpr uint32_t MaxNumHostsPerPriorityLevel = 10000;
+
+constexpr uint32_t MaxNumHostsPerPriorityLevel = 60000;
 
 } // namespace
 
-/*static const std::shared_ptr<MockClusterInfo>& mockClusterInfo() {
-  CONSTRUCT_ON_FIRST_USE(std::shared_ptr<MockClusterInfo>);
-}*/
-
-HostVector initializeHostsForUseInFuzzing() {
-  //const std::shared_ptr<NiceMock<MockClusterInfo>> info_ = std::make_shared<NiceMock<MockClusterInfo>>(mockClusterInfo());
-  //std::shared_ptr<NiceMock<MockClusterInfo>> info_{new NiceMock<MockClusterInfo>()};
+HostVector
+LoadBalancerFuzzBase::initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info_) {
   HostVector hosts;
-  for (uint32_t i = 0; i < 10000; ++i) {
-    hosts.push_back(makeTestHost(LoadBalancerFuzzBase::info_, "tcp://127.0.0.1:" + std::to_string(i)));
+  for (uint32_t i = 1; i <= 60000; ++i) {
+    hosts.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(i)));
   }
   return hosts;
 }
-
-std::shared_ptr<MockClusterInfo> LoadBalancerFuzzBase::info_{new NiceMock<MockClusterInfo>()};
-HostVector LoadBalancerFuzzBase::initialized_hosts_ = initializeHostsForUseInFuzzing();
 
 void LoadBalancerFuzzBase::initializeASingleHostSet(
     const test::common::upstream::SetupPriorityLevel& setup_priority_level,
@@ -41,8 +30,8 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   uint32_t hosts_made = 0;
   // Cap each host set at 256 hosts for efficiency - Leave port clause in for future changes
   while (hosts_made < std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel) &&
-         port < 65535) {
-    host_set.hosts_.push_back(initialized_hosts_[port - 80]);
+         port < 60000) {
+    host_set.hosts_.push_back(initialized_hosts_[port]);
     ++port;
     ++hosts_made;
   }
@@ -75,8 +64,16 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
 // Initializes random and fixed host sets
 void LoadBalancerFuzzBase::initializeLbComponents(
     const test::common::upstream::LoadBalancerTestCase& input) {
+  static NiceMock<MockClusterInfo> info;
+  static std::shared_ptr<MockClusterInfo> info_pointer{std::shared_ptr<MockClusterInfo>{}, &info};
+
+  // Will statically initialize 60000 hosts in this vector, so each fuzz run doesn't construct new
+  // hosts to use. This will require clearing of state after each run.
+  static HostVector initialized_hosts = initializeHostsForUseInFuzzing(info_pointer);
+  initialized_hosts_ = initialized_hosts;
+
   random_.initializeSeed(input.seed_for_prng());
-  uint16_t port = 80;
+  uint16_t port = 1;
   for (uint8_t priority_of_host_set = 0;
        priority_of_host_set < input.setup_priority_levels().size(); ++priority_of_host_set) {
     initializeASingleHostSet(input.setup_priority_levels().at(priority_of_host_set),
@@ -244,9 +241,10 @@ void LoadBalancerFuzzBase::replay(
 
 void LoadBalancerFuzzBase::clearStaticHostsHealthFlags() {
   // Have to clear the hosts health flags here - how do we know what hosts to clear?
-  // The only outstanding health flags set are those that are set from hosts being placed in degraded
-  // and excluded. Thus, use the priority set pointer to know which flags to clear.
-  for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size(); ++priority_level) {
+  // The only outstanding health flags set are those that are set from hosts being placed in
+  // degraded and excluded. Thus, use the priority set pointer to know which flags to clear.
+  for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size();
+       ++priority_level) {
     MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
     for (auto& host : host_set.degraded_hosts_) {
       host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);

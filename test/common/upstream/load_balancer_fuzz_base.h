@@ -45,8 +45,6 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Random::PsuedoRandomGenerator64 random_;
   NiceMock<MockPrioritySet> priority_set_;
-  //std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  static std::shared_ptr<MockClusterInfo> info_;
   std::unique_ptr<LoadBalancerBase> lb_;
 
 private:
@@ -65,9 +63,11 @@ private:
   // in
   absl::node_hash_map<uint8_t, uint8_t> locality_indexes_;
 
+  static HostVector initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info_);
+
   // Will statically initialize 10000? hosts in this vector
   // Will have to clear flags at the end of each iteration here
-  static HostVector initialized_hosts_;
+  HostVector initialized_hosts_;
 };
 
 } // namespace Upstream

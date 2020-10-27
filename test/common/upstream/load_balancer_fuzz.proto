@@ -8,7 +8,7 @@ import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
   // The host priority determines what host set within the priority set which will get updated.
-  uint64 host_priority = 1;
+  uint32 host_priority = 1;
   // These will determine how many hosts will get placed into health hosts, degraded hosts, and
   // excluded hosts from the full host list.
   uint32 num_healthy_hosts = 2;
@@ -32,13 +32,13 @@ message LbAction {
 }
 
 message SetupPriorityLevel {
-  uint32 num_hosts_in_priority_level = 1 [(validate.rules).uint32.lte = 10000];
-  uint32 num_hosts_locality_a = 2 [(validate.rules).uint32.lte = 10000];
-  uint32 num_hosts_locality_b = 3 [(validate.rules).uint32.lte = 10000];
+  uint32 num_hosts_in_priority_level = 1 [(validate.rules).uint32.lte = 60000];
+  uint32 num_hosts_locality_a = 2 [(validate.rules).uint32.lte = 60000];
+  uint32 num_hosts_locality_b = 3 [(validate.rules).uint32.lte = 60000];
   // Hard cap at 3 localities for simplicity
-  uint32 num_hosts_locality_c = 4 [(validate.rules).uint32.lte = 10000];
+  uint32 num_hosts_locality_c = 4 [(validate.rules).uint32.lte = 60000];
   // For choosing which hosts go in which locality
-  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 4, max_len: 40000}];
+  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 4, max_len: 50000}];
 }
 
 // This message represents what LoadBalancerFuzzBase will interact with, performing setup of host sets and calling into load balancers.
