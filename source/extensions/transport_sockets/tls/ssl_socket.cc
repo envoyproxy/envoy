@@ -327,7 +327,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
       config_(std::move(config)),
-      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -357,10 +357,12 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_, ssl_ctx_);
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
+
+bool ClientSslSocketFactory::isReady() const { return config_->isSecretReady(); }
 
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
                                                Envoy::Ssl::ContextManager& manager,
@@ -368,7 +370,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
       config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -398,10 +400,12 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_, ssl_ctx_);
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
+
+bool ServerSslSocketFactory::isReady() const { return true; }
 
 } // namespace Tls
 } // namespace TransportSockets
