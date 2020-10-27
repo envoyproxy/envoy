@@ -179,7 +179,8 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 
 // Send header only request, flood client, and verify that the upstream is disconnected and client
 // receieves 503.
-void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num_frames, const std::string& flood_stat) {
+void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num_frames,
+                                           const std::string& flood_stat) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -1138,8 +1139,8 @@ TEST_P(Http2FloodMitigationTest, UpstreamWindowUpdate) {
   config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
 
-  floodClient(Http2Frame::makeWindowUpdateFrame(0, 1),
-              4, "cluster.cluster_0.http2.inbound_window_update_frames_flood");
+  floodClient(Http2Frame::makeWindowUpdateFrame(0, 1), 4,
+              "cluster.cluster_0.http2.inbound_window_update_frames_flood");
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
@@ -1165,8 +1166,14 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
   waitForNextUpstreamRequest();
 
   auto* upstream = fake_upstreams_.front().get();
-  auto buf = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0), Http2Frame::HeadersFlags::None);
+  auto buf = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0),
+                                               Http2Frame::HeadersFlags::None);
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
 }
 
 } // namespace Envoy
