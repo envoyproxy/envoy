@@ -4,7 +4,7 @@ namespace Envoy {
 
 /**
  * Assert memory bounds to avoid copy errors.
-*/
+ */
 #define SAFE_MEMCPY(dst, src)                                                                      \
   do {                                                                                             \
     static_assert(src != nullptr && dst != nullptr);                                               \
@@ -13,7 +13,7 @@ namespace Envoy {
 
 /**
  * @return the size of a C array.
-*/
+ */
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 /**
