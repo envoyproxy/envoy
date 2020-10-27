@@ -359,7 +359,7 @@ void ConnectionImpl::readDisable(bool disable) {
       // transport socket internal buffers gets processed regardless and ensure that we dispatch it
       // via onRead.
       dispatch_buffered_data_ = true;
-      file_event_->activate(Event::FileReadyType::Read);
+      setReadBufferReady();
     }
   }
 }
