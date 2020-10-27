@@ -8,9 +8,9 @@ In this example, we demonstrate how HTTP caching can be utilized in Envoy by usi
 The setup of this sandbox is based on the setup of the :ref:`Front Proxy sandbox <install_sandboxes_front_proxy>`.
 
 All incoming requests are routed via the front Envoy, which acts as a reverse proxy sitting on
-the edge of the ``envoymesh`` network. Ports ``8000`` and ``8001`` are exposed by docker
+the edge of the ``envoymesh`` network. Port ``8000`` is exposed by docker
 compose (see :repo:`/examples/cache/docker-compose.yaml`) to handle ``HTTP`` calls
-to the services, and requests to ``/admin`` respectively. Two backend services are deployed behind the front Envoy, each with a sidecar Envoy.
+to the services. Two backend services are deployed behind the front Envoy, each with a sidecar Envoy.
 
 The front Envoy is configured to run the Cache Filter, which stores cacheable responses in an in-memory cache,
 and serves it to subsequent requests. In this demo, the responses that are served by the deployed services are stored in :repo:`/examples/cache/responses.yaml`.
@@ -35,9 +35,9 @@ Step 3: Start all of our containers
     $ docker-compose up -d
     $ docker-compose ps
 
-           Name                      Command            State                             Ports
-    ------------------------------------------------------------------------------------------------------------------------
-    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+           Name                      Command            State           Ports
+    ----------------------------------------------------------------------------------------------
+    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
     cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     cache_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
