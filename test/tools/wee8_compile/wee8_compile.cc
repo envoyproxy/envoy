@@ -133,7 +133,7 @@ wasm::vec<byte_t> stripWasmModule(const wasm::vec<byte_t>& module) {
         std::cerr << "ERROR: Failed to parse corrupted Wasm module." << std::endl;
         return wasm::vec<byte_t>::invalid();
       }
-      auto section_name = std::string_view(pos, section_name_len);
+      auto section_name = absl::string_view(pos, section_name_len);
       if (section_name.find("precompiled_") == std::string::npos) {
         stripped.insert(stripped.end(), section_start, section_data_start + section_len);
       }
