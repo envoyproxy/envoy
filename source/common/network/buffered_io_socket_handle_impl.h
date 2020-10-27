@@ -73,14 +73,6 @@ public:
 
   Buffer::WatermarkBuffer& getBufferForTest() { return pending_received_data_; }
 
-  void scheduleNextEvent() {
-    // It's possible there is no pending file event so as no io_callback.
-    if (io_callback_) {
-      ENVOY_LOG(trace, "Schedule IO callback on {}", static_cast<void*>(this));
-      io_callback_->scheduleCallbackNextIteration();
-    }
-  }
-
   void setWritablePeer(WritablePeer* writable_peer) {
     // Swapping writable peer is undefined behavior.
     ASSERT(!writable_peer_);
@@ -93,13 +85,19 @@ public:
   bool isWriteEndSet() override { return read_end_stream_; }
   void maybeSetNewData() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
-    scheduleNextEvent();
+    if (user_file_event_) {
+      user_file_event_->activate(Event::FileReadyType::Write);
+    }
   }
   void onPeerDestroy() override {
     writable_peer_ = nullptr;
     write_shutdown_ = true;
   }
-  void onPeerBufferWritable() override { scheduleNextEvent(); }
+  void onPeerBufferWritable() override {
+    if (user_file_event_) {
+      user_file_event_->activate(Event::FileReadyType::Read);
+    }
+  }
   bool isWritable() const override { return !isOverHighWatermark(); }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
@@ -118,7 +116,7 @@ private:
   // The attached file event with this socket. The event is not owned by the socket in the current
   // Envoy model. Multiple events can be created during the life time of this IO handle but at any
   // moment at most 1 event is attached.
-  Event::UserSpaceFileEventImpl* user_file_event_;
+  Event::UserSpaceFileEventImpl* user_file_event_{};
 
   // The schedulable handle of the above event.
   Event::SchedulableCallbackPtr io_callback_;

@@ -124,7 +124,7 @@ TEST_F(UserSpaceFileEventImplTest, TestActivateWillSchedule) {
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
       event_rw, *io_callback_);
   {
-    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    EXPECT_CALL(ready_cb_, called(_)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
@@ -144,7 +144,7 @@ TEST_F(UserSpaceFileEventImplTest, TestActivateDedup) {
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
       event_rw, *io_callback_);
   {
-    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    EXPECT_CALL(ready_cb_, called(_)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
@@ -166,7 +166,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
       event_rw, *io_callback_);
   {
-    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    EXPECT_CALL(ready_cb_, called(_)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
@@ -187,7 +187,6 @@ TEST_F(UserSpaceFileEventImplTest, TestEventClosedIsNotTriggeredUnlessManullyAct
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Write | Event::FileReadyType::Closed, *io_callback_);
   {
-    scheduleNextEvent();
     // No Closed event bit if enabled by not activated.
     EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

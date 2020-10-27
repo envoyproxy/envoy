@@ -7,18 +7,17 @@
 namespace Envoy {
 namespace Event {
 
-void DefaultEventListener::onEventEnabled(uint32_t enabled_events) {
+void EventListenerImpl::onEventEnabled(uint32_t enabled_events) {
   enabled_events_ = enabled_events;
   // Clear ephemeral events to align with FileEventImpl::setEnable().
-  ephermal_events_ = 0;
+  ephemeral_events_ = 0;
 }
 
-void DefaultEventListener::onEventActivated(uint32_t activated_events) {
-  // Event owner should not activate any event which is disabled.
-  // Also see onEventEnabled which clears ephemeral events.
-  // The overall prevents callback on disabled events.
-  ASSERT((activated_events & ~enabled_events_) == 0);
-  ephermal_events_ |= activated_events;
+void EventListenerImpl::onEventActivated(uint32_t activated_events) {
+  // Normally event owner should not activate any event which is disabled. Known exceptions includes
+  // ConsumerWantsToRead() == true.
+  // TODO(lambdai): Stricter check.
+  ephemeral_events_ |= activated_events;
 }
 
 void UserSpaceFileEventImpl::activate(uint32_t events) {
@@ -52,7 +51,7 @@ UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t e
                   static_cast<void*>(this), all_events, ephemeral_events);
         cb(all_events | ephemeral_events);
       }) {
-  event_listener_.onEventEnabled(events);
+  setEnabled(events);
 }
 
 std::unique_ptr<UserSpaceFileEventImpl> UserSpaceFileEventFactory::createUserSpaceFileEventImpl(

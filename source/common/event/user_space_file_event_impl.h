@@ -49,9 +49,9 @@ public:
 // must assume EV_CLOSED is never activated. Also event owner must tolerate that OS could notify
 // events which are not actually triggered.
 // TODO(lambdai): Add support of delivering EV_CLOSED.
-class DefaultEventListener : public EventListener {
+class EventListenerImpl : public EventListener {
 public:
-  ~DefaultEventListener() override = default;
+  ~EventListenerImpl() override = default;
 
   // Return both read and write if enabled. Note that this implementation is inefficient. Read and
   // write events are supposed to be independent.
@@ -60,13 +60,13 @@ public:
   void onEventEnabled(uint32_t enabled_events) override;
   void onEventActivated(uint32_t activated_events) override;
 
-  uint32_t getAndClearEphemeralEvents() override { return std::exchange(ephermal_events_, 0); }
+  uint32_t getAndClearEphemeralEvents() override { return std::exchange(ephemeral_events_, 0); }
 
 private:
   // The persisted interested events. The name on libevent document is pending event.
   uint32_t enabled_events_{};
   // The events set by activate() and will be cleared after the io callback.
-  uint32_t ephermal_events_{};
+  uint32_t ephemeral_events_{};
 };
 
 // A FileEvent implementation which is used to drive BufferedIoSocketHandle.
@@ -92,7 +92,7 @@ private:
                          SchedulableCallback& schedulable_cb);
 
   // Used to populate the event operations of enable and activate.
-  DefaultEventListener event_listener_;
+  EventListenerImpl event_listener_;
 
   // The handle to registered async callback from dispatcher.
   SchedulableCallback& schedulable_;

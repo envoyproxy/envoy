@@ -316,6 +316,8 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
     EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(1);
     auto result = io_handle_->recv(buf_.data(), 232, 0);
     EXPECT_TRUE(handle_as_peer->isWritable());
+    EXPECT_CALL(cb_, called(_));
+    scheduable_cb_->invokeCallback();
   }
 
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(1);
@@ -414,6 +416,7 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
 
 TEST_F(BufferedIoSocketHandleTest, TestRepeatedShutdownWR) {
   EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
+  ENVOY_LOG_MISC(debug, "lambdai: next shutdown");
   EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
 }
 

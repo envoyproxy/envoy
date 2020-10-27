@@ -45,9 +45,9 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
                 static_cast<void*>(writable_peer_));
       // Notify the peer we won't write more data. shutdown(WRITE).
       writable_peer_->setWriteEnd();
+      writable_peer_->maybeSetNewData();
       // Notify the peer that we no longer accept data. shutdown(RD).
       writable_peer_->onPeerDestroy();
-      writable_peer_->maybeSetNewData();
       writable_peer_ = nullptr;
     } else {
       ENVOY_LOG(trace, "socket {} close after peer closed.", static_cast<void*>(this));
@@ -260,8 +260,6 @@ Event::FileEventPtr BufferedIoSocketHandleImpl::createFileEvent(Event::Dispatche
   auto event = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
       dispatcher, cb, trigger_type, events, *io_callback_);
   user_file_event_ = event.get();
-  // Blindly activate the events.
-  io_callback_->scheduleCallbackNextIteration();
   return event;
 }
 
