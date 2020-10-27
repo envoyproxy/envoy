@@ -30,17 +30,13 @@ class TestFatalErrorHandler : public FatalErrorHandlerInterface {
 
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
-  TestFatalAction(bool is_safe) : is_safe_(is_safe) {}
-
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran_; }
-
+  TestFatalAction(bool is_safe, int* const counter) : is_safe_(is_safe), counter_(counter) {}
+  void run(const ScopeTrackedObject* /*current_object*/) override { ++(*counter_); }
   bool isAsyncSignalSafe() const override { return is_safe_; }
-
-  int getNumTimesRan() { return times_ran_; }
 
 private:
   bool is_safe_;
-  int times_ran_ = 0;
+  int* counter_;
 };
 
 class FatalActionTest : public ::testing::Test {
@@ -59,6 +55,7 @@ protected:
   std::unique_ptr<TestFatalErrorHandler> handler_;
   FatalAction::FatalActionPtrList safe_actions_;
   FatalAction::FatalActionPtrList unsafe_actions_;
+  int counter_ = 0;
 };
 
 TEST_F(FatalActionTest, ShouldNotBeAbleToRunActionsBeforeRegistration) {
@@ -73,36 +70,27 @@ TEST_F(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
                                           FatalAction::FatalActionPtrList(),
                                           Thread::threadFactoryForTest());
 
-  // Try to override the registration
-  safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true));
-  auto* safe_action = dynamic_cast<TestFatalAction*>(safe_actions_.front().get());
-  ASSERT_EQ(safe_action->getNumTimesRan(), 0);
-
+  safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true, &counter_));
   FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
                                           Thread::threadFactoryForTest());
 
   EXPECT_TRUE(FatalErrorHandler::runSafeActions());
-  EXPECT_EQ(safe_action->getNumTimesRan(), 0);
+  EXPECT_EQ(counter_, 0);
 }
 
 TEST_F(FatalActionTest, CanCallRegisteredActions) {
   // Set up Fatal Actions
-  safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true));
-  auto* safe_action = dynamic_cast<TestFatalAction*>(safe_actions_.front().get());
-
-  unsafe_actions_.emplace_back(std::make_unique<TestFatalAction>(false));
-  auto* unsafe_action = dynamic_cast<TestFatalAction*>(unsafe_actions_.front().get());
-
+  safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true, &counter_));
+  unsafe_actions_.emplace_back(std::make_unique<TestFatalAction>(false, &counter_));
   FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
                                           Thread::threadFactoryForTest());
 
-  // Call the actions
+  // Call the actions and check they increment the counter.
   EXPECT_TRUE(FatalErrorHandler::runSafeActions());
-  EXPECT_TRUE(FatalErrorHandler::runUnsafeActions());
+  EXPECT_EQ(counter_, 1);
 
-  // Expect ran once
-  EXPECT_EQ(safe_action->getNumTimesRan(), 1);
-  EXPECT_EQ(unsafe_action->getNumTimesRan(), 1);
+  EXPECT_TRUE(FatalErrorHandler::runUnsafeActions());
+  EXPECT_EQ(counter_, 2);
 }
 
 TEST_F(FatalActionTest, CanOnlyRunSafeActionsOnce) {
