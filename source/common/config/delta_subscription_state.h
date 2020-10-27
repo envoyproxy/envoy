@@ -93,7 +93,7 @@ private:
   absl::node_hash_map<std::string, ResourceState> resource_state_;
 
   // Not all xDS resources supports heartbeats due to there being specific information encoded in
-  // an empty response, which is indisinguishable from a heartbeat in some cases. For now we just
+  // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
   // disable heartbeats for these resources (currently only VHDS).
   const bool supports_heartbeats_;
   TtlManager ttl_;
