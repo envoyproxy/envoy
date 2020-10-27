@@ -11,7 +11,7 @@ and provides a trivial example of how to update Envoy's configuration dynamicall
 
 .. include:: _include/docker-env-setup.rst
 
-Change directory to ``examples/dynamic-configuration`` in the Envoy repository.
+Change directory to ``examples/dynamic-config-cp`` in the Envoy repository.
 
 Step 3: Start the proxy container
 *********************************
@@ -25,16 +25,16 @@ The control plane has not yet been started.
 .. code-block:: console
 
     $ pwd
-    envoy/examples/dynamic-configuration
+    envoy/examples/dynamic-config-cp
     $ docker-compose build --pull
     $ docker-compose up -d proxy
     $ docker-compose ps
 
 	      Name                            Command                 State                     Ports
     ------------------------------------------------------------------------------------------------------------------------------
-    dynamic-configuration_proxy_1      /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp, 0.0.0.0:19000->19000/tcp
-    dynamic-configuration_service1_1   /bin/echo-server               Up      8080/tcp
-    dynamic-configuration_service2_1   /bin/echo-server               Up      8080/tcp
+    dynamic-config-cp_proxy_1      /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp, 0.0.0.0:19000->19000/tcp
+    dynamic-config-cp_service1_1   /bin/echo-server               Up      8080/tcp
+    dynamic-config-cp_service2_1   /bin/echo-server               Up      8080/tcp
 
 Step 4: Check initial config and web response
 *********************************************
@@ -53,7 +53,7 @@ configured for the control plane:
 
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].static_clusters'
 
-.. literalinclude:: _include/dynamic-configuration/response-config-cluster.json
+.. literalinclude:: _include/dynamic-config-cp/response-config-cluster.json
    :language: json
 
 No ``dynamic_active_clusters`` have been configured yet:
@@ -77,10 +77,10 @@ You may need to wait a moment or two for it to become ``healthy``.
 
 		Name                                Command                  State                    Ports
     -----------------------------------------------------------------------------------------------------------------------------------------
-    dynamic-configuration_go-control-plane_1  bin/example -debug             Up (healthy)
-    dynamic-configuration_proxy_1             /docker-entrypoint.sh /usr ... Up            0.0.0.0:10000->10000/tcp, 0.0.0.0:19000->19000/tcp
-    dynamic-configuration_service1_1          /bin/echo-server               Up            8080/tcp
-    dynamic-configuration_service2_1          /bin/echo-server               Up            8080/tcp
+    dynamic-config-cp_go-control-plane_1  bin/example -debug             Up (healthy)
+    dynamic-config-cp_proxy_1             /docker-entrypoint.sh /usr ... Up            0.0.0.0:10000->10000/tcp, 0.0.0.0:19000->19000/tcp
+    dynamic-config-cp_service1_1          /bin/echo-server               Up            8080/tcp
+    dynamic-config-cp_service2_1          /bin/echo-server               Up            8080/tcp
 
 Step 6: Query the proxy
 ***********************
@@ -113,7 +113,7 @@ with the cluster pointing to ``service1``
 
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
 
-.. literalinclude:: _include/dynamic-configuration/response-config-active-clusters.json
+.. literalinclude:: _include/dynamic-config-cp/response-config-active-clusters.json
    :language: json
 
 Step 6: Stop the control plane
@@ -136,7 +136,7 @@ Step 7: Edit resource.go and restart the go-control-plane
 *********************************************************
 
 The example setup starts `go-control-plane <https://github.com/envoyproxy/go-control-plane>`_
-with a custom :download:`resource.go <_include/dynamic-configuration/resource.go>` file which
+with a custom :download:`resource.go <_include/dynamic-config-cp/resource.go>` file which
 specifies the configuration provided to Envoy.
 
 Let's update this to have Envoy proxy instead to ``service2``.
@@ -144,7 +144,7 @@ Let's update this to have Envoy proxy instead to ``service2``.
 Edit ``resource.go`` in the dynamic configuration example folder and change the ``UpstreamHost``
 from ``service1`` to ``service2``:
 
-.. literalinclude:: _include/dynamic-configuration/resource.go
+.. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
    :lines: 33-40
    :emphasize-lines: 6
@@ -153,7 +153,7 @@ from ``service1`` to ``service2``:
 Further down in this file you must also change the configuration snapshot version number from
 ``"1"`` to ``"2"`` to ensure Envoy sees the configuration as newer:
 
-.. literalinclude:: _include/dynamic-configuration/resource.go
+.. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
    :lineno-start: 167
    :lines: 167-177
@@ -195,5 +195,5 @@ Dumping the ``dynamic_active_clusters`` you should see the cluster is now config
 
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
 
-.. literalinclude:: _include/dynamic-configuration/response-config-active-clusters-updated.json
+.. literalinclude:: _include/dynamic-config-cp/response-config-active-clusters-updated.json
    :language: json

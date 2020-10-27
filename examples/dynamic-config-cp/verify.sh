@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-export NAME=dynamic-configuration
+export NAME=dynamic-config-cp
 export UPARGS=" proxy"
 
 # shellcheck source=examples/verify-common.sh
