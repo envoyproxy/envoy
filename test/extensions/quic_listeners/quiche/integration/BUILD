@@ -13,9 +13,9 @@ envoy_cc_test(
     size = "medium",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
-    # TODO(envoyproxy/windows-dev): diagnose msvc-cl build test failure
+    # TODO(envoyproxy/windows-dev): Diagnose msvc-cl opt build gcp rbe CI flake (passes locally)
     tags = [
-        "fails_on_windows",
+        "flaky_on_windows",
         "nofips",
     ],
     deps = [

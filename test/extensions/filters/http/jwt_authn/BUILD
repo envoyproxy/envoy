@@ -149,8 +149,6 @@ envoy_extension_cc_test(
     name = "group_verifier_test",
     srcs = ["group_verifier_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
-    # TODO(envoyproxy/windows-dev): Diagnose msvc-cl fastbuild test failure
-    tags = ["fails_on_windows"],
     deps = [
         ":mock_lib",
         ":test_common_lib",
