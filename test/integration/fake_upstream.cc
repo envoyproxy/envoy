@@ -611,6 +611,21 @@ void FakeUpstream::sendUdpDatagram(const std::string& buffer,
   });
 }
 
+testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const std::string& data,
+                                                          bool end_stream,
+                                                          std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  auto iter = consumed_connections_.begin();
+  std::advance(iter, index);
+  return (*iter)->executeOnDispatcher(
+      [data, end_stream](Network::Connection& connection) {
+        ASSERT(connection.state() == Network::Connection::State::Open);
+        Buffer::OwnedImpl buffer(data);
+        connection.write(buffer, end_stream);
+      },
+      timeout);
+}
+
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,
                                                milliseconds timeout) {
   absl::MutexLock lock(&lock_);
