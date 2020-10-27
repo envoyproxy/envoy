@@ -92,9 +92,6 @@ func makeRoute(routeName string, clusterName string) *route.RouteConfiguration {
 						ClusterSpecifier: &route.RouteAction_Cluster{
 							Cluster: clusterName,
 						},
-						HostRewriteSpecifier: &route.RouteAction_HostRewriteLiteral{
-							HostRewriteLiteral: UpstreamHost,
-						},
 					},
 				},
 			}},
