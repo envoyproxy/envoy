@@ -8,6 +8,7 @@
 #include "common/common/byte_order.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
+#include "common/common/mem_block_builder.h"
 #include "common/common/utility.h"
 
 namespace Envoy {
@@ -22,8 +23,7 @@ int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
   }
 
   int32_t val;
-  void* mem = data.linearize(sizeof(int32_t));
-  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int32_t));
+  SAFE_MEMCPY(&val, data.linearize(sizeof(int32_t)));
   return le32toh(val);
 }
 
@@ -43,8 +43,9 @@ void BufferHelper::removeBytes(Buffer::Instance& data, uint8_t* out, size_t out_
     throw EnvoyException("invalid buffer size");
   }
 
-  void* mem = data.linearize(out_len);
-  std::memcpy(out, mem, out_len);
+  MemBlockBuilder<uint8_t> mem_builder(out_len);
+  mem_builder.appendData(data.linearize(out_len));
+  out = mem_builder.release().get();
   data.drain(out_len);
 }
 
@@ -87,9 +88,7 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
     throw EnvoyException("invalid buffer size");
   }
 
-  int64_t val;
-  void* mem = data.linearize(sizeof(int64_t));
-  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int64_t));
+  SAFE_MEMCPY(&val, data.linearize(sizeof(int64_t)));
   data.drain(sizeof(int64_t));
   return le64toh(val);
 }
