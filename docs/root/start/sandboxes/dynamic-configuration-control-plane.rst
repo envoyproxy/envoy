@@ -108,7 +108,7 @@ Step 5: Dump Envoy's ``dynamic_active_clusters`` config
 *******************************************************
 
 If you now dump the proxy's ``dynamic_active_clusters`` configuration, you should see it is configured
-with the ``example_proxy_cluster`` pointing to ``service1``
+with the ``example_proxy_cluster`` pointing to ``service1``, and a version of ``1``.
 
 .. code-block:: console
 
@@ -116,7 +116,7 @@ with the ``example_proxy_cluster`` pointing to ``service1``
 
 .. literalinclude:: _include/dynamic-config-cp/response-config-active-clusters.json
    :language: json
-   :emphasize-lines: 11, 19-20
+   :emphasize-lines: 3, 11, 19-20
 
 Step 6: Stop the control plane
 ******************************
@@ -192,7 +192,7 @@ Now when you make a request to the proxy it should be served by the ``service2``
    User-Agent: curl/7.72.0
 
 Dumping the ``dynamic_active_clusters`` you should see the cluster is now configured with
-``service2``:
+``service2``, and has a version of ``2``:
 
 .. code-block:: console
 
@@ -200,4 +200,4 @@ Dumping the ``dynamic_active_clusters`` you should see the cluster is now config
 
 .. literalinclude:: _include/dynamic-config-cp/response-config-active-clusters-updated.json
    :language: json
-   :emphasize-lines: 11, 19-20
+   :emphasize-lines: 3, 11, 19-20
