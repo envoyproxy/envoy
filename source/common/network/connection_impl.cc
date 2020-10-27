@@ -558,6 +558,10 @@ void ConnectionImpl::onReadReady() {
     return;
   }
 
+  // Clear want_read_ just before the call to doRead. This is the only way to ensure that the
+  // transport socket read resumption happens as requested; onReadReady() returns early without
+  // reading from the transport if the read buffer is above high watermark at the start of the
+  // method.
   want_read_ = false;
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
