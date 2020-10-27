@@ -149,6 +149,7 @@ from ``service1`` to ``service2``:
 .. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
    :lines: 33-40
+   :lineno-start: 33
    :emphasize-lines: 6
    :linenos:
 
