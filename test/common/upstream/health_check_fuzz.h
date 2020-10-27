@@ -91,8 +91,6 @@ public:
   // In order to not affect unit tests, move state here. Since only one test session, we don't need
   // a vector. Also, we should make Timers NiceMocks.
   struct TestSession {
-    TestSession() = default;
-
     NiceMock<Event::MockTimer>* interval_timer_{};
     NiceMock<Event::MockTimer>* timeout_timer_{};
     Http::MockClientConnection* codec_{};
