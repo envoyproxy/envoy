@@ -149,35 +149,24 @@ TEST_F(ThreadLocalInstanceImplTest, CallbackNotInvokedAfterDeletion) {
   tls_.shutdownGlobalThreading();
 }
 
-// Test that the config passed into the update callback is the previous version stored in the slot.
+// Test that the update callback is called as expected, for the worker and main threads.
 TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
   InSequence s;
 
   SlotPtr slot = tls_.allocateSlot();
 
-  auto newer_version = std::make_shared<TestThreadLocalObject>();
-  bool update_called = false;
+  uint32_t update_called = 0;
 
   TestThreadLocalObject& object_ref = setObject(*slot);
-  auto update_cb = [&object_ref, &update_called,
-                    newer_version](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
-    // The unit test setup have two dispatchers registered, but only one thread, this lambda will be
-    // called twice in the same thread.
-    if (!update_called) {
-      EXPECT_EQ(obj.get(), &object_ref);
-      update_called = true;
-    } else {
-      EXPECT_EQ(obj.get(), newer_version.get());
-    }
-
-    return newer_version;
+  auto update_cb = [&update_called](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
+    ++update_called;
+    return obj;
   };
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref, onDestroy());
-  EXPECT_CALL(*newer_version, onDestroy());
   slot->runOnAllThreads(update_cb);
 
-  EXPECT_EQ(newer_version.get(), &slot->getTyped<TestThreadLocalObject>());
+  EXPECT_EQ(2, update_called); // 1 worker, 1 main thread.
 
   tls_.shutdownGlobalThreading();
   tls_.shutdownThread();

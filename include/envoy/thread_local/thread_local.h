@@ -76,11 +76,17 @@ public:
   virtual void set(InitializeCb cb) PURE;
 
   /**
-   * UpdateCb takes the current stored data, and returns an updated/new version data.
-   * TLS will run the callback and replace the stored data with the returned value *in each thread*.
+   * UpdateCb takes the current stored data, and must return the same data. The
+   * API was designed to allow replacement of the object via this API, but this
+   * is not currently used, and thus we are removing the functionality. In a future
+   * PR, the API will be removed.
    *
-   * NOTE: The update callback is not supposed to capture the Slot, or its owner. As the owner may
-   * be destructed in main thread before the update_cb gets called in a worker thread.
+   * TLS will run the callback and assert the returned returned value matches
+   * the current value.
+   *
+   * NOTE: The update callback is not supposed to capture the Slot, or its
+   * owner. As the owner may be destructed in main thread before the update_cb
+   * gets called in a worker thread.
    **/
   using UpdateCb = std::function<ThreadLocalObjectSharedPtr(ThreadLocalObjectSharedPtr)>;
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
@@ -108,6 +114,10 @@ public:
 // only reference is from TypedSlot, which we can then rename to Slot.
 template <class T> class TypedSlot {
 public:
+  static std::unique_ptr<TypedSlot> makeUnique(SlotAllocator& allocator) {
+    return std::make_unique<TypedSlot>(allocator);
+  }
+
   explicit TypedSlot(SlotAllocator& allocator) : slot_(allocator.allocateSlot()) {}
 
   /**

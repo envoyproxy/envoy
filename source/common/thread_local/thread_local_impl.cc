@@ -66,17 +66,28 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::getWorker(uint32_t index) {
 
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(index_); }
 
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   // See the header file comments for still_alive_guard_ for why we capture index_.
-  parent_.runOnAllThreads(
-      wrapCallback([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); }),
-      complete_cb);
+  return wrapCallback([cb, index = index_]() {
+    auto obj = getWorker(index);
+    auto new_obj = cb(obj);
+    // The API definition for runOnAllThreads allows for replacing the object
+    // via the callback return value. However, this never occurs in the codebase
+    // as of Oct 2020, and we plan to remove this API. To avoid PR races, we
+    // will add an assert to ensure such a dependency does not emerge.
+    //
+    // TODO(jmarantz): remove this once we phase out use of the untyped slot
+    // API, rename it, and change all call-sites to use TypedSlot.
+    ASSERT(obj.get() == new_obj.get());
+  });
+}
+
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+  parent_.runOnAllThreads(dataCallback(cb), complete_cb);
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
-  // See the header file comments for still_alive_guard_ for why we capture index_.
-  parent_.runOnAllThreads(
-      wrapCallback([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); }));
+  parent_.runOnAllThreads(dataCallback(cb));
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
