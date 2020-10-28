@@ -215,6 +215,7 @@ public:
 
     // When the router filter gets reset we should cancel the pool request.
     EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_.onDestroy();
   }
 
@@ -236,6 +237,7 @@ public:
 
     // When the router filter gets reset we should cancel the pool request.
     EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_.onDestroy();
     EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
     EXPECT_EQ(0U,
@@ -418,6 +420,7 @@ TEST_F(RouterTest, UpdateServerNameFilterState) {
                 ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
                 .value());
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -446,6 +449,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterState) {
                             Network::UpstreamSubjectAltNames::key())
                         .value()[0]);
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -530,6 +534,7 @@ TEST_F(RouterTest, Http1Upstream) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -552,6 +557,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -570,6 +576,7 @@ TEST_F(RouterTest, Http2Upstream) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -597,6 +604,7 @@ TEST_F(RouterTest, HashPolicy) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -624,6 +632,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -821,6 +830,7 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
 }
 
@@ -850,6 +860,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
 }
 
@@ -863,6 +874,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -2408,7 +2420,6 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -2453,6 +2464,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
         EXPECT_EQ(headers.Status()->value(), "200");
         EXPECT_TRUE(end_stream);
       }));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(2);
   response_decoder1->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
@@ -2572,7 +2584,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(2);
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(3);
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -4054,6 +4066,7 @@ TEST_F(RouterTest, MaxStreamDurationDisabledIfSetToZero) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
 
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
@@ -4076,6 +4089,7 @@ TEST_F(RouterTest, MaxStreamDurationCallbackNotCalled) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
 
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
@@ -4722,6 +4736,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
                     .value());
 
   // In production, the HCM recreateStream would have called this.
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_EQ(3, callbacks_.streamInfo()
                    .filterState()
@@ -4747,6 +4762,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
                     .value());
 
   // In production, the HCM recreateStream would have called this.
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
 }
 
@@ -4770,6 +4786,7 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
                     .value());
 
   // In production, the HCM recreateStream would have called this.
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
 }
 
@@ -6026,6 +6043,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -6125,6 +6143,7 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
   headers.setMethod("CONNECT");
   router_.decodeHeaders(headers, false);
 
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
 }
 
@@ -6455,6 +6474,7 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.onDestroy();
 }
 
@@ -6621,6 +6641,7 @@ TEST_P(RouterTestStrictCheckSomeHeaders, IgnoreOmittedHeaders) {
   HttpTestUtility::addDefaultHeaders(headers);
 
   expectResponseTimerCreate();
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, router_.decodeHeaders(headers, true));
   router_.onDestroy();
 }

@@ -108,14 +108,12 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 }
 
 UpstreamRequest::~UpstreamRequest() {
-
   if (!destroyed_) {
-    ENVOY_LOG_MISC(info, "IN DTOR");
     onDeferredDelete();
   }
 }
+
 void UpstreamRequest::onDeferredDelete() {
-  ENVOY_LOG_MISC(info, "DONG DEFERRED DELELTE");
   ASSERT(!destroyed_);
   destroyed_ = true;
 
@@ -449,7 +447,6 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::onResetStream(
   ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(),
                                parent_.parent_.parent_.callbacks()->dispatcher());
 
-  ENVOY_LOG_MISC(info, "SEEING RESET STREAM");
   if (parent_.parent_.span_ != nullptr) {
     // Add tags about reset.
     parent_.parent_.span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
@@ -558,8 +555,6 @@ void UpstreamRequestFilter::onPoolReady(
   parent_.parent_.callbacks()->streamInfo().setUpstreamSslConnection(
       info.downstreamSslConnection());
 
-  ENVOY_LOG_MISC(info, "IN POOL READY {} {}", parent_.parent_.downstreamEndStream(),
-                 parent_.create_per_try_timeout_on_request_complete_);
   if (parent_.parent_.downstreamEndStream()) {
     parent_.setupPerTryTimeout();
   } else {

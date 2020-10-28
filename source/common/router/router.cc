@@ -1156,6 +1156,7 @@ void Filter::resetAll() {
   while (!upstream_requests_.empty()) {
     auto upstream_request = upstream_requests_.back()->removeFromList(upstream_requests_);
     upstream_request->resetStream();
+    upstream_request->onDeferredDelete();
     callbacks_->dispatcher().deferredDelete(std::move(upstream_request));
   }
 }
