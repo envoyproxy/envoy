@@ -122,9 +122,14 @@ public:
 /**
  * std::ostream class that serializes writes into the provided buffer.
  */
-class OutputBufferStream : public virtual FixedSizeStreamBuffer, public std::ostream {
+class OutputBufferStream : private FixedSizeStreamBuffer, public std::ostream {
 public:
   OutputBufferStream(char* data, size_t size);
+
+  /**
+   * @return the number of bytes written prior to the "put" pointer into the buffer.
+   */
+  int numValidBytesWrittenToBuffer();
 };
 
 /**

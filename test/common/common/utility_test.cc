@@ -117,52 +117,66 @@ TEST(DateUtil, NowToMilliseconds) {
   EXPECT_EQ(12345067, DateUtil::nowToMilliseconds(test_time));
 }
 
-TEST(OutputBufferStream, All) {
-  // Fails on write to empty buffer
-  {
-    std::string data = "123";
-    OutputBufferStream ostream{nullptr, 0};
-    ASSERT_TRUE(ostream.good());
+TEST(OutputBufferStream, FailsOnWriteToEmptyBuffer) {
+  constexpr char data = 'x';
+  OutputBufferStream ostream{nullptr, 0};
+  ASSERT_TRUE(ostream.good());
 
-    ostream << data;
+  ostream << data;
 
-    EXPECT_TRUE(ostream.bad());
-  }
+  EXPECT_TRUE(ostream.bad());
+}
 
-  // Can write to buffer
-  {
-    std::string data = "123";
-    std::string buffer(3, 'x');
+TEST(OutputBufferStream, CanWriteToBuffer) {
+  constexpr char data[] = "123";
+  std::string buffer;
+  buffer.resize(3);
 
-    OutputBufferStream ostream{buffer.data(), buffer.size()};
-    ostream << data << std::endl;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  ostream << data;
 
-    EXPECT_EQ(buffer, data);
-  }
+  EXPECT_EQ(buffer, data);
+}
 
-  // Cannot overwrite buffer
-  {
-    std::string data = "123";
-    std::string buffer(2, 'x');
+TEST(OutputBufferStream, CannotOverwriteBuffer) {
+  constexpr char data[] = "123";
+  std::string buffer;
+  buffer.resize(2);
 
-    OutputBufferStream ostream{buffer.data(), buffer.size()};
-    ostream << data << std::endl;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  ostream << data << std::endl;
 
-    EXPECT_EQ(buffer, "12");
-  }
+  EXPECT_EQ(buffer, "12");
+}
 
-  // Does not allocate memory even if we try to overflow the buffer.
-  {
-    Stats::TestUtil::MemoryTest memory_test;
-    std::string data = "123";
-    std::string buffer(2, 'x');
+TEST(OutputBufferStream, DoesNotAllocateMemoryEvenIfWeTryToOverflowBuffer) {
+  constexpr char data[] = "123";
+  std::string buffer;
+  buffer.resize(2);
+  Stats::TestUtil::MemoryTest memory_test;
 
-    OutputBufferStream ostream{buffer.data(), buffer.size()};
-    ostream << data << std::endl;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  ostream << data << std::endl;
 
-    EXPECT_EQ(buffer, "12");
-    EXPECT_EQ(memory_test.consumedBytes(), 0);
-  }
+  EXPECT_EQ(buffer, "12");
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+}
+
+TEST(OutputBufferStream, ReturnsNumberOfBytesWrittenIntoBuffer) {
+  constexpr char data[] = "123";
+  std::string buffer;
+  buffer.resize(3);
+
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  ASSERT_EQ(ostream.numValidBytesWrittenToBuffer(), 0);
+
+  ostream << data;
+  ASSERT_EQ(buffer, data);
+  EXPECT_EQ(ostream.numValidBytesWrittenToBuffer(), 3);
+
+  // Try to overflow buffer, should still have 3 as bytes written.
+  ostream << data;
+  EXPECT_EQ(ostream.numValidBytesWrittenToBuffer(), 3);
 }
 
 TEST(InputConstMemoryStream, All) {

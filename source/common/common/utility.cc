@@ -230,6 +230,8 @@ FixedSizeStreamBuffer::FixedSizeStreamBuffer(char* base, size_t size) {
 OutputBufferStream::OutputBufferStream(char* data, size_t size)
     : FixedSizeStreamBuffer{data, size}, std::ostream{static_cast<std::streambuf*>(this)} {}
 
+int OutputBufferStream::numValidBytesWrittenToBuffer() { return pptr() - pbase(); }
+
 ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {
   // std::streambuf won't modify `data`, but the interface still requires a char* for convenience,
   // so we need to const_cast.
