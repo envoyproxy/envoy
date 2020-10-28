@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <ios>
+#include <iostream>
 #include <iterator>
 #include <regex>
 #include <string>
@@ -220,6 +222,13 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
 std::string DateFormatter::now(TimeSource& time_source) {
   return fromTime(time_source.systemTime());
 }
+
+FixedSizeStreamBuffer::FixedSizeStreamBuffer(char* base, size_t size) {
+  this->setp(base, base + size);
+}
+
+OutputBufferStream::OutputBufferStream(char* data, size_t size)
+    : FixedSizeStreamBuffer{data, size}, std::ostream{static_cast<std::streambuf*>(this)} {}
 
 ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {
   // std::streambuf won't modify `data`, but the interface still requires a char* for convenience,

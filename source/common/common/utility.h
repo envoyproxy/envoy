@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <ios>
 #include <set>
 #include <sstream>
 #include <string>
@@ -108,6 +109,22 @@ public:
   // TimeSource
   SystemTime systemTime() override { return std::chrono::system_clock::now(); }
   MonotonicTime monotonicTime() override { return std::chrono::steady_clock::now(); }
+};
+
+/**
+ * Class used for creating non-memory allocating std::ostream.
+ */
+class FixedSizeStreamBuffer : public std::streambuf {
+public:
+  FixedSizeStreamBuffer(char* base, size_t size);
+};
+
+/**
+ * std::ostream class that serializes writes into the provided buffer.
+ */
+class OutputBufferStream : public virtual FixedSizeStreamBuffer, public std::ostream {
+public:
+  OutputBufferStream(char* data, size_t size);
 };
 
 /**
