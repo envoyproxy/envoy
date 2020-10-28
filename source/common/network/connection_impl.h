@@ -55,6 +55,7 @@ public:
   void addWriteFilter(WriteFilterSharedPtr filter) override;
   void addFilter(FilterSharedPtr filter) override;
   void addReadFilter(ReadFilterSharedPtr filter) override;
+  void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
   // Network::Connection
@@ -78,6 +79,7 @@ public:
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
+  bool connecting() const override { return connecting_; }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
