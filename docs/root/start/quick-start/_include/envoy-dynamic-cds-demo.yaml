@@ -1,4 +1,5 @@
 version_info: "1"
+
 resources:
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: example_proxy_cluster

@@ -1,4 +1,5 @@
 version_info: "1"
+
 resources:
 - "@type": type.googleapis.com/envoy.config.listener.v3.Listener
   name: listener_0
@@ -12,7 +13,8 @@ resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         stat_prefix: ingress_http
-        codec_type: AUTO
+        http_filters:
+        - name: envoy.router
         route_config:
           name: local_route
           virtual_hosts:
@@ -24,5 +26,3 @@ resources:
                 prefix: "/"
               route:
                 cluster: example_proxy_cluster
-        http_filters:
-          - name: envoy.router
