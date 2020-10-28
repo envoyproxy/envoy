@@ -18,64 +18,73 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // request or response, including how requests and responses are
 // sent to the remote server.
 
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message ProcessingMode {
-  enum SyncMode {
-    // The default SyncMode depends on which part of the message is being
-    // processed. By default, request and response headers are processed
-    // in SYNC mode, while the body and trailers are skipped.
+  // Control how headers and trailers are handled
+  enum HeaderSendMode {
+    // The default HeaderSendMode depends on which part of the message is being
+    // processed. By default, request and response headers are sent, while
+    // while the body and trailers are skipped.
     DEFAULT = 0;
 
-    // Send the header, trailer, or body and wait for a response before continuing with
-    // the filter chain.
-    SYNC = 1;
+    // Send the header or trailer.
+    SEND = 1;
 
-    // Send the header, trailer, or body, but do not expect a response, continuing immediately
-    // with the filter chain.
-    ASYNC = 2;
-
-    // Do not send the header, trailer, or body.
-    SKIP = 3;
+    // Do not send the header or trailer.
+    SKIP = 2;
   }
 
   // Control how the request and response bodies are handled
   enum BodySendMode {
+    // Do not send the body at all. This is the default
+    NONE = 0;
+
     // Stream the body to the server in pieces as they arrive at the
     // proxy. This is the default.
-    STREAMED = 0;
+    STREAMED = 1;
 
     // Buffer the message body in memory and send the entire body at once.
     // If the body exceeds the configured buffer limit, then the
     // downstream system will receive an error.
-    BUFFERED = 1;
+    BUFFERED = 2;
 
     // Buffer the message body in memory and send the entire body in one
     // chunk. If the body exceeds the configured buffer limit, then the body contents
     // up to the buffer limit will be sent.
-    BUFFERED_PARTIAL = 2;
+    BUFFERED_PARTIAL = 3;
   }
 
-  // How to handle the request header. Default is "SYNC".
-  ProcessingMode request_header_mode = 1;
+  // Control whether headers, trailers, and body pieces are sent synchronously,
+  // in which Envoy will wait for a response before continuing filter
+  // processing, or asynchronously, in which Envoy will continue with filter
+  // processing after sending the pieces.
+  enum AsyncMode {
+    // Send message parts asynchronously. This is the default.
+    SYNC = 0;
 
-  // How to handle the response header. Default is "SYNC".
-  ProcessingMode response_header_mode = 2;
+    // Send message parts synchronously.
+    ASYNC = 1;
+  }
 
-  // How to handle the request body. Default is "SKIP".
-  ProcessingMode request_body_mode = 3;
+  // How to handle the request header. Default is "SEND".
+  HeaderSendMode request_header_mode = 1;
 
-  // How to send request body chunks if mode is not "SKIP".
-  BodySendMode request_body_send_mode = 4;
+  // How to handle the response header. Default is "SEND".
+  HeaderSendMode response_header_mode = 2;
 
-  // How do handle the response body. Default is "SKIP".
-  ProcessingMode response_body_mode = 5;
+  // How to handle the request body. Default is "NONE".
+  BodySendMode request_body_mode = 3;
 
-  // How to send response body chunks if the mode is not "SKIP".
-  BodySendMode response_body_send_mode = 6;
+  // How do handle the response body. Default is "NONE".
+  BodySendMode response_body_mode = 4;
 
   // How to handle the request trailers. Default is "SKIP".
-  ProcessingMode request_trailer_mode = 7;
+  HeaderSendMode request_trailer_mode = 5;
 
   // How to handle the response trailers. Default is "SKIP".
-  ProcessingMode response_trailer_mode = 8;
+  HeaderSendMode response_trailer_mode = 6;
+
+  // Whether to send all of the above synchronously or
+  // asynchronously. The default is "SYNC".
+  AsyncMode async_mode = 7;
 }

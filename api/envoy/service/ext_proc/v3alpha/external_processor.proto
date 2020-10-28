@@ -111,32 +111,30 @@ message ProcessingResponse {
   oneof response {
     // The server must send back this message in response to a message with the
     // "request_headers" field set.
-    HeaderResponse request_header_response = 1;
+    HeadersResponse request_headers = 1;
 
     // The server must send back this message in response to a message with the
     // "response_headers" field set.
-    HeaderResponse response_header_response = 2;
+    HeadersResponse response_headers = 2;
 
     // The server must send back this message in response to a message with
     // the "request_body" field set.
-    BodyResponse request_body_response = 3;
+    BodyResponse request_body = 3;
 
     // The server must send back this message in response to a message with
     // the "response_body" field set.
-    BodyResponse response_body_response = 4;
+    BodyResponse response_body = 4;
 
     // The server must send back this message in response to a message with
     // the "request_trailers" field set.
-    HeaderResponse request_trailer_response = 5;
+    TrailersResponse request_trailers = 5;
 
     // The server must send back this message in response to a message with
     // the "response_trailers" field set.
-    HeaderResponse response_trailer_response = 6;
+    TrailersResponse response_trailers = 6;
 
-    // The server can respond with this message instead of one of the above
-    // after a "request_headers" or "request_body" message. It causes an error
-    // to be immediately sent to the client. It is ignored after
-    // other message types.
+    // If specified, return the specified response downstream to the client
+    // and end further filter processing on the request path.
     ImmediateResponse immediate_response = 7;
   }
 
@@ -163,8 +161,7 @@ message ProcessingResponse {
 // This message is sent to the external server when the HTTP request and responses
 // are first received.
 message HttpHeaders {
-  // The HTTP request headers. If multiple headers share the same key, they
-  // must be merged according to the HTTP spec. All header keys must be
+  // The HTTP request headers. All header keys will be
   // lower-cased, because HTTP header keys are case-insensitive.
   config.core.v3.HeaderMap headers = 1;
 
@@ -179,7 +176,7 @@ message HttpHeaders {
 
   // If true, then there is no message body associated with this
   // request or response.
-  bool no_body = 4;
+  bool end_of_stream = 4;
 }
 
 // This message contains the message body that Envoy sends to the external server.
@@ -196,27 +193,35 @@ message HttpTrailers {
 
 // The following are messages that may be sent back by the server.
 
-// This message must be sent in response to a RequestHeaders or ResponseHeaders
+// This message must be sent in response to a request_headers or response_headers
 // message.
-message HeaderResponse {
-  // Add or replace HTTP headers.
-  repeated config.core.v3.HeaderValueOption set_headers = 1;
+message HeadersResponse {
+  // Instructions on how to manipulate the request headers
+  HeaderMutation header_mutation = 1;
 
-  // Remove these HTTP headers.
-  repeated string remove_headers = 2;
+  // If specified, add a body to the message if none was present
+  // before.
+  BodyMutation body_mutation = 2;
+}
+
+// This message must be sent in response to a request_trailers
+// or response_trailers message.
+message TrailersResponse {
+  // Instructions on how to manipulate the request trailers
+  HeaderMutation header_mutation = 1;
 }
 
 message BodyResponse {
-  // Request that the last body chunk delivered be modified.
-  BodyMutation body_mutation = 1;
-
   // If set, manipulate HTTP headers along with the body. Note that
   // this is only possible if the headers have not been sent down
   // the filter chain yet. Practically, then, this field will be ignored
   // unless the request or response BodySendMode is BUFFERED or
   // BUFFERED_PARTIAL, which means that Envoy is buffering the body
   // in memory while waiting for this response.
-  HeaderResponse header_mutation = 2;
+  HeaderMutation header_mutation = 1;
+
+  // Request that the last body chunk delivered be modified.
+  BodyMutation body_mutation = 2;
 }
 
 // This message completely replaces the response.
@@ -232,14 +237,26 @@ message ImmediateResponse {
   repeated config.core.v3.HeaderValue trailers = 4;
 }
 
-// Change all or part of the message body by replacing the portion
-// of the last chunk received denoted by "offset" and "length" with "body."
+// Change HTTP headers or trailers by appending, replacing, or removing
+// headers.
+message HeaderMutation {
+  // Add or replace HTTP headers.
+  repeated config.core.v3.HeaderValueOption set_headers = 1;
+
+  // Remove these HTTP headers.
+  repeated string remove_headers = 2;
+}
+
+// Replace the entire message body chunk received in the corresponding
+// HttpBody message with this new body, or clear the body.
 message BodyMutation {
-  uint32 offset = 1;
+  oneof mutation {
+    // The entire body to replace
+    bytes body = 1;
 
-  uint32 length = 2;
-
-  bytes body = 3;
+    // Clear the corresponding body chunk
+    bool clear_body = 2;
+  }
 }
 
 // Change the processing mode of the filter. If "duration" is set,
