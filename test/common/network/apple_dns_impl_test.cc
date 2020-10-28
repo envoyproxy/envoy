@@ -16,12 +16,12 @@
 #include "common/network/utility.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/network/dns_service.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -35,6 +35,21 @@ using testing::WithArgs;
 namespace Envoy {
 namespace Network {
 namespace {
+
+class MockDnsService : public Network::DnsService {
+public:
+  MockDnsService() = default;
+  ~MockDnsService() = default;
+
+  MOCK_METHOD(void, dnsServiceRefDeallocate, (DNSServiceRef sdRef));
+  MOCK_METHOD(DNSServiceErrorType, dnsServiceCreateConnection, (DNSServiceRef * sdRef));
+  MOCK_METHOD(dnssd_sock_t, dnsServiceRefSockFD, (DNSServiceRef sdRef));
+  MOCK_METHOD(DNSServiceErrorType, dnsServiceProcessResult, (DNSServiceRef sdRef));
+  MOCK_METHOD(DNSServiceErrorType, dnsServiceGetAddrInfo,
+              (DNSServiceRef * sdRef, DNSServiceFlags flags, uint32_t interfaceIndex,
+               DNSServiceProtocol protocol, const char* hostname,
+               DNSServiceGetAddrInfoReply callBack, void* context));
+};
 
 // This class tests the AppleDnsResolverImpl using actual calls to Apple's API. These tests have
 // limitations on the error conditions we are able to test as the Apple API is opaque, and prevents
@@ -202,7 +217,7 @@ public:
   }
 
 protected:
-  Network::MockDnsService dns_service_;
+  MockDnsService dns_service_;
   TestThreadsafeSingletonInjector<Network::DnsService> dns_service_injector_{&dns_service_};
   std::unique_ptr<Network::AppleDnsResolverImpl> resolver_{};
   NiceMock<Event::MockDispatcher> dispatcher_;

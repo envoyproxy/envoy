@@ -120,7 +120,6 @@ envoy_cc_test(
     ] + select({
         "//bazel:apple": [
             "//source/common/network:dns_lib",
-            "//test/mocks/network:dns_service_mocks",
         ],
         "//conditions:default": [],
     }),
