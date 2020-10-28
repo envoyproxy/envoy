@@ -215,7 +215,7 @@ public:
 
     // When the router filter gets reset we should cancel the pool request.
     EXPECT_CALL(cancellable_, cancel(_));
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_.onDestroy();
   }
 
@@ -237,7 +237,7 @@ public:
 
     // When the router filter gets reset we should cancel the pool request.
     EXPECT_CALL(cancellable_, cancel(_));
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_.onDestroy();
     EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
     EXPECT_EQ(0U,
