@@ -70,6 +70,8 @@ bool TapSocketFactory::usesProxyProtocolOptions() const {
   return transport_socket_factory_->usesProxyProtocolOptions();
 }
 
+bool TapSocketFactory::isReady() const { return transport_socket_factory_->isReady(); }
+
 } // namespace Tap
 } // namespace TransportSockets
 } // namespace Extensions
