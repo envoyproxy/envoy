@@ -40,7 +40,7 @@ extension EnvoyHTTPFilter {
         case .stopIterationNoBuffer:
           return [kEnvoyFilterDataStatusStopIterationNoBuffer, data]
         case .resumeIteration(let headers, let data):
-          return [kEnvoyFilterDataStatusResumeIteration, headers?.headers as Any, data]
+          return [kEnvoyFilterDataStatusResumeIteration, data, headers?.headers as Any]
         }
       }
 
@@ -54,9 +54,9 @@ extension EnvoyHTTPFilter {
         case .resumeIteration(let headers, let data, let trailers):
           return [
             kEnvoyFilterTrailersStatusResumeIteration,
+            trailers.headers,
             headers?.headers as Any,
             data as Any,
-            trailers.headers,
           ]
         }
       }
@@ -84,7 +84,7 @@ extension EnvoyHTTPFilter {
         case .stopIterationNoBuffer:
           return [kEnvoyFilterDataStatusStopIterationNoBuffer, data]
         case .resumeIteration(let headers, let data):
-          return [kEnvoyFilterDataStatusResumeIteration, headers?.headers as Any, data]
+          return [kEnvoyFilterDataStatusResumeIteration, data, headers?.headers as Any]
         }
       }
 
@@ -98,9 +98,9 @@ extension EnvoyHTTPFilter {
         case .resumeIteration(let headers, let data, let trailers):
           return [
             kEnvoyFilterTrailersStatusResumeIteration,
+            trailers.headers,
             headers?.headers as Any,
             data as Any,
-            trailers.headers,
           ]
         }
       }
