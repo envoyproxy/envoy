@@ -34,7 +34,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/common/common:hex_lib",
-        "//source/common/common/mem_block_builder_lib",
+        "//source/common/common:mem_block_builder_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
     ],
