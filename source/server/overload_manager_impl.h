@@ -6,6 +6,7 @@
 #include "envoy/api/api.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
@@ -117,6 +118,11 @@ public:
   // about overload state changes.
   void stop();
 
+protected:
+  // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
+  virtual Event::ScaledRangeTimerManagerPtr
+  createScaledRangeTimerManager(Event::Dispatcher& dispatcher) const;
+
 private:
   using FlushEpochId = uint64_t;
   class Resource : public ResourceMonitor::Callbacks {
@@ -161,6 +167,8 @@ private:
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
+
+  absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum> timer_minimums_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;
