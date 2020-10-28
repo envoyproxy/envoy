@@ -23,7 +23,7 @@ int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
   }
 
   int32_t val;
-  SAFE_MEMCPY(&val, data.linearize(sizeof(int32_t)));
+  SAFE_MEMCPY(&val, static_cast<int32_t*>(data.linearize(sizeof(int32_t))));
   return le32toh(val);
 }
 
@@ -87,8 +87,9 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
   if (data.length() < sizeof(int64_t)) {
     throw EnvoyException("invalid buffer size");
   }
-
-  SAFE_MEMCPY(&val, data.linearize(sizeof(int64_t)));
+  
+  int64_t val;
+  SAFE_MEMCPY(&val, static_cast<int64_t*>(data.linearize(sizeof(int64_t))));
   data.drain(sizeof(int64_t));
   return le64toh(val);
 }
