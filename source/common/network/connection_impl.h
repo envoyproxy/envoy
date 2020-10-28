@@ -115,7 +115,10 @@ public:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+  void setReadBufferReady() override {
+    transport_wants_read_ = true;
+    file_event_->activate(Event::FileReadyType::Read);
+  }
   void flushWriteBuffer() override;
 
   // Obtain global next connection ID. This should only be used in tests.
@@ -125,11 +128,10 @@ protected:
   // A convenience function which returns true if
   // 1) The read disable count is zero or
   // 2) The read disable count is one due to the read buffer being overrun.
-  // In either case the consumer of the data would like to read from the buffer.
-  // If the read count is greater than one, or equal to one when the buffer is
-  // not overrun, then the consumer of the data has called readDisable, and does
-  // not want to read.
-  bool consumerWantsToRead();
+  // In either case the filter chain would like to process data from the read buffer or transport
+  // socket. If the read count is greater than one, or equal to one when the buffer is not overrun,
+  // then the filter chain has called readDisable, and does not want additional data.
+  bool filterChainWantsData();
 
   // Network::ConnectionImplBase
   void closeConnectionImmediately() override;
@@ -195,6 +197,11 @@ private:
   bool write_end_stream_ : 1;
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
+  // True if the most recent call to the transport socket's doRead method invoked setReadBufferReady
+  // to schedule read resumption after yielding due to shouldDrainReadBuffer(). When true,
+  // readDisable must schedule read resumption when read_disable_count_ == 0 to ensure that read
+  // resumption happens when remaining bytes are held in transport socket internal buffers.
+  bool transport_wants_read_ : 1;
 };
 
 /**

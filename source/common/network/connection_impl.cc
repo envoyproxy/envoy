@@ -56,7 +56,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
-      write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
+      write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
+      transport_wants_read_(false) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(ConnectionImpl::ioHandle().fd()), "");
@@ -189,7 +190,7 @@ Connection::State ConnectionImpl::state() const {
 
 void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
 
-bool ConnectionImpl::consumerWantsToRead() {
+bool ConnectionImpl::filterChainWantsData() {
   return read_disable_count_ == 0 ||
          (read_disable_count_ == 1 && read_buffer_.highWatermarkTriggered());
 }
@@ -268,7 +269,7 @@ void ConnectionImpl::noDelay(bool enable) {
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (inDelayedClose() || !consumerWantsToRead()) {
+  if (inDelayedClose() || !filterChainWantsData()) {
     return;
   }
   ASSERT(ioHandle().isOpen());
@@ -354,11 +355,17 @@ void ConnectionImpl::readDisable(bool disable) {
       file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
     }
 
-    if (consumerWantsToRead() && read_buffer_.length() > 0) {
-      // If the connection has data buffered there's no guarantee there's also data in the kernel
-      // which will kick off the filter chain. Alternately if the read buffer has data the fd could
-      // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
-      // processed regardless and ensure that we dispatch it via onRead.
+    if (filterChainWantsData() && (read_buffer_.length() > 0 || transport_wants_read_)) {
+      // If the read_buffer_ is not empty or transport_wants_read_ is true, the connection may be
+      // able to process additional bytes even if there is no data in the kernel to kick off the
+      // filter chain. Alternately if the read buffer has data the fd could be read disabled. To
+      // handle these cases, fake an event to make sure the buffered data in the read buffer or in
+      // transport socket internal buffers gets processed regardless and ensure that we dispatch it
+      // via onRead.
+
+      // Sanity check: resumption with read_disable_count_ > 0 should only happen if the read
+      // buffer's high watermark has triggered.
+      ASSERT(read_buffer_.length() > 0 || read_disable_count_ == 0);
       dispatch_buffered_data_ = true;
       setReadBufferReady();
     }
@@ -553,12 +560,19 @@ void ConnectionImpl::onReadReady() {
   // 2) The consumer of connection data called readDisable(true), and instead of reading from the
   //    socket we simply need to dispatch already read data.
   if (read_disable_count_ != 0) {
-    if (latched_dispatch_buffered_data && consumerWantsToRead()) {
+    // Do not clear transport_wants_read_ when returning early; the early return skips the transport
+    // socket doRead call.
+    if (latched_dispatch_buffered_data && filterChainWantsData()) {
       onRead(read_buffer_.length());
     }
     return;
   }
 
+  // Clear transport_wants_read_ just before the call to doRead. This is the only way to ensure that
+  // the transport socket read resumption happens as requested; onReadReady() returns early without
+  // reading from the transport if the read buffer is above high watermark at the start of the
+  // method.
+  transport_wants_read_ = false;
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
