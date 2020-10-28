@@ -71,11 +71,7 @@ class UserSpaceFileEventImpl : public FileEvent, Logger::Loggable<Logger::Id::io
 public:
   UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events);
 
-  ~UserSpaceFileEventImpl() override {
-    if (schedulable_->enabled()) {
-      schedulable_->cancel();
-    }
-  }
+  ~UserSpaceFileEventImpl() override = default;
 
   // Event::FileEvent
   void activate(uint32_t events) override;
@@ -83,13 +79,6 @@ public:
 
   EventListener& getEventListener() { return event_listener_; }
   void onEvents() { cb_(); }
-
-  // Helper method which is equivalent to active the pending events.
-  void scheduleNextEvent() {
-    if (!schedulable_->enabled()) {
-      schedulable_->scheduleCallbackNextIteration();
-    }
-  }
 
   friend class Network::BufferedIoSocketHandleImpl;
 

@@ -7,6 +7,20 @@
 namespace Envoy {
 namespace Event {
 
+UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                               uint32_t events)
+    : schedulable_(dispatcher.createSchedulableCallback([this]() { onEvents(); })),
+      cb_([this, cb]() {
+        auto all_events = getEventListener().triggeredEvents();
+        auto ephemeral_events = getEventListener().getAndClearEphemeralEvents();
+        ENVOY_LOG(trace,
+                  "User space event {} invokes callbacks on allevents = {}, ephermal events = {}",
+                  static_cast<void*>(this), all_events, ephemeral_events);
+        cb(all_events | ephemeral_events);
+      }) {
+  setEnabled(events);
+}
+
 void EventListenerImpl::onEventEnabled(uint32_t enabled_events) {
   enabled_events_ = enabled_events;
   // Clear ephemeral events to align with FileEventImpl::setEnable().
@@ -24,9 +38,7 @@ void UserSpaceFileEventImpl::activate(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
   event_listener_.onEventActivated(events);
-  if (!schedulable_->enabled()) {
-    schedulable_->scheduleCallbackNextIteration();
-  }
+  schedulable_->scheduleCallbackNextIteration();
 }
 
 void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
@@ -39,20 +51,6 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   }
   ENVOY_LOG(trace, "User space file event {} set events {}. Will {} reschedule.",
             static_cast<void*>(this), events, was_enabled ? "not " : "");
-}
-
-UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                               uint32_t events)
-    : schedulable_(dispatcher.createSchedulableCallback([this]() { onEvents(); })),
-      cb_([this, cb]() {
-        auto all_events = getEventListener().triggeredEvents();
-        auto ephemeral_events = getEventListener().getAndClearEphemeralEvents();
-        ENVOY_LOG(trace,
-                  "User space event {} invokes callbacks on allevents = {}, ephermal events = {}",
-                  static_cast<void*>(this), all_events, ephemeral_events);
-        cb(all_events | ephemeral_events);
-      }) {
-  setEnabled(events);
 }
 
 } // namespace Event

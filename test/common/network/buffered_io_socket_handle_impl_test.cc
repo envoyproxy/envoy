@@ -1,4 +1,3 @@
-#include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -52,7 +51,7 @@ public:
     EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   }
 
-  NiceMock<Event::MockDispatcher> dispatcher_{};
+  NiceMock<Event::MockDispatcher> dispatcher_;
 
   // Owned by BufferedIoSocketHandle.
   NiceMock<Event::MockSchedulableCallback>* scheduable_cb_;
@@ -191,7 +190,7 @@ TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
   EXPECT_CALL(cb_, called(_));
   scheduable_cb_->invokeCallback();
@@ -203,7 +202,7 @@ TEST_F(BufferedIoSocketHandleTest, TestSetEnabledTriggerEventSchedule) {
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
   ASSERT_TRUE(scheduable_cb_->enabled());
   EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
@@ -238,7 +237,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAndWriteAreEdgeTriggered) {
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
   EXPECT_CALL(cb_, called(_));
   scheduable_cb_->invokeCallback();
@@ -262,7 +261,7 @@ TEST_F(BufferedIoSocketHandleTest, TestSetDisabledBlockEventSchedule) {
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
   io_handle_->enableFileEvents(0);
 
@@ -278,7 +277,7 @@ TEST_F(BufferedIoSocketHandleTest, TestEventResetClearCallback) {
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   ASSERT_TRUE(scheduable_cb_->enabled());
 
   EXPECT_CALL(cb_, called(_)).Times(0);
@@ -302,7 +301,7 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_peer_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   ASSERT_TRUE(scheduable_cb_->enabled());
   EXPECT_CALL(cb_, called(_));
   scheduable_cb_->invokeCallback();
@@ -353,7 +352,7 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
           }
         }
       },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   scheduable_cb_->invokeCallback();
 
   // Not closed yet.
@@ -397,7 +396,7 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
           }
         }
       },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   scheduable_cb_->invokeCallback();
 
   // Not closed yet.
@@ -537,7 +536,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
           }
         }
       },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   scheduable_cb_->invokeCallback();
   EXPECT_FALSE(scheduable_cb_->enabled());
 
@@ -577,7 +576,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevScheduleWritableEvent) {
           }
         }
       },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   scheduable_cb_->invokeCallback();
   EXPECT_FALSE(scheduable_cb_->enabled());
 
@@ -619,7 +618,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
           }
         }
       },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   scheduable_cb_->invokeCallback();
 
   EXPECT_FALSE(scheduable_cb_->enabled());
@@ -651,7 +650,7 @@ TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::PlatformDefaultTriggerType,
+      dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read);
   scheduable_cb_->invokeCallback();
   EXPECT_FALSE(scheduable_cb_->enabled());
@@ -679,6 +678,16 @@ TEST_F(BufferedIoSocketHandleTest, TestConnect) {
   auto address_is_ignored =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
   EXPECT_EQ(0, io_handle_->connect(address_is_ignored).rc_);
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestDeathOnActivatingDestroyedEvents) {
+  io_handle_->resetFileEvents();
+  ASSERT_DEBUG_DEATH(io_handle_->activateFileEvents(Event::FileReadyType::Read), "Null user_file_event_");
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestDeathOnEnablingDestroyedEvents) {
+  io_handle_->resetFileEvents();
+  ASSERT_DEBUG_DEATH(io_handle_->enableFileEvents(Event::FileReadyType::Read), "Null user_file_event_");
 }
 
 class BufferedIoSocketHandleNotImplementedTest : public testing::Test {

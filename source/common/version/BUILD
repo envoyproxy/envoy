@@ -14,7 +14,7 @@ genrule(
     name = "generate_version_number",
     srcs = ["//:VERSION"],
     outs = ["version_number.h"],
-    cmd = """echo "#define BUILD_VERSION_NUMBER \"$$(cat $<)\"" >$@""",
+    cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
     visibility = ["//visibility:private"],
 )
 
@@ -50,8 +50,8 @@ envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
     copts = envoy_select_boringssl(
-        ["-DENVOY_SSL_VERSION=\"BoringSSL-FIPS\""],
-        ["-DENVOY_SSL_VERSION=\"BoringSSL\""],
+        ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
+        ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
     ),
     deps = [
         ":version_includes",

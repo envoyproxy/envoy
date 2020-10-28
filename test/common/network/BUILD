@@ -462,3 +462,15 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "buffered_io_socket_handle_impl_platform_test",
+    srcs = ["buffered_io_socket_handle_impl_platform_test.cc"],
+    tags = ["fails_on_windows"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:buffered_io_socket_handle_lib",
+        "//test/mocks/event:event_mocks",
+    ],
+)
