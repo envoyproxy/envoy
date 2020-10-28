@@ -5,9 +5,6 @@ Fault Injection Filter
 
 This simple example demonstrates Envoy's :ref:`fault injection <config_http_filters_fault_injection>` capability using Envoy's :ref:`runtime support <config_runtime>` to control the feature.
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers
@@ -23,10 +20,10 @@ Terminal 1
   $ docker-compose up --build -d
   $ docker-compose ps
 
-            Name                         Command               State                             Ports
-  ------------------------------------------------------------------------------------------------------------------------------
+            Name                         Command               State               Ports
+  ------------------------------------------------------------------------------------------------------
   fault-injection_backend_1   gunicorn -b 0.0.0.0:80 htt       Up      0.0.0.0:8080->80/tcp
-  fault-injection_envoy_1     /docker-entrypoint.sh /usr       Up      10000/tcp, 0.0.0.0:9211->9211/tcp, 0.0.0.0:9901->9901/tcp
+  fault-injection_envoy_1     /docker-entrypoint.sh /usr       Up      10000/tcp, 0.0.0.0:9211->9211/tcp
 
 Step 4: Start sending continuous stream of HTTP requests
 ********************************************************

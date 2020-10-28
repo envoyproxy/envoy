@@ -21,6 +21,12 @@
 
 namespace Envoy {
 namespace Network {
+namespace {
+
+constexpr absl::string_view kTransportSocketConnectTimeoutTerminationDetails =
+    "transport socket timeout was reached";
+
+}
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
@@ -67,7 +73,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
-  file_event_ = socket_->ioHandle().createFileEvent(
+  socket_->ioHandle().initializeFileEvent(
       dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
@@ -128,7 +134,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
         initializeDelayedCloseTimer();
         delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
         // Monitor for the peer closing the connection.
-        file_event_->setEnabled(enable_half_close_ ? 0 : Event::FileReadyType::Closed);
+        ioHandle().enableFileEvents(enable_half_close_ ? 0 : Event::FileReadyType::Closed);
       }
     } else {
       closeConnectionImmediately();
@@ -170,8 +176,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
     }
 
-    file_event_->setEnabled(Event::FileReadyType::Write |
-                            (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
+    ioHandle().enableFileEvents(Event::FileReadyType::Write |
+                                (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
   }
 }
 
@@ -217,8 +223,6 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   write_buffer_->drain(write_buffer_->length());
 
   connection_stats_.reset();
-
-  file_event_.reset();
 
   socket_->close();
 
@@ -308,7 +312,6 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 void ConnectionImpl::readDisable(bool disable) {
   // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
-  ASSERT(file_event_ != nullptr);
 
   ENVOY_CONN_LOG(trace, "readDisable: disable={} disable_count={} state={} buffer_length={}", *this,
                  disable, read_disable_count_, static_cast<int>(state()), read_buffer_.length());
@@ -323,7 +326,7 @@ void ConnectionImpl::readDisable(bool disable) {
   if (disable) {
     ++read_disable_count_;
 
-    if (state() != State::Open || file_event_ == nullptr) {
+    if (state() != State::Open) {
       // If readDisable is called on a closed connection, do not crash.
       return;
     }
@@ -335,14 +338,14 @@ void ConnectionImpl::readDisable(bool disable) {
     // If half-close semantics are enabled, we never want early close notifications; we
     // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
-      file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
+      ioHandle().enableFileEvents(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {
-      file_event_->setEnabled(Event::FileReadyType::Write);
+      ioHandle().enableFileEvents(Event::FileReadyType::Write);
     }
   } else {
     ASSERT(read_disable_count_ != 0);
     --read_disable_count_;
-    if (state() != State::Open || file_event_ == nullptr) {
+    if (state() != State::Open) {
       // If readDisable is called on a closed connection, do not crash.
       return;
     }
@@ -350,7 +353,7 @@ void ConnectionImpl::readDisable(bool disable) {
     if (read_disable_count_ == 0) {
       // We never ask for both early close and read at the same time. If we are reading, we want to
       // consume all available data.
-      file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+      ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
     }
 
     if (consumerWantsToRead() && read_buffer_.length() > 0) {
@@ -379,7 +382,6 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
 bool ConnectionImpl::readEnabled() const {
   // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
-  ASSERT(file_event_ != nullptr);
   return read_disable_count_ == 0;
 }
 
@@ -436,8 +438,7 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through
     // doWriteReady into thinking the socket is connected. On macOS, the underlying write may fail
     // with a connection error if a call to write(2) occurs before the connection is completed.
     if (!connecting_) {
-      ASSERT(file_event_ != nullptr, "ConnectionImpl file event was unexpectedly reset");
-      file_event_->activate(Event::FileReadyType::Write);
+      ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
 }
@@ -714,6 +715,40 @@ void ConnectionImpl::flushWriteBuffer() {
   }
 }
 
+ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
+                                           ConnectionSocketPtr&& socket,
+                                           TransportSocketPtr&& transport_socket,
+                                           StreamInfo::StreamInfo& stream_info, bool connected)
+    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
+                     connected) {}
+
+void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
+  if (!transport_connect_pending_) {
+    return;
+  }
+  if (transport_socket_connect_timer_ == nullptr) {
+    transport_socket_connect_timer_ =
+        dispatcher_.createTimer([this] { onTransportSocketConnectTimeout(); });
+  }
+  transport_socket_connect_timer_->enableTimer(timeout);
+}
+
+void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
+  switch (event) {
+  case ConnectionEvent::Connected:
+  case ConnectionEvent::RemoteClose:
+  case ConnectionEvent::LocalClose:
+    transport_connect_pending_ = false;
+    transport_socket_connect_timer_.reset();
+  }
+  ConnectionImpl::raiseEvent(event);
+}
+
+void ServerConnectionImpl::onTransportSocketConnectTimeout() {
+  stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
+  closeConnectionImmediately();
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
@@ -731,7 +766,7 @@ ClientConnectionImpl::ClientConnectionImpl(
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;
       // Trigger a write event to close this connection out-of-band.
-      file_event_->activate(Event::FileReadyType::Write);
+      ioHandle().activateFileEvents(Event::FileReadyType::Write);
       return;
     }
 
@@ -753,7 +788,7 @@ ClientConnectionImpl::ClientConnectionImpl(
         immediate_error_event_ = ConnectionEvent::LocalClose;
 
         // Trigger a write event to close this connection out-of-band.
-        file_event_->activate(Event::FileReadyType::Write);
+        ioHandle().activateFileEvents(Event::FileReadyType::Write);
       }
     }
   }
@@ -783,7 +818,7 @@ void ClientConnectionImpl::connect() {
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
 
       // Trigger a write event. This is needed on macOS and seems harmless on Linux.
-      file_event_->activate(Event::FileReadyType::Write);
+      ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
 }

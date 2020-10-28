@@ -100,6 +100,7 @@ public:
   }
 
 protected:
+  std::vector<char> serializeFrames(const Http2Frame& frame, uint32_t num_frames);
   void floodServer(const Http2Frame& frame, const std::string& flood_stat, uint32_t num_frames);
   void floodServer(absl::string_view host, absl::string_view path,
                    Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat,
@@ -137,7 +138,7 @@ void Http2FloodMitigationTest::beginSession() {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   // set lower outbound frame limits to make tests run faster
-  config_helper_.setOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
+  config_helper_.setDownstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
   // Set up a raw connection to easily send requests without reading responses. Also, set a small
   // TCP receive buffer to speed up connection backup.
@@ -150,15 +151,21 @@ void Http2FloodMitigationTest::beginSession() {
   startHttp2Session();
 }
 
-// Verify that the server detects the flood of the given frame.
-void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::string& flood_stat,
-                                           uint32_t num_frames) {
+std::vector<char> Http2FloodMitigationTest::serializeFrames(const Http2Frame& frame,
+                                                            uint32_t num_frames) {
   // make sure all frames can fit into 16k buffer
-  ASSERT_LE(num_frames, (16u * 1024u) / frame.size());
+  ASSERT(num_frames <= ((16u * 1024u) / frame.size()));
   std::vector<char> buf(num_frames * frame.size());
   for (auto pos = buf.begin(); pos != buf.end();) {
     pos = std::copy(frame.begin(), frame.end(), pos);
   }
+  return buf;
+}
+
+// Verify that the server detects the flood of the given frame.
+void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::string& flood_stat,
+                                           uint32_t num_frames) {
+  auto buf = serializeFrames(frame, num_frames);
 
   ASSERT_TRUE(tcp_client_->write({buf.begin(), buf.end()}, false, false));
 
@@ -1054,6 +1061,41 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
   // expect Downstream Protocol Error
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamPingFlood) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+    // Upstream flood checks are not implemented in the old codec based on exceptions
+    return;
+  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
+                                    "true");
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower upstream outbound frame limits to make tests run faster
+  config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  auto* upstream = fake_upstreams_.front().get();
+  // Make Envoy's writes into the upstream connection to return EAGAIN
+  writev_matcher_->setSourcePort(
+      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+
+  auto buf = serializeFrames(Http2Frame::makePingFrame(), ControlFrameFloodLimit + 1);
+
+  writev_matcher_->setWritevReturnsEgain();
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Upstream connection should be disconnected
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  // Downstream client should receive 503 since upstream did not send response headers yet
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
 }
 
 } // namespace Envoy

@@ -106,11 +106,6 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
 
   authz_response.dynamic_metadata = expected_dynamic_metadata;
 
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
-  bool timer_destroyed = false;
-  timer->timer_destroyed_ = &timer_destroyed;
-
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
@@ -123,8 +118,6 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
-  // make sure the internal timeout timer is destroyed
-  EXPECT_EQ(timer_destroyed, true);
 }
 
 // Test the client when an ok response is received.
@@ -234,11 +227,6 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
 TEST_P(ExtAuthzGrpcClientTest, UnknownError) {
   initialize(GetParam());
 
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
-  bool timer_destroyed = false;
-  timer->timer_destroyed_ = &timer_destroyed;
-
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
@@ -247,9 +235,6 @@ TEST_P(ExtAuthzGrpcClientTest, UnknownError) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->onFailure(Grpc::Status::Unknown, "", span_);
-
-  // make sure the internal timeout timer is destroyed
-  EXPECT_EQ(timer_destroyed, true);
 }
 
 // Test the client when the request is canceled.

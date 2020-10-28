@@ -14,9 +14,6 @@ service behind the proxy will be checked by an external HTTP or gRPC service. In
 for every authorized call, the external authorization service adds additional ``x-current-user``
 header entry to the original request headers to be forwarded to the upstream service.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers
@@ -32,11 +29,11 @@ To build this sandbox example and start the example services, run the following 
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                   Name                             Command               State                             Ports
-    ---------------------------------------------------------------------------------------------------------------------------------------
+                   Name                             Command               State             Ports
+    ---------------------------------------------------------------------------------------------------------------
     ext_authz_ext_authz-grpc-service_1   /app/server -users /etc/us       Up
     ext_authz_ext_authz-http-service_1   docker-entrypoint.sh node        Up
-    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp
     ext_authz_upstream-service_1         python3 /app/service/server.py   Up
 
 .. note::
