@@ -59,11 +59,11 @@ Here is an example config for setting up the socket:
       transport_socket:
         name: envoy.transport_sockets.upstream_proxy_protocol
         typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport
-        config:
-          version: V1
-        transport_socket:
-          name: envoy.transport_sockets.raw_buffer
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport
+          config:
+            version: V1
+          transport_socket:
+            name: envoy.transport_sockets.raw_buffer
       ...
 
 Note: If you are wrapping a TLS socket, the header will be sent before the TLS handshake occurs.
