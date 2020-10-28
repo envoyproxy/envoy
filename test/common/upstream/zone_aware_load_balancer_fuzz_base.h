@@ -10,9 +10,7 @@ public:
       : LoadBalancerFuzzBase(), random_bytestring_(random_bytestring) {
     if (need_local_cluster) {
       local_priority_set_ = std::make_shared<NiceMock<MockPrioritySet>>();
-      local_priority_set_->getMockHostSet(0);
     }
-    // If you call local_priority_set_.get() and it's not constructed yet, it'll return a nullptr
   }
 
   ~ZoneAwareLoadBalancerFuzzBase() {

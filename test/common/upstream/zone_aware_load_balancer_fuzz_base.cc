@@ -11,7 +11,9 @@ void ZoneAwareLoadBalancerFuzzBase::initializeASingleHostSet(
   LoadBalancerFuzzBase::initializeASingleHostSet(setup_priority_level, priority_level, port);
   // Update local priority set if it exists - will mean load balancer is zone aware and has decided
   // to construct local priority set
-  if (priority_level == 0 && local_priority_set_.get() != nullptr) {
+  if (priority_level == 0 && local_priority_set_) {
+    // TODO(zasweq): Perhaps fuzz the local priority set as a distinct host set? rather than
+    // making it P = 0 of main Priority Set
     MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
     local_priority_set_->getMockHostSet(0)->hosts_ = host_set.hosts_;
     local_priority_set_->getMockHostSet(0)->hosts_per_locality_ = host_set.hosts_per_locality_;
@@ -29,22 +31,21 @@ void ZoneAwareLoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
   const uint8_t priority_of_host_set = host_priority % num_priority_levels_;
   if (priority_of_host_set == 0 && local_priority_set_.get() != nullptr) {
     MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
-    local_priority_set_->getMockHostSet(0)->healthy_hosts_ = host_set.healthy_hosts_;
-    local_priority_set_->getMockHostSet(0)->degraded_hosts_ = host_set.degraded_hosts_;
-    local_priority_set_->getMockHostSet(0)->excluded_hosts_ = host_set.excluded_hosts_;
-    local_priority_set_->getMockHostSet(0)->healthy_hosts_per_locality_ =
-        host_set.healthy_hosts_per_locality_;
-    local_priority_set_->getMockHostSet(0)->degraded_hosts_per_locality_ =
-        host_set.degraded_hosts_per_locality_;
-    local_priority_set_->getMockHostSet(0)->excluded_hosts_per_locality_ =
-        host_set.excluded_hosts_per_locality_;
-    local_priority_set_->getMockHostSet(0)->runCallbacks({}, {});
+    HostVector empty_host_vector;
+    local_priority_set_->updateHosts(
+        0,
+        HostSetImpl::updateHostsParams(
+            host_set.hostsPtr(), host_set.hostsPerLocalityPtr(), host_set.healthyHostsPtr(),
+            host_set.hostsPerLocalityPtr(), host_set.degradedHostsPtr(),
+            host_set.degradedHostsPerLocalityPtr(), host_set.excludedHostsPtr(),
+            host_set.excludedHostsPerLocalityPtr()),
+        {}, empty_host_vector, empty_host_vector, absl::nullopt);
   }
 }
 
 void ZoneAwareLoadBalancerFuzzBase::setupZoneAwareLoadBalancingSpecificLogic() {
   // Having 3 possible weights, 1, 2, and 3 to provide the state space at least some variation
-  // in regards to weights, which do affect the load balancing algorithm Cap the amount of
+  // in regards to weights, which do affect the load balancing algorithm. Cap the amount of
   // weights at 3 for simplicity's sake
   stats_.max_host_weight_.set(3UL);
   addWeightsToHosts();
