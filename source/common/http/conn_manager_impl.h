@@ -360,7 +360,7 @@ private:
     // when triggered, will close the stream.
     Event::TimerPtr stream_idle_timer_;
     // Per-stream request timeout. This timer is enabled when the stream is created and disabled
-    // when the downstream closes the connection. If triggered, it will close the stream.
+    // when the stream ends. If triggered, it will close the stream.
     Event::TimerPtr request_timer_;
     // Per-stream request header timeout. This timer is enabled when the stream is created and
     // disabled when the downstream finishes sending headers. If triggered, it will close the
