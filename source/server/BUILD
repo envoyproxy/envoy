@@ -153,6 +153,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:mem_block_builder_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:utility_lib",
