@@ -85,6 +85,9 @@ void TcpUpstream::resetStream() {
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   upstream_request_->decodeData(data, end_stream);
+  if (end_stream) {
+    upstream_request_ = nullptr;
+  }
 }
 
 void TcpUpstream::onEvent(Network::ConnectionEvent event) {
