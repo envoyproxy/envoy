@@ -27,6 +27,21 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
+namespace {
+
+RawConnectionDriver::DoWriteCallback writeBufferCallback(Buffer::Instance& data) {
+  auto shared_data = std::make_shared<Buffer::OwnedImpl>();
+  shared_data->move(data);
+  return [shared_data](Network::ClientConnection& client) {
+    if (shared_data->length() > 0) {
+      client.write(*shared_data, false);
+      shared_data->drain(shared_data->length());
+    }
+  };
+}
+
+} // namespace
+
 void BufferingStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
@@ -112,15 +127,24 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
 
-RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
-                                         ReadCallback data_callback,
+RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& request_data,
+                                         ReadCallback response_data_callback,
+                                         Network::Address::IpVersion version,
+                                         Event::Dispatcher& dispatcher,
+                                         Network::TransportSocketPtr transport_socket)
+    : RawConnectionDriver(port, writeBufferCallback(request_data), response_data_callback, version,
+                          dispatcher, std::move(transport_socket)) {}
+
+RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_request_callback,
+                                         ReadCallback response_data_callback,
                                          Network::Address::IpVersion version,
                                          Event::Dispatcher& dispatcher,
                                          Network::TransportSocketPtr transport_socket)
     : dispatcher_(dispatcher) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
-  callbacks_ = std::make_unique<ConnectionCallbacks>();
+  callbacks_ = std::make_unique<ConnectionCallbacks>(
+      [this, write_request_callback]() { write_request_callback(*client_); });
 
   if (transport_socket == nullptr) {
     transport_socket = Network::Test::createRawBufferSocket();
@@ -130,9 +154,13 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
       Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+  // ConnectionCallbacks will call write_request_callback from the connect and low-watermark
+  // callbacks. Set a small buffer limit so high-watermark is triggered after every write and
+  // low-watermark is triggered every time the buffer is drained.
+  client_->setBufferLimits(1);
   client_->addConnectionCallbacks(*callbacks_);
-  client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
-  client_->write(initial_data, false);
+  client_->addReadFilter(
+      Network::ReadFilterSharedPtr{new ForwardingFilter(*this, response_data_callback)});
   client_->connect();
 }
 
