@@ -67,7 +67,8 @@ private:
 };
 
 // A FileEvent implementation which is used to drive BufferedIoSocketHandle.
-class UserSpaceFileEventImpl : public FileEvent, Logger::Loggable<Logger::Id::io> {
+// Declare the class final to safely call virtual function setEnabled in constructor.
+class UserSpaceFileEventImpl final : public FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
   UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events);
 
