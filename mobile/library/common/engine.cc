@@ -104,7 +104,7 @@ Engine::~Engine() {
   main_thread_.join();
 }
 
-envoy_status_t Engine::recordCounterInc(const std::string& elements, uint64_t count) {
+envoy_status_t Engine::recordCounter(const std::string& elements, uint64_t count) {
   if (server_ && client_scope_) {
     std::string name = Stats::Utility::sanitizeStatsName(elements);
     server_->dispatcher().post([this, name, count]() -> void {

@@ -20,6 +20,6 @@ class CounterImpl: NSObject, Counter {
       return
     }
 
-    engine.recordCounterInc(self.series, count: numericCast(count))
+    engine.recordCounter(self.series, count: numericCast(count))
   }
 }

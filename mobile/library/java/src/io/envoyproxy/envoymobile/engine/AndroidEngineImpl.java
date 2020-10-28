@@ -40,8 +40,8 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public int recordCounterInc(String elements, int count) {
-    return envoyEngine.recordCounterInc(elements, count);
+  public int recordCounter(String elements, int count) {
+    return envoyEngine.recordCounter(elements, count);
   }
 
   @Override
