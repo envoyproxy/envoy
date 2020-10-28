@@ -89,6 +89,10 @@ public:
 
 using SlotPtr = std::unique_ptr<Slot>;
 
+// Provides a typesafe API for slots.
+//
+// TODO(jmarantz): Rename the Slot class to something like RawSlot, where the
+// only reference is from TypedSlot, which we can then rename to Slot.
 template <class T> class TypedSlot {
 public:
   /**
