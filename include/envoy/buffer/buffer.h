@@ -71,6 +71,8 @@ public:
 
 using SliceDataPtr = std::unique_ptr<SliceData>;
 
+class Reservation;
+
 /**
  * A basic buffer abstraction.
  */
@@ -200,6 +202,9 @@ public:
    * @return the number of iovecs used to reserve the space.
    */
   virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
+
+  virtual Reservation reserve(uint64_t preferred_length) PURE;
+  virtual void commit(Reservation& reservation, uint64_t length) PURE;
 
   /**
    * Search for an occurrence of data within the buffer.
@@ -410,6 +415,37 @@ public:
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
+
+/**
+ * Holds an in-progress addition to a buffer.
+ *
+ * @note For performance reasons, this class is passed by value to
+ * avoid an extra allocation, so it cannot have any virtual methods.
+ */
+class Reservation final {
+public:
+  Reservation(Reservation&&) = default;
+  ~Reservation() {
+    if (!slices_.empty()) {
+      buffer_.commit(*this, 0);
+    }
+  }
+  RawSlice* slices() { return slices_.data(); }
+  uint64_t numSlices() const { return slices_.size(); }
+  void commit(uint64_t length) {
+    buffer_.commit(*this, length);
+    slices_.clear();
+    owned_slices_.clear();
+  }
+
+  // private:
+  friend class Instance;
+  Reservation(Instance& buffer) : buffer_(buffer) {}
+  Instance& buffer_;
+  static constexpr uint32_t num_elements_ = 9;
+  absl::InlinedVector<RawSlice, num_elements_> slices_;
+  absl::InlinedVector<SliceDataPtr, num_elements_> owned_slices_;
+};
 
 } // namespace Buffer
 } // namespace Envoy

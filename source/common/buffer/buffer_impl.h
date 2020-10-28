@@ -261,9 +261,18 @@ public:
    * @param capacity number of bytes of space the slice should have.
    * @return an OwnedSlice with at least the specified capacity.
    */
-  static SlicePtr create(uint64_t capacity) {
+  static std::unique_ptr<OwnedSlice> create(uint64_t capacity) {
+    ASSERT(sliceSize(default_slice_size_) == default_slice_size_);
+
     uint64_t slice_capacity = sliceSize(capacity);
-    return SlicePtr(new (slice_capacity) OwnedSlice(slice_capacity));
+    std::unique_ptr<OwnedSlice> slice;
+    if (slice_capacity == default_slice_size_ && !free_list_.empty()) {
+      slice = std::move(free_list_.back());
+      free_list_.pop_back();
+    } else {
+      slice.reset(new (slice_capacity) OwnedSlice(slice_capacity));
+    }
+    return slice;
   }
 
   /**
@@ -274,11 +283,26 @@ public:
    *         the internal implementation) have a nonzero amount of reservable space at the end.
    */
   static SlicePtr create(const void* data, uint64_t size) {
-    uint64_t slice_capacity = sliceSize(size);
-    std::unique_ptr<OwnedSlice> slice(new (slice_capacity) OwnedSlice(slice_capacity));
+    std::unique_ptr<OwnedSlice> slice(create(size));
     memcpy(slice->base_, data, size);
     slice->reservable_ = size;
     return slice;
+  }
+
+  static constexpr uint32_t default_slice_size_ = 16384;
+
+  static void free(std::unique_ptr<OwnedSlice> slice) {
+    if (slice == nullptr) {
+      return;
+    }
+
+    if (slice->capacity_ == default_slice_size_ && slice->reservable_ == 0 &&
+        free_list_.size() < free_list_max_) {
+      free_list_.emplace_back(std::move(slice));
+      ASSERT(slice == nullptr);
+    } else {
+      slice.reset();
+    }
   }
 
 private:
@@ -291,11 +315,14 @@ private:
    * @param data_size the minimum amount of data the slice must be able to store, in bytes.
    * @return a recommended slice size, in bytes.
    */
-  static uint64_t sliceSize(uint64_t data_size) {
-    static constexpr uint64_t PageSize = 4096;
-    const uint64_t num_pages = (sizeof(OwnedSlice) + data_size + PageSize - 1) / PageSize;
-    return num_pages * PageSize - sizeof(OwnedSlice);
+  constexpr static uint64_t sliceSize(uint64_t data_size) {
+    constexpr uint64_t PageSize = 4096;
+    const uint64_t num_pages = (data_size + PageSize - 1) / PageSize;
+    return num_pages * PageSize;
   }
+
+  static constexpr uint32_t free_list_max_ = 8;
+  static thread_local absl::InlinedVector<std::unique_ptr<OwnedSlice>, free_list_max_> free_list_;
 
   uint8_t storage_[];
 };
@@ -561,6 +588,7 @@ public:
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
   void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
+  void commit(Reservation& reservation, uint64_t length) override;
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
@@ -570,6 +598,7 @@ public:
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
+  Reservation reserve(uint64_t preferred_length) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;

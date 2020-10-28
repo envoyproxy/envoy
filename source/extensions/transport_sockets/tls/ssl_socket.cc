@@ -93,16 +93,13 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
       ASSERT(static_cast<size_t>(rc) <= remaining);
       mem += rc;
       remaining -= rc;
-      result.commit_slice_ = true;
+      result.bytes_read_ += rc;
     } else {
       result.error_ = absl::make_optional<int>(rc);
       break;
     }
   }
 
-  if (result.commit_slice_) {
-    slice.len_ -= remaining;
-  }
   return result;
 }
 
@@ -122,17 +119,16 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   while (keep_reading) {
+    uint64_t bytes_read_this_iteration = 0;
     // We use 2 slices here so that we can use the remainder of an existing buffer chain element
     // if there is extra space. 16K read is arbitrary and can be tuned later.
-    Buffer::RawSlice slices[2];
-    uint64_t slices_to_commit = 0;
-    uint64_t num_slices = read_buffer.reserve(16384, slices, 2);
-    for (uint64_t i = 0; i < num_slices; i++) {
-      auto result = sslReadIntoSlice(slices[i]);
-      if (result.commit_slice_) {
-        slices_to_commit++;
-        bytes_read += slices[i].len_;
-      }
+    Buffer::Reservation reservation = read_buffer.reserve(16384);
+    // Buffer::RawSlice slices[2];
+    // uint64_t slices_to_commit = 0;
+    // uint64_t num_slices = read_buffer.reserve(16384, slices, 2);
+    for (uint64_t i = 0; i < reservation.numSlices(); i++) {
+      auto result = sslReadIntoSlice(reservation.slices()[i]);
+      bytes_read_this_iteration += result.bytes_read_;
       if (result.error_.has_value()) {
         keep_reading = false;
         int err = SSL_get_error(rawSsl(), result.error_.value());
@@ -162,13 +158,13 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
       }
     }
 
-    if (slices_to_commit > 0) {
-      read_buffer.commit(slices, slices_to_commit);
-      if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
-        keep_reading = false;
-      }
+    reservation.commit(bytes_read_this_iteration);
+    if (bytes_read_this_iteration > 0 && callbacks_->shouldDrainReadBuffer()) {
+      callbacks_->setReadBufferReady();
+      keep_reading = false;
     }
+
+    bytes_read += bytes_read_this_iteration;
   }
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);

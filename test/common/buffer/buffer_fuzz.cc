@@ -110,6 +110,11 @@ public:
     size_ += iovecs[0].len_;
   }
 
+  void commit(Buffer::Reservation&, uint64_t length) override {
+    size_ += length;
+    FUZZ_ASSERT(start_ + size_ + length <= data_.size());
+  }
+
   void copyOut(size_t start, uint64_t size, void* data) const override {
     ::memcpy(data, this->start() + start, size);
   }
@@ -150,6 +155,15 @@ public:
     iovecs[0].mem_ = mutableEnd();
     iovecs[0].len_ = length;
     return 1;
+  }
+
+  Buffer::Reservation reserve(uint64_t length) override {
+    Buffer::RawSlice slice;
+    reserve(length, &slice, 1);
+
+    Buffer::Reservation reservation(*this);
+    reservation.slices_.push_back(slice);
+    return reservation;
   }
 
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {

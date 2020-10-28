@@ -529,6 +529,8 @@ public:
   MOCK_METHOD(void, move, (Instance&), (override));
   MOCK_METHOD(void, move, (Instance&, uint64_t), (override));
   MOCK_METHOD(uint64_t, reserve, (uint64_t, Buffer::RawSlice*, uint64_t), (override));
+  MOCK_METHOD(Buffer::Reservation, reserve, (uint64_t preferred_length), (override));
+  MOCK_METHOD(void, commit, (Buffer::Reservation & reservation, uint64_t length), (override));
   MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
   MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
   MOCK_METHOD(std::string, toString, (), (const, override));

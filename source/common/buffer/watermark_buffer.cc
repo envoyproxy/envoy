@@ -36,6 +36,11 @@ void WatermarkBuffer::commit(RawSlice* iovecs, uint64_t num_iovecs) {
   checkHighAndOverflowWatermarks();
 }
 
+void WatermarkBuffer::commit(Reservation& reservation, uint64_t length) {
+  OwnedImpl::commit(reservation, length);
+  checkHighAndOverflowWatermarks();
+}
+
 void WatermarkBuffer::drain(uint64_t size) {
   OwnedImpl::drain(size);
   checkLowWatermark();
