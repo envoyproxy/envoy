@@ -58,6 +58,8 @@ public:
   const std::string Squash = "envoy.filters.http.squash";
   // External Authorization filter
   const std::string ExtAuthorization = "envoy.filters.http.ext_authz";
+  // Response Map filter
+  const std::string ResponseMap = "envoy.filters.http.response_map";
   // RBAC HTTP Authorization filter
   const std::string Rbac = "envoy.filters.http.rbac";
   // JWT authentication filter

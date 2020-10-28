@@ -151,6 +151,7 @@ envoy_cc_library(
         "//include/envoy/router:rds_interface",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/network:utility_lib",
+        "//source/common/response_map:response_map_lib",
         "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
