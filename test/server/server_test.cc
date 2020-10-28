@@ -1249,7 +1249,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
 
         abort_called.WaitForNotification();
       },
-      "(AddressSanitizer:DEADLYSIGNAL|Called SafeFatalAction.*Called UnsafeFatalAction)");
+      "");
 }
 
 // Static configuration validation. We test with both allow/reject settings various aspects of
