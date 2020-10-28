@@ -186,9 +186,8 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
   threading_ever_initialized_ = true;
   main_thread_dispatcher_ = &main_thread_dispatcher;
   tls_cache_.setSlot(tls.allocateSlot());
-  tls_cache_.set([](Event::Dispatcher&) -> std::shared_ptr<TlsCache> {
-    return std::make_shared<TlsCache>();
-  });
+  tls_cache_.set(
+      [](Event::Dispatcher&) -> std::shared_ptr<TlsCache> { return std::make_shared<TlsCache>(); });
 }
 
 void ThreadLocalStoreImpl::shutdownThreading() {
@@ -320,9 +319,8 @@ void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
     // https://gist.github.com/jmarantz/838cb6de7e74c0970ea6b63eded0139a
     // contains a patch that will implement batching together to clear multiple
     // histograms.
-    tls_cache_.runOnAllThreads([histogram_id](TlsCache& tls_cache) {
-      tls_cache.eraseHistogram(histogram_id);
-    });
+    tls_cache_.runOnAllThreads(
+        [histogram_id](TlsCache& tls_cache) { tls_cache.eraseHistogram(histogram_id); });
   }
 }
 

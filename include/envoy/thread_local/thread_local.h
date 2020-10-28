@@ -89,8 +89,8 @@ public:
 
 using SlotPtr = std::unique_ptr<Slot>;
 
-template<class T> class TypedSlot {
- public:
+template <class T> class TypedSlot {
+public:
   /**
    * @return true if the TypedSlot object has been allocated a slot.
    */
@@ -130,8 +130,8 @@ template<class T> class TypedSlot {
   /**
    * UpdateCb is passed a mutable reference to the current stored data.
    *
-   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner. As the owner may
-   * be destructed in main thread before the update_cb gets called in a worker thread.
+   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner. As the owner
+   * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using UpdateCb = std::function<void(T& obj)>;
   void runOnAllThreads(const UpdateCb& cb) { slot_->runOnAllThreads(makeSlotUpdateCb(cb)); }
@@ -139,7 +139,7 @@ template<class T> class TypedSlot {
     slot_->runOnAllThreads(makeSlotUpdateCb(cb), complete_cb);
   }
 
- private:
+private:
   Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
     return [this, cb](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
       T& typed_obj = slot_->getTyped<T>();
