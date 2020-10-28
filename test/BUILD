@@ -40,6 +40,7 @@ envoy_cc_test_library(
 
 envoy_pch_library(
     name = "test_pch",
+    testonly = True,
     external_deps = [
         "googletest",
     ],

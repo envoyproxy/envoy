@@ -11,12 +11,12 @@ load(
 load(":pch.bzl", "pch")
 
 def envoy_pch_copts(repository, target):
-    # TODO: enable only sometimes, same as below
     return select({
-        "//conditions:default": [
+        repository + "//bazel:clang_pch_build": [
             "-include-pch",
             "$(location {}{})".format(repository, target),
         ],
+        "//conditions:default": [],
     })
 
 def envoy_pch_library(
@@ -43,4 +43,8 @@ def envoy_pch_library(
         includes = includes,
         visibility = visibility,
         testonly = testonly,
+        enabled = select({
+            repository + "//bazel:clang_pch_build": True,
+            "//conditions:default": False,
+        }),
     )

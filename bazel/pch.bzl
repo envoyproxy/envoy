@@ -21,10 +21,11 @@ def _pch(ctx):
         cc_infos = [dep[CcInfo] for dep in ctx.attr.deps],
     )
 
-    # TODO: define somewhere to allow disables
-    enable_pch = True
-    if "clang" not in cc_compiler_path or not enable_pch:
+    if not ctx.attr.enabled:
         return [deps_cc_info]
+
+    if "clang" not in cc_compiler_path:
+        fail("error: attempting to use clang PCH without clang: {}".format(cc_compiler_path))
 
     generated_header_file = ctx.actions.declare_file(ctx.label.name + ".h")
     ctx.actions.write(
@@ -99,6 +100,9 @@ pch = rule(
             mandatory = True,
             allow_empty = False,
             providers = [CcInfo],
+        ),
+        enabled = attr.bool(
+            mandatory = True,
         ),
         _cc_toolchain = attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
     ),
