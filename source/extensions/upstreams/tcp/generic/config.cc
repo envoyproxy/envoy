@@ -12,10 +12,9 @@ namespace Generic {
 
 TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
-    const absl::optional<std::reference_wrapper<const std::string>> tunneling_hostname,
-    Upstream::LoadBalancerContext* context,
+    absl::string_view tunneling_hostname, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const {
-  if (tunneling_hostname.has_value()) {
+  if (!tunneling_hostname.empty()) {
     auto* cluster = cluster_manager.get(cluster_name);
     if (!cluster) {
       return nullptr;
@@ -28,8 +27,8 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
                             "http2_protocol_options on the cluster.");
       return nullptr;
     }
-    auto ret = std::make_unique<TcpProxy::HttpConnPool>(
-        cluster_name, cluster_manager, context, tunneling_hostname.value(), upstream_callbacks);
+    auto ret = std::make_unique<TcpProxy::HttpConnPool>(cluster_name, cluster_manager, context,
+                                                        tunneling_hostname, upstream_callbacks);
     return (ret->valid() ? std::move(ret) : nullptr);
   }
   auto ret = std::make_unique<TcpProxy::TcpConnPool>(cluster_name, cluster_manager, context,

@@ -454,9 +454,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::strin
     return false;
   }
 
-  const absl::optional<std::reference_wrapper<const std::string>> hostname =
-      (config_->tunnelingConfig() ? absl::optional(config_->tunnelingConfig()->hostname())
-                                  : absl::nullopt);
+  absl::string_view hostname =
+      config_->tunnelingConfig() ? config_->tunnelingConfig()->hostname() : "";
 
   generic_conn_pool_ = factory->createGenericConnPool(cluster_name, cluster_manager_, hostname,
                                                       this, *upstream_callbacks_);

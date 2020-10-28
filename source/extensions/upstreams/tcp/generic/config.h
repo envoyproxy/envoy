@@ -18,8 +18,7 @@ public:
   std::string name() const override { return "envoy.filters.connection_pools.tcp.generic"; }
   std::string category() const override { return "envoy.upstreams"; }
   TcpProxy::GenericConnPoolPtr createGenericConnPool(
-      const std::string& cluster_name, Upstream::ClusterManager& cm,
-      const absl::optional<std::reference_wrapper<const std::string>> hostname,
+      const std::string& cluster_name, Upstream::ClusterManager& cm, absl::string_view hostname,
       Upstream::LoadBalancerContext* context,
       Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const override;
 

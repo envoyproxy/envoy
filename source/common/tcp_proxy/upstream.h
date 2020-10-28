@@ -40,7 +40,7 @@ class HttpUpstream;
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
   HttpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
-               Upstream::LoadBalancerContext* context, std::string hostname,
+               Upstream::LoadBalancerContext* context, absl::string_view hostname,
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~HttpConnPool() override;
 

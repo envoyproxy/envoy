@@ -114,15 +114,14 @@ public:
   /*
    * @param cluster_name the name of the cluster to use
    * @param cm the cluster manager to get the connection pool from
-   * @param hostname the hostname to use if doing connect tunneling, absl::nullopt otherwise.
+   * @param hostname the hostname to use if doing connect tunneling.
    * @param context the load balancing context for this connection.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
    * @return may be null
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(const std::string& cluster_name, Upstream::ClusterManager& cm,
-                        const absl::optional<std::reference_wrapper<const std::string>> hostname,
-                        Upstream::LoadBalancerContext* context,
+                        absl::string_view hostname, Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;
 };
 

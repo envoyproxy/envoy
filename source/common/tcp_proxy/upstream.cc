@@ -201,7 +201,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 
 HttpConnPool::HttpConnPool(const std::string& cluster_name,
                            Upstream::ClusterManager& cluster_manager,
-                           Upstream::LoadBalancerContext* context, std::string hostname,
+                           Upstream::LoadBalancerContext* context, absl::string_view hostname,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
     : hostname_(hostname), upstream_callbacks_(upstream_callbacks) {
   conn_pool_ = cluster_manager.httpConnPoolForCluster(
