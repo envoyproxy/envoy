@@ -29,8 +29,7 @@ public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version, bool enable_half_close,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       Network::Address::InstanceConstSharedPtr source_address =
-                           Network::Address::InstanceConstSharedPtr());
+                       Network::Address::InstanceConstSharedPtr source_address = nullptr);
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);

@@ -233,7 +233,7 @@ public:
   /**
    * @return bool whether the transport socket will use proxy protocol options.
    */
-  virtual bool usesProxyProtocolOptions() const { return false; }
+  virtual bool usesProxyProtocolOptions() const PURE;
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

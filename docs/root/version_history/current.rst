@@ -18,6 +18,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
+* proxy_proto: fixed a bug where the wrong downstream address got sent to upstream connections.
 
 Removed Config or Runtime
 -------------------------
