@@ -30,6 +30,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 .. literalinclude:: _include/envoy-dynamic-lds-demo.yaml
     :language: yaml
     :linenos:
+    :emphasize-lines: 1, 8-9, 28
 
 ``resources`` - Clusters Discovery Service (CDS)
 ------------------------------------------------
@@ -37,6 +38,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 .. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
     :language: yaml
     :linenos:
+    :emphasize-lines: 1, 10, 16-17
 
 ``admin``
 ---------
