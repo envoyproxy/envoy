@@ -374,6 +374,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (direct_response != nullptr) {
     config_.stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers, !config_.suppress_envoy_headers_);
+    callbacks_->streamInfo().setRouteName(direct_response->routeName());
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
@@ -392,7 +393,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
-    callbacks_->streamInfo().setRouteName(direct_response->routeName());
     return Http::FilterHeadersStatus::StopIteration;
   }
 
