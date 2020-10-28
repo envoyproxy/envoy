@@ -1902,7 +1902,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
   connection_->readDisable(false);
 
-  // Do a read to clear the want_read_ flag, verify that no read activation is scheduled.
+  // Do a read to clear the transport_wants_read_ flag, verify that no read activation is scheduled.
   EXPECT_CALL(*transport_socket_, doRead(_))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   file_ready_cb_(Event::FileReadyType::Read);
@@ -1981,8 +1981,8 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
   connection_->readDisable(false);
 }
 
-// Verify that want_read_ read resumption is not lost when processing read buffer high-watermark
-// resumptions.
+// Verify that transport_wants_read_ read resumption is not lost when processing read buffer
+// high-watermark resumptions.
 TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
   InSequence s;
 
@@ -2020,8 +2020,8 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
   connection_->readDisable(false);
 
   // Invoke the file event cb while read_disable_count_ == 1 and fully drain the read buffer.
-  // Expect no transport reads. Expect a read resumption due to want_read_ being true when read is
-  // re-enabled due to going under the low watermark.
+  // Expect no transport reads. Expect a read resumption due to transport_wants_read_ being true
+  // when read is re-enabled due to going under the low watermark.
   EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
   EXPECT_CALL(*read_filter, onData(_, _))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
@@ -2029,8 +2029,8 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
         data.drain(data.length());
         return FilterStatus::Continue;
       }));
-  // The buffer is fully drained. Expect a read activation because setReadBufferReady set want_read_
-  // and no transport doRead calls have happened.
+  // The buffer is fully drained. Expect a read activation because setReadBufferReady set
+  // transport_wants_read_ and no transport doRead calls have happened.
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
   file_ready_cb_(Event::FileReadyType::Read);
@@ -2040,7 +2040,7 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
   file_ready_cb_(Event::FileReadyType::Read);
 
   // Verify there are no read activate calls the event callback does a transport read and clears the
-  // want_read_ state.
+  // transport_wants_read_ state.
   EXPECT_CALL(*file_event_, setEnabled(_));
   connection_->readDisable(true);
   EXPECT_CALL(*file_event_, setEnabled(_));
