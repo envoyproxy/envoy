@@ -640,7 +640,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
       resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
                          [&dns_callback_executed](DnsResolver::ResolutionStatus status,
                                                   std::list<DnsResponse>&& response) -> void {
-                           // Eventhough the second query will fail, this one will flush with the
+                           // Even though the second query will fail, this one will flush with the
                            // state it had.
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
                            EXPECT_EQ(1, response.size());
