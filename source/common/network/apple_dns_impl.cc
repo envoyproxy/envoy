@@ -24,7 +24,6 @@ namespace Network {
 void DnsService::dnsServiceRefDeallocate(DNSServiceRef sdRef) { DNSServiceRefDeallocate(sdRef); }
 
 DNSServiceErrorType DnsService::dnsServiceCreateConnection(DNSServiceRef* sdRef) {
-  ENVOY_LOG_MISC(debug, "In real implementation");
   return DNSServiceCreateConnection(sdRef);
 }
 
@@ -234,19 +233,19 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   RELEASE_ASSERT(interface_index == 0,
                  fmt::format("unexpected interface_index={}", interface_index));
 
+  if (!pending_cb_) {
+    pending_cb_ = {ResolutionStatus::Success, {}};
+    parent_.addPendingQuery(this);
+  }
+
   // Generic error handling.
   if (error_code != kDNSServiceErr_NoError) {
     // TODO(junr03): consider creating stats for known error types (timeout, refused connection,
     // etc.). Currently a bit challenging because there is no scope access wired through. Current
     // query gets a failure status
-    if (!pending_cb_) {
-      ENVOY_LOG(warn, "[Error path] Adding to queries pending callback");
-      pending_cb_ = {ResolutionStatus::Failure, {}};
-      parent_.addPendingQuery(this);
-    } else {
-      ENVOY_LOG(warn, "[Error path] Changing status for query already pending flush");
-      pending_cb_->status_ = ResolutionStatus::Failure;
-    }
+
+    pending_cb_->status_ = ResolutionStatus::Failure;
+    pending_cb_->responses_.clear();
 
     ENVOY_LOG(warn, "[Error path] DNS Resolver flushing queries pending callback");
     parent_.flushPendingQueries(true /* with_error */);
@@ -255,23 +254,14 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     return;
   }
 
-  // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are purely
+  // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are only
   // additive.
   if (flags & kDNSServiceFlagsAdd) {
+    ASSERT(address, "invalid to add null address");
     auto dns_response = buildDnsResponse(address, ttl);
     ENVOY_LOG(debug, "Address to add address={}, ttl={}",
               dns_response.address_->ip()->addressAsString(), ttl);
-
-    if (!pending_cb_) {
-      ENVOY_LOG(debug, "Adding to queries pending callback");
-      // DISCUSSION: should this be added on creation so even if a query returns success, but no new
-      // addresses the callbakc target is called?
-      pending_cb_ = {ResolutionStatus::Success, {dns_response}};
-      parent_.addPendingQuery(this);
-    } else {
-      ENVOY_LOG(debug, "New address for query already pending flush");
-      pending_cb_->responses_.push_back(dns_response);
-    }
+    pending_cb_->responses_.push_back(dns_response);
   }
 
   if (!(flags & kDNSServiceFlagsMoreComing)) {

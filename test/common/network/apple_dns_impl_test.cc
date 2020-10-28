@@ -426,7 +426,7 @@ TEST_F(AppleDnsImplFakeApiTest, QueryCompletedWithError) {
                          [&dns_callback_executed](DnsResolver::ResolutionStatus status,
                                                   std::list<DnsResponse>&& responses) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                           EXPECT_EQ(0, responses.size());
+                           EXPECT_TRUE(responses.empty());
                            dns_callback_executed.Notify();
                          }));
   dns_callback_executed.WaitForNotification();
@@ -504,8 +504,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
                          [&dns_callback_executed](DnsResolver::ResolutionStatus status,
                                                   std::list<DnsResponse>&& response) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                           // DISCUSSION: should the responses be cleared because of failure?
-                           EXPECT_EQ(1, response.size());
+                           EXPECT_TRUE(response.empty());
                            dns_callback_executed.Notify();
                          });
   ASSERT_NE(nullptr, query);
@@ -670,6 +669,69 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
 
   dns_callback_executed.WaitForNotification();
   dns_callback_executed2.WaitForNotification();
+}
+
+TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
+  createResolver();
+
+  const std::string hostname = "foo.com";
+  sockaddr_in addr4;
+  addr4.sin_family = AF_INET;
+  EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
+  addr4.sin_port = htons(6502);
+  Network::Address::Ipv4Instance address(&addr4);
+  DNSServiceGetAddrInfoReply reply_callback;
+  absl::Notification dns_callback_executed;
+
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
+                                    kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
+                                    StrEq(hostname.c_str()), _, _))
+      .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
+
+  auto query =
+      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
+                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
+                                                  std::list<DnsResponse>&& response) -> void {
+                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                           EXPECT_TRUE(response.empty());
+                           dns_callback_executed.Notify();
+                         });
+  ASSERT_NE(nullptr, query);
+
+  // The query's sd ref will be deallocated on completion.
+  EXPECT_CALL(dns_service_, dnsServiceRefDeallocate(_));
+  // Reply _without_ add and _without_ more coming flags. This should cause a flush with an empty
+  // response.
+  reply_callback(nullptr, 0, 0, kDNSServiceErr_NoError, hostname.c_str(), nullptr, 30, query);
+  dns_callback_executed.WaitForNotification();
+}
+
+TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
+  createResolver();
+
+  const std::string hostname = "foo.com";
+  sockaddr_in addr4;
+  addr4.sin_family = AF_INET;
+  EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
+  addr4.sin_port = htons(6502);
+  Network::Address::Ipv4Instance address(&addr4);
+  DNSServiceGetAddrInfoReply reply_callback;
+
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
+                                    kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
+                                    StrEq(hostname.c_str()), _, _))
+      .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
+
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void { FAIL(); });
+  ASSERT_NE(nullptr, query);
+
+  EXPECT_DEATH(reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError,
+                              hostname.c_str(), nullptr, 30, query),
+               "invalid to add null address");
 }
 
 } // namespace
