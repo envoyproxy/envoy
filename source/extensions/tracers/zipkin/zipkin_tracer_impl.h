@@ -119,6 +119,7 @@ public:
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& cluster() { return cluster_; }
+  const std::string& hostname() { return hostname_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
 
@@ -135,6 +136,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   std::string cluster_;
+  std::string hostname_;
   ZipkinTracerStats tracer_stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
