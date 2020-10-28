@@ -44,6 +44,9 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
 Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb&& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the
   // expired check below.
+  //
+  // Note also that this logic is duplicated below and dataCallback(), rather
+  // than incurring another lambda redirection.
   return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
     if (!still_alive_guard.expired()) {
       cb();
@@ -69,6 +72,10 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(inde
 Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   // See the header file comments for still_alive_guard_ for why we capture index_.
   return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb, index = index_] {
+    // This duplicates logic in wrapCallback() (above). Using wrapCallback also
+    // works, but incurs another indirection of lambda at runtime. As the
+    // duplicated logic is only an if-statement and a bool function, it doesn't
+    // seem worth factoring that out to a helper function.
     if (still_alive_guard.expired()) {
       return;
     }
