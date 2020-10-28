@@ -41,10 +41,10 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
             static_cast<void*>(this), events, was_enabled ? "not " : "");
 }
 
-UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events)
-    : schedulable_(
-      dispatcher.createSchedulableCallback([this]() { onEvents(); })
-    ), cb_([this, cb]() {
+UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                               uint32_t events)
+    : schedulable_(dispatcher.createSchedulableCallback([this]() { onEvents(); })),
+      cb_([this, cb]() {
         auto all_events = getEventListener().triggeredEvents();
         auto ephemeral_events = getEventListener().getAndClearEphemeralEvents();
         ENVOY_LOG(trace,

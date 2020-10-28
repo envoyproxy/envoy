@@ -280,7 +280,7 @@ TEST_F(BufferedIoSocketHandleTest, TestEventResetClearCallback) {
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   ASSERT_TRUE(scheduable_cb_->enabled());
-  
+
   EXPECT_CALL(cb_, called(_)).Times(0);
   io_handle_->resetFileEvents();
 }

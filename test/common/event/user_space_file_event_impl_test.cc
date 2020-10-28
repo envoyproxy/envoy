@@ -26,8 +26,7 @@ public:
 class UserSpaceFileEventImplTest : public testing::Test {
 public:
   UserSpaceFileEventImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
-  }
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
 protected:
   MockReadyCb ready_cb_;
@@ -66,7 +65,7 @@ TEST_F(UserSpaceFileEventImplTest, TestRescheduleIsDeduplicated) {
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw);
   {
     SCOPED_TRACE("1st schedule");
-        user_file_event_->activate(event_rw);
+    user_file_event_->activate(event_rw);
 
     user_file_event_->activate(event_rw);
     EXPECT_CALL(ready_cb_, called(event_rw)).Times(1);
