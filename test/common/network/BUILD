@@ -132,6 +132,8 @@ envoy_cc_test(
         # Used in createDnsResolver to force creation of DnsResolverImpl when running test on macOS.
         "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
     ],
+    # TODO(envoyproxy/windows-dev): Resolve test failing when compiled with clang-cl opt build on Windows
+    tags = ["fails_on_windows_clang"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",

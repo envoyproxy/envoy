@@ -49,4 +49,6 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "compressor_filter_speed_test_benchmark_test",
     benchmark_binary = "compressor_filter_speed_test",
+    # TODO(envoyproxy/windows-dev): Resolve test failing when compiled with clang-cl opt build on Windows
+    tags = ["fails_on_windows_clang"],
 )
