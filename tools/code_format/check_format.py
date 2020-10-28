@@ -34,7 +34,7 @@ EXCLUDED_PREFIXES = (
     "./test/extensions/common/wasm/test_data",
     "./test/extensions/access_loggers/wasm/test_data",
     "./source/extensions/common/wasm/ext",
-    "./examples/wasm",
+    "./examples/wasm-cc",
 )
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
@@ -121,7 +121,7 @@ BUILD_URLS_ALLOWLIST = (
     "./generated_api_shadow/bazel/repository_locations.bzl",
     "./generated_api_shadow/bazel/envoy_http_archive.bzl",
     "./bazel/repository_locations.bzl",
-    "./bazel/crates.bzl",
+    "./bazel/external/cargo/crates.bzl",
     "./api/bazel/repository_locations.bzl",
     "./api/bazel/envoy_http_archive.bzl",
 )
