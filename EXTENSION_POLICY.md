@@ -35,6 +35,10 @@ The following procedure will be used when proposing new extensions for inclusion
   by other contributors.
   5. Any new dependencies added for this extension must comply with
   [DEPENDENCY_POLICY.md](DEPENDENCY_POLICY.md), please follow the steps detailed there.
+  6. If an extension depends on platform specific functionality, be sure to guard it in the build
+  system. See [platform specific features](./PULL_REQUESTS.md#platform-specific-features).
+  Add the extension to the necessary `*_SKIP_TARGETS` in [bazel/repositories.bzl](bazel/repositories.bzl)
+  and tag tests to be skipped/failed on the unsupported platform.
 
 ## Removing existing extensions
 
@@ -122,3 +126,14 @@ An assessment of a robust security posture for an extension is subject to the fo
 
 The current stability and security posture of all extensions can be seen
 [here](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions).
+
+## Adding Extension Points
+
+Envoy might lack the extension point necessary for an extension. In that
+case we need to install an extension point, which can be done as follows:
+
+  1. Open a GitHub issue describing the proposed extension point and use cases.
+  2. Make changes in core Envoy for the extension point.
+  3. Update [extending envoy](docs/root/extending/extending.rst) to list the new
+     extension point and add any documentation explaining the extension point.
+     At the very least this should link to the corresponding proto.
