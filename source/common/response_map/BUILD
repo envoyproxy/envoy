@@ -9,9 +9,9 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "local_reply_lib",
-    srcs = ["local_reply.cc"],
-    hdrs = ["local_reply.h"],
+    name = "response_map_lib",
+    srcs = ["response_map.cc"],
+    hdrs = ["response_map.h"],
     deps = [
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codes_interface",
@@ -25,6 +25,6 @@ envoy_cc_library(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stream_info:stream_info_lib",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/response_map/v3:pkg_cc_proto",
     ],
 )

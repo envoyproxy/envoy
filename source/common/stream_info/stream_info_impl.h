@@ -117,6 +117,9 @@ struct StreamInfoImpl : public StreamInfo {
     return response_code_details_;
   }
 
+  void setResponseCode(uint32_t code) override {
+    response_code_ = code;
+  }
   void setResponseCodeDetails(absl::string_view rc_details) override {
     response_code_details_.emplace(rc_details);
   }

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
@@ -16,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
 // to generate a new string in either plain text or JSON format.
+// [#next-free-field: 6]
 message SubstitutionFormatString {
   oneof format {
     option (validate.required) = true;
@@ -57,5 +60,18 @@ message SubstitutionFormatString {
     //  }
     //
     google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
+
+    // A DataSource variant for text_format.
+    DataSource text_format_source = 5;
   }
+
+  // Specify a *content_type* field.
+  // If this field is not set then ``text/plain`` is used for *text_format* and
+  // ``application/json`` is used for *json_format*.
+  //
+  // .. code-block::
+  //
+  //   content_type: "text/html; charset=UTF-8"
+  //
+  string content_type = 4;
 }
