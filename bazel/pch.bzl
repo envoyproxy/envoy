@@ -4,6 +4,13 @@ load(
 )
 
 def _pch(ctx):
+    deps_cc_info = cc_common.merge_cc_infos(
+        cc_infos = [dep[CcInfo] for dep in ctx.attr.deps],
+    )
+
+    if not ctx.attr.enabled:
+        return [deps_cc_info]
+
     cc_toolchain = ctx.attr._cc_toolchain[cc_common.CcToolchainInfo]
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
@@ -17,13 +24,6 @@ def _pch(ctx):
         action_name = CPP_COMPILE_ACTION_NAME,
     )
 
-    deps_cc_info = cc_common.merge_cc_infos(
-        cc_infos = [dep[CcInfo] for dep in ctx.attr.deps],
-    )
-
-    if not ctx.attr.enabled:
-        return [deps_cc_info]
-
     if "clang" not in cc_compiler_path:
         fail("error: attempting to use clang PCH without clang: {}".format(cc_compiler_path))
 
@@ -33,10 +33,9 @@ def _pch(ctx):
         "\n".join(["#include \"{}\"".format(include) for include in ctx.attr.includes]) + "\n",
     )
 
-    pch_file = ctx.actions.declare_file(ctx.label.name + ".pch")
-
     # TODO: -fno-pch-timestamp / invalidation in that case doesn't work
     pch_flags = ["-x", "c++-header"]
+    pch_file = ctx.actions.declare_file(ctx.label.name + ".pch")
 
     deps_ctx = deps_cc_info.compilation_context
     cc_compile_variables = cc_common.create_compile_variables(
@@ -81,8 +80,7 @@ def _pch(ctx):
             direct_cc_infos = [
                 CcInfo(
                     compilation_context = cc_common.create_compilation_context(
-                        includes = depset([pch_file.dirname]),
-                        headers = depset([pch_file, generated_header_file]),
+                        headers = depset([generated_header_file]),
                     ),
                 ),
             ],
