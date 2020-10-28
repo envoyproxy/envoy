@@ -423,6 +423,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "io_socket_handle_impl_integration_test",
+    srcs = ["io_socket_handle_impl_integration_test.cc"],
+    tags = ["requires-network"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "transport_socket_options_impl_test",
     srcs = ["transport_socket_options_impl_test.cc"],
     deps = [

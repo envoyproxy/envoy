@@ -16,3 +16,5 @@ docker-compose logs http_service | grep http_service_2 | grep HTTP | grep 200
 
 run_log "Check logs: lrs_server"
 docker-compose logs lrs_server | grep "up and running"
+
+# TODO(phlax): add some test/docs for interacting with load reporting server

@@ -36,13 +36,14 @@ public:
   // Dispatcher
   const std::string& name() override { return name_; }
   TimeSource& timeSource() override { return time_system_; }
-  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                Network::TransportSocketPtr&& transport_socket,
-                                                StreamInfo::StreamInfo&) override {
+  Network::ServerConnectionPtr
+  createServerConnection(Network::ConnectionSocketPtr&& socket,
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo&) override {
     // The caller expects both the socket and the transport socket to be moved.
     socket.reset();
     transport_socket.reset();
-    return Network::ConnectionPtr{createServerConnection_()};
+    return Network::ServerConnectionPtr{createServerConnection_()};
   }
 
   Network::ClientConnectionPtr
@@ -102,7 +103,7 @@ public:
   // Event::Dispatcher
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
-  MOCK_METHOD(Network::Connection*, createServerConnection_, ());
+  MOCK_METHOD(Network::ServerConnection*, createServerConnection_, ());
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
               (Network::Address::InstanceConstSharedPtr address,
                Network::Address::InstanceConstSharedPtr source_address,

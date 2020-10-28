@@ -7,9 +7,6 @@ services:
       dockerfile: Dockerfile-frontenvoy
     networks:
       - envoymesh
-    expose:
-      - "8000"
-      - "8001"
     ports:
       - "8002:8000"
       - "8003:8001"
@@ -24,8 +21,6 @@ services:
       envoymesh:
         aliases:
           - backendservice
-    expose:
-      - "8000"
 
 networks:
   envoymesh: {}
