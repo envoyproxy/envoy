@@ -28,9 +28,14 @@ namespace Http {
 enum class FilterHeadersStatus {
   // Continue filter chain iteration.
   Continue,
-  // Do not iterate to any of the remaining filters in the chain. Returning
-  // FilterDataStatus::Continue from decodeData()/encodeData() or calling
+  // Do not iterate for headers on any of the remaining filters in the chain.
+  //
+  // Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  //
+  // Note that if a local reply was sent, no further iteration for headers as well as data and
+  // trailers for the current filter and the filters following will happen. A local reply can be
+  // triggered via sendLocalReply() or encodeHeaders().
   StopIteration,
   // Continue headers iteration to remaining filters, but delay ending the stream. This status MUST
   // NOT be returned when end_stream is already set to false.
@@ -129,6 +134,10 @@ enum class FilterDataStatus {
   // body data for later dispatching. Returning FilterDataStatus::Continue from
   // decodeData()/encodeData() or calling continueDecoding()/continueEncoding() MUST be called if
   // continued filter iteration is desired.
+  //
+  // Note that if a local reply was sent, no further iteration for either data or trailers
+  // for the current filter and the filters following will happen. A local reply can be
+  // triggered via sendLocalReply() or encodeHeaders().
   StopIterationNoBuffer
 };
 
