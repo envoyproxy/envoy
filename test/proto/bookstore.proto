@@ -118,9 +118,7 @@ service Bookstore {
   rpc EchoRawBody(google.api.HttpBody) returns (google.api.HttpBody) {
     option (google.api.http) = {
       get: "/echoRawBody"
-      additional_bindings: {
-        post: "/echoRawBody"
-      }
+      additional_bindings: {post: "/echoRawBody"}
     };
   }
 

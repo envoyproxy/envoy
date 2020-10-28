@@ -861,49 +861,49 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithNestedHttpBody) {
-    const std::string path = "/echoNestedBody?nested2.body.data=aGkh";
-    Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"}, {":path", path}, {"content-type", "text/plain"}};
-    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
-    EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
-    EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
-    EXPECT_EQ("POST", request_headers.get_("x-envoy-original-method"));
-    EXPECT_EQ("/bookstore.Bookstore/EchoNestedBody", request_headers.get_(":path"));
-    EXPECT_EQ("trailers", request_headers.get_("te"));
+  const std::string path = "/echoNestedBody?nested2.body.data=aGkh";
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", path}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("POST", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/EchoNestedBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
 
-    const std::string path2 = "/echoNestedBody?nested2.body.data=oops%7b";
-    request_headers = {{":method", "POST"}, {":path", path2}, {"content-type", "text/plain"}};
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(request_headers, true));
+  const std::string path2 = "/echoNestedBody?nested2.body.data=oops%7b";
+  request_headers = {{":method", "POST"}, {":path", path2}, {"content-type", "text/plain"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(request_headers, true));
 }
 
-
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithNestedHttpBodys) {
-    const std::string path = "/echoNestedBody?nested1.body.data=oops%7b";
-    Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"}, {":path", path}, {"content-type", "text/plain"}};
-    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  const std::string path = "/echoNestedBody?nested1.body.data=oops%7b";
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", path}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
 
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-    EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
-    EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
-    EXPECT_EQ("POST", request_headers.get_("x-envoy-original-method"));
-    EXPECT_EQ("/bookstore.Bookstore/EchoNestedBody", request_headers.get_(":path"));
-    EXPECT_EQ("trailers", request_headers.get_("te"));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("POST", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/EchoNestedBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryGetWithHttpBody) {
-    const std::string path = "/echoRawBody?data=oops%7b";
-    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", path}};
+  const std::string path = "/echoRawBody?data=oops%7b";
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", path}};
 
-    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
 
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
-    EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
-    EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
-    EXPECT_EQ("GET", request_headers.get_("x-envoy-original-method"));
-    EXPECT_EQ("/bookstore.Bookstore/EchoRawBody", request_headers.get_(":path"));
-    EXPECT_EQ("trailers", request_headers.get_("te"));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("GET", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/EchoRawBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
 }
-
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
   Http::TestRequestHeaderMapImpl request_headers{
