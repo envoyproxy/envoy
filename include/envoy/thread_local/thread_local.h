@@ -89,21 +89,26 @@ public:
 
 using SlotPtr = std::unique_ptr<Slot>;
 
+/**
+ * Interface used to allocate thread local slots.
+ */
+class SlotAllocator {
+public:
+  virtual ~SlotAllocator() = default;
+
+  /**
+   * @return SlotPtr a dedicated slot for use in further calls to get(), set(), etc.
+   */
+  virtual SlotPtr allocateSlot() PURE;
+};
+
 // Provides a typesafe API for slots.
 //
 // TODO(jmarantz): Rename the Slot class to something like RawSlot, where the
 // only reference is from TypedSlot, which we can then rename to Slot.
 template <class T> class TypedSlot {
 public:
-  /**
-   * @return true if the TypedSlot object has been allocated a slot.
-   */
-  bool hasSlot() const { return slot_ != nullptr; }
-
-  /**
-   * @param slot The allocated slot object. Ownership transferred into the TypedSlot.
-   */
-  void setSlot(SlotPtr&& slot) { slot_ = std::move(slot); }
+  explicit TypedSlot(SlotAllocator& allocator) : slot_(allocator.allocateSlot()) {}
 
   /**
    * Returns if there is thread local data for this thread.
@@ -125,8 +130,7 @@ public:
    * NOTE: The initialize callback is not supposed to capture the Slot, or its owner. As the owner
    * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
-  using SharedT = std::shared_ptr<T>;
-  using InitializeCb = std::function<SharedT(Event::Dispatcher& dispatcher)>;
+  using InitializeCb = std::function<std::shared_ptr<T>(Event::Dispatcher& dispatcher)>;
   void set(InitializeCb cb) { slot_->set(cb); }
 
   /**
@@ -164,18 +168,7 @@ private:
   SlotPtr slot_;
 };
 
-/**
- * Interface used to allocate thread local slots.
- */
-class SlotAllocator {
-public:
-  virtual ~SlotAllocator() = default;
-
-  /**
-   * @return SlotPtr a dedicated slot for use in further calls to get(), set(), etc.
-   */
-  virtual SlotPtr allocateSlot() PURE;
-};
+template <class T> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;
 
 /**
  * Interface for getting and setting thread local data as well as registering a thread

@@ -185,8 +185,8 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
                                                ThreadLocal::Instance& tls) {
   threading_ever_initialized_ = true;
   main_thread_dispatcher_ = &main_thread_dispatcher;
-  tls_cache_.setSlot(tls.allocateSlot());
-  tls_cache_.set(
+  tls_cache_ = std::make_unique<ThreadLocal::TypedSlot<TlsCache>>(tls);
+  tls_cache_->set(
       [](Event::Dispatcher&) -> std::shared_ptr<TlsCache> { return std::make_shared<TlsCache>(); });
 }
 
@@ -204,7 +204,7 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
     ASSERT(!merge_in_progress_);
     merge_in_progress_ = true;
-    tls_cache_.runOnAllThreads(
+    tls_cache_->runOnAllThreads(
         [](TlsCache& tls_cache) {
           for (const auto& id_hist : tls_cache.tls_histogram_cache_) {
             const TlsHistogramSharedPtr& tls_hist = id_hist.second;
@@ -302,7 +302,7 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
   // at the same time.
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
-    tls_cache_.runOnAllThreads(
+    tls_cache_->runOnAllThreads(
         [scope_id](TlsCache& tls_cache) { tls_cache.eraseScope(scope_id); },
         [central_cache]() { /* Holds onto central_cache until all tls caches are clear */ });
   }
@@ -319,7 +319,7 @@ void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
     // https://gist.github.com/jmarantz/838cb6de7e74c0970ea6b63eded0139a
     // contains a patch that will implement batching together to clear multiple
     // histograms.
-    tls_cache_.runOnAllThreads(
+    tls_cache_->runOnAllThreads(
         [histogram_id](TlsCache& tls_cache) { tls_cache.eraseHistogram(histogram_id); });
   }
 }
@@ -488,8 +488,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   // initialized currently.
   StatRefMap<Counter>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_cache_.hasSlot()) {
-    TlsCacheEntry& entry = parent_.tls_cache_->insertScope(this->scope_id_);
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    TlsCacheEntry& entry = parent_.tls_cache_->get().insertScope(this->scope_id_);
     tls_cache = &entry.counters_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
@@ -540,8 +540,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 
   StatRefMap<Gauge>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_cache_.hasSlot()) {
-    TlsCacheEntry& entry = parent_.tls_cache_->scope_cache_[this->scope_id_];
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    TlsCacheEntry& entry = parent_.tls_cache_->get().scope_cache_[this->scope_id_];
     tls_cache = &entry.gauges_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
@@ -578,8 +578,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_cache_.hasSlot()) {
-    TlsCacheEntry& entry = parent_.tls_cache_->scope_cache_[this->scope_id_];
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    TlsCacheEntry& entry = parent_.tls_cache_->get().scope_cache_[this->scope_id_];
     tls_cache = &entry.parent_histograms_;
     auto iter = tls_cache->find(final_stat_name);
     if (iter != tls_cache->end()) {
@@ -656,8 +656,8 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
   // initialized currently.
   StatRefMap<TextReadout>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_cache_.hasSlot()) {
-    TlsCacheEntry& entry = parent_.tls_cache_->insertScope(this->scope_id_);
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    TlsCacheEntry& entry = parent_.tls_cache_->get().insertScope(this->scope_id_);
     tls_cache = &entry.text_readouts_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
@@ -702,9 +702,8 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
   // See comments in counterFromStatName() which explains the logic here.
 
   TlsHistogramSharedPtr* tls_histogram = nullptr;
-  if (!shutting_down_ && tls_cache_.hasSlot()) {
-    TlsCache& tls_cache = tls_cache_.get();
-    tls_histogram = &tls_cache.tls_histogram_cache_[id];
+  if (!shutting_down_ && tls_cache_) {
+    tls_histogram = &tls_cache_->get().tls_histogram_cache_[id];
     if (*tls_histogram != nullptr) {
       return **tls_histogram;
     }

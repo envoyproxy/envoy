@@ -183,6 +183,38 @@ TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
   tls_.shutdownThread();
 }
 
+struct StringSlotObject : public ThreadLocalObject {
+  std::string str_;
+};
+
+TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
+  InSequence s;
+
+  TypedSlot<StringSlotObject> slot(tls_);
+
+  uint32_t update_called = 0;
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot.set([](Event::Dispatcher&) -> std::shared_ptr<StringSlotObject> {
+    auto s = std::make_shared<StringSlotObject>();
+    s->str_ = "hello";
+    return s;
+  });
+  EXPECT_EQ("hello", slot.get().str_);
+
+  auto update_cb = [&update_called](StringSlotObject& s) {
+    ++update_called;
+    s.str_ = "goodbye";
+  };
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot.runOnAllThreads(update_cb);
+
+  EXPECT_EQ("goodbye", slot.get().str_);
+  EXPECT_EQ(2, update_called); // 1 worker, 1 main thread.
+
+  tls_.shutdownGlobalThreading();
+  tls_.shutdownThread();
+}
+
 // TODO(ramaraochavali): Run this test with real threads. The current issue in the unit
 // testing environment is, the post to main_dispatcher is not working as expected.
 

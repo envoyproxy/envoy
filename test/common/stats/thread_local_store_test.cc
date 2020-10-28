@@ -54,7 +54,7 @@ public:
   static void numTlsHistograms(ThreadLocalStoreImpl& thread_local_store_impl,
                                const std::function<void(uint32_t)>& num_tls_hist_cb) {
     auto num_tls_histograms = std::make_shared<std::atomic<uint32_t>>(0);
-    thread_local_store_impl.tls_cache_.runOnAllThreads(
+    thread_local_store_impl.tls_cache_->runOnAllThreads(
         [num_tls_histograms](ThreadLocalStoreImpl::TlsCache& tls_cache) {
           *num_tls_histograms += tls_cache.tls_histogram_cache_.size();
         },
