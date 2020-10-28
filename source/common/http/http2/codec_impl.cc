@@ -185,6 +185,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
 
 void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
                                                      bool end_stream) {
+  ASSERT(HeaderUtility::checkRequiredHeaders(headers).ok());
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
   std::vector<nghttp2_nv> final_headers;
