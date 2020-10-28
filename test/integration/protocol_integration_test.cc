@@ -24,6 +24,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
@@ -1091,6 +1092,73 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
       upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
     response->waitForReset();
   }
+}
+
+TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
+  initialize();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection->write(
+        "HTTP/1.1 11111111111111111111111111111111111111111111111111111111111111111 OK\r\n",
+        false));
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  } else {
+    Http::Http2::Http2Frame::SettingsFlags settings_flags =
+        static_cast<Http::Http2::Http2Frame::SettingsFlags>(0);
+    Http2Frame setting_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
+    // Ack settings
+    settings_flags = static_cast<Http::Http2::Http2Frame::SettingsFlags>(1); // ack
+    Http2Frame ack_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
+    ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
+    ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
+    Http::Http2::Http2Frame overflowed_status = Http::Http2::Http2Frame::makeHeadersFrameWithStatus(
+        "11111111111111111111111111111111111111111111111111111111111111111", 0);
+    ASSERT_TRUE(fake_upstream_connection->write(std::string(overflowed_status)));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(ProtocolIntegrationTest, MissingStatus) {
+  initialize();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 OK\r\n", false));
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  } else {
+    Http::Http2::Http2Frame::SettingsFlags settings_flags =
+        static_cast<Http::Http2::Http2Frame::SettingsFlags>(0);
+    Http2Frame setting_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
+    // Ack settings
+    settings_flags = static_cast<Http::Http2::Http2Frame::SettingsFlags>(1); // ack
+    Http2Frame ack_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
+    ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
+    ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
+    Http::Http2::Http2Frame missing_status = Http::Http2::Http2Frame::makeHeadersFrameNoStatus(0);
+    ASSERT_TRUE(fake_upstream_connection->write(std::string(missing_status)));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
