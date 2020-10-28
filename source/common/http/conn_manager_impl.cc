@@ -52,6 +52,17 @@
 namespace Envoy {
 namespace Http {
 
+bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
+  if (!headers) {
+    return false;
+  }
+  if (protocol <= Protocol::Http11) {
+    return HeaderUtility::isConnect(*headers);
+  }
+  // All HTTP/2 style upgrades were originally connect requests.
+  return HeaderUtility::isConnect(*headers) || Utility::isUpgrade(*headers);
+}
+
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
   return ConnectionManagerStats(
@@ -177,7 +188,19 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
     // TODO(snowp): This call might not be necessary, try to clean up + remove setter function.
     stream.filter_manager_.setLocalComplete();
     stream.state_.codec_saw_local_complete_ = true;
-    stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+
+    // Per https://tools.ietf.org/html/rfc7540#section-8.3 if there was an error
+    // with the TCP connection during a CONNECT request, it should be
+    // communicated via CONNECT_ERROR
+    if (requestWasConnect(stream.request_headers_, codec_->protocol()) &&
+        (stream.filter_manager_.streamInfo().hasResponseFlag(
+             StreamInfo::ResponseFlag::UpstreamConnectionFailure) ||
+         stream.filter_manager_.streamInfo().hasResponseFlag(
+             StreamInfo::ResponseFlag::UpstreamConnectionTermination))) {
+      stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
+    } else {
+      stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+    }
     reset_stream = true;
   }
 
@@ -204,6 +227,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   stream.filter_manager_.disarmRequestTimeout();
 
   stream.completeRequest();
+  stream.filter_manager_.onStreamComplete();
   stream.filter_manager_.log();
 
   stream.filter_manager_.destroyFilters();
@@ -244,7 +268,7 @@ void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   // GOAWAY.
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay,
                     StreamInfo::ResponseFlag::DownstreamProtocolError,
-                    absl::StrCat("codec error: ", error));
+                    absl::StrCat("codec error:", error));
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
@@ -602,6 +626,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   filter_manager_.streamInfo().setDownstreamSslConnection(
       connection_manager_.read_callbacks_->connection().ssl());
 
+  filter_manager_.streamInfo().setConnectionID(
+      connection_manager_.read_callbacks_->connection().id());
+
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -714,7 +741,8 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
     sendLocalReply(request_headers_ != nullptr &&
                        Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+                   Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                   StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
   } else {
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
@@ -837,7 +865,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   filter_manager_.maybeEndDecode(end_stream);
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
-  if (connection_manager_.overload_stop_accepting_requests_ref_.isSaturated()) {
+  if (connection_manager_.random_generator_.bernoulli(
+          connection_manager_.overload_stop_accepting_requests_ref_.value())) {
     // In this one special case, do not create the filter chain. If there is a risk of memory
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     filter_manager_.skipFilterChainCreation();
@@ -1135,6 +1164,83 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
+void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
+  if (!filter_manager_.streamInfo().route_entry_ || !request_headers_) {
+    return;
+  }
+  auto& route = filter_manager_.streamInfo().route_entry_;
+
+  auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
+  std::chrono::milliseconds timeout;
+  bool disable_timer = false;
+
+  if (!grpc_timeout || !route->grpcTimeoutHeaderMax()) {
+    // Either there is no grpc-timeout header or special timeouts for it are not
+    // configured. Use stream duration.
+    if (route->maxStreamDuration()) {
+      timeout = route->maxStreamDuration().value();
+      if (timeout == std::chrono::milliseconds(0)) {
+        // Explicitly configured 0 means no timeout.
+        disable_timer = true;
+      }
+    } else {
+      // Fall back to HCM config. If no HCM duration limit exists, disable
+      // timers set by any prior route configuration.
+      const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
+      if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
+        timeout = max_stream_duration.value();
+      } else {
+        disable_timer = true;
+      }
+    }
+  } else {
+    // Start with the timeout equal to the gRPC timeout header.
+    timeout = grpc_timeout.value();
+    // If there's a valid cap, apply it.
+    if (timeout > route->grpcTimeoutHeaderMax().value() &&
+        route->grpcTimeoutHeaderMax().value() != std::chrono::milliseconds(0)) {
+      timeout = route->grpcTimeoutHeaderMax().value();
+    }
+
+    // Apply the configured offset.
+    if (timeout != std::chrono::milliseconds(0) && route->grpcTimeoutHeaderOffset()) {
+      const auto offset = route->grpcTimeoutHeaderOffset().value();
+      if (offset < timeout) {
+        timeout -= offset;
+      } else {
+        timeout = std::chrono::milliseconds(0);
+      }
+    }
+  }
+
+  // Disable any existing timer if configured to do so.
+  if (disable_timer) {
+    if (max_stream_duration_timer_) {
+      max_stream_duration_timer_->disableTimer();
+    }
+    return;
+  }
+
+  // See how long this stream has been alive, and adjust the timeout
+  // accordingly.
+  std::chrono::duration time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
+      connection_manager_.timeSource().monotonicTime() -
+      filter_manager_.streamInfo().startTimeMonotonic());
+  if (timeout > time_used) {
+    timeout -= time_used;
+  } else {
+    timeout = std::chrono::milliseconds(0);
+  }
+
+  // Finally create (if necessary) and enable the timer.
+  if (!max_stream_duration_timer_) {
+    max_stream_duration_timer_ =
+        connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onStreamMaxDurationReached(); });
+  }
+  max_stream_duration_timer_->enableTimer(timeout);
+}
+
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
@@ -1160,6 +1266,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
 
   filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
   refreshCachedTracingCustomTags();
+  refreshDurationTimeout();
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
@@ -1255,7 +1362,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.overload_disable_keepalive_ref_.isSaturated()) {
+      connection_manager_.random_generator_.bernoulli(
+          connection_manager_.overload_disable_keepalive_ref_.value())) {
     ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
     if (connection_manager_.codec_->protocol() < Protocol::Http2 ||
         Runtime::runtimeFeatureEnabled(
@@ -1389,7 +1497,8 @@ void ConnectionManagerImpl::ActiveStream::onDecoderFilterAboveWriteBufferHighWat
   connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
 }
 
-void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl::string_view) {
+void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_reason,
+                                                        absl::string_view) {
   // NOTE: This function gets called in all of the following cases:
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset
@@ -1398,11 +1507,13 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
 
-  // If the codec sets its responseDetails(), impute a
-  // DownstreamProtocolError and propagate the details upwards.
+  // If the codec sets its responseDetails() for a reason other than peer reset, set a
+  // DownstreamProtocolError. Either way, propagate details.
   const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
-  if (!encoder_details.empty()) {
+  if (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset) {
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+  }
+  if (!encoder_details.empty()) {
     filter_manager_.streamInfo().setResponseCodeDetails(encoder_details);
   }
 

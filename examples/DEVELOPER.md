@@ -109,6 +109,16 @@ responds_without_header \
 
 `responds_without_header` can accept additional curl arguments like `responds_with`
 
+#### Utility functions: `wait_for`
+
+You can wait for some amount of time (specified in seconds) for a command to return `0`.
+
+The following example will wait for 20 seconds for a service ``my-service`` to become healthy.
+
+```bash
+wait_for 20 sh -c "docker-compose ps my-service | grep healthy | grep -v unhealthy"
+```
+
 ### Slow starting `docker` compositions
 
 Unless your example provides a way for ensuring that all containers are healthy by
@@ -182,7 +192,6 @@ bring_up_example
 If your sandbox has multiple compositions, and uses the `$PATHS` env var described above,
 `bring_up_example` will bring all of your compositions up.
 
-
 ### Additional arguments to `docker-compose up -d`
 
 If you need to pass additional arguments to compose you can set the `UPARGS`
@@ -208,3 +217,81 @@ export UPARGS="--scale http_service=2"
 If your example asks the user to run commands inside containers, you can
 mimick this using `docker-compose exec -T`. The `-T` flag is necessary as the
 tests do not have access to a `tty` in the CI pipeline.
+
+### Note on permissions and configuration
+
+The sandbox tests are run with a `umask` setting of `027` to ensure they will run in environments
+where this is the case.
+
+As the Envoy containers run as non-root, it is essential that any configurations required
+by the daemon are included in the relevant example `Dockerfile` rather than mounted in
+any `docker-compose.yaml` files.
+
+The Docker recipe should also ensure that added configurations are world-readable.
+
+For example, with an added configuration file named `front-envoy.yaml`, you should add
+the following in the Docker recipe:
+
+```
+RUN chmod go+r /etc/front-envoy.yaml
+```
+
+## Sandbox configuration tests
+
+Example configuration files are tested to ensure they are valid and well-formed, and do
+not contain deprecated features.
+
+### Exclude configs from example configuration tests
+
+The CI script searches for all files in the examples folders with a `yaml` or `lua` extension.
+
+These files are bundled into a test and the `yaml` files are used to try to start an Envoy server.
+
+If your example includes `yaml` files that are either not Envoy configuration, or for some reason
+cannot be tested in this way, you should add the files to the `exclude` list in the `filegroup.srcs`
+section of the `examples/BUILD` file.
+
+The `exclude` patterns are evaluated as `globs` in the context of the `examples` folder.
+
+
+## Verifying your sandbox
+
+Once you have built your sandbox, and added the `verify.sh` script you can run it directly in the
+sandbox folder.
+
+For example:
+
+```
+cd examples/example-sandbox
+./verify.sh
+
+```
+
+You should see the docker composition brought up, your tests run, and the composition brought down again.
+
+The script should exit with `0` for the tests to pass.
+
+
+## Verifying multiple/all sandboxes
+
+In continuous integration, all of the sandboxes are checked using the `ci/verify-examples.sh`.
+
+This can also be called with a filter argument, which is a `glob` evaluated in the context of the `examples` folder.
+
+For example, to run all sandboxes with names beginning `jaeger`:
+
+```
+./ci/verify-examples.sh jaeger*
+```
+
+---
+
+**NOTE**
+
+You can use this script locally to test the sandboxes on your platform, but you should be aware that it requires
+a lot of resources as it downloads and builds many Docker images, and then runs them in turn.
+
+---
+
+One way to run the tests in an isolated environment is to mount the `envoy` source into a `docker-in-docker` container
+or similar, and then run the script from inside that container.

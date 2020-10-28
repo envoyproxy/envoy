@@ -120,7 +120,7 @@ message PrivateKeyProvider {
 
   // Private key method provider name. The name must match a
   // supported private key method provider type.
-  string provider_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string provider_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Private key method provider specific configuration.
   oneof config_type {
@@ -151,7 +151,9 @@ message TlsCertificate {
   // TLS private key is not password encrypted.
   config.core.v3.DataSource password = 3 [(udpa.annotations.sensitive) = true];
 
-  // [#not-implemented-hide:]
+  // The OCSP response to be stapled with this certificate during the handshake.
+  // The response must be DER-encoded and may only be  provided via ``filename`` or
+  // ``inline_bytes``. The response may pertain to only one certificate.
   config.core.v3.DataSource ocsp_staple = 4;
 
   // [#not-implemented-hide:]
@@ -205,7 +207,7 @@ message CertificateValidationContext {
     ACCEPT_UNTRUSTED = 1;
   }
 
-  reserved 4;
+  reserved 4, 5;
 
   reserved "verify_subject_alt_name";
 
@@ -264,7 +266,7 @@ message CertificateValidationContext {
   //   because SPKI is tied to a private key, so it doesn't change when the certificate
   //   is renewed using the same private key.
   repeated string verify_certificate_spki = 3
-      [(validate.rules).repeated = {items {string {min_bytes: 44 max_bytes: 44}}}];
+      [(validate.rules).repeated = {items {string {min_len: 44 max_bytes: 44}}}];
 
   // An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will verify that
   // the SHA-256 of the DER-encoded presented certificate matches one of the specified values.
@@ -293,10 +295,10 @@ message CertificateValidationContext {
   // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>` are specified,
   // a hash matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
-      [(validate.rules).repeated = {items {string {min_bytes: 64 max_bytes: 95}}}];
+      [(validate.rules).repeated = {items {string {min_len: 64 max_bytes: 95}}}];
 
-  // An optional list of Subject Alternative name matchers. Envoy will verify that the
-  // Subject Alternative Name of the presented certificate matches one of the specified matches.
+  // An optional list of Subject Alternative name matchers. If specified, Envoy will verify that the
+  // Subject Alternative Name of the presented certificate matches one of the specified matchers.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
   // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.v3.StringMatcher>`.
@@ -314,9 +316,6 @@ message CertificateValidationContext {
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9;
-
-  // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
-  google.protobuf.BoolValue require_ocsp_staple = 5;
 
   // [#not-implemented-hide:] Must present signed certificate time-stamp.
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;

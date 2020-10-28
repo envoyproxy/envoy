@@ -904,6 +904,10 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   initializeTls(options, *tls_context.mutable_common_tls_context());
+  if (options.ocsp_staple_required_) {
+    tls_context.set_ocsp_staple_policy(
+        envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE);
+  }
   filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
@@ -967,6 +971,10 @@ void ConfigHelper::initializeTls(
         TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    if (options.rsa_cert_ocsp_staple_) {
+      tls_certificate->mutable_ocsp_staple()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/server_ocsp_resp.der"));
+    }
   }
   if (options.ecdsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
@@ -974,6 +982,10 @@ void ConfigHelper::initializeTls(
         TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsacert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsakey.pem"));
+    if (options.ecdsa_cert_ocsp_staple_) {
+      tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
+          "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
+    }
   }
 }
 
@@ -1081,7 +1093,8 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   TestEnvironment::renameFile(file, lds_filename);
 }
 
-void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames) {
+void ConfigHelper::setDownstreamOutboundFramesLimits(uint32_t max_all_frames,
+                                                     uint32_t max_control_frames) {
   auto filter = getFilterFromListener("http");
   if (filter) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
@@ -1095,6 +1108,18 @@ void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max
       storeHttpConnectionManager(hcm_config);
     }
   }
+}
+
+void ConfigHelper::setUpstreamOutboundFramesLimits(uint32_t max_all_frames,
+                                                   uint32_t max_control_frames) {
+  addConfigModifier(
+      [max_all_frames, max_control_frames](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* static_resources = bootstrap.mutable_static_resources();
+        auto* cluster = static_resources->mutable_clusters(0);
+        auto* http_protocol_options = cluster->mutable_http2_protocol_options();
+        http_protocol_options->mutable_max_outbound_frames()->set_value(max_all_frames);
+        http_protocol_options->mutable_max_outbound_control_frames()->set_value(max_control_frames);
+      });
 }
 
 void ConfigHelper::setLocalReply(

@@ -251,7 +251,7 @@ message HttpConnectionManager {
   // The human readable prefix to use when emitting statistics for the
   // connection manager. See the :ref:`statistics documentation <config_http_conn_man_stats>` for
   // more information.
-  string stat_prefix = 2 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
 
   oneof route_specifier {
     option (validate.required) = true;
@@ -573,27 +573,29 @@ message LocalReplyConfig {
   // The configuration to form response body from the :ref:`command operators <config_access_log_command_operators>`
   // and to specify response content type as one of: plain/text or application/json.
   //
-  // Example one: plain/text body_format.
+  // Example one: "plain/text" ``body_format``.
   //
-  // .. code-block::
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.config.core.v3.SubstitutionFormatString
   //
-  //   text_format: %LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=$REQ(:path)%
+  //   text_format: "%LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=%REQ(:path)%\n"
   //
-  // The following response body in `plain/text` format will be generated for a request with
+  // The following response body in "plain/text" format will be generated for a request with
   // local reply body of "upstream connection error", response_code=503 and path=/foo.
   //
-  // .. code-block::
+  // .. code-block:: text
   //
   //   upstream connect error:503:path=/foo
   //
-  //  Example two: application/json body_format.
+  // Example two: "application/json" ``body_format``.
   //
-  // .. code-block::
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.config.core.v3.SubstitutionFormatString
   //
-  //  json_format:
-  //    status: %RESPONSE_CODE%
-  //    message: %LOCAL_REPLY_BODY%
-  //    path: $REQ(:path)%
+  //   json_format:
+  //     status: "%RESPONSE_CODE%"
+  //     message: "%LOCAL_REPLY_BODY%"
+  //     path: "%REQ(:path)%"
   //
   // The following response body in "application/json" format would be generated for a request with
   // local reply body of "upstream connection error", response_code=503 and path=/foo.
@@ -721,14 +723,18 @@ message ScopedRoutes {
           // If an element contains no separator, the whole element is parsed as key and the
           // fragment value is an empty string.
           // If there are multiple values for a matched key, the first value is returned.
-          string separator = 1 [(validate.rules).string = {min_bytes: 1}];
+          string separator = 1 [(validate.rules).string = {min_len: 1}];
 
           // The key to match on.
-          string key = 2 [(validate.rules).string = {min_bytes: 1}];
+          string key = 2 [(validate.rules).string = {min_len: 1}];
         }
 
         // The name of the header field to extract the value from.
-        string name = 1 [(validate.rules).string = {min_bytes: 1}];
+        //
+        // .. note::
+        //
+        //   If the header appears multiple times only the first value is used.
+        string name = 1 [(validate.rules).string = {min_len: 1}];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').
         // Default: empty string. This causes the entirety of the header field to be extracted.
@@ -762,7 +768,7 @@ message ScopedRoutes {
   }
 
   // The name assigned to the scoped routing configuration.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The algorithm to use for constructing a scope key for each request.
   ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message = {required: true}];
@@ -813,15 +819,15 @@ message HttpFilter {
   // The name of the filter configuration. The name is used as a fallback to
   // select an extension if the type of the configuration proto is not
   // sufficient. It also serves as a resource name in ExtensionConfigDS.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Filter specific configuration which depends on the filter being instantiated. See the supported
-  // filters for further documentation.
   oneof config_type {
+    // Filter specific configuration which depends on the filter being instantiated. See the supported
+    // filters for further documentation.
     google.protobuf.Any typed_config = 4;
 
     // Configuration source specifier for an extension configuration discovery service.
-    // In case of a failure and without the default configuration, the HTTP listener responds with 500.
+    // In case of a failure and without the default configuration, the HTTP listener responds with code 500.
     // Extension configs delivered through this mechanism are not expected to require warming (see https://github.com/envoyproxy/envoy/issues/12061).
     config.core.v4alpha.ExtensionConfigSource config_discovery = 5;
   }

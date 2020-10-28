@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -307,9 +308,31 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  time of the connection. If the platform does not support this, then an empty optional is
+   *  returned.
+   */
+  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;
+
+/**
+ * Connections servicing inbound connects.
+ */
+class ServerConnection : public virtual Connection {
+public:
+  /**
+   * Set the amount of time allowed for the transport socket to report that a connection is
+   * established. The provided timeout is relative to the current time. If this method is called
+   * after a connection has already been established, it is a no-op.
+   */
+  virtual void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) PURE;
+};
+
+using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
  * Connections capable of outbound connects.

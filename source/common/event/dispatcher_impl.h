@@ -45,9 +45,10 @@ public:
   TimeSource& timeSource() override { return api_.timeSource(); }
   void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override;
   void clearDeferredDeleteList() override;
-  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                Network::TransportSocketPtr&& transport_socket,
-                                                StreamInfo::StreamInfo& stream_info) override;
+  Network::ServerConnectionPtr
+  createServerConnection(Network::ConnectionSocketPtr&& socket,
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo& stream_info) override;
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
@@ -62,7 +63,7 @@ public:
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, bool bind_to_port,
                                       uint32_t backlog_size) override;
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
+  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override;

@@ -19,7 +19,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    Api::IoCallUint64Result result = buffer.read(callbacks_->ioHandle(), 16384);
+    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, 16384);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
@@ -62,7 +62,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    Api::IoCallUint64Result result = buffer.write(callbacks_->ioHandle());
+    Api::IoCallUint64Result result = callbacks_->ioHandle().write(buffer);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
@@ -93,5 +93,7 @@ RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsSharedPtr) c
 }
 
 bool RawBufferSocketFactory::implementsSecureTransport() const { return false; }
+
+bool RawBufferSocketFactory::isReady() const { return true; }
 } // namespace Network
 } // namespace Envoy

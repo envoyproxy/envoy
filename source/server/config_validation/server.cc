@@ -44,8 +44,8 @@ ValidationInstance::ValidationInstance(
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
                                              !options.ignoreUnknownDynamicFields()),
-      stats_store_(store),
-      api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
+      stats_store_(store), api_(new Api::ValidationImpl(thread_factory, store, time_system,
+                                                        file_system, random_generator_)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
@@ -99,8 +99,8 @@ void ValidationInstance::initialize(const Options& options,
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
+      admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
+      localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
       grpc_context_, accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());

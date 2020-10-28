@@ -144,15 +144,6 @@ public:
     src.size_ -= length;
   }
 
-  Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override {
-    FUZZ_ASSERT(start_ + size_ + max_length <= data_.size());
-    Buffer::RawSlice slice{mutableEnd(), max_length};
-    Api::IoCallUint64Result result = io_handle.readv(max_length, &slice, 1);
-    FUZZ_ASSERT(result.ok() && result.rc_ > 0);
-    size_ += result.rc_;
-    return result;
-  }
-
   uint64_t reserve(uint64_t length, Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
     FUZZ_ASSERT(num_iovecs > 0);
     FUZZ_ASSERT(start_ + size_ + length <= data_.size());
@@ -171,15 +162,6 @@ public:
   }
 
   std::string toString() const override { return std::string(data_.data() + start_, size_); }
-
-  Api::IoCallUint64Result write(Network::IoHandle& io_handle) override {
-    const Buffer::RawSlice slice{const_cast<char*>(start()), size_};
-    Api::IoCallUint64Result result = io_handle.writev(&slice, 1);
-    FUZZ_ASSERT(result.ok());
-    start_ += result.rc_;
-    size_ -= result.rc_;
-    return result;
-  }
 
   absl::string_view asStringView() const { return {start(), size_}; }
 
@@ -355,7 +337,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     std::string data(max_length, insert_value);
     const ssize_t rc = ::write(pipe_fds[1], data.data(), max_length);
     FUZZ_ASSERT(rc > 0);
-    Api::IoCallUint64Result result = target_buffer.read(io_handle, max_length);
+    Api::IoCallUint64Result result = io_handle.read(target_buffer, max_length);
     FUZZ_ASSERT(result.rc_ == static_cast<uint64_t>(rc));
     FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     break;
@@ -370,7 +352,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     do {
       const bool empty = target_buffer.length() == 0;
       const std::string previous_data = target_buffer.toString();
-      const auto result = target_buffer.write(io_handle);
+      const auto result = io_handle.write(target_buffer);
       FUZZ_ASSERT(result.ok());
       rc = result.rc_;
       ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,

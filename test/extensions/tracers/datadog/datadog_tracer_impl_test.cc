@@ -175,8 +175,48 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 
   Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  msg->body() = std::make_unique<Buffer::OwnedImpl>("");
 
+  callback->onSuccess(request, std::move(msg));
+
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_skipped_no_cluster").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_sent").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_failed").value());
+}
+
+TEST_F(DatadogDriverTest, NoBody) {
+  setupValidDriver();
+
+  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(1));
+  EXPECT_CALL(cm_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+            EXPECT_EQ("application/msgpack", message->headers().getContentTypeValue());
+
+            return &request;
+          }));
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+
+  // Timer should be re-enabled.
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900), _));
+
+  timer_->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.timer_flushed").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.traces_sent").value());
+
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "0"}}}));
   callback->onSuccess(request, std::move(msg));
 
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_skipped_no_cluster").value());

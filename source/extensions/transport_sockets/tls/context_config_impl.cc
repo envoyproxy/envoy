@@ -169,14 +169,14 @@ ContextConfigImpl::ContextConfigImpl(
     const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : api_(factory_context.api()),
+      tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
+      certificate_validation_context_provider_(
+          getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
-      tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
-      certificate_validation_context_provider_(
-          getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
@@ -375,6 +375,15 @@ ClientContextConfigImpl::ClientContextConfigImpl(
   }
 }
 
+bool ClientContextConfigImpl::isSecretReady() const {
+  for (const auto& provider : tls_certificate_providers_) {
+    if (provider->secret() == nullptr) {
+      return false;
+    }
+  }
+  return certificate_validation_context_provider_->secret() != nullptr;
+}
+
 const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
 const unsigned ServerContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_3_VERSION;
 
@@ -410,6 +419,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+      ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
 
@@ -502,6 +512,21 @@ ServerContextConfigImpl::getSessionTicketKey(const std::string& key_data) {
   ASSERT(key_data.begin() + pos == key_data.end());
 
   return dst_key;
+}
+
+Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
+        policy) {
+  switch (policy) {
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::LENIENT_STAPLING:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STRICT_STAPLING:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 } // namespace Tls

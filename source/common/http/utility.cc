@@ -1,5 +1,7 @@
 #include "common/http/utility.h"
 
+#include <http_parser.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -223,6 +225,43 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 } // namespace Http2
 
 namespace Http {
+
+static const char kDefaultPath[] = "/";
+
+bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
+  struct http_parser_url u;
+  http_parser_url_init(&u);
+  const int result =
+      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
+
+  if (result != 0) {
+    return false;
+  }
+  if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
+      (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
+    return false;
+  }
+  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
+                              u.field_data[UF_SCHEMA].len);
+
+  uint16_t authority_len = u.field_data[UF_HOST].len;
+  if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
+    authority_len = authority_len + u.field_data[UF_PORT].len + 1;
+  }
+  host_and_port_ =
+      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+
+  // RFC allows the absolute-uri to not end in /, but the absolute path form
+  // must start with
+  uint64_t path_len = absolute_url.length() - (u.field_data[UF_HOST].off + hostAndPort().length());
+  if (path_len > 0) {
+    uint64_t path_beginning = u.field_data[UF_HOST].off + hostAndPort().length();
+    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
+  } else if (!is_connect) {
+    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
+  }
+  return true;
+}
 
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
@@ -606,7 +645,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    const HeaderEntry* nominated_header = nullptr;
+    HeaderMap::GetResult nominated_header;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -633,8 +672,10 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       nominated_header = headers.get(lcs_header_to_remove);
     }
 
-    if (nominated_header) {
-      auto nominated_header_value_sv = nominated_header->value().getStringView();
+    if (!nominated_header.empty()) {
+      // NOTE: The TE header is an inline header, so by definition if we operate on it there can
+      // only be a single value. In all other cases we remove the nominated header.
+      auto nominated_header_value_sv = nominated_header[0]->value().getStringView();
 
       const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
 
@@ -645,6 +686,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       }
 
       if (is_te_header) {
+        ASSERT(nominated_header.size() == 1);
         for (const auto& header_value :
              StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
 
@@ -777,6 +819,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote reset";
   case Http::StreamResetReason::RemoteRefusedStreamReset:
     return "remote refused stream reset";
+  case Http::StreamResetReason::ConnectError:
+    return "remote error with CONNECT request";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

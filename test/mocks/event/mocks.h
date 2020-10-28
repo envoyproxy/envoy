@@ -36,13 +36,14 @@ public:
   // Dispatcher
   const std::string& name() override { return name_; }
   TimeSource& timeSource() override { return time_system_; }
-  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                Network::TransportSocketPtr&& transport_socket,
-                                                StreamInfo::StreamInfo&) override {
+  Network::ServerConnectionPtr
+  createServerConnection(Network::ConnectionSocketPtr&& socket,
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo&) override {
     // The caller expects both the socket and the transport socket to be moved.
     socket.reset();
     transport_socket.reset();
-    return Network::ConnectionPtr{createServerConnection_()};
+    return Network::ServerConnectionPtr{createServerConnection_()};
   }
 
   Network::ClientConnectionPtr
@@ -69,9 +70,9 @@ public:
     return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port, backlog_size)};
   }
 
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
+  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                             Network::UdpListenerCallbacks& cb) override {
-    return Network::UdpListenerPtr{createUdpListener_(std::move(socket), cb)};
+    return Network::UdpListenerPtr{createUdpListener_(socket, cb)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -102,7 +103,7 @@ public:
   // Event::Dispatcher
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
-  MOCK_METHOD(Network::Connection*, createServerConnection_, ());
+  MOCK_METHOD(Network::ServerConnection*, createServerConnection_, ());
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
               (Network::Address::InstanceConstSharedPtr address,
                Network::Address::InstanceConstSharedPtr source_address,
@@ -118,7 +119,7 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                bool bind_to_port, uint32_t backlog_size));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr && socket, Network::UdpListenerCallbacks& cb));
+              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
@@ -161,10 +162,8 @@ public:
 
   // Timer
   MOCK_METHOD(void, disableTimer, ());
-  MOCK_METHOD(void, enableTimer,
-              (const std::chrono::milliseconds&, const ScopeTrackedObject* scope));
-  MOCK_METHOD(void, enableHRTimer,
-              (const std::chrono::microseconds&, const ScopeTrackedObject* scope));
+  MOCK_METHOD(void, enableTimer, (std::chrono::milliseconds, const ScopeTrackedObject* scope));
+  MOCK_METHOD(void, enableHRTimer, (std::chrono::microseconds, const ScopeTrackedObject* scope));
   MOCK_METHOD(bool, enabled, ());
 
   MockDispatcher* dispatcher_{};

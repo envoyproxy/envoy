@@ -1,0 +1,19 @@
+intro/arch_overview/http/websocket.rst intro/arch_overview/http/upgrades.rst
+configuration/observability/access_log.rst intro/arch_overview/observability/access_logging.rst
+
+install/building.rst  start/building.rst
+install/ref_configs.rst       start/install/ref_configs.rst
+install/sandboxes/local_docker_build.rst      start/install/sandboxes/local_docker_build.rst
+install/tools/config_load_check_tool.rst      start/install/tools/config_load_check_tool.rst
+install/tools/route_table_check_tool.rst      start/install/tools/route_table_check_tool.rst
+install/tools/schema_validator_check_tool.rst start/install/tools/schema_validator_check_tool.rst
+install/tools/tools.rst       start/install/tools/tools.rst
+install/install.rst	      start/start.rst
+
+start/install/ref_configs.rst	intro/deployment_types/deployment_types.rst
+start/install/sandboxes/local_docker_build.rst start/building/local_docker_build.rst
+
+start/install/tools/tools.rst	operations/tools/tools.rst
+start/install/tools/route_table_check_tool.rst	operations/tools/route_table_check_tool.rst
+start/install/tools/schema_validator_check_tool.rst	operations/tools/schema_validator_check_tool.rst
+start/install/tools/config_load_check_tool.rst	operations/tools/config_load_check_tool.rst

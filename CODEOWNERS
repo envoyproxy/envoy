@@ -37,7 +37,7 @@ extensions/filters/common/original_src @snowp @klarose
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # tls transport socket extension
-/*/extensions/transport_sockets/tls @PiotrSikora @lizan
+/*/extensions/transport_sockets/tls @PiotrSikora @lizan @asraa
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
 # common transport socket
@@ -80,12 +80,20 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/listener/http_inspector @yxue @PiotrSikora @lizan
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
+# webassembly access logger extensions
+/*/extensions/access_loggers/wasm @PiotrSikora @lizan
+# webassembly bootstrap extensions
+/*/extensions/bootstrap/wasm @PiotrSikora @lizan
+# webassembly http extensions
+/*/extensions/filters/http/wasm @PiotrSikora @lizan
+# webassembly network extensions
+/*/extensions/filters/network/wasm @PiotrSikora @lizan
 # webassembly common extension
-/*/extensions/common/wasm @jplevyak @PiotrSikora @lizan
+/*/extensions/common/wasm @PiotrSikora @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 # common crypto extension
-/*/extensions/common/crypto @lizan @PiotrSikora @bdecoste
+/*/extensions/common/crypto @lizan @PiotrSikora @bdecoste @asraa
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
 /*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
@@ -100,13 +108,15 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/squash @yuval-k @alyssawilk
 /*/extensions/filters/common/ext_authz @gsagula @dio
 /*/extensions/filters/common/original_src @klarose @snowp
-/*/extensions/filters/listener/tls_inspector @piotrsikora @htuch
+/*/extensions/filters/listener/tls_inspector @piotrsikora @htuch @asraa
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
 /*/extensions/internal_redirect @alyssawilk @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
+# webassembly stat-sink extensions
+/*/extensions/stat_sinks/wasm @PiotrSikora @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
@@ -132,7 +142,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/decompressor @rojkov @dio
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
-/*/extensions/watchdog/abort_action @kbaichoo @antoniovicente
 # Core upstream code
 extensions/upstreams/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/http/http @alyssawilk @snowp @mattklein123
@@ -140,3 +149,6 @@ extensions/upstreams/http/tcp @alyssawilk @mattklein123
 extensions/upstreams/http/default @alyssawilk @snowp @mattklein123
 # OAuth2
 extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
+# HTTP Local Rate Limit
+/*/extensions/filters/http/local_ratelimit @rgs1 @mattklein123
+/*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1

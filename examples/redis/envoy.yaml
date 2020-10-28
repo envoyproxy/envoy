@@ -9,7 +9,7 @@ static_resources:
     - filters:
       - name: envoy.filters.network.redis_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
           stat_prefix: egress_redis
           settings:
             op_timeout: 5s

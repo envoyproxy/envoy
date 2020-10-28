@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/matchers.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 
@@ -23,7 +24,8 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
-  disabled_ = other.disabled_;
+  // We only merge context extensions here, and leave boolean flags untouched since those flags are
+  // not used from the merged config.
   auto begin_it = other.context_extensions_.begin();
   auto end_it = other.context_extensions_.end();
   for (auto it = begin_it; it != end_it; ++it) {
@@ -61,7 +63,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      check_request_, config_->maxRequestBytes(), config_->includePeerCertificate());
+      check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
+      config_->includePeerCertificate());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *callbacks_);
   state_ = State::Calling;
@@ -76,12 +79,14 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   Router::RouteConstSharedPtr route = callbacks_->route();
-  skip_check_ = skipCheckForRoute(route);
+  const auto per_route_flags = getPerRouteFlags(route);
+  skip_check_ = per_route_flags.skip_check_;
+  if (skip_check_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
-  if (!config_->filterEnabled() || skip_check_) {
-    if (skip_check_) {
-      return Http::FilterHeadersStatus::Continue;
-    }
+  if (!config_->filterEnabled(callbacks_->streamInfo().dynamicMetadata())) {
+    stats_.disabled_.inc();
     if (config_->denyAtDisable()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(
@@ -94,9 +99,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   request_headers_ = &headers;
-  buffer_data_ = config_->withRequestBody() &&
+  buffer_data_ = config_->withRequestBody() && !per_route_flags.skip_request_body_buffering_ &&
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
                    Http::Utility::isH2UpgradeRequest(headers));
+
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *callbacks_);
     if (!config_->allowPartialMessage()) {
@@ -165,8 +171,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   switch (response->status) {
   case CheckStatus::OK: {
+    // Any changes to request headers can affect how the request is going to be
+    // routed. If we are changing the headers we also need to clear the route
+    // cache.
     if (config_->clearRouteCache() &&
-        (!response->headers_to_set.empty() || !response->headers_to_append.empty())) {
+        (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
+         !response->headers_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *callbacks_);
       callbacks_->clearRouteCache();
     }
@@ -181,7 +191,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->addCopy(header.first, header.second);
     }
     for (const auto& header : response->headers_to_append) {
-      const Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
+      const auto header_to_modify = request_headers_->get(header.first);
       // TODO(dio): Add a flag to allow appending non-existent headers, without setting it first
       // (via `headers_to_add`). For example, given:
       // 1. Original headers {"original": "true"}
@@ -190,13 +200,25 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
       // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
       // to upstream server by only sets `headers_to_append`.
-      if (header_to_modify != nullptr) {
+      if (!header_to_modify.empty()) {
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
         // The current behavior of appending is by combining entries with the same key, into one
         // entry. The value of that combined entry is separated by ",".
         // TODO(dio): Consider to use addCopy instead.
         request_headers_->appendCopy(header.first, header.second);
       }
+    }
+
+    ENVOY_STREAM_LOG(trace, "ext_authz filter removed header(s) from the request:", *callbacks_);
+    for (const auto& header : response->headers_to_remove) {
+      // We don't allow removing any :-prefixed headers, nor Host, as removing
+      // them would make the request malformed.
+      if (absl::StartsWithIgnoreCase(absl::string_view(header.get()), ":") ||
+          header == Http::Headers::get().HostLegacy) {
+        continue;
+      }
+      ENVOY_STREAM_LOG(trace, "'{}'", *callbacks_, header.get());
+      request_headers_->remove(header);
     }
 
     if (!response->dynamic_metadata.fields().empty()) {
@@ -301,25 +323,29 @@ bool Filter::isBufferFull() const {
 }
 
 void Filter::continueDecoding() {
+  // After sending the check request, we don't need to buffer the data anymore.
+  buffer_data_ = false;
+
   filter_return_ = FilterReturn::ContinueDecoding;
   if (!initiating_call_) {
     callbacks_->continueDecoding();
   }
 }
 
-bool Filter::skipCheckForRoute(const Router::RouteConstSharedPtr& route) const {
+Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
   if (route == nullptr || route->routeEntry() == nullptr) {
-    return true;
+    return PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
   }
 
   const auto* specific_per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route);
   if (specific_per_route_config != nullptr) {
-    return specific_per_route_config->disabled();
+    return PerRouteFlags{specific_per_route_config->disabled(),
+                         specific_per_route_config->disableRequestBodyBuffering()};
   }
 
-  return false;
+  return PerRouteFlags{false /*skip_check_*/, false /*skip_request_body_buffering_*/};
 }
 
 } // namespace ExtAuthz

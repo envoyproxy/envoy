@@ -46,7 +46,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_names: 
+    match_subject_alt_names:
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -57,7 +57,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_names: 
+    match_subject_alt_names:
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -118,8 +118,7 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
 }
 
 void XfccIntegrationTest::createUpstreams() {
-  fake_upstreams_.emplace_back(new FakeUpstream(
-      createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+  addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
 }
 
 void XfccIntegrationTest::initialize() {
@@ -745,6 +744,8 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"server.parent_connections", "server.parent_connections"},
       {"server.total_connections", "server.total_connections"},
       {"server.days_until_first_cert_expiring", "server.days_until_first_cert_expiring"},
+      {"server.seconds_until_first_ocsp_response_expiring",
+       "server.seconds_until_first_ocsp_response_expiring"},
       {"server.version", "server.version"}};
 
   auto test_name_against_mapping =

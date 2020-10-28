@@ -1,4 +1,3 @@
-#include "envoy/service/auth/v2alpha/external_auth.pb.h" // for proto link
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
@@ -12,6 +11,7 @@
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/test_runtime.h"
 
@@ -32,7 +32,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-using Params = std::tuple<envoy::config::core::v3::ApiVersion, bool>;
+using Params = std::tuple<envoy::config::core::v3::ApiVersion>;
 
 class ExtAuthzGrpcClientTest : public testing::TestWithParam<Params> {
 public:
@@ -40,9 +40,8 @@ public:
 
   void initialize(const Params& param) {
     api_version_ = std::get<0>(param);
-    use_alpha_ = std::get<1>(param);
     client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
-                                               api_version_, use_alpha_);
+                                               api_version_);
   }
 
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
@@ -53,7 +52,7 @@ public:
                           Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                           const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(TestUtility::getVersionedServiceFullName(
-                            "envoy.service.auth.{}.Authorization", api_version_, use_alpha_),
+                            "envoy.service.auth.{}.Authorization", api_version_),
                         service_full_name);
               EXPECT_EQ("Check", method_name);
               if (Runtime::runtimeFeatureEnabled(
@@ -73,16 +72,14 @@ public:
   MockRequestCallbacks request_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Tracing::MockSpan span_;
-  bool use_alpha_{};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   envoy::config::core::v3::ApiVersion api_version_;
 };
 
 INSTANTIATE_TEST_SUITE_P(Parameterized, ExtAuthzGrpcClientTest,
-                         Values(Params(envoy::config::core::v3::ApiVersion::AUTO, false),
-                                Params(envoy::config::core::v3::ApiVersion::V2, false),
-                                Params(envoy::config::core::v3::ApiVersion::V2, true),
-                                Params(envoy::config::core::v3::ApiVersion::V3, false)));
+                         Values(Params(envoy::config::core::v3::ApiVersion::AUTO),
+                                Params(envoy::config::core::v3::ApiVersion::V2),
+                                Params(envoy::config::core::v3::ApiVersion::V3)));
 
 // Test the client when an ok response is received.
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
@@ -109,11 +106,6 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
 
   authz_response.dynamic_metadata = expected_dynamic_metadata;
 
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
-  bool timer_destroyed = false;
-  timer->timer_destroyed_ = &timer_destroyed;
-
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
@@ -126,8 +118,6 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
-  // make sure the internal timeout timer is destroyed
-  EXPECT_EQ(timer_destroyed, true);
 }
 
 // Test the client when an ok response is received.
@@ -237,11 +227,6 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
 TEST_P(ExtAuthzGrpcClientTest, UnknownError) {
   initialize(GetParam());
 
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
-  bool timer_destroyed = false;
-  timer->timer_destroyed_ = &timer_destroyed;
-
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
@@ -250,9 +235,6 @@ TEST_P(ExtAuthzGrpcClientTest, UnknownError) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->onFailure(Grpc::Status::Unknown, "", span_);
-
-  // make sure the internal timeout timer is destroyed
-  EXPECT_EQ(timer_destroyed, true);
 }
 
 // Test the client when the request is canceled.
@@ -371,6 +353,65 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
+}
+
+class AsyncClientCacheTest : public testing::Test {
+public:
+  AsyncClientCacheTest() {
+    client_cache_ = std::make_unique<AsyncClientCache>(async_client_manager_, scope_, tls_);
+  }
+
+  void expectClientCreation() {
+    factory_ = new Grpc::MockAsyncClientFactory;
+    async_client_ = new Grpc::MockAsyncClient;
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
+            return Grpc::RawAsyncClientPtr{async_client_};
+          }));
+          return Grpc::AsyncClientFactoryPtr{factory_};
+        }));
+  }
+
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Grpc::MockAsyncClientManager async_client_manager_;
+  Grpc::MockAsyncClient* async_client_ = nullptr;
+  Grpc::MockAsyncClientFactory* factory_ = nullptr;
+  std::unique_ptr<AsyncClientCache> client_cache_;
+  NiceMock<Stats::MockIsolatedStatsStore> scope_;
+};
+
+TEST_F(AsyncClientCacheTest, Deduplication) {
+  Stats::IsolatedStoreImpl scope;
+  testing::InSequence s;
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz config;
+  config.mutable_grpc_service()->mutable_google_grpc()->set_target_uri("dns://test01");
+  config.mutable_grpc_service()->mutable_google_grpc()->set_credentials_factory_name(
+      "test_credential01");
+
+  expectClientCreation();
+  Grpc::RawAsyncClientSharedPtr test_client_01 = client_cache_->getOrCreateAsyncClient(config);
+  // Fetches the existing client.
+  EXPECT_EQ(test_client_01, client_cache_->getOrCreateAsyncClient(config));
+
+  config.mutable_grpc_service()->mutable_google_grpc()->set_credentials_factory_name(
+      "test_credential02");
+  expectClientCreation();
+  // Different credentials use different clients.
+  EXPECT_NE(test_client_01, client_cache_->getOrCreateAsyncClient(config));
+  Grpc::RawAsyncClientSharedPtr test_client_02 = client_cache_->getOrCreateAsyncClient(config);
+
+  config.mutable_grpc_service()->mutable_google_grpc()->set_credentials_factory_name(
+      "test_credential02");
+  // No creation, fetching the existing one.
+  EXPECT_EQ(test_client_02, client_cache_->getOrCreateAsyncClient(config));
+
+  // Different targets use different clients.
+  config.mutable_grpc_service()->mutable_google_grpc()->set_target_uri("dns://test02");
+  expectClientCreation();
+  EXPECT_NE(test_client_01, client_cache_->getOrCreateAsyncClient(config));
+  EXPECT_NE(test_client_02, client_cache_->getOrCreateAsyncClient(config));
 }
 
 } // namespace ExtAuthz

@@ -10,6 +10,7 @@
 
 #include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 
+using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 
 namespace Envoy {
@@ -26,7 +27,6 @@ void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(
     Network::TransportSocketCallbacks& callbacks) {
   transport_socket_->setTransportSocketCallbacks(callbacks);
   callbacks_ = &callbacks;
-  generateHeader();
 }
 
 Network::IoResult UpstreamProxyProtocolSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
@@ -51,7 +51,7 @@ void UpstreamProxyProtocolSocket::generateHeader() {
 }
 
 void UpstreamProxyProtocolSocket::generateHeaderV1() {
-  // Default to local addresses
+  // Default to local addresses (used if no downstream connection exists e.g. health checks)
   auto src_addr = callbacks_->connection().localAddress();
   auto dst_addr = callbacks_->connection().remoteAddress();
 
@@ -82,7 +82,7 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
       break;
     }
 
-    Api::IoCallUint64Result result = header_buffer_.write(callbacks_->ioHandle());
+    Api::IoCallUint64Result result = callbacks_->ioHandle().write(header_buffer_);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
@@ -98,6 +98,33 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
   } while (true);
 
   return {action, bytes_written, false};
+}
+
+void UpstreamProxyProtocolSocket::onConnected() {
+  generateHeader();
+  transport_socket_->onConnected();
+}
+
+UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
+    Network::TransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config)
+    : transport_socket_factory_(std::move(transport_socket_factory)), config_(config) {}
+
+Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsSharedPtr options) const {
+  auto inner_socket = transport_socket_factory_->createTransportSocket(options);
+  if (inner_socket == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options,
+                                                       config_.version());
+}
+
+bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
+  return transport_socket_factory_->implementsSecureTransport();
+}
+
+bool UpstreamProxyProtocolSocketFactory::isReady() const {
+  return transport_socket_factory_->isReady();
 }
 
 } // namespace ProxyProtocol

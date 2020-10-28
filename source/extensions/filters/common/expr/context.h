@@ -4,6 +4,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/grpc/status.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 
 #include "eval/public/cel_value.h"
@@ -45,6 +46,9 @@ constexpr absl::string_view GrpcStatus = "grpc_status";
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
 
+// Per-request or per-connection filter state
+constexpr absl::string_view FilterState = "filter_state";
+
 // Connection properties
 constexpr absl::string_view Connection = "connection";
 constexpr absl::string_view MTLS = "mtls";
@@ -73,10 +77,13 @@ constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_
 class RequestWrapper;
 
 absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
+absl::optional<CelValue>
+convertHeaderEntry(Protobuf::Arena& arena,
+                   Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
 
 template <class T> class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
-  HeadersWrapper(const T* value) : value_(value) {}
+  HeadersWrapper(Protobuf::Arena& arena, const T* value) : arena_(arena), value_(value) {}
   absl::optional<CelValue> operator[](CelValue key) const override {
     if (value_ == nullptr || !key.IsString()) {
       return {};
@@ -86,8 +93,8 @@ public:
       // Reject key if it is an invalid header string
       return {};
     }
-    auto out = value_->get(Http::LowerCaseString(str));
-    return convertHeaderEntry(out);
+    return convertHeaderEntry(
+        arena_, Http::HeaderUtility::getAllOfHeaderAsString(*value_, Http::LowerCaseString(str)));
   }
   int size() const override { return value_ == nullptr ? 0 : value_->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
@@ -98,6 +105,7 @@ public:
 private:
   friend class RequestWrapper;
   friend class ResponseWrapper;
+  Protobuf::Arena& arena_;
   const T* value_;
 };
 
@@ -112,13 +120,21 @@ public:
   const google::api::expr::runtime::CelList* ListKeys() const override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  CelValue Produce(ProtobufWkt::Arena*) override { return CelValue::CreateMap(this); }
+  CelValue Produce(ProtobufWkt::Arena* arena) override {
+    // Producer is unique per evaluation arena since activation is re-created.
+    arena_ = arena;
+    return CelValue::CreateMap(this);
+  }
+
+protected:
+  ProtobufWkt::Arena* arena_;
 };
 
 class RequestWrapper : public BaseWrapper {
 public:
-  RequestWrapper(const Http::RequestHeaderMap* headers, const StreamInfo::StreamInfo& info)
-      : headers_(headers), info_(info) {}
+  RequestWrapper(Protobuf::Arena& arena, const Http::RequestHeaderMap* headers,
+                 const StreamInfo::StreamInfo& info)
+      : headers_(arena, headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
@@ -128,9 +144,9 @@ private:
 
 class ResponseWrapper : public BaseWrapper {
 public:
-  ResponseWrapper(const Http::ResponseHeaderMap* headers, const Http::ResponseTrailerMap* trailers,
-                  const StreamInfo::StreamInfo& info)
-      : headers_(headers), trailers_(trailers), info_(info) {}
+  ResponseWrapper(Protobuf::Arena& arena, const Http::ResponseHeaderMap* headers,
+                  const Http::ResponseTrailerMap* trailers, const StreamInfo::StreamInfo& info)
+      : headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
@@ -176,6 +192,15 @@ public:
 
 private:
   const envoy::config::core::v3::Metadata& metadata_;
+};
+
+class FilterStateWrapper : public BaseWrapper {
+public:
+  FilterStateWrapper(const StreamInfo::FilterState& filter_state) : filter_state_(filter_state) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  const StreamInfo::FilterState& filter_state_;
 };
 
 } // namespace Expr

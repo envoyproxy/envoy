@@ -345,6 +345,9 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -378,6 +381,10 @@ private:
     // Network::FilterChain
     const Network::TransportSocketFactory& transportSocketFactory() const override {
       return transport_socket_factory_;
+    }
+
+    std::chrono::milliseconds transportSocketConnectTimeout() const override {
+      return std::chrono::milliseconds::zero();
     }
 
     const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {

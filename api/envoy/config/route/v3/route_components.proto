@@ -60,7 +60,7 @@ message VirtualHost {
 
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A list of domains (host/authority header) that will be matched to this
   // virtual host. Wildcard hosts are supported in the suffix or prefix form.
@@ -113,7 +113,7 @@ message VirtualHost {
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
   repeated string request_headers_to_remove = 13 [(validate.rules).repeated = {
-    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];
 
   // Specifies a list of HTTP headers that should be added to each response
@@ -128,7 +128,7 @@ message VirtualHost {
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
   repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
-    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];
 
   // Indicates that the virtual host has a CORS policy.
@@ -263,7 +263,7 @@ message Route {
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
   repeated string request_headers_to_remove = 12 [(validate.rules).repeated = {
-    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];
 
   // Specifies a set of headers that will be added to responses to requests
@@ -278,7 +278,7 @@ message Route {
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
   repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
-    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];
 
   // Presence of the object defines whether the connection manager's tracing configuration
@@ -311,7 +311,7 @@ message WeightedCluster {
 
     // Name of the upstream cluster. The cluster must exist in the
     // :ref:`cluster manager configuration <config_cluster_manager>`.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // An integer between 0 and :ref:`total_weight
     // <envoy_api_field_config.route.v3.WeightedCluster.total_weight>`. When a request matches the route,
@@ -591,7 +591,7 @@ message RouteAction {
 
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
-    string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
     // If not specified, all requests to the target cluster will be mirrored.
     //
@@ -620,9 +620,8 @@ message RouteAction {
 
       // The name of the request header that will be used to obtain the hash
       // key. If the request header is not present, no hash will be produced.
-      string header_name = 1 [
-        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
-      ];
+      string header_name = 1
+          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
       // If specified, the request header value will be rewritten and used
       // to produce the hash key.
@@ -650,7 +649,7 @@ message RouteAction {
       // The name of the cookie that will be used to obtain the hash key. If the
       // cookie is not present and ttl below is not set, no hash will be
       // produced.
-      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string name = 1 [(validate.rules).string = {min_len: 1}];
 
       // If specified, a cookie with the TTL will be generated if the cookie is
       // not present. If the TTL is present and zero, the generated cookie will
@@ -677,7 +676,7 @@ message RouteAction {
       // The name of the URL query parameter that will be used to obtain the hash
       // key. If the parameter is not present, no hash will be produced. Query
       // parameter names are case-sensitive.
-      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string name = 1 [(validate.rules).string = {min_len: 1}];
     }
 
     message FilterState {
@@ -687,7 +686,7 @@ message RouteAction {
       // The name of the Object in the per-request filterState, which is an
       // Envoy::Http::Hashable object. If there is no data associated with the key,
       // or the stored object is not Envoy::Http::Hashable, no hash will be produced.
-      string key = 1 [(validate.rules).string = {min_bytes: 1}];
+      string key = 1 [(validate.rules).string = {min_len: 1}];
     }
 
     oneof policy_specifier {
@@ -764,21 +763,22 @@ message RouteAction {
     ConnectConfig connect_config = 3;
   }
 
-  // [#not-implemented-hide:]
   message MaxStreamDuration {
     // Specifies the maximum duration allowed for streams on the route. If not specified, the value
     // from the :ref:`max_stream_duration
     // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` field in
     // :ref:`HttpConnectionManager.common_http_protocol_options
     // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
-    // is used.
+    // is used. If this field is set explicitly to zero, any
+    // HttpConnectionManager max_stream_duration timeout will be disabled for
+    // this route.
     google.protobuf.Duration max_stream_duration = 1;
 
     // If present, and the request contains a `grpc-timeout header
     // <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, use that value as the
     // *max_stream_duration*, but limit the applied timeout to the maximum value specified here.
     // If set to 0, the `grpc-timeout` header is used without modification.
-    google.protobuf.Duration grpc_max_timeout = 2;
+    google.protobuf.Duration grpc_timeout_header_max = 2;
 
     // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by
     // subtracting the provided duration from the header. This is useful for allowing Envoy to set
@@ -786,7 +786,7 @@ message RouteAction {
     // makes it more likely that Envoy will handle the timeout instead of having the call canceled
     // by the client. If, after applying the offset, the resulting timeout is zero or negative,
     // the stream will timeout immediately.
-    google.protobuf.Duration grpc_timeout_offset = 3;
+    google.protobuf.Duration grpc_timeout_header_offset = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21, 10;
@@ -798,7 +798,7 @@ message RouteAction {
 
     // Indicates the upstream cluster to which the request should be routed
     // to.
-    string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
     // Envoy will determine the cluster to route to by reading the value of the
     // HTTP header named by cluster_header from the request headers. If the
@@ -809,8 +809,12 @@ message RouteAction {
     //
     //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
     //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     string cluster_header = 2
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -917,6 +921,10 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     string host_rewrite_header = 29
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
@@ -1018,6 +1026,7 @@ message RouteAction {
   // Indicates that the route has a CORS policy.
   CorsPolicy cors = 17;
 
+  // Deprecated by :ref:`grpc_timeout_header_max <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`
   // If present, and the request is a gRPC request, use the
   // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
   // or its default value (infinity) instead of
@@ -1037,8 +1046,9 @@ message RouteAction {
   //    :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
   //    :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
   //    :ref:`retry overview <arch_overview_http_routing_retry>`.
-  google.protobuf.Duration max_grpc_timeout = 23;
+  google.protobuf.Duration max_grpc_timeout = 23 [deprecated = true];
 
+  // Deprecated by :ref:`grpc_timeout_header_offset <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_offset>`.
   // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
   // the provided duration from the header. This is useful in allowing Envoy to set its global
   // timeout to be less than that of the deadline imposed by the calling client, which makes it more
@@ -1046,7 +1056,7 @@ message RouteAction {
   // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
   // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
   // infinity).
-  google.protobuf.Duration grpc_timeout_offset = 28;
+  google.protobuf.Duration grpc_timeout_offset = 28 [deprecated = true];
 
   repeated UpgradeConfig upgrade_configs = 25;
 
@@ -1080,7 +1090,6 @@ message RouteAction {
   HedgePolicy hedge_policy = 27;
 
   // Specifies the maximum stream duration for this route.
-  // [#not-implemented-hide:]
   MaxStreamDuration max_stream_duration = 36;
 }
 
@@ -1102,7 +1111,7 @@ message RetryPolicy {
 
     reserved "config";
 
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     oneof config_type {
       google.protobuf.Any typed_config = 3;
@@ -1117,7 +1126,7 @@ message RetryPolicy {
 
     reserved "config";
 
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     oneof config_type {
       google.protobuf.Any typed_config = 3;
@@ -1145,9 +1154,15 @@ message RetryPolicy {
   }
 
   message ResetHeader {
+    // The name of the reset header.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     string name = 1
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
+    // The format of the reset header.
     ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
   }
 
@@ -1413,7 +1428,7 @@ message Decorator {
   //   For ingress (inbound) requests, or egress (outbound) responses, this value may be overridden
   //   by the :ref:`x-envoy-decorator-operation
   //   <config_http_filters_router_x-envoy-decorator-operation>` header.
-  string operation = 1 [(validate.rules).string = {min_bytes: 1}];
+  string operation = 1 [(validate.rules).string = {min_len: 1}];
 
   // Whether the decorated details should be propagated to the other party. The default is true.
   google.protobuf.BoolValue propagate = 2;
@@ -1488,14 +1503,14 @@ message VirtualCluster {
   // Specifies the name of the virtual cluster. The virtual cluster name as well
   // as the virtual host name are used when emitting statistics. The statistics are emitted by the
   // router filter and are documented :ref:`here <config_http_filters_router_stats>`.
-  string name = 2 [(validate.rules).string = {min_bytes: 1}];
+  string name = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1546,12 +1561,11 @@ message RateLimit {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
-      string header_name = 1 [
-        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
-      ];
+      string header_name = 1
+          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
       // The key to use in the descriptor entry.
-      string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
+      string descriptor_key = 2 [(validate.rules).string = {min_len: 1}];
 
       // If set to true, Envoy skips the descriptor while calling rate limiting service
       // when header is not present in the request. By default it skips calling the
@@ -1580,7 +1594,7 @@ message RateLimit {
           "envoy.api.v2.route.RateLimit.Action.GenericKey";
 
       // The value to use in the descriptor entry.
-      string descriptor_value = 1 [(validate.rules).string = {min_bytes: 1}];
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
       // An optional key to use in the descriptor entry. If not set it defaults
       // to 'generic_key' as the descriptor key.
@@ -1597,7 +1611,7 @@ message RateLimit {
           "envoy.api.v2.route.RateLimit.Action.HeaderValueMatch";
 
       // The value to use in the descriptor entry.
-      string descriptor_value = 1 [(validate.rules).string = {min_bytes: 1}];
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
       // If set to true, the action will append a descriptor entry when the
       // request matches the headers. If set to false, the action will append a
@@ -1613,14 +1627,18 @@ message RateLimit {
       repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
     }
 
-    // The following descriptor entry is appended when the dynamic metadata contains a key value:
+    // The following descriptor entry is appended when the
+    // :ref:`dynamic metadata <well_known_dynamic_metadata>` contains a key value:
     //
     // .. code-block:: cpp
     //
-    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    //   ("<descriptor_key>", "<value_queried_from_dynamic_metadata>")
+    //
+    // .. attention::
+    //   This action has been deprecated in favor of the :ref:`metadata <envoy_api_msg_config.route.v3.RateLimit.Action.MetaData>` action
     message DynamicMetaData {
       // The key to use in the descriptor entry.
-      string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
+      string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
 
       // Metadata struct that defines the key and path to retrieve the string value. A match will
       // only happen if the value in the dynamic metadata is of type string.
@@ -1629,6 +1647,35 @@ message RateLimit {
       // An optional value to use if *metadata_key* is empty. If not set and
       // no value is present under the metadata_key then no descriptor is generated.
       string default_value = 3;
+    }
+
+    // The following descriptor entry is appended when the metadata contains a key value:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    message MetaData {
+      enum Source {
+        // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
+        DYNAMIC = 0;
+
+        // Query :ref:`route entry metadata <envoy_api_field_config.route.v3.Route.metadata>`
+        ROUTE_ENTRY = 1;
+      }
+
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
+
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the metadata is of type string.
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+
+      // An optional value to use if *metadata_key* is empty. If not set and
+      // no value is present under the metadata_key then no descriptor is generated.
+      string default_value = 3;
+
+      // Source of metadata
+      Source source = 4 [(validate.rules).enum = {defined_only: true}];
     }
 
     oneof action_specifier {
@@ -1653,7 +1700,14 @@ message RateLimit {
       HeaderValueMatch header_value_match = 6;
 
       // Rate limit on dynamic metadata.
-      DynamicMetaData dynamic_metadata = 7;
+      //
+      // .. attention::
+      //   This field has been deprecated in favor of the :ref:`metadata <envoy_api_field_config.route.v3.RateLimit.Action.metadata>` field
+      DynamicMetaData dynamic_metadata = 7
+          [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+      // Rate limit on metadata.
+      MetaData metadata = 8;
     }
   }
 
@@ -1736,7 +1790,7 @@ message HeaderMatcher {
 
   // Specifies the name of the header in the request.
   string name = 1
-      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
@@ -1771,7 +1825,7 @@ message HeaderMatcher {
     // Examples:
     //
     // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
-    string prefix_match = 9 [(validate.rules).string = {min_bytes: 1}];
+    string prefix_match = 9 [(validate.rules).string = {min_len: 1}];
 
     // If specified, header match will be performed based on the suffix of the header value.
     // Note: empty suffix is not allowed, please use present_match instead.
@@ -1779,7 +1833,7 @@ message HeaderMatcher {
     // Examples:
     //
     // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
-    string suffix_match = 10 [(validate.rules).string = {min_bytes: 1}];
+    string suffix_match = 10 [(validate.rules).string = {min_len: 1}];
 
     // If specified, header match will be performed based on whether the header value contains
     // the given value or not.
@@ -1788,7 +1842,7 @@ message HeaderMatcher {
     // Examples:
     //
     // * The value *abcd* matches the value *xyzabcdpqr*, but not for *xyzbcdpqr*.
-    string contains_match = 12 [(validate.rules).string = {min_bytes: 1}];
+    string contains_match = 12 [(validate.rules).string = {min_len: 1}];
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.
@@ -1813,7 +1867,7 @@ message QueryParameterMatcher {
 
   // Specifies the name of a key that must be present in the requested
   // *path*'s query string.
-  string name = 1 [(validate.rules).string = {min_bytes: 1 max_bytes: 1024}];
+  string name = 1 [(validate.rules).string = {min_len: 1 max_bytes: 1024}];
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.

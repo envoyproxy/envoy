@@ -20,6 +20,7 @@
 #include "common/common/fmt.h"
 #include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -66,10 +67,11 @@ typeToCodecType(Http::CodecClient::Type type) {
 } // namespace
 
 IntegrationCodecClient::IntegrationCodecClient(
-    Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
-    Upstream::HostDescriptionConstSharedPtr host_description, CodecClient::Type type)
-    : CodecClientProd(type, std::move(conn), host_description, dispatcher), dispatcher_(dispatcher),
-      callbacks_(*this), codec_callbacks_(*this) {
+    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+    Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
+    CodecClient::Type type)
+    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
+      dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -226,8 +228,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
-  return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
-                                                  downstream_protocol_);
+  return std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
+                                                  host_description, downstream_protocol_);
 }
 
 Network::TransportSocketFactoryPtr HttpIntegrationTest::createUpstreamTlsContext() {
@@ -372,10 +374,10 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
   EXPECT_EQ(response_code, response->headers().getStatusValue());
   expected_headers.iterate([response_headers = &response->headers()](
                                const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    const Http::HeaderEntry* entry =
+    const auto entry =
         response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
-    EXPECT_NE(entry, nullptr);
-    EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
+    EXPECT_FALSE(entry.empty());
+    EXPECT_EQ(header.value().getStringView(), entry[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
 
@@ -848,12 +850,13 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   codec_client_->sendData(*request_encoder_, 10, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Verify the Expect header is stripped.
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Expect));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Expect).empty());
   if (via.empty()) {
-    EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Via));
+    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Via).empty());
   } else {
-    EXPECT_EQ(via,
-              upstream_request_->headers().get(Http::Headers::get().Via)->value().getStringView());
+    EXPECT_EQ(
+        via,
+        upstream_request_->headers().get(Http::Headers::get().Via)[0]->value().getStringView());
   }
 
   if (additional_continue_from_upstream) {
@@ -1185,7 +1188,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   codec_client_->sendData(*request_encoder_, 0, true);
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)->value(), "a=b; c=d");
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(), "a=b; c=d");
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, false);
@@ -1386,4 +1389,58 @@ std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name
   }
   return "listener.[__1]_0." + stat_name;
 }
+
+void Http2RawFrameIntegrationTest::startHttp2Session() {
+  ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
+
+  // Send empty initial SETTINGS frame.
+  auto settings = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+
+  // Read initial SETTINGS frame from the server.
+  readFrame();
+
+  // Send an SETTINGS ACK.
+  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+
+  // read pending SETTINGS and WINDOW_UPDATE frames
+  readFrame();
+  readFrame();
+}
+
+void Http2RawFrameIntegrationTest::beginSession() {
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower outbound frame limits to make tests run faster
+  config_helper_.setDownstreamOutboundFramesLimits(1000, 100);
+  initialize();
+  // Set up a raw connection to easily send requests without reading responses.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  tcp_client_ = makeTcpConnection(lookupPort("http"), options);
+  startHttp2Session();
+}
+
+Http2Frame Http2RawFrameIntegrationTest::readFrame() {
+  Http2Frame frame;
+  EXPECT_TRUE(tcp_client_->waitForData(frame.HeaderSize));
+  frame.setHeader(tcp_client_->data());
+  tcp_client_->clearData(frame.HeaderSize);
+  auto len = frame.payloadSize();
+  if (len) {
+    EXPECT_TRUE(tcp_client_->waitForData(len));
+    frame.setPayload(tcp_client_->data());
+    tcp_client_->clearData(len);
+  }
+  return frame;
+}
+
+void Http2RawFrameIntegrationTest::sendFrame(const Http2Frame& frame) {
+  ASSERT_TRUE(tcp_client_->connected());
+  ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
+}
+
 } // namespace Envoy

@@ -11,20 +11,23 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
+ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers) {
   auto activation = std::make_unique<Activation>();
-  activation->InsertValueProducer(Request, std::make_unique<RequestWrapper>(request_headers, info));
-  activation->InsertValueProducer(
-      Response, std::make_unique<ResponseWrapper>(response_headers, response_trailers, info));
+  activation->InsertValueProducer(Request,
+                                  std::make_unique<RequestWrapper>(arena, request_headers, info));
+  activation->InsertValueProducer(Response, std::make_unique<ResponseWrapper>(
+                                                arena, response_headers, response_trailers, info));
   activation->InsertValueProducer(Connection, std::make_unique<ConnectionWrapper>(info));
   activation->InsertValueProducer(Upstream, std::make_unique<UpstreamWrapper>(info));
   activation->InsertValueProducer(Source, std::make_unique<PeerWrapper>(info, false));
   activation->InsertValueProducer(Destination, std::make_unique<PeerWrapper>(info, true));
   activation->InsertValueProducer(Metadata,
                                   std::make_unique<MetadataProducer>(info.dynamicMetadata()));
+  activation->InsertValueProducer(FilterState,
+                                  std::make_unique<FilterStateWrapper>(info.filterState()));
   return activation;
 }
 
@@ -65,13 +68,14 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
   return std::move(cel_expression_status.value());
 }
 
-absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
+absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
                                   const StreamInfo::StreamInfo& info,
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers) {
-  auto activation = createActivation(info, request_headers, response_headers, response_trailers);
-  auto eval_status = expr.Evaluate(*activation, arena);
+  auto activation =
+      createActivation(arena, info, request_headers, response_headers, response_trailers);
+  auto eval_status = expr.Evaluate(*activation, &arena);
   if (!eval_status.ok()) {
     return {};
   }
@@ -82,7 +86,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers) {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, &arena, info, &headers, nullptr, nullptr);
+  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr);
   if (!eval_status.has_value()) {
     return false;
   }

@@ -641,7 +641,7 @@ TEST_F(RouterTest, AddCookie) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -663,8 +663,9 @@ TEST_F(RouterTest, AddCookie) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
-        EXPECT_EQ(std::string{headers.get(Http::Headers::get().SetCookie)->value().getStringView()},
-                  "foo=\"" + cookie_value + "\"; Max-Age=1337; HttpOnly");
+        EXPECT_EQ(
+            std::string{headers.get(Http::Headers::get().SetCookie)[0]->value().getStringView()},
+            "foo=\"" + cookie_value + "\"; Max-Age=1337; HttpOnly");
       }));
   expectResponseTimerCreate();
 
@@ -692,7 +693,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -714,8 +715,9 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
-        EXPECT_EQ(std::string{headers.get(Http::Headers::get().SetCookie)->value().getStringView()},
-                  "foo=baz");
+        EXPECT_EQ(
+            std::string{headers.get(Http::Headers::get().SetCookie)[0]->value().getStringView()},
+            "foo=baz");
       }));
   expectResponseTimerCreate();
 
@@ -742,7 +744,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -970,7 +972,7 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
-        EXPECT_NE(nullptr, headers.get(Http::Headers::get().EnvoyUpstreamServiceTime));
+        EXPECT_FALSE(headers.get(Http::Headers::get().EnvoyUpstreamServiceTime).empty());
       }));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
@@ -1239,10 +1241,10 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&cluster_header_name](Http::HeaderMap& headers, bool) {
-        const Http::HeaderEntry* cluster_header =
+        const auto cluster_header =
             headers.get(cluster_header_name.value_or(Http::Headers::get().EnvoyCluster));
-        EXPECT_NE(nullptr, cluster_header);
-        EXPECT_EQ("fake_cluster", cluster_header->value().getStringView());
+        EXPECT_FALSE(cluster_header.empty());
+        EXPECT_EQ("fake_cluster", cluster_header[0]->value().getStringView());
       }));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
@@ -1297,15 +1299,15 @@ void RouterTestBase::testAppendUpstreamHost(
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&hostname_header_name, &host_address_header_name](Http::HeaderMap& headers,
                                                                           bool) {
-        const Http::HeaderEntry* hostname_header =
+        const auto hostname_header =
             headers.get(hostname_header_name.value_or(Http::Headers::get().EnvoyUpstreamHostname));
-        EXPECT_NE(nullptr, hostname_header);
-        EXPECT_EQ("scooby.doo", hostname_header->value().getStringView());
+        EXPECT_FALSE(hostname_header.empty());
+        EXPECT_EQ("scooby.doo", hostname_header[0]->value().getStringView());
 
-        const Http::HeaderEntry* host_address_header = headers.get(
+        const auto host_address_header = headers.get(
             host_address_header_name.value_or(Http::Headers::get().EnvoyUpstreamHostAddress));
-        EXPECT_NE(nullptr, host_address_header);
-        EXPECT_EQ("10.0.0.5:9211", host_address_header->value().getStringView());
+        EXPECT_FALSE(host_address_header.empty());
+        EXPECT_EQ("10.0.0.5:9211", host_address_header[0]->value().getStringView());
       }));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
@@ -1430,7 +1432,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyUpstreamServiceTime) {
       {":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
-        EXPECT_EQ(nullptr, headers.get(Http::Headers::get().EnvoyUpstreamServiceTime));
+        EXPECT_TRUE(headers.get(Http::Headers::get().EnvoyUpstreamServiceTime).empty());
       }));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
@@ -2328,9 +2330,9 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   EXPECT_CALL(*per_try_timeout_, disableTimer());
-  EXPECT_CALL(*response_timeout_, disableTimer());
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(*response_timeout_, disableTimer());
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
@@ -4730,7 +4732,7 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_CALL(*shadow_writer_, shadow_("foo", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
                           const Http::AsyncClient::RequestOptions& options) -> void {
-        EXPECT_NE(nullptr, request->body());
+        EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
         EXPECT_TRUE(options.sampled_);
@@ -4738,7 +4740,7 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
                           const Http::AsyncClient::RequestOptions& options) -> void {
-        EXPECT_NE(nullptr, request->body());
+        EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
         EXPECT_FALSE(options.sampled_);

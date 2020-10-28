@@ -14,6 +14,7 @@
 #include "common/api/os_sys_calls_impl_linux.h"
 #endif
 
+#include "test/mocks/common.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
@@ -41,11 +42,13 @@ public:
   MOCK_METHOD(Filesystem::Instance&, fileSystem, ());
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
   MOCK_METHOD(const Stats::Scope&, rootScope, ());
+  MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {
@@ -89,7 +92,9 @@ public:
   MOCK_METHOD(SysCallIntResult, shutdown, (os_fd_t sockfd, int how));
   MOCK_METHOD(SysCallIntResult, socketpair, (int domain, int type, int protocol, os_fd_t sv[2]));
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));
+  MOCK_METHOD(SysCallSocketResult, duplicate, (os_fd_t sockfd));
   MOCK_METHOD(SysCallSizeResult, write, (os_fd_t sockfd, const void* buffer, size_t length));
+  MOCK_METHOD(SysCallBoolResult, socketTcpInfo, (os_fd_t sockfd, EnvoyTcpInfo* tcp_info));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(bool, supportsIpTransparent, (), (const));

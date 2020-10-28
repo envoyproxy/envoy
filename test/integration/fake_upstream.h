@@ -29,10 +29,12 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/udp_default_writer_config.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/active_raw_udp_listener_config.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -456,6 +458,7 @@ private:
   const Type type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
@@ -611,6 +614,13 @@ public:
     return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
   }
 
+  // Write into the outbound buffer of the network connection at the specified index.
+  // Note: that this write bypasses any processing by the upstream codec.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  rawWriteConnection(uint32_t index, const std::string& data, bool end_stream = false,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
@@ -655,9 +665,9 @@ private:
   public:
     FakeListener(FakeUpstream& parent)
         : parent_(parent), name_("fake_upstream"),
-          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()),
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>(1)),
           udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
-          init_manager_(nullptr) {}
+          udp_listener_worker_router_(1), init_manager_(nullptr) {}
 
   private:
     // Network::ListenerConfig
@@ -680,6 +690,9 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
     }
+    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+      return udp_listener_worker_router_;
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -701,6 +714,7 @@ private:
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
+    Network::UdpListenerWorkerRouterImpl udp_listener_worker_router_;
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;

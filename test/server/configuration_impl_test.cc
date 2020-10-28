@@ -60,10 +60,10 @@ protected:
       : api_(Api::createApiForTest()),
         cluster_manager_factory_(
             server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
-            server_.dispatcher(), server_.localInfo(), server_.secretManager(),
-            server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
-            server_.accessLogManager(), server_.singletonManager()) {}
+            server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
+            server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
+            server_.httpContext(), server_.grpcContext(), server_.accessLogManager(),
+            server_.singletonManager()) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -754,8 +754,8 @@ TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
+  EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
 }
 
 TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
@@ -793,8 +793,8 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.mainThreadWatchdogConfig().killTimeout());
-  EXPECT_EQ(std::chrono::milliseconds(0), config.workerWatchdogConfig().killTimeout());
+  EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
+  EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
 }
 
 TEST_F(ConfigurationImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {

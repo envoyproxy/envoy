@@ -14,26 +14,10 @@ service behind the proxy will be checked by an external HTTP or gRPC service. In
 for every authorized call, the external authorization service adds additional ``x-current-user``
 header entry to the original request headers to be forwarded to the upstream service.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
+.. include:: _include/docker-env-setup.rst
 
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Start all of our containers**
+Step 3: Start all of our containers
+***********************************
 
 To build this sandbox example and start the example services, run the following commands:
 
@@ -45,11 +29,11 @@ To build this sandbox example and start the example services, run the following 
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                   Name                             Command               State                             Ports
-    ---------------------------------------------------------------------------------------------------------------------------------------
+                   Name                             Command               State             Ports
+    ---------------------------------------------------------------------------------------------------------------
     ext_authz_ext_authz-grpc-service_1   /app/server -users /etc/us       Up
     ext_authz_ext_authz-http-service_1   docker-entrypoint.sh node        Up
-    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp
     ext_authz_upstream-service_1         python3 /app/service/server.py   Up
 
 .. note::
@@ -76,7 +60,8 @@ For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
     $ FRONT_ENVOY_YAML=config/http-service.yaml docker-compose up --build -d
     $ # Or you can update the .env file with the above FRONT_ENVOY_YAML value, so you don't have to specify it when running the "up" command.
 
-**Step 4: Access the upstream-service behind the Front Envoy**
+Step 4: Access the upstream-service behind the Front Envoy
+**********************************************************
 
 You can now try to send a request to upstream-service via the front-envoy as follows:
 

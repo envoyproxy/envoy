@@ -167,9 +167,9 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
-        context.dispatcher().timeSource())});
+        *filter_config, context.drainDecision(), context.api().randomGenerator(),
+        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
+        context.overloadManager(), context.dispatcher().timeSource())});
   };
 }
 
@@ -270,7 +270,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     request_id_extension_ =
         Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
   } else {
-    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(context_.random());
+    request_id_extension_ =
+        Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
@@ -581,13 +582,15 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             "envoy.reloadable_features.new_codec_behavior")) {
       return std::make_unique<Http::Http2::ServerConnectionImpl>(
           connection, callbacks,
-          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()), http2_options_,
-          maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
+          context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
+          maxRequestHeadersCount(), headersWithUnderscoresAction());
     } else {
       return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
           connection, callbacks,
-          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()), http2_options_,
-          maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
+          context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
+          maxRequestHeadersCount(), headersWithUnderscoresAction());
     }
   }
   case CodecType::HTTP3:
@@ -601,9 +604,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_codec_stats_, http2_codec_stats_,
-        http1_settings_, http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
+        connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
+        http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
@@ -709,9 +712,9 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
-        context.dispatcher().timeSource());
+        *filter_config, context.drainDecision(), context.api().randomGenerator(),
+        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
+        context.overloadManager(), context.dispatcher().timeSource());
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.

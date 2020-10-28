@@ -90,6 +90,7 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override;
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
@@ -105,7 +106,7 @@ public:
   IoHandle& ioHandle() final { return socket_->ioHandle(); }
   const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
-  void raiseEvent(ConnectionEvent event) final;
+  void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
@@ -115,7 +116,7 @@ public:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+  void setReadBufferReady() override { ioHandle().activateFileEvents(Event::FileReadyType::Read); }
   void flushWriteBuffer() override;
 
   // Obtain global next connection ID. This should only be used in tests.
@@ -158,7 +159,6 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
-  Event::FileEventPtr file_event_;
 
 private:
   friend class Envoy::RandomPauseFilter;
@@ -195,6 +195,25 @@ private:
   bool write_end_stream_ : 1;
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
+};
+
+class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
+public:
+  ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
+                       bool connected);
+
+  // ServerConnection impl
+  void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) override;
+  void raiseEvent(ConnectionEvent event) override;
+
+private:
+  void onTransportSocketConnectTimeout();
+
+  bool transport_connect_pending_{true};
+  // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
+  // call to setTransportSocketConnectTimeout and is reset when the connection is established.
+  Event::TimerPtr transport_socket_connect_timer_;
 };
 
 /**

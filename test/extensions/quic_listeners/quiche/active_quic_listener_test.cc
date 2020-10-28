@@ -1,18 +1,15 @@
 #include <cstdlib>
-
-#pragma GCC diagnostic push
-// QUICHE allows unused parameters.
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-
 #include <memory>
-
-#include "common/runtime/runtime_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/network/exception.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
@@ -20,21 +17,24 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/quic/test_tools/quic_crypto_server_config_peer.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "server/configuration_impl.h"
 #include "common/common/logger.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/environment.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/instance.h"
-
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/network_utility.h"
 #include "absl/time/time.h"
@@ -81,7 +81,7 @@ protected:
       : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_), quic_version_([]() {
+        connection_handler_(*dispatcher_, absl::nullopt), quic_version_([]() {
           if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
@@ -111,23 +111,27 @@ protected:
     ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
     ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
 
-    // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test
+    // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
+    // supported.
     ON_CALL(listener_config_, udpPacketWriterFactory())
         .WillByDefault(Return(
             std::reference_wrapper<Network::UdpPacketWriterFactory>(udp_packet_writer_factory_)));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
         .WillByDefault(Invoke(
             [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
-              Network::UdpPacketWriterPtr udp_packet_writer =
-                  std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
-              return udp_packet_writer;
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
+              return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
+#else
+              UNREFERENCED_PARAMETER(scope);
+              return std::make_unique<Network::UdpDefaultWriter>(io_handle);
+#endif
             }));
 
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager_));
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
-            connection_handler_, *dispatcher_, listener_config_));
+            0, connection_handler_, *dispatcher_, listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
         ActiveQuicListenerPeer::cryptoConfig(*quic_listener_);
@@ -137,6 +141,13 @@ protected:
     crypto_config_peer.ResetProofSource(std::move(proof_source));
     simulated_time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), *dispatcher_,
                                              Event::Dispatcher::RunType::NonBlock);
+
+    // The state of whether client hellos can be buffered or not is different before and after
+    // the first packet processed by the listener. This only matters in tests. Force an event
+    // to get it into a consistent state.
+    dispatcher_->post([this]() { quic_listener_->onReadReady(); });
+
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
@@ -200,6 +211,14 @@ protected:
     auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(),
                                                    1, nullptr, *listen_socket_->localAddress());
     ASSERT_EQ(slice[0].len_, send_rc.rc_);
+
+#if defined(__APPLE__)
+    // This sleep makes the tests pass more reliably. Some debugging showed that without this,
+    // no packet is received when the event loop is running.
+    // TODO(ggreenway): make tests more reliable, and handle packet loss during the tests, possibly
+    // by retransmitting on a timer.
+    ::usleep(1000);
+#endif
   }
 
   void readFromClientSockets() {
@@ -211,7 +230,7 @@ protected:
 
       do {
         Api::IoCallUint64Result result =
-            result_buffer->read(client_socket->ioHandle(), bytes_to_read - bytes_read);
+            client_socket->ioHandle().read(*result_buffer, bytes_to_read - bytes_read);
 
         if (result.ok()) {
           bytes_read += result.rc_;
@@ -230,7 +249,9 @@ protected:
   }
 
   void TearDown() override {
-    quic_listener_->onListenerShutdown();
+    if (quic_listener_ != nullptr) {
+      quic_listener_->onListenerShutdown();
+    }
     // Trigger alarm to fire before listener destruction.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     Runtime::LoaderSingleton::clear();
@@ -292,10 +313,11 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
       .WillOnce(Return(false));
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
+  quic_listener_.reset();
   EXPECT_THROW_WITH_REGEX(
-      std::make_unique<ActiveQuicListener>(
-          *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
-          options,
+      (void)std::make_unique<ActiveQuicListener>(
+          0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
+          options, false,
           ActiveQuicListenerFactoryPeer::runtimeEnabled(
               static_cast<ActiveQuicListenerFactory*>(listener_factory_.get()))),
       Network::CreateListenerException, "Failed to apply socket options.");
@@ -315,50 +337,46 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
 TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
-  maybeConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
+  const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
+  maybeConfigureMocks(count);
 
   // Generate one more CHLO than can be processed immediately.
-  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 1; ++i) {
+  for (size_t i = 1; i <= count; ++i) {
     sendCHLO(quic::test::TestConnectionId(i));
   }
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  // The first kNumSessionsToCreatePerLoop CHLOs are processed,
-  // the last one is buffered.
-  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop; ++i) {
-    EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(i)));
-  }
-  EXPECT_TRUE(buffered_packets->HasBufferedPackets(
-      quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 1)));
-  EXPECT_TRUE(buffered_packets->HasChlosBuffered());
-  EXPECT_FALSE(quic_dispatcher_->session_map().empty());
+  // The first kNumSessionsToCreatePerLoop were processed immediately, the next
+  // kNumSessionsToCreatePerLoop were buffered for the next run of the event loop, and the last one
+  // was buffered to the subsequent event loop.
+  EXPECT_EQ(2, quic_listener_->eventLoopsWithBufferedChlosForTest());
 
-  // Generate more data to trigger a socket read during the next event loop.
-  sendCHLO(quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-
-  // The socket read results in processing all CHLOs.
-  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 2; ++i) {
+  for (size_t i = 1; i <= count; ++i) {
     EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(i)));
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
-
+  EXPECT_FALSE(quic_dispatcher_->session_map().empty());
   readFromClientSockets();
 }
 
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
+  maybeConfigureMocks(/* connection_count = */ 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
   sendCHLO(quic::test::TestConnectionId(1));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(quic_dispatcher_->session_map().size(), 1);
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
+  sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
-  EXPECT_TRUE(quic_dispatcher_->session_map().empty());
+  EXPECT_EQ(quic_dispatcher_->session_map().size(), 1);
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
+
   Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " true"}});
-  maybeConfigureMocks(/* connection_count = */ 1);
-  sendCHLO(quic::test::TestConnectionId(1));
+  sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_FALSE(quic_dispatcher_->session_map().empty());
+  EXPECT_EQ(quic_dispatcher_->session_map().size(), 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
 

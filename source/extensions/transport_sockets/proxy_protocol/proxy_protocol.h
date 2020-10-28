@@ -9,6 +9,7 @@
 
 #include "extensions/transport_sockets/common/passthrough.h"
 
+using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 
 namespace Envoy {
@@ -25,6 +26,7 @@ public:
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
+  void onConnected() override;
 
 private:
   void generateHeader();
@@ -36,6 +38,22 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
+};
+
+class UpstreamProxyProtocolSocketFactory : public Network::TransportSocketFactory {
+public:
+  UpstreamProxyProtocolSocketFactory(Network::TransportSocketFactoryPtr transport_socket_factory,
+                                     ProxyProtocolConfig config);
+
+  // Network::TransportSocketFactory
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  bool implementsSecureTransport() const override;
+  bool isReady() const override;
+
+private:
+  Network::TransportSocketFactoryPtr transport_socket_factory_;
+  ProxyProtocolConfig config_;
 };
 
 } // namespace ProxyProtocol

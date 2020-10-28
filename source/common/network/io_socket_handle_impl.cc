@@ -59,6 +59,10 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::close() {
+  if (file_event_) {
+    file_event_.reset();
+  }
+
   ASSERT(SOCKET_VALID(fd_));
   const int rc = Api::OsSysCallsSingleton::get().close(fd_).rc_;
   SET_SOCKET_INVALID(fd_);
@@ -84,6 +88,24 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint64_t max_length) {
+  if (max_length == 0) {
+    return Api::ioCallUint64ResultNoError();
+  }
+  constexpr uint64_t MaxSlices = 2;
+  Buffer::RawSlice slices[MaxSlices];
+  const uint64_t num_slices = buffer.reserve(max_length, slices, MaxSlices);
+  Api::IoCallUint64Result result = readv(max_length, slices, num_slices);
+  uint64_t bytes_to_commit = result.ok() ? result.rc_ : 0;
+  ASSERT(bytes_to_commit <= max_length);
+  for (uint64_t i = 0; i < num_slices; i++) {
+    slices[i].len_ = std::min(slices[i].len_, static_cast<size_t>(bytes_to_commit));
+    bytes_to_commit -= slices[i].len_;
+  }
+  buffer.commit(slices, num_slices);
+  return result;
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                    uint64_t num_slice) {
   absl::FixedArray<iovec> iov(num_slice);
@@ -100,6 +122,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   }
   return sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
+}
+
+Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
+  constexpr uint64_t MaxSlices = 16;
+  Buffer::RawSliceVector slices = buffer.getRawSlices(MaxSlices);
+  Api::IoCallUint64Result result = writev(slices.begin(), slices.size());
+  if (result.ok() && result.rc_ > 0) {
+    buffer.drain(static_cast<uint64_t>(result.rc_));
+  }
+  return result;
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
@@ -449,6 +481,13 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
 }
 
+IoHandlePtr IoSocketHandleImpl::duplicate() {
+  auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
+  RELEASE_ASSERT(result.rc_ != -1, fmt::format("duplicate failed for '{}': ({}) {}", fd_,
+                                               result.errno_, errorDetails(result.errno_)));
+  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
+}
+
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
@@ -489,15 +528,41 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   return Address::addressFromSockAddr(ss, ss_len);
 }
 
-Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
-                                                        Event::FileReadyCb cb,
-                                                        Event::FileTriggerType trigger,
-                                                        uint32_t events) {
-  return dispatcher.createFileEvent(fd_, cb, trigger, events);
+void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                             Event::FileTriggerType trigger, uint32_t events) {
+  ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
+                                 "file descriptor. This is not allowed.");
+  file_event_ = dispatcher.createFileEvent(fd_, cb, trigger, events);
+}
+
+void IoSocketHandleImpl::activateFileEvents(uint32_t events) {
+  if (file_event_) {
+    file_event_->activate(events);
+  } else {
+    ENVOY_BUG(false, "Null file_event_");
+  }
+}
+
+void IoSocketHandleImpl::enableFileEvents(uint32_t events) {
+  if (file_event_) {
+    file_event_->setEnabled(events);
+  } else {
+    ENVOY_BUG(false, "Null file_event_");
+  }
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
 }
+
+absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
+  Api::EnvoyTcpInfo info;
+  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
+  if (!result.rc_) {
+    return {};
+  }
+  return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
+}
+
 } // namespace Network
 } // namespace Envoy

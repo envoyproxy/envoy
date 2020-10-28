@@ -87,6 +87,9 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
   * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
   * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
+  * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
+    release, please also make sure there's a stable maintainer signed up for next quarter,
+    and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
 * Wait for tests to pass on [master](https://dev.azure.com/cncf/envoy/_build).
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
@@ -137,10 +140,7 @@ Deprecated
 ----------
 ```
 * Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
-  to file tracking issues for code which can be removed.
-* Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)
-  to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
-  an email to envoy-announce.
+  to file tracking issues for runtime guarded code which can be removed.
 * Check source/common/runtime/runtime_features.cc and see if any runtime guards in
   disabled_runtime_features should be reassessed, and ping on the relevant issues.
 

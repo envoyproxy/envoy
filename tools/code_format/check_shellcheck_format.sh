@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^examples|^ci|^bin|^source|^bazel|^.github"}
+EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^.github|.rst$|.md$"}
 
 
 find_shell_files () {
@@ -16,10 +16,12 @@ find_shell_files () {
 }
 
 run_shellcheck_on () {
-    local file
-    file="$1"
-    echo "Shellcheck: ${file}"
-    # TODO: add -f diff when shellcheck version allows (ubuntu > bionic)
+    local file op
+    op="$1"
+    file="$2"
+    if [ "$op" != "fix" ]; then
+	echo "Shellcheck: ${file}"
+    fi
     shellcheck -x "$file"
 }
 
@@ -35,7 +37,7 @@ run_shellchecks () {
 	<<< "$(echo -e "$found_shellfiles" | grep -vE "${EXCLUDED_SHELLFILES}")"
 
     for file in "${filtered_shellfiles[@]}"; do
-	run_shellcheck_on "$file" || {
+	run_shellcheck_on "$1" "$file" || {
 	    failed+=("$file")
 	}
     done
@@ -54,4 +56,4 @@ run_shellchecks () {
     fi
 }
 
-run_shellchecks
+run_shellchecks "${1:-check}"

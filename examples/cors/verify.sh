@@ -45,3 +45,8 @@ responds_with_header \
     "access-control-allow-origin: http://foo.envoyproxy.io" \
     -H "Origin: http://foo.envoyproxy.io" \
     http://localhost:8002/cors/restricted
+
+run_log "Check admin ingress stats"
+responds_with \
+    ingress_http.cors \
+    "http://localhost:8003/stats?filter=ingress_http"
