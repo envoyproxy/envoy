@@ -24,16 +24,6 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
     :lineno-start: 3
     :emphasize-lines: 3-7
 
-``admin``
----------
-
-.. literalinclude:: _include/envoy-dynamic-filesystem-demo.yaml
-    :language: yaml
-    :linenos:
-    :lines: 9-16
-    :lineno-start: 9
-    :emphasize-lines: 3-8
-
 ``resources`` - Listeners Discovery Service (LDS)
 -------------------------------------------------
 
@@ -47,3 +37,13 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 .. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
     :language: yaml
     :linenos:
+
+``admin``
+---------
+
+.. literalinclude:: _include/envoy-dynamic-filesystem-demo.yaml
+    :language: yaml
+    :linenos:
+    :lines: 9-16
+    :lineno-start: 9
+    :emphasize-lines: 3-8
