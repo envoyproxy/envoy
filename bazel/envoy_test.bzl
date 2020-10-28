@@ -116,7 +116,6 @@ def envoy_cc_fuzz_test(
         data = [corpus_name],
         # No fuzzing on macOS or Windows
         deps = select({
-            # TODO remove for incompatible target skipping
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],
             "@envoy//bazel:windows_x86_64": [repository + "//test:dummy_main"],
             "//conditions:default": [
