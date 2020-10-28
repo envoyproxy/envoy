@@ -18,6 +18,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
+* http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
 
 Removed Config or Runtime
 -------------------------
