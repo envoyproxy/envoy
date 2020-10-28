@@ -68,7 +68,10 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(inde
 
 Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   // See the header file comments for still_alive_guard_ for why we capture index_.
-  return wrapCallback([cb, index = index_]() {
+  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb, index = index_] {
+    if (still_alive_guard.expired()) {
+      return;
+    }
     auto obj = getWorker(index);
     auto new_obj = cb(obj);
     // The API definition for runOnAllThreads allows for replacing the object
@@ -79,7 +82,7 @@ Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
     // TODO(jmarantz): remove this once we phase out use of the untyped slot
     // API, rename it, and change all call-sites to use TypedSlot.
     ASSERT(obj.get() == new_obj.get());
-  });
+  };
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {

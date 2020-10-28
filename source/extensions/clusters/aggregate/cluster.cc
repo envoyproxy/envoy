@@ -94,7 +94,6 @@ void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predic
   tls_->runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()](
                             ThreadLocal::ThreadLocalObjectSharedPtr object)
                             -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    ASSERT(object == nullptr);
     PriorityContextPtr priority_context = linearizePrioritySet(skip_predicate);
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
     ASSERT(cluster != nullptr);

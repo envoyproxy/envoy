@@ -180,7 +180,7 @@ private:
     };
   }
 
-  SlotPtr slot_;
+  const SlotPtr slot_;
 };
 
 template <class T> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;
