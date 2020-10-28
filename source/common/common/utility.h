@@ -129,7 +129,7 @@ public:
   /**
    * @return the number of bytes written prior to the "put" pointer into the buffer.
    */
-  int numValidBytesWrittenToBuffer();
+  int numValidBytesWrittenToBuffer() const;
 };
 
 /**

@@ -1,3 +1,4 @@
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -129,37 +130,34 @@ TEST(OutputBufferStream, FailsOnWriteToEmptyBuffer) {
 
 TEST(OutputBufferStream, CanWriteToBuffer) {
   constexpr char data[] = "123";
-  std::string buffer;
-  buffer.resize(3);
+  std::array<char, 3> buffer;
 
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ostream << data;
 
-  EXPECT_EQ(buffer, data);
+  EXPECT_EQ(std::string(buffer.data(), ostream.numValidBytesWrittenToBuffer()), data);
 }
 
 TEST(OutputBufferStream, CannotOverwriteBuffer) {
   constexpr char data[] = "123";
-  std::string buffer;
-  buffer.resize(2);
+  std::array<char, 2> buffer;
 
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ostream << data << std::endl;
 
-  EXPECT_EQ(buffer, "12");
+  EXPECT_EQ(std::string(buffer.data(), ostream.numValidBytesWrittenToBuffer()), "12");
 }
 
 TEST(OutputBufferStream, DoesNotAllocateMemoryEvenIfWeTryToOverflowBuffer) {
   constexpr char data[] = "123";
-  std::string buffer;
-  buffer.resize(2);
+  std::array<char, 2> buffer;
   Stats::TestUtil::MemoryTest memory_test;
 
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ostream << data << std::endl;
 
-  EXPECT_EQ(buffer, "12");
   EXPECT_EQ(memory_test.consumedBytes(), 0);
+  EXPECT_EQ(std::string(buffer.data(), ostream.numValidBytesWrittenToBuffer()), "12");
 }
 
 TEST(OutputBufferStream, ReturnsNumberOfBytesWrittenIntoBuffer) {
