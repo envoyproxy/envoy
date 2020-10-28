@@ -137,9 +137,11 @@ envoy_cc_library(
     name = "protocol_constraints_lib",
     srcs = ["protocol_constraints.cc"],
     hdrs = ["protocol_constraints.h"],
+    external_deps = [
+        "nghttp2",
+    ],
     deps = [
         ":codec_stats_lib",
-        "//bazel/foreign_cc:nghttp2",
         "//include/envoy/network:connection_interface",
         "//source/common/common:assert_lib",
         "//source/common/http:status_lib",
