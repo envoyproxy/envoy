@@ -53,6 +53,7 @@ inline WasmResult envoy_set_active_span_tag(const char* key_ptr, size_t key_size
           .u64_);
 }
 
+
 #undef WS
 #undef WR
 
