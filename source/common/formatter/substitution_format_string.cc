@@ -1,6 +1,8 @@
+#include "common/config/datasource.h"
 #include "common/formatter/substitution_format_string.h"
-
 #include "common/formatter/substitution_formatter.h"
+
+#include "envoy/api/api.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -28,12 +30,14 @@ SubstitutionFormatStringUtils::createJsonFormatter(const ProtobufWkt::Struct& st
 }
 
 FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
-    const envoy::config::core::v3::SubstitutionFormatString& config) {
+    const envoy::config::core::v3::SubstitutionFormatString& config, Api::Api& api) {
   switch (config.format_case()) {
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
     return std::make_unique<FormatterImpl>(config.text_format());
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat: {
     return createJsonFormatter(config.json_format(), true);
+  case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
+    return std::make_unique<FormatterImpl>(Config::DataSource::read(config.text_format_source(), true, api));
   }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

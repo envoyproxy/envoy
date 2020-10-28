@@ -1,4 +1,4 @@
-#include "common/local_reply/local_reply.h"
+#include "common/response_map/response_map.h"
 
 #include <string>
 #include <vector>
@@ -14,7 +14,7 @@
 #include "envoy/api/api.h"
 
 namespace Envoy {
-namespace LocalReply {
+namespace ResponseMap {
 
 class BodyFormatter {
 public:
@@ -52,7 +52,7 @@ using BodyFormatterPtr = std::unique_ptr<BodyFormatter>;
 class ResponseMapper {
 public:
   ResponseMapper(
-      const envoy::extensions::filters::network::http_connection_manager::v3::ResponseMapper&
+      const envoy::extensions::filters::http::response_map::v3::ResponseMapper&
           config,
       Server::Configuration::FactoryContext& context)
       : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context.runtime(),
@@ -70,24 +70,48 @@ public:
     }
   }
 
-  bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
-                       Http::ResponseHeaderMap& response_headers,
-                       const Http::ResponseTrailerMap& response_trailers,
-                       StreamInfo::StreamInfoImpl& stream_info, Http::Code& code, std::string& body,
-                       BodyFormatter*& final_formatter) const {
-    // If not matched, just bail out.
-    if (!filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
-      return false;
+  // Decide if a request/response pair matches this mapper.
+  bool match(const Http::RequestHeaderMap* request_headers,
+             const Http::ResponseHeaderMap& response_headers,
+             StreamInfo::StreamInfo& stream_info) const {
+    // Set response code on the stream_info because it's used by the StatusCode filter.
+    // Further, we know that the status header present on the upstream response headers
+    // is the status we want to match on. It may not be the status we send downstream
+    // to the client, though, because of rewrites below.
+    //
+    // Under normal circumstances we should have a response status by this point, because
+    // either the upstream set it or the router filter set it. If for whatever reason we
+    // don't, skip setting the stream info's response code and just let our evaluation
+    // logic do without it. We can't do much better, and we certaily don't want to throw
+    // an exception and crash here.
+    if (response_headers.Status() != nullptr) {
+      stream_info.setResponseCode(
+          static_cast<uint32_t>(Http::Utility::getResponseStatus(response_headers)));
     }
 
+    if (request_headers == nullptr) {
+      request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
+    }
+
+    return filter_->evaluate(stream_info,
+                             *request_headers,
+                             response_headers,
+                             *Http::StaticEmptyHeaders::get().response_trailers
+                             );
+  }
+
+  bool rewrite(const Http::RequestHeaderMap&,
+               Http::ResponseHeaderMap& response_headers,
+               const Http::ResponseTrailerMap&,
+               StreamInfo::StreamInfo&, std::string& body,
+               BodyFormatter*& final_formatter) const {
     if (body_.has_value()) {
       body = body_.value();
     }
 
-    if (status_code_.has_value() && code != status_code_.value()) {
-      code = status_code_.value();
-      response_headers.setStatus(std::to_string(enumToInt(code)));
-      stream_info.response_code_ = static_cast<uint32_t>(code);
+    if (status_code_.has_value() &&
+        Http::Utility::getResponseStatus(response_headers) != enumToInt(status_code_.value())) {
+      response_headers.setStatus(std::to_string(enumToInt(status_code_.value())));
     }
 
     if (body_formatter_) {
@@ -105,12 +129,12 @@ private:
 
 using ResponseMapperPtr = std::unique_ptr<ResponseMapper>;
 
-class LocalReplyImpl : public LocalReply {
+class ResponseMapImpl : public ResponseMap {
 public:
-  LocalReplyImpl() : body_formatter_(std::make_unique<BodyFormatter>()) {}
+  ResponseMapImpl() : body_formatter_(std::make_unique<BodyFormatter>()) {}
 
-  LocalReplyImpl(
-      const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
+  ResponseMapImpl(
+      const envoy::extensions::filters::http::response_map::v3::ResponseMap&
           config,
       Server::Configuration::FactoryContext& context)
       : body_formatter_(config.has_body_format()
@@ -121,25 +145,36 @@ public:
     }
   }
 
-  void rewrite(const Http::RequestHeaderMap* request_headers,
-               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfoImpl& stream_info,
-               Http::Code& code, std::string& body,
-               absl::string_view& content_type) const override {
-    // Set response code to stream_info and response_headers due to:
-    // 1) StatusCode filter is using response_code from stream_info,
-    // 2) %RESP(:status)% is from Status() in response_headers.
-    response_headers.setStatus(std::to_string(enumToInt(code)));
-    stream_info.response_code_ = static_cast<uint32_t>(code);
+  bool match(const Http::RequestHeaderMap* request_headers,
+             const Http::ResponseHeaderMap& response_headers,
+             StreamInfo::StreamInfo& stream_info) const override {
+    for (const auto& mapper : mappers_) {
+      if (mapper->match(request_headers, response_headers, stream_info)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
+  void rewrite(const Http::RequestHeaderMap* request_headers,
+               Http::ResponseHeaderMap& response_headers,
+               StreamInfo::StreamInfo& stream_info,
+               std::string& body,
+               absl::string_view& content_type) const override {
     if (request_headers == nullptr) {
       request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
     }
 
     BodyFormatter* final_formatter{};
     for (const auto& mapper : mappers_) {
-      if (mapper->matchAndRewrite(*request_headers, response_headers,
-                                  *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                                  code, body, final_formatter)) {
+      if (!mapper->match(request_headers, response_headers, stream_info)) {
+          continue;
+      }
+
+      if (mapper->rewrite(*request_headers, response_headers,
+                          *Http::StaticEmptyHeaders::get().response_trailers,
+                          stream_info,
+                          body, final_formatter)) {
         break;
       }
     }
@@ -157,14 +192,14 @@ private:
   const BodyFormatterPtr body_formatter_;
 };
 
-LocalReplyPtr Factory::createDefault() { return std::make_unique<LocalReplyImpl>(); }
+ResponseMapPtr Factory::createDefault() { return std::make_unique<ResponseMapImpl>(); }
 
-LocalReplyPtr Factory::create(
-    const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
+ResponseMapPtr Factory::create(
+    const envoy::extensions::filters::http::response_map::v3::ResponseMap&
         config,
     Server::Configuration::FactoryContext& context) {
-  return std::make_unique<LocalReplyImpl>(config, context);
+  return std::make_unique<ResponseMapImpl>(config, context);
 }
 
-} // namespace LocalReply
+} // namespace ResponseMap
 } // namespace Envoy

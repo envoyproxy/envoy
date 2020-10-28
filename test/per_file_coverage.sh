@@ -20,6 +20,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/cache/simple_http_cache:84.5"
 "source/extensions/filters/http/dynamic_forward_proxy:91.5"
 "source/extensions/filters/http/ext_authz:96.5"
+"source/extensions/filters/http/external_response:95.9"
 "source/extensions/filters/http/grpc_json_transcoder:93.3"
 "source/extensions/filters/http/header_to_metadata:95.0"
 "source/extensions/filters/http/ip_tagging:91.2"

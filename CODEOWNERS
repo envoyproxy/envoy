@@ -87,6 +87,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
 /*/extensions/filters/http/router @alyssawilk @mattklein123 @snowp
 /*/extensions/filters/http/ext_authz @gsagula @dio
+/*/extensions/filters/http/response_map @esmet
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
 /*/extensions/filters/http/squash @yuval-k @alyssawilk
