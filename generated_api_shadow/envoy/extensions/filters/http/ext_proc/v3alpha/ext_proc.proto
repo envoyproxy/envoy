@@ -49,6 +49,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * A server may asynchronously monitor traffic coming through the filter by inspecting
 //   headers, bodies, or both, and then decide to switch to a synchronous processing
 //   mode, either permanently or temporarily.
+//
+// The protocol itself is based on a bidirectional gRPC stream. Envoy will send the
+// server
+// :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingRequest>`
+// messages, and the server must reply with
+// :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingResponse>`.
 
 // [#next-free-field: 7]
 message ExternalProcessor {
