@@ -16,7 +16,7 @@ all Envoys are configured to collect request traces (e.g., http_connection_manag
 by the SkyWalking tracer to a SkyWalking cluster (trace driver setup
 in :repo:`/examples/skywalking-tracing/front-envoy-skywalking.yaml`).
 
-When service1 accepts the request forwarded from front envoy, it will makes an API call to service2 before
+When service1 accepts the request forwarded from front envoy, it will make an API call to service2 before
 returning a response.
 
 .. include:: _include/docker-env-setup.rst
