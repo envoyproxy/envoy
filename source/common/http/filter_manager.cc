@@ -371,6 +371,32 @@ void ActiveStreamDecoderFilter::onDecoderFilterAboveWriteBufferHighWatermark() {
   parent_.filter_manager_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark();
 }
 
+FilterHeadersStatus ActiveStreamDecoderFilter::decodeHeaders(RequestHeaderMap& headers,
+                                                             bool end_stream) {
+  // Each decoder filter instance checks if the request passed to the filter is gRPC
+  // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
+  // called here may change the content type, so we must check it before the call.
+
+  is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
+  FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
+
+  // Validate filters did not erroneously remove required headers. If they do, send a direct
+  // response.
+  const Http::Status header_status = HeaderUtility::checkRequiredHeaders(headers);
+  if (!header_status.ok()) {
+    ENVOY_STREAM_LOG(debug, "filter={} removed required headers", parent_,
+                     static_cast<const void*>(this));
+    parent_.stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    const std::string body = fmt::format("missing required header: {}", header_status.message());
+    const std::string details =
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
+                     header_status.message(), "}");
+    sendLocalReply(Http::Code::ServiceUnavailable, body, nullptr, absl::nullopt, details);
+    return FilterHeadersStatus::StopIteration;
+  }
+  return status;
+}
+
 void ActiveStreamDecoderFilter::requestDataTooLarge() {
   ENVOY_STREAM_LOG(debug, "request data too large watermark exceeded", parent_);
   if (parent_.state_.decoder_filters_streaming_) {

@@ -190,14 +190,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
 
-  // Each decoder filter instance checks if the request passed to the filter is gRPC
-  // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
-  // called here may change the content type, so we must check it before the call.
-  FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
-    is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
-    FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
-    return status;
-  }
+  FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream);
 
   void requestDataTooLarge();
   void requestDataDrained();

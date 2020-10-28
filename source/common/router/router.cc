@@ -263,22 +263,6 @@ FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Http::Status FilterUtility::checkHeaderMap(const Http::RequestHeaderMap& headers) {
-  if (!headers.Method()) {
-    return absl::InvalidArgumentError(Envoy::Http::Headers::get().Method.get());
-  }
-  bool is_connect = Http::HeaderUtility::isConnect(headers);
-  if (!headers.Path() && !is_connect) {
-    // :path header must be present for non-CONNECT requests.
-    return absl::InvalidArgumentError(Envoy::Http::Headers::get().Path.get());
-  }
-  if (!headers.Host() && is_connect) {
-    // Host header must be present for CONNECT request.
-    return absl::InvalidArgumentError(Envoy::Http::Headers::get().Host.get());
-  }
-  return Http::okStatus();
-}
-
 Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
   return upstream_host ? upstream_host->localityZoneStatName() : config_.empty_stat_name_;
 }
@@ -345,21 +329,6 @@ void Filter::chargeUpstreamCode(Http::Code code,
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  // Do a common header check ensuring required headers are present before forwarding. These mimic
-  // checks done in the HTTP Connection Manager before filter processing and ensure that filters did
-  // not erroneously remove required headers.
-  const auto header_status = FilterUtility::checkHeaderMap(headers);
-  if (!header_status.ok()) {
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
-    const std::string body = fmt::format("missing required header: {}", header_status.message());
-    const std::string details =
-        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
-                     header_status.message(), "}");
-    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, body, nullptr, absl::nullopt,
-                               details);
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-
   downstream_headers_ = &headers;
 
   // Extract debug configuration from filter state. This is used further along to determine whether

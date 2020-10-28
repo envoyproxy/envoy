@@ -356,7 +356,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   // Missing method
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/url"},
+                                     {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"remove-method", "yes"}});
@@ -366,12 +366,12 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("filter_removed_required_headers"));
 
   // Missing path for non-CONNECT
-  response =
-      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                          {":path", "/test/url"},
-                                                                          {":scheme", "http"},
-                                                                          {":authority", "host"},
-                                                                          {"remove-path", "yes"}});
+  response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"remove-path", "yes"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -380,7 +380,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   // Missing host for CONNECT
   response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
-                                     {":path", "/test/url"},
+                                     {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "www.host.com:80"}});
   response->waitForEndStream();

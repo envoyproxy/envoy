@@ -27,7 +27,6 @@ public:
       headers.removePath();
     }
     if (Http::HeaderUtility::isConnect(headers)) {
-      ENVOY_LOG_MISC(info, "REMOVING Host FROM CONNECT");
       headers.removeHost();
     }
     return Http::FilterHeadersStatus::Continue;
