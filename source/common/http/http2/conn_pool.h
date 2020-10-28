@@ -25,9 +25,6 @@ public:
 
   ~ConnPoolImpl() override;
 
-  // Http::ConnectionPool::Instance
-  Http::Protocol protocol() const override { return Http::Protocol::Http2; }
-
   // ConnPoolImplBase
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
 
@@ -68,8 +65,6 @@ protected:
   // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
   // side we do 2^29.
   static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
-
-  Random::RandomGenerator& random_generator_;
 };
 
 /**
