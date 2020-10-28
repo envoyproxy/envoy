@@ -555,7 +555,6 @@ struct AuthorityAttributes {
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
 AuthorityAttributes parseAuthority(absl::string_view host);
-
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy
