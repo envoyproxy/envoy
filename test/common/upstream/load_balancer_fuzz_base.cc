@@ -9,6 +9,16 @@ namespace {
 
 constexpr uint32_t MaxNumHostsPerPriorityLevel = 60000;
 
+// Helper function for converting repeated proto fields to byte vectors to pass into random subset
+std::vector<uint32_t>
+constructByteVectorForRandom(const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring) {
+  std::vector<uint32_t> random_bytestring_vector;
+  for (int i = 0; i < random_bytestring.size(); ++i) {
+    random_bytestring_vector.push_back(random_bytestring.at(i));
+  }
+  return random_bytestring_vector;
+}
+
 } // namespace
 
 HostVector
@@ -36,7 +46,8 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
     ++hosts_made;
   }
 
-  Fuzz::ProperSubsetSelector subset_selector(setup_priority_level.random_bytestring());
+  Fuzz::ProperSubsetSelector subset_selector(
+      constructByteVectorForRandom(setup_priority_level.random_bytestring()));
 
   const std::vector<std::vector<uint32_t>> localities = subset_selector.constructSubsets(
       {setup_priority_level.num_hosts_locality_a(), setup_priority_level.num_hosts_locality_b(),
@@ -85,11 +96,10 @@ void LoadBalancerFuzzBase::initializeLbComponents(
 // Updating host sets is shared amongst all the load balancer tests. Since logically, we're just
 // setting the mock priority set to have certain values, and all load balancers interface with host
 // sets and their health statuses, this action maps to all load balancers.
-void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_priority,
-                                                        const uint32_t num_healthy_hosts,
-                                                        const uint32_t num_degraded_hosts,
-                                                        const uint32_t num_excluded_hosts,
-                                                        const std::string random_bytestring) {
+void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
+    const uint64_t host_priority, const uint32_t num_healthy_hosts,
+    const uint32_t num_degraded_hosts, const uint32_t num_excluded_hosts,
+    const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring) {
   const uint8_t priority_of_host_set = host_priority % num_priority_levels_;
   ENVOY_LOG_MISC(trace, "Updating health flags for host set at priority: {}", priority_of_host_set);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
@@ -113,7 +123,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
     EXCLUDED = 2,
   };
 
-  Fuzz::ProperSubsetSelector subset_selector(random_bytestring);
+  Fuzz::ProperSubsetSelector subset_selector(constructByteVectorForRandom(random_bytestring));
 
   const std::vector<std::vector<uint32_t>> subsets = subset_selector.constructSubsets(
       {num_healthy_hosts, num_degraded_hosts, num_excluded_hosts}, host_set_size);
@@ -240,7 +250,6 @@ void LoadBalancerFuzzBase::replay(
 }
 
 void LoadBalancerFuzzBase::clearStaticHostsHealthFlags() {
-  // Have to clear the hosts health flags here - how do we know what hosts to clear?
   // The only outstanding health flags set are those that are set from hosts being placed in
   // degraded and excluded. Thus, use the priority set pointer to know which flags to clear.
   for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size();

@@ -36,16 +36,8 @@ namespace Fuzz {
 
 class ProperSubsetSelector {
 public:
-  ProperSubsetSelector(const std::string& random_bytestring)
-      : random_bytestring_(random_bytestring) {
-    // Must be at least 4 bytes wide to serve as randomness for the subset selector
-    ASSERT(random_bytestring_.length() >= 4);
-    // Pull off the last few bits to make random_bytestring_ a multiple of 4 - this will make
-    // iteration through the bytestring a lot easier and cleaner
-    while (random_bytestring_.length() % 4 != 0) {
-      random_bytestring_.pop_back();
-    }
-  }
+  ProperSubsetSelector(const std::vector<uint32_t>& random_bytestring)
+      : random_bytestring_(random_bytestring) {}
 
   /**
    * This function does proper subset selection on a certain number of elements. It returns a vector
@@ -83,22 +75,16 @@ private:
     std::vector<uint32_t> subset;
 
     for (uint32_t i = 0; i < number_of_elements_in_subset && !(num_elements_left_ == 0); i++) {
-      // Index of bytestring will wrap around if it "overflows" past the random bytestring's length.
-      // uint32_t* bytes_from_bytestring = reinterpret_cast<uint32_t*>(
-      //    &random_bytestring_[index_of_random_bytestring_ % random_bytestring_.length()]);
-      std::string bytes_from_bytestring =
-          random_bytestring_.substr(index_of_random_bytestring_ % random_bytestring_.length(), 4);
-      /*uint32_t random_32_bits;
-      absl::SimpleAtoi(bytes_from_bytestring, &random_32_bits);*/
       uint32_t index_of_index_vector =
-          *reinterpret_cast<uint32_t*>(&bytes_from_bytestring) % num_elements_left_;
+          random_bytestring_.at(index_of_random_bytestring_ % random_bytestring_.size()) %
+          num_elements_left_;
       uint32_t index = index_vector.at(index_of_index_vector);
       subset.push_back(index);
       // Move the index chosen to the end of the vector - will not be chosen again
       std::swap(index_vector[index_of_index_vector], index_vector[num_elements_left_ - 1]);
       --num_elements_left_;
 
-      index_of_random_bytestring_ += 4;
+      ++index_of_random_bytestring_;
     }
 
     return subset;
@@ -106,8 +92,7 @@ private:
 
   // This bytestring will be iterated through representing randomness in order to choose
   // subsets
-  std::string random_bytestring_;
-  // This will iterate by 4 every time bytestring is iterated
+  std::vector<uint32_t> random_bytestring_;
   uint32_t index_of_random_bytestring_ = 0;
 
   // Used to make subset construction linear time complexity with std::swap - chosen indexes will be

@@ -23,10 +23,10 @@ public:
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
   void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
-  void updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
-                                    const uint32_t num_degraded_hosts,
-                                    const uint32_t num_excluded_hosts,
-                                    const std::string random_bytestring);
+  void
+  updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
+                               const uint32_t num_degraded_hosts, const uint32_t num_excluded_hosts,
+                               const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring);
   // These two actions have a lot of logic attached to them. However, all the logic that the load
   // balancer needs to run its algorithm is already encapsulated within the load balancer. Thus,
   // once the load balancer is constructed, all this class has to do is call lb_->peekAnotherHost()
