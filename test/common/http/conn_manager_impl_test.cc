@@ -11,6 +11,7 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Mock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -2866,10 +2867,10 @@ TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutDisarmedAfterHeaders) 
   conn_manager_->onData(second_line, false);
   EXPECT_TRUE(request_header_timer->enabled_);
   conn_manager_->onData(empty_line, false);
-  EXPECT_FALSE(request_header_timer->enabled_);
+  Mock::VerifyAndClearExpectations(codec_);
+  Mock::VerifyAndClearExpectations(request_header_timer);
 
   expectOnDestroy();
-  EXPECT_CALL(*request_header_timer, disableTimer).Times(1);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
