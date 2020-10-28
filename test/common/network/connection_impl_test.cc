@@ -287,6 +287,15 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   Buffer::OwnedImpl buffer("hello world");
   client_connection_->write(buffer, false);
   client_connection_->connect();
+  EXPECT_TRUE(client_connection_->connecting());
+
+  StrictMock<MockConnectionCallbacks> added_and_removed_callbacks;
+  // Make sure removed connections don't get events.
+  client_connection_->addConnectionCallbacks(added_and_removed_callbacks);
+  client_connection_->removeConnectionCallbacks(added_and_removed_callbacks);
+
+  std::shared_ptr<MockReadFilter> add_and_remove_filter =
+      std::make_shared<StrictMock<MockReadFilter>>();
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -302,6 +311,8 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
+        server_connection_->addReadFilter(add_and_remove_filter);
+        server_connection_->removeReadFilter(add_and_remove_filter);
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -537,12 +548,21 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 
   MockConnectionStats client_connection_stats;
   client_connection_->setConnectionStats(client_connection_stats.toBufferStats());
+  EXPECT_TRUE(client_connection_->connecting());
   client_connection_->connect();
+  // The Network::Connection class oddly uses onWrite as its indicator of if
+  // it's done connection, rather than the Connected event.
+  EXPECT_TRUE(client_connection_->connecting());
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
   std::shared_ptr<MockFilter> filter(new MockFilter());
   client_connection_->addFilter(filter);
   client_connection_->addWriteFilter(write_filter);
+
+  // Make sure removed filters don't get callbacks.
+  std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
+  client_connection_->addReadFilter(read_filter);
+  client_connection_->removeReadFilter(read_filter);
 
   Sequence s1;
   EXPECT_CALL(*write_filter, onWrite(_, _))
@@ -853,6 +873,11 @@ TEST_P(ConnectionImplTest, WriteWatermarks) {
 
   setUpBasicConnection();
   EXPECT_FALSE(client_connection_->aboveHighWatermark());
+
+  StrictMock<MockConnectionCallbacks> added_and_removed_callbacks;
+  // Make sure removed connections don't get events.
+  client_connection_->addConnectionCallbacks(added_and_removed_callbacks);
+  client_connection_->removeConnectionCallbacks(added_and_removed_callbacks);
 
   // Stick 5 bytes in the connection buffer.
   std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));

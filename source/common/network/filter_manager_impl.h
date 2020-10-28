@@ -105,6 +105,7 @@ public:
   void addWriteFilter(WriteFilterSharedPtr filter);
   void addFilter(FilterSharedPtr filter);
   void addReadFilter(ReadFilterSharedPtr filter);
+  void removeReadFilter(ReadFilterSharedPtr filter);
   bool initializeReadFilters();
   void onRead();
   FilterStatus onWrite();

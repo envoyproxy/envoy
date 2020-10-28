@@ -22,6 +22,7 @@ public:
 
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
+  void removeConnectionCallbacks(ConnectionCallbacks& cb) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   uint64_t id() const override { return id_; }
   void hashKey(std::vector<uint8_t>& hash) const override;

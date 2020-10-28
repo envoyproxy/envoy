@@ -30,6 +30,10 @@ void QuicFilterManagerConnectionImpl::addReadFilter(Network::ReadFilterSharedPtr
   filter_manager_.addReadFilter(filter);
 }
 
+void QuicFilterManagerConnectionImpl::removeReadFilter(Network::ReadFilterSharedPtr filter) {
+  filter_manager_.removeReadFilter(filter);
+}
+
 bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_.initializeReadFilters();
 }
