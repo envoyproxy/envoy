@@ -125,7 +125,15 @@ public:
   using InitializeCb = std::function<SharedT(Event::Dispatcher& dispatcher)>;
   void set(InitializeCb cb) { slot_->set(cb); }
 
+  /**
+   * @return a reference to the thread local object.
+   */
   T& get() { return slot_->getTyped<T>(); }
+
+  /**
+   * @return a pointer to the thread local object.
+   */
+  T* operator->() { return &get(); }
 
   /**
    * UpdateCb is passed a mutable reference to the current stored data.
@@ -141,8 +149,8 @@ public:
 
 private:
   Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
-    return [this, cb](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
-      T& typed_obj = slot_->getTyped<T>();
+    return [cb](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
+      T& typed_obj = obj->asType<T>();
       cb(typed_obj);
       // Note: Better have a test for mutating the object.
       return obj;
