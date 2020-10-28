@@ -291,6 +291,15 @@ void SslSocket::shutdownSsl() {
   }
 }
 
+void SslSocket::shutdownBasic() {
+  if (info_->state() != Ssl::SocketState::ShutdownSent &&
+      callbacks_->connection().state() != Network::Connection::State::Closed) {
+    callbacks_->ioHandle().shutdown(ENVOY_SHUT_WR);
+    drainErrorQueue();
+    info_->setState(Ssl::SocketState::ShutdownSent);
+  }
+}
+
 void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Unregister the SSL connection object from private key method providers.
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
@@ -303,6 +312,10 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   if (info_->state() == Ssl::SocketState::HandshakeInProgress ||
       info_->state() == Ssl::SocketState::HandshakeComplete) {
     shutdownSsl();
+  } else {
+    // We're not in a state to do the full SSL shutdown so perform a basic shutdown to flush any
+    // outstanding alerts
+    shutdownBasic();
   }
 }
 
