@@ -148,17 +148,9 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
   ASSERT(address != nullptr);
   // Finish local, synchronous resolution. This needs to happen outside of the exception block above
   // as the callback itself can throw.
-  try {
-    callback(DnsResolver::ResolutionStatus::Success,
-             {DnsResponse(address, std::chrono::seconds(60))});
-    return nullptr;
-  } catch (const std::exception& e) {
-    ENVOY_LOG(warn, "std::exception in callback with local resolution: {}", e.what());
-    throw EnvoyException(e.what());
-  } catch (...) {
-    ENVOY_LOG(warn, "Unknown exception in callback with local resolution");
-    throw EnvoyException("unknown");
-  }
+  callback(DnsResolver::ResolutionStatus::Success,
+           {DnsResponse(address, std::chrono::seconds(60))});
+  return nullptr;
 }
 
 void AppleDnsResolverImpl::addPendingQuery(PendingResolution* query) {
@@ -176,16 +168,9 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
   for (std::set<PendingResolution*>::iterator it = queries_with_pending_cb_.begin();
        it != queries_with_pending_cb_.end(); ++it) {
     auto query = *it;
-    try {
-      ASSERT(query->pending_cb_);
-      query->callback_(query->pending_cb_->status_, std::move(query->pending_cb_->responses_));
-    } catch (const std::exception& e) {
-      ENVOY_LOG(warn, "std::exception in DNSService callback: {}", e.what());
-      throw EnvoyException(e.what());
-    } catch (...) {
-      ENVOY_LOG(warn, "Unknown exception in DNSService callback");
-      throw EnvoyException("unknown");
-    }
+
+    ASSERT(query->pending_cb_);
+    query->callback_(query->pending_cb_->status_, std::move(query->pending_cb_->responses_));
 
     if (query->owned_) {
       ENVOY_LOG(debug, "Resolution for {} completed (async)", query->dns_name_);
