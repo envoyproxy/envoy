@@ -13,11 +13,29 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Network {
+
+// This abstraction allows for finer control in tests by using a mocked API. Production code simply
+// forwards the function calls to Apple's API.
+class DnsService {
+public:
+  virtual ~DnsService() = default;
+  virtual void dnsServiceRefDeallocate(DNSServiceRef sdRef);
+  virtual DNSServiceErrorType dnsServiceCreateConnection(DNSServiceRef* sdRef);
+  virtual dnssd_sock_t dnsServiceRefSockFD(DNSServiceRef sdRef);
+  virtual DNSServiceErrorType dnsServiceProcessResult(DNSServiceRef sdRef);
+  virtual DNSServiceErrorType
+  dnsServiceGetAddrInfo(DNSServiceRef* sdRef, DNSServiceFlags flags, uint32_t interfaceIndex,
+                        DNSServiceProtocol protocol, const char* hostname,
+                        DNSServiceGetAddrInfoReply callBack, void* context);
+};
+
+using DnsServiceSingleton = ThreadSafeSingleton<DnsService>;
 
 /**
  * Implementation of DnsResolver that uses Apple dns_sd.h APIs. All calls and callbacks are assumed
