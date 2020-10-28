@@ -122,7 +122,7 @@ private:
   TimerPtr createTimerInternal(TimerCb cb);
   void updateApproximateMonotonicTimeInternal();
   void runPostCallbacks();
-  // Helper used to touch all watchdog after most schedulable, fd, and timer callbacks.
+  // Helper used to touch the watchdog after most schedulable, fd, and timer callbacks.
   void touchWatchdog();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
