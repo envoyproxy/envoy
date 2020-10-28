@@ -312,7 +312,7 @@ extern const int kEnvoyFailure;
  @param count Amount to add to the counter.
  @return A status indicating if the action was successful.
  */
-- (int)recordCounterInc:(NSString *)elements count:(NSUInteger)count;
+- (int)recordCounter:(NSString *)elements count:(NSUInteger)count;
 
 /**
  Set a gauge of a given string of elements with the given value.
