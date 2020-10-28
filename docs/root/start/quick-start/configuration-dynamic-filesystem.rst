@@ -25,7 +25,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
     :emphasize-lines: 3-7
 
 ``resources`` - Listeners Discovery Service (LDS)
--------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. literalinclude:: _include/envoy-dynamic-lds-demo.yaml
     :language: yaml
@@ -33,7 +33,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
     :emphasize-lines: 1, 8-9, 28
 
 ``resources`` - Clusters Discovery Service (CDS)
-------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
     :language: yaml
