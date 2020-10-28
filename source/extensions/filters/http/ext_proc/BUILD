@@ -14,8 +14,8 @@ envoy_cc_library(
     srcs = ["ext_proc.cc"],
     hdrs = ["ext_proc.h"],
     deps = [
-        "//include/envoy/grpc:async_client_interface",
         "//include/envoy/http:filter_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )

@@ -11,18 +11,11 @@ namespace ExternalProcessing {
 
 Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext&) {
   const auto filter_config = std::make_shared<FilterConfig>(proto_config);
 
-  return [&context, &proto_config, filter_config](Http::FilterChainFactoryCallbacks& callbacks) {
-    const auto client_factory =
-        context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-            proto_config.grpc_service(), context.scope(), /* skip_cluster_check */ true);
-
-    auto grpc_client = client_factory->create();
-
-    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
-        std::make_shared<Filter>(filter_config, std::move(grpc_client))});
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config)});
   };
 }
 

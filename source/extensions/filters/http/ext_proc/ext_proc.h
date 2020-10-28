@@ -8,6 +8,8 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/filters/http/common/pass_through_filter.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -26,33 +28,14 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-class Filter : public Logger::Loggable<Logger::Id::filter>, public Http::StreamFilter {
+class Filter : public Logger::Loggable<Logger::Id::filter>, public Http::PassThroughFilter {
 public:
-  Filter(const FilterConfigSharedPtr& config, Grpc::RawAsyncClientPtr&& client)
-      : config_(config), grpc_client_(std::move(client)) {}
+  Filter(const FilterConfigSharedPtr& config) : config_(config) {}
 
-  // Http::StreamFilterBase
   void onDestroy() override;
-
-  // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
-
-  // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override;
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
 private:
   FilterConfigSharedPtr config_;
-  Grpc::RawAsyncClientPtr grpc_client_;
 };
 
 } // namespace ExternalProcessing
