@@ -83,10 +83,7 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
-    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed. These are typically
-    available via a package manager, but may not be available in default repositories depending on
-    OS version. To build against `libc++` build with the `--config=libc++` instead of the
-    `--config=clang` flag.
+    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
     
     #### Config Flag Choices
     Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:   
