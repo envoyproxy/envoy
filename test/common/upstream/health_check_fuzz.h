@@ -108,7 +108,6 @@ public:
   void expectClientCreate();
   void expectStreamCreate();
 
-  std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
 };
 
