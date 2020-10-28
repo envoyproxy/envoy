@@ -96,10 +96,11 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
       local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
-      overload_stop_accepting_requests_ref_(overload_manager.getThreadLocalOverloadState().getState(
-          Server::OverloadActionNames::get().StopAcceptingRequests)),
-      overload_disable_keepalive_ref_(overload_manager.getThreadLocalOverloadState().getState(
-          Server::OverloadActionNames::get().DisableHttpKeepAlive)),
+      overload_state_(overload_manager.getThreadLocalOverloadState()),
+      overload_stop_accepting_requests_ref_(
+          overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
+      overload_disable_keepalive_ref_(
+          overload_state_.getState(Server::OverloadActionNames::get().DisableHttpKeepAlive)),
       time_source_(time_source) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -120,7 +121,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_.idleTimeout()) {
-    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+    connection_idle_timer_ = overload_state_.createScaledTimer(
+        Server::OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
         [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }

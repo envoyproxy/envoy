@@ -332,6 +332,17 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
   EXPECT_EQ(1, cfg_->stats().http2_found_.value());
 }
 
+TEST_F(HttpInspectorTest, ReadClosed) {
+  init();
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK));
+  EXPECT_CALL(socket_, close());
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  socket_.close();
+  file_event_callback_(Event::FileReadyType::Closed);
+  EXPECT_EQ(0, cfg_->stats().http2_found_.value());
+}
+
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   init();
 

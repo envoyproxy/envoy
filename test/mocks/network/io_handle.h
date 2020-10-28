@@ -14,9 +14,9 @@ public:
   MockIoHandle();
   ~MockIoHandle() override;
 
-  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                      Event::FileTriggerType trigger, uint32_t events) override {
-    return Event::FileEventPtr{createFileEvent_(dispatcher, cb, trigger, events)};
+  void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                           Event::FileTriggerType trigger, uint32_t events) override {
+    createFileEvent_(dispatcher, cb, trigger, events);
   }
 
   MOCK_METHOD(os_fd_t, fdDoNotUse, (), (const));
@@ -51,9 +51,13 @@ public:
   MOCK_METHOD(absl::optional<int>, domain, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr, localAddress, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr, peerAddress, ());
-  MOCK_METHOD(Event::FileEvent*, createFileEvent_,
+  MOCK_METHOD(IoHandlePtr, duplicate, ());
+  MOCK_METHOD(void, createFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
+  MOCK_METHOD(void, activateFileEvents, (uint32_t events));
+  MOCK_METHOD(void, enableFileEvents, (uint32_t events));
+  MOCK_METHOD(void, resetFileEvents, ());
   MOCK_METHOD(Api::SysCallIntResult, shutdown, (int how));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
 };
