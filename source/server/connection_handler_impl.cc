@@ -1,5 +1,7 @@
 #include "server/connection_handler_impl.h"
 
+#include <chrono>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/exception.h"
@@ -458,6 +460,10 @@ void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+  // Refresh local address in case it was restored by a listener filter like the original_dst
+  // filter.
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
@@ -475,6 +481,10 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
+  if (const auto timeout = filter_chain->transportSocketConnectTimeout();
+      timeout != std::chrono::milliseconds::zero()) {
+    server_conn_ptr->setTransportSocketConnectTimeout(timeout);
+  }
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher_.timeSource(), std::move(stream_info)));

@@ -383,6 +383,10 @@ private:
       return transport_socket_factory_;
     }
 
+    std::chrono::milliseconds transportSocketConnectTimeout() const override {
+      return std::chrono::milliseconds::zero();
+    }
+
     const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
       return empty_network_filter_factory_;
     }

@@ -4,6 +4,7 @@
 
 set -e
 
+
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
@@ -211,7 +212,7 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS+=(-c opt --copt -g "--config=clang-asan" "--build_tests_only")
+  BAZEL_BUILD_OPTIONS+=(-c dbg "--config=clang-asan" "--build_tests_only")
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
@@ -279,10 +280,10 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "boringssl=fips"
     "--define" "log_debug_assert_in_release=enabled"
     "--define" "quiche=enabled"
-    "--define" "wasm=disabled"
+    "--define" "wasm=wavm"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
-    "--define" "use_new_codecs_in_integration_tests=true"
+    "--define" "use_new_codecs_in_integration_tests=false"
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng")
 
@@ -373,6 +374,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   setup_clang_toolchain
 
   echo "fix_format..."
+  ./tools/code_format/check_shellcheck_format.sh fix
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test
@@ -384,7 +386,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
-  ./tools/code_format/check_shellcheck_format.sh
+  ./tools/code_format/check_shellcheck_format.sh check
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
@@ -411,13 +413,24 @@ elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
-  # Validate dependency relationships between core/extensions and external deps.
-  tools/dependency/validate_test.py
-  tools/dependency/validate.py
-  # Validate the CVE scanner works. TODO(htuch): create a dedicated tools CI target.
-  python3.8 tools/dependency/cve_scan_test.py
   # Build docs.
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" docs/build.sh
+  exit 0
+elif [[ "$CI_TARGET" == "deps" ]]; then
+  echo "verifying dependencies..."
+  # Validate dependency relationships between core/extensions and external deps.
+  ./tools/dependency/validate_test.py
+  ./tools/dependency/validate.py
+  # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
+  # presubmits, but cve_scan only runs async.
+  python3.8 tools/dependency/cve_scan_test.py
+  # Validate repository metadata.
+  ./ci/check_repository_locations.sh
+  exit 0
+elif [[ "$CI_TARGET" == "cve_scan" ]]; then
+  echo "scanning for CVEs in dependencies..."
+  python3.8 tools/dependency/cve_scan_test.py
+  python3.8 tools/dependency/cve_scan.py
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   echo "verify examples..."
@@ -438,6 +451,7 @@ elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   sudo apt-get install -y -qq --no-install-recommends redis-tools
   export DOCKER_NO_PULL=1
   umask 027
+  chmod -R o-rwx examples/
   ci/verify_examples.sh
   exit 0
 else
