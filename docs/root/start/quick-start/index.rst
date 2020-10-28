@@ -9,7 +9,7 @@ intro message
     :maxdepth: 3
 
     run-envoy
-    static-configuration
-    dynamic-configuration-filesystem
-    dynamic-configuration-control-plane
+    configuration-static
+    configuration-dynamic-filesystem
+    configuration-dynamic-control-plane
     next-steps

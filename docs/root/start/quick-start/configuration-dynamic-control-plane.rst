@@ -1,7 +1,7 @@
 .. _start_quick_start_dynamic_control_plane:
 
-Dynamic configuration (control plane)
-=====================================
+Configuration: Dynamic from control plane
+=========================================
 
 Setting up Envoy with dynamic configuration is slightly more complex as you must also set up a control plane
 to provide Envoy with its configuration.

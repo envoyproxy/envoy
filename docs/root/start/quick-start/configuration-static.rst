@@ -1,8 +1,8 @@
 
 .. _start_quick_start_static:
 
-Static configuration
-====================
+Configuration: Static
+=====================
 
 To start Envoy with static configuration, you will need to specify :ref:`listeners <start_quick_start_static_listeners>`
 and :ref:`clusters <start_quick_start_static_clusters>` as

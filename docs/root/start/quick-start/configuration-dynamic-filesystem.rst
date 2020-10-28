@@ -1,7 +1,7 @@
 .. _start_quick_start_dynamic_filesystem:
 
-Dynamic configuration (filesystem)
-==================================
+Configuration: Dynamic from filesystem
+======================================
 
 ``node``
 --------
