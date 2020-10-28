@@ -14,9 +14,6 @@ class BufferedIoSocketHandleImpl;
 }
 namespace Event {
 
-// Forward declare for friend class.
-class UserSpaceFileEventFactory;
-
 // The interface of populating event watcher and obtaining the active events. The events are the
 // combination of FileReadyType values. The event listener is populated by user event registration
 // and io events passively. Also the owner of this listener query the activated events by calling
@@ -72,9 +69,11 @@ private:
 // A FileEvent implementation which is used to drive BufferedIoSocketHandle.
 class UserSpaceFileEventImpl : public FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
+  UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events);
+
   ~UserSpaceFileEventImpl() override {
-    if (schedulable_.enabled()) {
-      schedulable_.cancel();
+    if (schedulable_->enabled()) {
+      schedulable_->cancel();
     }
   }
 
@@ -84,29 +83,26 @@ public:
 
   EventListener& getEventListener() { return event_listener_; }
   void onEvents() { cb_(); }
-  friend class UserSpaceFileEventFactory;
+
+  // Helper method which is equivalent to active the pending events.
+  void scheduleNextEvent() {
+    if (!schedulable_->enabled()) {
+      schedulable_->scheduleCallbackNextIteration();
+    }
+  }
+
   friend class Network::BufferedIoSocketHandleImpl;
 
 private:
-  UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t events,
-                         SchedulableCallback& schedulable_cb);
-
   // Used to populate the event operations of enable and activate.
   EventListenerImpl event_listener_;
 
   // The handle to registered async callback from dispatcher.
-  SchedulableCallback& schedulable_;
+  Event::SchedulableCallbackPtr schedulable_;
 
   // The registered callback of this event. This callback is usually on top of the frame of
   // Dispatcher::run().
   std::function<void()> cb_;
-};
-
-class UserSpaceFileEventFactory {
-public:
-  static std::unique_ptr<UserSpaceFileEventImpl>
-  createUserSpaceFileEventImpl(Event::Dispatcher&, Event::FileReadyCb cb, Event::FileTriggerType,
-                               uint32_t events, SchedulableCallback& scheduable_cb);
 };
 
 } // namespace Event

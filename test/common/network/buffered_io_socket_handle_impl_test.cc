@@ -189,19 +189,19 @@ TEST_F(BufferedIoSocketHandleTest, FlowControl) {
 TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
   EXPECT_CALL(cb_, called(_));
   scheduable_cb_->invokeCallback();
-  ev.reset();
+  io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestSetEnabledTriggerEventSchedule) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -211,32 +211,32 @@ TEST_F(BufferedIoSocketHandleTest, TestSetEnabledTriggerEventSchedule) {
   ASSERT_FALSE(scheduable_cb_->enabled());
 
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  ev->setEnabled(Event::FileReadyType::Read);
+  io_handle_->enableFileEvents(Event::FileReadyType::Read);
   ASSERT_TRUE(scheduable_cb_->enabled());
   EXPECT_CALL(cb_, called(_));
   scheduable_cb_->invokeCallback();
   ASSERT_FALSE(scheduable_cb_->enabled());
 
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  ev->setEnabled(Event::FileReadyType::Write);
+  io_handle_->enableFileEvents(Event::FileReadyType::Write);
   ASSERT_TRUE(scheduable_cb_->enabled());
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
   scheduable_cb_->invokeCallback();
   ASSERT_FALSE(scheduable_cb_->enabled());
 
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  ev->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Read);
+  io_handle_->enableFileEvents(Event::FileReadyType::Write | Event::FileReadyType::Read);
   ASSERT_TRUE(scheduable_cb_->enabled());
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write | Event::FileReadyType::Read));
   scheduable_cb_->invokeCallback();
   ASSERT_FALSE(scheduable_cb_->enabled());
-  ev.reset();
+  io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestReadAndWriteAreEdgeTriggered) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -254,35 +254,35 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAndWriteAreEdgeTriggered) {
   EXPECT_EQ(1, result.rc_);
 
   ASSERT_FALSE(scheduable_cb_->enabled());
-  ev.reset();
+  io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestSetDisabledBlockEventSchedule) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
-  ev->setEnabled(0);
+  io_handle_->enableFileEvents(0);
 
   EXPECT_CALL(cb_, called(0));
   scheduable_cb_->invokeCallback();
 
   ASSERT_FALSE(scheduable_cb_->enabled());
-  ev.reset();
+  io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestEventResetClearCallback) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   ASSERT_TRUE(scheduable_cb_->enabled());
-
-  ev.reset();
-  ASSERT_FALSE(scheduable_cb_->enabled());
+  
+  EXPECT_CALL(cb_, called(_)).Times(0);
+  io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
@@ -300,7 +300,7 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
   // Clear invoke callback on peer.
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  auto ev = io_handle_peer_->createFileEvent(
+  io_handle_peer_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   ASSERT_TRUE(scheduable_cb_->enabled());
@@ -331,7 +331,7 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_,
       [this, &should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
@@ -369,7 +369,7 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(0);
   io_handle_->close();
   EXPECT_EQ(4, accumulator.size());
-  ev.reset();
+  io_handle_->resetFileEvents();
 }
 
 // Test that a readable event is raised when peer shutdown write. Also confirm read will return
@@ -382,7 +382,7 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_,
       [this, &should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
@@ -411,7 +411,7 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
   ASSERT_FALSE(should_close);
   EXPECT_EQ(4, accumulator.size());
   io_handle_->close();
-  ev.reset();
+  io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestRepeatedShutdownWR) {
@@ -519,7 +519,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_,
       [&should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
@@ -559,7 +559,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevScheduleWritableEvent) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_,
       [&should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
@@ -601,7 +601,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
-  auto ev = io_handle_peer_->createFileEvent(
+  io_handle_peer_->initializeFileEvent(
       dispatcher_,
       [&should_close, handle = io_handle_peer_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
@@ -635,7 +635,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
 
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_->close();
-  ev.reset();
+  io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
@@ -650,7 +650,7 @@ TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
 
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  auto ev = io_handle_->createFileEvent(
+  io_handle_->initializeFileEvent(
       dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::PlatformDefaultTriggerType,
       Event::FileReadyType::Read);
   scheduable_cb_->invokeCallback();

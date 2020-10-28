@@ -66,8 +66,14 @@ public:
   absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
-  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                      Event::FileTriggerType trigger, uint32_t events) override;
+
+  void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                           Event::FileTriggerType trigger, uint32_t events) override;
+  IoHandlePtr duplicate() override;
+  void activateFileEvents(uint32_t events) override;
+  void enableFileEvents(uint32_t events) override;
+  void resetFileEvents() override;
+
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
 
@@ -116,10 +122,7 @@ private:
   // The attached file event with this socket. The event is not owned by the socket in the current
   // Envoy model. Multiple events can be created during the life time of this IO handle but at any
   // moment at most 1 event is attached.
-  Event::UserSpaceFileEventImpl* user_file_event_{};
-
-  // The schedulable handle of the above event.
-  Event::SchedulableCallbackPtr io_callback_;
+  std::unique_ptr<Event::UserSpaceFileEventImpl> user_file_event_;
 
   // True if pending_received_data_ is not addable. Note that pending_received_data_ may have
   // pending data to drain.

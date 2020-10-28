@@ -24,8 +24,8 @@ void UserSpaceFileEventImpl::activate(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
   event_listener_.onEventActivated(events);
-  if (!schedulable_.enabled()) {
-    schedulable_.scheduleCallbackNextIteration();
+  if (!schedulable_->enabled()) {
+    schedulable_->scheduleCallbackNextIteration();
   }
 }
 
@@ -33,17 +33,18 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
   event_listener_.onEventEnabled(events);
-  bool was_enabled = schedulable_.enabled();
+  bool was_enabled = schedulable_->enabled();
   if (!was_enabled) {
-    schedulable_.scheduleCallbackNextIteration();
+    schedulable_->scheduleCallbackNextIteration();
   }
   ENVOY_LOG(trace, "User space file event {} set events {}. Will {} reschedule.",
             static_cast<void*>(this), events, was_enabled ? "not " : "");
 }
 
-UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t events,
-                                               SchedulableCallback& schedulable_cb)
-    : schedulable_(schedulable_cb), cb_([this, cb]() {
+UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events)
+    : schedulable_(
+      dispatcher.createSchedulableCallback([this]() { onEvents(); })
+    ), cb_([this, cb]() {
         auto all_events = getEventListener().triggeredEvents();
         auto ephemeral_events = getEventListener().getAndClearEphemeralEvents();
         ENVOY_LOG(trace,
@@ -52,14 +53,6 @@ UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t e
         cb(all_events | ephemeral_events);
       }) {
   setEnabled(events);
-}
-
-std::unique_ptr<UserSpaceFileEventImpl> UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-    Event::Dispatcher&, Event::FileReadyCb cb, Event::FileTriggerType trigger_type, uint32_t events,
-    SchedulableCallback& scheduable_cb) {
-  ASSERT(trigger_type == Event::FileTriggerType::Edge);
-  return std::unique_ptr<UserSpaceFileEventImpl>(
-      new UserSpaceFileEventImpl(cb, events, scheduable_cb));
 }
 
 } // namespace Event

@@ -252,16 +252,38 @@ Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::peerAddress() {
   throw EnvoyException(fmt::format("getsockname failed for BufferedIoSocketHandleImpl"));
 }
 
-Event::FileEventPtr BufferedIoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
-                                                                Event::FileReadyCb cb,
-                                                                Event::FileTriggerType trigger_type,
-                                                                uint32_t events) {
-  io_callback_ = dispatcher.createSchedulableCallback([this]() { user_file_event_->onEvents(); });
-  auto event = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      dispatcher, cb, trigger_type, events, *io_callback_);
-  user_file_event_ = event.get();
-  return event;
+void BufferedIoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
+                                                     Event::FileReadyCb cb,
+                                                     Event::FileTriggerType trigger,
+                                                     uint32_t events) {
+  ASSERT(user_file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
+                                      "file descriptor. This is not allowed.");
+  ASSERT(trigger == Event::FileTriggerType::Edge, "Only support edge type.");
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(dispatcher, cb, events);
 }
+IoHandlePtr BufferedIoSocketHandleImpl::duplicate() {
+  // duplicate() is supposed to be used on listener io handle while this implementation doesn't
+  // support listen.
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
+void BufferedIoSocketHandleImpl::activateFileEvents(uint32_t events) {
+  if (user_file_event_) {
+    user_file_event_->activate(events);
+  } else {
+    ENVOY_BUG(false, "Null user_file_event_");
+  }
+}
+
+void BufferedIoSocketHandleImpl::enableFileEvents(uint32_t events) {
+  if (user_file_event_) {
+    user_file_event_->setEnabled(events);
+  } else {
+    ENVOY_BUG(false, "Null user_file_event_");
+  }
+}
+
+void BufferedIoSocketHandleImpl::resetFileEvents() { user_file_event_.reset(); }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
   // Support only shutdown write.

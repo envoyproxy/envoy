@@ -27,73 +27,48 @@ class UserSpaceFileEventImplTest : public testing::Test {
 public:
   UserSpaceFileEventImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
-    io_callback_ =
-        dispatcher_->createSchedulableCallback([this]() { user_file_event_->onEvents(); });
-  }
-
-  void scheduleNextEvent() {
-    ASSERT(io_callback_ != nullptr);
-    io_callback_->scheduleCallbackNextIteration();
   }
 
 protected:
   MockReadyCb ready_cb_;
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
-  Event::SchedulableCallbackPtr io_callback_;
   std::unique_ptr<Event::UserSpaceFileEventImpl> user_file_event_;
 };
 
-TEST_F(UserSpaceFileEventImplTest, TestLevelTriggerIsNotSupported) {
-  ASSERT_DEBUG_DEATH(Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-                         *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
-                         Event::FileTriggerType::Level, event_rw, *io_callback_),
-                     "assert failure");
-}
-
 TEST_F(UserSpaceFileEventImplTest, TestEnabledEventsTriggeredAfterCreate) {
-  user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-      event_rw, *io_callback_);
-  scheduleNextEvent();
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw);
   EXPECT_CALL(ready_cb_, called(event_rw));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestDebugDeathOnActivateDisabledEvents) {
-  user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read, *io_callback_);
-  ASSERT_DEBUG_DEATH(user_file_event_->activate(Event::FileReadyType::Write), "");
-}
-
 TEST_F(UserSpaceFileEventImplTest, TestRescheduleAfterTriggered) {
-  user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-      event_rw, *io_callback_);
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw);
   {
     SCOPED_TRACE("1st schedule");
-    scheduleNextEvent();
+    user_file_event_->activate(event_rw);
     EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   {
     SCOPED_TRACE("2nd schedule");
-    scheduleNextEvent();
+    user_file_event_->activate(event_rw);
     EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestRescheduleIsDeduplicated) {
-  user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-      event_rw, *io_callback_);
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw);
   {
     SCOPED_TRACE("1st schedule");
-    scheduleNextEvent();
-    scheduleNextEvent();
+        user_file_event_->activate(event_rw);
+
+    user_file_event_->activate(event_rw);
     EXPECT_CALL(ready_cb_, called(event_rw)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -109,10 +84,9 @@ TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents
   std::vector<uint32_t> events{Event::FileReadyType::Read, Event::FileReadyType::Write, event_rw};
   for (const auto& e : events) {
     SCOPED_TRACE(absl::StrCat("current event:", e));
-    user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-        *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-        event_rw, *io_callback_);
-    scheduleNextEvent();
+    user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+        *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw);
+    user_file_event_->activate(e);
     EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     user_file_event_.reset();
@@ -120,9 +94,8 @@ TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestActivateWillSchedule) {
-  user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-      event_rw, *io_callback_);
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -140,9 +113,8 @@ TEST_F(UserSpaceFileEventImplTest, TestActivateWillSchedule) {
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestActivateDedup) {
-  user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-      event_rw, *io_callback_);
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -162,9 +134,8 @@ TEST_F(UserSpaceFileEventImplTest, TestActivateDedup) {
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
-  user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-      event_rw, *io_callback_);
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -183,9 +154,9 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestEventClosedIsNotTriggeredUnlessManullyActivated) {
-  user_file_event_ = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Write | Event::FileReadyType::Closed, *io_callback_);
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
+      Event::FileReadyType::Write | Event::FileReadyType::Closed);
   {
     // No Closed event bit if enabled by not activated.
     EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write)).Times(1);
