@@ -114,6 +114,13 @@ public:
 // only reference is from TypedSlot, which we can then rename to Slot.
 template <class T> class TypedSlot {
 public:
+  /**
+   * Helper method to create a unique_ptr for a typed slot. This helper
+   * reduces some verbose parameterization at call-sites.
+   *
+   * @param allocator factory to allocate untyped Slot objects.
+   * @return a TypedSlotPtr<T> (the type is defined below).
+   */
   static std::unique_ptr<TypedSlot> makeUnique(SlotAllocator& allocator) {
     return std::make_unique<TypedSlot>(allocator);
   }
@@ -168,9 +175,7 @@ public:
 private:
   Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
     return [cb](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
-      T& typed_obj = obj->asType<T>();
-      cb(typed_obj);
-      // Note: Better have a test for mutating the object.
+      cb(obj->asType<T>());
       return obj;
     };
   }
