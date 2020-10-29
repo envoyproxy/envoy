@@ -3,7 +3,7 @@
 # 3. Fix MSAN linking.
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
-@@ -329,6 +329,8 @@ template("gcc_toolchain") {
+@@ -348,6 +348,8 @@ template("gcc_toolchain") {
          # AIX does not support either -D (deterministic output) or response
          # files.
          command = "$ar -X64 {{arflags}} -r -c -s {{output}} {{inputs}}"
@@ -12,7 +12,7 @@
        } else {
          rspfile = "{{output}}.rsp"
          rspfile_content = "{{inputs}}"
-@@ -507,7 +509,7 @@ template("gcc_toolchain") {
+@@ -543,7 +545,7 @@ template("gcc_toolchain") {
 
        start_group_flag = ""
        end_group_flag = ""
@@ -51,5 +51,5 @@
 -    is_msan && (msan_track_origins == 0 || msan_track_origins == 2)
 +prebuilt_instrumented_libraries_available = false
 
- if (use_libfuzzer && is_linux) {
+ if (use_libfuzzer && (is_linux || is_chromeos)) {
    if (is_asan) {
