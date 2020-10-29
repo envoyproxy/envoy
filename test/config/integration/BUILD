@@ -1,9 +1,9 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -42,5 +42,5 @@ filegroup(
 
 filegroup(
     name = "google_com_proxy_port_0",
-    srcs = ["google_com_proxy_port_0.v2.yaml"],
+    srcs = ["google_com_proxy_port_0.yaml"],
 )

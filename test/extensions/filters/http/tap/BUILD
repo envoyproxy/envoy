@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
@@ -7,8 +9,6 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -54,6 +54,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.tap",
     deps = [
         "//source/extensions/filters/http/tap:config",
+        "//test/extensions/common/tap:common",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

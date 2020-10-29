@@ -160,7 +160,7 @@ void testMerge() {
   Api::ApiPtr api = Api::createApiForTest();
 
   const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
-  OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v2.yaml", overlay,
+  OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,

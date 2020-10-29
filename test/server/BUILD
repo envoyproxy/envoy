@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -10,8 +12,6 @@ load(
 )
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -358,6 +358,8 @@ envoy_cc_test(
         ":server_test_data",
         ":static_validation_test_data",
     ],
+    # TODO(envoyproxy/windows-dev): diagnose clang-cl build test timeout
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",

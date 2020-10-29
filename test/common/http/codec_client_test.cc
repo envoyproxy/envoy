@@ -279,7 +279,8 @@ TEST_F(CodecClientTest, SSLConnectionInfo) {
 }
 
 // Test the codec getting input from a real TCP connection.
-class CodecNetworkTest : public Event::TestUsingSimulatedTime, public testing::TestWithParam<Network::Address::IpVersion> {
+class CodecNetworkTest : public Event::TestUsingSimulatedTime,
+                         public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource()) {
     dispatcher_ = api_->allocateDispatcher("test_thread");

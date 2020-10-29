@@ -1,11 +1,11 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -146,21 +146,6 @@ envoy_cc_test_library(
     name = "passthrough_filter_config_lib",
     srcs = [
         "passthrough_filter.cc",
-    ],
-    deps = [
-        ":common_lib",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "headers_only_filter_config_lib",
-    srcs = [
-        "headers_only_filter.cc",
     ],
     deps = [
         ":common_lib",

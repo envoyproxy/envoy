@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -8,8 +10,6 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -241,6 +241,55 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "load_balancer_fuzz_lib",
+    srcs = ["load_balancer_fuzz_base.cc"],
+    hdrs = ["load_balancer_fuzz_base.h"],
+    deps = [
+        ":load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+        "//source/common/upstream:load_balancer_lib",
+        "//test/fuzz:random_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "load_balancer_fuzz_proto",
+    srcs = ["load_balancer_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg",
+    ],
+)
+
+envoy_proto_library(
+    name = "random_load_balancer_fuzz_proto",
+    srcs = ["random_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:load_balancer_fuzz_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "random_load_balancer_fuzz_test",
+    srcs = ["random_load_balancer_fuzz_test.cc"],
+    corpus = "//test/common/upstream:random_load_balancer_corpus",
+    deps = [
+        ":load_balancer_fuzz_lib",
+        ":load_balancer_fuzz_proto_cc_proto",
+        ":random_load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
     ],
 )
 
@@ -686,7 +735,7 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "health_check_fuzz_test",
     srcs = ["health_check_fuzz_test.cc"],
-    corpus = "//test/common/upstream:health_check_corpus",
+    corpus = "health_check_corpus",
     deps = [
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",

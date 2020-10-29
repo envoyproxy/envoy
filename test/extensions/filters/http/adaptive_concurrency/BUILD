@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -6,8 +8,6 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -34,6 +34,8 @@ envoy_extension_cc_test(
         "adaptive_concurrency_filter_integration_test.h",
     ],
     extension_name = "envoy.filters.http.adaptive_concurrency",
+    # TODO(envoyproxy/windows-dev): diagnose clang-cl build test failure
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/adaptive_concurrency:config",
         "//source/extensions/filters/http/fault:config",

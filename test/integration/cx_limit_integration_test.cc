@@ -7,7 +7,6 @@
 #include "test/config/utility.h"
 #include "test/integration/integration.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
@@ -15,7 +14,6 @@ namespace Envoy {
 namespace {
 
 class ConnectionLimitIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                       public Event::TestUsingSimulatedTime,
                                        public BaseIntegrationTest {
 public:
   ConnectionLimitIntegrationTest()

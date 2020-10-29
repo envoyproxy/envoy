@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -5,8 +7,6 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -49,4 +49,6 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "compressor_filter_speed_test_benchmark_test",
     benchmark_binary = "compressor_filter_speed_test",
+    # TODO(envoyproxy/windows-dev): diagnose clang-cl build test failure
+    tags = ["fails_on_windows"],
 )

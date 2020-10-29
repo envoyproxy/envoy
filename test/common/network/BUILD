@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -7,8 +9,6 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -419,6 +419,16 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "io_socket_handle_impl_integration_test",
+    srcs = ["io_socket_handle_impl_integration_test.cc"],
+    tags = ["requires-network"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
     ],
 )
 

@@ -1,5 +1,6 @@
 #include "extensions/filters/http/admission_control/config.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -20,6 +21,10 @@ static constexpr std::chrono::seconds defaultSamplingWindow{30};
 Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+
+  if (config.has_sr_threshold() && config.sr_threshold().default_value().value() == 0) {
+    throw EnvoyException("Success Rate Threshold cannot be zero percent");
+  }
 
   const std::string prefix = stats_prefix + "admission_control.";
 

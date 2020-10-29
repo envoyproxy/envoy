@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -6,8 +8,6 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -31,6 +31,8 @@ envoy_extension_cc_test(
     name = "hystrix_test",
     srcs = ["hystrix_test.cc"],
     extension_name = "envoy.stat_sinks.hystrix",
+    # TODO(envoyproxy/windows-dev): Diagnose msvc-cl fastbuild test failure
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/stats:stats_lib",
