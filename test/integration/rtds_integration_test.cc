@@ -163,7 +163,9 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ("saz", getRuntimeKey("baz"));
 
   EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  EXPECT_EQ(0, test_server_->counter("runtime.update_failure")->value());
   EXPECT_EQ(initial_load_success_ + 2, test_server_->counter("runtime.load_success")->value());
+  EXPECT_EQ(2, test_server_->counter("runtime.update_success")->value());
   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 }
