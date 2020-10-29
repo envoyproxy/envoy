@@ -371,6 +371,7 @@ envoy_cc_library(
     external_deps = [
         "abseil_node_hash_set",
         "abseil_optional",
+        "googleurl",
         "http_parser",
         "nghttp2",
     ],

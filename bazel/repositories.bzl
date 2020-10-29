@@ -155,6 +155,7 @@ def envoy_dependencies(skip_targets = []):
     _com_googlesource_chromium_v8()
     _com_googlesource_quiche()
     _com_googlesource_googleurl()
+    _org_unicode_icuuc()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
@@ -690,10 +691,19 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     external_http_archive(
         name = "com_googlesource_googleurl",
+        patches = ["@envoy//bazel/external:googleurl.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "googleurl",
         actual = "@com_googlesource_googleurl//url:url",
+    )
+
+# The local repository for the shimmed ICU.
+def _org_unicode_icuuc():
+    native.local_repository(
+        name = "org_unicode_icuuc",
+        path = "third_party/icu/shim",
     )
 
 def _org_llvm_releases_compiler_rt():
