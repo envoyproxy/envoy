@@ -768,7 +768,7 @@ void ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
   }
 
   Utility::Url absolute_url;
-  if (!absolute_url.initialize(active_request.request_url_.getStringView())) {
+  if (!absolute_url.initialize(active_request.request_url_.getStringView(), is_connect)) {
     sendProtocolError(Http1ResponseCodeDetails::get().InvalidUrl);
     throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
