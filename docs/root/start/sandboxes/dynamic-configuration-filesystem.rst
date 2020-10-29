@@ -29,7 +29,7 @@ Step 3: Start the proxy container
       $ chmod go+r configs/*
       $ chmod go+x configs
 
-Build and start the containers
+Build and start the containers.
 
 This should also start two backend ``HTTP`` echo servers, ``service1`` and ``service2``.
 
