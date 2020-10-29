@@ -80,6 +80,7 @@ message Action {
     //TODO: respondBody, respondTrailers
     google.protobuf.Empty trigger_timeout_timer = 3;
     RaiseEvent raise_event = 4 [(validate.rules).enum.defined_only = true];
+    bool raise_go_away = 5;
   }
 }
 
