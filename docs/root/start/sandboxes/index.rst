@@ -14,6 +14,7 @@ features. The following sandboxes are available:
     cache
     cors
     csrf
+    dynamic-configuration-control-plane
     ext_authz
     fault_injection
     front_proxy
