@@ -11,12 +11,21 @@ namespace ResponseMapFilter {
 
 Http::FilterFactoryCb ResponseMapFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::response_map::v3::ResponseMap& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
   ResponseMapFilterConfigSharedPtr config =
       std::make_shared<ResponseMapFilterConfig>(proto_config, stats_prefix, context);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<ResponseMapFilter>(config));
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+ResponseMapFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::response_map::v3::ResponseMapPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext&,
+    ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 
 /**

@@ -3,11 +3,14 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,21 +29,44 @@ ResponseMapFilter::ResponseMapFilter(ResponseMapFilterConfigSharedPtr config)
 Http::FilterHeadersStatus ResponseMapFilter::decodeHeaders(Http::RequestHeaderMap& request_headers,
                                                            bool end_stream) {
   ENVOY_LOG(trace, "response map filter: decodeHeaders with end_stream = {}", end_stream);
+
+  // Disable filter per route config if applies
+  if (decoder_callbacks_->route() != nullptr) {
+    const auto* per_route_config =
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+            Extensions::HttpFilters::HttpFilterNames::get().ResponseMap,
+            decoder_callbacks_->route());
+    ENVOY_LOG(trace, "response map filter: found route. has per_route_config? {}",
+        per_route_config != nullptr);
+    if (per_route_config != nullptr && per_route_config->disabled()) {
+      ENVOY_LOG(trace, "response map filter: disabling due to per_route_config");
+      disabled_ = true;
+      return Http::FilterHeadersStatus::Continue;
+    }
+  }
+
   request_headers_ = &request_headers;
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus ResponseMapFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                            bool end_stream) {
-  ENVOY_LOG(trace, "response map filter: encodeHeaders with http status = {} and end_stream = {}",
-      headers.getStatusValue(), end_stream);
+  ENVOY_LOG(trace,
+      "response map filter: encodeHeaders with http status = {}, end_stream = {}, disabled = {}",
+      headers.getStatusValue(), end_stream, disabled_);
+
+  // If this filter is disabled, continue without doing anything.
+  if (disabled_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
   // Save a reference to the response headers. If we end up rewriting the response,
   // we'll need to set the content-length (and possibly other) headers later.
   response_headers_ = &headers;
 
   // Check whether we should rewrite this response based on response headers.
-  do_rewrite_ = config_->response_map()->match(request_headers_, headers, encoder_callbacks_->streamInfo());
+  do_rewrite_ = config_->response_map()->match(
+      request_headers_, headers, encoder_callbacks_->streamInfo());
   ENVOY_LOG(trace, "response map filter: do_rewrite_ {}", do_rewrite_);
 
   // If we decided not to rewrite the response, simply pass through to other
@@ -61,9 +87,16 @@ Http::FilterHeadersStatus ResponseMapFilter::encodeHeaders(Http::ResponseHeaderM
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus ResponseMapFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(trace, "response map filter: encodeData with data length {} and end_stream = {}",
-      data.length(), end_stream);
+Http::FilterDataStatus ResponseMapFilter::encodeData(Buffer::Instance& data,
+                                                     bool end_stream) {
+  ENVOY_LOG(trace,
+      "response map filter: encodeData with data length {}, end_stream = {}, disabled = {}",
+      data.length(), end_stream, disabled_);
+
+  // If this filter is disabled, continue without doing anything.
+  if (disabled_) {
+    return Http::FilterDataStatus::Continue;
+  }
 
   // If we decided not to rewrite the response, simply pass through to other
   // filters.
@@ -93,6 +126,11 @@ void ResponseMapFilter::doRewrite(void) {
 
   ENVOY_LOG(trace, "response map filter: doRewrite with {} encoding_buffer",
       encoding_buffer != nullptr ? "non-null" : "null");
+
+  // If this route is disabled, we should never be doing a rewrite.
+  // In fact, we never should have even checked if we should do
+  // a rewrite.
+  ASSERT(!disabled_);
 
   // We should either see no encoding buffer or an empty encoding buffer.
   //
