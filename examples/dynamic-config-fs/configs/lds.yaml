@@ -1,5 +1,3 @@
-version_info: "1"
-
 resources:
 - "@type": type.googleapis.com/envoy.config.listener.v3.Listener
   name: listener_0
