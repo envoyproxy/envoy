@@ -480,7 +480,8 @@ private:
 
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  ThreadLocal::SlotPtr tls_;
+  using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
+  ThreadLocal::TypedSlotPtr<TlsCache> tls_cache_;
   mutable Thread::MutexBasicLockable lock_;
   absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
   ScopePtr default_scope_;

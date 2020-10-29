@@ -1,0 +1,23 @@
+version: '3.7'
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    depends_on:
+      - web_service
+    networks:
+      - envoymesh
+    ports:
+      - "8000:8000"
+
+  web_service:
+    build:
+      context: .
+      dockerfile: Dockerfile-web-service
+    networks:
+      - envoymesh
+
+networks:
+  envoymesh: {}

@@ -83,8 +83,8 @@ public:
 
   std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
   Network::MockClientConnection* connection_{};
-  Event::MockTimer* timeout_timer_{};
-  Event::MockTimer* interval_timer_{};
+  NiceMock<Event::MockTimer>* timeout_timer_{};
+  NiceMock<Event::MockTimer>* interval_timer_{};
   Network::ReadFilterSharedPtr read_filter_;
 };
 

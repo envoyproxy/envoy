@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <fstream>
 #include <stack>
 #include <string>
@@ -224,6 +225,27 @@ TEST(DirectoryIteratorImpl, NonExistingDir) {
       fmt::format("unable to open directory {}: No such file or directory", dir_path));
 #endif
 }
+
+#ifndef WIN32
+TEST_F(DirectoryTest, Fifo) {
+  std::string fifo_path = fmt::format("{}/fifo", dir_path_);
+  ASSERT_EQ(0, mkfifo(fifo_path.c_str(), 0644));
+
+  const EntrySet expected = {
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"fifo", FileType::Other},
+  };
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
+  remove(fifo_path.c_str());
+}
+
+TEST_F(DirectoryTest, FileTypeTest) {
+  auto sys_calls = Api::OsSysCallsSingleton::get();
+  EXPECT_THROW_WITH_REGEX(DirectoryIteratorImpl::fileType("foo", sys_calls), EnvoyException,
+                          "unable to stat file: 'foo' .*");
+}
+#endif
 
 // Test that we correctly handle trailing path separators
 TEST(Directory, DirectoryHasTrailingPathSeparator) {
