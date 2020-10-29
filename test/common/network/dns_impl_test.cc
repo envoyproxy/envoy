@@ -967,7 +967,7 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
   server_->setRefused(true);
 
   EXPECT_NE(nullptr,
-            resolveWithExpectations("", DnsLookupFamily::V4Only,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   // The c-ares channel should be dirty because the TestDnsServer replied with return code REFUSED;
