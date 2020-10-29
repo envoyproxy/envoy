@@ -48,8 +48,8 @@ namespace Envoy {
  */
 #define SAFE_MEMCPY(dst, src)                                                                      \
   do {                                                                                             \
-    assert(ARRAY_SIZE(src) == ARRAY_SIZE(dst));                                                    \
-    memmove(dst, src, ARRAY_SIZE(src));                                                            \
+    assert(sizeof(*(src)) == sizeof(*(dst)));                                                    \
+    memmove(dst, src, sizeof(*(src)));                                                            \
   } while (0)
 
 /**
