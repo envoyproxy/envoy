@@ -23,7 +23,6 @@ curl -s http://localhost:19000/config_dump \
 
 run_log "Set upstream to service2"
 sed -i s/service1/service2/ configs/cds.yaml
-sed -i s/'version_info: "1"'/'version_info: "2"'/ configs/cds.yaml
 
 run_log "Check for response comes from service2 upstream"
 responds_with \
