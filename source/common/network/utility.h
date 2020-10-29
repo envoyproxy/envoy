@@ -72,6 +72,7 @@ public:
    * Resolve a URL.
    * @param url supplies the url to resolve.
    * @return Address::InstanceConstSharedPtr the resolved address.
+   * @throw EnvoyException if url is invalid.
    */
   static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
 

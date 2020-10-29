@@ -97,16 +97,15 @@ public:
                               });
   }
 
-  template <typename T>
   ActiveDnsQuery* resolveWithException(const std::string& address,
-                                       const DnsLookupFamily lookup_family, T exception_object) {
-    return resolver_->resolve(address, lookup_family,
-                              [exception_object](DnsResolver::ResolutionStatus status,
-                                                 std::list<DnsResponse>&& results) -> void {
-                                UNREFERENCED_PARAMETER(status);
-                                UNREFERENCED_PARAMETER(results);
-                                throw exception_object;
-                              });
+                                       const DnsLookupFamily lookup_family) {
+    return resolver_->resolve(
+        address, lookup_family,
+        [](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+          UNREFERENCED_PARAMETER(status);
+          UNREFERENCED_PARAMETER(results);
+          throw EnvoyException("Envoy exception");
+        });
   }
 
 protected:
@@ -154,24 +153,14 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersion) {
 }
 
 TEST_F(AppleDnsImplTest, CallbackException) {
-  EXPECT_NE(nullptr, resolveWithException<EnvoyException>("1.2.3.4", DnsLookupFamily::V4Only,
-                                                          EnvoyException("Envoy exception")));
+  EXPECT_NE(nullptr, resolveWithException("google.com", DnsLookupFamily::V4Only));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "Envoy exception");
 }
 
-TEST_F(AppleDnsImplTest, CallbackException2) {
-  EXPECT_NE(nullptr, resolveWithException<std::runtime_error>("1.2.3.4", DnsLookupFamily::V4Only,
-                                                              std::runtime_error("runtime error")));
-  EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
-                            "runtime error");
-}
-
-TEST_F(AppleDnsImplTest, CallbackException3) {
-  EXPECT_NE(nullptr,
-            resolveWithException<std::string>("1.2.3.4", DnsLookupFamily::V4Only, std::string()));
-  EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
-                            "unknown");
+TEST_F(AppleDnsImplTest, CallbackExceptionLocalResolution) {
+  EXPECT_THROW_WITH_MESSAGE(resolveWithException("1.2.3.4", DnsLookupFamily::V4Only),
+                            EnvoyException, "Envoy exception");
 }
 
 // Validate working of cancellation provided by ActiveDnsQuery return.
@@ -192,6 +181,19 @@ TEST_F(AppleDnsImplTest, Timeout) {
   EXPECT_NE(nullptr, resolveWithExpectations("some.domain", DnsLookupFamily::V6Only,
                                              DnsResolver::ResolutionStatus::Failure, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, LocalResolution) {
+  auto pending_resolution = resolver_->resolve(
+      "0.0.0.0", DnsLookupFamily::Auto,
+      [](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        EXPECT_EQ(1, results.size());
+        EXPECT_EQ("0.0.0.0:0", results.front().address_->asString());
+        EXPECT_EQ(std::chrono::seconds(60), results.front().ttl_);
+      });
+  EXPECT_EQ(nullptr, pending_resolution);
+  // Note that the dispatcher does NOT have to run because resolution is synchronous.
 }
 
 // This class compliments the tests above by using a mocked Apple API that allows finer control over
