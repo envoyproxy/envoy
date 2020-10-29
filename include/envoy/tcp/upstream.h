@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
@@ -111,17 +112,21 @@ class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
 public:
   ~GenericConnPoolFactory() override = default;
 
+  using TunnelingConfig =
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
+
   /*
    * @param cluster_name the name of the cluster to use
    * @param cm the cluster manager to get the connection pool from
-   * @param hostname the hostname to use if doing connect tunneling.
+   * @param config the tunneling config, if doing connect tunneling.
    * @param context the load balancing context for this connection.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
    * @return may be null
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(const std::string& cluster_name, Upstream::ClusterManager& cm,
-                        absl::string_view hostname, Upstream::LoadBalancerContext* context,
+                        const absl::optional<TunnelingConfig>& config,
+                        Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;
 };
 

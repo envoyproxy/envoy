@@ -39,8 +39,11 @@ class HttpUpstream;
 
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
+  using TunnelingConfig =
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
+
   HttpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
-               Upstream::LoadBalancerContext* context, absl::string_view hostname,
+               Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~HttpConnPool() override;
 

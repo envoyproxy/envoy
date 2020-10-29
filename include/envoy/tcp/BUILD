@@ -25,5 +25,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
