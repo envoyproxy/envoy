@@ -434,13 +434,17 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
-    resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
-
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
+
+    if (set_resolver_in_constructor()) {
+      resolver_ = dispatcher_->createDnsResolver({socket_->localAddress()}, use_tcp_for_dns_lookups());
+    } else {
+      resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
+    }
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
@@ -542,6 +546,7 @@ protected:
   virtual bool zero_timeout() const { return false; }
   virtual bool tcp_only() const { return true; }
   virtual bool use_tcp_for_dns_lookups() const { return false; }
+  virtual bool set_resolver_in_constructor() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
   Network::MockConnectionHandler connection_handler_;
@@ -943,6 +948,40 @@ TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
   EXPECT_NE(nullptr,
             resolveWithUnreferencedParameters("root.cnam.domain", DnsLookupFamily::Auto, true));
   ares_destroy_options(&opts);
+}
+
+class DnsImplCustomResolverTest : public DnsImplTest {
+  bool tcp_only() const override { return false; }
+  bool use_tcp_for_dns_lookups() const override { return true; }
+  bool set_resolver_in_constructor() const override { return true; }
+};
+
+TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
+  ASSERT_FALSE(peer_->isChannelDirty());
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->setRefused(true);
+
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("", DnsLookupFamily::V4Only,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // The c-ares channel should be dirty because the TestDnsServer replied with return code REFUSED;
+  // This test, and the way the TestDnsServerQuery is setup, relies on the fact that Envoy's
+  // c-ares channel is configured **without** the ARES_FLAG_NOCHECKRESP flag. This causes c-ares to
+  // discard packets with REFUSED, and thus Envoy receives ARES_ECONNREFUSED due to the code here:
+  // https://github.com/c-ares/c-ares/blob/d7e070e7283f822b1d2787903cce3615536c5610/ares_process.c#L654
+  // If that flag needs to be set, or c-ares changes its handling this test will need to be updated
+  // to create another condition where c-ares invokes onAresGetAddrInfoCallback with status ==
+  // ARES_ECONNREFUSED.
+  EXPECT_TRUE(peer_->isChannelDirty());
+
+  server_->setRefused(false);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(peer_->isChannelDirty());
 }
 
 } // namespace Network
