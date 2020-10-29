@@ -96,8 +96,8 @@ from ``service1`` to ``service2``:
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
    :linenos:
-   :lines: 9-17
-   :lineno-start: 9
+   :lines: 7-15
+   :lineno-start: 7
    :emphasize-lines: 8
 
 Step 6: Check Envoy uses updated configuration
