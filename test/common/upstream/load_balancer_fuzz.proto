@@ -15,7 +15,7 @@ message UpdateHealthFlags {
   uint32 num_degraded_hosts = 3;
   uint32 num_excluded_hosts = 4;
   // This is used to determine which hosts get marked as healthy, degraded, and excluded.
-  // TODO: What should this be capped at? There might be some efficiency/code coverage tradeoff
+  // TODO: What should this be capped at? There might be some efficiency/code coverage trade off
   // dependent on the amount of digits this random_bytestring is allowed to scale too.
   repeated uint32 random_bytestring = 5
       [(validate.rules).repeated = {min_items: 1, max_items: 60000}];
