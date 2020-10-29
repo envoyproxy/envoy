@@ -80,15 +80,15 @@ the ``example_proxy_cluster`` pointing to ``service1``.
    :language: json
    :emphasize-lines: 11, 19-20
 
-Step 5: Edit ``cds.yaml`` file to update upstream cluster
-*********************************************************
+Step 5: Edit ``configs/cds.yaml`` file to update upstream cluster
+*****************************************************************
 
 The example setup provides two dynamic configuration files:
 
 - :download:`configs/cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a :ref:`Cluster
-  Discovery Service (CDS) <config_cluster_manager_cds>`.
+  discovery service (CDS) <config_cluster_manager_cds>`.
 - :download:`configs/lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` to provide a :ref:`Listener
-  Discovery Service (CDS) <config_listeners_lds>`.
+  discovery service (CDS) <config_listeners_lds>`.
 
 Edit ``configs/cds.yaml`` in the dynamic configuration example folder and change the cluster address
 from ``service1`` to ``service2``:
