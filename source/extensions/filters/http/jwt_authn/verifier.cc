@@ -26,7 +26,7 @@ struct CompletionState {
   // number of completed inner verifier for an any/all verifier.
   std::size_t number_completed_children_{0};
   // A valid error for a RequireAny
-  Status any_valid_error_{Status::Ok};
+  Status status_;
 };
 
 class ContextImpl : public Verifier::Context {
@@ -82,6 +82,8 @@ public:
 
   void completeWithStatus(Status status, ContextImpl& context) const {
     if (parent_ != nullptr) {
+      auto& completion_state = context.getCompletionState(this);
+      completion_state.status = status;
       return parent_->onComplete(status, context);
     }
 
@@ -258,39 +260,25 @@ public:
                   const Protobuf::Map<std::string, JwtProvider>& providers,
                   const BaseVerifierImpl* parent)
       : BaseGroupVerifierImpl(parent) {
-    const JwtRequirement* by_pass_type_requirement = nullptr;
-    std::vector<std::string> used_providers;
     for (const auto& it : or_list.requirements()) {
-      bool is_regular_requirement = true;
       switch (it.requires_type_case()) {
       case JwtRequirement::RequiresTypeCase::kProviderName:
-        used_providers.emplace_back(it.provider_name());
+        verifiers_.emplace_back(
+            innerCreate(it, providers, factory, std::vector<std::string>{}, this));
         break;
       case JwtRequirement::RequiresTypeCase::kProviderAndAudiences:
-        used_providers.emplace_back(it.provider_and_audiences().provider_name());
+        verifiers_.emplace_back(
+            innerCreate(it, providers, factory, std::vector<std::string>{}, this));
         break;
       case JwtRequirement::RequiresTypeCase::kAllowMissingOrFailed:
+        is_allow_failed_ = true;
+        break;
       case JwtRequirement::RequiresTypeCase::kAllowMissing:
-        is_regular_requirement = false;
-        if (by_pass_type_requirement == nullptr ||
-            by_pass_type_requirement->requires_type_case() ==
-                JwtRequirement::RequiresTypeCase::kAllowMissing) {
-          // We need to keep only one by_pass_type_requirement. If both
-          // kAllowMissing and kAllowMissingOrFailed are set, use
-          // kAllowMissingOrFailed.
-          by_pass_type_requirement = &it;
-        }
+        is_allow_missing_ = true;
+        break;
       default:
         break;
       }
-      if (is_regular_requirement) {
-        verifiers_.emplace_back(
-            innerCreate(it, providers, factory, std::vector<std::string>{}, this));
-      }
-    }
-    if (by_pass_type_requirement) {
-      verifiers_.emplace_back(
-          innerCreate(*by_pass_type_requirement, providers, factory, used_providers, this));
     }
   }
 
@@ -299,22 +287,37 @@ public:
     if (completion_state.is_completed_) {
       return;
     }
-    // For RequireAny: usually it returns the error from the last provider.
-    // But if a Jwt is not for a provider, its auth returns JwtMissed or JwtUnknownIssuer.
-    // Such error should not be used as the final error if there are other valid errors.
-    if (status != Status::Ok && status != Status::JwtMissed && status != Status::JwtUnknownIssuer) {
-      completion_state.any_valid_error_ = status;
-    }
-    if (++completion_state.number_completed_children_ == verifiers_.size() ||
-        Status::Ok == status) {
+
+    // If any of children is OK, return OK
+    if (Status::Ok == status) {
       completion_state.is_completed_ = true;
-      Status final_status = status;
-      if (status != Status::Ok && completion_state.any_valid_error_ != Status::Ok) {
-        final_status = completion_state.any_valid_error_;
+      completeWithStatus(status, context);
+      return;
+    }
+
+    // Then wait for all children to be done.
+    if (++completion_state.number_completed_children_ == verifiers_.size()) {
+      // Aggregate status from children, group into either Missed error or other failures
+      Status final_status = Status::JwtMissed;
+      for (const auto& it : verifiers_) {
+        Status child_status = getCompletionState(it.get()).status;
+        if (child_status != Status::JwtMissed && child_status != Status::JwtUnknownIssuer) {
+          final_status = child_status;
+        }
       }
+
+      if (is_allow_failed_) {
+        final_status = Status::Ok;
+      } else if (is_allow_missing_ && status == Status::JwtMissed) {
+        final_status = Status::Ok;
+      }
+      completion_state.is_completed_ = true;
       completeWithStatus(final_status, context);
     }
   }
+ private:
+  bool is_allow_failed_{false};
+  bool is_allow_missing_{false};
 };
 
 // Requires all verifier
