@@ -44,7 +44,8 @@ void BufferHelper::removeBytes(Buffer::Instance& data, uint8_t* out, size_t out_
   }
 
   MemBlockBuilder<uint8_t> mem_builder(out_len);
-  mem_builder.appendData(absl::Span<uint8_t>(static_cast<uint8_t*>(data.linearize(out_len)), out_len));
+  mem_builder.appendData(
+      absl::Span<uint8_t>(static_cast<uint8_t*>(data.linearize(out_len)), out_len));
   out = mem_builder.release().get();
   data.drain(out_len);
 }
