@@ -8,7 +8,7 @@ Setup a Docker deployment
 
 Learn more about :ref:`using the Envoy Docker image <start_docker>`.
 
-You can also :ref:`build your own Envoy and/or Docker image <>`.
+You can also :ref:`build your own Envoy and/or Docker image <start_docker>`.
 
 Run example sandboxes
 ---------------------
