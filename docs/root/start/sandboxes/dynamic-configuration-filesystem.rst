@@ -1,4 +1,4 @@
-.. _install_sandboxes_dynamic_config_cp:
+.. _install_sandboxes_dynamic_config_fs:
 
 Dynamic configuration (filesystem)
 ==================================
