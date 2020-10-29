@@ -90,5 +90,8 @@ message ResponseMapPerRoute {
     // Disable the response map filter for this particular vhost or route.
     // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // Override the global configuration of the response map filter with this new config.
+    ResponseMap response_map = 2 [(validate.rules).message = {required: true}];
   }
 }

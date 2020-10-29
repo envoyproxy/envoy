@@ -52,12 +52,12 @@ using BodyFormatterPtr = std::unique_ptr<BodyFormatter>;
 class ResponseMapper {
 public:
   ResponseMapper(
-      const envoy::extensions::filters::http::response_map::v3::ResponseMapper&
-          config,
-      Server::Configuration::FactoryContext& context)
+      const envoy::extensions::filters::http::response_map::v3::ResponseMapper& config,
+      Server::Configuration::CommonFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validationVisitor)
       : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context.runtime(),
                                                     context.random(),
-                                                    context.messageValidationVisitor())) {
+                                                    validationVisitor)) {
     if (config.has_status_code()) {
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
@@ -134,14 +134,14 @@ public:
   ResponseMapImpl() : body_formatter_(std::make_unique<BodyFormatter>()) {}
 
   ResponseMapImpl(
-      const envoy::extensions::filters::http::response_map::v3::ResponseMap&
-          config,
-      Server::Configuration::FactoryContext& context)
+      const envoy::extensions::filters::http::response_map::v3::ResponseMap& config,
+      Server::Configuration::CommonFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validationVisitor)
       : body_formatter_(config.has_body_format()
                             ? std::make_unique<BodyFormatter>(config.body_format(), context.api())
                             : std::make_unique<BodyFormatter>()) {
     for (const auto& mapper : config.mappers()) {
-      mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context));
+      mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context, validationVisitor));
     }
   }
 
@@ -195,10 +195,10 @@ private:
 ResponseMapPtr Factory::createDefault() { return std::make_unique<ResponseMapImpl>(); }
 
 ResponseMapPtr Factory::create(
-    const envoy::extensions::filters::http::response_map::v3::ResponseMap&
-        config,
-    Server::Configuration::FactoryContext& context) {
-  return std::make_unique<ResponseMapImpl>(config, context);
+    const envoy::extensions::filters::http::response_map::v3::ResponseMap& config,
+    Server::Configuration::CommonFactoryContext& context,
+    ProtobufMessage::ValidationVisitor& validationVisitor) {
+  return std::make_unique<ResponseMapImpl>(config, context, validationVisitor);
 }
 
 } // namespace ResponseMap
