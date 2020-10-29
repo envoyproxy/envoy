@@ -983,6 +983,9 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
 
   server_->setRefused(false);
 
+  // The next query destroys, and reinitializes the channel. Furthermore, because the test dns
+  // server's address was passed as a custom resolver on construction, the new channel should still
+  // point to the test dns server, and the query should succeed.
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,
                                              {"201.134.56.7"}, {}, absl::nullopt));
