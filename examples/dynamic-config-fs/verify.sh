@@ -16,9 +16,6 @@ responds_with \
 run_log "Check config for active clusters pointing to service1"
 curl -s http://localhost:19000/config_dump \
     | jq -r '.configs[1].dynamic_active_clusters' \
-    | grep '"version_info": "1"'
-curl -s http://localhost:19000/config_dump \
-    | jq -r '.configs[1].dynamic_active_clusters' \
     | grep '"address": "service1"'
 
 run_log "Set upstream to service2"
@@ -33,7 +30,3 @@ run_log "Check config for active clusters pointing to service2"
 curl -s http://localhost:19000/config_dump \
     | jq -r '.configs[1].dynamic_active_clusters' \
     | grep '"address": "service2"'
-
-# curl -s http://localhost:19000/config_dump  \
-#    | jq -r '.configs[1].dynamic_active_clusters' \
-#    | grep '"version_info": "2"'
