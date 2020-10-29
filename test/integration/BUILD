@@ -440,6 +440,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/common/http/http2:http2_frame",
         "//test/integration/filters:continue_headers_only_inject_body",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
@@ -875,6 +876,7 @@ envoy_cc_test(
     ],
     shard_count = 2,
     # Times out on Windows
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",

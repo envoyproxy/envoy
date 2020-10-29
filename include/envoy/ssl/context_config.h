@@ -111,6 +111,11 @@ public:
    *         for names.
    */
   virtual const std::string& signingAlgorithmsForTest() const PURE;
+
+  /**
+   * Check whether TLS certificate entity and certificate validation context entity is available
+   */
+  virtual bool isSecretReady() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
