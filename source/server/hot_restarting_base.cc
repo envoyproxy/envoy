@@ -38,7 +38,7 @@ sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std:
   Network::Address::PipeInstance addr(fmt::format(socket_path + "_{}_{}", role, base_id_ + id),
                                       socket_mode, nullptr);
   MemBlockBuilder<sockaddr> mem_builder(addr.sockAddrLen());
-  mem_builder.appendData(absl::Span<sockaddr>(addr.sockAddr(), addr.sockAddrLen()));
+  mem_builder.appendData(absl::Span<const sockaddr>(addr.sockAddr(), addr.sockAddrLen()));
   SAFE_MEMCPY(&address, mem_builder.release().get());
   fchmod(my_domain_socket_, socket_mode);
 

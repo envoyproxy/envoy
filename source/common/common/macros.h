@@ -1,14 +1,8 @@
 #pragma once
 
-namespace Envoy {
+#include <cassert>
 
-/**
- * Assert memory bounds to avoid copy errors.
- */
-#define SAFE_MEMCPY(dst, src)                                                                      \
-  do {                                                                                             \
-    memmove(dst, src, std::min(sizeof(*(src)), sizeof(*(dst))));                                   \
-  } while (0)
+namespace Envoy {
 
 /**
  * @return the size of a C array.
@@ -47,6 +41,15 @@ namespace Envoy {
   do {                                                                                             \
     static type* objectptr = new type{__VA_ARGS__};                                                \
     return *objectptr;                                                                             \
+  } while (0)
+
+/**
+ * Assert memory bounds to avoid copy errors.
+ */
+#define SAFE_MEMCPY(dst, src)                                                                      \
+  do {                                                                                             \
+    assert(ARRAY_SIZE(src) == ARRAY_SIZE(dst));                                                    \
+    memmove(dst, src, ARRAY_SIZE(src));                                                            \
   } while (0)
 
 /**
