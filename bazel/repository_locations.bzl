@@ -833,7 +833,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "da4c2efa1e23a7c556acc46b87ccf177b9999c57",
         sha256 = "5ab7777ae55b852b4cda418dcdebd3cdb7b31484ae928ac17277b8b94591799c",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
-        urls = ["https://github.com/mathetake/proxy-wasm-cpp-host/archive/${version}.tar.gz"],
+        urls = ["https://github.com/mathetake/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
