@@ -64,12 +64,14 @@ The following example of a :download:`dynamic LDS file <_include/envoy-dynamic-l
 configures an ``HTTP`` :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`
 on port ``10000``.
 
-All paths are matched and routed to the ``service_envoyproxy_io`` cluster.
+All domains and paths are matched and routed to the ``service_envoyproxy_io`` cluster.
+
+The ``host`` headers are rewritten to ``www.envoyproxy.io``
 
 .. literalinclude:: _include/envoy-dynamic-lds-demo.yaml
     :language: yaml
     :linenos:
-    :emphasize-lines: 6-7, 20-21, 24, 27
+    :emphasize-lines: 6-7, 20-21, 24, 26-27
 
 .. _start_quick_start_dynamic_fs_dynamic_cds:
 
@@ -83,7 +85,7 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
 .. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
     :language: yaml
     :linenos:
-    :emphasize-lines: 8, 14-15
+    :emphasize-lines: 8, 14-15, 19-20
 
 .. _start_quick_start_dynamic_fs_admin:
 
