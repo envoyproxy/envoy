@@ -276,6 +276,19 @@ message RuntimeFeatureFlag {
 message HeaderValue {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
 
+  message ValueFormat {
+    message Tokenized {
+      // Headers to tokenize
+      repeated HeaderValue headers = 1 [(validate.rules).repeated = {min_items: 1}];
+    }
+
+    oneof value_format {
+      option (validate.required) = true;
+
+      Tokenized tokenized = 1;
+    }
+  }
+
   // Header name.
   string key = 1
       [(validate.rules).string =
@@ -302,21 +315,6 @@ message HeaderValueOption {
   // Should the value be appended? If true (default), the value is appended to
   // existing values. Otherwise it replaces any existing values.
   google.protobuf.BoolValue append = 2;
-}
-
-// Header name/value pair (where value is a tokenized string with format header-a;value-a,header-b;value-b etc.) plus option to control append behavior.
-message TokenizedHeaderValueOption {
-  // Header name
-  string name = 1
-      [(validate.rules).string =
-           {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
-
-  // Headers to tokenize
-  repeated HeaderValue headers = 2 [(validate.rules).repeated = {min_items: 1}];
-
-  // Should the value be appended? If true (default), the value is appended to
-  // existing values. Otherwise it replaces any existing values.
-  google.protobuf.BoolValue append = 3;
 }
 
 // Wrapper for a set of headers.
