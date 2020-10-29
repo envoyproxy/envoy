@@ -194,6 +194,15 @@ Connection::State ConnectionImpl::state() const {
 
 void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
 
+void ConnectionImpl::setTransportSocketIsReadable() {
+  transport_wants_read_ = true;
+  // Only schedule a read activation if read is enabled. If read was disabled, read resumption will
+  // happen once read is re-enabled since transport_wants_read_ is now set to true.
+  if (read_disable_count_ == 0) {
+    ioHandle().activateFileEvents(Event::FileReadyType::Read);
+  }
+}
+
 bool ConnectionImpl::filterChainWantsData() {
   return read_disable_count_ == 0 ||
          (read_disable_count_ == 1 && read_buffer_.highWatermarkTriggered());
@@ -369,7 +378,7 @@ void ConnectionImpl::readDisable(bool disable) {
       // buffer's high watermark has triggered.
       ASSERT(read_buffer_.length() > 0 || read_disable_count_ == 0);
       dispatch_buffered_data_ = true;
-      setReadBufferReady();
+      ioHandle().activateFileEvents(Event::FileReadyType::Read);
     }
   }
 }
@@ -559,8 +568,9 @@ void ConnectionImpl::onReadReady() {
   ASSERT(!connecting_);
 
   // We get here while read disabled in two ways.
-  // 1) There was a call to setReadBufferReady(), for example if a raw buffer socket ceded due to
-  //    shouldDrainReadBuffer(). In this case we defer the event until the socket is read enabled.
+  // 1) There was a call to setTransportSocketIsReadable(), for example if a raw buffer socket ceded
+  //    due to shouldDrainReadBuffer(). In this case we defer the event until the socket is read
+  //    enabled.
   // 2) The consumer of connection data called readDisable(true), and instead of reading from the
   //    socket we simply need to dispatch already read data.
   if (read_disable_count_ != 0) {
