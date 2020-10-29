@@ -69,7 +69,7 @@ public:
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
    *
-   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner. As the owner
+   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner, as the owner
    * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using InitializeCb = std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)>;
@@ -85,7 +85,7 @@ public:
    * the current value.
    *
    * NOTE: The update callback is not supposed to capture the Slot, or its
-   * owner. As the owner may be destructed in main thread before the update_cb
+   * owner, as the owner may be destructed in main thread before the update_cb
    * gets called in a worker thread.
    **/
   using UpdateCb = std::function<ThreadLocalObjectSharedPtr(ThreadLocalObjectSharedPtr)>;
@@ -148,7 +148,7 @@ public:
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
    *
-   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner. As the owner
+   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner, as the owner
    * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using InitializeCb = std::function<std::shared_ptr<T>(Event::Dispatcher& dispatcher)>;
@@ -167,7 +167,7 @@ public:
   /**
    * UpdateCb is passed a mutable reference to the current stored data.
    *
-   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner. As the owner
+   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner, as the owner
    * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using UpdateCb = std::function<void(T& obj)>;
