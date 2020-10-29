@@ -1005,6 +1005,99 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
   }
 }
 
+TEST_F(CacheChunkSizeTest, HandleDownstreamWatermarkCallbacks) {
+  request_headers_.setHost("DownstreamPressureHandling");
+  int chunks_count = 3;
+  uint64_t body_size = buffer_limit_ * chunks_count;
+  const std::string body = std::string(body_size, 'a');
+  {
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Add Etag & Last-Modified headers to the response for validation.
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag_);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      response_last_modified_);
+
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+
+    filter->onDestroy();
+  }
+  waitBeforeSecondRequest();
+  {
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    // Set require validation.
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+
+    // Cached response requiring validation is treated as a cache miss.
+    testDecodeRequestMiss(filter);
+
+    // Verify validation conditional headers are added.
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", etag_}, {"if-modified-since", response_last_modified_}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+
+    // Advance time so that the cached date is updated.
+    time_source_.advanceTimeWait(std::chrono::seconds(10));
+    const std::string not_modified_date = formatter_.now(time_source_);
+    Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
+                                                                     {"date", not_modified_date}};
+
+    // The filter should continue headers encoding without ending the stream as data will be
+    // injected.
+    EXPECT_EQ(filter->encodeHeaders(not_modified_response_headers, true),
+              Http::FilterHeadersStatus::ContinueAndDontEndStream);
+
+    // Verify the cached response headers with the updated date.
+    Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
+    updated_response_headers.setDate(not_modified_date);
+    EXPECT_THAT(not_modified_response_headers, IsSupersetOfHeaders(updated_response_headers));
+
+    // Downstream backs up multiple times, increase watermarks.
+    filter->onAboveWriteBufferHighWatermark();
+    filter->onAboveWriteBufferHighWatermark();
+
+    // The first cache lookup callback is already posted to the dispatcher before the watermark
+    // increases. Run the event loop to invoke the callback. No additional callbacks will be
+    // invoked due to watermark being greater than zero.
+    EXPECT_CALL(encoder_callbacks_,
+                injectEncodedDataToFilterChain(
+                    testing::Property(&Buffer::Instance::toString,
+                                      testing::Eq(std::string(buffer_limit_, 'a'))),
+                    false))
+        .Times(1);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    // Lower the watermark, but still above 0.
+    filter->onBelowWriteBufferLowWatermark();
+    EXPECT_CALL(encoder_callbacks_,
+                injectEncodedDataToFilterChain(
+                    testing::Property(&Buffer::Instance::toString,
+                                      testing::Eq(std::string(buffer_limit_, 'a'))),
+                    _))
+        .Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    // Further lower the watermark, resume processing.
+    filter->onBelowWriteBufferLowWatermark();
+    EXPECT_CALL(encoder_callbacks_,
+                injectEncodedDataToFilterChain(
+                    testing::Property(&Buffer::Instance::toString,
+                                      testing::Eq(std::string(buffer_limit_, 'a'))),
+                    _))
+        .Times(2);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+
+    filter->onDestroy();
+  }
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters
