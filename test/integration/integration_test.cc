@@ -777,6 +777,41 @@ TEST_P(IntegrationTest, AbsolutePath) {
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
+// Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
+TEST_P(IntegrationTest, TestHostWithAddress) {
+  useAccessLog("%REQ(Host)%\n");
+  std::string address_string;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    address_string = TestUtility::getIpv4Loopback();
+  } else {
+    address_string = "[::1]";
+  }
+
+  auto host = config_helper_.createVirtualHost(address_string.c_str(), "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+
+  // Test absolute URL with ipv6.
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), absl::StrCat("GET http://", address_string, " HTTP/1.1\r\n\r\n").c_str(),
+      &response, true);
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  EXPECT_TRUE(response.find("301") != std::string::npos);
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr(address_string));
+
+  // Test normal IPv6 request as well.
+  response.clear();
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"),
+      absl::StrCat("GET / HTTP/1.1\r\nHost: ", address_string, "\r\n\r\n").c_str(), &response,
+      true);
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  EXPECT_TRUE(response.find("301") != std::string::npos);
+}
+
 TEST_P(IntegrationTest, AbsolutePathWithPort) {
   // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
   // encountered via absolute URL with a port.
@@ -789,6 +824,7 @@ TEST_P(IntegrationTest, AbsolutePathWithPort) {
       lookupPort("http"), "GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
       &response, true);
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  EXPECT_TRUE(response.find("301") != std::string::npos);
 }
 
 TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
