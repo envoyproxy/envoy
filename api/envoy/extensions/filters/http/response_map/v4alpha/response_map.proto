@@ -87,3 +87,17 @@ message ResponseMap {
   //
   config.core.v4alpha.SubstitutionFormatString body_format = 2;
 }
+
+// Extra settings on a per virtualhost/route/weighted-cluster level.
+message ResponseMapPerRoute {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.response_map.v3.ResponseMapPerRoute";
+
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the response map filter for this particular vhost or route.
+    // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+  }
+}

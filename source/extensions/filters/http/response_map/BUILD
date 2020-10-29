@@ -20,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//source/common/response_map:response_map_lib",
+        "//source/extensions/filters/http:well_known_names",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
