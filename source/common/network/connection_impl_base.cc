@@ -18,6 +18,16 @@ void ConnectionImplBase::addConnectionCallbacks(ConnectionCallbacks& cb) {
   callbacks_.push_back(&cb);
 }
 
+void ConnectionImplBase::removeConnectionCallbacks(ConnectionCallbacks& callbacks) {
+  // For performance/safety reasons we just clear the callback and do not resize the list
+  for (auto& callback : callbacks_) {
+    if (callback == &callbacks) {
+      callback = nullptr;
+      return;
+    }
+  }
+}
+
 void ConnectionImplBase::hashKey(std::vector<uint8_t>& hash) const { addIdToHashKey(hash, id()); }
 
 void ConnectionImplBase::setConnectionStats(const ConnectionStats& stats) {
@@ -45,7 +55,9 @@ void ConnectionImplBase::raiseConnectionEvent(ConnectionEvent event) {
   for (ConnectionCallbacks* callback : callbacks_) {
     // TODO(mattklein123): If we close while raising a connected event we should not raise further
     // connected events.
-    callback->onEvent(event);
+    if (callback != nullptr) {
+      callback->onEvent(event);
+    }
   }
 }
 
