@@ -47,9 +47,6 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
   event_listener_.onEventEnabled(events);
   bool was_enabled = schedulable_->enabled();
-  // if (!was_enabled) {
-  //   schedulable_->scheduleCallbackNextIteration();
-  // }
   // Recalculate activated events.
   uint32_t events_to_notify = 0;
   if ((events & FileReadyType::Read) && io_source_.isReadable()) {

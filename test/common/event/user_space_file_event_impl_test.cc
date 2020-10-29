@@ -222,8 +222,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEventClosedIsNotTriggeredUnlessManullyAct
     setReadable();
     user_file_event_->activate(Event::FileReadyType::Closed);
     // Activate could deliver Closed event bit.
-    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Closed))
-        .Times(1);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Closed)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {

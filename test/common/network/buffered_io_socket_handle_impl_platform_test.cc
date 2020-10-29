@@ -46,7 +46,7 @@ public:
 
 TEST_F(BufferedIoSocketHandlePlatformTest, TestCreatePlatformDefaultTriggerTypeFailOnWindows) {
   auto scheduable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration()).Times(0);
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);

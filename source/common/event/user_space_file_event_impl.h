@@ -51,12 +51,8 @@ class EventListenerImpl : public EventListener {
 public:
   ~EventListenerImpl() override = default;
 
-  // Return both read and write if enabled. Note that this implementation is inefficient. Read and
-  // write events are supposed to be independent.
-  uint32_t triggeredEvents() override {
-    // return enabled_events_ & (~Event::FileReadyType::Closed);
-    return 0;
-  }
+  // The ready events are not preserved. All ready events must be notified by activate().
+  uint32_t triggeredEvents() override { return 0; }
 
   void onEventEnabled(uint32_t enabled_events) override;
   void onEventActivated(uint32_t activated_events) override;
