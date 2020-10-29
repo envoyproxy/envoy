@@ -307,7 +307,6 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
   cleanupUpstreamAndDownstream();
 }
 
-
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectTerminationIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
