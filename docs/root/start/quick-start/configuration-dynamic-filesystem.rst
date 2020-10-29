@@ -68,7 +68,7 @@ All paths are matched and routed to the ``service_envoyproxy_io`` cluster.
 .. literalinclude:: _include/envoy-dynamic-lds-demo.yaml
     :language: yaml
     :linenos:
-    :emphasize-lines: 5-7, 29
+    :emphasize-lines: 6-7, 27
 
 .. _start_quick_start_dynamic_fs_dynamic_cds:
 
