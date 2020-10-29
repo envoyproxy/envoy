@@ -3,7 +3,8 @@
 Quick start
 ===========
 
-intro message
+The quick start section takes you through basic operations with the Envoy server, and
+provides an introduction to the types of configuration Envoy can be used with.
 
 .. toctree::
     :maxdepth: 3

@@ -43,6 +43,11 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 ``dynamic_resources``
 ---------------------
 
+The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` specify
+where to load dynamic configuration.
+
+In this example, the configuration is provided by the ``yaml`` files set below.
+
 .. literalinclude:: _include/envoy-dynamic-filesystem-demo.yaml
     :language: yaml
     :linenos:
@@ -52,28 +57,35 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 
 .. _start_quick_start_dynamic_fs_dynamic_lds:
 
-``resources`` - Listeners Discovery Service (LDS)
+``resources`` - Listener discovery service (LDS)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. literalinclude:: _include/envoy-dynamic-lds-demo.yaml
     :language: yaml
     :linenos:
-    :emphasize-lines: 1, 8-9, 28
+    :emphasize-lines: 8-9, 28
 
 .. _start_quick_start_dynamic_fs_dynamic_cds:
 
-``resources`` - Clusters Discovery Service (CDS)
+``resources`` - Cluster discovery service (CDS)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
     :language: yaml
     :linenos:
-    :emphasize-lines: 1, 10, 16-17
+    :emphasize-lines: 10, 16-17
 
 .. _start_quick_start_dynamic_fs_admin:
 
 ``admin``
 ---------
+
+Configuring the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` section is
+the same as for :ref:`static configuration <start_quick_start_static_admin>`.
+
+Enabling the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` interface with
+dynamic configuration, allows you to use the :ref:`config_dump <operations_admin_interface_config_dump>`
+endpoint to see how Envoy is currently configured.
 
 .. literalinclude:: _include/envoy-dynamic-filesystem-demo.yaml
     :language: yaml
