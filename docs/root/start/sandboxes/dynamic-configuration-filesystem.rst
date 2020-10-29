@@ -78,7 +78,7 @@ the ``example_proxy_cluster`` pointing to ``service1``.
 
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters.json
    :language: json
-   :emphasize-lines: 11, 19-20
+   :emphasize-lines: 10, 18-19
 
 Step 5: Edit ``configs/cds.yaml`` file to update upstream cluster
 *****************************************************************
@@ -119,4 +119,4 @@ configured to proxy to ``service2``:
 
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters-updated.json
    :language: json
-   :emphasize-lines: 11, 19-20
+   :emphasize-lines: 10, 18-19
