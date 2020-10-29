@@ -72,7 +72,7 @@ public:
  */
 class ReadWritable : public virtual ReadableSource, public virtual WritablePeer {
 public:
-  virtual ~ReadWritable() override = default;
+  ~ReadWritable() override = default;
 };
 } // namespace Network
 } // namespace Envoy

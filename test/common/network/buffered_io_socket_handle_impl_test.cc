@@ -100,7 +100,7 @@ TEST_F(BufferedIoSocketHandleTest, TestBasicRecv) {
   EXPECT_TRUE(result.ok());
 }
 
-// Test recv side effects.
+// Test read side effects.
 TEST_F(BufferedIoSocketHandleTest, TestReadEmpty) {
   Buffer::OwnedImpl buf;
   auto result = io_handle_->read(buf, 10);
@@ -111,7 +111,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadEmpty) {
   EXPECT_TRUE(result.ok());
 }
 
-// Test recv side effects.
+// Test read side effects.
 TEST_F(BufferedIoSocketHandleTest, TestReadContent) {
   Buffer::OwnedImpl buf;
   auto& internal_buffer = io_handle_->getBufferForTest();
@@ -126,6 +126,31 @@ TEST_F(BufferedIoSocketHandleTest, TestReadContent) {
   EXPECT_EQ(4, result.rc_);
   ASSERT_EQ(7, buf.length());
   ASSERT_EQ(0, internal_buffer.length());
+}
+
+// Test readv behavior.
+TEST_F(BufferedIoSocketHandleTest, TestBasicReadv) {
+  Buffer::OwnedImpl buf_to_write("abc");
+  io_handle_peer_->write(buf_to_write);
+
+  Buffer::OwnedImpl buf;
+  Buffer::RawSlice slice;
+  buf.reserve(1024, &slice, 1);
+  auto result = io_handle_->readv(1024, &slice, 1);
+
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(3, result.rc_);
+
+  result = io_handle_->readv(1024, &slice, 1);
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
+
+  io_handle_->setWriteEnd();
+  result = io_handle_->readv(1024, &slice, 1);
+  // EOF
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.rc_);
 }
 
 // Test recv side effects.
@@ -416,7 +441,6 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
 
 TEST_F(BufferedIoSocketHandleTest, TestRepeatedShutdownWR) {
   EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
-  ENVOY_LOG_MISC(debug, "lambdai: next shutdown");
   EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
 }
 
@@ -683,6 +707,16 @@ TEST_F(BufferedIoSocketHandleTest, TestConnect) {
   EXPECT_EQ(0, io_handle_->connect(address_is_ignored).rc_);
 }
 
+TEST_F(BufferedIoSocketHandleTest, TestActivateEvent) {
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  io_handle_->initializeFileEvent(
+      dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::FileTriggerType::Edge,
+      Event::FileReadyType::Read);
+  EXPECT_FALSE(scheduable_cb_->enabled());
+  io_handle_->activateFileEvents(Event::FileReadyType::Read);
+  ASSERT_TRUE(scheduable_cb_->enabled());
+}
+
 TEST_F(BufferedIoSocketHandleTest, TestDeathOnActivatingDestroyedEvents) {
   io_handle_->resetFileEvents();
   ASSERT_DEBUG_DEATH(io_handle_->activateFileEvents(Event::FileReadyType::Read),
@@ -693,6 +727,18 @@ TEST_F(BufferedIoSocketHandleTest, TestDeathOnEnablingDestroyedEvents) {
   io_handle_->resetFileEvents();
   ASSERT_DEBUG_DEATH(io_handle_->enableFileEvents(Event::FileReadyType::Read),
                      "Null user_file_event_");
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestNotImplementDuplicate) {
+  ASSERT_DEATH(io_handle_->duplicate(), "");
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestNotImplementAccept) {
+  ASSERT_DEATH(io_handle_->accept(nullptr, 0), "");
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestLastRoundtripTimeNullOpt) {
+  ASSERT_EQ(absl::nullopt, io_handle_->lastRoundTripTime());
 }
 
 class BufferedIoSocketHandleNotImplementedTest : public testing::Test {
