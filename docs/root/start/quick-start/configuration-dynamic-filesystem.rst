@@ -44,7 +44,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 ---------------------
 
 The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` specify
-where to load dynamic configuration.
+where to load dynamic configuration from.
 
 In this example, the configuration is provided by the ``yaml`` files set below.
 
@@ -57,26 +57,27 @@ In this example, the configuration is provided by the ``yaml`` files set below.
 
 .. _start_quick_start_dynamic_fs_dynamic_lds:
 
-``resources`` - Listener discovery service (LDS)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``resources`` - :ref:`Listener discovery service (LDS) <config_listeners_lds>`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The following example of a :download:`dynamic LDS file <_include/envoy-dynamic-lds-demo.yaml>`,
-configures an ``HTTP`` listener on port ``10000``.
+configures an ``HTTP`` :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`
+on port ``10000``.
 
 All paths are matched and routed to the ``service_envoyproxy_io`` cluster.
 
 .. literalinclude:: _include/envoy-dynamic-lds-demo.yaml
     :language: yaml
     :linenos:
-    :emphasize-lines: 6-7, 27
+    :emphasize-lines: 6-7, 20-21, 24, 27
 
 .. _start_quick_start_dynamic_fs_dynamic_cds:
 
-``resources`` - Cluster discovery service (CDS)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``resources`` - :ref:`Cluster discovery service (CDS) <config_cluster_manager_cds>`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In the following example of a :download:`dynamic CDS file <_include/envoy-dynamic-cds-demo.yaml>`,
-the ``service_envoyproxy_io`` :ref:`cluster <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
+the ``example_proxy_cluster`` :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
 proxies over ``TLS`` to https://www.envoyproxy.io.
 
 .. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
