@@ -30,7 +30,7 @@ void ZoneAwareLoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
   // Update local priority set if it exists - will mean load balancer is zone aware and has decided
   // to construct local priority set
   const uint8_t priority_of_host_set = host_priority % num_priority_levels_;
-  if (priority_of_host_set == 0 && local_priority_set_.get() != nullptr) {
+  if (priority_of_host_set == 0 && local_priority_set_) {
     const MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
     const HostVector empty_host_vector;
     local_priority_set_->updateHosts(0, HostSetImpl::updateHostsParams(host_set), {},
