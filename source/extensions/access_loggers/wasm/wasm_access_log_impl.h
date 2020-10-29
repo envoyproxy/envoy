@@ -43,7 +43,7 @@ public:
     tls_slot_ = std::move(tls_slot);
   }
 
-  ~WasmAccessLog() {
+  ~WasmAccessLog() override {
     if (tls_slot_->get()) {
       tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
                                      -> ThreadLocal::ThreadLocalObjectSharedPtr {
