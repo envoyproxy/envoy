@@ -441,7 +441,8 @@ public:
     listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
 
     if (set_resolver_in_constructor()) {
-      resolver_ = dispatcher_->createDnsResolver({socket_->localAddress()}, use_tcp_for_dns_lookups());
+      resolver_ =
+          dispatcher_->createDnsResolver({socket_->localAddress()}, use_tcp_for_dns_lookups());
     } else {
       resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
     }
