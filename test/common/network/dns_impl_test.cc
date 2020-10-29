@@ -956,6 +956,11 @@ class DnsImplCustomResolverTest : public DnsImplTest {
   bool set_resolver_in_constructor() const override { return true; }
 };
 
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplCustomResolverTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
   ASSERT_FALSE(peer_->isChannelDirty());
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
