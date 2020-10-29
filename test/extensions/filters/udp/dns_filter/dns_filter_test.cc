@@ -400,7 +400,7 @@ TEST_F(DnsFilterTest, InvalidQuery) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -426,7 +426,7 @@ TEST_F(DnsFilterTest, MaxQueryAndResponseSizeTest) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   // There are 8 addresses, however, since the domain is part of the answer record, each
   // serialized answer is over 100 bytes in size, there is room for 3 before the next
   // serialized answer puts the buffer over the 512 byte limit. The query itself is also
@@ -457,7 +457,7 @@ TEST_F(DnsFilterTest, InvalidQueryNameTooLongTest) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -466,7 +466,7 @@ TEST_F(DnsFilterTest, InvalidQueryNameTooLongTest) {
   EXPECT_TRUE(config_->stats().downstream_rx_bytes_.used());
   EXPECT_TRUE(config_->stats().downstream_tx_bytes_.used());
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 }
 
@@ -485,7 +485,7 @@ TEST_F(DnsFilterTest, InvalidLabelNameTooLongTest) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -494,7 +494,7 @@ TEST_F(DnsFilterTest, InvalidLabelNameTooLongTest) {
   EXPECT_TRUE(config_->stats().downstream_rx_bytes_.used());
   EXPECT_TRUE(config_->stats().downstream_tx_bytes_.used());
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 }
 
@@ -513,7 +513,7 @@ TEST_F(DnsFilterTest, SingleTypeAQuery) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(1, query_ctx_->answers_.size());
 
   // Verify that we have an answer record for the queried domain
@@ -560,7 +560,7 @@ TEST_F(DnsFilterTest, RepeatedTypeAQuerySuccess) {
     EXPECT_EQ(iter, query_id_list.end());
     EXPECT_TRUE(query_ctx_->parse_status_);
 
-    EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+    EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
     EXPECT_EQ(1, query_ctx_->answers_.size());
 
     // Verify that we have an answer record for the queried domain
@@ -594,7 +594,7 @@ TEST_F(DnsFilterTest, LocalTypeAQueryFail) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -619,7 +619,7 @@ TEST_F(DnsFilterTest, LocalTypeAAAAQuerySuccess) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(expected.size(), query_ctx_->answers_.size());
 
   // Verify the address returned
@@ -667,7 +667,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(1, query_ctx_->answers_.size());
 
   std::list<std::string> expected{expected_address};
@@ -720,7 +720,7 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(1, query_ctx_->answers_.size());
 
   std::list<std::string> expected{expected_address};
@@ -773,7 +773,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(expected_address.size(), query_ctx_->answers_.size());
 
   EXPECT_LT(udp_response_.buffer_->length(), Utils::MAX_UDP_DNS_SIZE);
@@ -823,7 +823,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   // parse the result
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -862,7 +862,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
   // parse the result
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -910,7 +910,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   // parse the result
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -961,7 +961,7 @@ TEST_F(DnsFilterTest, ExternalResolutionExceedMaxPendingLookups) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
   EXPECT_EQ(0, query_ctx_->answers_.size());
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
 
   // Validate stats
   EXPECT_EQ(3, config_->stats().downstream_rx_queries_.value());
@@ -989,7 +989,7 @@ TEST_F(DnsFilterTest, ConsumeExternalJsonTableTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(2, query_ctx_->answers_.size());
 
   // Verify the address returned
@@ -1023,7 +1023,7 @@ TEST_F(DnsFilterTest, ConsumeExternalJsonTableTestNoIpv6Answer) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -1052,7 +1052,7 @@ TEST_F(DnsFilterTest, ConsumeExternalYamlTableTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(2, query_ctx_->answers_.size());
 
   // Verify the address returned
@@ -1095,7 +1095,7 @@ TEST_F(DnsFilterTest, RawBufferTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(1, query_ctx_->answers_.size());
 
   // Verify that we have an answer record for the queried domain
@@ -1133,7 +1133,7 @@ TEST_F(DnsFilterTest, InvalidAnswersInQueryTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 }
 
@@ -1164,7 +1164,7 @@ TEST_F(DnsFilterTest, InvalidQueryNameTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
 
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
 }
@@ -1534,7 +1534,7 @@ TEST_F(DnsFilterTest, InvalidQueryNameTest2) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
 
   // TODO(abaptiste): underflow/overflow stats
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
@@ -1572,7 +1572,7 @@ TEST_F(DnsFilterTest, MultipleQueryCountTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
 
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
   EXPECT_EQ(0, config_->stats().a_record_queries_.value());
@@ -1604,7 +1604,7 @@ TEST_F(DnsFilterTest, InvalidQueryCountTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
 
   EXPECT_EQ(0, config_->stats().a_record_queries_.value());
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
@@ -1637,7 +1637,7 @@ TEST_F(DnsFilterTest, InvalidNameLabelTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
 
   EXPECT_EQ(0, config_->stats().a_record_queries_.value());
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
@@ -1670,7 +1670,7 @@ TEST_F(DnsFilterTest, NotImplementedQueryTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NOT_IMPLEMENTED, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NOT_IMPLEMENTED, query_ctx_->getQueryResponseCode());
 
   EXPECT_EQ(0, config_->stats().a_record_queries_.value());
   EXPECT_EQ(0, config_->stats().downstream_rx_invalid_queries_.value());
@@ -1702,7 +1702,7 @@ TEST_F(DnsFilterTest, NotImplementedAuthorityRRTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NOT_IMPLEMENTED, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NOT_IMPLEMENTED, query_ctx_->getQueryResponseCode());
 }
 
 TEST_F(DnsFilterTest, NoTransactionIdTest) {
@@ -1731,7 +1731,7 @@ TEST_F(DnsFilterTest, NoTransactionIdTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
 }
 
 TEST_F(DnsFilterTest, InvalidShortBufferTest) {
@@ -1745,7 +1745,7 @@ TEST_F(DnsFilterTest, InvalidShortBufferTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_FALSE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, query_ctx_->getQueryResponseCode());
 
   EXPECT_EQ(0, config_->stats().a_record_queries_.value());
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
@@ -1764,7 +1764,7 @@ TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
 
   // Although 16 addresses are defined, only 8 are returned
   EXPECT_EQ(8, query_ctx_->answers_.size());
@@ -1799,7 +1799,7 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
 
   std::map<uint16_t, std::string> validation_weight_map = {
       {10, "backup.voip.subzero.com"},
@@ -1897,7 +1897,7 @@ TEST_F(DnsFilterTest, SrvTargetResolution) {
 
     query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
     EXPECT_TRUE(query_ctx_->parse_status_);
-    EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+    EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
     EXPECT_EQ(1, query_ctx_->answers_.size());
 
     const DnsAnswerRecordPtr& answer = query_ctx_->answers_.find(domain)->second;
@@ -1930,7 +1930,7 @@ TEST_F(DnsFilterTest, NonExistentClusterServiceLookup) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 
   // Validate stats
@@ -1968,7 +1968,7 @@ TEST_F(DnsFilterTest, SrvRecordQuery) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
   EXPECT_EQ(1, query_ctx_->queries_.size());
 
   const auto& parsed_query = query_ctx_->queries_.front();
@@ -1999,7 +1999,7 @@ TEST_F(DnsFilterTest, SrvQueryMaxRecords) {
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode(query_ctx_));
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
 
   // We can only serialize 7 records before reaching the 512 byte limit
   EXPECT_LT(query_ctx_->answers_.size(), MAX_RETURNED_RECORDS);

@@ -187,6 +187,12 @@ public:
   DnsAnswerMap answers_;
   DnsAnswerMap additional_;
   bool in_callback_;
+
+  /**
+   * @param context the query context for which we are querying the response code
+   * @return uint16_t the response code flag value from a parsed dns object
+   */
+  uint16_t getQueryResponseCode() { return static_cast<uint16_t>(header_.flags.rcode); }
 };
 
 using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
@@ -343,14 +349,6 @@ public:
   bool storeDnsAnswerRecord(DnsQueryContextPtr& context, const DnsQueryRecord& query_rec,
                             const std::chrono::seconds ttl,
                             Network::Address::InstanceConstSharedPtr ipaddr);
-
-  /**
-   * @param context the query context for which we are querying the response code
-   * @return uint16_t the response code flag value from a parsed dns object
-   */
-  uint16_t getQueryResponseCode(DnsQueryContextPtr& context) {
-    return static_cast<uint16_t>(context->header_.flags.rcode);
-  }
 
   /**
    * @brief Parse the incoming query and create a context object for the filter
