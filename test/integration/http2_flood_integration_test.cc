@@ -100,6 +100,7 @@ public:
   }
 
 protected:
+  bool initializeUpstreamFloodTest();
   std::vector<char> serializeFrames(const Http2Frame& frame, uint32_t num_frames);
   void floodServer(const Http2Frame& frame, const std::string& flood_stat, uint32_t num_frames);
   void floodServer(absl::string_view host, absl::string_view path,
@@ -116,6 +117,21 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+    // Upstream flood checks are not implemented in the old codec based on exceptions
+    return false;
+  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
+                                    "true");
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower upstream outbound frame limits to make tests run faster
+  config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
+  initialize();
+  return true;
+}
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
   // nghttp2 library has its own internal mitigation for outbound control frames (see
@@ -1093,63 +1109,33 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamPingFlood) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-    // Upstream flood checks are not implemented in the old codec based on exceptions
+  if (!initializeUpstreamFloodTest()) {
     return;
   }
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
-                                    "true");
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  // set lower upstream outbound frame limits to make tests run faster
-  config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
-  initialize();
 
   floodClient(Http2Frame::makePingFrame(), ControlFrameFloodLimit + 1,
               "cluster.cluster_0.http2.outbound_control_flood");
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamSettings) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-    // Upstream flood checks are not implemented in the old codec based on exceptions
+  if (!initializeUpstreamFloodTest()) {
     return;
   }
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
-                                    "true");
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  // set lower upstream outbound frame limits to make tests run faster
-  config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
-  initialize();
 
   floodClient(Http2Frame::makeEmptySettingsFrame(), ControlFrameFloodLimit + 1,
               "cluster.cluster_0.http2.outbound_control_flood");
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamWindowUpdate) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-    // Upstream flood checks are not implemented in the old codec based on exceptions
+  if (!initializeUpstreamFloodTest()) {
     return;
   }
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
-                                    "true");
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  // set lower upstream outbound frame limits to make tests run faster
-  config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
-  initialize();
 
   floodClient(Http2Frame::makeWindowUpdateFrame(0, 1), 4,
               "cluster.cluster_0.http2.inbound_window_update_frames_flood");
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-    // Upstream flood checks are not implemented in the old codec based on exceptions
-    return;
-  }
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
-                                    "true");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -1157,9 +1143,9 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
         ->mutable_max_consecutive_inbound_frames_with_empty_payload()
         ->set_value(0);
   });
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  initialize();
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
