@@ -6,6 +6,7 @@
 
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"
+#include "common/network/peer_buffer.h"
 
 namespace Envoy {
 
@@ -52,7 +53,10 @@ public:
 
   // Return both read and write if enabled. Note that this implementation is inefficient. Read and
   // write events are supposed to be independent.
-  uint32_t triggeredEvents() override { return enabled_events_ & (~Event::FileReadyType::Closed); }
+  uint32_t triggeredEvents() override {
+    // return enabled_events_ & (~Event::FileReadyType::Closed);
+    return 0;
+  }
 
   void onEventEnabled(uint32_t enabled_events) override;
   void onEventActivated(uint32_t activated_events) override;
@@ -70,7 +74,8 @@ private:
 // Declare the class final to safely call virtual function setEnabled in constructor.
 class UserSpaceFileEventImpl final : public FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
-  UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events);
+  UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
+                         Network::ReadWritable& io_source);
 
   ~UserSpaceFileEventImpl() override = default;
 
@@ -92,6 +97,8 @@ private:
   // The registered callback of this event. This callback is usually on top of the frame of
   // Dispatcher::run().
   std::function<void()> cb_;
+
+  Network::ReadWritable& io_source_;
 };
 
 } // namespace Event

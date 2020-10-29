@@ -28,8 +28,7 @@ namespace Network {
  *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
  */
 class BufferedIoSocketHandleImpl : public IoHandle,
-                                   public WritablePeer,
-                                   public ReadableSource,
+                                   public ReadWritable,
                                    protected Logger::Loggable<Logger::Id::io> {
 public:
   BufferedIoSocketHandleImpl();
@@ -92,7 +91,7 @@ public:
   void maybeSetNewData() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
-      user_file_event_->activate(Event::FileReadyType::Write);
+      user_file_event_->activate(Event::FileReadyType::Read);
     }
   }
   void onPeerDestroy() override {
@@ -101,10 +100,14 @@ public:
   }
   void onPeerBufferWritable() override {
     if (user_file_event_) {
-      user_file_event_->activate(Event::FileReadyType::Read);
+      user_file_event_->activate(Event::FileReadyType::Write);
     }
   }
   bool isWritable() const override { return !isOverHighWatermark(); }
+  bool isPeerWritable() const override {
+    return writable_peer_ != nullptr && !writable_peer_->isWriteEndSet() &&
+           writable_peer_->isWritable();
+  }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
   // ReadableSource

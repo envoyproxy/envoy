@@ -41,6 +41,11 @@ public:
   virtual bool isWritable() const PURE;
 
   /**
+   * @return true if peer is valid and writable.
+   */
+  virtual bool isPeerWritable() const PURE;
+
+  /**
    * Raised by the peer when the peer switch from high water mark to low.
    */
   virtual void onPeerBufferWritable() PURE;
@@ -60,6 +65,14 @@ public:
 
   virtual bool isOverHighWatermark() const PURE;
   virtual bool isReadable() const PURE;
+};
+
+/**
+ * The interface as the union of ReadableSource and WritablePeer.
+ */
+class ReadWritable : public virtual ReadableSource, public virtual WritablePeer {
+public:
+  virtual ~ReadWritable() = default;
 };
 } // namespace Network
 } // namespace Envoy

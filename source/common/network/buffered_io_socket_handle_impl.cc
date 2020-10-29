@@ -259,7 +259,7 @@ void BufferedIoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatch
   ASSERT(user_file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                       "file descriptor. This is not allowed.");
   ASSERT(trigger == Event::FileTriggerType::Edge, "Only support edge type.");
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(dispatcher, cb, events);
+  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(dispatcher, cb, events, *this);
 }
 IoHandlePtr BufferedIoSocketHandleImpl::duplicate() {
   // duplicate() is supposed to be used on listener io handle while this implementation doesn't

@@ -49,6 +49,7 @@ envoy_cc_test(
         "//include/envoy/event:file_event_interface",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:peer_buffer_lib",
         "//test/mocks:common_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:test_runtime_lib",

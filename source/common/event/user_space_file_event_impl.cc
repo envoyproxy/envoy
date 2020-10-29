@@ -3,21 +3,22 @@
 #include <cstdint>
 
 #include "common/common/assert.h"
+#include "common/network/peer_buffer.h"
 
 namespace Envoy {
 namespace Event {
 
 UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                               uint32_t events)
-    : schedulable_(dispatcher.createSchedulableCallback([this]() { cb_(); })),
-      cb_([this, cb]() {
+                                               uint32_t events, Network::ReadWritable& io_source)
+    : schedulable_(dispatcher.createSchedulableCallback([this]() { cb_(); })), cb_([this, cb]() {
         auto all_events = getEventListener().triggeredEvents();
         auto ephemeral_events = getEventListener().getAndClearEphemeralEvents();
         ENVOY_LOG(trace,
                   "User space event {} invokes callbacks on allevents = {}, ephermal events = {}",
                   static_cast<void*>(this), all_events, ephemeral_events);
         cb(all_events | ephemeral_events);
-      }) {
+      }),
+      io_source_(io_source) {
   setEnabled(events);
 }
 
@@ -46,8 +47,21 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
   event_listener_.onEventEnabled(events);
   bool was_enabled = schedulable_->enabled();
-  if (!was_enabled) {
-    schedulable_->scheduleCallbackNextIteration();
+  // if (!was_enabled) {
+  //   schedulable_->scheduleCallbackNextIteration();
+  // }
+  // Recalculate activated events.
+  uint32_t events_to_notify = 0;
+  if ((events & FileReadyType::Read) && io_source_.isReadable()) {
+    events_to_notify |= FileReadyType::Read;
+  }
+  if ((events & FileReadyType::Write) && io_source_.isPeerWritable()) {
+    events_to_notify |= FileReadyType::Write;
+  }
+  if (events_to_notify != 0) {
+    activate(events_to_notify);
+  } else {
+    schedulable_->cancel();
   }
   ENVOY_LOG(trace, "User space file event {} set events {}. Will {} reschedule.",
             static_cast<void*>(this), events, was_enabled ? "not " : "");
