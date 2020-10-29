@@ -132,6 +132,7 @@ message H2FrameMetadata {
   Metadata metadata = 3;
 }
 
+// A header that contains an arbitrary status
 message H2FrameStatus {
   bytes status = 1;
   uint32 stream_index = 2;
