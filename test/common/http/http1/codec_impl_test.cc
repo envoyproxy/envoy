@@ -2405,18 +2405,12 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
 
   NiceMock<MockResponseDecoder> response_decoder;
 
-  // Need to set :method and :path.
-  // New and legacy codecs will behave differently on errors from processing outbound data. The
-  // legacy codecs will throw an exception (that presently will be uncaught in contexts like
-  // sendLocalReply), while the new codecs temporarily RELEASE_ASSERT until Envoy handles errors on
-  // outgoing data.
+  // Invalid outbound data errors are impossible to trigger in normal processing, since bad
+  // downstream data would have been rejected by the codec, and erroneous filter processing would
+  // cause a direct response by the filter manager. The old codecs will still throw an exception
+  // (that presently will be uncaught in contexts like sendLocalReply).
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  if (testingNewCodec()) {
-    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
-                 ":method and :path must be specified");
-    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
-                 ":method and :path must be specified");
-  } else {
+  if (!testingNewCodec()) {
     EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
                  CodecClientException);
     EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
