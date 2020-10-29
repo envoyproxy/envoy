@@ -187,8 +187,8 @@ TEST_F(FilterTest, InlineUnauthorizedFailure) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
-  EXPECT_EQ(filter_callbacks_.details(), "jwt_authn_access_denied{Jwt is not in the form of "
-                                         "Header.Payload.Signature with two dots and 3 sections}");
+  EXPECT_EQ(filter_callbacks_.details(), "jwt_authn_access_denied{Jwt_is_not_in_the_form_of_"
+                                         "Header.Payload.Signature_with_two_dots_and_3_sections}");
 }
 
 // This test verifies Verifier::Callback is called inline with a failure(403 Forbidden) status.
@@ -210,7 +210,7 @@ TEST_F(FilterTest, InlineForbiddenFailure) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
   EXPECT_EQ(filter_callbacks_.details(),
-            "jwt_authn_access_denied{Audiences in Jwt are not allowed}");
+            "jwt_authn_access_denied{Audiences_in_Jwt_are_not_allowed}");
 }
 
 // This test verifies Verifier::Callback is called with OK status after verify().
@@ -410,7 +410,7 @@ TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
   EXPECT_EQ(filter_callbacks_.details(),
-            "jwt_authn_access_denied{Wrong requirement_name: abc. Correct names are: r1,r2}");
+            "jwt_authn_access_denied{Wrong_requirement_name:_abc._Correct_names_are:_r1,r2}");
 }
 
 // Test verifier from per-route config

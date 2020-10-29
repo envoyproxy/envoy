@@ -5,6 +5,7 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/str_split.h"
 #include "jwt_verify_lib/status.h"
 
 using ::google::jwt_verify::Status;
@@ -29,6 +30,14 @@ bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
 
 // The prefix used in the response code detail sent from jwt authn filter.
 constexpr absl::string_view kRcDetailJwtAuthnPrefix = "jwt_authn_access_denied";
+
+std::string generateRcDetails(absl::string_view error_msg) {
+  // Replace space with underscore since RCDetails may be written to access log.
+  // Some log processors assume each log segment is separated by whitespace.
+  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{",
+                      absl::StrJoin(absl::StrSplit(error_msg, " "), "_"), "}");
+}
+
 } // namespace
 
 Filter::Filter(FilterConfigSharedPtr config)
@@ -70,9 +79,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       if (!error_msg.empty()) {
         stats_.denied_.inc();
         state_ = Responded;
-        decoder_callbacks_->sendLocalReply(
-            Http::Code::Forbidden, absl::StrCat("Failed JWT authentication: ", error_msg), nullptr,
-            absl::nullopt, absl::StrCat(kRcDetailJwtAuthnPrefix, "{", error_msg, "}"));
+        decoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
+                                           absl::StrCat("Failed JWT authentication: ", error_msg),
+                                           nullptr, absl::nullopt, generateRcDetails(error_msg));
         return Http::FilterHeadersStatus::StopIteration;
       }
     }
@@ -117,8 +126,7 @@ void Filter::onComplete(const Status& status) {
     // return failure reason as message body
     decoder_callbacks_->sendLocalReply(
         code, ::google::jwt_verify::getStatusString(status), nullptr, absl::nullopt,
-        absl::StrCat(kRcDetailJwtAuthnPrefix, "{", ::google::jwt_verify::getStatusString(status),
-                     "}"));
+        generateRcDetails(::google::jwt_verify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();
