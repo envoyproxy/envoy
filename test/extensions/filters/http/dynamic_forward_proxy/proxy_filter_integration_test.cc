@@ -278,8 +278,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
-      {":authority", fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()),
-                                 fake_upstreams_[0]->localAddress()->ip()->port())}};
+      {":authority", fake_upstreams_[0]->localAddress()->asString()}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();

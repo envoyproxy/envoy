@@ -1063,10 +1063,15 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
 
 TEST(Url, ParsingFails) {
   Utility::Url url;
-  EXPECT_FALSE(url.initialize(""));
-  EXPECT_FALSE(url.initialize("foo"));
-  EXPECT_FALSE(url.initialize("http://"));
-  EXPECT_FALSE(url.initialize("random_scheme://host.com/path"));
+  EXPECT_FALSE(url.initialize("", false));
+  EXPECT_FALSE(url.initialize("foo", false));
+  EXPECT_FALSE(url.initialize("http://", false));
+  EXPECT_FALSE(url.initialize("random_scheme://host.com/path", false));
+  EXPECT_FALSE(url.initialize("http://www.foo.com", true));
+  EXPECT_FALSE(url.initialize("foo.com", true));
+  EXPECT_FALSE(url.initialize("http://[notaddress]:80/?query=param", false));
+  EXPECT_FALSE(url.initialize("http://[1::z::2]:80/?query=param", false));
+  EXPECT_FALSE(url.initialize("http://1.2.3.4:65536/?query=param", false));
 }
 
 void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
@@ -1076,6 +1081,19 @@ void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.host_and_port(), expected_host_port);
   EXPECT_EQ(url.path_and_query_params(), expected_path);
+}
+
+void validateConnectUrl(absl::string_view raw_url) {
+  Utility::Url url;
+  ASSERT_TRUE(url.initialize(raw_url, true)) << "Failed to initialize " << raw_url;
+  EXPECT_TRUE(url.scheme().empty());
+  EXPECT_TRUE(url.pathAndQueryParams().empty());
+  EXPECT_EQ(url.hostAndPort(), raw_url);
+}
+
+void invalidConnectUrl(absl::string_view raw_url) {
+  Utility::Url url;
+  ASSERT_FALSE(url.initialize(raw_url, true)) << "Unexpectedly initialized " << raw_url;
 }
 
 TEST(Url, ParsingTest) {
@@ -1110,6 +1128,14 @@ TEST(Url, ParsingTest) {
   ValidateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
   ValidateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
 
+  // Test with an ipv4 host address.
+  validateUrl("http://1.2.3.4/?query=param", "http", "1.2.3.4", "/?query=param");
+  validateUrl("http://1.2.3.4:80/?query=param", "http", "1.2.3.4:80", "/?query=param");
+
+  // Test with an ipv6 address
+  validateUrl("http://[1::2:3]/?query=param", "http", "[1::2:3]", "/?query=param");
+  validateUrl("http://[1::2:3]:80/?query=param", "http", "[1::2:3]:80", "/?query=param");
+
   // Test url with query parameter but without slash
   ValidateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
   ValidateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
@@ -1129,6 +1155,19 @@ TEST(Url, ParsingTest) {
               "www.host.com:80", "/path?query=param&query2=param2#fragment");
   ValidateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
               "/path?query=param&query2=param2#fragment");
+}
+
+TEST(Url, ParsingForConnectTest) {
+  validateConnectUrl("host.com:443");
+  validateConnectUrl("host.com:80");
+  validateConnectUrl("1.2.3.4:80");
+  validateConnectUrl("[1:2::3:4]:80");
+
+  invalidConnectUrl("[::12345678]:80");
+  invalidConnectUrl("[1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1]:80");
+  invalidConnectUrl("[1:1]:80");
+  invalidConnectUrl("[:::]:80");
+  invalidConnectUrl("[::1::]:80");
 }
 
 void validatePercentEncodingEncodeDecode(absl::string_view source,
