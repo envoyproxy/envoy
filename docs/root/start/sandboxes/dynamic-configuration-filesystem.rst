@@ -110,7 +110,7 @@ Checking the web response again, the request should now be handled by ``service2
    $ curl http://localhost:10000 | grep "served by"
    Request served by service2
 
-Dumping the ``dynamic_active_clusters``, the cluster ``example_proxy_cluster`` should now be
+Dumping the ``dynamic_active_clusters``, the ``example_proxy_cluster`` should now be
 configured to proxy to ``service2``:
 
 .. code-block:: console
