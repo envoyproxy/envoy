@@ -63,10 +63,10 @@ private:
   // in
   absl::node_hash_map<uint8_t, uint8_t> locality_indexes_;
 
-  static HostVector initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info_);
+  static HostVector initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info);
 
-  // Will statically initialize 10000? hosts in this vector
-  // Will have to clear flags at the end of each iteration here
+  // Will statically initialize 60000 hosts in this vector. Will have to clear these static
+  // hosts flags at the end of each fuzz iteration
   HostVector initialized_hosts_;
 };
 

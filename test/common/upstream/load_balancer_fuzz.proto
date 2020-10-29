@@ -15,10 +15,10 @@ message UpdateHealthFlags {
   uint32 num_degraded_hosts = 3;
   uint32 num_excluded_hosts = 4;
   // This is used to determine which hosts get marked as healthy, degraded, and excluded.
-  //bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 4, max_len: 40000}];
-  // TODO: What should this be capped at?
+  // TODO: What should this be capped at? There might be some efficiency/code coverage tradeoff
+  // dependent on the amount of digits this random_bytestring is allowed to scale too.
   repeated uint32 random_bytestring = 5
-      [(validate.rules).repeated = {min_items: 1, max_items: 10000}];
+      [(validate.rules).repeated = {min_items: 1, max_items: 60000}];
 }
 
 message LbAction {
@@ -42,7 +42,7 @@ message SetupPriorityLevel {
   uint32 num_hosts_locality_c = 4 [(validate.rules).uint32.lte = 60000];
   // For choosing which hosts go in which locality
   repeated uint32 random_bytestring = 5
-      [(validate.rules).repeated = {min_items: 1, max_items: 10000}];
+      [(validate.rules).repeated = {min_items: 1, max_items: 60000}];
 }
 
 // This message represents what LoadBalancerFuzzBase will interact with, performing setup of host sets and calling into load balancers.

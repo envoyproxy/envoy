@@ -12,20 +12,18 @@ constexpr uint32_t MaxNumHostsPerPriorityLevel = 60000;
 // Helper function for converting repeated proto fields to byte vectors to pass into random subset
 std::vector<uint32_t>
 constructByteVectorForRandom(const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring) {
-  std::vector<uint32_t> random_bytestring_vector;
-  for (int i = 0; i < random_bytestring.size(); ++i) {
-    random_bytestring_vector.push_back(random_bytestring.at(i));
-  }
+  std::vector<uint32_t> random_bytestring_vector(random_bytestring.begin(),
+                                                 random_bytestring.end());
   return random_bytestring_vector;
 }
 
 } // namespace
 
 HostVector
-LoadBalancerFuzzBase::initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info_) {
+LoadBalancerFuzzBase::initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info) {
   HostVector hosts;
   for (uint32_t i = 1; i <= 60000; ++i) {
-    hosts.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(i)));
+    hosts.push_back(makeTestHost(info, "tcp://127.0.0.1:" + std::to_string(i)));
   }
   return hosts;
 }
@@ -38,7 +36,8 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
                  priority_level, num_hosts_in_priority_level);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
   uint32_t hosts_made = 0;
-  // Cap each host set at 256 hosts for efficiency - Leave port clause in for future changes
+  // Cap each host set at 60000 hosts - however, let port number enforce a max of 60k hosts across
+  // all priority levels.
   while (hosts_made < std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel) &&
          port < 60000) {
     host_set.hosts_.push_back(initialized_hosts_[port]);
