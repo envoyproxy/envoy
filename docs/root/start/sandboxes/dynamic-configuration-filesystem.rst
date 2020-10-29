@@ -31,7 +31,7 @@ Step 3: Start the proxy container
 
 Build and start the containers.
 
-This should also start two backend ``HTTP`` echo servers, ``service1`` and ``service2``.
+This should also start two upstream ``HTTP`` echo servers, ``service1`` and ``service2``.
 
 .. code-block:: console
 
@@ -66,7 +66,7 @@ You should be able to make a request to port ``10000``, which will be served by 
    X-Request-Id: 6672902d-56ca-456c-be6a-992a603cab9a
    X-Envoy-Expected-Rq-Timeout-Ms: 15000
 
-Step 4: Dump Envoy's ``dynamic_active_clusters`` config
+Step 5: Dump Envoy's ``dynamic_active_clusters`` config
 *******************************************************
 
 If you now dump the proxy’s ``dynamic_active_clusters`` configuration, you should see it is configured with
@@ -78,17 +78,17 @@ the ``example_proxy_cluster`` pointing to ``service1``.
 
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters.json
    :language: json
-   :emphasize-lines: 11, 19
+   :emphasize-lines: 11, 19-20
 
 Step 5: Edit ``cds.yaml`` file to update upstream cluster
 *********************************************************
 
 The example setup provides two dynamic configuration files:
 
-- :download:`configs/cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a "Clusters
-  Discovery Service (CDS)"
-- :download:`configs/lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` to provide a "Listeners
-  Discovery Service" (LDS).
+- :download:`configs/cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a :ref:`Cluster
+  Discovery Service (CDS) <config_cluster_manager_cds>`.
+- :download:`configs/lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` to provide a :ref:`Listener
+  Discovery Service (CDS) <config_listeners_lds>`.
 
 Edit ``configs/cds.yaml`` in the dynamic configuration example folder and change the cluster address
 from ``service1`` to ``service2``:
@@ -117,6 +117,6 @@ configured to proxy to ``service2``:
 
    $ curl -s http://localhost:19000/config_dump jq -r '.configs[1].dynamic_active_clusters'
 
-.. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters.json
+.. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters-updated.json
    :language: json
-   :emphasize-lines: 11, 19
+   :emphasize-lines: 11, 19-20
