@@ -67,7 +67,7 @@ Step 5: Edit ``cds.yaml`` file to update upstream cluster
 
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
-   :emphasize-lines: 1, 15
+   :emphasize-lines: 1, 16
 
 Step 6: Check web response again
 ********************************
