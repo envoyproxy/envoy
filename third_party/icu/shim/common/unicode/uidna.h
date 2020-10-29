@@ -22,7 +22,7 @@ struct UIDNAInfo {
 
 // This is called by IDNToASCII
 // (https://quiche.googlesource.com/googleurl/+/ef0d23689e240e6c8de4c3a5296b209128c87373/url/url_idna_icu.cc#85)
-// which responsible for converting the Unicode input representing a hostname to ASCII using IDN
+// which is responsible for converting the Unicode input representing a hostname to ASCII using IDN
 // rules. In this shimmed implementation, we always set the error code to U_ILLEGAL_ARGUMENT_ERROR
 // and info errors to UIDNA_ERROR_DISALLOWED, hence the coversion always fails.
 int32_t uidna_nameToASCII(const UIDNA*, const UChar*, int32_t, UChar*, int32_t, UIDNAInfo* info,
