@@ -55,7 +55,6 @@ protected:
     client_.tsi_socket_ =
         std::make_unique<TsiSocket>(client_.handshaker_factory_, client_validator,
                                     Network::TransportSocketPtr{client_.raw_socket_});
-
     ON_CALL(client_.callbacks_.connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(server_.callbacks_.connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
 
@@ -194,6 +193,7 @@ static const std::string ClientToServerData = "hello from client";
 TEST_F(TsiSocketTest, DoesNotHaveSsl) {
   initialize(nullptr, nullptr);
   EXPECT_EQ(nullptr, client_.tsi_socket_->ssl());
+  EXPECT_FALSE(client_.tsi_socket_->canFlushClose());
 
   const auto& socket_ = *client_.tsi_socket_;
   EXPECT_EQ(nullptr, socket_.ssl());
@@ -408,6 +408,7 @@ TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {
 
 TEST_F(TsiSocketFactoryTest, UsesProxyProtocolOptions) {
   EXPECT_FALSE(socket_factory_->usesProxyProtocolOptions());
+  EXPECT_TRUE(socket_factory_->isReady());
 }
 
 } // namespace
