@@ -35,7 +35,7 @@ std::string generateRcDetails(absl::string_view error_msg) {
   // Replace space with underscore since RCDetails may be written to access log.
   // Some log processors assume each log segment is separated by whitespace.
   return absl::StrCat(kRcDetailJwtAuthnPrefix, "{",
-                      absl::StrJoin(absl::StrSplit(error_msg, " "), "_"), "}");
+                      absl::StrJoin(absl::StrSplit(error_msg, ' '), "_"), "}");
 }
 
 } // namespace
