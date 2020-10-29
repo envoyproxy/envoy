@@ -9,7 +9,7 @@ namespace Event {
 
 UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                                uint32_t events)
-    : schedulable_(dispatcher.createSchedulableCallback([this]() { onEvents(); })),
+    : schedulable_(dispatcher.createSchedulableCallback([this]() { cb_(); })),
       cb_([this, cb]() {
         auto all_events = getEventListener().triggeredEvents();
         auto ephemeral_events = getEventListener().getAndClearEphemeralEvents();
