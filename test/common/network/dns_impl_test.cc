@@ -440,17 +440,17 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
 
-    if (set_resolver_in_constructor()) {
+    if (setResolverInConstructor()) {
       resolver_ =
-          dispatcher_->createDnsResolver({socket_->localAddress()}, use_tcp_for_dns_lookups());
+          dispatcher_->createDnsResolver({socket_->localAddress()}, useTcpForDnsLookups());
     } else {
-      resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
+      resolver_ = dispatcher_->createDnsResolver({}, useTcpForDnsLookups());
     }
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
-    if (tcp_only()) {
-      peer_->resetChannelTcpOnly(zero_timeout());
+    if (tcpOnly()) {
+      peer_->resetChannelTcpOnly(zeroTimeout());
     }
     ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
   }
@@ -544,10 +544,10 @@ public:
 
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
-  virtual bool zero_timeout() const { return false; }
-  virtual bool tcp_only() const { return true; }
-  virtual bool use_tcp_for_dns_lookups() const { return false; }
-  virtual bool set_resolver_in_constructor() const { return false; }
+  virtual bool zeroTimeout() const { return false; }
+  virtual bool tcpOnly() const { return true; }
+  virtual bool useTcpForDnsLookups() const { return false; }
+  virtual bool setResolverInConstructor() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
   Network::MockConnectionHandler connection_handler_;
@@ -585,7 +585,7 @@ TEST_P(DnsImplTest, DestructCallback) {
 
   // This simulates destruction thanks to another query setting the dirty_channel_ bit, thus causing
   // a subsequent result to call ares_destroy.
-  peer_->resetChannelTcpOnly(zero_timeout());
+  peer_->resetChannelTcpOnly(zeroTimeout());
   ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -710,8 +710,8 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
   EXPECT_FALSE(peer_->isChannelDirty());
 
   // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
-  if (tcp_only()) {
-    peer_->resetChannelTcpOnly(zero_timeout());
+  if (tcpOnly()) {
+    peer_->resetChannelTcpOnly(zeroTimeout());
   }
   ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
 
@@ -884,7 +884,7 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
 
 class DnsImplZeroTimeoutTest : public DnsImplTest {
 protected:
-  bool zero_timeout() const override { return true; }
+  bool zeroTimeout() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
@@ -904,8 +904,8 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 
 class DnsImplAresFlagsForTcpTest : public DnsImplTest {
 protected:
-  bool tcp_only() const override { return false; }
-  bool use_tcp_for_dns_lookups() const override { return true; }
+  bool tcpOnly() const override { return false; }
+  bool useTcpForDnsLookups() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
@@ -929,7 +929,7 @@ TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
 
 class DnsImplAresFlagsForUdpTest : public DnsImplTest {
 protected:
-  bool tcp_only() const override { return false; }
+  bool tcpOnly() const override { return false; }
 };
 
 // Parameterize the DNS test server socket address.
@@ -952,9 +952,9 @@ TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
 }
 
 class DnsImplCustomResolverTest : public DnsImplTest {
-  bool tcp_only() const override { return false; }
-  bool use_tcp_for_dns_lookups() const override { return true; }
-  bool set_resolver_in_constructor() const override { return true; }
+  bool tcpOnly() const override { return false; }
+  bool useTcpForDnsLookups() const override { return true; }
+  bool setResolverInConstructor() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
