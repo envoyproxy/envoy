@@ -74,19 +74,21 @@ the ``example_proxy_cluster`` pointing to ``service1``.
 
 .. code-block:: console
 
-   $ curl -s http://localhost:19000/config_dump jq -r '.configs[1].dynamic_active_clusters'
+   $ curl -s http://localhost:19000/config_dump | jq -r '.configs[1].dynamic_active_clusters'
 
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters.json
    :language: json
-   :emphasize-lines: 11, 19-20
+   :emphasize-lines: 11, 19
 
 Step 5: Edit ``cds.yaml`` file to update upstream cluster
 *********************************************************
 
-The example setup provides two dynamic configuration files,
-:download:`cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a "Clusters
-Discovery Service (CDS)" and :download:`lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` which
-provides a "Listeners Discovery Service" (LDS).
+The example setup provides two dynamic configuration files:
+
+- :download:`configs/cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a "Clusters
+  Discovery Service (CDS)"
+- :download:`configs/lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` to provide a "Listeners
+  Discovery Service" (LDS).
 
 Edit ``configs/cds.yaml`` in the dynamic configuration example folder and change the cluster address
 from ``service1`` to ``service2``:
@@ -94,22 +96,22 @@ from ``service1`` to ``service2``:
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
    :linenos:
-   :lines: 9-16
+   :lines: 9-17
    :lineno-start: 9
    :emphasize-lines: 8
 
 Step 6: Check Envoy uses updated configuration
 **********************************************
 
-Checking the web response again, you should now see that the request is handled by ``service2``:
+Checking the web response again, the request should now be handled by ``service2``:
 
 .. code-block:: console
 
    $ curl http://localhost:10000 | grep "served by"
    Request served by service2
 
-Dumping the ``dynamic_active_clusters`` you should see in the cluster configuration that
-``example_proxy_cluster`` is now configured to proxy to ``service2``:
+Dumping the ``dynamic_active_clusters``, the cluster ``example_proxy_cluster`` should now be
+configured to proxy to ``service2``:
 
 .. code-block:: console
 
@@ -117,4 +119,4 @@ Dumping the ``dynamic_active_clusters`` you should see in the cluster configurat
 
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters.json
    :language: json
-   :emphasize-lines: 11, 19-20
+   :emphasize-lines: 11, 19
