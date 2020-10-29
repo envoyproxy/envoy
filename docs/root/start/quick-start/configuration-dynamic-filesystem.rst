@@ -16,8 +16,8 @@ At a minimum, you will need to start Envoy configured with the following section
 
 For the given example you will also need two dynamic configuration files:
 
-- :ref:`cds.yaml <start_quick_start_dynamic_fs_dynamic_cds>` for clusters.
 - :ref:`lds.yaml <start_quick_start_dynamic_fs_dynamic_lds>` for listeners.
+- :ref:`cds.yaml <start_quick_start_dynamic_fs_dynamic_cds>` for clusters.
 
 You can also add an :ref:`admin <start_quick_start_dynamic_fs_admin>` section if you wish to monitor Envoy or
 retrieve stats or configuration information.
