@@ -67,8 +67,7 @@ class ConnectionHandlerImpl : public Network::ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                        OverloadManager& overload_manager,
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, OverloadManager& overload_manager,
                         absl::optional<uint32_t> worker_index);
 
   // Network::ConnectionHandler

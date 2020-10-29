@@ -143,7 +143,7 @@ OverloadTimerType parseTimerType(
   case Config::HTTP_DOWNSTREAM_CONNECTION_IDLE:
     return OverloadTimerType::HttpDownstreamIdleConnectionTimeout;
   case Config::TRANSPORT_SOCKET_CONNECT:
-    return OverloadTimerType::HttpDownstreamIdleConnectionTimeout;
+    return OverloadTimerType::TransportSocketConnectTimeout;
   default:
     throw EnvoyException(fmt::format("Unknown timer type {}", config_timer_type));
   }

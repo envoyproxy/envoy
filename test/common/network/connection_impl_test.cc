@@ -4,6 +4,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"
@@ -17,7 +18,6 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
-#include "envoy/server/overload/thread_local_overload_state.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"

@@ -12,7 +12,7 @@ namespace Event {
  * Describes a minimum timer value that is equal to a scale factor applied to the maximum.
  */
 struct ScaledMinimum {
-  explicit ScaledMinimum(double scale_factor) : scale_factor_(scale_factor) {}
+  explicit constexpr ScaledMinimum(double scale_factor) : scale_factor_(scale_factor) {}
   const double scale_factor_;
 };
 
@@ -20,7 +20,7 @@ struct ScaledMinimum {
  * Describes a minimum timer value that is an absolute duration.
  */
 struct AbsoluteMinimum {
-  explicit AbsoluteMinimum(std::chrono::milliseconds value) : value_(value) {}
+  explicit constexpr AbsoluteMinimum(std::chrono::milliseconds value) : value_(value) {}
   const std::chrono::milliseconds value_;
 };
 
@@ -53,6 +53,11 @@ public:
     return absl::visit<Visitor, const absl::variant<ScaledMinimum, AbsoluteMinimum>&>(
         Visitor(maximum), *this);
   }
+
+  // Test-only functions that need access to the internals of
+  // ScaledTimerMinimum. These are declared here but only defined in tests.
+  friend bool operator==(const ScaledTimerMinimum&, const ScaledTimerMinimum&);
+  friend void PrintTo(const ScaledTimerMinimum&, std::ostream*);
 };
 
 /**

@@ -1,7 +1,11 @@
 #include <chrono>
+#include <initializer_list>
+#include <type_traits>
 
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/server/overload/overload_manager.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
@@ -26,13 +30,55 @@ using testing::AllOf;
 using testing::AnyNumber;
 using testing::ByMove;
 using testing::DoubleNear;
+using testing::Eq;
 using testing::Invoke;
+using testing::Mock;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
 
 namespace Envoy {
+namespace Event {
+
+// Define helper functions for comparing and printing ScaledTimerMinimum and
+// friends.
+
+bool operator==(const ScaledMinimum& lhs, const ScaledMinimum& rhs) {
+  return lhs.scale_factor_ == rhs.scale_factor_;
+}
+
+bool operator==(const AbsoluteMinimum& lhs, const AbsoluteMinimum& rhs) {
+  return lhs.value_ == rhs.value_;
+}
+
+bool operator==(const ScaledTimerMinimum& lhs, const ScaledTimerMinimum& rhs) {
+  using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
+  return absl::visit(
+      [&](const auto& minimum) {
+        using T = std::remove_const_t<std::remove_reference_t<decltype(minimum)>>;
+        return absl::holds_alternative<T>(rhs) &&
+               absl::get<T>(static_cast<const Variant&>(lhs)) ==
+                   absl::get<T>(static_cast<const Variant&>(rhs));
+      },
+      static_cast<const Variant&>(lhs));
+}
+
+void PrintTo(const ScaledMinimum& minimum, std::ostream* output) {
+  (*output) << "ScaledMinimum { scale_factor_ = " << minimum.scale_factor_ << " }";
+}
+void PrintTo(const AbsoluteMinimum& minimum, std::ostream* output) {
+  (*output) << "AbsoluteMinimum { value = " << minimum.value_.count() << "ms }";
+}
+
+void PrintTo(const ScaledTimerMinimum& minimum, std::ostream* output) {
+  using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
+  absl::visit([&](const auto& minimum) { PrintTo(minimum, output); },
+              static_cast<const Variant&>(minimum));
+}
+
+} // namespace Event
+
 namespace Server {
 namespace {
 
@@ -478,17 +524,27 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
     - name: envoy.resource_monitors.fake_resource1
   actions:
     - name: envoy.overload_actions.reduce_timeouts
-      typed_config:
-        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
-        timer_scale_factors:
-          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
-            min_timeout: 2s
       triggers:
         - name: "envoy.resource_monitors.fake_resource1"
           scaled:
             scaling_threshold: 0.5
             saturation_threshold: 1.0
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 2s
+          - timer: TRANSPORT_SOCKET_CONNECT
+            min_scale: { value: 10 } # percent
   )YAML";
+
+// These are the timer types according to the reduced timeouts config above.
+constexpr std::pair<OverloadTimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
+    {OverloadTimerType::UnscaledRealTimerForTest, Event::ScaledMinimum(1.0)},
+    {OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
+     Event::AbsoluteMinimum(std::chrono::seconds(2))},
+    {OverloadTimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(0.1)},
+};
 
 TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
   setDispatcherExpectation();
@@ -519,13 +575,8 @@ TEST_F(OverloadManagerImplTest, CreateUnscaledScaledTimer) {
 
   auto* mock_scaled_timer = new Event::MockTimer();
   MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(*scaled_timer_manager, createTimer_)
-      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
-        // Since this timer was created with the timer type "unscaled", it should use the same value
-        // for the min and max. Test that by checking an arbitrary value.
-        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(55));
-        return mock_scaled_timer;
-      });
+  EXPECT_CALL(*scaled_timer_manager, createTimer_(Eq(Event::ScaledMinimum(1.0)), _))
+      .WillOnce(Return(mock_scaled_timer));
 
   auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
       OverloadTimerType::UnscaledRealTimerForTest, mock_callback.AsStdFunction());
@@ -545,17 +596,30 @@ TEST_F(OverloadManagerImplTest, CreateScaledTimerWithAbsoluteMinimum) {
 
   auto* mock_scaled_timer = new Event::MockTimer();
   MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(*scaled_timer_manager, createTimer_)
-      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
-        // This timer was created with an absolute minimum. Test that by checking an arbitrary
-        // value.
-        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(2));
-        return mock_scaled_timer;
-      });
+  EXPECT_CALL(*scaled_timer_manager,
+              createTimer_(Eq(Event::AbsoluteMinimum(std::chrono::seconds(2))), _))
+      .WillOnce(Return(mock_scaled_timer));
 
   auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
       OverloadTimerType::HttpDownstreamIdleConnectionTimeout, mock_callback.AsStdFunction());
   EXPECT_EQ(timer.get(), mock_scaled_timer);
+}
+
+TEST_F(OverloadManagerImplTest, TimerTypesProduceCorrectMinimums) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+  manager->start();
+
+  for (const auto& [timer_type, expected_minimum] : kReducedTimeoutsMinimums) {
+    SCOPED_TRACE(static_cast<int>(timer_type));
+    EXPECT_CALL(*scaled_timer_manager, createTimer_(Eq(expected_minimum), _));
+    manager->getThreadLocalOverloadState().createScaledTimer(timer_type, []() {});
+    Mock::VerifyAndClearExpectations(scaled_timer_manager);
+  }
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
