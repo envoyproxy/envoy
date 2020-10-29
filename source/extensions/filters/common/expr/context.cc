@@ -194,6 +194,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
     if (info_.connectionTerminationDetails().has_value()) {
       return CelValue::CreateString(&info_.connectionTerminationDetails().value());
     }
+    return {};
   }
 
   auto ssl_info = info_.downstreamSslConnection();
