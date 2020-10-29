@@ -29,7 +29,7 @@ Step 3: Start the proxy container
       $ chmod go+r configs/*
       $ chmod go+x configs
 
-First build the containers and start the ``proxy`` container.
+Build and start the containers
 
 This should also start two backend ``HTTP`` echo servers, ``service1`` and ``service2``.
 
@@ -38,7 +38,7 @@ This should also start two backend ``HTTP`` echo servers, ``service1`` and ``ser
     $ pwd
     envoy/examples/dynamic-config-fs
     $ docker-compose build --pull
-    $ docker-compose up -d proxy
+    $ docker-compose up -d
     $ docker-compose ps
 
            Name                            Command                State                     Ports
@@ -47,12 +47,30 @@ This should also start two backend ``HTTP`` echo servers, ``service1`` and ``ser
     dynamic-config-fs_service1_1   /bin/echo-server               Up      8080/tcp
     dynamic-config-fs_service2_1   /bin/echo-server               Up      8080/tcp
 
-Step 4: Check initial config and web response
-*********************************************
+Step 4: Check web response
+**************************
+
+You should be able to make a request to port ``10000``, which will be served by ``service1``.
 
 .. code-block:: console
 
    $ curl -s http://localhost:10000
+   Request served by service1
+
+   HTTP/2.0 GET /
+
+   Host: localhost:10000
+   User-Agent: curl/7.72.0
+   Accept: */*
+   X-Forwarded-Proto: http
+   X-Request-Id: 6672902d-56ca-456c-be6a-992a603cab9a
+   X-Envoy-Expected-Rq-Timeout-Ms: 15000
+
+Step 4: Dump Envoy's ``dynamic_active_clusters`` config
+*******************************************************
+
+If you now dump the proxy’s ``dynamic_active_clusters`` configuration, you should see it is configured with
+the ``example_proxy_cluster`` pointing to ``service1``.
 
 .. code-block:: console
 
@@ -60,30 +78,38 @@ Step 4: Check initial config and web response
 
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters.json
    :language: json
-   :emphasize-lines: 3, 11, 19-20
+   :emphasize-lines: 11, 19-20
 
 Step 5: Edit ``cds.yaml`` file to update upstream cluster
 *********************************************************
 
-:download:`cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>`
+The example setup provides two dynamic configuration files,
+:download:`cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a "Clusters
+Discovery Service (CDS)" and :download:`lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` which
+provides a "Listeners Discovery Service" (LDS).
+
+Edit ``configs/cds.yaml`` in the dynamic configuration example folder and change the cluster address
+from ``service1`` to ``service2``:
 
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
    :linenos:
    :lines: 9-16
-   :emphasize-lines: 5
+   :lineno-start: 9
+   :emphasize-lines: 8
 
-Step 6: Check web response again
-********************************
+Step 6: Check Envoy uses updated configuration
+**********************************************
+
+Checking the web response again, you should now see that the request is handled by ``service2``:
 
 .. code-block:: console
 
    $ curl http://localhost:10000 | grep "served by"
    Request served by service2
 
-
-Step 7: Check configs again
-***************************
+Dumping the ``dynamic_active_clusters`` you should see in the cluster configuration that
+``example_proxy_cluster`` is now configured to proxy to ``service2``:
 
 .. code-block:: console
 
@@ -91,4 +117,4 @@ Step 7: Check configs again
 
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters.json
    :language: json
-   :emphasize-lines: 3, 11, 19-20
+   :emphasize-lines: 11, 19-20
