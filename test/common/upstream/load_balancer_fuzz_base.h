@@ -22,18 +22,18 @@ public:
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
-  void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
-  void updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
-                                    const uint32_t num_degraded_hosts,
-                                    const uint32_t num_excluded_hosts,
-                                    const std::string random_bytestring);
+  virtual void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
+  virtual void updateHealthFlagsForAHostSet(const uint64_t host_priority,
+                                            const uint32_t num_healthy_hosts,
+                                            const uint32_t num_degraded_hosts,
+                                            const uint32_t num_excluded_hosts,
+                                            const std::string random_bytestring);
   // These two actions have a lot of logic attached to them. However, all the logic that the load
   // balancer needs to run its algorithm is already encapsulated within the load balancer. Thus,
   // once the load balancer is constructed, all this class has to do is call lb_->peekAnotherHost()
   // and lb_->chooseHost().
   void prefetch();
   void chooseHost();
-  ~LoadBalancerFuzzBase() = default;
   void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
 
   // These public objects shared amongst all types of load balancers will be used to construct load
@@ -45,6 +45,8 @@ public:
   NiceMock<MockPrioritySet> priority_set_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::unique_ptr<LoadBalancer> lb_;
+
+  virtual ~LoadBalancerFuzzBase() = default;
 
 protected:
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant

@@ -14,9 +14,10 @@ void ZoneAwareLoadBalancerFuzzBase::initializeASingleHostSet(
   if (priority_level == 0 && local_priority_set_) {
     // TODO(zasweq): Perhaps fuzz the local priority set as a distinct host set? rather than
     // making it P = 0 of main Priority Set
-    MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
-    local_priority_set_->getMockHostSet(0)->hosts_ = host_set.hosts_;
-    local_priority_set_->getMockHostSet(0)->hosts_per_locality_ = host_set.hosts_per_locality_;
+    const MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
+    const HostVector empty_host_vector;
+    local_priority_set_->updateHosts(0, HostSetImpl::updateHostsParams(host_set), {},
+                                     empty_host_vector, empty_host_vector, absl::nullopt);
   }
 }
 
@@ -30,16 +31,10 @@ void ZoneAwareLoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
   // to construct local priority set
   const uint8_t priority_of_host_set = host_priority % num_priority_levels_;
   if (priority_of_host_set == 0 && local_priority_set_.get() != nullptr) {
-    MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
-    HostVector empty_host_vector;
-    local_priority_set_->updateHosts(
-        0,
-        HostSetImpl::updateHostsParams(
-            host_set.hostsPtr(), host_set.hostsPerLocalityPtr(), host_set.healthyHostsPtr(),
-            host_set.hostsPerLocalityPtr(), host_set.degradedHostsPtr(),
-            host_set.degradedHostsPerLocalityPtr(), host_set.excludedHostsPtr(),
-            host_set.excludedHostsPerLocalityPtr()),
-        {}, empty_host_vector, empty_host_vector, absl::nullopt);
+    const MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
+    const HostVector empty_host_vector;
+    local_priority_set_->updateHosts(0, HostSetImpl::updateHostsParams(host_set), {},
+                                     empty_host_vector, empty_host_vector, absl::nullopt);
   }
 }
 
