@@ -65,9 +65,13 @@ Step 4: Check initial config and web response
 Step 5: Edit ``cds.yaml`` file to update upstream cluster
 *********************************************************
 
+:download:`cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>`
+
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
-   :emphasize-lines: 1, 16
+   :linenos:
+   :lines: 9-16
+   :emphasize-lines: 5
 
 Step 6: Check web response again
 ********************************
