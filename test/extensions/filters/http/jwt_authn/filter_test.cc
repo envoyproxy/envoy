@@ -421,7 +421,7 @@ TEST_F(FilterTest, TestPerRouteVerifierOK) {
 
   // findVerifier is not called.
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).Times(0);
-  // If findPerRouteVerifier is called
+  // If findPerRouteVerifier is called, and return the mock_verifier_.
   EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_))
       .WillOnce(Return(std::make_pair(mock_verifier_.get(), EMPTY_STRING)));
 
