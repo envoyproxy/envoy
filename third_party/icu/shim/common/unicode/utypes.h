@@ -24,7 +24,7 @@ enum UErrorCode {
 // This is called inside IDNToASCII
 // https://quiche.googlesource.com/googleurl/+/ef0d23689e240e6c8de4c3a5296b209128c87373/url/url_idna_icu.cc#95,
 // this should always return false.
-static inline UBool U_SUCCESS(UErrorCode code) { return false; }
+static inline UBool U_SUCCESS(UErrorCode) { return false; }
 
 // This is called by UIDNAWrapper constructor
 // https://quiche.googlesource.com/googleurl/+/ef0d23689e240e6c8de4c3a5296b209128c87373/url/url_idna_icu.cc#51.
