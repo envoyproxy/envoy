@@ -89,7 +89,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
 
   // Some tests try to read without initializing the file_event.
   if (result.wouldBlock() && file_event_) {
-    file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
+    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
   }
   return result;
 }
@@ -112,7 +112,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint6
 
   // Some tests try to read without initializing the file_event.
   if (result.wouldBlock() && file_event_) {
-    file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
+    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
   }
   return result;
 }
@@ -136,7 +136,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
 
   // Some tests try to read without initializing the file_event.
   if (result.wouldBlock() && file_event_) {
-    file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Write);
+    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
   }
   return result;
 }
@@ -151,7 +151,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
 
   // Some tests try to read without initializing the file_event.
   if (result.wouldBlock() && file_event_) {
-    file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Write);
+    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
   }
   return result;
 }
@@ -233,7 +233,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
   auto io_result = sysCallResultToIoCallResult(result);
   if (io_result.wouldBlock() && file_event_) {
-    file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Write);
+    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
   }
   return io_result;
 }
@@ -324,7 +324,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   if (result.rc_ < 0) {
     auto io_result = sysCallResultToIoCallResult(result);
     if (io_result.wouldBlock() && file_event_) {
-      file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
     }
     return io_result;
   }
@@ -411,7 +411,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   if (result.rc_ <= 0) {
     auto io_result = sysCallResultToIoCallResult(result);
     if (io_result.wouldBlock() && file_event_) {
-      file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
     }
     return io_result;
   }
@@ -469,7 +469,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, in
       Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
   auto io_result = sysCallResultToIoCallResult(result);
   if (io_result.wouldBlock() && file_event_) {
-    file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
+    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
   }
   return io_result;
 }

@@ -41,8 +41,8 @@ public:
 class FastMockFileEvent : public Event::FileEvent {
   void activate(uint32_t) override {}
   void setEnabled(uint32_t) override {}
-  void unregisterReadOrWriteIfLevel(uint32_t) override {}
-  void registerReadOrWriteIfLevel(uint32_t) override {}
+  void unregisterEventIfEmulatedEdge(uint32_t) override {}
+  void registerEventIfEmulatedEdge(uint32_t) override {}
 };
 
 class FastMockDispatcher : public Event::MockDispatcher {

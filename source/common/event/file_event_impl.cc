@@ -28,7 +28,8 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
   // an OOM condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(fd), "");
 #ifdef WIN32
-  RELEASE_ASSERT(isLevelLike(trigger_), "libevent does not support edge triggers on Windows");
+  RELEASE_ASSERT(isEventTypeLevelLike(trigger_),
+                 "libevent does not support edge triggers on Windows");
 #endif
   assignEvents(events, &dispatcher.base());
   event_add(&raw_event_, nullptr);
@@ -127,7 +128,7 @@ void FileEventImpl::setEnabled(uint32_t events) {
   updateEvents(events);
 }
 
-void FileEventImpl::unregisterReadOrWriteIfLevel(uint32_t event) {
+void FileEventImpl::unregisterEventIfEmulatedEdge(uint32_t event) {
   ASSERT(event == FileReadyType::Write || event == FileReadyType::Read,
          fmt::format("not allowed to unregister {}", event));
   if (trigger_ == FileTriggerType::EmulatedEdge) {
@@ -143,7 +144,7 @@ void FileEventImpl::unregisterReadOrWriteIfLevel(uint32_t event) {
   }
 }
 
-void FileEventImpl::registerReadOrWriteIfLevel(uint32_t event) {
+void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
   ASSERT(event == Event::FileReadyType::Write || event == Event::FileReadyType::Read);
   if (trigger_ == FileTriggerType::EmulatedEdge) {
     auto new_event_mask = enabled_events_ | event;
@@ -168,7 +169,7 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
   std::array<uint32_t, 2> event_types{Event::FileReadyType::Write, Event::FileReadyType::Read};
   for (const auto& event_type : event_types) {
     if ((event_type & events) && trigger_ == FileTriggerType::EmulatedEdge) {
-      unregisterReadOrWriteIfLevel(event_type);
+      unregisterEventIfEmulatedEdge(event_type);
     }
   }
 

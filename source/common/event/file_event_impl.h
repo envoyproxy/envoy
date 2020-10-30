@@ -22,8 +22,8 @@ public:
   // Event::FileEvent
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
-  void unregisterReadOrWriteIfLevel(uint32_t event) override;
-  void registerReadOrWriteIfLevel(uint32_t event) override;
+  void unregisterEventIfEmulatedEdge(uint32_t event) override;
+  void registerEventIfEmulatedEdge(uint32_t event) override;
 
 private:
   void assignEvents(uint32_t events, event_base* base);

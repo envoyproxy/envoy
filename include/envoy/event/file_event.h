@@ -23,7 +23,7 @@ enum class FileTriggerType { Level, Edge, EmulatedEdge };
 
 static constexpr bool optimizeLevelEvents = true;
 
-constexpr FileTriggerType isPlatformUsingLevelEvents() {
+constexpr FileTriggerType determinePlatformPreferredEventType() {
 #if defined(WIN32) || defined(FORCE_LEVEL_EVENTS)
   if constexpr (optimizeLevelEvents) {
     return FileTriggerType::EmulatedEdge;
@@ -35,9 +35,9 @@ constexpr FileTriggerType isPlatformUsingLevelEvents() {
 #endif
 }
 
-static constexpr FileTriggerType PlatformDefaultTriggerType = isPlatformUsingLevelEvents();
+static constexpr FileTriggerType PlatformDefaultTriggerType = determinePlatformPreferredEventType();
 
-static constexpr bool isLevelLike(FileTriggerType event) {
+static constexpr bool isEventTypeLevelLike(FileTriggerType event) {
   return (event == FileTriggerType::EmulatedEdge) || (event == FileTriggerType::Level);
 }
 
@@ -70,12 +70,12 @@ public:
   /**
    * Add a single event from the event registration mark.
    */
-  virtual void registerReadOrWriteIfLevel(uint32_t event) PURE;
+  virtual void registerEventIfEmulatedEdge(uint32_t event) PURE;
 
   /**
    * Remove a single event from the event registration mark.
    */
-  virtual void unregisterReadOrWriteIfLevel(uint32_t event) PURE;
+  virtual void unregisterEventIfEmulatedEdge(uint32_t event) PURE;
 };
 
 using FileEventPtr = std::unique_ptr<FileEvent>;
