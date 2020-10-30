@@ -194,7 +194,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 }
 
 // Send header only request, flood client, and verify that the upstream is disconnected and client
-// receieves 503.
+// receives 503.
 void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num_frames,
                                            const std::string& flood_stat) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
