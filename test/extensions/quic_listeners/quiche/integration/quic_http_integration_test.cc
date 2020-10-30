@@ -525,5 +525,10 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
+TEST_P(QuicHttpIntegrationTest, RequestResponseWithTrailers) {
+  testTrailers(/*request_size=*/10, /*response_size=*/10, /*request_trailers_present=*/true,
+               /*response_trailers_present=*/true);
+}
+
 } // namespace Quic
 } // namespace Envoy
