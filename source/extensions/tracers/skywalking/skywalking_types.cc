@@ -32,7 +32,8 @@ std::string base64Encode(const absl::string_view input) {
 
 // Decode and validate fields of propagation header.
 std::string base64Decode(absl::string_view input) {
-  std::string result = input.length() % 4 ? EMPTY_STRING : Base64::decodeWithoutPadding(input);
+  // The input can be Base64 string with or without padding.
+  std::string result = Base64::decodeWithoutPadding(input);
   if (result.empty()) {
     throw EnvoyException("Invalid propagation header for SkyWalking: parse error");
   }
