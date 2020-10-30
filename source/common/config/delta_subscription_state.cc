@@ -17,7 +17,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                Event::Dispatcher& dispatcher)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
     // empty resources as updates.
-    : supports_heartbeats_(!absl::StrContains(type_url, "VirtualHost")),
+    : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
       ttl_(
           [this](const auto& expired) {
             Protobuf::RepeatedPtrField<std::string> removed_resources;

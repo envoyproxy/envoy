@@ -678,9 +678,9 @@ To update the TTL associated with a *Resource*, the management server resends th
 new TTL. To remove the TTL, the management server resends the resource with the TTL field unset.
 
 To allow for lightweight TTL updates ("heartbeats"), a response can be sent that provides a
-:ref:`Resource <envoy_api_msg_Resource>` with the resource unset and version matching the
-clients version can be used to update the TTL. These resources will not be treated as resource
-updates, but only as TTL updates.
+:ref:`Resource <envoy_api_msg_Resource>` with the :ref:`resource <envoy_api_field_Resource.resource>`
+unset and version matching the most recently sent version can be used to update the TTL. These
+resources will not be treated as resource updates, but only as TTL updates.
 
 SotW TTL
 ^^^^^^^^

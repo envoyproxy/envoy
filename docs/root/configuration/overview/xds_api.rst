@@ -360,7 +360,7 @@ safely, xDS TTLs can be used to make sure that if the control plane becomes unav
 the xDS change, Envoy will remove the resource after a TTL specified by the server. See the
 :ref:`protocol documentation <xds_protocol_ttl>` for more information.
 
-Currently the behavior when a TTL expires is that the resource is *expired* (as opposed to reverted to the
+Currently the behavior when a TTL expires is that the resource is *removed* (as opposed to reverted to the
 previous version). As such, this feature should primarily be used for use cases where the absence of the resource
 is preferred instead of the temporary version, e.g. when using RTDS to apply a temporary runtime override.
 
@@ -368,5 +368,5 @@ The TTL is specified on the :ref:`Resource <envoy_api_msg_Resource>` proto: for 
 within the response, while for SotW xDS the server may wrap individual resources listed in the response within a
 :ref:`Resource <envoy_api_msg_Resource>` in order to specify a TTL value.
 
-The server can refresh or modify the TTL by issuing another response for the same version. Note that the entire resource
-must be sent along with the TTL update.
+The server can refresh or modify the TTL by issuing another response for the same version. In this case the resource
+itself does not have to be included.
