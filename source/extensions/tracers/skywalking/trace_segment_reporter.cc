@@ -1,5 +1,7 @@
 #include "extensions/tracers/skywalking/trace_segment_reporter.h"
 
+#include "envoy/http/header_map.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -7,9 +9,8 @@ namespace SkyWalking {
 
 namespace {
 
-const Http::LowerCaseString& authenticationTokenKey() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "Authentication");
-}
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    authentication_handle(Http::CustomHeaders::get().Authentication);
 
 // Convert SegmentContext to SegmentObject.
 TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
@@ -98,7 +99,7 @@ TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory
 
 void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   if (!client_config_.backendToken().empty()) {
-    metadata.setReferenceKey(authenticationTokenKey(), client_config_.backendToken());
+    metadata.setInline(authentication_handle.handle(), client_config_.backendToken());
   }
 }
 
