@@ -362,8 +362,7 @@ message HttpConnectionManager {
 
   // The amount of time that Envoy will wait for the request headers to be received. The timer is
   // activated when the first byte of the headers is received, and is disarmed when the last byte of
-  // the headers has been received (i.e. all decoding filters have processed the headers). If not
-  // specified or set to 0, this timeout is disabled.
+  // the headers has been received. If not specified or set to 0, this timeout is disabled.
   google.protobuf.Duration request_headers_timeout = 41 [
     (validate.rules).duration = {gte {}},
     (udpa.annotations.security).configure_for_untrusted_downstream = true

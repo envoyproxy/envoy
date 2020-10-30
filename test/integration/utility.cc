@@ -120,7 +120,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
                                          Network::Address::IpVersion version,
                                          Event::Dispatcher& dispatcher,
                                          Network::TransportSocketPtr transport_socket)
-    : dispatcher_(dispatcher) {
+    : dispatcher_(dispatcher), remaining_bytes_to_send_(initial_data.length()) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
   callbacks_ = std::make_unique<ConnectionCallbacks>();
@@ -135,6 +135,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
       Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
   client_->addConnectionCallbacks(*callbacks_);
   client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
+  client_->addBytesSentCallback([&](uint64_t bytes) { remaining_bytes_to_send_ -= bytes; });
   client_->write(initial_data, false);
   client_->connect();
 }
@@ -153,6 +154,8 @@ void RawConnectionDriver::waitForConnection() {
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_.run(run_type); }
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
+
+bool RawConnectionDriver::allBytesSent() const { return remaining_bytes_to_send_ == 0; }
 
 WaitForPayloadReader::WaitForPayloadReader(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}

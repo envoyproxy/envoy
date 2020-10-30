@@ -79,6 +79,7 @@ public:
   void waitForConnection();
 
   bool closed() { return callbacks_->closed(); }
+  bool allBytesSent() const;
 
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
@@ -123,6 +124,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
+  uint64_t remaining_bytes_to_send_;
 };
 
 /**
