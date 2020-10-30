@@ -196,7 +196,7 @@ void Filter::parseV2Header(char* buf) {
                        std::make_shared<Network::Address::Ipv4Instance>(&la4)});
         return;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
-        int offset = 0; // Offset to iterate over buf
+        std::size_t offset = 0; // Offset to iterate over buf
         sockaddr_in6 ra6, la6;
         memset(&ra6, 0, sizeof(ra6));
         memset(&la6, 0, sizeof(la6));
