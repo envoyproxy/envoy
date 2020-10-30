@@ -51,6 +51,11 @@ public:
     EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   }
 
+  Buffer::WatermarkBuffer&
+  getWatermarkBufferHelper(Network::BufferedIoSocketHandleImpl& io_handle) {
+    return dynamic_cast<Buffer::WatermarkBuffer&>(*io_handle.getWriteBuffer());
+  }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
 
   // Owned by BufferedIoSocketHandle.
@@ -114,7 +119,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadEmpty) {
 // Test read side effects.
 TEST_F(BufferedIoSocketHandleTest, TestReadContent) {
   Buffer::OwnedImpl buf;
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcdefg");
   auto result = io_handle_->read(buf, 3);
   EXPECT_TRUE(result.ok());
@@ -165,7 +170,7 @@ TEST_F(BufferedIoSocketHandleTest, TestBasicPeek) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestRecvDrain) {
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcd");
   auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
   EXPECT_TRUE(result.ok());
@@ -176,7 +181,7 @@ TEST_F(BufferedIoSocketHandleTest, TestRecvDrain) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, FlowControl) {
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   WritablePeer* handle_as_peer = io_handle_.get();
   internal_buffer.setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
@@ -267,7 +272,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAndWriteAreEdgeTriggered) {
   EXPECT_CALL(cb_, called(_)).Times(0);
 
   // Drain 1 bytes.
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcd");
   auto result = io_handle_->recv(buf_.data(), 1, 0);
   EXPECT_TRUE(result.ok());
@@ -305,7 +310,7 @@ TEST_F(BufferedIoSocketHandleTest, TestEventResetClearCallback) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   WritablePeer* handle_as_peer = io_handle_.get();
   internal_buffer.setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
@@ -340,7 +345,7 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestClose) {
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcd");
   std::string accumulator;
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
@@ -400,7 +405,7 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
 // Test that a readable event is raised when peer shutdown write. Also confirm read will return
 // EAGAIN.
 TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcd");
 
   std::string accumulator;
@@ -451,8 +456,10 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownOptionsNotSupported) {
 
 TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
   Buffer::OwnedImpl buf("0123456789");
-  io_handle_peer_->write(buf);
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto result = io_handle_peer_->write(buf);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(10, result.rc_);
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   EXPECT_EQ("0123456789", internal_buffer.toString());
   EXPECT_EQ(0, buf.length());
 }
@@ -464,7 +471,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
 
   {
     // Populate write destination with massive data so as to not writable.
-    auto& internal_buffer = io_handle_peer_->getBufferForTest();
+    auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
     internal_buffer.setWatermarks(1024);
     internal_buffer.add(std::string(2048, ' '));
 
@@ -497,7 +504,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevErrorCode) {
 
   {
     // Populate write destination with massive data so as to not writable.
-    auto& internal_buffer = io_handle_peer_->getBufferForTest();
+    auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
     internal_buffer.setWatermarks(1024);
     internal_buffer.add(std::string(2048, ' '));
     result = io_handle_->writev(&slice, 1);
@@ -533,7 +540,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
       Buffer::RawSlice{raw_data.data() + 1, 2},
   };
   io_handle_peer_->writev(slices.data(), slices.size());
-  auto& internal_buffer = io_handle_->getBufferForTest();
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   EXPECT_EQ(3, internal_buffer.length());
   EXPECT_EQ("012", internal_buffer.toString());
 }
@@ -665,7 +672,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
-  auto& peer_internal_buffer = io_handle_peer_->getBufferForTest();
+  auto& peer_internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
   peer_internal_buffer.setWatermarks(128);
   std::string big_chunk(256, 'a');
   peer_internal_buffer.add(big_chunk);

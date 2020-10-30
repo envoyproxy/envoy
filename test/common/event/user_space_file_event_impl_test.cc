@@ -38,7 +38,6 @@ public:
   MOCK_METHOD(bool, isPeerWritable, (), (const));
   MOCK_METHOD(void, onPeerBufferWritable, ());
   MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
-  MOCK_METHOD(bool, isOverHighWatermark, (), (const));
   MOCK_METHOD(bool, isReadable, (), (const));
 };
 class UserSpaceFileEventImplTest : public testing::Test {

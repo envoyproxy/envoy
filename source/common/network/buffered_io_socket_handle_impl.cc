@@ -37,6 +37,12 @@ BufferedIoSocketHandleImpl::BufferedIoSocketHandleImpl()
           },
           []() -> void {}) {}
 
+BufferedIoSocketHandleImpl::~BufferedIoSocketHandleImpl() {
+  if (!closed_) {
+    close();
+  }
+}
+
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {

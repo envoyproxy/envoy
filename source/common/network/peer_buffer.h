@@ -17,6 +17,9 @@ public:
    * Set the flag to indicate no further write from peer.
    */
   virtual void setWriteEnd() PURE;
+  /**
+   * @return true if the peer promise no more write.
+   */
   virtual bool isWriteEndSet() PURE;
 
   /**
@@ -52,27 +55,21 @@ public:
 };
 
 /**
- * The interface for the buffer owner who want to consume the buffer.
+ * The interface as the union of ReadableSource and WritablePeer.
  */
-class ReadableSource {
+class ReadWritable : public WritablePeer {
 public:
-  virtual ~ReadableSource() = default;
+  ~ReadWritable() override = default;
 
   /**
    * Read the flag to indicate no further write. Used by early close detection.
    */
   virtual bool isPeerShutDownWrite() const PURE;
 
-  virtual bool isOverHighWatermark() const PURE;
+  /**
+   * @return true if the pending receive buffer is not full.
+   */
   virtual bool isReadable() const PURE;
-};
-
-/**
- * The interface as the union of ReadableSource and WritablePeer.
- */
-class ReadWritable : public virtual ReadableSource, public virtual WritablePeer {
-public:
-  ~ReadWritable() override = default;
 };
 } // namespace Network
 } // namespace Envoy

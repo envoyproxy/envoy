@@ -79,8 +79,6 @@ public:
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
 
-  EventListener& getEventListener() { return event_listener_; }
-
   friend class Network::BufferedIoSocketHandleImpl;
 
 private:

@@ -33,7 +33,7 @@ class BufferedIoSocketHandleImpl : public IoHandle,
 public:
   BufferedIoSocketHandleImpl();
 
-  ~BufferedIoSocketHandleImpl() override { ASSERT(closed_); }
+  ~BufferedIoSocketHandleImpl() override;
 
   // IoHandle
   os_fd_t fdDoNotUse() const override { return INVALID_SOCKET; }
@@ -76,15 +76,6 @@ public:
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
 
-  Buffer::WatermarkBuffer& getBufferForTest() { return pending_received_data_; }
-
-  void setWritablePeer(WritablePeer* writable_peer) {
-    // Swapping writable peer is undefined behavior.
-    ASSERT(!writable_peer_);
-    ASSERT(!write_shutdown_);
-    writable_peer_ = writable_peer;
-  }
-
   // WritablePeer
   void setWriteEnd() override { read_end_stream_ = true; }
   bool isWriteEndSet() override { return read_end_stream_; }
@@ -103,18 +94,25 @@ public:
       user_file_event_->activate(Event::FileReadyType::Write);
     }
   }
-  bool isWritable() const override { return !isOverHighWatermark(); }
+  bool isWritable() const override { return !over_high_watermark_; }
   bool isPeerWritable() const override {
     return writable_peer_ != nullptr && !writable_peer_->isWriteEndSet() &&
            writable_peer_->isWritable();
   }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
-  // ReadableSource
+  // ReadWritable
   bool isPeerShutDownWrite() const override { return read_end_stream_; }
-  bool isOverHighWatermark() const override { return over_high_watermark_; }
   bool isReadable() const override {
     return isPeerShutDownWrite() || pending_received_data_.length() > 0;
+  }
+
+  // Set the peer which will populate the owned pending_received_data.
+  void setWritablePeer(WritablePeer* writable_peer) {
+    // Swapping writable peer is undefined behavior.
+    ASSERT(!writable_peer_);
+    ASSERT(!write_shutdown_);
+    writable_peer_ = writable_peer;
   }
 
 private:
