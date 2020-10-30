@@ -339,19 +339,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    // Clone the whole listener.
-    auto static_resources = bootstrap.mutable_static_resources();
-    auto* old_listener = static_resources->mutable_listeners(0);
-    auto* cloned_listener = static_resources->add_listeners();
-    cloned_listener->CopyFrom(*old_listener);
-    old_listener->set_name("http_forward");
-  });
   initialize();
-
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Missing method
@@ -364,7 +352,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("filter_removed_required_headers"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
 
   // Missing path for non-CONNECT
   response = codec_client_->makeHeaderOnlyRequest(
@@ -376,18 +364,35 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("filter_removed_required_headers"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+}
+
+TEST_P(ProtocolIntegrationTest, FaultyFilterWithConnect) {
+  // Faulty filter that removed host in a CONNECT request.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    // Clone the whole listener.
+    auto static_resources = bootstrap.mutable_static_resources();
+    auto* old_listener = static_resources->mutable_listeners(0);
+    auto* cloned_listener = static_resources->add_listeners();
+    cloned_listener->CopyFrom(*old_listener);
+    old_listener->set_name("http_forward");
+  });
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Missing host for CONNECT
-  response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "www.host.com:80"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("filter_removed_required_headers"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270

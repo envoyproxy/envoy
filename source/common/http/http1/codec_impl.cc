@@ -366,16 +366,15 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
-void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+  // Required headers must be present. This can only happen by some erroneous processing after the
+  // downstream codecs decode.
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   const HeaderEntry* host = headers.Host();
   bool is_connect = HeaderUtility::isConnect(headers);
-
-  // Required headers must be present. If downstream traffic is missing headers, downstream codecs
-  // will reject the request. If a faulty filter removes these headers, the filter manager will
-  // reject before forwarding the request headers here.
-  ASSERT(HeaderUtility::checkRequiredHeaders(headers).ok());
 
   if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
@@ -397,6 +396,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   encodeHeadersBase(headers, absl::nullopt, end_stream);
+  return okStatus();
 }
 
 int ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {

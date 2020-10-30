@@ -1275,7 +1275,7 @@ public:
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request.
    */
-  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
   /**
    * Encode trailers. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
