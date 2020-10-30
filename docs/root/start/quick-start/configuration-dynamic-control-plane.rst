@@ -18,7 +18,6 @@ At a minimum, you will need to start Envoy configured with the following section
 - :ref:`node <start_quick_start_dynamic_node>` to uniquely identify the proxy node.
 - :ref:`dynamic_resources <start_quick_start_dynamic_dynamic_resources>` to tell Envoy which configurations should be updated dynamically
 - :ref:`static_resources <start_quick_start_dynamic_static_resources>` to specify where Envoy should retrieve its configuration from.
-- :ref:`layered_runtime <start_quick_start_dynamic_layered_runtime>` to persist dynamically-provided configurations.
 
 You can also add an :ref:`admin <start_quick_start_dynamic_admin>` section if you wish to monitor Envoy or
 retrieve stats or configuration information.
@@ -74,24 +73,6 @@ The ``xds_cluster`` is configured to query a control plane at http://my-control-
     :lineno-start: 17
     :emphasize-lines: 3-17
 
-.. _start_quick_start_dynamic_layered_runtime:
-
-``layered_runtime``
--------------------
-
-A :ref:`layered_runtime <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime>` is
-required with an :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
-to persist configuration provided by the control plane.
-
-.. literalinclude:: _include/envoy-dynamic-control-plane-demo.yaml
-    :language: yaml
-    :linenos:
-    :lines: 33-44
-    :lineno-start: 33
-    :emphasize-lines: 3-10
-
-.. _start_quick_start_dynamic_admin:
-
 ``admin``
 ---------
 
@@ -105,8 +86,8 @@ endpoint to see how Envoy is currently configured.
 .. literalinclude:: _include/envoy-dynamic-control-plane-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 42-49
-    :lineno-start: 42
+    :lines: 33-40
+    :lineno-start: 33
     :emphasize-lines: 3-8
 
 .. warning::
