@@ -57,8 +57,10 @@ In this example, the configuration is provided by the ``yaml`` files set below.
 
 .. _start_quick_start_dynamic_fs_dynamic_lds:
 
-``resources`` - :ref:`Listener discovery service (LDS) <config_listeners_lds>`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``resources`` - listeners
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The linked ``lds_config`` should be an implementation of a :ref:`Listener discovery service (LDS) <config_listeners_lds>`.
 
 The following example of a :download:`dynamic LDS file <_include/envoy-dynamic-lds-demo.yaml>`,
 configures an ``HTTP`` :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`
@@ -75,8 +77,10 @@ The ``host`` headers are rewritten to ``www.envoyproxy.io``
 
 .. _start_quick_start_dynamic_fs_dynamic_cds:
 
-``resources`` - :ref:`Cluster discovery service (CDS) <config_cluster_manager_cds>`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``resources`` - clusters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The linked ``cds_config`` should be an implementation of a :ref:`Cluster discovery service (CDS) <config_cluster_manager_cds>`.
 
 In the following example of a :download:`dynamic CDS file <_include/envoy-dynamic-cds-demo.yaml>`,
 the ``example_proxy_cluster`` :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
