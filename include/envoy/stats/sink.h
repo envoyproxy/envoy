@@ -40,6 +40,11 @@ public:
    * @return a snapshot of all text readouts.
    */
   virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
+
+  /**
+   * @return a snapshot of all text readouts.
+   */
+  virtual int64_t snapShotTimeInMillis() PURE;
 };
 
 /**

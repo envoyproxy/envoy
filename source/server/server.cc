@@ -8,6 +8,7 @@
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -147,7 +148,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
   snapped_counters_ = store.counters();
   counters_.reserve(snapped_counters_.size());
   for (const auto& counter : snapped_counters_) {
@@ -172,15 +173,19 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   for (const auto& text_readout : snapped_text_readouts_) {
     text_readouts_.push_back(*text_readout);
   }
+
+  snapshot_time_ = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       time_source.systemTime().time_since_epoch())
+                       .count();
 }
 
-void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                       TimeSource& time_source) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store);
+  MetricSnapshotImpl snapshot(store, time_source);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -231,7 +236,7 @@ void InstanceImpl::updateServerStats() {
 
 void InstanceImpl::flushStatsInternal() {
   updateServerStats();
-  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
+  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_, timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(config_.statsFlushInterval());
