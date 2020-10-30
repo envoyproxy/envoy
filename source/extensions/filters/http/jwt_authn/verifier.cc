@@ -274,7 +274,7 @@ public:
     }
 
     // RequiresAny only has one missing or failed requirement.
-    if (verifiers_.size() == 0 && (is_allow_failed_ || is_allow_missing_)) {
+    if (verifiers_.empty() && (is_allow_failed_ || is_allow_missing_)) {
       JwtRequirement requirement;
       if (is_allow_failed_) {
         requirement.mutable_allow_missing_or_failed();
