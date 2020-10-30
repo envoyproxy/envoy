@@ -105,9 +105,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 }
 
 UpstreamRequest::~UpstreamRequest() {
-  if (!destroyed_) {
-    onDeferredDelete();
-  }
+  ASSERT(destroyed_);
 }
 
 void UpstreamRequest::onDeferredDelete() {

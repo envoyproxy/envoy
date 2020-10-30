@@ -115,7 +115,7 @@ public:
     // Allow any number of setTrackedObject calls for the dispatcher strict mock.
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
   }
-  ~RouterTestBase() {
+  ~RouterTestBase() override {
     EXPECT_CALL(callbacks_.dispatcher_, clearDeferredDeleteList());
     callbacks_.dispatcher_.clearDeferredDeleteList();
   }

@@ -50,7 +50,7 @@ struct UpstreamRequestFilter : public Http::StreamDecoderFilter,
                                public GenericConnectionPoolCallbacks,
                                public Logger::Loggable<Logger::Id::router> {
   UpstreamRequestFilter(UpstreamRequest& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
-  ~UpstreamRequestFilter();
+  ~UpstreamRequestFilter() override;
 
   void resetWatermarks();
   void resetStream();
