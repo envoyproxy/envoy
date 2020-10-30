@@ -253,6 +253,46 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
+// Tests that health checking gracefully handles a NO_ERROR GOAWAY from the upstream.
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initHttpHealthCheck(cluster_idx);
+
+  // GOAWAY doesn't exist in HTTP1.
+  if (upstream_protocol_ != FakeHttpConnection::Type::HTTP1) {
+    // Send a GOAWAY with NO_ERROR and then a 200. The health checker should allow the request
+    // to finish despite the GOAWAY.
+    clusters_[cluster_idx].host_fake_connection_->onGoAway(Http::GoAwayErrorCode::NoError);
+  }
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that health checking properly handles a GOAWAY with an error, followed by a reset.
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayErrorAndReset) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initHttpHealthCheck(cluster_idx);
+
+  // GOAWAY doesn't exist in HTTP1.
+  if (upstream_protocol_ != FakeHttpConnection::Type::HTTP1) {
+    // Send a GOAWAY with NO_ERROR and then a 200. The health checker should allow the request
+    // to finish despite the GOAWAY.
+    clusters_[cluster_idx].host_fake_connection_->onGoAway(Http::GoAwayErrorCode::Other);
+  }
+  clusters_[cluster_idx].host_stream_->onResetStream(Http::StreamResetReason::RemoteReset,
+                                                     "upstream reset");
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
 class TcpHealthCheckIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HealthCheckIntegrationTestBase {
 public:
