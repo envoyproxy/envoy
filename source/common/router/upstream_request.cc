@@ -104,9 +104,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   filter_manager_.streamInfo().healthCheck(parent_.callbacks()->streamInfo().healthCheck());
 }
 
-UpstreamRequest::~UpstreamRequest() {
-  ASSERT(destroyed_);
-}
+UpstreamRequest::~UpstreamRequest() { ASSERT(destroyed_); }
 
 void UpstreamRequest::onDeferredDelete() {
   ASSERT(!destroyed_);
