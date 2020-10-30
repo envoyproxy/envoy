@@ -281,10 +281,12 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayErrorAndReset) {
 
   // GOAWAY doesn't exist in HTTP1.
   if (upstream_protocol_ != FakeHttpConnection::Type::HTTP1) {
-    // Send a GOAWAY with NO_ERROR and then a 200. The health checker should allow the request
-    // to finish despite the GOAWAY.
+    // Send a GOAWAY with an error. The health checker should treat this as an
+    // error and cancel the request.
     clusters_[cluster_idx].host_fake_connection_->onGoAway(Http::GoAwayErrorCode::Other);
   }
+  // This should be ignored by the HTTP/2 health checker since it saw GOAWAY
+  // already. For HTTP/1 this will cause a failed check.
   clusters_[cluster_idx].host_stream_->onResetStream(Http::StreamResetReason::RemoteReset,
                                                      "upstream reset");
 
