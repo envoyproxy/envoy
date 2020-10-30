@@ -30,14 +30,17 @@ static_resources:
               socket_address:
                 address: proxy-postgres-backend
                 port_value: 5432
-    tls_context:
-      allow_renegotiation: true
-      common_tls_context:
-        tls_certificates:
-          certificate_chain:
-            filename: /certs/clientcert.pem
-          private_key:
-            filename: /certs/clientkey.pem
-        validation_context:
-          trusted_ca:
-            filename: /certs/cacert.pem
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        allow_renegotiation: true
+        common_tls_context:
+          tls_certificates:
+            certificate_chain:
+              filename: /certs/clientcert.pem
+            private_key:
+              filename: /certs/clientkey.pem
+          validation_context:
+            trusted_ca:
+              filename: /certs/cacert.pem

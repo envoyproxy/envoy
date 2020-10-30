@@ -2,7 +2,7 @@
 
 export NAME=double-proxy
 export MANUAL=true
-export DELAY=10
+export DELAY=5
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -11,7 +11,7 @@ mkdir -p certs
 
 run_log "Create a cert authority"
 openssl genrsa -out certs/ca.key 4096
-openssl req -x509 -new -nodes -key certs/ca.key -sha256 -days 1024 -out certs/ca.crt
+openssl req -batch -x509 -new -nodes -key certs/ca.key -sha256 -days 1024 -out certs/ca.crt
 openssl genrsa -out certs/example.com.key 2048
 
 run_log "Generate signing requests for each proxy"
