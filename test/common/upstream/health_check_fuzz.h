@@ -48,13 +48,7 @@ public:
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
   // No op
-  void raiseGoAway(bool no_error) override {
-    if (no_error) {
-      return;
-    } else {
-      return;
-    }
-  }
+  void raiseGoAway(bool) override {}
   ~HttpHealthCheckFuzz() override = default;
 
   // Determines whether the client gets reused or not after response
@@ -70,13 +64,7 @@ public:
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
   // No op
-  void raiseGoAway(bool no_error) override {
-    if (no_error) {
-      return;
-    } else {
-      return;
-    }
-  }
+  void raiseGoAway(bool) override {}
   ~TcpHealthCheckFuzz() override = default;
 
   // Determines whether the client gets reused or not after response
