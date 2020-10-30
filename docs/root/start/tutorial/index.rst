@@ -8,14 +8,16 @@ Distributed systems are hard, but upgrading your networking with Envoy doesn’t
 Getting Started
 ~~~~~~~~~~~~~~~
 
-You can get Envoy set up on your laptop with a bootstrap config, then extend it as you need more functionality. Start seeing the benefits, and learn how to talk to the community when you get stuck.
+You can get Envoy set up on your laptop or local system with a bootstrap config, then extend it as you need more functionality. Start seeing the benefits, and learn how to talk to the community when you get stuck.
 
 .. toctree::
   :maxdepth: 2
 
-  on-your-laptop
-  routing-basic
-  getting-help
+  getting-started/requirements
+  getting-started/running-envoy
+  getting-started/using-the-envoy-admin
+  getting-started/routing-basic
+  getting-started/getting-help
 
 Dynamic configuration
 ~~~~~~~~~~~~~~~~~~~~~
