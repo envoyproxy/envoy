@@ -69,7 +69,7 @@ public:
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
    *
-   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner. As the owner
+   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner, as the owner
    * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using InitializeCb = std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)>;
@@ -85,12 +85,14 @@ public:
    * the current value.
    *
    * NOTE: The update callback is not supposed to capture the Slot, or its
-   * owner. As the owner may be destructed in main thread before the update_cb
+   * owner, as the owner may be destructed in main thread before the update_cb
    * gets called in a worker thread.
    **/
   using UpdateCb = std::function<ThreadLocalObjectSharedPtr(ThreadLocalObjectSharedPtr)>;
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
-  virtual void runOnAllThreads(const UpdateCb& update_cb, Event::PostCb complete_cb) PURE;
+  virtual void runOnAllThreads(const UpdateCb& update_cb, const Event::PostCb& complete_cb) PURE;
+  virtual void runOnAllThreads(const Event::PostCb& cb) PURE;
+  virtual void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& complete_cb) PURE;
 };
 
 using SlotPtr = std::unique_ptr<Slot>;
@@ -108,11 +110,13 @@ public:
   virtual SlotPtr allocateSlot() PURE;
 };
 
-// Provides a typesafe API for slots.
+// Provides a typesafe API for slots. The slot data must be derived from
+// ThreadLocalObject. If there is no slot data, you can instantiated TypedSlot
+// with the default type param: TypedSlot<> tls_;
 //
 // TODO(jmarantz): Rename the Slot class to something like RawSlot, where the
 // only reference is from TypedSlot, which we can then rename to Slot.
-template <class T> class TypedSlot {
+template <class T = ThreadLocalObject> class TypedSlot {
 public:
   /**
    * Helper method to create a unique_ptr for a typed slot. This helper
@@ -144,7 +148,7 @@ public:
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
    *
-   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner. As the owner
+   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner, as the owner
    * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using InitializeCb = std::function<std::shared_ptr<T>(Event::Dispatcher& dispatcher)>;
@@ -163,13 +167,17 @@ public:
   /**
    * UpdateCb is passed a mutable reference to the current stored data.
    *
-   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner. As the owner
+   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner, as the owner
    * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using UpdateCb = std::function<void(T& obj)>;
   void runOnAllThreads(const UpdateCb& cb) { slot_->runOnAllThreads(makeSlotUpdateCb(cb)); }
-  void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+  void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
     slot_->runOnAllThreads(makeSlotUpdateCb(cb), complete_cb);
+  }
+  void runOnAllThreads(const Event::PostCb& cb) { slot_->runOnAllThreads(cb); }
+  void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& complete_cb) {
+    slot_->runOnAllThreads(cb, complete_cb);
   }
 
 private:

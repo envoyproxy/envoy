@@ -41,7 +41,7 @@ SlotPtr InstanceImpl::allocateSlot() {
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
-Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb&& cb) {
+Event::PostCb InstanceImpl::SlotImpl::wrapCallback(const Event::PostCb& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the
   // expired check below.
   //
@@ -92,12 +92,21 @@ Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   };
 }
 
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
   parent_.runOnAllThreads(dataCallback(cb), complete_cb);
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
   parent_.runOnAllThreads(dataCallback(cb));
+}
+
+void InstanceImpl::SlotImpl::runOnAllThreads(const Event::PostCb& cb,
+                                             const Event::PostCb& complete_cb) {
+  parent_.runOnAllThreads(wrapCallback(cb), complete_cb);
+}
+
+void InstanceImpl::SlotImpl::runOnAllThreads(const Event::PostCb& cb) {
+  parent_.runOnAllThreads(wrapCallback(cb));
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {

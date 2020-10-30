@@ -55,7 +55,7 @@ private:
   // Currently applied configuration to ensure that the main thread deletes the last reference to
   // it.
   absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 
   // Local initialization target to ensure that the subscription starts in
   // case no warming is requested by any other filter config provider.

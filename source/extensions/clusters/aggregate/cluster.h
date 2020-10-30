@@ -54,7 +54,7 @@ public:
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<> tls_;
   const std::vector<std::string> clusters_;
 
 private:

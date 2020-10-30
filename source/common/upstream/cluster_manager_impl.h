@@ -489,7 +489,7 @@ private:
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
   Random::RandomGenerator& random_;
 
 protected:
