@@ -42,6 +42,8 @@ public:
   // constructed, a local_priority_set_.get() call will return a nullptr.
   std::shared_ptr<PrioritySetImpl> local_priority_set_;
 
+  void clearStaticHostsState() override;
+
 private:
   // This bytestring will be iterated through representing randomness in order to choose
   // weights for hosts.

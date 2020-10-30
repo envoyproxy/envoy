@@ -35,7 +35,7 @@ public:
   void chooseHost();
   void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
 
-  void clearStaticHostsHealthFlags();
+  virtual void clearStaticHostsState();
 
   // These public objects shared amongst all types of load balancers will be used to construct load
   // balancers in specific load balancer fuzz classes
