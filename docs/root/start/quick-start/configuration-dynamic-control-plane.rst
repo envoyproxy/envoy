@@ -73,6 +73,8 @@ The ``xds_cluster`` is configured to query a control plane at http://my-control-
     :lineno-start: 17
     :emphasize-lines: 3-17
 
+.. _start_quick_start_dynamic_admin:
+
 ``admin``
 ---------
 
