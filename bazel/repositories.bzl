@@ -345,10 +345,20 @@ def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
         build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
 def _com_google_cel_cpp():
-    external_http_archive("com_google_cel_cpp")
+    external_http_archive(
+        "com_google_cel_cpp",
+        patch_args = ["-p1"],
+        # Patches to remove "fast" protobuf-internal access
+        # The patch can be removed when the "fast" access is safe to be enabled back.
+        # This requires public visibility of Reflection::LookupMapValue in protobuf and
+        # any release of cel-cpp after 10/27/2020.
+        patches = ["@envoy//bazel:cel-cpp.patch"],
+    )
     external_http_archive("rules_antlr")
 
     # Parser dependencies

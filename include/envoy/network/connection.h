@@ -102,6 +102,11 @@ public:
   virtual void addConnectionCallbacks(ConnectionCallbacks& cb) PURE;
 
   /**
+   * Unregister callbacks which previously fired when connection events occur.
+   */
+  virtual void removeConnectionCallbacks(ConnectionCallbacks& cb) PURE;
+
+  /**
    * Register for callback every time bytes are written to the underlying TransportSocket.
    */
   virtual void addBytesSentCallback(BytesSentCb cb) PURE;
@@ -242,6 +247,12 @@ public:
   virtual State state() const PURE;
 
   /**
+   * @return true if the connection has not completed connecting, false if the connection is
+   * established.
+   */
+  virtual bool connecting() const PURE;
+
+  /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
    * are installed.
    * @param data Supplies the data to write to the connection.
@@ -318,6 +329,21 @@ public:
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;
+
+/**
+ * Connections servicing inbound connects.
+ */
+class ServerConnection : public virtual Connection {
+public:
+  /**
+   * Set the amount of time allowed for the transport socket to report that a connection is
+   * established. The provided timeout is relative to the current time. If this method is called
+   * after a connection has already been established, it is a no-op.
+   */
+  virtual void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) PURE;
+};
+
+using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
  * Connections capable of outbound connects.
