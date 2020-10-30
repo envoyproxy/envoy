@@ -233,6 +233,7 @@ public:
     }
     return sizeof(pipe_.address_);
   }
+  void getSockAddr(sockaddr_un& address) { address = pipe_.address_; }
 
 private:
   struct PipeHelper : public Pipe {
