@@ -48,5 +48,6 @@ envoy_pch_library(
         "gmock/gmock.h",
         "gtest/gtest.h",
     ],
+    visibility = ["//visibililty:public"],
     deps = [],
 )
