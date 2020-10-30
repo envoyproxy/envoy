@@ -16,6 +16,20 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: postgres_tcp
           cluster: postgres_cluster
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          require_client_certificate: false
+          common_tls_context:
+            tls_certificates:
+              certificate_chain:
+                filename: /certs/servercert.pem
+              private_key:
+                filename: /certs/serverkey.pem
+            validation_context:
+              trusted_ca:
+                filename: /certs/cacert.pem
 
   clusters:
   - name: postgres_cluster
