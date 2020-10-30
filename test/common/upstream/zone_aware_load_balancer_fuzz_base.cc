@@ -38,9 +38,10 @@ void ZoneAwareLoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
   }
 }
 
-void ZoneAwareLoadBalancerFuzzBase::initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input) {
-    LoadBalancerFuzzBase::initializeLbComponents(input);
-    setupZoneAwareLoadBalancingSpecificLogic();
+void ZoneAwareLoadBalancerFuzzBase::initializeLbComponents(
+    const test::common::upstream::LoadBalancerTestCase& input) {
+  LoadBalancerFuzzBase::initializeLbComponents(input);
+  setupZoneAwareLoadBalancingSpecificLogic();
 }
 
 void ZoneAwareLoadBalancerFuzzBase::setupZoneAwareLoadBalancingSpecificLogic() {
