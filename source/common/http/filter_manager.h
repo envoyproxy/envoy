@@ -486,7 +486,7 @@ class FilterManager : public ScopeTrackedObject,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                const Network::Connection& connection, uint64_t stream_id, bool proxy_100_continue,
+                const Network::Connection* connection, uint64_t stream_id, bool proxy_100_continue,
                 uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
                 const LocalReply::LocalReply& local_reply, absl::optional<Http::Protocol> protocol,
                 TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
@@ -697,7 +697,7 @@ public:
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
 
-  const Network::Connection* connection() const { return &connection_; }
+  const Network::Connection* connection() const { return connection_; }
 
   uint64_t streamId() const { return stream_id_; }
 
@@ -763,7 +763,7 @@ private:
 
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
-  const Network::Connection& connection_;
+  const Network::Connection* connection_;
   const uint64_t stream_id_;
   const bool proxy_100_continue_;
 
