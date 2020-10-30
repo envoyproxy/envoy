@@ -85,6 +85,9 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/... 
 # Build tests that are known-flaky or known-failing to ensure no compilation regressions
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... "${fail_test_tags}" --build_tests_only
 
+# Demonstrate broken linkage of all tests known to fail to build with clang-cl
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... "--test_tag_filters=skip_on_windows_clang" --build_tests_only --keep-going
+
 # Summarize tests bypasssed to monitor the progress of porting to Windows
 echo "Tests bypassed as skip_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unbuildable or inapplicable tests"
 echo "Tests bypassed as fails_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "fails_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known incompatible tests"
