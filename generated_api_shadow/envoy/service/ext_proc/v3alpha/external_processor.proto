@@ -67,6 +67,9 @@ message ProcessingRequest {
   // the server requests a change in the processing mode.
   bool response_required = 1;
 
+  // Each request message will include one of the following sub-messages. Which
+  // ones are set for a particular HTTP request/response depend on the
+  // processing mode.
   oneof request {
     option (validate.required) = true;
 
@@ -80,23 +83,19 @@ message ProcessingRequest {
     // HeaderResponse message or close the stream.
     HttpHeaders response_headers = 3;
 
-    // A chunk of the HTTP request body. This is only sent if the server
-    // requested it. If "response_required" is set, the server must send back
+    // A chunk of the HTTP request body. If "response_required" is set, the server must send back
     // a BodyResponse message, an ImmediateResponse message, or close the stream.
     HttpBody request_body = 4;
 
-    // A chunk of the HTTP request body. This is only sent if the server
-    // requested it. If "response_required" is set, the server must send back
+    // A chunk of the HTTP request body. If "response_required" is set, the server must send back
     // a BodyResponse message or close the stream.
     HttpBody response_body = 5;
 
-    // The HTTP trailers for the request path. These are only sent if
-    // the server requested them. If "response_required" is set, the server
+    // The HTTP trailers for the request path. If "response_required" is set, the server
     // must send back a TrailerResponse message or close the stream.
     HttpTrailers request_trailers = 6;
 
-    // The HTTP trailers for the response path. These are only sent if
-    // the server requested them. If "response_required" is set, the server
+    // The HTTP trailers for the response path. If "response_required" is set, the server
     // must send back a TrailerResponse message or close the stream.
     HttpTrailers response_trailers = 7;
   }
@@ -106,9 +105,11 @@ message ProcessingRequest {
 // set, the server must send back exactly one ProcessingResponse message.
 // In addition, the server may send back a message with the "async_mode_change"
 // message at any time.
-// [#next-free-field: 11]
+// [#next-free-field: 10]
 message ProcessingResponse {
   oneof response {
+    option (validate.required) = true;
+
     // The server must send back this message in response to a message with the
     // "request_headers" field set.
     HeadersResponse request_headers = 1;
@@ -138,22 +139,15 @@ message ProcessingResponse {
     ImmediateResponse immediate_response = 7;
   }
 
-  // Add new metadata to the Envoy context
-  google.protobuf.Struct new_metadata = 8;
+  // Optional metadata that will be emitted as dynamic metadata to be consumed by the next
+  // filter. This metadata will be placed in the namespace "envoy.filters.http.ext_proc".
+  google.protobuf.Struct dynamic_metadata = 8;
 
   // Override how parts of the HTTP request and response are processed
   // for the duration of this particular request/response only. Servers
   // may use this to intelligently control how requests are processed
   // based on the headers and other metadata that they see.
   envoy.extensions.filters.http.ext_proc.v3alpha.ProcessingMode mode_override = 9;
-
-  // Change how and if the filter waits for responses from the server
-  // for future messages. Servers may use this to switch between
-  // synchronous and asynchronous processing modes based on what they see.
-  // A message with this field may be sent even if none of the "oneof" fields
-  // have been sent, and it may be sent out-of-band with respect to
-  // the other messages if desired.
-  ProcessingModeChange mode_change = 10;
 }
 
 // The following are messages that are sent to the server.
@@ -196,7 +190,7 @@ message HttpTrailers {
 // This message must be sent in response to a request_headers or response_headers
 // message.
 message HeadersResponse {
-  // Instructions on how to manipulate the request headers
+  // Instructions on how to manipulate the headers
   HeaderMutation header_mutation = 1;
 
   // If specified, add a body to the message if none was present
@@ -207,7 +201,7 @@ message HeadersResponse {
 // This message must be sent in response to a request_trailers
 // or response_trailers message.
 message TrailersResponse {
-  // Instructions on how to manipulate the request trailers
+  // Instructions on how to manipulate the trailers
   HeaderMutation header_mutation = 1;
 }
 
@@ -257,17 +251,4 @@ message BodyMutation {
     // Clear the corresponding body chunk
     bool clear_body = 2;
   }
-}
-
-// Change the processing mode of the filter. If "duration" is set,
-// then the change is a temporary change that will be un-done after the specified
-// timeout. (If multiple requests arrive after a timer has been set, then the results
-// may or may not reflect the last one received.)
-message ProcessingModeChange {
-  envoy.extensions.filters.http.ext_proc.v3alpha.ProcessingMode async_mode = 1;
-
-  // If set, then the change will be reverted back to the configured async_mode
-  // after this time. If not set, then the mode change request will be
-  // permanent.
-  google.protobuf.Duration duration = 2;
 }

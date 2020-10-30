@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.ext_proc.v3alpha;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3alpha";
 option java_outer_classname = "ProcessingModeProto";
@@ -14,17 +15,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Processing Filter Processing Mode
 // [#extension: envoy.filters.http.ext_proc]
 
-// This configuration describes how an external processing filter processes the HTTP
-// request or response, including how requests and responses are
-// sent to the remote server.
+// This configuration describes which parts of an HTTP request and
+// response are sent to a remote server and how they are delivered.
 
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message ProcessingMode {
   // Control how headers and trailers are handled
   enum HeaderSendMode {
     // The default HeaderSendMode depends on which part of the message is being
-    // processed. By default, request and response headers are sent, while
-    // while the body and trailers are skipped.
+    // processed. By default, request and response headers are sent,
+    // while trailers are skipped.
     DEFAULT = 0;
 
     // Send the header or trailer.
@@ -36,11 +36,11 @@ message ProcessingMode {
 
   // Control how the request and response bodies are handled
   enum BodySendMode {
-    // Do not send the body at all. This is the default
+    // Do not send the body at all. This is the default.
     NONE = 0;
 
     // Stream the body to the server in pieces as they arrive at the
-    // proxy. This is the default.
+    // proxy.
     STREAMED = 1;
 
     // Buffer the message body in memory and send the entire body at once.
@@ -54,37 +54,21 @@ message ProcessingMode {
     BUFFERED_PARTIAL = 3;
   }
 
-  // Control whether headers, trailers, and body pieces are sent synchronously,
-  // in which Envoy will wait for a response before continuing filter
-  // processing, or asynchronously, in which Envoy will continue with filter
-  // processing after sending the pieces.
-  enum AsyncMode {
-    // Send message parts asynchronously. This is the default.
-    SYNC = 0;
-
-    // Send message parts synchronously.
-    ASYNC = 1;
-  }
-
   // How to handle the request header. Default is "SEND".
-  HeaderSendMode request_header_mode = 1;
+  HeaderSendMode request_header_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
   // How to handle the response header. Default is "SEND".
-  HeaderSendMode response_header_mode = 2;
+  HeaderSendMode response_header_mode = 2 [(validate.rules).enum = {defined_only: true}];
 
   // How to handle the request body. Default is "NONE".
-  BodySendMode request_body_mode = 3;
+  BodySendMode request_body_mode = 3 [(validate.rules).enum = {defined_only: true}];
 
   // How do handle the response body. Default is "NONE".
-  BodySendMode response_body_mode = 4;
+  BodySendMode response_body_mode = 4 [(validate.rules).enum = {defined_only: true}];
 
   // How to handle the request trailers. Default is "SKIP".
-  HeaderSendMode request_trailer_mode = 5;
+  HeaderSendMode request_trailer_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
   // How to handle the response trailers. Default is "SKIP".
-  HeaderSendMode response_trailer_mode = 6;
-
-  // Whether to send all of the above synchronously or
-  // asynchronously. The default is "SYNC".
-  AsyncMode async_mode = 7;
+  HeaderSendMode response_trailer_mode = 6 [(validate.rules).enum = {defined_only: true}];
 }

@@ -1,15 +1,16 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.ext_proc.v3alpha;
+package envoy.extensions.filters.http.ext_proc.v4alpha;
 
 import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v4alpha";
 option java_outer_classname = "ProcessingModeProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: External Processing Filter]
 // External Processing Filter Processing Mode
@@ -20,6 +21,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 7]
 message ProcessingMode {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.ext_proc.v3alpha.ProcessingMode";
+
   // Control how headers and trailers are handled
   enum HeaderSendMode {
     // The default HeaderSendMode depends on which part of the message is being
