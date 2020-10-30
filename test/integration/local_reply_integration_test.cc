@@ -428,14 +428,16 @@ mappers:
         key: response-code-details
         value: "%RESPONSE_CODE_DETAILS%"
       append: false  
-  tokenized_headers_to_add:
-    - name: useful-info
-      headers:
-        - key: response-flags
-          value: "%RESPONSE_FLAGS%"
-        - key: response-code-details
-          value: "%RESPONSE_CODE_DETAILS%"
-      append: false 
+    - header:
+        key: useful-info
+        value_format:
+          tokenized:
+            headers:
+              - key: response-flags
+                value: "%RESPONSE_FLAGS%"
+              - key: response-code-details
+                value: "%RESPONSE_CODE_DETAILS%"
+      append: false
   status_code: 513
   body:
     inline_string: "customized body text"

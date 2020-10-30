@@ -48,17 +48,6 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
       const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
-  /*
-   * @param headers_to_add defines headers to add during calls to evaluateHeaders
-   * @param tokenized_headers_to_add defines the tokenized headers to add during calls to
-   * evaluateHeaders
-   * @return HeaderParserPtr a configured HeaderParserPtr
-   */
-  static HeaderParserPtr configure(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::TokenizedHeaderValueOption>&
-          tokenized_headers_to_add);
-
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
 

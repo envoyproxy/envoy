@@ -1021,24 +1021,24 @@ TEST(TokenizedHeaderParserTest, TokenizedHeadersAreCorrectlyEvaluated) {
 
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add;
 
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::TokenizedHeaderValueOption>
-        tokenized_headers_to_add;
-    envoy::config::core::v3::TokenizedHeaderValueOption* tokenized_header =
-        tokenized_headers_to_add.Add();
-    tokenized_header->set_name("x-tokenized-header");
-    tokenized_header->mutable_headers()->CopyFrom(headers);
+    envoy::config::core::v3::HeaderValueOption* header_value_option = headers_to_add.Add();
+    header_value_option->mutable_header()->set_key("x-tokenized-header");
+    header_value_option->mutable_header()
+        ->mutable_value_format()
+        ->mutable_tokenized()
+        ->mutable_headers()
+        ->CopyFrom(headers);
 
     std::string hint = fmt::format("for test case with number: {}", test_case.number_);
 
     if (test_case.expected_exception_) {
       EXPECT_FALSE(test_case.expected_output_) << hint;
-      EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(headers_to_add, tokenized_headers_to_add),
-                                EnvoyException, test_case.expected_exception_.value());
+      EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(headers_to_add), EnvoyException,
+                                test_case.expected_exception_.value());
       continue;
     }
 
-    HeaderParserPtr header_parser =
-        HeaderParser::configure(headers_to_add, tokenized_headers_to_add);
+    HeaderParserPtr header_parser = HeaderParser::configure(headers_to_add);
 
     Http::TestRequestHeaderMapImpl header_map{};
     header_parser->evaluateHeaders(header_map, stream_info);

@@ -233,33 +233,27 @@ HeaderFormatterPtr createTokenizedHeaderFormatter(
 
 HeaderParserPtr HeaderParser::configure(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add) {
+
+  // go through each header to add and
+  // check if it has a normal formatter, then proceed with current flow
+  // if it has a tokenized formatter, then use a new branch of the code to create a formatter
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-    HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
-    header_parser->headers_to_add_.emplace_back(
-        Http::LowerCaseString(header_value_option.header().key()),
-        HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value()});
-  }
+    const envoy::config::core::v3::HeaderValue header = header_value_option.header();
 
-  return header_parser;
-}
-
-HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::TokenizedHeaderValueOption>&
-        tokenized_headers_to_add) {
-  HeaderParserPtr header_parser = configure(headers_to_add);
-
-  for (const auto& tokenized_header : tokenized_headers_to_add) {
-    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(tokenized_header, append, true);
-    HeaderFormatterPtr header_formatter =
-        createTokenizedHeaderFormatter(tokenized_header.headers(), append);
-
-    header_parser->tokenized_headers_to_add_.emplace_back(
-        std::make_pair(Http::LowerCaseString(tokenized_header.name()),
-                       HeadersToAddEntry{std::move(header_formatter), ""}));
+    if (header.has_value_format() && header.value_format().has_tokenized()) {
+      HeaderFormatterPtr header_formatter =
+          createTokenizedHeaderFormatter(header.value_format().tokenized().headers(), append);
+      header_parser->tokenized_headers_to_add_.emplace_back(std::make_pair(
+          Http::LowerCaseString(header.key()), HeadersToAddEntry{std::move(header_formatter), ""}));
+    } else {
+      HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
+      header_parser->headers_to_add_.emplace_back(
+          Http::LowerCaseString(header_value_option.header().key()),
+          HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value()});
+    }
   }
 
   return header_parser;

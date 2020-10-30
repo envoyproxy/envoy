@@ -57,7 +57,7 @@ public:
       : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context.runtime(),
                                                     context.api().randomGenerator(),
                                                     context.messageValidationVisitor())) {
-    validateTokenizedHeadersConfiguration(config.tokenized_headers_to_add());
+    validateHeadersToAddConfiguration(config.headers_to_add());
 
     if (config.has_status_code()) {
       status_code_ = static_cast<Http::Code>(config.status_code().value());
@@ -70,8 +70,7 @@ public:
       body_formatter_ = std::make_unique<BodyFormatter>(config.body_format_override());
     }
 
-    header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add(),
-                                                            config.tokenized_headers_to_add());
+    header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
   }
 
   bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
@@ -110,17 +109,26 @@ private:
   HeaderParserPtr header_parser_;
   BodyFormatterPtr body_formatter_;
 
-  void validateTokenizedHeadersConfiguration(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::TokenizedHeaderValueOption>&
-          tokenized_headers) {
-    if (!tokenized_headers.empty()) {
-      for (const auto& tokenized_header : tokenized_headers) {
+  void validateHeadersToAddConfiguration(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>&
+          headers_to_add) {
+    for (const auto& header_value_option : headers_to_add) {
+      const envoy::config::core::v3::HeaderValue header = header_value_option.header();
+
+      if (header.has_value_format() && header.value_format().has_tokenized()) {
         int total_size = 0;
-        for (const auto& header_value : tokenized_header.headers()) {
-          total_size += header_value.key().size() + header_value.value().size();
+        for (const auto& tokenized_header : header.value_format().tokenized().headers()) {
+          // error out in case of nested tokenized headers
+          if (tokenized_header.has_value_format() &&
+              tokenized_header.value_format().has_tokenized()) {
+            throw EnvoyException(fmt::format("unsupported nested tokenized headers for '{}'",
+                                             tokenized_header.key()));
+          }
+          // error out in case max allowed size for header is exceeded
+          total_size += tokenized_header.key().size() + tokenized_header.value().size();
           if (total_size > HeaderMaxSize) {
-            throw EnvoyException(fmt::format("exceeded max allowed size for tokenized header '{}'",
-                                             tokenized_header.name()));
+            throw EnvoyException(
+                fmt::format("exceeded max allowed size for tokenized header '{}'", header.key()));
           }
         }
       }

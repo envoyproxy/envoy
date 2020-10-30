@@ -426,27 +426,36 @@ TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
             value:
               default_value: 0
               runtime_key: key_b
-      tokenized_headers_to_add:
-        - name: tokenized-foo-1
-          headers:
-            - key: foo-1
-              value: bar1
-            - key: foo-2
-              value: bar2  
+      headers_to_add:
+        - header:
+            key: tokenized-foo-1
+            value_format:
+              tokenized:     
+                headers:
+                  - key: foo-1
+                    value: bar1
+                  - key: foo-2
+                    value: bar2
           append: true
-        - name: tokenized-foo-2
-          headers:
-            - key: foo-3
-              value: bar3
-            - key: foo-4
-              value: bar4  
+        - header:
+            key: tokenized-foo-2
+            value_format:
+              tokenized:
+                headers:
+                  - key: foo-3
+                    value: bar3
+                  - key: foo-4
+                    value: bar4  
           append: false
-        - name: tokenized-foo-3
-          headers:
-            - key: foo-5
-              value: bar5
-            - key: foo-6
-              value: bar6  
+        - header:
+            key: tokenized-foo-3
+            value_format:
+              tokenized:
+                headers:
+                  - key: foo-5
+                    value: bar5
+                  - key: foo-6
+                    value: bar6  
           append: true    
 )";
   TestUtility::loadFromYaml(yaml, config_);
@@ -484,13 +493,15 @@ TEST_F(LocalReplyTest, TestHeadersAndTokenizedHeadersAddition) {
             key: foo
             value: bar
           append: false
-      tokenized_headers_to_add:
-        - name: tokenized-foo
-          headers:
-            - key: foo-1
-              value: bar1
-            - key: foo-2
-              value: bar2  
+        - header:
+            key: tokenized-foo
+            value_format:
+              tokenized:
+                headers:
+                  - key: foo-1
+                    value: bar1
+                  - key: foo-2
+                    value: bar2  
           append: false   
 )";
   TestUtility::loadFromYaml(yaml, config_);
@@ -519,28 +530,108 @@ TEST_F(LocalReplyTest, TestPreventTokenizedHeadersThatExceedMaxSize) {
             value:
               default_value: 0
               runtime_key: key_b
-      tokenized_headers_to_add:
-        - name: tokenized-foo
-          headers:
-            - key: foo-1
-              value: bar1
-            - key: foo-2
-              value: bar2 
-            - key: foo-3
-              value: bar3    
-          append: false   
+      headers_to_add:
+        - header:
+            key: tokenized-foo
+            value_format:
+              tokenized:
+                headers:
+                  - key: foo-1
+                    value: bar1
+                  - key: foo-2
+                    value: bar2 
+                  - key: foo-3
+                    value: bar3
+          append: false
 )";
   TestUtility::loadFromYaml(yaml, config_);
   // change headers so that max size is exceeded
   for (int i = 0; i < 3; i++) {
-    config_.mutable_mappers(0)->mutable_tokenized_headers_to_add(0)->mutable_headers(i)->set_key(
-        long_key);
-    config_.mutable_mappers(0)->mutable_tokenized_headers_to_add(0)->mutable_headers(i)->set_value(
-        long_value);
+    config_.mutable_mappers(0)
+        ->mutable_headers_to_add(0)
+        ->mutable_header()
+        ->mutable_value_format()
+        ->mutable_tokenized()
+        ->mutable_headers(i)
+        ->set_key(long_key);
+    config_.mutable_mappers(0)
+        ->mutable_headers_to_add(0)
+        ->mutable_header()
+        ->mutable_value_format()
+        ->mutable_tokenized()
+        ->mutable_headers(i)
+        ->set_value(long_value);
   }
 
   EXPECT_THROW_WITH_MESSAGE(Factory::create(config_, context_), EnvoyException,
                             "exceeded max allowed size for tokenized header 'tokenized-foo'");
+}
+
+// Test that only either one of plain header value or formatted value is supported
+TEST_F(LocalReplyTest, TestEitherPlainOrFormatedHeaderValueIsSupported) {
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: GE
+            value:
+              default_value: 0
+              runtime_key: key_b
+      headers_to_add:
+        - header:
+            key: tokenized-foo
+            value: plain-foo
+            value_format:
+              tokenized:
+                headers:
+                  - key: foo-1
+                    value: bar1
+                  - key: foo-2
+                    value: bar2 
+                  - key: foo-3
+                    value: bar3
+          append: false
+)";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestUtility::loadFromYaml(yaml, config_), EnvoyException,
+      "Unable to parse JSON as proto.*oneof field 'specifier' is already set.*");
+}
+
+// Test that nested tokenized headers are prevented
+TEST_F(LocalReplyTest, TestPreventNestedTokenizedHeaders) {
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: GE
+            value:
+              default_value: 0
+              runtime_key: key_b
+      headers_to_add:
+        - header:
+            key: tokenized-foo
+            value_format:
+              tokenized:
+                headers:
+                  - key: foo-1
+                    value: bar1
+                  - key: foo-2
+                    value_format:
+                      tokenized:
+                        headers:
+                          - key: nested-foo
+                            value: nested-bar              
+                  - key: foo-3
+                    value: bar3
+          append: false
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_MESSAGE(Factory::create(config_, context_), EnvoyException,
+                            "unsupported nested tokenized headers for 'foo-2'");
 }
 
 } // namespace LocalReply

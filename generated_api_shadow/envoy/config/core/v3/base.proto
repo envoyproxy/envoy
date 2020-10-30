@@ -282,7 +282,7 @@ message HeaderValue {
       repeated HeaderValue headers = 1 [(validate.rules).repeated = {min_items: 1}];
     }
 
-    oneof value_format {
+    oneof specifier {
       option (validate.required) = true;
 
       Tokenized tokenized = 1;
@@ -294,14 +294,20 @@ message HeaderValue {
       [(validate.rules).string =
            {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
-  // Header value.
-  //
-  // The same :ref:`format specifier <config_access_log_format>` as used for
-  // :ref:`HTTP access logging <config_access_log>` applies here, however
-  // unknown header values are replaced with the empty string instead of `-`.
-  string value = 2 [
-    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
-  ];
+  oneof specifier {
+    option (validate.required) = true;
+
+    // Header value.
+    //
+    // The same :ref:`format specifier <config_access_log_format>` as used for
+    // :ref:`HTTP access logging <config_access_log>` applies here, however
+    // unknown header values are replaced with the empty string instead of `-`.
+    string value = 2 [
+      (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    ];
+
+    ValueFormat value_format = 3;
+  }
 }
 
 // Header name/value pair plus option to control append behavior.
