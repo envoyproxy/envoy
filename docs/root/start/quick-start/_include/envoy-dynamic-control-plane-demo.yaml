@@ -29,7 +29,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: go-control-plane
+                address: my-control-plane
                 port_value: 18000
 
 admin:
