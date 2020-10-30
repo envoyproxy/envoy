@@ -109,13 +109,21 @@ public:
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
-    for (auto& stream : active_streams_) {
-      stream->runHighWatermarkCallbacks();
+    if (h2_watermark_improvements_) {
+      send_pending_frames_cb_->cancel();
+    } else {
+      for (auto& stream : active_streams_) {
+        stream->runHighWatermarkCallbacks();
+      }
     }
   }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
-    for (auto& stream : active_streams_) {
-      stream->runLowWatermarkCallbacks();
+    if (h2_watermark_improvements_) {
+      send_pending_frames_cb_->scheduleCallbackNextIteration();
+    } else {
+      for (auto& stream : active_streams_) {
+        stream->runLowWatermarkCallbacks();
+      }
     }
   }
 
@@ -190,7 +198,7 @@ protected:
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
-    void onDataSourceSend(const uint8_t* framehd, size_t length);
+    ssize_t onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
@@ -218,7 +226,7 @@ protected:
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
+    uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.addressProvider().localAddress();
     }
@@ -243,9 +251,9 @@ protected:
       }
     }
 
-    void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
-      pending_recv_data_.setWatermarks(low_watermark, high_watermark);
-      pending_send_data_.setWatermarks(low_watermark, high_watermark);
+    void setWriteBufferWatermarks(uint32_t high_watermark) {
+      pending_recv_data_->setWatermarks(high_watermark);
+      pending_send_data_->setWatermarks(high_watermark);
     }
 
     // If the receive buffer encounters watermark callbacks, enable/disable reads on this stream.
@@ -284,14 +292,8 @@ protected:
     // watermark can never overflow because the peer can never send more bytes than the stream
     // window without triggering protocol error and this buffer is drained after each DATA frame was
     // dispatched through the filter chain. See source/docs/flow_control.md for more information.
-    Buffer::WatermarkBuffer pending_recv_data_{
-        [this]() -> void { this->pendingRecvBufferLowWatermark(); },
-        [this]() -> void { this->pendingRecvBufferHighWatermark(); },
-        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
-    Buffer::WatermarkBuffer pending_send_data_{
-        [this]() -> void { this->pendingSendBufferLowWatermark(); },
-        [this]() -> void { this->pendingSendBufferHighWatermark(); },
-        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
+    Buffer::InstancePtr pending_recv_data_;
+    Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;
@@ -503,7 +505,10 @@ protected:
   // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514. This is
   // controlled by "envoy.reloadable_features.http2_skip_encoding_empty_trailers" runtime feature
   // flag.
-  const bool skip_encoding_empty_trailers_;
+  const bool skip_encoding_empty_trailers_ : 1;
+
+  // Latched value of envoy.reloadable_features.enable_h2_watermark_improvements runtime feature.
+  const bool h2_watermark_improvements_ : 1;
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
@@ -534,6 +539,7 @@ private:
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
+  Event::SchedulableCallbackPtr send_pending_frames_cb_;
   Random::RandomGenerator& random_;
   Event::TimerPtr keepalive_send_timer_;
   Event::TimerPtr keepalive_timeout_timer_;

@@ -5,9 +5,16 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+class MockNghttp2Session : public Nghttp2SessionInterface {
+public:
+  MOCK_METHOD(size_t, getOutboundControlFrameQueueSize, (), (const));
+};
 
 class ProtocolConstraintsTest : public ::testing::Test {
 protected:
@@ -15,6 +22,7 @@ protected:
     return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
   }
 
+  MockNghttp2Session session_;
   Stats::TestUtil::TestStore stats_store_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   envoy::config::core::v3::Http2ProtocolOptions options_;
@@ -31,9 +39,28 @@ TEST_F(ProtocolConstraintsTest, OutboundControlFrameFlood) {
   ProtocolConstraints constraints(http2CodecStats(), options_);
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_TRUE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(0));
+  EXPECT_TRUE(constraints.checkOutboundFrameLimits(session_).ok());
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(0));
+  EXPECT_FALSE(constraints.checkOutboundFrameLimits(session_).ok());
+  EXPECT_TRUE(isBufferFloodError(constraints.status()));
+  EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
+}
+
+TEST_F(ProtocolConstraintsTest, QueuedOutboundControlFrameFlood) {
+  options_.mutable_max_outbound_frames()->set_value(20);
+  options_.mutable_max_outbound_control_frames()->set_value(4);
+  ProtocolConstraints constraints(http2CodecStats(), options_);
+  constraints.incrementOutboundFrameCount(true);
+  constraints.incrementOutboundFrameCount(true);
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(2));
+  EXPECT_TRUE(constraints.checkOutboundFrameLimits(session_).ok());
+  // The two control frames in the output buffer plus 3 queued control frames at the nghttp2 level
+  // push the past the control frame limit.
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(3));
+  EXPECT_FALSE(constraints.checkOutboundFrameLimits(session_).ok());
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
@@ -46,11 +73,36 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFlood) {
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_TRUE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(0));
+  EXPECT_TRUE(constraints.checkOutboundFrameLimits(session_).ok());
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(0));
+  EXPECT_FALSE(constraints.checkOutboundFrameLimits(session_).ok());
+  EXPECT_TRUE(isBufferFloodError(constraints.status()));
+  EXPECT_EQ("Too many frames in the outbound queue.", constraints.status().message());
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
+}
+
+TEST_F(ProtocolConstraintsTest, QueuedOutboundFrameFlood) {
+  options_.mutable_max_outbound_frames()->set_value(10);
+  options_.mutable_max_outbound_control_frames()->set_value(5);
+  ProtocolConstraints constraints(http2CodecStats(), options_);
+  constraints.incrementOutboundFrameCount(false);
+  constraints.incrementOutboundFrameCount(false);
+  constraints.incrementOutboundFrameCount(false);
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(4));
+  EXPECT_TRUE(constraints.checkOutboundFrameLimits(session_).ok());
+  constraints.incrementOutboundFrameCount(false);
+  constraints.incrementOutboundFrameCount(false);
+  constraints.incrementOutboundFrameCount(false);
+  constraints.incrementOutboundFrameCount(false);
+  // The 4 control frames queued at the nghttp2 level count against the total outbound frame limit,
+  // so those combined with the 7 frames in the output buffer push the connection past the outbound
+  // frame limit.
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(4));
+  EXPECT_FALSE(constraints.checkOutboundFrameLimits(session_).ok());
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   EXPECT_EQ("Too many frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
@@ -66,13 +118,15 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFloodStatusIsIdempotent) {
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_TRUE(isBufferFloodError(constraints.checkOutboundFrameLimits()));
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).WillOnce(Return(0));
+  EXPECT_TRUE(isBufferFloodError(constraints.checkOutboundFrameLimits(session_)));
   EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   // Then trigger flood check for all frame types
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).Times(0);
+  EXPECT_FALSE(constraints.checkOutboundFrameLimits(session_).ok());
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   // The status should still reflect the first violation
   EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
@@ -114,7 +168,8 @@ TEST_F(ProtocolConstraintsTest, OutboundAndInboundFrameFloodStatusIsIdempotent) 
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.checkOutboundFrameLimits()));
+  EXPECT_CALL(session_, getOutboundControlFrameQueueSize()).Times(0);
+  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.checkOutboundFrameLimits(session_)));
   EXPECT_EQ(1, stats_store_.counter("http2.inbound_empty_frames_flood").value());
   EXPECT_EQ(0, stats_store_.counter("http2.outbound_control_flood").value());
 }

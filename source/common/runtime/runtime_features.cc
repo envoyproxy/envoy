@@ -102,6 +102,8 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // v2 is fatal-by-default.
     "envoy.reloadable_features.enable_deprecated_v2_api",
+    // Improvements to HTTP2 watermark handling and buffering.
+    "envoy.reloadable_features.enable_h2_watermark_improvements",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
     // v2 url is removed from codebase.
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",

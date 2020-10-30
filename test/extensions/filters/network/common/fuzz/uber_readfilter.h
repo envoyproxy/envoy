@@ -29,7 +29,7 @@ protected:
   // Reset the states of the mock objects.
   void reset();
   // Mock behaviors for specific filters.
-  void perFilterSetup(const std::string& filter_name);
+  void perFilterSetup(const std::string& filter_name, const Protobuf::Message& message);
 
 private:
   Server::Configuration::FakeFactoryContext factory_context_;

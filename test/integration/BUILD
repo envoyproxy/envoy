@@ -1273,6 +1273,7 @@ envoy_cc_test(
     deps = [
         ":tracked_watermark_buffer_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )
 

@@ -89,6 +89,7 @@ UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.simulatedTi
 void UberFilterFuzzer::fuzz(
     const envoy::config::listener::v3::Filter& proto_config,
     const Protobuf::RepeatedPtrField<::test::extensions::filters::network::Action>& actions) {
+  ProtobufTypes::MessagePtr message;
   try {
     // Try to create the filter callback(cb_). Exit early if the config is invalid or violates PGV
     // constraints.
@@ -96,7 +97,7 @@ void UberFilterFuzzer::fuzz(
     ENVOY_LOG_MISC(info, "filter name {}", filter_name);
     auto& factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::NamedNetworkFilterConfigFactory>(filter_name);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+    message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
     // Make sure no invalid system calls are executed in fuzzer.
     checkInvalidInputForFuzzer(filter_name, message.get());
@@ -106,7 +107,7 @@ void UberFilterFuzzer::fuzz(
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup {}", e.what());
     return;
   }
-  perFilterSetup(proto_config.name());
+  perFilterSetup(proto_config.name(), *message);
   // Add filter to connection_.
   cb_(read_filter_callbacks_->connection_);
   for (const auto& action : actions) {

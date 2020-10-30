@@ -28,6 +28,22 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+namespace {
+
+class Nghttp2Session : public Nghttp2SessionInterface {
+public:
+  explicit Nghttp2Session(nghttp2_session& session) : session_(session) {}
+
+  size_t getOutboundControlFrameQueueSize() const override {
+    return nghttp2_session_get_outbound_queue_size(&session_);
+  }
+
+private:
+  nghttp2_session& session_;
+};
+
+} // namespace
+
 // Changes or additions to details should be reflected in
 // docs/root/configuration/http/http_conn_man/response_code_details_details.rst
 class Http2ResponseCodeDetailValues {
@@ -116,13 +132,22 @@ template <typename T> static T* removeConst(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-    : parent_(parent), local_end_stream_sent_(false), remote_end_stream_(false),
-      data_deferred_(false), received_noninformational_headers_(false),
+    : parent_(parent),
+      pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().create(
+          [this]() -> void { this->pendingRecvBufferLowWatermark(); },
+          [this]() -> void { this->pendingRecvBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().create(
+          [this]() -> void { this->pendingSendBufferLowWatermark(); },
+          [this]() -> void { this->pendingSendBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
+      received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
-    setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
+    setWriteBufferWatermarks(buffer_limit);
   }
 }
 
@@ -131,7 +156,7 @@ ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(stream_idle_timer_ == nullptr
 void ConnectionImpl::StreamImpl::destroy() {
   disarmStreamIdleTimer();
   parent_.stats_.streams_active_.dec();
-  parent_.stats_.pending_send_bytes_.sub(pending_send_data_.length());
+  parent_.stats_.pending_send_bytes_.sub(pending_send_data_->length());
 }
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
@@ -239,7 +264,7 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
-  if (pending_send_data_.length() > 0) {
+  if (pending_send_data_->length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     // However, for empty trailers, we don't need to to save the trailers.
@@ -395,13 +420,13 @@ void ConnectionImpl::StreamImpl::submitMetadata(uint8_t flags) {
 }
 
 ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* data_flags) {
-  if (pending_send_data_.length() == 0 && !local_end_stream_) {
+  if (pending_send_data_->length() == 0 && !local_end_stream_) {
     ASSERT(!data_deferred_);
     data_deferred_ = true;
     return NGHTTP2_ERR_DEFERRED;
   } else {
     *data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
-    if (local_end_stream_ && pending_send_data_.length() <= length) {
+    if (local_end_stream_ && pending_send_data_->length() <= length) {
       *data_flags |= NGHTTP2_DATA_FLAG_EOF;
       if (pending_trailers_to_encode_) {
         // We need to tell the library to not set end stream so that we can emit the trailers.
@@ -411,29 +436,38 @@ ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* 
       }
     }
 
-    return std::min(length, pending_send_data_.length());
+    return std::min(length, pending_send_data_->length());
   }
 }
 
-void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t length) {
+ssize_t ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t length) {
   // In this callback we are writing out a raw DATA frame without copying. nghttp2 assumes that we
   // "just know" that the frame header is 9 bytes.
   // https://nghttp2.org/documentation/types.html#c.nghttp2_send_data_callback
   static const uint64_t FRAME_HEADER_SIZE = 9;
 
+  if (parent_.h2_watermark_improvements_ && length > 0 &&
+      parent_.connection_.aboveHighWatermark()) {
+    // The network connection's output buffer is full. Delay generation of the data frame until the
+    // buffer's size drops to its low-watermark.
+    return NGHTTP2_ERR_WOULDBLOCK;
+  }
+
   parent_.protocol_constraints_.incrementOutboundDataFrameCount();
 
   Buffer::OwnedImpl output;
   parent_.addOutboundFrameFragment(output, framehd, FRAME_HEADER_SIZE);
-  if (!parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
+  if (!parent_.protocol_constraints_.checkOutboundFrameLimits(Nghttp2Session(*parent_.session_))
+           .ok()) {
     ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
                    parent_.connection_);
     setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
   }
 
   parent_.stats_.pending_send_bytes_.sub(length);
-  output.move(pending_send_data_, length);
+  output.move(*pending_send_data_, length);
   parent_.connection_.write(output, false);
+  return 0;
 }
 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -488,7 +522,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
 
   local_end_stream_ = end_stream;
   parent_.stats_.pending_send_bytes_.add(data.length());
-  pending_send_data_.move(data);
+  pending_send_data_->move(data);
   if (data_deferred_) {
     int rc = nghttp2_session_resume_data(parent_.session_, stream_id_);
     ASSERT(rc == 0);
@@ -500,7 +534,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
     // Intended to check through coverage that this error case is tested
     return;
   }
-  if (local_end_stream_ && pending_send_data_.length() > 0) {
+  if (local_end_stream_ && pending_send_data_->length() > 0) {
     createPendingFlushTimer();
   }
 }
@@ -568,7 +602,11 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       protocol_constraints_(stats, http2_options),
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
+      h2_watermark_improvements_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_h2_watermark_improvements")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false),
+      send_pending_frames_cb_(connection_.dispatcher().createSchedulableCallback(
+          [this]() -> void { sendPendingFramesAndHandleError(); })),
       random_(random_generator) {
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
@@ -681,9 +719,11 @@ ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
 
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
   StreamImpl* stream = getStream(stream_id);
+  // onData callback only triggers if the stream is still alive when the data arrives.
+  ASSERT(stream != nullptr);
   // If this results in buffering too much data, the watermark buffer will call
   // pendingRecvBufferHighWatermark, resulting in ++read_disable_count_
-  stream->pending_recv_data_.add(data, len);
+  stream->pending_recv_data_->add(data, len);
   // Update the window to the peer unless some consumer of this stream's data has hit a flow control
   // limit and disabled reads on this stream
   if (!stream->buffersOverrun()) {
@@ -838,10 +878,10 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // It's possible that we are waiting to send a deferred reset, so only raise data if local
     // is not complete.
     if (!stream->deferred_reset_) {
-      stream->decoder().decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
+      stream->decoder().decodeData(*stream->pending_recv_data_, stream->remote_end_stream_);
     }
 
-    stream->pending_recv_data_.drain(stream->pending_recv_data_.length());
+    stream->pending_recv_data_->drain(stream->pending_recv_data_->length());
     break;
   }
   case NGHTTP2_RST_STREAM: {
@@ -887,7 +927,14 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   case NGHTTP2_HEADERS:
   case NGHTTP2_DATA: {
     StreamImpl* stream = getStream(frame->hd.stream_id);
-    stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
+    // Check if stream is still active before recording flag state. onFrameSend callbacks runs once
+    // the frame is serialized to the output buffer; queued frames can be sent after the associated
+    // stream has been terminated.
+    // TODO(antoniovicente) Is this delay recording local_end_stream_sent_ when writes
+    // NGHTTP2_ERR_WOULDBLOCK acceptable?
+    if (stream != nullptr) {
+      stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
+    }
     break;
   }
   }
@@ -953,6 +1000,12 @@ void ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const u
 
 ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
   ENVOY_CONN_LOG(trace, "send data: bytes={}", connection_, length);
+  if (h2_watermark_improvements_ && connection_.aboveHighWatermark()) {
+    // The network connection's output buffer is full. Return NGHTTP2_ERR_WOULDBLOCK so nghttp2
+    // queues the control frame until the buffer's size drops to its low-watermark.
+    return NGHTTP2_ERR_WOULDBLOCK;
+  }
+
   Buffer::OwnedImpl buffer;
   addOutboundFrameFragment(buffer, data, length);
 
@@ -1119,7 +1172,7 @@ Status ConnectionImpl::sendPendingFrames() {
 
   // After all pending frames have been written into the outbound buffer check if any of
   // protocol constraints had been violated.
-  Status status = protocol_constraints_.checkOutboundFrameLimits();
+  Status status = protocol_constraints_.checkOutboundFrameLimits(Nghttp2Session(*session_));
   if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "error sending frames: Too many frames in the outbound queue.",
                    connection_);
@@ -1232,8 +1285,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
          nghttp2_data_source* source, void*) -> int {
         ASSERT(frame->data.padlen == 0);
-        static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
-        return 0;
+        return static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
       });
 
   nghttp2_session_callbacks_set_on_begin_headers_callback(
@@ -1407,7 +1459,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
   // If the connection is currently above the high watermark, make sure to inform the new stream.
   // The connection can not pass this on automatically as it has no awareness that a new stream is
   // created.
-  if (connection_.aboveHighWatermark()) {
+  if (!h2_watermark_improvements_ && connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
   ClientStreamImpl& stream_ref = *stream;
@@ -1424,6 +1476,8 @@ Status ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->headers.padlen));
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
+    // Header frames are discarded if the stream is no longer around when the frame arrives.
+    ASSERT(stream != nullptr);
     stream->allocTrailers();
   }
 
@@ -1500,12 +1554,14 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
     ASSERT(frame->headers.cat == NGHTTP2_HCAT_HEADERS);
 
     StreamImpl* stream = getStream(frame->hd.stream_id);
+    // Header frames are discarded if the stream is no longer around when the frame arrives.
+    ASSERT(stream != nullptr);
     stream->allocTrailers();
     return okStatus();
   }
 
   ServerStreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
-  if (connection_.aboveHighWatermark()) {
+  if (!h2_watermark_improvements_ && connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
   stream->request_decoder_ = &callbacks_.newStream(*stream);
@@ -1560,7 +1616,7 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
 
 Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
-  RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
+  RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits(Nghttp2Session(*session_)));
   return ConnectionImpl::innerDispatch(data);
 }
 

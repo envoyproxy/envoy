@@ -459,6 +459,12 @@ public:
     ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
   }
 
+  void
+  waitForGaugeLe(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeLe(statStore(), name, value, time_system_, timeout));
+  }
+
   void waitForCounterExists(const std::string& name) override {
     notifyingStatsAllocator().waitForCounterExists(name);
   }

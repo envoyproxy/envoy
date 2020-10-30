@@ -257,10 +257,22 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
-  // If the network connection is backed up, the stream should be made aware of it on creation.
-  // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
-  ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
-         new_stream->filter_manager_.aboveHighWatermark());
+
+  // If the network connection is backed up, the HTTP/1.x stream should be made aware of it on
+  // creation. In the case of HTTP/2 the stream should be allowed to read up to the configured
+  // stream limit even when the network connection is backed up, so the readDisable status is not
+  // propagated from the network connection if the
+  // envoy.reloadable_features.enable_h2_watermark_improvements runtime feature is enabled. Both
+  // HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
+  // TODO(antoniovicente) For full consistency we need to use the enable_h2_watermark_improvements
+  // latched by the H2 connection when it was created. Accessing the current value of the runtime
+  // feature may trigger spurious ASSERT failures.
+  ASSERT((Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_h2_watermark_improvements") &&
+          codec_->protocol() >= Protocol::Http2)
+             ? !new_stream->filter_manager_.aboveHighWatermark()
+             : read_callbacks_->connection().aboveHighWatermark() == false ||
+                   new_stream->filter_manager_.aboveHighWatermark());
   LinkedList::moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }

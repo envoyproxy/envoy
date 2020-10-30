@@ -40,17 +40,18 @@ void ProtocolConstraints::releaseOutboundControlFrame() {
   releaseOutboundFrame();
 }
 
-Status ProtocolConstraints::checkOutboundFrameLimits() {
+Status ProtocolConstraints::checkOutboundFrameLimits(const Nghttp2SessionInterface& session) {
   // Stop checking for further violations after the first failure.
   if (!status_.ok()) {
     return status_;
   }
 
-  if (outbound_frames_ > max_outbound_frames_) {
+  size_t nghttp2_outbound_queue = session.getOutboundControlFrameQueueSize();
+  if ((outbound_frames_ + nghttp2_outbound_queue) > max_outbound_frames_) {
     stats_.outbound_flood_.inc();
     return status_ = bufferFloodError("Too many frames in the outbound queue.");
   }
-  if (outbound_control_frames_ > max_outbound_control_frames_) {
+  if ((outbound_control_frames_ + nghttp2_outbound_queue) > max_outbound_control_frames_) {
     stats_.outbound_control_flood_.inc();
     return status_ = bufferFloodError("Too many control frames in the outbound queue.");
   }

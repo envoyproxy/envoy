@@ -68,6 +68,9 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
   NiceMock<ConnPoolCallbacks> callbacks_;
 
   auto* connection = new NiceMock<Network::MockClientConnection>();
+  if (protocol.has_value() && protocol.value() == Protocol::Http2) {
+    new Event::MockSchedulableCallback(&connection->dispatcher_);
+  }
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
   NiceMock<MockResponseDecoder> decoder;
   conn_pool_->newStream(decoder, callbacks_);

@@ -40,6 +40,15 @@ uint32_t Http2Frame::payloadSize() const {
   return (uint32_t(data_[0]) << 16) + (uint32_t(data_[1]) << 8) + uint32_t(data_[2]);
 }
 
+uint32_t Http2Frame::streamId() const {
+  ASSERT(type() == Type::Headers || type() == Type::Data);
+  uint32_t stream_id;
+  memcpy(&stream_id, &data_[5], sizeof(stream_id));
+  return ntohl(stream_id);
+}
+
+uint8_t Http2Frame::flags() const { return data_[4]; }
+
 Http2Frame::ResponseStatus Http2Frame::responseStatus() const {
   if (empty() || Type::Headers != type() || size() <= HeaderSize ||
       ((data_[HeaderSize] & 0x80) == 0)) {

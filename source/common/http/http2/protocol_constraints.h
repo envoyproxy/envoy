@@ -15,6 +15,20 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+/**
+ * Provides limited access to the nghttp2_session and allows mocking in tests.
+ */
+class Nghttp2SessionInterface {
+public:
+  virtual ~Nghttp2SessionInterface() = default;
+
+  /**
+   * Returns the size of nghttp2 session's outbound control frame queue. See
+   * nghttp2_session_get_outbound_queue_size.
+   */
+  virtual size_t getOutboundControlFrameQueueSize() const PURE;
+};
+
 //  Class for detecting abusive peers and validating additional constraints imposed by Envoy.
 //  This class does not check protocol compliance with the H/2 standard, as this is checked by
 //  protocol framer/codec. Currently implemented constraints:
@@ -51,7 +65,7 @@ public:
   // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
 
-  Status checkOutboundFrameLimits();
+  Status checkOutboundFrameLimits(const Nghttp2SessionInterface& session);
 
 private:
   void releaseOutboundFrame();

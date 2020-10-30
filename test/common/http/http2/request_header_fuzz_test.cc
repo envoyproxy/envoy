@@ -15,6 +15,7 @@ namespace {
 
 void replay(const Frame& frame, ServerCodecFrameInjector& codec) {
   // Create the server connection containing the nghttp2 session.
+  new Event::MockSchedulableCallback(&codec.server_connection_.dispatcher_);
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,

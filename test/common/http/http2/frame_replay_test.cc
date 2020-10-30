@@ -57,6 +57,7 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
+  new Event::MockSchedulableCallback(&codec.server_connection_.dispatcher_);
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
@@ -90,6 +91,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ClientCodecFrameInjector codec;
+  new Event::MockSchedulableCallback(&codec.client_connection_.dispatcher_);
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
@@ -135,6 +137,7 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
+  new Event::MockSchedulableCallback(&codec.server_connection_.dispatcher_);
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
@@ -170,6 +173,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ClientCodecFrameInjector codec;
+  new Event::MockSchedulableCallback(&codec.client_connection_.dispatcher_);
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
@@ -200,6 +204,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
+      new Event::MockSchedulableCallback(&codec.server_connection_.dispatcher_);
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
           codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
@@ -233,6 +238,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
+      new Event::MockSchedulableCallback(&codec.client_connection_.dispatcher_);
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
           codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
@@ -268,6 +274,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
+      new Event::MockSchedulableCallback(&codec.server_connection_.dispatcher_);
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
           codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
@@ -306,6 +313,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
+      new Event::MockSchedulableCallback(&codec.client_connection_.dispatcher_);
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
           codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,

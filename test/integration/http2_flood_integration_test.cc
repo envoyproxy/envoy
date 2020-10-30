@@ -10,6 +10,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/socket_option_impl.h"
 
+#include "test/config/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/filters/test_socket_interface.h"
 #include "test/integration/http_integration.h"
@@ -26,30 +27,34 @@ using ::testing::HasSubstr;
 
 namespace Envoy {
 
-namespace {
-const uint32_t ControlFrameFloodLimit = 100;
-const uint32_t AllFrameFloodLimit = 1000;
-} // namespace
-
 class SocketInterfaceSwap {
 public:
   // Object of this class hold the state determining the IoHandle which
   // should return EAGAIN from the `writev` call.
   struct IoHandleMatcher {
-    bool shouldReturnEgain(uint32_t src_port, uint32_t dst_port) const {
-      absl::ReaderMutexLock lock(&mutex_);
-      return writev_returns_egain_ && (src_port == src_port_ || dst_port == dst_port_);
+    bool shouldReturnEgain(Envoy::Network::TestIoSocketHandle* io_handle) {
+      absl::MutexLock lock(&mutex_);
+      if (writev_returns_egain_ && (io_handle->localAddress()->ip()->port() == src_port_ ||
+                                    io_handle->peerAddress()->ip()->port() == dst_port_)) {
+        ASSERT(matched_iohandle_ == nullptr || matched_iohandle_ == io_handle,
+               "Matched multiple io_handles, expected at most one to match.");
+        matched_iohandle_ = io_handle;
+        return true;
+      }
+      return false;
     }
 
     // Source port to match. The port specified should be associated with a listener.
     void setSourcePort(uint32_t port) {
       absl::WriterMutexLock lock(&mutex_);
       src_port_ = port;
+      dst_port_ = 0;
     }
 
     // Destination port to match. The port specified should be associated with a listener.
     void setDestinationPort(uint32_t port) {
       absl::WriterMutexLock lock(&mutex_);
+      src_port_ = 0;
       dst_port_ = port;
     }
 
@@ -59,11 +64,23 @@ public:
       writev_returns_egain_ = true;
     }
 
+    void setResumeWrites() {
+      absl::MutexLock lock(&mutex_);
+      mutex_.Await(absl::Condition(
+          +[](Network::TestIoSocketHandle** matched_iohandle) {
+            return *matched_iohandle != nullptr;
+          },
+          &matched_iohandle_));
+      writev_returns_egain_ = false;
+      matched_iohandle_->activateInDispatcherThreadForTest(Event::FileReadyType::Write);
+    }
+
   private:
     mutable absl::Mutex mutex_;
     uint32_t src_port_ ABSL_GUARDED_BY(mutex_) = 0;
     uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
     bool writev_returns_egain_ ABSL_GUARDED_BY(mutex_) = false;
+    Network::TestIoSocketHandle* matched_iohandle_{};
   };
 
   SocketInterfaceSwap() {
@@ -73,8 +90,7 @@ public:
             [writev_matcher = writev_matcher_](
                 Envoy::Network::TestIoSocketHandle* io_handle, const Buffer::RawSlice*,
                 uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-              if (writev_matcher->shouldReturnEgain(io_handle->localAddress()->ip()->port(),
-                                                    io_handle->peerAddress()->ip()->port())) {
+              if (writev_matcher->shouldReturnEgain(io_handle)) {
                 return Api::IoCallUint64Result(
                     0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                        Network::IoSocketError::deleteIoError));
@@ -100,15 +116,23 @@ protected:
 // destructor stops Envoy the SocketInterfaceSwap destructor needs to run after it. This order of
 // multiple inheritance ensures that SocketInterfaceSwap destructor runs after
 // Http2FrameIntegrationTest destructor completes.
-class Http2FloodMitigationTest : public SocketInterfaceSwap,
-                                 public testing::TestWithParam<Network::Address::IpVersion>,
-                                 public Http2RawFrameIntegrationTest {
+class Http2FloodMitigationTest
+    : public SocketInterfaceSwap,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public Http2RawFrameIntegrationTest {
 public:
-  Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(GetParam()) {
+  Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_h2_watermark_improvements",
+                                      http2FlowControlV2() ? "true" : "false");
+
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
+
+    setServerBufferFactory(buffer_factory_);
   }
+
+  bool http2FlowControlV2() const { return std::get<1>(GetParam()); }
 
 protected:
   bool initializeUpstreamFloodTest();
@@ -120,15 +144,29 @@ protected:
   void floodClient(const Http2Frame& frame, uint32_t num_frames, const std::string& flood_stat);
 
   void setNetworkConnectionBufferSize();
-  void beginSession() override;
+  void initialize() override {
+    Http2RawFrameIntegrationTest::initialize();
+    writev_matcher_->setSourcePort(lookupPort("http"));
+  }
   void prefillOutboundDownstreamQueue(uint32_t data_frame_count, uint32_t data_frame_size = 10);
   IntegrationStreamDecoderPtr prefillOutboundUpstreamQueue(uint32_t frame_count);
   void triggerListenerDrain();
+
+  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
+      std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+static std::string http2FloodMitigationTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return absl::StrCat(std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4"
+                                                                                   : "IPv6",
+                      "_", std::get<1>(params.param) ? "Http2FlowControlV2" : "Http2FlowControlV1");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2FloodMitigationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    http2FloodMitigationTestParamsToString);
 
 bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
@@ -159,23 +197,6 @@ void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
   });
 }
 
-void Http2FloodMitigationTest::beginSession() {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  // set lower outbound frame limits to make tests run faster
-  config_helper_.setDownstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
-  initialize();
-  // Set up a raw connection to easily send requests without reading responses. Also, set a small
-  // TCP receive buffer to speed up connection backup.
-  auto options = std::make_shared<Network::Socket::Options>();
-  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND,
-      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
-  writev_matcher_->setSourcePort(lookupPort("http"));
-  tcp_client_ = makeTcpConnection(lookupPort("http"), options);
-  startHttp2Session();
-}
-
 std::vector<char> Http2FloodMitigationTest::serializeFrames(const Http2Frame& frame,
                                                             uint32_t num_frames) {
   // make sure all frames can fit into 16k buffer
@@ -198,7 +219,8 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_delayed_close_timeout", 1);
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_delayed_close_timeout", 1,
+                                 TestUtility::DefaultTimeout);
 }
 
 // Send header only request, flood client, and verify that the upstream is disconnected and client
@@ -364,9 +386,6 @@ TEST_P(Http2FloodMitigationTest, 404) {
 
 // Verify that the server can detect flood of response DATA frames
 TEST_P(Http2FloodMitigationTest, Data) {
-  auto buffer_factory = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
-  setServerBufferFactory(buffer_factory);
-
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
@@ -400,22 +419,22 @@ TEST_P(Http2FloodMitigationTest, Data) {
 
   // The factory will be used to create 4 buffers: the input and output buffers for request and
   // response pipelines.
-  EXPECT_EQ(4, buffer_factory->numBuffersCreated());
+  EXPECT_EQ(8, buffer_factory_->numBuffersCreated());
 
   // Expect at least 1000 1 byte data frames in the output buffer. Each data frame comes with a
   // 9-byte frame header; 10 bytes per data frame, 10000 bytes total. The output buffer should also
   // contain response headers, which should be less than 100 bytes.
-  EXPECT_LE(10000, buffer_factory->maxBufferSize());
-  EXPECT_GE(10100, buffer_factory->maxBufferSize());
+  EXPECT_LE(10000, buffer_factory_->maxBufferSize());
+  EXPECT_GE(10100, buffer_factory_->maxBufferSize());
 
   // The response pipeline input buffer could end up with the full upstream response in 1 go, but
   // there are no guarantees of that being the case.
-  EXPECT_LE(10000, buffer_factory->sumMaxBufferSizes());
+  EXPECT_LE(10000, buffer_factory_->sumMaxBufferSizes());
   // The max size of the input and output buffers used in the response pipeline is around 10kb each.
-  EXPECT_GE(22000, buffer_factory->sumMaxBufferSizes());
+  EXPECT_GE(22000, buffer_factory_->sumMaxBufferSizes());
   // Verify that all buffers have watermarks set.
-  EXPECT_THAT(buffer_factory->highWatermarkRange(),
-              testing::Pair(1024 * 1024 * 1024, 1024 * 1024 * 1024));
+  EXPECT_THAT(buffer_factory_->highWatermarkRange(),
+              testing::Pair(256 * 1024 * 1024, 1024 * 1024 * 1024));
 }
 
 // Verify that the server can detect flood triggered by a DATA frame from a decoder filter call
@@ -1545,6 +1564,10 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
       {"header_key2", "header_value2"},
   };
   for (uint32_t frame = 0; frame < AllFrameFloodLimit + 1; ++frame) {
+    if (response->reset()) {
+      // Stream was reset, codec_client_ no longer valid.
+      break;
+    }
     codec_client_->sendMetadata(*request_encoder_, metadata_map);
   }
 
@@ -1555,6 +1578,584 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   // Verify that the flood check was triggered.
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_flood")->value());
+}
+
+class Http2BufferWatermarksTest : public Http2FloodMitigationTest {
+public:
+  struct BufferParams {
+    uint32_t connection_watermark;
+    uint32_t downstream_h2_stream_window;
+    uint32_t downstream_h2_conn_window;
+    uint32_t upstream_h2_stream_window;
+    uint32_t upstream_h2_conn_window;
+  };
+
+  void initializeWithBufferConfig(
+      const BufferParams& buffer_params, uint32_t num_responses,
+      bool enable_downstream_frame_limits,
+      FakeHttpConnection::Type upstream_protocol = FakeHttpConnection::Type::HTTP2) {
+    config_helper_.setBufferLimits(buffer_params.connection_watermark,
+                                   buffer_params.connection_watermark);
+
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          auto* h2_options = hcm.mutable_http2_protocol_options();
+          h2_options->mutable_max_concurrent_streams()->set_value(num_responses);
+          h2_options->mutable_initial_stream_window_size()->set_value(
+              buffer_params.downstream_h2_stream_window);
+          h2_options->mutable_initial_connection_window_size()->set_value(
+              buffer_params.downstream_h2_conn_window);
+        });
+
+    if (upstream_protocol == FakeHttpConnection::Type::HTTP2) {
+      config_helper_.addConfigModifier(
+          [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+            ConfigHelper::HttpProtocolOptions protocol_options;
+            auto* upstream_h2_options =
+                protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+            upstream_h2_options->mutable_max_concurrent_streams()->set_value(100);
+            upstream_h2_options->mutable_initial_stream_window_size()->set_value(
+                buffer_params.upstream_h2_stream_window);
+            upstream_h2_options->mutable_initial_connection_window_size()->set_value(
+                buffer_params.upstream_h2_conn_window);
+            for (auto& cluster_config : *bootstrap.mutable_static_resources()->mutable_clusters()) {
+              ConfigHelper::setProtocolOptions(cluster_config, protocol_options);
+            }
+          });
+    }
+
+    autonomous_upstream_ = true;
+    autonomous_allow_incomplete_streams_ = true;
+    if (enable_downstream_frame_limits) {
+      beginSession(upstream_protocol);
+    } else {
+      beginSession(upstream_protocol, std::numeric_limits<uint32_t>::max(),
+                   std::numeric_limits<uint32_t>::max());
+    }
+  }
+
+  std::vector<uint32_t> sendRequests(uint32_t num_responses, uint32_t chunks_per_response,
+                                     uint32_t chunk_size,
+                                     uint32_t min_buffered_bytes_per_stream = 0) {
+    uint32_t expected_response_size = chunks_per_response * chunk_size;
+    std::vector<uint32_t> stream_ids;
+
+    auto connection_window_update = Http2Frame::makeWindowUpdateFrame(0, 1024 * 1024 * 1024);
+    sendFrame(connection_window_update);
+
+    for (uint32_t idx = 0; idx < num_responses; ++idx) {
+      const uint32_t request_stream_id = Http2Frame::makeClientStreamId(idx);
+      stream_ids.push_back(request_stream_id);
+      const auto request = Http2Frame::makeRequest(
+          request_stream_id, "host", "/test/long/url",
+          {Http2Frame::Header("response_data_blocks", absl::StrCat(chunks_per_response)),
+           Http2Frame::Header("response_size_bytes", absl::StrCat(chunk_size)),
+           Http2Frame::Header("no_trailers", "0")});
+      EXPECT_EQ(request_stream_id, request.streamId());
+      sendFrame(request);
+
+      auto stream_window_update =
+          Http2Frame::makeWindowUpdateFrame(request_stream_id, expected_response_size);
+      sendFrame(stream_window_update);
+
+      if (min_buffered_bytes_per_stream > 0) {
+        EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(
+            (idx + 1) * min_buffered_bytes_per_stream, TestUtility::DefaultTimeout))
+            << "idx: " << idx << " buffer total: " << buffer_factory_->totalBufferSize()
+            << " buffer max: " << buffer_factory_->maxBufferSize();
+      }
+    }
+
+    return stream_ids;
+  }
+
+  void runTestWithBufferConfig(
+      const BufferParams& buffer_params, uint32_t num_responses, uint32_t chunks_per_response,
+      uint32_t chunk_size, uint32_t min_buffered_bytes, uint32_t min_buffered_bytes_per_stream = 0,
+      FakeHttpConnection::Type upstream_protocol = FakeHttpConnection::Type::HTTP2) {
+    uint32_t expected_response_size = chunks_per_response * chunk_size;
+
+    initializeWithBufferConfig(buffer_params, num_responses, false, upstream_protocol);
+
+    // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames
+    // start to accumulate in the transport socket buffer.
+    writev_matcher_->setWritevReturnsEgain();
+
+    std::vector<uint32_t> stream_ids =
+        sendRequests(num_responses, chunks_per_response, chunk_size, min_buffered_bytes_per_stream);
+
+    ASSERT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(min_buffered_bytes,
+                                                               TestUtility::DefaultTimeout))
+        << "buffer total: " << buffer_factory_->totalBufferSize()
+        << " buffer max: " << buffer_factory_->maxBufferSize();
+    writev_matcher_->setResumeWrites();
+
+    std::map<uint32_t, ResponseInfo> response_info;
+    parseResponse(&response_info, num_responses);
+    ASSERT_EQ(stream_ids.size(), response_info.size());
+    for (uint32_t stream_id : stream_ids) {
+      EXPECT_EQ(expected_response_size, response_info[stream_id].response_size_) << stream_id;
+    }
+
+    tcp_client_->close();
+  }
+
+  struct ResponseInfo {
+    uint32_t response_size_ = 0;
+    bool reset_stream_ = false;
+    bool end_stream_ = false;
+  };
+
+  void parseResponse(std::map<uint32_t, ResponseInfo>* response_info, uint32_t expect_completed) {
+    parseResponseUntil(response_info, [&]() -> bool {
+      uint32_t completed = 0;
+      for (const auto& item : *response_info) {
+        if (item.second.end_stream_ || item.second.reset_stream_) {
+          ++completed;
+        }
+      }
+      return completed >= expect_completed;
+    });
+  }
+
+  void parseResponseUntil(std::map<uint32_t, ResponseInfo>* response_info,
+                          const std::function<bool()>& stop_predicate) {
+    while (!stop_predicate()) {
+      auto frame = readFrame();
+      switch (frame.type()) {
+      case Http2Frame::Type::Headers: {
+        uint32_t stream_id = frame.streamId();
+        auto result = response_info->emplace(stream_id, ResponseInfo());
+        ASSERT(result.second);
+      } break;
+      case Http2Frame::Type::Data: {
+        uint32_t stream_id = frame.streamId();
+        auto it = response_info->find(stream_id);
+        ASSERT(it != response_info->end());
+        it->second.response_size_ += frame.payloadSize();
+        if (frame.flags() > 0) {
+          it->second.end_stream_ = true;
+        }
+      } break;
+      case Http2Frame::Type::RstStream: {
+        uint32_t stream_id = frame.streamId();
+        ENVOY_LOG_MISC(critical, "rst {}", stream_id);
+        auto it = response_info->find(stream_id);
+        ASSERT(it != response_info->end());
+        it->second.reset_stream_ = true;
+      } break;
+      default:
+        RELEASE_ASSERT(false, absl::StrCat("Unknown frame type: ", frame.type()));
+      }
+    }
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2BufferWatermarksTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    http2FloodMitigationTestParamsToString);
+
+// Verify buffering behavior when the downstream and upstream H2 stream high watermarks are
+// configured to the same value.
+TEST_P(Http2BufferWatermarksTest, DataFlowControlSymmetricStreamConfig) {
+  int num_requests = 5;
+  uint32_t connection_watermark = 32768;
+  uint32_t h2_stream_window = 128 * 1024;
+  uint32_t h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  uint64_t kBlockSize = 1024;
+  uint64_t kNumBlocks = 5 * h2_stream_window / kBlockSize;
+
+  runTestWithBufferConfig(
+      {connection_watermark, h2_stream_window, h2_conn_window, h2_stream_window, h2_conn_window},
+      num_requests, kNumBlocks, kBlockSize, h2_stream_window * num_requests, h2_stream_window);
+
+  // Verify that the flood check was not triggered
+  EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
+
+  EXPECT_EQ(24, buffer_factory_->numBuffersCreated());
+  if (http2FlowControlV2()) {
+    EXPECT_LE(h2_stream_window - connection_watermark, buffer_factory_->maxBufferSize());
+    EXPECT_GE(3 * h2_stream_window, buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LE(1.0, std::get<0>(overflow_info));
+    EXPECT_GE(3.0, std::get<0>(overflow_info));
+    // Max overflow happens on the stream buffer.
+    EXPECT_EQ(h2_stream_window, std::get<1>(overflow_info));
+  } else {
+    EXPECT_LE(h2_stream_window * num_requests / 2, buffer_factory_->maxBufferSize());
+    EXPECT_GE(h2_stream_window * num_requests + 2 * connection_watermark,
+              buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LT(18.0, std::get<0>(overflow_info));
+    // Max overflow happens on the connection buffer.
+    EXPECT_EQ(connection_watermark, std::get<1>(overflow_info));
+  }
+  EXPECT_LT(h2_stream_window * num_requests, buffer_factory_->sumMaxBufferSizes());
+  EXPECT_THAT(buffer_factory_->highWatermarkRange(), testing::Pair(32768, 128 * 1024));
+}
+
+// Verify buffering behavior when the upstream buffer high watermarks are configured to a larger
+// value than downstream.
+TEST_P(Http2BufferWatermarksTest, DataFlowControlLargeUpstreamStreamWindow) {
+  int num_requests = 5;
+  uint32_t connection_watermark = 32768;
+  uint32_t downstream_h2_stream_window = 64 * 1024;
+  uint32_t downstream_h2_conn_window = 256 * 1024;
+  uint32_t upstream_h2_stream_window = 512 * 1024;
+  uint32_t upstream_h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  uint64_t kBlockSize = 1024;
+  uint64_t kNumBlocks = 5 * upstream_h2_stream_window / kBlockSize;
+
+  runTestWithBufferConfig(
+      {connection_watermark, downstream_h2_stream_window, downstream_h2_conn_window,
+       upstream_h2_stream_window, upstream_h2_conn_window},
+      num_requests, kNumBlocks, kBlockSize, upstream_h2_stream_window * num_requests);
+
+  // Verify that the flood check was not triggered
+  EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
+
+  EXPECT_EQ(24, buffer_factory_->numBuffersCreated());
+  if (http2FlowControlV2()) {
+    EXPECT_LE(upstream_h2_stream_window - connection_watermark, buffer_factory_->maxBufferSize());
+    EXPECT_GE(2 * upstream_h2_stream_window, buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LE(7.5, std::get<0>(overflow_info));
+    EXPECT_GT(10.0, std::get<0>(overflow_info));
+    // Max overflow happens on the downstream H2 stream buffer.
+    EXPECT_EQ(downstream_h2_stream_window, std::get<1>(overflow_info));
+  } else {
+    EXPECT_LE(upstream_h2_stream_window * num_requests - connection_watermark,
+              buffer_factory_->maxBufferSize());
+    EXPECT_GE(upstream_h2_stream_window * num_requests + 2 * connection_watermark,
+              buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LT(30.0, std::get<0>(overflow_info));
+    // Max overflow happens on the connection buffer.
+    EXPECT_EQ(connection_watermark, std::get<1>(overflow_info));
+  }
+  EXPECT_LT(upstream_h2_stream_window * num_requests, buffer_factory_->sumMaxBufferSizes());
+  EXPECT_THAT(buffer_factory_->highWatermarkRange(), testing::Pair(32768, 512 * 1024));
+}
+
+// Verify buffering behavior when the downstream buffer high watermarks are configured to a larger
+// value than upstream.
+TEST_P(Http2BufferWatermarksTest, DataFlowControlLargeDownstreamStreamWindow) {
+  int num_requests = 5;
+  uint32_t connection_watermark = 32768;
+  uint32_t downstream_h2_stream_window = 512 * 1024;
+  uint32_t downstream_h2_conn_window = 64 * 1024;
+  uint32_t upstream_h2_stream_window = 64 * 1024;
+  uint32_t upstream_h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  uint64_t kBlockSize = 1024;
+  uint64_t kNumBlocks = 5 * downstream_h2_stream_window / kBlockSize;
+
+  runTestWithBufferConfig({connection_watermark, downstream_h2_stream_window,
+                           downstream_h2_conn_window, upstream_h2_stream_window,
+                           upstream_h2_conn_window},
+                          num_requests, kNumBlocks, kBlockSize,
+                          http2FlowControlV2() ? downstream_h2_stream_window * num_requests
+                                               : upstream_h2_stream_window * num_requests);
+
+  // Verify that the flood check was not triggered
+  EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
+
+  EXPECT_EQ(24, buffer_factory_->numBuffersCreated());
+  if (http2FlowControlV2()) {
+    EXPECT_LE(downstream_h2_stream_window - connection_watermark, buffer_factory_->maxBufferSize());
+    EXPECT_GE(2 * downstream_h2_stream_window, buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LE(1.0, std::get<0>(overflow_info));
+    EXPECT_GT(2.0, std::get<0>(overflow_info));
+
+    EXPECT_LT(downstream_h2_stream_window * num_requests, buffer_factory_->sumMaxBufferSizes());
+    EXPECT_GT(2 * downstream_h2_stream_window * num_requests, buffer_factory_->sumMaxBufferSizes());
+  } else {
+    EXPECT_LE(num_requests * upstream_h2_stream_window - connection_watermark,
+              buffer_factory_->maxBufferSize());
+    EXPECT_GE(2 * num_requests * upstream_h2_stream_window, buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LT(9.0, std::get<0>(overflow_info));
+    // Max overflow happens on the connection buffer.
+    EXPECT_EQ(connection_watermark, std::get<1>(overflow_info));
+
+    EXPECT_LT(upstream_h2_stream_window * num_requests, buffer_factory_->sumMaxBufferSizes());
+    EXPECT_GT(2 * upstream_h2_stream_window * num_requests, buffer_factory_->sumMaxBufferSizes());
+  }
+  EXPECT_THAT(buffer_factory_->highWatermarkRange(), testing::Pair(32768, 512 * 1024));
+}
+
+// Verify that buffering is limited when using HTTP1 upstreams.
+TEST_P(Http2BufferWatermarksTest, DataFlowControlHttp1Upstream) {
+  int num_requests = 25;
+  uint32_t connection_watermark = 32768;
+  uint32_t h2_stream_window = 128 * 1024;
+  uint32_t h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  uint64_t kBlockSize = 1024;
+  uint64_t kNumBlocks = 5 * h2_stream_window / kBlockSize;
+
+  runTestWithBufferConfig(
+      {connection_watermark, h2_stream_window, h2_conn_window, 0, 0}, num_requests, kNumBlocks,
+      kBlockSize, http2FlowControlV2() ? h2_stream_window * num_requests : connection_watermark,
+      http2FlowControlV2() ? h2_stream_window : 0, FakeHttpConnection::Type::HTTP1);
+
+  // Verify that the flood check was not triggered
+  EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
+
+  EXPECT_EQ(127, buffer_factory_->numBuffersCreated());
+  if (http2FlowControlV2()) {
+    EXPECT_LE(h2_stream_window - connection_watermark, buffer_factory_->maxBufferSize());
+    EXPECT_GE(h2_stream_window + 2 * connection_watermark, buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LE(1.0, std::get<0>(overflow_info));
+    EXPECT_GE(2.0, std::get<0>(overflow_info));
+    EXPECT_EQ(connection_watermark, std::get<1>(overflow_info));
+  } else {
+    EXPECT_LE(connection_watermark, buffer_factory_->maxBufferSize());
+    EXPECT_GE(3 * connection_watermark, buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LT(1.0, std::get<0>(overflow_info));
+    EXPECT_GE(3.0, std::get<0>(overflow_info));
+    // Max overflow happens on the connection buffer.
+    EXPECT_EQ(connection_watermark, std::get<1>(overflow_info));
+  }
+  EXPECT_THAT(buffer_factory_->highWatermarkRange(), testing::Pair(32768, 128 * 1024));
+}
+
+// Verify that buffering is limited when handling small responses.
+TEST_P(Http2BufferWatermarksTest, SmallResponseBuffering) {
+  int num_requests = 200;
+  uint64_t kNumBlocks = 1;
+  uint64_t kBlockSize = 10240;
+  uint32_t connection_watermark = 32768;
+  uint32_t downstream_h2_stream_window = 64 * 1024;
+  uint32_t downstream_h2_conn_window = 256 * 1024;
+  uint32_t upstream_h2_stream_window = 512 * 1024;
+  uint32_t upstream_h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+
+  runTestWithBufferConfig(
+      {connection_watermark, downstream_h2_stream_window, downstream_h2_conn_window,
+       upstream_h2_stream_window, upstream_h2_conn_window},
+      num_requests, kNumBlocks, kBlockSize, num_requests * kNumBlocks * kBlockSize, kBlockSize);
+
+  EXPECT_LT(800, buffer_factory_->numBuffersCreated());
+  if (http2FlowControlV2()) {
+    EXPECT_LE(connection_watermark, buffer_factory_->maxBufferSize());
+    EXPECT_GE(2 * connection_watermark, buffer_factory_->maxBufferSize());
+    EXPECT_GT(2.0, std::get<0>(buffer_factory_->maxOverflowRatio()));
+  } else {
+    EXPECT_LE(50 * connection_watermark, buffer_factory_->maxBufferSize());
+    EXPECT_GE(70 * connection_watermark, buffer_factory_->maxBufferSize());
+    auto overflow_info = buffer_factory_->maxOverflowRatio();
+    EXPECT_LT(50.0, std::get<0>(overflow_info));
+    // Max overflow happens on the connection buffer.
+    EXPECT_EQ(connection_watermark, std::get<1>(overflow_info));
+  }
+  EXPECT_THAT(buffer_factory_->highWatermarkRange(), testing::Pair(32768, 512 * 1024));
+}
+
+// Verify that control frame protections take effect even if control frames end up queued internally
+// by nghttp2.
+TEST_P(Http2BufferWatermarksTest, PingFloodAfterHighWatermark) {
+  int num_requests = 1;
+  uint64_t kNumBlocks = 10;
+  uint64_t kBlockSize = 16 * 1024;
+  uint32_t connection_watermark = 32768;
+  uint32_t h2_stream_window = 64 * 1024;
+  uint32_t h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+
+  initializeWithBufferConfig(
+      {connection_watermark, h2_stream_window, h2_conn_window, h2_stream_window, h2_conn_window},
+      num_requests, true);
+
+  writev_matcher_->setWritevReturnsEgain();
+
+  sendRequests(num_requests, kNumBlocks, kBlockSize, connection_watermark + h2_stream_window);
+
+  floodServer(Http2Frame::makePingFrame(), "http2.outbound_control_flood",
+              ControlFrameFloodLimit + 1);
+}
+
+TEST_P(Http2BufferWatermarksTest, RstStreamWhileBlockedProxyingDataFrame) {
+  int num_requests = 5;
+  uint64_t kNumBlocks = 20;
+  uint64_t kBlockSize = 16 * 1024;
+  uint32_t connection_watermark = 32768;
+  uint32_t h2_stream_window = 128 * 1024;
+  uint32_t h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  uint32_t expected_response_size = kNumBlocks * kBlockSize;
+
+  initializeWithBufferConfig(
+      {connection_watermark, h2_stream_window, h2_conn_window, h2_stream_window, h2_conn_window},
+      num_requests, true);
+
+  writev_matcher_->setWritevReturnsEgain();
+
+  sendRequests(num_requests, kNumBlocks, kBlockSize, h2_stream_window);
+  if (http2FlowControlV2()) {
+    test_server_->waitForGaugeEq("http2.streams_active", 5);
+  }
+
+  // Reset streams in reverse order except for the most recently created stream. Verify that the rst
+  // streams are properly cancelled.
+  for (int32_t idx = num_requests - 2; idx >= 0; --idx) {
+    const uint32_t request_stream_id = Http2Frame::makeClientStreamId(idx);
+    auto rst_frame =
+        Http2Frame::makeResetStreamFrame(request_stream_id, Http2Frame::ErrorCode::Cancel);
+    sendFrame(rst_frame);
+  }
+
+  if (http2FlowControlV2()) {
+    test_server_->waitForGaugeEq("http2.streams_active", 1);
+  }
+  writev_matcher_->setResumeWrites();
+
+  uint32_t first_stream = Http2Frame::makeClientStreamId(0);
+  uint32_t last_stream = Http2Frame::makeClientStreamId(num_requests - 1);
+
+  std::map<uint32_t, ResponseInfo> response_info;
+  parseResponse(&response_info, 1);
+  if (http2FlowControlV2()) {
+    ASSERT_EQ(2, response_info.size());
+    // Full response on last_stream.
+    EXPECT_EQ(expected_response_size, response_info[last_stream].response_size_);
+    // Partial response on first_stream.
+    EXPECT_LT(0, response_info[first_stream].response_size_);
+    EXPECT_GT(expected_response_size, response_info[first_stream].response_size_);
+    EXPECT_GT(2 * h2_stream_window, response_info[first_stream].response_size_);
+  } else {
+    ASSERT_EQ(num_requests, response_info.size());
+    for (auto& [stream_id, info] : response_info) {
+      if (stream_id == last_stream) {
+        EXPECT_EQ(expected_response_size, response_info[stream_id].response_size_) << stream_id;
+      } else {
+        EXPECT_LT(0, response_info[stream_id].response_size_) << stream_id;
+        EXPECT_GT(expected_response_size, response_info[stream_id].response_size_) << stream_id;
+        EXPECT_GT(2 * h2_stream_window, response_info[stream_id].response_size_) << stream_id;
+      }
+    }
+  }
+
+  tcp_client_->close();
+}
+
+// Create some requests and reset them immediately. Do not wait for the request to reach a specific
+// point in the state machine. Only expect a full response on the one stream that we didn't reset.
+TEST_P(Http2BufferWatermarksTest, RstStreamQuickly) {
+  int num_requests = 5;
+  uint64_t kNumBlocks = 20;
+  uint64_t kBlockSize = 16 * 1024;
+  uint32_t connection_watermark = 32768;
+  uint32_t h2_stream_window = 128 * 1024;
+  uint32_t h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  uint32_t expected_response_size = kNumBlocks * kBlockSize;
+
+  initializeWithBufferConfig(
+      {connection_watermark, h2_stream_window, h2_conn_window, h2_stream_window, h2_conn_window},
+      num_requests, true);
+
+  writev_matcher_->setWritevReturnsEgain();
+
+  sendRequests(num_requests, kNumBlocks, kBlockSize);
+  // Reset streams in reverse order except for the most recently created stream. Verify that the rst
+  // streams are properly cancelled.
+  for (int32_t idx = num_requests - 2; idx >= 0; --idx) {
+    const uint32_t request_stream_id = Http2Frame::makeClientStreamId(idx);
+    auto rst_frame =
+        Http2Frame::makeResetStreamFrame(request_stream_id, Http2Frame::ErrorCode::Cancel);
+    sendFrame(rst_frame);
+  }
+
+  if (http2FlowControlV2()) {
+    test_server_->waitForGaugeEq("http2.streams_active", 1);
+  }
+  writev_matcher_->setResumeWrites();
+
+  uint32_t last_stream = Http2Frame::makeClientStreamId(num_requests - 1);
+
+  // Wait for a full response on |last_stream|
+  std::map<uint32_t, ResponseInfo> response_info;
+  parseResponseUntil(&response_info, [&]() -> bool {
+    auto it = response_info.find(last_stream);
+    return it != response_info.end() && it->second.end_stream_;
+  });
+
+  // The test does not wait for replies to be generated on all streams before sending out the resets
+  // so we are only guaranteed that there will be a response on last_stream.
+  EXPECT_LE(1, response_info.size());
+  for (auto& [stream_id, info] : response_info) {
+    if (stream_id == last_stream) {
+      EXPECT_EQ(expected_response_size, response_info[stream_id].response_size_) << stream_id;
+    } else {
+      // Other streams may get a partial response.
+      EXPECT_GT(expected_response_size, response_info[stream_id].response_size_) << stream_id;
+      EXPECT_GT(2 * h2_stream_window, response_info[stream_id].response_size_) << stream_id;
+    }
+  }
+
+  tcp_client_->close();
+}
+
+// Cover the case where the frame that triggered blocking was a header frame, and a RST_STREAM
+// arrives for that stream.
+TEST_P(Http2BufferWatermarksTest, RstStreamWhileBlockedProxyingHeaderFrame) {
+  int num_requests = 5;
+  uint64_t kNumBlocks = 4;
+  uint64_t kBlockSize = 16 * 1024;
+  uint32_t connection_watermark = 64 * 1024;
+  uint32_t h2_stream_window = 64 * 1024;
+  uint32_t h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  uint32_t expected_response_size = kNumBlocks * kBlockSize;
+
+  initializeWithBufferConfig(
+      {connection_watermark, h2_stream_window, h2_conn_window, h2_stream_window, h2_conn_window},
+      num_requests, true);
+
+  writev_matcher_->setWritevReturnsEgain();
+
+  sendRequests(num_requests, kNumBlocks, kBlockSize, h2_stream_window);
+  if (http2FlowControlV2()) {
+    test_server_->waitForGaugeGe("http2.streams_active", 4);
+  } else {
+    test_server_->waitForGaugeEq("http2.streams_active", 0);
+  }
+
+  for (int32_t idx = 1; idx < num_requests - 1; ++idx) {
+    const uint32_t request_stream_id = Http2Frame::makeClientStreamId(idx);
+    auto rst_frame =
+        Http2Frame::makeResetStreamFrame(request_stream_id, Http2Frame::ErrorCode::Cancel);
+    sendFrame(rst_frame);
+  }
+  if (http2FlowControlV2()) {
+    test_server_->waitForGaugeLe("http2.streams_active", 2);
+  }
+
+  writev_matcher_->setResumeWrites();
+
+  uint32_t first_stream = Http2Frame::makeClientStreamId(0);
+  uint32_t last_stream = Http2Frame::makeClientStreamId(num_requests - 1);
+
+  std::map<uint32_t, ResponseInfo> response_info;
+  parseResponse(&response_info, 2);
+  if (http2FlowControlV2()) {
+    EXPECT_GE(3, response_info.size());
+    EXPECT_LE(2, response_info.size());
+    for (auto& [stream_id, info] : response_info) {
+      if (stream_id == first_stream || stream_id == last_stream) {
+        EXPECT_EQ(expected_response_size, response_info[stream_id].response_size_) << stream_id;
+      } else {
+        EXPECT_EQ(0, response_info[stream_id].response_size_) << stream_id;
+      }
+    }
+  } else {
+    EXPECT_EQ(2, response_info.size());
+    for (auto& [stream_id, info] : response_info) {
+      EXPECT_EQ(expected_response_size, response_info[stream_id].response_size_) << stream_id;
+    }
+  }
+
+  tcp_client_->close();
 }
 
 } // namespace Envoy

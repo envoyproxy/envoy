@@ -9,6 +9,12 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* http2: delay serialization of control and data frames if the network connection's output buffer
+  has triggered its fullness high-watermark. By avoiding eager serialization the H2 codec
+  implementation is able to prioritize more important frames so they are sent sooner and provide
+  stricter bounds on connection and stream buffers. This change can be disabled by setting the
+  `envoy.reloadable_features.enable_h2_watermark_improvements` feature flag to false. If setting
+  this flag to false is required in a deployment please open an issue against the project.
 * upstream: host weight changes now cause a full load balancer rebuild as opposed to happening
   atomically inline. This change has been made to support load balancer pre-computation of data
   structures based on host weight, but may have performance implications if host weight changes

@@ -3133,6 +3133,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMismatch)) 
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
   setupNoServiceValidationHCWithHttp2();
+  new Event::MockSchedulableCallback(&connection_->dispatcher_);
   EXPECT_EQ(Http::CodecClient::Type::HTTP2,
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }

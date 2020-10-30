@@ -1417,11 +1417,12 @@ void Http2RawFrameIntegrationTest::startHttp2Session() {
   readFrame();
 }
 
-void Http2RawFrameIntegrationTest::beginSession() {
+void Http2RawFrameIntegrationTest::beginSession(FakeHttpConnection::Type upstream_protocol,
+                                                uint32_t max_all_frames,
+                                                uint32_t max_control_frames) {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  // set lower outbound frame limits to make tests run faster
-  config_helper_.setDownstreamOutboundFramesLimits(1000, 100);
+  setUpstreamProtocol(upstream_protocol);
+  config_helper_.setDownstreamOutboundFramesLimits(max_all_frames, max_control_frames);
   initialize();
   // Set up a raw connection to easily send requests without reading responses.
   auto options = std::make_shared<Network::Socket::Options>();
@@ -1435,12 +1436,12 @@ void Http2RawFrameIntegrationTest::beginSession() {
 Http2Frame Http2RawFrameIntegrationTest::readFrame() {
   Http2Frame frame;
   EXPECT_TRUE(tcp_client_->waitForData(frame.HeaderSize));
-  frame.setHeader(tcp_client_->data());
+  frame.setHeader(absl::string_view(tcp_client_->data()).substr(0, frame.HeaderSize));
   tcp_client_->clearData(frame.HeaderSize);
   auto len = frame.payloadSize();
   if (len) {
     EXPECT_TRUE(tcp_client_->waitForData(len));
-    frame.setPayload(tcp_client_->data());
+    frame.setPayload(absl::string_view(tcp_client_->data()).substr(0, len));
     tcp_client_->clearData(len);
   }
   return frame;

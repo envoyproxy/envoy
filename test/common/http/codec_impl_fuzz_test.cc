@@ -487,6 +487,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   const bool http2 = http_version == HttpVersion::Http2;
 
   if (http2) {
+    new Event::MockSchedulableCallback(&client_connection.dispatcher_);
     client = std::make_unique<Http2::ClientConnectionImpl>(
         client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
         random, client_http2_options, max_request_headers_kb, max_response_headers_count,
@@ -498,6 +499,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   }
 
   if (http2) {
+    new Event::MockSchedulableCallback(&server_connection.dispatcher_);
     const envoy::config::core::v3::Http2ProtocolOptions server_http2_options{
         fromHttp2Settings(input.h2_settings().server())};
     server = std::make_unique<Http2::ServerConnectionImpl>(

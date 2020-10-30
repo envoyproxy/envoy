@@ -128,9 +128,11 @@ public:
   virtual void initialize() {
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
+    new Event::MockSchedulableCallback(&client_connection_.dispatcher_);
     client_ = std::make_unique<TestClientConnectionImpl>(
         client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
         max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+    new Event::MockSchedulableCallback(&server_connection_.dispatcher_);
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
@@ -1090,7 +1092,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // Now that the flow control window is full, further data causes the send buffer to back up.
   Buffer::OwnedImpl more_long_data(std::string(initial_stream_window, 'a'));
   request_encoder_->encodeData(more_long_data, false);
-  EXPECT_EQ(initial_stream_window, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(initial_stream_window, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(initial_stream_window,
             TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->unconsumed_bytes_);
@@ -1099,7 +1101,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   Buffer::OwnedImpl last_byte("!");
   request_encoder_->encodeData(last_byte, false);
-  EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(initial_stream_window + 1,
             TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
 
@@ -1144,7 +1146,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
   server_->getStream(1)->readDisable(false);
-  EXPECT_EQ(0, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(0, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
   // initial window minus the last 1 byte flush from the client to server.
@@ -1231,7 +1233,7 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
   // the recv buffer can be overrun by a client which negotiates a larger
   // SETTINGS_MAX_FRAME_SIZE but there's no current easy way to tweak that in
   // envoy (without sending raw HTTP/2 frames) so we lower the buffer limit instead.
-  server_->getStream(1)->setWriteBufferWatermarks(10, 20);
+  server_->getStream(1)->setWriteBufferWatermarks(20);
 
   EXPECT_CALL(request_decoder_, decodeData(_, false));
   Buffer::OwnedImpl data(std::string(40, 'a'));
@@ -1548,9 +1550,11 @@ class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
   http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
+  new Event::MockSchedulableCallback(&client_connection_.dispatcher_);
   client_ = std::make_unique<TestClientConnectionImpl>(
       client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
       max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+  new Event::MockSchedulableCallback(&server_connection_.dispatcher_);
   server_ = std::make_unique<TestServerConnectionImpl>(
       server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
       max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
@@ -2730,9 +2734,11 @@ protected:
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
+    new Event::MockSchedulableCallback(&client_connection_.dispatcher_);
     client_ = std::make_unique<MetadataTestClientConnectionImpl>(
         client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
         max_request_headers_kb_, max_response_headers_count_, http2_session_factory_);
+    new Event::MockSchedulableCallback(&server_connection_.dispatcher_);
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);

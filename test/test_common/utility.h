@@ -227,6 +227,21 @@ public:
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Wait for a gauge to <= a given value.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param value target value.
+   * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the counter gauge <= to the value within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult
+  waitForGaugeLe(Stats::Store& store, const std::string& name, uint64_t value,
+                 Event::TestTimeSystem& time_system,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
    * Wait for a gauge to >= a given value.
    * @param store supplies the stats store.
    * @param name gauge name.

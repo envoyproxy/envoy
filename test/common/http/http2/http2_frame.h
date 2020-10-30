@@ -179,6 +179,8 @@ public:
   static Http2Frame makeGenericFrameFromHexDump(absl::string_view contents);
 
   Type type() const { return static_cast<Type>(data_[3]); }
+  uint32_t streamId() const;
+  uint8_t flags() const;
   ResponseStatus responseStatus() const;
 
   // Copy HTTP2 header. The `header` parameter must at least be HeaderSize long.

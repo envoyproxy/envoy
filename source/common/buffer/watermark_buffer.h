@@ -49,7 +49,7 @@ public:
 
 protected:
   virtual void checkHighAndOverflowWatermarks();
-  void checkLowWatermark();
+  virtual void checkLowWatermark();
 
 private:
   std::function<void()> below_low_watermark_;

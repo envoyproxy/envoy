@@ -269,10 +269,18 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, version) {}
 
 protected:
+  static constexpr uint32_t ControlFrameFloodLimit = 100;
+  static constexpr uint32_t AllFrameFloodLimit = 1000;
+
   void startHttp2Session();
   Http2Frame readFrame();
   void sendFrame(const Http2Frame& frame);
-  virtual void beginSession();
+
+  // Use lower default outbound frame limits to make overflow tests run faster.
+  virtual void
+  beginSession(FakeHttpConnection::Type upstream_protocol = FakeHttpConnection::Type::HTTP2,
+               uint32_t max_all_frames = AllFrameFloodLimit,
+               uint32_t max_control_frames = ControlFrameFloodLimit);
 
   IntegrationTcpClientPtr tcp_client_;
 };

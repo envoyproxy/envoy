@@ -54,7 +54,8 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   return filter_names;
 }
 
-void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
+void UberFilterFuzzer::perFilterSetup(const std::string& filter_name,
+                                      const Protobuf::Message& message) {
   // Set up response for ext_authz filter
   if (filter_name == NetworkFilterNames::get().ExtAuthorization) {
 
@@ -94,6 +95,13 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
         pipe_addr_);
+
+    auto config = dynamic_cast<const envoy::extensions::filters::network::http_connection_manager::
+                                   v3::HttpConnectionManager&>(message);
+    if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
+                                   HttpConnectionManager::HTTP2) {
+      new Event::MockSchedulableCallback(&read_filter_callbacks_->connection_.dispatcher_);
+    }
   } else if (filter_name == NetworkFilterNames::get().RateLimit) {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
