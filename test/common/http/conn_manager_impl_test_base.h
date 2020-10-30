@@ -59,7 +59,8 @@ public:
   Event::MockTimer* setUpTimer();
   void sendRequestHeadersAndData();
   ResponseHeaderMap* sendResponseHeaders(ResponseHeaderMapPtr&& response_headers);
-  void expectOnDestroy(bool deferred = true);
+  void expectOnComplete(bool deferred);
+  void expectOnDestroy(bool deferred = true, bool complete = true);
   void doRemoteClose(bool deferred = true);
 
   // Http::ConnectionManagerConfig

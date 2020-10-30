@@ -1400,10 +1400,11 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   Buffer::OwnedImpl fake_response(data);
   InSequence s;
   EXPECT_CALL(stream_, removeCallbacks(_));
-  expectOnDestroy(false);
+  expectOnComplete(false);
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(stream_, resetStream(_));
+  expectOnDestroy(false, false);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   EXPECT_LOG_CONTAINS(
       "debug",
@@ -1442,12 +1443,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
       }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
-  expectOnDestroy();
+  expectOnComplete(true);
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));
   conn_manager_->onData(fake_input, false);
+  expectOnDestroy(false, false);
 }
 
 // Verify that if an encoded stream has been ended, but gets stopped by a filter chain, we end

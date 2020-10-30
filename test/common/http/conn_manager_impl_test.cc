@@ -3207,7 +3207,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   EXPECT_CALL(*codec_, shutdownNotice());
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
-  expectOnDestroy();
+  expectOnComplete(true);
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
@@ -3221,6 +3221,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   conn_manager_->onData(fake_input, false);
 
   // Now fire the close event which should have no effect as all close work has already been done.
+  expectOnDestroy(false, false);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 

@@ -224,7 +224,7 @@ HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& respon
   return altered_response_headers;
 }
 
-void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
+void HttpConnectionManagerImplTest::expectOnComplete(bool deferred) {
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onStreamComplete());
   }
@@ -235,6 +235,16 @@ void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
     std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
   }
 
+  if (deferred) {
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  }
+}
+
+void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred, bool complete) {
+  if (complete) {
+    expectOnComplete(deferred);
+  }
+
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onDestroy());
   }
@@ -243,10 +253,6 @@ void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
       EXPECT_CALL(*filter, onDestroy());
     };
     std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
-  }
-
-  if (deferred) {
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   }
 }
 
