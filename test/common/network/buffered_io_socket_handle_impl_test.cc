@@ -248,7 +248,9 @@ TEST_F(BufferedIoSocketHandleTest, TestSetEnabledTriggerEventSchedule) {
     EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
     scheduable_cb_->invokeCallback();
     ASSERT_FALSE(scheduable_cb_->enabled());
+    // Close io_handle_ first to prevent events originated from peer close.
     io_handle_->close();
+    io_handle_peer_->close();
   }
 }
 

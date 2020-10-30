@@ -11,19 +11,16 @@ namespace Event {
 UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                                uint32_t events, Network::ReadWritable& io_source)
     : schedulable_(dispatcher.createSchedulableCallback([this]() { cb_(); })), cb_([this, cb]() {
-        auto all_events = event_listener_.triggeredEvents();
         auto ephemeral_events = event_listener_.getAndClearEphemeralEvents();
-        ENVOY_LOG(trace,
-                  "User space event {} invokes callbacks on allevents = {}, ephermal events = {}",
-                  static_cast<void*>(this), all_events, ephemeral_events);
-        cb(all_events | ephemeral_events);
+        ENVOY_LOG(trace, "User space event {} invokes callbacks on events = {}",
+                  static_cast<void*>(this), ephemeral_events);
+        cb(ephemeral_events);
       }),
       io_source_(io_source) {
   setEnabled(events);
 }
 
-void EventListenerImpl::onEventEnabled(uint32_t enabled_events) {
-  enabled_events_ = enabled_events;
+void EventListenerImpl::onEventEnabled(uint32_t) {
   // Clear ephemeral events to align with FileEventImpl::setEnable().
   ephemeral_events_ = 0;
 }

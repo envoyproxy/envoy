@@ -23,8 +23,6 @@ class EventListener {
 public:
   virtual ~EventListener() = default;
 
-  // Get the events which are enabled and triggered.
-  virtual uint32_t triggeredEvents() PURE;
   // Get the events which are ephemerally activated. Upon returning the ephemeral events are
   // cleared.
   virtual uint32_t getAndClearEphemeralEvents() PURE;
@@ -51,17 +49,12 @@ class EventListenerImpl : public EventListener {
 public:
   ~EventListenerImpl() override = default;
 
-  // The ready events are not preserved. All ready events must be notified by activate().
-  uint32_t triggeredEvents() override { return 0; }
-
   void onEventEnabled(uint32_t enabled_events) override;
   void onEventActivated(uint32_t activated_events) override;
 
   uint32_t getAndClearEphemeralEvents() override { return std::exchange(ephemeral_events_, 0); }
 
 private:
-  // The persisted interested events. The name on libevent document is pending event.
-  uint32_t enabled_events_{};
   // The events set by activate() and will be cleared after the io callback.
   uint32_t ephemeral_events_{};
 };
