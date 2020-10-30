@@ -20,7 +20,6 @@ public:
   FilterStatus onUpstreamData(size_t data_length, bool end_stream) override;
   void onForeignFunction(uint32_t, uint32_t) override;
   void onDownstreamConnectionClose(CloseType close_type) override;
-  void onUpstreamConnectionClose(CloseType close_type) override;
 };
 static RegisterContextFactory register_ExampleContext(CONTEXT_FACTORY(ExampleContext));
 
@@ -52,11 +51,6 @@ void ExampleContext::onForeignFunction(uint32_t, uint32_t) {
 
 void ExampleContext::onDownstreamConnectionClose(CloseType close_type) {
   logTrace("onDownstreamConnectionClose " + std::to_string(id()) + " " +
-           std::to_string(static_cast<uint32_t>(close_type)));
-}
-
-void ExampleContext::onUpstreamConnectionClose(CloseType close_type) {
-  logTrace("onUpstreamConnectionClose " + std::to_string(id()) + " " +
            std::to_string(static_cast<uint32_t>(close_type)));
 }
 

@@ -179,7 +179,6 @@ public:
 
   // proxy_wasm::ContextBase
   void onDownstreamConnectionClose(CloseType) override;
-  void onUpstreamConnectionClose(CloseType) override;
 
   // Http::StreamFilterBase. Note: This calls onDone() in Wasm.
   void onDestroy() override;
@@ -468,8 +467,6 @@ protected:
   absl::flat_hash_map<std::string, std::unique_ptr<StorageObject>> data_storage_;
 
   // TCP State.
-  bool upstream_closed_ = false;
-  bool downstream_closed_ = false;
   bool tcp_connection_closed_ = false;
 
   // Filter state prototype declaration.
