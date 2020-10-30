@@ -7,7 +7,7 @@ These instructions are slightly more complex as you must also set up a control p
 configuration.
 
 There are a number of control planes compatible with Envoy's API such as `Gloo <https://docs.solo.io/gloo/latest/>`_
-or `Istiod <https://istio.io/latest/docs/ops/deployment/architecture/#istiod>`_.
+or `Istio <https://istio.io>`_.
 
 You may also wish to explore implementing your own control plane, in which case the
 `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_ provides a reference implementation
