@@ -1099,8 +1099,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  if (Event::optimizeLevelEvents &&
-      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+  if (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     EXPECT_CALL(os_sys_calls, readv(_, _, _))
         .WillOnce(Invoke([&](os_fd_t fd, const iovec* vec, int l) -> Api::SysCallSizeResult {
           return os_calls.get_latched_instance()->readv(fd, vec, l);
@@ -2431,12 +2430,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  int times_enabled_called = 1;
-  if (Event::optimizeLevelEvents &&
-      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
-    times_enabled_called = 2;
-  }
-  EXPECT_CALL(*file_event_, setEnabled(_)).Times(times_enabled_called);
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(1);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().
@@ -2463,12 +2457,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
   EXPECT_CALL(dispatcher_, createTimer_(_));
   // With half-close semantics enabled we will not wait for early close notification.
   // See the `Envoy::Network::ConnectionImpl::readDisable()' method for more details.
-  int times_enabled_called = 1;
-  if (Event::optimizeLevelEvents &&
-      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
-    times_enabled_called = 2;
-  }
-  EXPECT_CALL(*file_event_, setEnabled(_)).Times(times_enabled_called);
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(1);
   connection_->enableHalfClose(true);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
@@ -2501,12 +2490,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredCanFlush
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  int times_enabled_called = 1;
-  if (Event::optimizeLevelEvents &&
-      Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
-    times_enabled_called = 2;
-  }
-  EXPECT_CALL(*file_event_, setEnabled(_)).Times(times_enabled_called);
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(1);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().

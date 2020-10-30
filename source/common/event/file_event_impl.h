@@ -22,11 +22,13 @@ public:
   // Event::FileEvent
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
-  uint32_t getEnabled() override { return enabled_events_; }
+  void unregisterReadOrWriteIfLevel(uint32_t event) override;
+  void registerReadOrWriteIfLevel(uint32_t event) override;
 
 private:
   void assignEvents(uint32_t events, event_base* base);
   void mergeInjectedEventsAndRunCb(uint32_t events);
+  void updateEvents(uint32_t events);
 
   FileReadyCb cb_;
   os_fd_t fd_;

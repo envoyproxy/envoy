@@ -28,8 +28,7 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
   // an OOM condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(fd), "");
 #ifdef WIN32
-  RELEASE_ASSERT(trigger_ == FileTriggerType::Level,
-                 "libevent does not support edge triggers on Windows");
+  RELEASE_ASSERT(isLevelLike(trigger_), "libevent does not support edge triggers on Windows");
 #endif
   assignEvents(events, &dispatcher.base());
   event_add(&raw_event_, nullptr);
@@ -109,6 +108,13 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
       this);
 }
 
+void FileEventImpl::updateEvents(uint32_t events) {
+  auto* base = event_get_base(&raw_event_);
+  event_del(&raw_event_);
+  assignEvents(events, base);
+  event_add(&raw_event_, nullptr);
+}
+
 void FileEventImpl::setEnabled(uint32_t events) {
   if (activate_fd_events_next_event_loop_ && injected_activation_events_ != 0) {
     // Clear pending events on updates to the fd event mask to avoid delivering events that are no
@@ -118,11 +124,38 @@ void FileEventImpl::setEnabled(uint32_t events) {
     injected_activation_events_ = 0;
     activation_cb_->cancel();
   }
+  updateEvents(events);
+}
 
-  auto* base = event_get_base(&raw_event_);
-  event_del(&raw_event_);
-  assignEvents(events, base);
-  event_add(&raw_event_, nullptr);
+void FileEventImpl::unregisterReadOrWriteIfLevel(uint32_t event) {
+  ASSERT(event == FileReadyType::Write || event == FileReadyType::Read,
+         fmt::format("not allowed to unregister {}", event));
+  if (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+    auto new_event_mask = enabled_events_ & ~event;
+    if (event == FileReadyType::Write && injected_activation_events_ & FileReadyType::Read) {
+      // we cancel all the injected activation and merge the
+      // read event with the new registration mask
+      injected_activation_events_ = 0;
+      activation_cb_->cancel();
+      new_event_mask |= FileReadyType::Read;
+    }
+    updateEvents(new_event_mask);
+  }
+}
+
+void FileEventImpl::registerReadOrWriteIfLevel(uint32_t event) {
+  ASSERT(event == Event::FileReadyType::Write || event == Event::FileReadyType::Read);
+  if (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+    auto new_event_mask = enabled_events_ | event;
+    if (event == FileReadyType::Write && injected_activation_events_ & FileReadyType::Read) {
+      // we cancel all the injected activation and merge the
+      // read event with the new registration mask
+      injected_activation_events_ = 0;
+      activation_cb_->cancel();
+      new_event_mask |= FileReadyType::Read;
+    }
+    setEnabled(new_event_mask);
+  }
 }
 
 void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
@@ -131,6 +164,14 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
     injected_activation_events_ = 0;
     activation_cb_->cancel();
   }
+
+  std::array<uint32_t, 2> event_types{Event::FileReadyType::Write, Event::FileReadyType::Read};
+  for (const auto& event_type : event_types) {
+    if ((event_type & events) && trigger_ == FileTriggerType::EmulatedEdge) {
+      unregisterReadOrWriteIfLevel(event_type);
+    }
+  }
+
   cb_(events);
 }
 

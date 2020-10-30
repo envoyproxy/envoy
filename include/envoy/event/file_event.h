@@ -18,18 +18,28 @@ struct FileReadyType {
   static const uint32_t Closed = 0x4;
 };
 
-#define FORCE_LEVEL 0
-enum class FileTriggerType { Level, Edge };
+#define FORCE_LEVEL_EVENTS 0
+enum class FileTriggerType { Level, Edge, EmulatedEdge };
 
 static constexpr bool optimizeLevelEvents = true;
 
-static constexpr FileTriggerType PlatformDefaultTriggerType
+constexpr FileTriggerType isPlatformUsingLevelEvents() {
 #if defined(WIN32) || defined(FORCE_LEVEL_EVENTS)
-    // Libevent only supports Level trigger on Windows.
-    {FileTriggerType::Level};
+  if constexpr (optimizeLevelEvents) {
+    return FileTriggerType::EmulatedEdge;
+  } else {
+    return FileTriggerType::Level;
+  }
 #else
-    {FileTriggerType::Edge};
+  return FileTriggerType::Edge;
 #endif
+}
+
+static constexpr FileTriggerType PlatformDefaultTriggerType = isPlatformUsingLevelEvents();
+
+static constexpr bool isLevelLike(FileTriggerType event) {
+  return (event == FileTriggerType::EmulatedEdge) || (event == FileTriggerType::Level);
+}
 
 /**
  * Callback invoked when a FileEvent is ready for reading or writing.
@@ -58,9 +68,14 @@ public:
   virtual void setEnabled(uint32_t events) PURE;
 
   /**
-   * Gets the currently enabled events.
+   * Add a single event from the event registration mark.
    */
-  virtual uint32_t getEnabled() PURE;
+  virtual void registerReadOrWriteIfLevel(uint32_t event) PURE;
+
+  /**
+   * Remove a single event from the event registration mark.
+   */
+  virtual void unregisterReadOrWriteIfLevel(uint32_t event) PURE;
 };
 
 using FileEventPtr = std::unique_ptr<FileEvent>;
