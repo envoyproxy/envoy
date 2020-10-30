@@ -115,7 +115,7 @@ public:
         ASSERT(metrics_family.metric(0).has_timestamp_ms());
         // Validate that all metrics have the same timestamp.
         if (previous_time_stamp > 0) {
-                  EXPECT_EQ(previous_time_stamp, metrics_family.metric(0).timestamp_ms());
+          EXPECT_EQ(previous_time_stamp, metrics_family.metric(0).timestamp_ms());
         }
         previous_time_stamp = metrics_family.metric(0).timestamp_ms();
         if (known_counter_exists && known_gauge_exists && known_histogram_exists) {
