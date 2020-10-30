@@ -345,14 +345,6 @@ should only be done to correct a DCO mistake.
 
 ## Triggering CI re-run without making changes
 
-To rerun failed tasks in Circle-CI, add a comment with the line
-
-```
-/retest-circle
-```
-
-in it. This should rebuild only the failed tasks.
-
 To rerun failed tasks in Azure pipelines, add a comment with the line
 
 ```
