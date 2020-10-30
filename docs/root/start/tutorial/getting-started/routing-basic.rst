@@ -5,7 +5,7 @@ Routing basics
 ==============
 
 This article discusses Envoy's routing in more detail. You may have already
-seen how routing works :ref:`on your laptop <on_your_laptop>`
+seen how routing works :ref:`running Envoy <tutorial_running_envoy>`
 but now you can see more of how routes, clusters, and listeners are configured
 with static files.
 
@@ -39,7 +39,7 @@ Defining Routes
 ~~~~~~~~~~~~~~~
 
 Envoy’s routing definitions map a domain + URL to a cluster. In our previous
-tutorial :ref:`on your laptop <on_your_laptop>`,
+tutorial :ref:`running Envoy <running_envoy>`,
 we defined a simple setup with 2 clusters (service1 and service2), each of
 which lived at a separate URL (/service1 and /service2).
 
@@ -61,7 +61,7 @@ which lived at a separate URL (/service1 and /service2).
 
 Clusters pull their membership data from DNS and use a round-robin load
 balancing over all hosts. This cluster definition is from the examples
-:ref:`on your laptop <on_your_laptop>`.
+:ref:`running Envoy <running_envoy>`.
 
 .. code-block:: yaml
 
