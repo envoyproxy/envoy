@@ -1,3 +1,3 @@
 [build]
-    command = "./ci/run_envoy_docker.sh 'docs/build.sh'"
+    command = "./ci/do_circle_ci.sh docs"
     publish = "./envoy/docs/generated/docs"
