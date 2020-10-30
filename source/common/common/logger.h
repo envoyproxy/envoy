@@ -329,6 +329,27 @@ protected:
   }
 };
 
+// Contains custom flags to introduce user defined flags in log pattern. Reference:
+// https://github.com/gabime/spdlog#user-defined-flags-in-the-log-pattern.
+namespace CustomFlagFormatter {
+
+/**
+ * When added to a formatter, this adds '_' as a user defined flag in the log pattern that escapes
+ * newlines.
+ */
+class EscapeMessageNewLine : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<EscapeMessageNewLine>();
+  }
+
+  constexpr static char Placeholder = '_';
+};
+
+} // namespace CustomFlagFormatter
 } // namespace Logger
 
 /**

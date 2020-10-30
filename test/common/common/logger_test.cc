@@ -43,5 +43,43 @@ TEST(LoggerEscapeTest, WhitespaceOnly) {
 
 TEST(LoggerEscapeTest, Empty) { EXPECT_EQ("", DelegatingLogSink::escapeLogLine("")); }
 
+TEST(LoggerCustomFlagsTest, SetFormatter) {
+  using PatternFormatterPtr = std::unique_ptr<spdlog::pattern_formatter>;
+
+  auto create_formatter = [](const std::string& pattern) -> PatternFormatterPtr {
+    auto formatter = std::make_unique<spdlog::pattern_formatter>();
+    formatter
+        ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
+            CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
+        .set_pattern(pattern);
+    return formatter;
+  };
+
+  spdlog::details::log_msg msg("test", spdlog::level::info, "\n\nmessage\n\n");
+
+  {
+    auto logger = DelegatingLogSink::init();
+    // This uses "%v", the default flag for printing the actual text to log.
+    // https://github.com/gabime/spdlog/wiki/3.-Custom-formatting#pattern-flags.
+    auto formatter = create_formatter("%v");
+    logger->set_formatter(std::move(formatter));
+
+    testing::internal::CaptureStderr();
+    logger->log(msg);
+    EXPECT_EQ("\n\nmessage\n\n\n", testing::internal::GetCapturedStderr());
+  }
+
+  {
+    auto escape_newline_logger = DelegatingLogSink::init();
+    // This uses "%_", the added custom flag that escapes newlines from the actual text to log.
+    auto escape_newline_formatter = create_formatter("%_");
+    escape_newline_logger->set_formatter(std::move(escape_newline_formatter));
+
+    testing::internal::CaptureStderr();
+    escape_newline_logger->log(msg);
+    EXPECT_EQ("\\n\\nmessage\\n\\n\n", testing::internal::GetCapturedStderr());
+  }
+}
+
 } // namespace Logger
 } // namespace Envoy
