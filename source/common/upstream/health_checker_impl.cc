@@ -285,12 +285,12 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
   request_in_flight_ = false;
   ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
-  if (client_ && !reuse_connection_) {
-    client_->close();
-  }
-
   if (expect_reset_) {
     return;
+  }
+
+  if (client_ && !reuse_connection_) {
+    client_->close();
   }
 
   handleFailure(envoy::data::core::v3::NETWORK);
@@ -303,8 +303,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
 
   // Runtime guard around graceful handling of NO_ERROR GOAWAY handling. The old behavior is to
   // ignore GOAWAY completely.
-  if (!parent_.runtime_.snapshot().featureEnabled(
-          "envoy.reloadable_features.health_check.graceful_goaway_handling", 100UL)) {
+  if (!parent_.runtime_.snapshot().runtimeFeatureEnabled(
+          "envoy.reloadable_features.health_check.graceful_goaway_handling")) {
     return;
   }
 

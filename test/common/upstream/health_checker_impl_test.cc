@@ -2572,7 +2572,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   expectChangePending(0);
   EXPECT_CALL(
       runtime_.snapshot_,
-      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
       .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2588,7 +2588,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
   expectUnhealthyTransition(0, false);
   EXPECT_CALL(
       runtime_.snapshot_,
-      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
       .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
   EXPECT_EQ(Host::Health::Unhealthy,
@@ -2613,7 +2613,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
 
   EXPECT_CALL(
       runtime_.snapshot_,
-      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
       .WillOnce(Return(true));
   // GOAWAY with NO_ERROR code during check should be handled gracefully.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
@@ -2649,7 +2649,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
 
   EXPECT_CALL(
       runtime_.snapshot_,
-      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
       .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2687,7 +2687,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
 
   EXPECT_CALL(
       runtime_.snapshot_,
-      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
       .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2725,7 +2725,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
 
   EXPECT_CALL(
       runtime_.snapshot_,
-      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
       .WillOnce(Return(true));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2767,7 +2767,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
 
   EXPECT_CALL(
       runtime_.snapshot_,
-      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
       .WillOnce(Return(true));
   // GOAWAY should cause a new connection to be created but should not affect health status.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
@@ -2802,7 +2802,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamResetRuntimeDisable
 
   EXPECT_CALL(
       runtime_.snapshot_,
-      featureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling", 100))
+      runtimeFeatureEnabled("envoy.reloadable_features.health_check.graceful_goaway_handling"))
       .WillOnce(Return(false));
 
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
