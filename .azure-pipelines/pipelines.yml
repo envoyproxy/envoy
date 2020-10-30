@@ -288,11 +288,11 @@ stages:
               artifactName: docker
             condition: always()
 
-  - stage: docs_publish
+  - stage: docs
     dependsOn: ["docker"]
     condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
     jobs:
-      - job: docs_publish
+      - job: publish
         pool:
           vmImage: "ubuntu-18.04"
         steps:
