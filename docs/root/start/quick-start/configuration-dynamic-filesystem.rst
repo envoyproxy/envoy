@@ -109,3 +109,7 @@ endpoint to see how Envoy is currently configured.
     :lines: 9-16
     :lineno-start: 9
     :emphasize-lines: 3-8
+
+.. warning::
+
+   You may wish to restrict the network address the admin server listens to in your own deployment.

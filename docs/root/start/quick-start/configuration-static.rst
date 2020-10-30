@@ -1,4 +1,3 @@
-
 .. _start_quick_start_static:
 
 Configuration: Static
