@@ -5,7 +5,9 @@
 
 #include "envoy/event/dispatcher.h"
 
+#include "common/common/assert.h"
 #include "common/common/macros.h"
+#include "common/signal/fatal_action.h"
 
 #include "absl/base/attributes.h"
 #include "absl/synchronization/mutex.h"
@@ -107,57 +109,70 @@ void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
     // Our manager is the system's singleton, ensure that the unique_ptr does not
     // delete the instance.
     mananger.release();
+  } else {
+    ENVOY_BUG(false, "Fatal Actions have already been registered.");
   }
 }
 
-bool runSafeActions() {
+FatalAction::Status runSafeActions() {
   // Check that registerFatalActions has already been called.
   FatalAction::FatalActionManager* action_manager =
       fatal_action_manager.load(std::memory_order_acquire);
 
   if (action_manager == nullptr) {
-    return false;
+    return FatalAction::Status::ActionManangerUnset;
   }
 
   // Check that we're the thread that gets to run the actions.
   int64_t my_tid = action_manager->getThreadFactory().currentThreadId().getId();
   int64_t expected_tid = -1;
 
-  if (failure_tid.compare_exchange_strong(expected_tid, my_tid, std::memory_order_release,
-                                          std::memory_order_relaxed)) {
+  if (failure_tid.compare_exchange_strong(expected_tid, my_tid, std::memory_order_acq_rel,
+                                          std::memory_order_acquire)) {
     // Run the actions
     runFatalActions(action_manager->getSafeActions());
-    return true;
+    return FatalAction::Status::Success;
+  } else if (expected_tid == my_tid) {
+    return FatalAction::Status::AlreadyRanOnThisThread;
   }
 
-  return false;
+  return FatalAction::Status::RunningOnAnotherThread;
 }
 
-bool runUnsafeActions() {
+FatalAction::Status runUnsafeActions() {
   // Check that registerFatalActions has already been called.
   FatalAction::FatalActionManager* action_manager =
       fatal_action_manager.load(std::memory_order_acquire);
 
   if (action_manager == nullptr) {
-    return false;
+    return FatalAction::Status::ActionManangerUnset;
   }
 
   // Check that we're the thread that gets to run the actions.
   int64_t my_tid = action_manager->getThreadFactory().currentThreadId().getId();
+  int64_t failing_tid = failure_tid.load(std::memory_order_acquire);
 
-  if (my_tid == failure_tid.load(std::memory_order_acquire)) {
+  if (my_tid == failing_tid) {
     // Run the actions
     runFatalActions(action_manager->getUnsafeActions());
-    return true;
+    return FatalAction::Status::Success;
+  } else if (failing_tid == -1) {
+    return FatalAction::Status::SafeActionsNotYetRan;
   }
-  return false;
+  return FatalAction::Status::RunningOnAnotherThread;
 }
 
-// Only call this from tests!
+void clearFatalActionsOnTerminate() {
+  auto* raw_ptr = fatal_action_manager.exchange(nullptr, std::memory_order_relaxed);
+  if (raw_ptr != nullptr) {
+    delete raw_ptr;
+  }
+}
+
 // This resets the internal state of Fatal Action for the module.
 // This is necessary as it allows us to have multiple test cases invoke the
 // fatal actions without state from other tests leaking in.
-void resetFatalActionState() {
+void resetFatalActionStateForTest() {
   // Free the memory of the Fatal Action, since it's not managed by a smart
   // pointer. This prevents memory leaks in tests.
   auto* raw_ptr = fatal_action_manager.exchange(nullptr, std::memory_order_relaxed);

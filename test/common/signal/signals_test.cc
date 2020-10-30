@@ -19,12 +19,23 @@ namespace Envoy {
 #define ASANITIZED /* Sanitized by GCC */
 #endif
 
+namespace FatalErrorHandler {
+
+extern void resetFatalActionStateForTest();
+
+} // namespace FatalErrorHandler
+
 // Use this test handler instead of a mock, because fatal error handlers must be
 // signal-safe and a mock might allocate memory.
 class TestFatalErrorHandler : public FatalErrorHandlerInterface {
   void onFatalError(std::ostream& os) const override { os << "HERE!"; }
-  void runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList&
-                                      /*actions*/) const override {}
+  void
+  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override {
+    // Run the actions
+    for (const auto& action : actions) {
+      action->run(nullptr);
+    }
+  }
 };
 
 // Death tests that expect a particular output are disabled under address sanitizer.
@@ -47,10 +58,6 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
   TestFatalErrorHandler handler;
   FatalErrorHandler::registerFatalErrorHandler(handler);
 
-  FatalAction::FatalActionPtrList safe_actions;
-  FatalAction::FatalActionPtrList unsafe_actions;
-  FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
-                                          Thread::threadFactoryForTest());
   SignalAction actions;
   // Make sure the fatal error log "HERE" registered above is logged on fatal error.
   EXPECT_DEATH(
@@ -211,6 +218,58 @@ TEST(FatalErrorHandler, DontAllocateMemory) {
   FatalErrorHandler::callFatalErrorHandlers(os);
 
   EXPECT_MEMORY_EQ(allocated_after_call, allocated_before_call);
+}
+
+class EchoFatalAction : public Server::Configuration::FatalAction {
+public:
+  EchoFatalAction(absl::string_view echo_msg) : echo_msg_(echo_msg) {}
+  void run(const ScopeTrackedObject* /*current_object*/) override { std::cerr << echo_msg_; }
+  bool isAsyncSignalSafe() const override { return true; }
+
+private:
+  std::string echo_msg_;
+};
+
+class SegfaultFatalAction : public Server::Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) override { raise(SIGSEGV); }
+  bool isAsyncSignalSafe() const override { return false; }
+};
+
+TEST(SignalsDeathTest, CanRunAllFatalActions) {
+  TestFatalErrorHandler handler;
+  FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  FatalAction::FatalActionPtrList safe_actions;
+  FatalAction::FatalActionPtrList unsafe_actions;
+
+  safe_actions.emplace_back(std::make_unique<EchoFatalAction>("Safe Action!"));
+  unsafe_actions.emplace_back(std::make_unique<EchoFatalAction>("Unsafe Action!"));
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
+                                          Thread::threadFactoryForTest());
+
+  SignalAction actions;
+  EXPECT_DEATH([]() -> void { raise(SIGABRT); }(), "Safe Action!.*HERE.*Unsafe Action!");
+  FatalErrorHandler::removeFatalErrorHandler(handler);
+  FatalErrorHandler::resetFatalActionStateForTest();
+}
+
+TEST(SignalsDeathTest, ShouldJustExitIfFatalActionsRaiseAnotherSignal) {
+  TestFatalErrorHandler handler;
+  FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  FatalAction::FatalActionPtrList safe_actions;
+  FatalAction::FatalActionPtrList unsafe_actions;
+
+  unsafe_actions.emplace_back(std::make_unique<SegfaultFatalAction>());
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
+                                          Thread::threadFactoryForTest());
+
+  SignalAction actions;
+  EXPECT_DEATH([]() -> void { raise(SIGABRT); }(),
+               "Our FatalActions triggered a different fatal signal.");
+  FatalErrorHandler::removeFatalErrorHandler(handler);
+  FatalErrorHandler::resetFatalActionStateForTest();
 }
 
 } // namespace Envoy

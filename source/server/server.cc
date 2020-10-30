@@ -435,7 +435,7 @@ void InstanceImpl::initialize(const Options& options,
       }
     }
     Envoy::FatalErrorHandler::registerFatalActions(
-        std::move(safe_actions), std::move(unsafe_actions), this->api_->threadFactory());
+        std::move(safe_actions), std::move(unsafe_actions), api_->threadFactory());
   }
 
   if (!bootstrap_.default_socket_interface().empty()) {
@@ -752,6 +752,7 @@ void InstanceImpl::terminate() {
   restarter_.shutdown();
   ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
+  FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }

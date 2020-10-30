@@ -55,7 +55,7 @@ void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
  * continue running the failure functions and have ran the safe actions.
  * Otherwise it returns false.
  */
-bool runSafeActions();
+FatalAction::Status runSafeActions();
 
 /**
  * Tries to run all of the unsafe fatal actions. Call this only
@@ -64,6 +64,12 @@ bool runSafeActions();
  * Returns whether the thread was successfully able to run the
  * unsafe actions.
  */
-bool runUnsafeActions();
+FatalAction::Status runUnsafeActions();
+
+/**
+ *  Clear the Fatal Actions at the end of the server's call to terminate().
+ *  We should clean up the Fatal Action to prevent the memory from leaking.
+ */
+void clearFatalActionsOnTerminate();
 } // namespace FatalErrorHandler
 } // namespace Envoy

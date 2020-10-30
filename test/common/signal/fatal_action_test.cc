@@ -1,5 +1,6 @@
 #include "envoy/server/fatal_action_config.h"
 
+#include "common/signal/fatal_action.h"
 #include "common/signal/fatal_error_handler.h"
 
 #include "test/mocks/server/instance.h"
@@ -11,7 +12,8 @@
 namespace Envoy {
 namespace FatalErrorHandler {
 
-extern void resetFatalActionState();
+extern void resetFatalActionStateForTest();
+
 } // namespace FatalErrorHandler
 namespace FatalAction {
 
@@ -35,8 +37,8 @@ public:
   bool isAsyncSignalSafe() const override { return is_safe_; }
 
 private:
-  bool is_safe_;
-  int* counter_;
+  const bool is_safe_;
+  int* const counter_;
 };
 
 class FatalActionTest : public ::testing::Test {
@@ -48,7 +50,7 @@ public:
 protected:
   void TearDown() override {
     // Reset module state
-    FatalErrorHandler::resetFatalActionState();
+    FatalErrorHandler::resetFatalActionStateForTest();
     FatalErrorHandler::removeFatalErrorHandler(*handler_);
   }
 
@@ -60,22 +62,15 @@ protected:
 
 TEST_F(FatalActionTest, ShouldNotBeAbleToRunActionsBeforeRegistration) {
   // Call the actions
-  EXPECT_FALSE(FatalErrorHandler::runSafeActions());
-  EXPECT_FALSE(FatalErrorHandler::runUnsafeActions());
+  EXPECT_EQ(FatalErrorHandler::runSafeActions(), Status::ActionManangerUnset);
+  EXPECT_EQ(FatalErrorHandler::runUnsafeActions(), Status::ActionManangerUnset);
 }
 
 TEST_F(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
   // Register empty list of actions
-  FatalErrorHandler::registerFatalActions(FatalAction::FatalActionPtrList(),
-                                          FatalAction::FatalActionPtrList(),
-                                          Thread::threadFactoryForTest());
-
-  safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true, &counter_));
-  FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
-                                          Thread::threadFactoryForTest());
-
-  EXPECT_TRUE(FatalErrorHandler::runSafeActions());
-  EXPECT_EQ(counter_, 0);
+  FatalErrorHandler::registerFatalActions({}, {}, Thread::threadFactoryForTest());
+  EXPECT_DEBUG_DEATH(
+      { FatalErrorHandler::registerFatalActions({}, {}, Thread::threadFactoryForTest()); }, "");
 }
 
 TEST_F(FatalActionTest, CanCallRegisteredActions) {
@@ -86,20 +81,19 @@ TEST_F(FatalActionTest, CanCallRegisteredActions) {
                                           Thread::threadFactoryForTest());
 
   // Call the actions and check they increment the counter.
-  EXPECT_TRUE(FatalErrorHandler::runSafeActions());
+  EXPECT_EQ(FatalErrorHandler::runSafeActions(), Status::Success);
   EXPECT_EQ(counter_, 1);
 
-  EXPECT_TRUE(FatalErrorHandler::runUnsafeActions());
+  EXPECT_EQ(FatalErrorHandler::runUnsafeActions(), Status::Success);
   EXPECT_EQ(counter_, 2);
 }
 
 TEST_F(FatalActionTest, CanOnlyRunSafeActionsOnce) {
   FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
                                           Thread::threadFactoryForTest());
-  ASSERT_TRUE(FatalErrorHandler::runSafeActions());
+  ASSERT_EQ(FatalErrorHandler::runSafeActions(), Status::Success);
 
-  // This should return false since they've ran already.
-  EXPECT_FALSE(FatalErrorHandler::runSafeActions());
+  EXPECT_EQ(FatalErrorHandler::runSafeActions(), Status::AlreadyRanOnThisThread);
 }
 
 TEST_F(FatalActionTest, ShouldOnlyBeAbleToRunUnsafeActionsFromThreadThatRanSafeActions) {
@@ -107,25 +101,25 @@ TEST_F(FatalActionTest, ShouldOnlyBeAbleToRunUnsafeActionsFromThreadThatRanSafeA
                                           Thread::threadFactoryForTest());
 
   // Jump to run unsafe actions, without running safe actions.
-  ASSERT_FALSE(FatalErrorHandler::runUnsafeActions());
+  ASSERT_EQ(FatalErrorHandler::runUnsafeActions(), Status::SafeActionsNotYetRan);
 
   absl::Notification run_unsafe_actions;
   absl::Notification ran_safe_actions;
   auto fatal_action_thread =
       Thread::threadFactoryForTest().createThread([&run_unsafe_actions, &ran_safe_actions]() {
         // Run Safe Actions and notify
-        EXPECT_TRUE(FatalErrorHandler::runSafeActions());
+        EXPECT_EQ(FatalErrorHandler::runSafeActions(), Status::Success);
         ran_safe_actions.Notify();
 
         run_unsafe_actions.WaitForNotification();
-        EXPECT_TRUE(FatalErrorHandler::runUnsafeActions());
+        EXPECT_EQ(FatalErrorHandler::runUnsafeActions(), Status::Success);
       });
 
   // Wait for other thread to run safe actions, then try to run safe and
   // unsafe actions, they should both not run for this thread.
   ran_safe_actions.WaitForNotification();
-  ASSERT_FALSE(FatalErrorHandler::runSafeActions());
-  ASSERT_FALSE(FatalErrorHandler::runUnsafeActions());
+  ASSERT_EQ(FatalErrorHandler::runSafeActions(), Status::RunningOnAnotherThread);
+  ASSERT_EQ(FatalErrorHandler::runUnsafeActions(), Status::RunningOnAnotherThread);
   run_unsafe_actions.Notify();
 
   fatal_action_thread->join();

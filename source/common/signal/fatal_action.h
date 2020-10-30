@@ -11,6 +11,25 @@ namespace FatalAction {
 
 using FatalActionPtrList = std::list<Server::Configuration::FatalActionPtr>;
 
+// Status when trying to run the Fatal Actions.
+enum class Status {
+  Success,
+
+  // We either haven't set up the Fatal Action manager, or we unregistered it
+  // as the server terminated.
+  ActionManangerUnset,
+
+  // Another thread beat us to running the Fatal Actions.
+  RunningOnAnotherThread,
+
+  // We have already ran those actions on this thread.
+  AlreadyRanOnThisThread,
+
+  // We haven't yet ran safe actions. Safe Actions must run before Unsafe
+  // Actions run.
+  SafeActionsNotYetRan,
+};
+
 // A simple class which manages the Fatal Actions registered via the
 // extension point.
 class FatalActionManager {

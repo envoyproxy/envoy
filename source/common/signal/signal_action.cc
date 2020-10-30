@@ -5,6 +5,7 @@
 #include <csignal>
 
 #include "common/common/assert.h"
+#include "common/signal/fatal_action.h"
 #include "common/version/version.h"
 
 namespace Envoy {
@@ -24,9 +25,33 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
 
   // Finally after logging the stack trace, call the crash handlers
   // in order from safe to unsafe.
-  if (FatalErrorHandler::runSafeActions()) {
+  auto status = FatalErrorHandler::runSafeActions();
+
+  switch (status) {
+  case FatalAction::Status::Success:
     FatalErrorHandler::callFatalErrorHandlers(std::cerr);
     FatalErrorHandler::runUnsafeActions();
+    break;
+  case FatalAction::Status::ActionManangerUnset:
+    FatalErrorHandler::callFatalErrorHandlers(std::cerr);
+    break;
+  case FatalAction::Status::RunningOnAnotherThread: {
+    // We should wait for some duration for the other thread to finish
+    // running. We should add support for this scenario, even though the
+    // probability of it occurring is low.
+    // TODO(kbaichoo): Implement a configurable call to sleep
+    break;
+  }
+  case FatalAction::Status::AlreadyRanOnThisThread:
+    // We caused a different fatal signal to be raised.
+    // It can't be the the same signal since the bit would be saturated and when
+    // we return from the handler we'll have restored the default signal handler
+    // to exit the process.
+    std::cerr << "Our FatalActions triggered a different fatal signal.\n";
+    break;
+  default:
+    // All the cases runSafeActions() returns have been covered.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   signal(sig, SIG_DFL);
