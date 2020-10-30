@@ -36,14 +36,7 @@ public:
     io_handle_peer_->setWritablePeer(io_handle_.get());
   }
 
-  ~BufferedIoSocketHandleTest() override {
-    if (io_handle_->isOpen()) {
-      io_handle_->close();
-    }
-    if (io_handle_peer_->isOpen()) {
-      io_handle_peer_->close();
-    }
-  }
+  ~BufferedIoSocketHandleTest() override = default;
 
   void expectAgain() {
     auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
@@ -255,6 +248,7 @@ TEST_F(BufferedIoSocketHandleTest, TestSetEnabledTriggerEventSchedule) {
     EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
     scheduable_cb_->invokeCallback();
     ASSERT_FALSE(scheduable_cb_->enabled());
+    io_handle_->close();
   }
 }
 
