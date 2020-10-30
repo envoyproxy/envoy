@@ -51,7 +51,7 @@ public:
 protected:
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
-  void
+  virtual void
   initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
                            const uint8_t priority_level, uint16_t& port);
 

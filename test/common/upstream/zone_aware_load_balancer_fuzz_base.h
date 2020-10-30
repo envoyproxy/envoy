@@ -7,7 +7,7 @@ namespace Upstream {
 class ZoneAwareLoadBalancerFuzzBase : public LoadBalancerFuzzBase {
 public:
   ZoneAwareLoadBalancerFuzzBase(bool need_local_cluster, const std::string& random_bytestring)
-      : LoadBalancerFuzzBase(), random_bytestring_(random_bytestring) {
+      : random_bytestring_(random_bytestring) {
     if (need_local_cluster) {
       local_priority_set_ = std::make_shared<PrioritySetImpl>();
       local_priority_set_->getOrCreateHostSet(0);
@@ -25,11 +25,14 @@ public:
   // These extend base class logic in order to handle local_priority_set_ if applicable.
   void
   initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
-                           const uint8_t priority_level, uint16_t& port);
+                           const uint8_t priority_level, uint16_t& port) override;
+  
+  void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input) override;
+
   void updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
                                     const uint32_t num_degraded_hosts,
                                     const uint32_t num_excluded_hosts,
-                                    const std::string random_bytestring);
+                                    const std::string random_bytestring) override;
 
   void setupZoneAwareLoadBalancingSpecificLogic();
 

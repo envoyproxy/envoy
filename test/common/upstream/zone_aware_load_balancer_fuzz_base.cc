@@ -38,6 +38,11 @@ void ZoneAwareLoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
   }
 }
 
+void ZoneAwareLoadBalancerFuzzBase::initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input) {
+    LoadBalancerFuzzBase::initializeLbComponents(input);
+    setupZoneAwareLoadBalancingSpecificLogic();
+}
+
 void ZoneAwareLoadBalancerFuzzBase::setupZoneAwareLoadBalancingSpecificLogic() {
   // Having 3 possible weights, 1, 2, and 3 to provide the state space at least some variation
   // in regards to weights, which do affect the load balancing algorithm. Cap the amount of

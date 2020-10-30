@@ -24,7 +24,6 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase
       zone_aware_load_balancer_test_case.random_bytestring_for_weights());
   zone_aware_load_balancer_fuzz.initializeLbComponents(
       zone_aware_load_balancer_test_case.load_balancer_test_case());
-  zone_aware_load_balancer_fuzz.setupZoneAwareLoadBalancingSpecificLogic();
 
   try {
     zone_aware_load_balancer_fuzz.lb_ = std::make_unique<RoundRobinLoadBalancer>(
