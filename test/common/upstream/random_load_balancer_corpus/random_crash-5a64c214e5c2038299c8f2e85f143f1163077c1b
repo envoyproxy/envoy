@@ -15,17 +15,11 @@ load_balancer_test_case {
       host_priority: 270582939648
       num_degraded_hosts: 4194304
       random_bytestring: 1
-      random_bytestring: 2
-      random_bytestring: 1
-      random_bytestring: 2
     }
   }
   setup_priority_levels {
     num_hosts_in_priority_level: 1024
     random_bytestring: 1
-    random_bytestring: 2
-    random_bytestring: 1
-    random_bytestring: 2
   }
   seed_for_prng: 62208
 }
