@@ -24,7 +24,7 @@ void ZoneAwareLoadBalancerFuzzBase::initializeASingleHostSet(
 void ZoneAwareLoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
     const uint64_t host_priority, const uint32_t num_healthy_hosts,
     const uint32_t num_degraded_hosts, const uint32_t num_excluded_hosts,
-    const std::string random_bytestring) {
+    const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring) {
   LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
       host_priority, num_healthy_hosts, num_degraded_hosts, num_excluded_hosts, random_bytestring);
   // Update local priority set if it exists - will mean load balancer is zone aware and has decided

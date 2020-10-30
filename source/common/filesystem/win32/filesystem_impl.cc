@@ -129,7 +129,7 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
 
   // On Windows, we need to explicitly set the file mode as binary. Otherwise,
   // 0x1a will be treated as EOF
-  std::ifstream file(path, std::ios_base::binary);
+  std::ifstream file(path, std::ios::binary);
   if (file.fail()) {
     auto last_error = ::GetLastError();
     if (last_error == ERROR_FILE_NOT_FOUND) {

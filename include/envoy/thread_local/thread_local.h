@@ -76,11 +76,17 @@ public:
   virtual void set(InitializeCb cb) PURE;
 
   /**
-   * UpdateCb takes the current stored data, and returns an updated/new version data.
-   * TLS will run the callback and replace the stored data with the returned value *in each thread*.
+   * UpdateCb takes the current stored data, and must return the same data. The
+   * API was designed to allow replacement of the object via this API, but this
+   * is not currently used, and thus we are removing the functionality. In a future
+   * PR, the API will be removed.
    *
-   * NOTE: The update callback is not supposed to capture the Slot, or its owner. As the owner may
-   * be destructed in main thread before the update_cb gets called in a worker thread.
+   * TLS will run the callback and assert the returned returned value matches
+   * the current value.
+   *
+   * NOTE: The update callback is not supposed to capture the Slot, or its
+   * owner. As the owner may be destructed in main thread before the update_cb
+   * gets called in a worker thread.
    **/
   using UpdateCb = std::function<ThreadLocalObjectSharedPtr(ThreadLocalObjectSharedPtr)>;
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
@@ -101,6 +107,83 @@ public:
    */
   virtual SlotPtr allocateSlot() PURE;
 };
+
+// Provides a typesafe API for slots.
+//
+// TODO(jmarantz): Rename the Slot class to something like RawSlot, where the
+// only reference is from TypedSlot, which we can then rename to Slot.
+template <class T> class TypedSlot {
+public:
+  /**
+   * Helper method to create a unique_ptr for a typed slot. This helper
+   * reduces some verbose parameterization at call-sites.
+   *
+   * @param allocator factory to allocate untyped Slot objects.
+   * @return a TypedSlotPtr<T> (the type is defined below).
+   */
+  static std::unique_ptr<TypedSlot> makeUnique(SlotAllocator& allocator) {
+    return std::make_unique<TypedSlot>(allocator);
+  }
+
+  explicit TypedSlot(SlotAllocator& allocator) : slot_(allocator.allocateSlot()) {}
+
+  /**
+   * Returns if there is thread local data for this thread.
+   *
+   * This should return true for Envoy worker threads and false for threads which do not have thread
+   * local storage allocated.
+   *
+   * @return true if registerThread has been called for this thread, false otherwise.
+   */
+  bool currentThreadRegistered() { return slot_->currentThreadRegistered(); }
+
+  /**
+   * Set thread local data on all threads previously registered via registerThread().
+   * @param initializeCb supplies the functor that will be called *on each thread*. The functor
+   *                     returns the thread local object which is then stored. The storage is via
+   *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
+   *                     the same data across all threads or to share different data on each thread.
+   *
+   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner. As the owner
+   * may be destructed in main thread before the update_cb gets called in a worker thread.
+   */
+  using InitializeCb = std::function<std::shared_ptr<T>(Event::Dispatcher& dispatcher)>;
+  void set(InitializeCb cb) { slot_->set(cb); }
+
+  /**
+   * @return a reference to the thread local object.
+   */
+  T& get() { return slot_->getTyped<T>(); }
+
+  /**
+   * @return a pointer to the thread local object.
+   */
+  T* operator->() { return &get(); }
+
+  /**
+   * UpdateCb is passed a mutable reference to the current stored data.
+   *
+   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner. As the owner
+   * may be destructed in main thread before the update_cb gets called in a worker thread.
+   */
+  using UpdateCb = std::function<void(T& obj)>;
+  void runOnAllThreads(const UpdateCb& cb) { slot_->runOnAllThreads(makeSlotUpdateCb(cb)); }
+  void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+    slot_->runOnAllThreads(makeSlotUpdateCb(cb), complete_cb);
+  }
+
+private:
+  Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
+    return [cb](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
+      cb(obj->asType<T>());
+      return obj;
+    };
+  }
+
+  const SlotPtr slot_;
+};
+
+template <class T> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;
 
 /**
  * Interface for getting and setting thread local data as well as registering a thread

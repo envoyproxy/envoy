@@ -7,7 +7,8 @@ actions {
     update_health_flags {
         host_priority: 0
         num_healthy_hosts: 50
-        random_bytestring: "\x01\x02"
+        random_bytestring: 1
+        random_bytestring: 2
     }
 }
 actions {
@@ -32,11 +33,13 @@ actions {
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 100
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
+    random_bytestring: 2
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 0
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
+    random_bytestring: 2
 }
 seed_for_prng: 1
 }

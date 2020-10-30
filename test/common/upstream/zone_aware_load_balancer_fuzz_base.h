@@ -32,7 +32,7 @@ public:
   void updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
                                     const uint32_t num_degraded_hosts,
                                     const uint32_t num_excluded_hosts,
-                                    const std::string random_bytestring) override;
+                                    const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring) override;
 
   void setupZoneAwareLoadBalancingSpecificLogic();
 
