@@ -72,7 +72,7 @@ template <typename ReturnValue> struct IoCallResult {
   bool ok() const { return err_ == nullptr; }
 
   /**
-   * This return code is frequent enough that we have a seperate function to check.
+   * This return code is frequent enough that we have a separate function to check.
    * @return true if the system call failed because the socket would block.
    */
   bool wouldBlock() const {
