@@ -5,6 +5,7 @@ package envoy.service.discovery.v4alpha;
 import "envoy/config/core/v4alpha/base.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
 
 import "udpa/core/v1/resource_locator.proto";
@@ -254,7 +255,7 @@ message DeltaDiscoveryResponse {
   string nonce = 5;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Resource {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.Resource";
@@ -276,4 +277,19 @@ message Resource {
 
   // The resource being tracked.
   google.protobuf.Any resource = 2;
+
+  // Time-to-live value for the resource. For each resource, a timer is started. The timer is
+  // reset each time the resource is received with a new TTL. If the resource is received with
+  // no TTL set, the timer is removed for the resource. Upon expiration of the timer, the
+  // configuration for the resource will be removed.
+  //
+  // The TTL can be refreshed or changed by sending a response that doesn't change the resource
+  // version. In this case the resource field does not need to be populated, which allows for
+  // light-weight "heartbeat" updates to keep a resource with a TTL alive.
+  //
+  // The TTL feature is meant to support configurations that should be removed in the event of
+  // a management server // failure. For example, the feature may be used for fault injection
+  // testing where the fault injection should be terminated in the event that Envoy loses contact
+  // with the management server.
+  google.protobuf.Duration ttl = 6;
 }

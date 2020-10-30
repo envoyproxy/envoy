@@ -68,6 +68,19 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//source/common/protobuf:utility_lib",
         "@com_github_cncf_udpa//udpa/core/v1:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "ttl_lib",
+    srcs = ["ttl.cc"],
+    hdrs = ["ttl.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+        "@com_google_absl//absl/container:btree",
     ],
 )
 
@@ -78,6 +91,7 @@ envoy_cc_library(
     deps = [
         ":api_version_lib",
         ":pausable_ack_queue_lib",
+        ":ttl_lib",
         ":utility_lib",
         ":watch_map_lib",
         "//include/envoy/config:subscription_interface",
@@ -137,6 +151,7 @@ envoy_cc_library(
         ":api_version_lib",
         ":decoded_resource_lib",
         ":grpc_stream_lib",
+        ":ttl_lib",
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",

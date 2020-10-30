@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/common/assert.h"
 #include "common/config/config_provider_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -89,12 +90,12 @@ public:
 
     ConfigSubscriptionCommonBase::onConfigUpdate();
   }
+  // Envoy::Config::SubscriptionCallbacks
   void onConfigUpdate(const std::vector<DecodedResourceRef>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
-  // Envoy::Config::SubscriptionCallbacks
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {}
 

@@ -24,6 +24,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), transport_api_version_(transport_api_version),
+      dispatcher_(dispatcher),
       enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {}
 
@@ -192,8 +193,8 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
 
 void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
                                      const bool use_namespace_matching) {
-  subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching));
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
+                                       type_url, local_info_, use_namespace_matching, dispatcher_));
   subscription_ordering_.emplace_back(type_url);
 }
 

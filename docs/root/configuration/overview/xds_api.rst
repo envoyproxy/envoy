@@ -348,3 +348,25 @@ To use delta, simply set the api_type field of your
 That works for both xDS and ADS; for ADS, it's the api_type field of
 :ref:`DynamicResources.ads_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>`,
 as described in the previous section.
+
+
+.. _config_overview_ttl:
+
+xDS TTL
+^^^^^^^
+
+When using xDS, users might find themself wanting to temporarily update certain xDS resources. In order to do
+safely, xDS TTLs can be used to make sure that if the control plane becomes unavailable and is unable to revert
+the xDS change, Envoy will remove the resource after a TTL specified by the server. See the
+:ref:`protocol documentation <xds_protocol_ttl>` for more information.
+
+Currently the behavior when a TTL expires is that the resource is *removed* (as opposed to reverted to the
+previous version). As such, this feature should primarily be used for use cases where the absence of the resource
+is preferred instead of the temporary version, e.g. when using RTDS to apply a temporary runtime override.
+
+The TTL is specified on the :ref:`Resource <envoy_api_msg_Resource>` proto: for Delta xDS this is specified directly
+within the response, while for SotW xDS the server may wrap individual resources listed in the response within a
+:ref:`Resource <envoy_api_msg_Resource>` in order to specify a TTL value.
+
+The server can refresh or modify the TTL by issuing another response for the same version. In this case the resource
+itself does not have to be included.

@@ -656,6 +656,42 @@ adding/removing/updating clusters. On the other hand, routes are not
 warmed, i.e., the management plane must ensure that clusters referenced
 by a route are in place, before pushing the updates for a route.
 
+.. _xds_protocol_TTL:
+
+TTL
+~~~
+
+In the event that the management server becomes unreachable, the last known configuration received
+by Envoy will persist until the connection is reestablished. For some services, this may not be
+desirable. For example, in the case of a fault injection service, a management server crash at the
+wrong time may leave Envoy in an undesirable state. The TTL setting allows Envoy to remove a set of
+resources after a specified period of time if contact with the management server is lost. This can
+be used, for example, to terminate a fault injection test when the management server can no longer
+be reached.
+
+For clients that support the *xds.config.supports-resource-ttl* client feature, A TTL field may
+be specified on each :ref:`Resource <envoy_api_msg_Resource>`. Each resource will have its own TTL
+expiry time, at which point the resource will be expired. Each xDS type may have different ways of
+handling such an expiry.
+
+To update the TTL associated with a *Resource*, the management server resends the resource with a
+new TTL. To remove the TTL, the management server resends the resource with the TTL field unset.
+
+To allow for lightweight TTL updates ("heartbeats"), a response can be sent that provides a
+:ref:`Resource <envoy_api_msg_Resource>` with the :ref:`resource <envoy_api_field_Resource.resource>`
+unset and version matching the most recently sent version can be used to update the TTL. These
+resources will not be treated as resource updates, but only as TTL updates.
+
+SotW TTL
+^^^^^^^^
+
+In order to use TTL with SotW xDS, the relevant resources must be wrapped in a
+:ref:`Resource <envoy_api_msg_Resource>`. This allows setting the same TTL field that is used for
+Delta xDS with SotW, without changing the SotW API. Heartbeats are supported for SotW as well:
+any resource within the response that look like a heartbeat resource will only be used to update the TTL.
+
+This feature is gated by the *xds.config.supports-resource-in-sotw* client feature.
+
 .. _xds_protocol_ads:
 
 Aggregated Discovery Service

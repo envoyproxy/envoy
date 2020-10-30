@@ -124,6 +124,7 @@ public:
 
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url_);
+    response->set_version_info(fmt::format("version-{}", version_++));
     auto* resource = response->mutable_resources()->Add();
     resource->PackFrom(cluster_load_assignment);
     if (v2_config_) {
@@ -141,6 +142,7 @@ public:
   State& state_;
   const bool v2_config_;
   const std::string type_url_;
+  uint64_t version_{};
   bool initialized_{};
   Stats::IsolatedStoreImpl stats_;
   Config::SubscriptionStats subscription_stats_;

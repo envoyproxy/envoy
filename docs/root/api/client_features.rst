@@ -23,3 +23,7 @@ Currently Defined Client Features
 - **envoy.lrs.supports_send_all_clusters**: This feature indicates that the client supports
   the *envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters*
   field in the LRS response.
+- **xds.config.supports-resource-ttl**: This feature indicates that xDS client supports
+  per-resource or per SotW :ref:`TTL <xds_protocol_TTL>`.
+- **xds.config.resource-in-sotw**: This feature indicates that the xDS client is able to unwrap
+  *Resource* wrappers within the SotW DiscoveryResponse.

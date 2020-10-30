@@ -173,12 +173,14 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // TODO(vishalpowar) This is not going to work for incremental updates, and we
   // need to instead change the health status to indicate the assignments are
   // stale.
+  // TODO(snowp): This should probably just use xDS TTLs?
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name(cluster_name_);
   ProtobufWkt::Any any_resource;
   any_resource.PackFrom(resource);
-  Config::DecodedResourceImpl decoded_resource(resource_decoder_, any_resource, "");
-  std::vector<Config::DecodedResourceRef> resource_refs = {decoded_resource};
+  auto decoded_resource =
+      Config::DecodedResourceImpl::fromResource(resource_decoder_, any_resource, "");
+  std::vector<Config::DecodedResourceRef> resource_refs = {*decoded_resource};
   onConfigUpdate(resource_refs, "");
   // Stat to track how often we end up with stale assignments.
   info_->stats().assignment_stale_.inc();
