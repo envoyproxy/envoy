@@ -59,7 +59,10 @@ stages:
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
             displayName: "Generate docs"
 
-          - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+          - script: |
+              SHORT_COMMIT_SHA=$(git log --pretty=%P -n 1 | cut -d' ' -f2 | head -c7)
+              export SHORT_COMMIT_SHA
+              ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
             displayName: "Upload Docs to GCS"
             env:
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
