@@ -228,6 +228,11 @@ public:
   virtual void addReadFilter(ReadFilterSharedPtr filter) PURE;
 
   /**
+   * Remove a read filter from the connection.
+   */
+  virtual void removeReadFilter(ReadFilterSharedPtr filter) PURE;
+
+  /**
    * Initialize all of the installed read filters. This effectively calls onNewConnection() on
    * each of them.
    * @return true if read filters were initialized successfully, otherwise false.
