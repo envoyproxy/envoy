@@ -38,9 +38,9 @@ static_resources:
         common_tls_context:
           tls_certificates:
             certificate_chain:
-              filename: /certs/clientcert.pem
+              filename: certs/clientcert.pem
             private_key:
-              filename: /certs/clientkey.pem
+              filename: certs/clientkey.pem
           validation_context:
             trusted_ca:
-              filename: /certs/cacert.pem
+              filename: certs/cacert.pem
