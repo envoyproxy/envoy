@@ -196,27 +196,29 @@ void Filter::parseV2Header(char* buf) {
                        std::make_shared<Network::Address::Ipv4Instance>(&la4)});
         return;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
-        PACKED_STRUCT(struct pp_ipv6_addr {
-          uint8_t src_addr[16];
-          uint8_t dst_addr[16];
-          uint16_t src_port;
-          uint16_t dst_port;
-        });
-        pp_ipv6_addr* v6;
-        v6 = reinterpret_cast<pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
+        int offset = 0; // Offset to iterate over buf
         sockaddr_in6 ra6, la6;
         memset(&ra6, 0, sizeof(ra6));
         memset(&la6, 0, sizeof(la6));
         ra6.sin6_family = AF_INET6;
-        ra6.sin6_port = v6->src_port;
-        for(int i = 0; i < ARRAY_SIZE(ra6.sin6_addr.s6_addr); ++i )
-          ra6.sin6_addr.s6_addr[] = v6->src_addr;
-
         la6.sin6_family = AF_INET6;
-        la6.sin6_port = v6->dst_port;
-        for(int i = 0; i < ARRAY_SIZE(la6.sin6_addr.s6_addr); ++i )
-          la6.sin6_addr.s6_addr[] = v6->dst_addr;
-        
+
+        for (; offset < ARRAY_SIZE(ra6.sin6_addr.s6_addr); ++offset)
+          ra6.sin6_addr.s6_addr[offset] = buf[PROXY_PROTO_V2_HEADER_LEN + offset];
+
+        for (; offset < ARRAY_SIZE(la6.sin6_addr.s6_addr); ++offset)
+          la6.sin6_addr.s6_addr[offset] = buf[PROXY_PROTO_V2_HEADER_LEN + offset];
+
+        PACKED_STRUCT(struct ports {
+          uint16_t src_port;
+          uint16_t dst_port;
+        });
+        ports* port_pair;
+        port_pair = reinterpret_cast<ports*>(&buf[PROXY_PROTO_V2_HEADER_LEN + offset]);
+
+        ra6.sin6_port = port_pair->src_port;
+        la6.sin6_port = port_pair->dst_port;
+
         proxy_protocol_header_.emplace(WireHeader{
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
             std::make_shared<Network::Address::Ipv6Instance>(ra6),
