@@ -1,0 +1,3 @@
+[build]
+    command = "./ci/run_envoy_docker.sh 'docs/build.sh'"
+    publish = "./envoy/docs/generated/docs"
