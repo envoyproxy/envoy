@@ -43,6 +43,7 @@ def envoy_pch_library(
         includes = includes,
         visibility = visibility,
         testonly = testonly,
+        tags = ["no-cache", "no-remote"],
         enabled = select({
             repository + "//bazel:clang_pch_build": True,
             "//conditions:default": False,

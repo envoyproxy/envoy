@@ -80,7 +80,7 @@ def _pch(ctx):
             direct_cc_infos = [
                 CcInfo(
                     compilation_context = cc_common.create_compilation_context(
-                        headers = depset([generated_header_file]),
+                        headers = depset([pch_file, generated_header_file]),
                     ),
                 ),
             ],
