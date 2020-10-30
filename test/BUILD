@@ -48,6 +48,5 @@ envoy_pch_library(
         "gmock/gmock.h",
         "gtest/gtest.h",
     ],
-    visibility = ["//test:__subpackages__"],
     deps = [],
 )
