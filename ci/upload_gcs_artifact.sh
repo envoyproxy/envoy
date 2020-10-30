@@ -7,6 +7,11 @@ if [[ -z "${GCS_ARTIFACT_BUCKET}" ]]; then
   exit 0
 fi
 
+if [ -z "${SHORT_COMMIT_SHA}" ]; then
+  echo "ERROR: SHORT_COMMIT_SHA is not set."
+  exit 1
+fi
+
 # Fail when service account key is not specified
 bash -c 'echo ${GCP_SERVICE_ACCOUNT_KEY}' | base64 --decode | gcloud auth activate-service-account --key-file=-
 
@@ -18,8 +23,7 @@ if [ ! -d "${SOURCE_DIRECTORY}" ]; then
   exit 1
 fi
 
-BRANCH=${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}
-GCS_LOCATION="${GCS_ARTIFACT_BUCKET}/${BRANCH}/${TARGET_SUFFIX}"
+GCS_LOCATION="${GCS_ARTIFACT_BUCKET}/${SHORT_COMMIT_SHA}/${TARGET_SUFFIX}"
 
 echo "Uploading to gs://${GCS_LOCATION} ..."
 gsutil -mq rsync -dr "${SOURCE_DIRECTORY}" "gs://${GCS_LOCATION}"

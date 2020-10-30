@@ -84,13 +84,12 @@ docker run --rm \
        -e ENVOY_SRCDIR \
        -e ENVOY_BUILD_TARGET \
        -e SYSTEM_PULLREQUEST_TARGETBRANCH \
-       -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
        -e GITHUB_TOKEN \
-       -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \
        -e SLACK_TOKEN \
+       -e SHORT_COMMIT_SHA \
        -e BUILD_URI\
        -e REPO_URI \
        "${ENVOY_BUILD_IMAGE}" \
