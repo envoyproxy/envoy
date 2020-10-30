@@ -1,6 +1,6 @@
 node:
-  id: id_1
-  cluster: test
+  cluster: test-cluster
+  id: test-id
 
 dynamic_resources:
   cds_config:
