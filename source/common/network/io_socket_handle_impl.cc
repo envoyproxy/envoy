@@ -86,10 +86,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
   ASSERT(num_bytes_to_read <= max_length);
   auto result = sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
-  if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+
+  // Some tests try to read without initializing the file_event.
+  if (result.wouldBlock() && file_event_) {
     file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
   }
-
   return result;
 }
 
@@ -108,7 +109,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint6
     bytes_to_commit -= slices[i].len_;
   }
   buffer.commit(slices, num_slices);
-  if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+
+  // Some tests try to read without initializing the file_event.
+  if (result.wouldBlock() && file_event_) {
     file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
   }
   return result;
@@ -131,7 +134,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
 
-  if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+  // Some tests try to read without initializing the file_event.
+  if (result.wouldBlock() && file_event_) {
     file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Write);
   }
   return result;
@@ -145,7 +149,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
     buffer.drain(static_cast<uint64_t>(result.rc_));
   }
 
-  if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+  // Some tests try to read without initializing the file_event.
+  if (result.wouldBlock() && file_event_) {
     file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Write);
   }
   return result;
@@ -184,8 +189,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   if (self_ip == nullptr) {
     message.msg_control = nullptr;
     message.msg_controllen = 0;
-    const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-    return sysCallResultToIoCallResult(result);
   } else {
     const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
@@ -226,9 +229,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       pktinfo->ipi6_ifindex = 0;
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
-    const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-    return sysCallResultToIoCallResult(result);
   }
+  const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+  auto io_result = sysCallResultToIoCallResult(result);
+  if (io_result.wouldBlock() && file_event_) {
+    file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Write);
+  }
+  return io_result;
 }
 
 Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
@@ -315,7 +322,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_controllen = cmsg_space_;
   const Api::SysCallSizeResult result = Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, 0);
   if (result.rc_ < 0) {
-    return sysCallResultToIoCallResult(result);
+    auto io_result = sysCallResultToIoCallResult(result);
+    if (io_result.wouldBlock() && file_event_) {
+      file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
+    }
+    return io_result;
   }
 
   RELEASE_ASSERT((hdr.msg_flags & MSG_CTRUNC) == 0,
@@ -398,7 +409,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       fd_, mmsg_hdr.data(), num_packets_per_mmsg_call, MSG_TRUNC | MSG_WAITFORONE, nullptr);
 
   if (result.rc_ <= 0) {
-    return sysCallResultToIoCallResult(result);
+    auto io_result = sysCallResultToIoCallResult(result);
+    if (io_result.wouldBlock() && file_event_) {
+      file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
+    }
+    return io_result;
   }
 
   int num_packets_read = result.rc_;
@@ -452,7 +467,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   const Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
-  return sysCallResultToIoCallResult(result);
+  auto io_result = sysCallResultToIoCallResult(result);
+  if (io_result.wouldBlock() && file_event_) {
+    file_event_->registerReadOrWriteIfLevel(Event::FileReadyType::Read);
+  }
+  return io_result;
 }
 
 bool IoSocketHandleImpl::supportsMmsg() const {

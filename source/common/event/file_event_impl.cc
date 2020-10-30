@@ -130,7 +130,7 @@ void FileEventImpl::setEnabled(uint32_t events) {
 void FileEventImpl::unregisterReadOrWriteIfLevel(uint32_t event) {
   ASSERT(event == FileReadyType::Write || event == FileReadyType::Read,
          fmt::format("not allowed to unregister {}", event));
-  if (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+  if (trigger_ == FileTriggerType::EmulatedEdge) {
     auto new_event_mask = enabled_events_ & ~event;
     if (event == FileReadyType::Write && injected_activation_events_ & FileReadyType::Read) {
       // we cancel all the injected activation and merge the
@@ -145,7 +145,7 @@ void FileEventImpl::unregisterReadOrWriteIfLevel(uint32_t event) {
 
 void FileEventImpl::registerReadOrWriteIfLevel(uint32_t event) {
   ASSERT(event == Event::FileReadyType::Write || event == Event::FileReadyType::Read);
-  if (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+  if (trigger_ == FileTriggerType::EmulatedEdge) {
     auto new_event_mask = enabled_events_ | event;
     if (event == FileReadyType::Write && injected_activation_events_ & FileReadyType::Read) {
       // we cancel all the injected activation and merge the
@@ -154,7 +154,7 @@ void FileEventImpl::registerReadOrWriteIfLevel(uint32_t event) {
       activation_cb_->cancel();
       new_event_mask |= FileReadyType::Read;
     }
-    setEnabled(new_event_mask);
+    updateEvents(new_event_mask);
   }
 }
 
