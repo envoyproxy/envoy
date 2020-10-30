@@ -91,6 +91,7 @@ docker run --rm \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \
        -e SLACK_TOKEN \
+       -e SHORT_COMMIT_SHA \
        -e BUILD_URI\
        -e REPO_URI \
        "${ENVOY_BUILD_IMAGE}" \
