@@ -177,6 +177,11 @@ public:
   virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
 
   /**
+   * @see man 2 dup(2).
+   */
+  virtual SysCallSocketResult duplicate(os_fd_t oldfd) PURE;
+
+  /**
    * @see man TCP_INFO. Get the tcp info for the socket.
    */
   virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) PURE;
