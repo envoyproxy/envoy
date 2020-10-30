@@ -113,7 +113,7 @@ protected:
     });
   }
 
-  ~CallbackNotInvokedAfterDeletionTest() {
+  ~CallbackNotInvokedAfterDeletionTest() override {
     EXPECT_FALSE(thread_status_.all_threads_complete_);
     EXPECT_EQ(2, total_callbacks_);
     slot_.reset();
