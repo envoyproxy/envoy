@@ -126,7 +126,7 @@ following are the command line options that Envoy supports.
    The supported format flags are (with example output):
 
    :%v:	The actual message to log ("some user text")
-   :%_: The actual message to log, but with escaped newlines ("some user text\\nbelow")
+   :%_: The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")
