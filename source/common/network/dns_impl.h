@@ -87,6 +87,9 @@ private:
     int optmask_;
   };
 
+  static absl::optional<std::string>
+  maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+
   // Callback for events on sockets tracked in events_.
   void onEventCallback(os_fd_t fd, uint32_t events);
   // c-ares callback when a socket state changes, indicating that libevent
@@ -105,6 +108,7 @@ private:
   bool dirty_channel_{};
   const bool use_tcp_for_dns_lookups_;
   absl::node_hash_map<int, Event::FileEventPtr> events_;
+  const absl::optional<std::string> resolvers_csv_;
 };
 
 } // namespace Network
