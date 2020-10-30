@@ -82,7 +82,6 @@ private:
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{nullptr};
-  Event::FileEventPtr file_event_;
   absl::string_view protocol_;
   http_parser parser_;
   static http_parser_settings settings_;

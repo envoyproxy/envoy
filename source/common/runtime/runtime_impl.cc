@@ -432,13 +432,14 @@ RtdsSubscription::RtdsSubscription(
     : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
           rtds_layer.rtds_config().resource_api_version(), validation_visitor, "name"),
       parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
-      resource_name_(rtds_layer.name()),
+      stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
 
 void RtdsSubscription::createSubscription() {
   const auto resource_name = getResourceName();
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this, resource_decoder_);
+      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this,
+      resource_decoder_);
 }
 
 void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

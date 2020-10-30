@@ -93,5 +93,7 @@ RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsSharedPtr) c
 }
 
 bool RawBufferSocketFactory::implementsSecureTransport() const { return false; }
+
+bool RawBufferSocketFactory::isReady() const { return true; }
 } // namespace Network
 } // namespace Envoy

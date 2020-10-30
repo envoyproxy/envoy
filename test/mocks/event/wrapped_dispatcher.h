@@ -28,9 +28,10 @@ public:
 
   void clearDeferredDeleteList() override { impl_.clearDeferredDeleteList(); }
 
-  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                Network::TransportSocketPtr&& transport_socket,
-                                                StreamInfo::StreamInfo& stream_info) override {
+  Network::ServerConnectionPtr
+  createServerConnection(Network::ConnectionSocketPtr&& socket,
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo& stream_info) override {
     return impl_.createServerConnection(std::move(socket), std::move(transport_socket),
                                         stream_info);
   }

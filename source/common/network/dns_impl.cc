@@ -25,39 +25,41 @@ DnsResolverImpl::DnsResolverImpl(
     const bool use_tcp_for_dns_lookups)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
-      use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups) {
-
+      use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups),
+      resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
-
-  if (!resolvers.empty()) {
-    std::vector<std::string> resolver_addrs;
-    resolver_addrs.reserve(resolvers.size());
-    for (const auto& resolver : resolvers) {
-      // This should be an IP address (i.e. not a pipe).
-      if (resolver->ip() == nullptr) {
-        ares_destroy(channel_);
-        throw EnvoyException(
-            fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
-      }
-      // Note that the ip()->port() may be zero if the port is not fully specified by the
-      // Address::Instance.
-      // resolver->asString() is avoided as that format may be modified by custom
-      // Address::Instance implementations in ways that make the <port> not a simple
-      // integer. See https://github.com/envoyproxy/envoy/pull/3366.
-      resolver_addrs.push_back(fmt::format(resolver->ip()->ipv6() ? "[{}]:{}" : "{}:{}",
-                                           resolver->ip()->addressAsString(),
-                                           resolver->ip()->port()));
-    }
-    const std::string resolvers_csv = absl::StrJoin(resolver_addrs, ",");
-    int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
-    RELEASE_ASSERT(result == ARES_SUCCESS, "");
-  }
 }
 
 DnsResolverImpl::~DnsResolverImpl() {
   timer_->disableTimer();
   ares_destroy(channel_);
+}
+
+absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
+  if (resolvers.empty()) {
+    return absl::nullopt;
+  }
+
+  std::vector<std::string> resolver_addrs;
+  resolver_addrs.reserve(resolvers.size());
+  for (const auto& resolver : resolvers) {
+    // This should be an IP address (i.e. not a pipe).
+    if (resolver->ip() == nullptr) {
+      throw EnvoyException(
+          fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
+    }
+    // Note that the ip()->port() may be zero if the port is not fully specified by the
+    // Address::Instance.
+    // resolver->asString() is avoided as that format may be modified by custom
+    // Address::Instance implementations in ways that make the <port> not a simple
+    // integer. See https://github.com/envoyproxy/envoy/pull/3366.
+    resolver_addrs.push_back(fmt::format(resolver->ip()->ipv6() ? "[{}]:{}" : "{}:{}",
+                                         resolver->ip()->addressAsString(),
+                                         resolver->ip()->port()));
+  }
+  return {absl::StrJoin(resolver_addrs, ",")};
 }
 
 DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
@@ -72,11 +74,19 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
 }
 
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
+  dirty_channel_ = false;
+
   options->sock_state_cb = [](void* arg, os_fd_t fd, int read, int write) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
+
+  // Ensure that the channel points to custom resolvers, if they exist.
+  if (resolvers_csv_.has_value()) {
+    int result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
+    RELEASE_ASSERT(result == ARES_SUCCESS, "");
+  }
 }
 
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
@@ -236,12 +246,11 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 
   // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for why this is done.
   if (dirty_channel_) {
-    dirty_channel_ = false;
     ares_destroy(channel_);
-
     AresOptions options = defaultAresOptions();
     initializeChannel(&options.options_, options.optmask_);
   }
+
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
   if (dns_lookup_family == DnsLookupFamily::Auto) {
