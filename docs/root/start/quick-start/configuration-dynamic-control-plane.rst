@@ -3,8 +3,8 @@
 Configuration: Dynamic from control plane
 =========================================
 
-Setting up Envoy with dynamic configuration is slightly more complex as you must also set up a control plane
-to provide Envoy with its configuration.
+These instructions are slightly more complex as you must also set up a control plane to provide Envoy with its
+configuration.
 
 There are a number of control planes compatible with Envoy's API such as `Gloo <https://docs.solo.io/gloo/latest/>`_
 or `Istiod <https://istio.io/latest/docs/ops/deployment/architecture/#istiod>`_.
@@ -23,7 +23,7 @@ You can also add an :ref:`admin <start_quick_start_dynamic_admin>` section if yo
 retrieve stats or configuration information.
 
 The following sections walk through the dynamic configuration provided in the
-:download:`demo dynamic configuration file <_include/envoy-dynamic-control-plane-demo.yaml>`.
+:download:`demo dynamic control plane configuration file <_include/envoy-dynamic-control-plane-demo.yaml>`.
 
 .. _start_quick_start_dynamic_node:
 
