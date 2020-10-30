@@ -19,4 +19,5 @@ Envoy documentation
   extending/extending
   api/api
   faq/overview
+  glossary
   version_history/version_history
