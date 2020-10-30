@@ -3,8 +3,8 @@
 Configuration: Dynamic from filesystem
 ======================================
 
-You can start Envoy with dynamic configuration that uses files as a form of
-:ref:`Extensible discovery service (xDS) <xds_protocol>`.
+You can start Envoy with dynamic configuration by using files that implement the :ref:`xDS <xds_protocol>`
+protocol.
 
 When the files are changed on the filesystem, Envoy will automatically update its configuration.
 
