@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cassert>
+#include "common/common/assert.h"
 
 namespace Envoy {
 
@@ -48,8 +48,8 @@ namespace Envoy {
  */
 #define SAFE_MEMCPY(dst, src)                                                                      \
   do {                                                                                             \
-    assert(sizeof(*(src)) == sizeof(*(dst)));                                                    \
-    memmove(dst, src, sizeof(*(src)));                                                            \
+    ASSERT(sizeof(*(src)) == sizeof(*(dst)));                                                      \
+    memmove(dst, src, sizeof(*(src)));                                                             \
   } while (0)
 
 /**
