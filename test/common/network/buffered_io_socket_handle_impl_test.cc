@@ -734,7 +734,7 @@ TEST_F(BufferedIoSocketHandleTest, TestNotImplementDuplicate) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestNotImplementAccept) {
-  ASSERT_DEATH(io_handle_->accept(nullptr, 0), "");
+  ASSERT_DEATH(io_handle_->accept(nullptr, nullptr), "");
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestLastRoundtripTimeNullOpt) {
