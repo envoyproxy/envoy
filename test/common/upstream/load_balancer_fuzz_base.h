@@ -23,10 +23,10 @@ public:
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
   void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
-  void updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
-                                    const uint32_t num_degraded_hosts,
-                                    const uint32_t num_excluded_hosts,
-                                    const std::string random_bytestring);
+  void
+  updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
+                               const uint32_t num_degraded_hosts, const uint32_t num_excluded_hosts,
+                               const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring);
   // These two actions have a lot of logic attached to them. However, all the logic that the load
   // balancer needs to run its algorithm is already encapsulated within the load balancer. Thus,
   // once the load balancer is constructed, all this class has to do is call lb_->peekAnotherHost()
@@ -36,6 +36,8 @@ public:
   ~LoadBalancerFuzzBase() = default;
   void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
 
+  void clearStaticHostsHealthFlags();
+
   // These public objects shared amongst all types of load balancers will be used to construct load
   // balancers in specific load balancer fuzz classes
   Stats::IsolatedStoreImpl stats_store_;
@@ -43,7 +45,6 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Random::PsuedoRandomGenerator64 random_;
   NiceMock<MockPrioritySet> priority_set_;
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::unique_ptr<LoadBalancerBase> lb_;
 
 private:
@@ -61,6 +62,12 @@ private:
   // localities Key - index of host within full host list, value - locality level host at index is
   // in
   absl::node_hash_map<uint8_t, uint8_t> locality_indexes_;
+
+  static HostVector initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info);
+
+  // Will statically initialize 60000 hosts in this vector. Will have to clear these static
+  // hosts flags at the end of each fuzz iteration
+  HostVector initialized_hosts_;
 };
 
 } // namespace Upstream
