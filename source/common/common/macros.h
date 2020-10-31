@@ -42,7 +42,7 @@ namespace Envoy {
   } while (0)
 
 /**
- * Assert memory bounds to avoid copy errors.
+ * @brief Assert memory bounds to avoid copy errors.
  */
 #define SAFE_MEMCPY(dst, src)                                                                      \
   do {                                                                                             \

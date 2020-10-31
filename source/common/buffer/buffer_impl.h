@@ -8,6 +8,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/assert.h"
+#include "common/common/mem_block_builder.h"
 #include "common/common/non_copyable.h"
 #include "common/common/utility.h"
 #include "common/event/libevent.h"
@@ -153,7 +154,9 @@ public:
     uint8_t* dest = base_ + reservable_;
     reservable_ += copy_size;
     // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
-    memcpy(dest, data, copy_size);
+    MemBlockBuilder<uint8_t> mem_builder(copy_size);
+    mem_builder.appendData(data);
+    dest = mem_builder.release().get();
     return copy_size;
   }
 
@@ -276,7 +279,9 @@ public:
   static SlicePtr create(const void* data, uint64_t size) {
     uint64_t slice_capacity = sliceSize(size);
     std::unique_ptr<OwnedSlice> slice(new (slice_capacity) OwnedSlice(slice_capacity));
-    memcpy(slice->base_, data, size);
+    MemBlockBuilder<uint8_t> mem_builder(size);
+    mem_builder.appendData(data);
+    slice->base_ = mem_builder.release().get();
     slice->reservable_ = size;
     return slice;
   }
@@ -653,7 +658,9 @@ private:
   OwnedBufferFragmentImpl(absl::string_view data, const Releasor& releasor)
       : releasor_(releasor), size_(data.size()) {
     ASSERT(releasor != nullptr);
-    memcpy(data_, data.data(), data.size());
+    MemBlockBuilder<uint8_t> mem_builder(data.size());
+    mem_builder.appendData(data.data());
+    data_ = mem_builder.release().get();
   }
 
   const Releasor releasor_;

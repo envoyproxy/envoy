@@ -125,6 +125,7 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
 void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   uint64_t bytes_to_skip = start;
   uint8_t* dest = static_cast<uint8_t*>(data);
+  MemBlockBuilder<uint8_t> mem_builder(size);
   for (const auto& slice : slices_) {
     if (size == 0) {
       break;
@@ -137,14 +138,14 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
       continue;
     }
     uint64_t copy_size = std::min(size, data_size - bytes_to_skip);
-    memcpy(dest, slice->data() + bytes_to_skip, copy_size);
+    mem_builder.appendData(slice->data() + bytes_to_skip);
     size -= copy_size;
-    dest += copy_size;
     // Now that we've started copying, there are no bytes left to skip over. If there
     // is any more data to be copied, the next iteration can start copying from the very
     // beginning of the next slice.
     bytes_to_skip = 0;
   }
+  dest = mem_builder.release().get();
   ASSERT(size == 0);
 }
 
