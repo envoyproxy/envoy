@@ -67,7 +67,7 @@ TEST(LoggerCustomFlagsTest, SetFormatter) {
     testing::internal::CaptureStderr();
     logger->log(msg);
 #ifdef WIN32
-    EXPECT_EQ("\\n\\nmessage\\n\\n\r\n", testing::internal::GetCapturedStderr());
+    EXPECT_EQ("\n\nmessage\n\n\r\n", testing::internal::GetCapturedStderr());
 #else
     EXPECT_EQ("\n\nmessage\n\n\n", testing::internal::GetCapturedStderr());
 #endif
