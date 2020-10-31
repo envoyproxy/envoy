@@ -27,6 +27,8 @@ services:
         aliases:
           - postgres
       postgres-in-between:
+        aliases:
+          - proxy-postgres-frontend.example.com
 
   proxy-postgres-backend:
     build:
@@ -35,6 +37,8 @@ services:
     networks:
       postgres-backend:
       postgres-in-between:
+        aliases:
+          - proxy-postgres-backend.example.com
 
   postgres:
     image: postgres:latest

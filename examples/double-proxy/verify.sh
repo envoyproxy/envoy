@@ -32,6 +32,7 @@ openssl x509 -req \
 	-CA certs/ca.crt \
 	-CAkey certs/ca.key \
 	-CAcreateserial \
+	-extfile <(printf "subjectAltName=DNS:proxy-postgres-frontend.example.com") \
 	-out certs/postgres-frontend.example.com.crt \
 	-days 500 \
 	-sha256
@@ -40,6 +41,7 @@ openssl x509 -req \
 	-CA certs/ca.crt \
 	-CAkey certs/ca.key \
 	-CAcreateserial \
+	-extfile <(printf "subjectAltName=DNS:proxy-postgres-backend.example.com") \
 	-out certs/postgres-backend.example.com.crt \
 	-days 500 \
 	-sha256
