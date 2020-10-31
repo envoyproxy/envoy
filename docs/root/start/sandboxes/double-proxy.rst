@@ -45,7 +45,11 @@ First create a key for the certificate authority:
    ..........................................................................................................++++
    e is 65537 (0x010001)
 
-Now use the key to generate a certificate:
+Now use the key to generate a certificate.
+
+If you wish, You can interactively alter the fields in the certificate.
+
+For the purpose of this example, the defaults should be sufficient.
 
 .. code-block:: console
 
@@ -128,12 +132,16 @@ You can now use the certificate authority that you created to sign the certifica
    Getting CA Private Key
 
 At this point you should have the necessary certificates and keys to secure the connection between
-the proxies. They are stored in the ``certs/`` directory.
+the proxies.
+
+They keys and certificates are stored in the ``certs/`` directory.
 
 Step 6: Start all of our containers
 ***********************************
 
 Build and start the containers.
+
+This will load the required keys and cerficates into the frontend and backend proxies.
 
 .. code-block:: console
 
