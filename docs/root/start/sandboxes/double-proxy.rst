@@ -18,7 +18,7 @@ and to relay requests to upstream servers and services.
 
 This example encrypts the transmission of data between the two middle proxies.
 
-This can be useful if the proxies are phsyically separated or transmit data over untrusted networks.
+This can be useful if the proxies are physically separated or transmit data over untrusted networks.
 
 In order to  use the sandbox you will first need to generate the necessary SSL keys and certificates.
 
