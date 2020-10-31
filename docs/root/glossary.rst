@@ -8,6 +8,10 @@ Glossary
    Aggregated discovery service (ADS)
       ``NotDefined``
 
+      .. note::
+
+	 testing block inside term definition...
+
    Backend
       ``NotDefined``
 
@@ -60,6 +64,9 @@ Glossary
       ``NotDefined``
 
    gRPC
+      ``NotDefined``
+
+   HTTP connection manager (HCM)
       ``NotDefined``
 
    Ingress
