@@ -19,16 +19,13 @@ jobs:
     - name: Build
       run: bash ./ci/run_envoy_docker.sh 'docs/build.sh'
       
-    - name: Check result
-      run: | 
-            echo $(pwd)
-            ls -ltr generated/docs/
             
     - name: Deploy to Netlify
       uses: nwtgck/actions-netlify@v1.1
       with:
         publish-dir: 'generated/docs/'
         production-branch: zh
+        production-deploy: false
         github-token: ${{ secrets.ENVOY }}
         deploy-message: "${{ github.event.pull_request.title }} Deploy succeeded"
         enable-pull-request-comment: true
@@ -39,3 +36,9 @@ jobs:
         NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
       timeout-minutes: 5   
+    
+    - name: Deploy docs with github pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY}}
+        publish_dir: ./generated/docs
