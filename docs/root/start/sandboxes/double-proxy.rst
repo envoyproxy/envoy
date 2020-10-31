@@ -1,7 +1,7 @@
 .. _install_sandboxes_double_proxy:
 
-Double proxy
-============
+Double proxy (with encryption)
+==============================
 
 This sandbox demonstrates a basic "double proxy" configuration, in which a simple Flask app
 connects to a PostgreSQL database, with two Envoy proxies in between.
