@@ -168,11 +168,12 @@ Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool
   }
 
   envoy_data in_data;
-  bool already_buffering = iteration_state_ == IterationState::Stopped && internal_buffer &&
-                           internal_buffer->length() > 0;
 
-  if (already_buffering) {
-    // Pre-emptively buffer data to present aggregate to platform.
+  // Decide whether to preemptively buffer data to present aggregate to platform.
+  bool prebuffer_data = iteration_state_ == IterationState::Stopped && internal_buffer &&
+                        &data != internal_buffer && internal_buffer->length() > 0;
+
+  if (prebuffer_data) {
     internal_buffer->move(data);
     in_data = Buffer::Utility::copyToBridgeData(*internal_buffer);
   } else {
@@ -191,7 +192,7 @@ Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool
     return Http::FilterDataStatus::Continue;
 
   case kEnvoyFilterDataStatusStopIterationAndBuffer:
-    if (already_buffering) {
+    if (prebuffer_data) {
       // Data will already have been added to the internal buffer (above).
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
