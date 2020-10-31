@@ -23,5 +23,7 @@ run_log "Test http -> https"
 responds_with \
     '"x-forwarded-proto": "http",' \
     http://localhost:10002
-
 curl -s http://localhost:10002  | jq  '.os.hostname' | grep '"service-https"'
+
+run_log "Test https passthrough"
+curl -sk https://localhost:10003  | jq  '.os.hostname' | grep '"service-https"'
