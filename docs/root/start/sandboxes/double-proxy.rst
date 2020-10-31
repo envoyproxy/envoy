@@ -4,9 +4,9 @@ Double proxy
 ============
 
 This sandbox demonstrates a basic "double proxy" configuration, in which a simple ``Flask`` app
-connects to a ``PostgreSql`` database, with two Envoy proxies in between.
+connects to a ``PostgreSQL`` database, with two Envoy proxies in between.
 
-``Envoy (front)`` -> ``Flask`` -> ``Envoy (postgres-front)`` -> ``Envoy (postgres-back)`` -> ``PostgreSql``
+``Envoy (front)`` -> ``Flask`` -> ``Envoy (postgres-front)`` -> ``Envoy (postgres-back)`` -> ``PostgreSQL``
 
 This type of setup is common in a service mesh where Envoy acts as a "sidecar" between individual services.
 
@@ -32,6 +32,8 @@ Change to the ``examples/double-proxy`` directory.
 Step 3: Create a certificate authority
 **************************************
 
+First create a key for the certificate authority:
+
 .. code-block:: console
 
    $ pwd
@@ -42,6 +44,8 @@ Step 3: Create a certificate authority
    ..........++++
    ..........................................................................................................++++
    e is 65537 (0x010001)
+
+Now use the key to generate a certificate:
 
 .. code-block:: console
 
@@ -66,6 +70,8 @@ Step 3: Create a certificate authority
 Step 4: Create a domain key
 ***************************
 
+Now create a key for the example domain:
+
 .. code-block:: console
 
    $ openssl genrsa -out certs/example.com.key 2048
@@ -76,6 +82,8 @@ Step 4: Create a domain key
 
 Step 5: Generate certificate signing requests for the proxies
 *************************************************************
+
+Use the domain key to generate certificate signing requests for each of the proxies:
 
 .. code-block:: console
 
@@ -90,6 +98,8 @@ Step 5: Generate certificate signing requests for the proxies
 
 Step 5: Sign the proxy certificates
 ***********************************
+
+You can now use the certificate authority that you created to sign the certificate requests:
 
 .. code-block:: console
 
@@ -117,6 +127,9 @@ Step 5: Sign the proxy certificates
    subject=C = US, ST = CA, O = "MyExample, Inc.", CN = proxy-postgres-backend.example.com
    Getting CA Private Key
 
+At this point you should have the necessary certificates and keys to secure the connection between
+the proxies. They are stored in the ``certs/`` directory.
+
 Step 6: Start all of our containers
 ***********************************
 
@@ -140,6 +153,8 @@ Build and start the containers.
 
 Step 7: Check the flask app can connect to the database
 *******************************************************
+
+Checking the response at http://localhost:10000, you should see the output from the flask app:
 
 .. code-block:: console
 
