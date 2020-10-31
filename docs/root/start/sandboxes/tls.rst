@@ -6,11 +6,12 @@ TLS
 This example walks through some of the ways that Envoy can be configured to make
 use of encrypted connections using ``TLS`` over ``HTTP``.
 
-It demonstrates a number of commonly used proxying and termination patterns:
+It demonstrates a number of commonly used proxying and ``TLS`` termination patterns:
 
 - ``https`` -> ``http``
 - ``https`` -> ``https``
 - ``http`` -> ``https``
+- ``https`` passthrough
 
 .. include:: _include/docker-env-setup.rst
 
@@ -38,7 +39,7 @@ Step 3: Build the sandbox
 Step 4: Test proxying ``https`` -> ``http``
 ********************************************
 
-The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and proxies to the interal ``HTTP`` server
+The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and proxies to the upstream ``HTTP`` server
 
 .. code-block:: console
 
@@ -51,7 +52,7 @@ The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and pr
 Step 5: Test proxying ``https`` -> ``https``
 ********************************************
 
-The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and proxies to the interal ``HTTPS`` server
+The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and proxies to the upstream ``HTTPS`` server
 
 .. code-block:: console
 
@@ -64,7 +65,22 @@ The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and pr
 Step 6: Test proxying ``http`` -> ``https``
 *******************************************
 
-The Envoy proxy listening on https://localhost:10002 terminates ``HTTP`` and proxies to the interal ``HTTPS`` server
+The Envoy proxy listening on https://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` server
+
+.. code-block:: console
+
+   $ curl -s http://localhost:10002  | jq  '.headers["x-forwarded-proto"]'
+   "http"
+
+   $ curl -s http://localhost:10002  | jq  '.os.hostname'
+   "service-https"
+
+
+Step 7: Test proxying ``https`` passthrough
+*******************************************
+
+The Envoy proxy listening on https://localhost:10003 proxies directly to the upstream ``HTTPS`` server which
+does the termination.
 
 .. code-block:: console
 
