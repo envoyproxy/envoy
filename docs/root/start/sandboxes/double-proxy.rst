@@ -47,7 +47,7 @@ First create a key for the certificate authority:
 
 Now use the key to generate a certificate.
 
-If you wish, You can interactively alter the fields in the certificate.
+If you wish, you can interactively alter the fields in the certificate.
 
 For the purpose of this example, the defaults should be sufficient.
 
@@ -69,7 +69,6 @@ For the purpose of this example, the defaults should be sufficient.
    Organizational Unit Name (eg, section) []:
    Common Name (e.g. server FQDN or YOUR name) []:
    Email Address []:
-
 
 Step 4: Create a domain key
 ***************************
