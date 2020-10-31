@@ -105,7 +105,7 @@ public:
 
   /**
    * Return true if the scheduler will run the loop at most once.
-   */ 
+   */
   static constexpr bool supportsMultipleLoops() { return !(flagsBasedOnEventType() & EVLOOP_ONCE); }
 
 private:
