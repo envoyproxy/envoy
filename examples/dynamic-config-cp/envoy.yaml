@@ -32,15 +32,6 @@ static_resources:
                 address: go-control-plane
                 port_value: 18000
 
-layered_runtime:
-  layers:
-  - name: runtime-0
-    rtds_layer:
-      name: runtime-0
-      rtds_config:
-        resource_api_version: V3
-        ads: {}
-
 admin:
   access_log_path: /dev/null
   address:
