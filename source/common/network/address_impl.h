@@ -227,13 +227,13 @@ public:
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&pipe_.address_);
   }
+  const sockaddr_un& getSockAddr() const override { return pipe_.address_; }
   socklen_t sockAddrLen() const override {
     if (pipe_.abstract_namespace_) {
       return offsetof(struct sockaddr_un, sun_path) + pipe_.address_length_;
     }
     return sizeof(pipe_.address_);
   }
-  void getSockAddr(sockaddr_un& address) { address = pipe_.address_; }
 
 private:
   struct PipeHelper : public Pipe {
