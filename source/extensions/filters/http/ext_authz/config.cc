@@ -52,13 +52,15 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    auto async_client_cache = getAsyncClientCacheSingleton(context);
+    auto async_client_cache_singleton = getAsyncClientCacheSingleton(context);
+    auto async_client_cache =
+        async_client_cache_singleton->getOrCreateAsyncClientCache(context, proto_config);
     callback = [async_client_cache, filter_config, timeout_ms, proto_config,
                 transport_api_version = proto_config.transport_api_version()](
                    Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          async_client_cache->getOrCreateAsyncClient(proto_config),
-          std::chrono::milliseconds(timeout_ms), transport_api_version);
+          async_client_cache->getAsyncClient(), std::chrono::milliseconds(timeout_ms),
+          transport_api_version);
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
           std::make_shared<Filter>(filter_config, std::move(client))});
     };
@@ -105,14 +107,11 @@ REGISTER_FACTORY(ExtAuthzFilterConfig,
 
 SINGLETON_MANAGER_REGISTRATION(google_grpc_async_client_cache);
 
-Filters::Common::ExtAuthz::AsyncClientCacheSharedPtr
+Filters::Common::ExtAuthz::AsyncClientCacheSingletonSharedPtr
 getAsyncClientCacheSingleton(Server::Configuration::FactoryContext& context) {
-  return context.singletonManager().getTyped<Filters::Common::ExtAuthz::AsyncClientCache>(
-      SINGLETON_MANAGER_REGISTERED_NAME(google_grpc_async_client_cache), [&context] {
-        return std::make_shared<Filters::Common::ExtAuthz::AsyncClientCache>(
-            context.clusterManager().grpcAsyncClientManager(), context.scope(),
-            context.threadLocal());
-      });
+  return context.singletonManager().getTyped<Filters::Common::ExtAuthz::AsyncClientCacheSingleton>(
+      SINGLETON_MANAGER_REGISTERED_NAME(google_grpc_async_client_cache),
+      [] { return std::make_shared<Filters::Common::ExtAuthz::AsyncClientCacheSingleton>(); });
 }
 
 } // namespace ExtAuthz

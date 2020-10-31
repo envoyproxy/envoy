@@ -142,21 +142,37 @@ void GrpcClientImpl::toAuthzResponseHeader(
   }
 }
 
-const Grpc::RawAsyncClientSharedPtr AsyncClientCache::getOrCreateAsyncClient(
+AsyncClientCacheSharedPtr AsyncClientCacheSingleton::getOrCreateAsyncClientCache(
+    Server::Configuration::FactoryContext& context,
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
-  // The cache stores Google gRPC client, so channel is not created for each request.
-  ASSERT(proto_config.has_grpc_service() && proto_config.grpc_service().has_google_grpc());
-  auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
   const std::size_t cache_key = MessageUtil::hash(proto_config.grpc_service().google_grpc());
-  const auto it = cache.async_clients_.find(cache_key);
-  if (it != cache.async_clients_.end()) {
+  const auto it = async_clients_.find(cache_key);
+  if (it != async_clients_.end()) {
     return it->second;
   }
-  const Grpc::AsyncClientFactoryPtr factory =
-      async_client_manager_.factoryForGrpcService(proto_config.grpc_service(), scope_, true);
-  const Grpc::RawAsyncClientSharedPtr async_client = factory->create();
-  cache.async_clients_.emplace(cache_key, async_client);
+  AsyncClientCacheSharedPtr async_client =
+      std::make_shared<Filters::Common::ExtAuthz::AsyncClientCache>(
+          context.clusterManager().grpcAsyncClientManager(), context.scope(),
+          context.threadLocal());
+  async_client->init(proto_config);
+  async_clients_.emplace(cache_key, async_client);
   return async_client;
+}
+
+void AsyncClientCache::init(
+    const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
+  // The cache stores Google gRPC client, so channel is not created for each
+  // request.
+  ASSERT(proto_config.has_grpc_service() && proto_config.grpc_service().has_google_grpc());
+  auto shared_this = shared_from_this();
+  tls_slot_->set([shared_this, proto_config](Event::Dispatcher&) {
+    return std::make_shared<ThreadLocalCache>(shared_this->async_client_manager_,
+                                              shared_this->scope_, proto_config);
+  });
+}
+
+const Grpc::RawAsyncClientSharedPtr AsyncClientCache::getAsyncClient() {
+  return tls_slot_->get().async_client_;
 }
 
 } // namespace ExtAuthz

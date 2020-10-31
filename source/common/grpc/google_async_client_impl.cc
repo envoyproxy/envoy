@@ -90,6 +90,8 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
   std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
+  // Get state with try connection = true to ensure the channel is healthy.
+  channel->GetState(/*try_to_connect=*/true);
   stub_ = stub_factory.createStub(channel);
   scope_->counterFromStatName(stat_names.google_grpc_client_creation_).inc();
   // Initialize client stats.

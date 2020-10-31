@@ -84,35 +84,54 @@ using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;
 // The client cache for RawAsyncClient for Google grpc so channel is not created for each request.
 // TODO(fpliu233): The cache will cause resource leak that a new channel is created every time a new
 // config is pushed. Improve gRPC channel cache with better solution.
-class AsyncClientCache : public Singleton::Instance {
+class AsyncClientCache : public std::enable_shared_from_this<AsyncClientCache> {
 public:
   AsyncClientCache(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
                    ThreadLocal::SlotAllocator& tls)
-      : async_client_manager_(async_client_manager), scope_(scope), tls_slot_(tls.allocateSlot()) {
-    tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
-  }
-
-  const Grpc::RawAsyncClientSharedPtr getOrCreateAsyncClient(
-      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config);
+      : async_client_manager_(async_client_manager), scope_(scope),
+        tls_slot_(ThreadLocal::TypedSlot<ThreadLocalCache>::makeUnique(tls)) {}
+  void init(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config);
+  const Grpc::RawAsyncClientSharedPtr getAsyncClient();
 
 private:
   /**
    * Per-thread cache.
    */
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalCache() = default;
-    // The client cache stored with key as hash of
-    // envoy::config::core::v3::GrpcService::GoogleGrpc config.
-    // TODO(fpliu233): Remove when the cleaner and generic solution for gRPC is live.
-    absl::flat_hash_map<std::size_t, Grpc::RawAsyncClientSharedPtr> async_clients_;
+    ThreadLocalCache(
+        Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
+        const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
+      const Grpc::AsyncClientFactoryPtr factory =
+          async_client_manager.factoryForGrpcService(proto_config.grpc_service(), scope, true);
+      async_client_ = factory->create();
+    }
+    Grpc::RawAsyncClientSharedPtr async_client_;
   };
 
   Grpc::AsyncClientManager& async_client_manager_;
   Stats::Scope& scope_;
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalCache> tls_slot_;
 };
 
 using AsyncClientCacheSharedPtr = std::shared_ptr<AsyncClientCache>;
+
+// The Cache Singleton keeps all the AsyncClientCache.
+class AsyncClientCacheSingleton : public Singleton::Instance {
+public:
+  AsyncClientCacheSingleton() = default;
+  AsyncClientCacheSharedPtr getOrCreateAsyncClientCache(
+      Server::Configuration::FactoryContext& context,
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config);
+
+private:
+  // The tls slots with client cache stored with key as hash of
+  // envoy::config::core::v3::GrpcService::GoogleGrpc config.
+  // TODO(fpliu233): Remove when the cleaner and generic solution for gRPC is
+  // live. Tracking in issue12598 and issue13417.
+  absl::flat_hash_map<std::size_t, AsyncClientCacheSharedPtr> async_clients_;
+};
+
+using AsyncClientCacheSingletonSharedPtr = std::shared_ptr<AsyncClientCacheSingleton>;
 
 } // namespace ExtAuthz
 } // namespace Common
