@@ -155,7 +155,7 @@ public:
     reservable_ += copy_size;
     // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
     MemBlockBuilder<uint8_t> mem_builder(copy_size);
-    mem_builder.appendData(data);
+    mem_builder.appendData(absl::Span<uint8_t>(reinterpret_cast<uint8_t*>(data)));
     dest = mem_builder.release().get();
     return copy_size;
   }
@@ -280,7 +280,7 @@ public:
     uint64_t slice_capacity = sliceSize(size);
     std::unique_ptr<OwnedSlice> slice(new (slice_capacity) OwnedSlice(slice_capacity));
     MemBlockBuilder<uint8_t> mem_builder(size);
-    mem_builder.appendData(data);
+    mem_builder.appendData(absl::Span<uint8_t>(reinterpret_cast<uint8_t*>(data)));
     slice->base_ = mem_builder.release().get();
     slice->reservable_ = size;
     return slice;
@@ -659,7 +659,7 @@ private:
       : releasor_(releasor), size_(data.size()) {
     ASSERT(releasor != nullptr);
     MemBlockBuilder<uint8_t> mem_builder(data.size());
-    mem_builder.appendData(data.data());
+    mem_builder.appendData(absl::Span<uint8_t>(reinterpret_cast<uint8_t*>(data.data())));
     data_ = mem_builder.release().get();
   }
 
