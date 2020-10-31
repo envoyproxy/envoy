@@ -28,4 +28,5 @@ features. The following sandboxes are available:
     postgres
     redis
     wasm-cc
+    websocket
     zipkin_tracing
