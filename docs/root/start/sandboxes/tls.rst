@@ -28,18 +28,19 @@ Step 3: Build the sandbox
   $ docker-compose up --build -d
   $ docker-compose ps
 
-         Name                         Command                 State          Ports
-  --------------------------------------------------------------------------------------------
-  tls_proxy-https-to-http_1    /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
-  tls_proxy-https-to-https_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:10001->10000/tcp
-  tls_proxy-http-to-https_1    /docker-entrypoint.sh /usr ... Up      0.0.0.0:10002->10000/tcp
-  tls_service-http_1           node ./index.js                Up
-  tls_service-https_1          node ./index.js                Up
+         Name                            Command                 State          Ports
+  -----------------------------------------------------------------------------------------------
+  tls_proxy-https-to-http_1       /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
+  tls_proxy-https-to-https_1      /docker-entrypoint.sh /usr ... Up      0.0.0.0:10001->10000/tcp
+  tls_proxy-http-to-https_1       /docker-entrypoint.sh /usr ... Up      0.0.0.0:10002->10000/tcp
+  tls_proxy-https-passthrough_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:10003->10000/tcp
+  tls_service-http_1              node ./index.js                Up
+  tls_service-https_1             node ./index.js                Up
 
 Step 4: Test proxying ``https`` -> ``http``
 ********************************************
 
-The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and proxies to the upstream ``HTTP`` server
+The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and proxies to the upstream ``HTTP`` service.
 
 .. code-block:: console
 
@@ -52,7 +53,7 @@ The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and pr
 Step 5: Test proxying ``https`` -> ``https``
 ********************************************
 
-The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and proxies to the upstream ``HTTPS`` server
+The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and proxies to the upstream ``HTTPS`` service.
 
 .. code-block:: console
 
@@ -65,7 +66,7 @@ The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and pr
 Step 6: Test proxying ``http`` -> ``https``
 *******************************************
 
-The Envoy proxy listening on https://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` server
+The Envoy proxy listening on https://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` service.
 
 .. code-block:: console
 
@@ -79,7 +80,7 @@ The Envoy proxy listening on https://localhost:10002 terminates ``HTTP`` and pro
 Step 7: Test proxying ``https`` passthrough
 *******************************************
 
-The Envoy proxy listening on https://localhost:10003 proxies directly to the upstream ``HTTPS`` server which
+The Envoy proxy listening on https://localhost:10003 proxies directly to the upstream ``HTTPS`` service which
 does the termination.
 
 .. code-block:: console
