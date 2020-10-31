@@ -104,6 +104,8 @@ Step 6: Sign the proxy certificates
 
 You can now use the certificate authority that you created to sign the certificate requests:
 
+Note the ``subjectAltName``. This is used for reciprocally matching and validating the certificates.
+
 .. code-block:: console
 
    $ openssl x509 -req \
@@ -111,6 +113,7 @@ You can now use the certificate authority that you created to sign the certifica
 	-CA certs/ca.crt \
 	-CAkey certs/ca.key \
 	-CAcreateserial \
+        -extfile <(printf "subjectAltName=DNS:proxy-postgres-frontend.example.com") \
 	-out certs/postgres-frontend.example.com.crt \
 	-days 500 \
 	-sha256
@@ -123,6 +126,7 @@ You can now use the certificate authority that you created to sign the certifica
 	-CA certs/ca.crt \
 	-CAkey certs/ca.key \
 	-CAcreateserial \
+        -extfile <(printf "subjectAltName=DNS:proxy-postgres-backend.example.com") \
 	-out certs/postgres-backend.example.com.crt \
 	-days 500 \
 	-sha256
