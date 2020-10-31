@@ -37,7 +37,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: service-http-https
+                address: service-https
                 port_value: 443
     transport_socket:
       name: envoy.transport_sockets.tls
