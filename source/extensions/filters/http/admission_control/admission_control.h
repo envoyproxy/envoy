@@ -55,12 +55,12 @@ class AdmissionControlFilterConfig {
 public:
   AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
                                Random::RandomGenerator& random, Stats::Scope& scope,
-                               ThreadLocal::SlotPtr&& tls,
+                               ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
                                std::shared_ptr<ResponseEvaluator> response_evaluator);
   virtual ~AdmissionControlFilterConfig() = default;
 
   virtual ThreadLocalController& getController() const {
-    return tls_->getTyped<ThreadLocalControllerImpl>();
+    return tls_->get();
   }
 
   Random::RandomGenerator& random() const { return random_; }
@@ -73,7 +73,7 @@ public:
 private:
   Random::RandomGenerator& random_;
   Stats::Scope& scope_;
-  const ThreadLocal::SlotPtr tls_;
+  const ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl> tls_;
   Runtime::FeatureFlag admission_control_feature_;
   std::unique_ptr<Runtime::Double> aggression_;
   std::unique_ptr<Runtime::Percentage> sr_threshold_;
