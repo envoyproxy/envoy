@@ -100,7 +100,7 @@ Use the domain key to generate certificate signing requests for each of the prox
 	-subj "/C=US/ST=CA/O=MyExample, Inc./CN=proxy-postgres-backend.example.com" \
 	-out certs/proxy-postgres-backend.example.com.csr
 
-Step 5: Sign the proxy certificates
+Step 6: Sign the proxy certificates
 ***********************************
 
 You can now use the certificate authority that you created to sign the certificate requests:
@@ -136,7 +136,7 @@ the proxies.
 
 They keys and certificates are stored in the ``certs/`` directory.
 
-Step 6: Start all of our containers
+Step 7: Start all of our containers
 ***********************************
 
 Build and start the containers.
@@ -159,7 +159,7 @@ This will load the required keys and cerficates into the frontend and backend pr
    double-proxy_proxy-postgres-backend_1    /docker-entrypoint.sh /usr ... Up      10000/tcp
    double-proxy_proxy-postgres-frontend_1   /docker-entrypoint.sh /usr ... Up      10000/tcp
 
-Step 7: Check the flask app can connect to the database
+Step 8: Check the flask app can connect to the database
 *******************************************************
 
 Checking the response at http://localhost:10000, you should see the output from the flask app:
