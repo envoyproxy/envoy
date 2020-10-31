@@ -71,6 +71,7 @@ TEST(LoggerCustomFlagsTest, SetFormatter) {
 #else
     EXPECT_EQ("\n\nmessage\n\n\n", testing::internal::GetCapturedStderr());
 #endif
+    logger.reset();
   }
 
   {
@@ -86,6 +87,7 @@ TEST(LoggerCustomFlagsTest, SetFormatter) {
 #else
     EXPECT_EQ("\\n\\nmessage\\n\\n\n", testing::internal::GetCapturedStderr());
 #endif
+    escape_newline_logger.reset();
   }
 }
 
