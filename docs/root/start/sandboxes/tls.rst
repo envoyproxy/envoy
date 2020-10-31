@@ -20,6 +20,10 @@ Change directory to ``examples/tls`` in the Envoy repository.
 Step 3: Build the sandbox
 *************************
 
+This starts four proxies listening on ``localhost`` ports ``10000-10003``.
+
+It also starts two upstream services, one ``HTTP`` and one ``HTTPS``.
+
 .. code-block:: console
 
   $ pwd
@@ -66,7 +70,7 @@ The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and pr
 Step 6: Test proxying ``http`` -> ``https``
 *******************************************
 
-The Envoy proxy listening on https://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` service.
+The Envoy proxy listening on http://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` service.
 
 .. code-block:: console
 
@@ -81,12 +85,9 @@ Step 7: Test proxying ``https`` passthrough
 *******************************************
 
 The Envoy proxy listening on https://localhost:10003 proxies directly to the upstream ``HTTPS`` service which
-does the termination.
+does the ``TLS`` termination.
 
 .. code-block:: console
 
-   $ curl -s http://localhost:10002  | jq  '.headers["x-forwarded-proto"]'
-   "http"
-
-   $ curl -s http://localhost:10002  | jq  '.os.hostname'
+   $ curl -sk http://localhost:10003  | jq  '.os.hostname'
    "service-https"
