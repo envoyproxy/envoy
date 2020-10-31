@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ zh ]
+  pull_request:
+    branches: [ zh ]
+    
+jobs:
+  
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Check out code into the envoy module directory
+      uses: actions/checkout@v2
+    
+    - name: Build
+      run: bash ./ci/run_envoy_docker.sh 'docs/build.sh'
+      
+    - name: Check result
+      run: | 
+            echo $(pwd)
+            ls -ltr generated/docs/
+            
+    - name: Deploy to Netlify
+      uses: nwtgck/actions-netlify@v1.1
+      with:
+        publish-dir: 'generated/docs/'
+        production-branch: zh
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        deploy-message: "Deploy from GitHub Actions"
+        enable-pull-request-comment: true
+        enable-commit-comment: true
+        overwrites-pull-request-comment: true
+      env:
+        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+      timeout-minutes: 5   
