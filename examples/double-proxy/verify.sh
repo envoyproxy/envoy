@@ -12,6 +12,8 @@ mkdir -p certs
 run_log "Create a cert authority"
 openssl genrsa -out certs/ca.key 4096
 openssl req -batch -x509 -new -nodes -key certs/ca.key -sha256 -days 1024 -out certs/ca.crt
+
+run_log "Create a domain key"
 openssl genrsa -out certs/example.com.key 2048
 
 run_log "Generate signing requests for each proxy"
