@@ -32,7 +32,11 @@ services:
   service-http:
     image: mendhak/http-https-echo
     hostname: service-http
+    environment:
+      - HTTPS_PORT=0
 
   service-https:
     image: mendhak/http-https-echo
     hostname: service-https
+    environment:
+      - HTTP_PORT=0
