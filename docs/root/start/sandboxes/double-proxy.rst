@@ -74,7 +74,7 @@ For the purpose of this example, the defaults should be sufficient.
 Step 4: Create a domain key
 ***************************
 
-Now create a key for the example domain:
+Create a key for the example domain:
 
 .. code-block:: console
 
