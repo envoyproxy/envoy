@@ -11,16 +11,19 @@ connects to a ``PostgreSql`` database, with two Envoy proxies in between.
 This type of setup is common in a service mesh where Envoy acts as a "sidecar" between individual services.
 
 It can also be useful as a way of providing access for application servers to upstream services or
-databases that may be in a different location or subnet.
+databases that may be in a different location or subnet, outside of a service mesh or sidecar-based setup.
 
-Another common use case is with Envoy configured to provide a "Point of presence" at the edge of the cloud,
+Another common use case is with Envoy configured to provide "Points of presence" at the edges of the cloud,
 and to relay requests to upstream servers and services.
 
-This example encrypts (and compresses) the transmission of data between the two middle proxies.
+This example encrypts the transmission of data between the two middle proxies.
 
 This can be useful if the proxies are phsyically separated (or transmit data over untrusted networks).
 
 In order to  use the sandbox you will first need to generate the necessary SSL keys and certificates.
+
+This example walks through creating a certificate authority, and using it to create a domain key and sign
+certificates for the proxyies.
 
 .. include:: _include/docker-env-setup.rst
 
@@ -29,11 +32,116 @@ Change to the ``examples/double-proxy`` directory.
 Step 3: Create a certificate authority
 **************************************
 
-Step 4: Generate certificates for the proxies
-*********************************************
+.. code-block:: console
 
-Step 5: Start all of our containers
+   $ pwd
+   envoy/examples/double-proxy
+   $ mkdir -p certs
+   $ openssl genrsa -out certs/ca.key 4096
+   Generating RSA private key, 4096 bit long modulus (2 primes)
+   ..........++++
+   ..........................................................................................................++++
+   e is 65537 (0x010001)
+
+.. code-block:: console
+
+   $ openssl req -x509 -new -nodes -key certs/ca.key -sha256 -days 1024 -out certs/ca.crt
+
+   You are about to be asked to enter information that will be incorporated
+   into your certificate request.
+   What you are about to enter is what is called a Distinguished Name or a DN.
+   There are quite a few fields but you can leave some blank
+   For some fields there will be a default value,
+   If you enter '.', the field will be left blank.
+   -----
+   Country Name (2 letter code) [AU]:
+   State or Province Name (full name) [Some-State]:
+   Locality Name (eg, city) []:
+   Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+   Organizational Unit Name (eg, section) []:
+   Common Name (e.g. server FQDN or YOUR name) []:
+   Email Address []:
+
+
+Step 4: Create a domain key
+***************************
+
+.. code-block:: console
+
+   $ openssl genrsa -out certs/example.com.key 2048
+   Generating RSA private key, 2048 bit long modulus (2 primes)
+   ..+++++
+   .................................................+++++
+   e is 65537 (0x010001)
+
+Step 5: Generate certificate signing requests for the proxies
+*************************************************************
+
+.. code-block:: console
+
+   $ openssl req -new -sha256 \
+	-key certs/example.com.key \
+	-subj "/C=US/ST=CA/O=MyExample, Inc./CN=proxy-postgres-frontend.example.com" \
+	-out certs/proxy-postgres-frontend.example.com.csr
+   $ openssl req -new -sha256 \
+	-key certs/example.com.key \
+	-subj "/C=US/ST=CA/O=MyExample, Inc./CN=proxy-postgres-backend.example.com" \
+	-out certs/proxy-postgres-backend.example.com.csr
+
+Step 5: Sign the proxy certificates
 ***********************************
 
-Step 6: Check the flask app can connect to the database
+.. code-block:: console
+
+   $ openssl x509 -req \
+	-in certs/proxy-postgres-frontend.example.com.csr \
+	-CA certs/ca.crt \
+	-CAkey certs/ca.key \
+	-CAcreateserial \
+	-out certs/postgres-frontend.example.com.crt \
+	-days 500 \
+	-sha256
+   Signature ok
+   subject=C = US, ST = CA, O = "MyExample, Inc.", CN = proxy-postgres-frontend.example.com
+   Getting CA Private Key
+
+   $ openssl x509 -req \
+	-in certs/proxy-postgres-backend.example.com.csr \
+	-CA certs/ca.crt \
+	-CAkey certs/ca.key \
+	-CAcreateserial \
+	-out certs/postgres-backend.example.com.crt \
+	-days 500 \
+	-sha256
+   Signature ok
+   subject=C = US, ST = CA, O = "MyExample, Inc.", CN = proxy-postgres-backend.example.com
+   Getting CA Private Key
+
+Step 6: Start all of our containers
+***********************************
+
+Build and start the containers.
+
+.. code-block:: console
+
+   $ pwd
+   envoy/examples/double-proxy
+   $ docker-compose build --pull
+   $ docker-compose up -d
+   $ docker-compose ps
+
+          Name                                      Command                State         Ports
+   --------------------------------------------------------------------------------------------------------
+   double-proxy_app_1                       python3 /code/service.py       Up
+   double-proxy_postgres_1                  docker-entrypoint.sh postgres  Up      5432/tcp
+   double-proxy_proxy-frontend_1            /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
+   double-proxy_proxy-postgres-backend_1    /docker-entrypoint.sh /usr ... Up      10000/tcp
+   double-proxy_proxy-postgres-frontend_1   /docker-entrypoint.sh /usr ... Up      10000/tcp
+
+Step 7: Check the flask app can connect to the database
 *******************************************************
+
+.. code-block:: console
+
+   $ curl http://localhost:10000
+   Connected to Postgres, version: PostgreSQL 13.0 (Debian 13.0-1.pgdg100+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 8.3.0-6) 8.3.0, 64-bit
