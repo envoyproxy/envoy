@@ -16,7 +16,8 @@ databases that may be in a different location or subnet, outside of a service me
 Another common use case is with Envoy configured to provide "Points of presence" at the edges of the cloud,
 and to relay requests to upstream servers and services.
 
-This example encrypts the transmission of data between the two middle proxies.
+This example encrypts the transmission of data between the two middle proxies, using ``mTLS``. The proxies
+also validate and authenticate each others certificates.
 
 This can be useful if the proxies are physically separated or transmit data over untrusted networks.
 
@@ -45,7 +46,7 @@ First create a key for the certificate authority:
    ..........................................................................................................++++
    e is 65537 (0x010001)
 
-Now use the key to generate a certificate.
+Now use the key to generate a certificate authority certificate.
 
 If you wish, you can interactively alter the fields in the certificate.
 
@@ -134,7 +135,7 @@ Note the ``subjectAltName``. This is used for reciprocally matching and validati
    subject=C = US, ST = CA, O = "MyExample, Inc.", CN = proxy-postgres-backend.example.com
    Getting CA Private Key
 
-At this point you should have the necessary certificates and keys to secure the connection between
+At this point you should have the necessary keys and certificates to secure the connection between
 the proxies.
 
 They keys and certificates are stored in the ``certs/`` directory.
@@ -144,7 +145,7 @@ Step 7: Start all of our containers
 
 Build and start the containers.
 
-This will load the required keys and cerficates into the frontend and backend proxies.
+This will load the required keys and certificates into the frontend and backend proxies.
 
 .. code-block:: console
 
