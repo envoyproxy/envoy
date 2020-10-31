@@ -85,9 +85,9 @@ public:
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
   void flushCounter(const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-                    int64_t snapshot_time);
-  void flushGauge(const Stats::Gauge& gauge, int64_t snapshot_time);
-  void flushHistogram(const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time);
+                    int64_t snapshot_time_ms);
+  void flushGauge(const Stats::Gauge& gauge, int64_t snapshot_time_ms);
+  void flushHistogram(const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time_ms);
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;

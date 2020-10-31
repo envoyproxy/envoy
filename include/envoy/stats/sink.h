@@ -44,7 +44,7 @@ public:
   /**
    * @return a snapshot of all text readouts.
    */
-  virtual int64_t snapShotTimeInMillis() PURE;
+  virtual int64_t snapshotTimeMs() PURE;
 };
 
 /**
