@@ -30,10 +30,11 @@ jobs:
         publish-dir: 'generated/docs/'
         production-branch: zh
         github-token: ${{ secrets.ENVOY }}
-        deploy-message: "Deploy succeeded"
+        deploy-message: "${{ github.event.pull_request.title }} Deploy succeeded"
         enable-pull-request-comment: true
         enable-commit-comment: true
         overwrites-pull-request-comment: true
+        alias: deploy-preview-${{ github.event.number }}
       env:
         NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}

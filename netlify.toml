@@ -1,3 +1,0 @@
-[build]
-    command = "./ci/do_circle_ci.sh docs"
-    publish = "./envoy/docs/generated/docs"
