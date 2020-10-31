@@ -3,8 +3,8 @@
 Double proxy
 ============
 
-This sandbox demonstrates a basic "double proxy" configuration, in which a simple ``Flask`` app
-connects to a ``PostgreSQL`` database, with two Envoy proxies in between.
+This sandbox demonstrates a basic "double proxy" configuration, in which a simple Flask app
+connects to a PostgreSQL database, with two Envoy proxies in between.
 
 ``Envoy (front)`` -> ``Flask`` -> ``Envoy (postgres-front)`` -> ``Envoy (postgres-back)`` -> ``PostgreSQL``
 
@@ -18,7 +18,7 @@ and to relay requests to upstream servers and services.
 
 This example encrypts the transmission of data between the two middle proxies.
 
-This can be useful if the proxies are phsyically separated (or transmit data over untrusted networks).
+This can be useful if the proxies are phsyically separated or transmit data over untrusted networks.
 
 In order to  use the sandbox you will first need to generate the necessary SSL keys and certificates.
 
@@ -162,7 +162,7 @@ This will load the required keys and cerficates into the frontend and backend pr
 Step 8: Check the flask app can connect to the database
 *******************************************************
 
-Checking the response at http://localhost:10000, you should see the output from the flask app:
+Checking the response at http://localhost:10000, you should see the output from the Flask app:
 
 .. code-block:: console
 
