@@ -76,19 +76,14 @@ public:
   virtual void set(InitializeCb cb) PURE;
 
   /**
-   * UpdateCb takes the current stored data, and must return the same data. The
-   * API was designed to allow replacement of the object via this API, but this
-   * is not currently used, and thus we are removing the functionality. In a future
-   * PR, the API will be removed.
-   *
-   * TLS will run the callback and assert the returned returned value matches
-   * the current value.
+   * UpdateCb takes is passed a shared point to the current stored data. Use of
+   * this API is deprecated; please use TypedSlot::runOnAllThreads instead.
    *
    * NOTE: The update callback is not supposed to capture the Slot, or its
    * owner, as the owner may be destructed in main thread before the update_cb
    * gets called in a worker thread.
    **/
-  using UpdateCb = std::function<ThreadLocalObjectSharedPtr(ThreadLocalObjectSharedPtr)>;
+  using UpdateCb = std::function<void(ThreadLocalObjectSharedPtr)>;
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
   virtual void runOnAllThreads(const UpdateCb& update_cb, const Event::PostCb& complete_cb) PURE;
   virtual void runOnAllThreads(const Event::PostCb& cb) PURE;

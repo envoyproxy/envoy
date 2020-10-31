@@ -141,17 +141,15 @@ protected:
 TEST_F(CallbackNotInvokedAfterDeletionTest, WithArg) {
   InSequence s;
   slot_->runOnAllThreads(
-      [this](ThreadLocal::ThreadLocalObjectSharedPtr) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      [this](ThreadLocal::ThreadLocalObjectSharedPtr) {
         // Callbacks happen on the main thread but not the workers, so track the total.
         total_callbacks_++;
-        return nullptr;
       });
   slot_->runOnAllThreads(
-      [this](ThreadLocal::ThreadLocalObjectSharedPtr) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      [this](ThreadLocal::ThreadLocalObjectSharedPtr) {
         ++thread_status_.thread_local_calls_;
-        return nullptr;
       },
-      [this]() -> void {
+      [this]() {
         // Callbacks happen on the main thread but not the workers.
         EXPECT_EQ(thread_status_.thread_local_calls_, 1);
         thread_status_.all_threads_complete_ = true;
@@ -165,7 +163,7 @@ TEST_F(CallbackNotInvokedAfterDeletionTest, WithoutArg) {
     total_callbacks_++;
   });
   slot_->runOnAllThreads([this]() { ++thread_status_.thread_local_calls_; },
-                         [this]() -> void {
+                         [this]() {
                            // Callbacks happen on the main thread but not the workers.
                            EXPECT_EQ(thread_status_.thread_local_calls_, 1);
                            thread_status_.all_threads_complete_ = true;
@@ -181,9 +179,8 @@ TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
   uint32_t update_called = 0;
 
   TestThreadLocalObject& object_ref = setObject(*slot);
-  auto update_cb = [&update_called](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
+  auto update_cb = [&update_called](ThreadLocalObjectSharedPtr) {
     ++update_called;
-    return obj;
   };
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref, onDestroy());
@@ -241,12 +238,10 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   // Ensure that the thread local call back and all_thread_complete call back are called.
   ThreadStatus thread_status;
   tlsptr->runOnAllThreads(
-      [&thread_status](ThreadLocal::ThreadLocalObjectSharedPtr object)
-          -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      [&thread_status](ThreadLocal::ThreadLocalObjectSharedPtr) {
         ++thread_status.thread_local_calls_;
-        return object;
       },
-      [&thread_status]() -> void {
+      [&thread_status]() {
         EXPECT_EQ(thread_status.thread_local_calls_, 2);
         thread_status.all_threads_complete_ = true;
       });
