@@ -28,9 +28,9 @@ jobs:
         production-deploy: false
         github-token: ${{ secrets.ENVOY }}
         deploy-message: "${{ github.event.pull_request.title }} Deploy succeeded"
-        enable-pull-request-comment: true
-        enable-commit-comment: true
-        overwrites-pull-request-comment: true
+        enable-pull-request-comment: false
+        enable-commit-comment: false
+        overwrites-pull-request-comment: false
         alias: deploy-preview-${{ github.event.number }}
       env:
         NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
