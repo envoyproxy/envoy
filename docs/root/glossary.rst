@@ -81,6 +81,9 @@ Glossary
    Middle proxy
       ``NotDefined``
 
+   Mutual TLS (mTLS)
+      ``NotDefined``
+
    North-south traffic
       ``NotDefined``
 
@@ -100,6 +103,9 @@ Glossary
       ``NotDefined``
 
    Static configuration
+      ``NotDefined``
+
+   Transport layer security (TLS)
       ``NotDefined``
 
    Typed config
