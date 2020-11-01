@@ -48,7 +48,7 @@ class LoggerCustomFlagsTest : public testing::Test {
 public:
   LoggerCustomFlagsTest() : logger_(Registry::getSink()) {}
 
-  void expectMessageLog(const std::string& pattern, const std::string& message,
+  void expectLogMessage(const std::string& pattern, const std::string& message,
                         const std::string& expected) {
     auto formatter = std::make_unique<spdlog::pattern_formatter>();
     formatter
@@ -73,12 +73,12 @@ protected:
 TEST_F(LoggerCustomFlagsTest, LogMessageAsIs) {
   // This uses "%v", the default flag for printing the actual text to log.
   // https://github.com/gabime/spdlog/wiki/3.-Custom-formatting#pattern-flags.
-  expectMessageLog("%v", "\n\nmessage\n\n", "\n\nmessage\n\n");
+  expectLogMessage("%v", "\n\nmessage\n\n", "\n\nmessage\n\n");
 }
 
 TEST_F(LoggerCustomFlagsTest, LogMessageAsEscaped) {
   // This uses "%_", the added custom flag that escapes newlines from the actual text to log.
-  expectMessageLog("%_", "\n\nmessage\n\n", "\\n\\nmessage\\n\\n");
+  expectLogMessage("%_", "\n\nmessage\n\n", "\\n\\nmessage\\n\\n");
 }
 
 } // namespace Logger
