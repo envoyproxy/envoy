@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     UIDNAInfo info = UIDNA_INFO_INITIALIZER;
     UChar data[] = {'1', '2', '3'};
     UChar* src = &data[0];
-    uidna_nameToASCII(nullptr, src, 2, nullptr, *src, &info, &err);
+    uidna_nameToASCII(nullptr, src, 0, nullptr, *src, &info, &err);
 
     ASSERT_EQ(info.errors, 0x80);
     ASSERT_EQ(err, U_ILLEGAL_ARGUMENT_ERROR);
