@@ -3684,6 +3684,11 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
       client.mutable_common_tls_context()->mutable_tls_params();
 
+  // Note: There aren't any valid TLSv1.0 or TLSv1.1 cipher suites enabled by default,
+  // so enable them to avoid false positives.
+  client_params->add_cipher_suites("ECDHE-RSA-AES128-SHA");
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-SHA");
+
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
   TestUtilOptionsV2 tls_v1_2_test_options =
       createProtocolTestOptions(listener, client, GetParam(), "TLSv1.2");
