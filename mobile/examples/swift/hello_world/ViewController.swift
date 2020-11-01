@@ -19,6 +19,7 @@ final class ViewController: UITableViewController {
       NSLog("starting Envoy...")
       self.client = try EngineBuilder()
         .addFilter(factory: DemoFilter.init)
+        .addFilter(factory: BufferDemoFilter.init)
         .addFilter(factory: AsyncDemoFilter.init)
         .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
         .build()
