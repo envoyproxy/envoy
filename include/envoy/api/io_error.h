@@ -76,7 +76,7 @@ template <typename ReturnValue> struct IoCallResult {
    * @return true if the system call failed because the socket would block.
    */
   bool wouldBlock() const {
-    return !ok() && err_->getErrorCode() == Api::IoError::IoErrorCode::Again;
+    return !ok() && err_->getErrorCode() == IoError::IoErrorCode::Again;
   }
 
   // TODO(danzh): rename it to be more meaningful, i.e. return_value_.
