@@ -28,6 +28,8 @@ public:
 
 using ThreadLocalObjectSharedPtr = std::shared_ptr<ThreadLocalObject>;
 
+template <class T = ThreadLocalObject> class TypedSlot;
+
 /**
  * An individual allocated TLS slot. When the slot is destroyed the stored thread local will
  * be freed on each thread.
@@ -75,6 +77,9 @@ public:
   using InitializeCb = std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)>;
   virtual void set(InitializeCb cb) PURE;
 
+protected:
+  template <class T> friend class TypedSlot;
+
   /**
    * UpdateCb takes is passed a shared point to the current stored data. Use of
    * this API is deprecated; please use TypedSlot::runOnAllThreads instead.
@@ -84,6 +89,8 @@ public:
    * gets called in a worker thread.
    **/
   using UpdateCb = std::function<void(ThreadLocalObjectSharedPtr)>;
+
+  // Callers must use the TypedSlot API, below.
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
   virtual void runOnAllThreads(const UpdateCb& update_cb, const Event::PostCb& complete_cb) PURE;
   virtual void runOnAllThreads(const Event::PostCb& cb) PURE;
@@ -111,7 +118,7 @@ public:
 //
 // TODO(jmarantz): Rename the Slot class to something like RawSlot, where the
 // only reference is from TypedSlot, which we can then rename to Slot.
-template <class T = ThreadLocalObject> class TypedSlot {
+template <class T> class TypedSlot {
 public:
   /**
    * Helper method to create a unique_ptr for a typed slot. This helper
@@ -153,11 +160,13 @@ public:
    * @return a reference to the thread local object.
    */
   T& get() { return slot_->getTyped<T>(); }
+  const T& get() const { return slot_->getTyped<T>(); }
 
   /**
    * @return a pointer to the thread local object.
    */
   T* operator->() { return &get(); }
+  const T* operator->() const { return &get(); }
 
   /**
    * UpdateCb is passed a mutable reference to the current stored data.
@@ -186,7 +195,7 @@ private:
   const SlotPtr slot_;
 };
 
-template <class T> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;
+template <class T = ThreadLocalObject> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;
 
 /**
  * Interface for getting and setting thread local data as well as registering a thread
