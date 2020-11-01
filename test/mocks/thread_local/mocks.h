@@ -64,8 +64,7 @@ public:
       parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); });
     }
     void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& main_callback) override {
-      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); },
-                              main_callback);
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
     }
     void runOnAllThreads(const Event::PostCb& cb) override { parent_.runOnAllThreads(cb); }
     void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& main_callback) override {

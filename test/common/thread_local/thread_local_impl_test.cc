@@ -140,15 +140,12 @@ protected:
 
 TEST_F(CallbackNotInvokedAfterDeletionTest, WithArg) {
   InSequence s;
+  slot_->runOnAllThreads([this](ThreadLocal::ThreadLocalObjectSharedPtr) {
+    // Callbacks happen on the main thread but not the workers, so track the total.
+    total_callbacks_++;
+  });
   slot_->runOnAllThreads(
-      [this](ThreadLocal::ThreadLocalObjectSharedPtr) {
-        // Callbacks happen on the main thread but not the workers, so track the total.
-        total_callbacks_++;
-      });
-  slot_->runOnAllThreads(
-      [this](ThreadLocal::ThreadLocalObjectSharedPtr) {
-        ++thread_status_.thread_local_calls_;
-      },
+      [this](ThreadLocal::ThreadLocalObjectSharedPtr) { ++thread_status_.thread_local_calls_; },
       [this]() {
         // Callbacks happen on the main thread but not the workers.
         EXPECT_EQ(thread_status_.thread_local_calls_, 1);
@@ -179,9 +176,7 @@ TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
   uint32_t update_called = 0;
 
   TestThreadLocalObject& object_ref = setObject(*slot);
-  auto update_cb = [&update_called](ThreadLocalObjectSharedPtr) {
-    ++update_called;
-  };
+  auto update_cb = [&update_called](ThreadLocalObjectSharedPtr) { ++update_called; };
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref, onDestroy());
   slot->runOnAllThreads(update_cb);
