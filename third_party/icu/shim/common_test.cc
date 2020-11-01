@@ -1,8 +1,8 @@
 // Basic smoke test to ensure that ICU shim works properly.
 
-#include "unicode/uidna.h"
 #include <cstdlib>
 #include <iostream>
+#include "unicode/uidna.h"
 
 #define ASSERT_EQ(v1, v2)                                                                          \
   if ((v1) != (v2)) {                                                                              \
@@ -16,10 +16,12 @@
 int main(int argc, char** argv) {
   {
     UErrorCode err = U_ZERO_ERROR;
-    UIDNA* uidna = uidna_openUTS46(0, &err);
+    auto uidna = uidna_openUTS46(0, &err);
 
     ASSERT_EQ(uidna != nullptr, true);
     ASSERT_EQ(err, U_ZERO_ERROR);
+
+    delete uidna;
   }
 
   {
