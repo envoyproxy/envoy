@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 
 #include "common/common/logger.h"
@@ -45,22 +46,15 @@ TEST(LoggerEscapeTest, Empty) { EXPECT_EQ("", DelegatingLogSink::escapeLogLine("
 
 class LoggerCustomFlagsTest : public testing::Test {
 public:
-  LoggerCustomFlagsTest() : logger_(DelegatingLogSink::init()) {}
+  LoggerCustomFlagsTest() : logger_(Registry::getSink()) {}
 
   void expectMessageLog(const std::string& pattern, const std::string& message,
                         const std::string& expected) {
-    using PatternFormatterPtr = std::unique_ptr<spdlog::pattern_formatter>;
-
-    auto create_formatter = [](const std::string& pattern) -> PatternFormatterPtr {
-      auto formatter = std::make_unique<spdlog::pattern_formatter>();
-      formatter
-          ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
-              CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
-          .set_pattern(pattern);
-      return formatter;
-    };
-
-    auto formatter = create_formatter(pattern);
+    auto formatter = std::make_unique<spdlog::pattern_formatter>();
+    formatter
+        ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
+            CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
+        .set_pattern(pattern);
     logger_->set_formatter(std::move(formatter));
 
     testing::internal::CaptureStderr();
