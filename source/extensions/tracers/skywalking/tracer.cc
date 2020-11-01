@@ -7,8 +7,8 @@ namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
-constexpr char StatusCodeTag[] = "status_code";
-constexpr char UrlTag[] = "url";
+constexpr absl::string_view StatusCodeTag = "status_code";
+constexpr absl::string_view UrlTag = "url";
 
 namespace {
 

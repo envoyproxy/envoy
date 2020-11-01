@@ -20,7 +20,7 @@ class Span;
 class Tracer {
 public:
   explicit Tracer(TimeSource& time_source) : time_source_(time_source) {}
-  ~Tracer() { reporter_->closeStream(); }
+  virtual ~Tracer() { reporter_->closeStream(); }
 
   /*
    * Set a trace segment reporter to the current Tracer. Whenever a SkyWalking segment ends, the

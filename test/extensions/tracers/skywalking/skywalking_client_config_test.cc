@@ -37,27 +37,16 @@ protected:
   SkyWalkingClientConfigPtr client_config_;
 };
 
-static const std::string SKYWALKING_CONFIG_WITH_CLIENT_CONFIG = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: fake_cluster
-  client_config:
-    backend_token: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
-    service_name: "FAKE_FAKE_FAKE"
-    instance_name: "FAKE_FAKE_FAKE"
-    max_cache_size: 2333
-)EOF";
-
-static const std::string SKYWALKING_CONFIG_NO_CLIENT_CONFIG = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: fake_cluster
-)EOF";
-
 // Test whether the default value can be set correctly when there is no proto client config
 // provided.
 TEST_F(SkyWalkingClientConfigTest, NoProtoClientConfigTest) {
-  setupSkyWalkingClientConfig(SKYWALKING_CONFIG_NO_CLIENT_CONFIG);
+  const std::string yaml_string = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: fake_cluster
+  )EOF";
+
+  setupSkyWalkingClientConfig(yaml_string);
 
   EXPECT_EQ(client_config_->service(), test_string);
   EXPECT_EQ(client_config_->serviceInstance(), test_string);
@@ -67,7 +56,18 @@ TEST_F(SkyWalkingClientConfigTest, NoProtoClientConfigTest) {
 
 // Test whether the client config can work correctly when the proto client config is provided.
 TEST_F(SkyWalkingClientConfigTest, WithProtoClientConfigTest) {
-  setupSkyWalkingClientConfig(SKYWALKING_CONFIG_WITH_CLIENT_CONFIG);
+  const std::string yaml_string = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: fake_cluster
+  client_config:
+    backend_token: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
+    service_name: "FAKE_FAKE_FAKE"
+    instance_name: "FAKE_FAKE_FAKE"
+    max_cache_size: 2333
+  )EOF";
+
+  setupSkyWalkingClientConfig(yaml_string);
 
   EXPECT_EQ(client_config_->service(), "FAKE_FAKE_FAKE");
   EXPECT_EQ(client_config_->serviceInstance(), "FAKE_FAKE_FAKE");
@@ -78,7 +78,14 @@ TEST_F(SkyWalkingClientConfigTest, WithProtoClientConfigTest) {
 // Test whether the client config can get default value for service name and instance name.
 TEST_F(SkyWalkingClientConfigTest, BothLocalInfoAndClientConfigEmptyTest) {
   test_string = "";
-  setupSkyWalkingClientConfig(SKYWALKING_CONFIG_NO_CLIENT_CONFIG);
+
+  const std::string yaml_string = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: fake_cluster
+  )EOF";
+
+  setupSkyWalkingClientConfig(yaml_string);
 
   EXPECT_EQ(client_config_->service(), "EnvoyProxy");
   EXPECT_EQ(client_config_->serviceInstance(), "EnvoyProxy");

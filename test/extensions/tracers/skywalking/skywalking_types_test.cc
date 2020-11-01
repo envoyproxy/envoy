@@ -19,10 +19,10 @@ namespace Tracers {
 namespace SkyWalking {
 
 // Some constant strings for testing.
-constexpr char TEST_SERVICE[] = "EnvoyIngressForTest";
-constexpr char TEST_INSTANCE[] = "node-2.3.4.5~ingress";
-constexpr char TEST_ADDRESS[] = "255.255.255.255";
-constexpr char TEST_ENDPOINT[] = "/POST/path/for/test";
+constexpr absl::string_view TEST_SERVICE = "EnvoyIngressForTest";
+constexpr absl::string_view TEST_INSTANCE = "node-2.3.4.5~ingress";
+constexpr absl::string_view TEST_ADDRESS = "255.255.255.255";
+constexpr absl::string_view TEST_ENDPOINT = "/POST/path/for/test";
 
 // Test whether SpanContext can correctly parse data from propagation headers and throw exceptions
 // when errors occur.
@@ -169,11 +169,11 @@ TEST(SegmentContextTest, SegmentContextTestWithEmptyPreviousSpanContext) {
   // Test whether the value of the fields can be set correctly and the value of the fields can be
   // obtained correctly.
   EXPECT_EQ(segment_context->service(), "NEW#SERVICE");
-  segment_context->setService(TEST_SERVICE);
+  segment_context->setService(std::string(TEST_SERVICE));
   EXPECT_EQ(segment_context->service(), TEST_SERVICE);
 
   EXPECT_EQ(segment_context->serviceInstance(), "NEW#INSTANCE");
-  segment_context->setServiceInstance(TEST_INSTANCE);
+  segment_context->setServiceInstance(std::string(TEST_INSTANCE));
   EXPECT_EQ(segment_context->serviceInstance(), TEST_INSTANCE);
 
   EXPECT_EQ(segment_context->rootSpanStore(), nullptr);
@@ -302,7 +302,7 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   EXPECT_EQ("oooooop", root_store->operation());
 
   EXPECT_EQ("0.0.0.0", root_store->peerAddress());
-  root_store->setPeerAddress(TEST_ADDRESS);
+  root_store->setPeerAddress(std::string(TEST_ADDRESS));
   EXPECT_EQ(TEST_ADDRESS, root_store->peerAddress());
 
   EXPECT_EQ(22222222, root_store->startTime());

@@ -23,12 +23,9 @@ namespace SkyWalking {
 class TracerTest : public testing::Test {
 public:
   void setupTracer(const std::string& yaml_string) {
-    EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      timer_cb_ = timer_cb;
-      return timer_;
+    EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce(Invoke([](Event::TimerCb) {
+      return new NiceMock<Event::MockTimer>();
     }));
-
-    timer_ = new NiceMock<Event::MockTimer>();
 
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
 
@@ -67,9 +64,6 @@ protected:
   NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
 
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
-
-  NiceMock<Event::MockTimer>* timer_;
-  Event::TimerCb timer_cb_;
 
   std::string test_string = "ABCDEFGHIJKLMN";
 

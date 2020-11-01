@@ -37,7 +37,7 @@ TEST(SkyWalkingTracerConfigTest, SkyWalkingHttpTracer) {
       grpc_service:
         envoy_grpc:
           cluster_name: fake_cluster
-   )EOF";
+  )EOF";
   envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
@@ -70,7 +70,7 @@ TEST(SkyWalkingTracerConfigTest, SkyWalkingHttpTracerWithClientConfig) {
         service_name: "Test Service"
         instance_name: "Test Instance"
         max_cache_size: 2333
-   )EOF";
+  )EOF";
   envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 

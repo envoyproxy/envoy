@@ -12,7 +12,7 @@ constexpr uint32_t DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE = 1024;
 // When the user does not provide any available configuration, in order to ensure that the service
 // name and instance name are not empty, use this value as the default identifier. In practice,
 // user should provide accurate configuration as much as possible to avoid using the default value.
-constexpr char DEFAULT_SERVICE_AND_INSTANCE[] = "EnvoyProxy";
+constexpr absl::string_view DEFAULT_SERVICE_AND_INSTANCE = "EnvoyProxy";
 
 SkyWalkingClientConfig::SkyWalkingClientConfig(Server::Configuration::TracerFactoryContext& context,
                                                const envoy::config::trace::v3::ClientConfig& config)

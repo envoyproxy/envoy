@@ -32,6 +32,9 @@ public:
                 factoryForGrpcService(_, _, _))
         .WillOnce(Return(ByMove(std::move(mock_client_factory))));
 
+    EXPECT_CALL(factory_context.thread_local_.dispatcher_, createTimer_(_))
+        .WillOnce(Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
+
     ON_CALL(factory_context.local_info_, clusterName()).WillByDefault(ReturnRef(test_string));
     ON_CALL(factory_context.local_info_, nodeName()).WillByDefault(ReturnRef(test_string));
 
@@ -52,7 +55,8 @@ protected:
   DriverPtr driver_;
 };
 
-static const std::string SKYWALKING_CONFIG_WITH_CLIENT_CONFIG = R"EOF(
+TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
+  const std::string yaml_string = R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: fake_cluster
@@ -61,16 +65,8 @@ static const std::string SKYWALKING_CONFIG_WITH_CLIENT_CONFIG = R"EOF(
     service_name: "FAKE_FAKE_FAKE"
     instance_name: "FAKE_FAKE_FAKE"
     max_cache_size: 2333
-)EOF";
-
-static const std::string SKYWALKING_CONFIG_NO_CLIENT_CONFIG = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: fake_cluster
-)EOF";
-
-TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
-  setupSkyWalkingDriver(SKYWALKING_CONFIG_WITH_CLIENT_CONFIG);
+  )EOF";
+  setupSkyWalkingDriver(yaml_string);
 
   std::string trace_id =
       SkyWalkingTestHelper::generateId(context_.server_factory_context_.api_.random_);
@@ -151,7 +147,13 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
 }
 
 TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
-  setupSkyWalkingDriver(SKYWALKING_CONFIG_NO_CLIENT_CONFIG);
+  const std::string yaml_string = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: fake_cluster
+  )EOF";
+
+  setupSkyWalkingDriver(yaml_string);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
