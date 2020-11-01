@@ -1,6 +1,5 @@
 // Basic smoke test to ensure that ICU shim works properly.
 
-#include <cstdlib>
 #include <iostream>
 #include "unicode/uidna.h"
 
