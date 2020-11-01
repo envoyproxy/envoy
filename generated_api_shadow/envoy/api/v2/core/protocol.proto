@@ -99,6 +99,14 @@ message Http1ProtocolOptions {
     message ProperCaseWords {
     }
 
+    message Custom {
+      // Custom header rewrite rules.
+      // In each rule of the map, the key is a case-insensitive header name. The value
+      // is the new header value, case-sensitive. This allows for custom header
+      // capitalization, eg: `x-my-header-key` -> `X-MY-HEADER-Key`
+      map<string, string> rules = 1;
+    }
+
     oneof header_format {
       option (validate.required) = true;
 
@@ -108,6 +116,9 @@ message Http1ProtocolOptions {
       // Note that while this results in most headers following conventional casing, certain headers
       // are not covered. For example, the "TE" header will be formatted as "Te".
       ProperCaseWords proper_case_words = 1;
+
+      // Formats the header according to custom rules.
+      Custom custom = 2;
     }
   }
 
