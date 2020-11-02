@@ -15,20 +15,6 @@ Change directory to ``examples/dynamic-config-fs`` in the Envoy repository.
 Step 3: Start the proxy container
 *********************************
 
-.. note::
-
-   If you are running on a system with strict ``umask`` you will need to ``chmod`` the dynamic config
-   files which are mounted into the container:
-
-   .. code-block:: console
-
-      $ umask
-      027
-      $ pwd
-      envoy/examples/dynamic-config-fs
-      $ chmod go+r configs/*
-      $ chmod go+x configs
-
 Build and start the containers.
 
 This should also start two upstream ``HTTP`` echo servers, ``service1`` and ``service2``.
@@ -80,17 +66,17 @@ the ``example_proxy_cluster`` pointing to ``service1``.
    :language: json
    :emphasize-lines: 10, 18-19
 
-Step 5: Edit ``configs/cds.yaml`` file to update upstream cluster
-*****************************************************************
+Step 5: Edit ``cds.yaml`` inside the container to update upstream cluster
+*************************************************************************
 
-The example setup provides two dynamic configuration files:
+The example setup provides Envoy with two dynamic configuration files:
 
-- :download:`configs/cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a :ref:`Cluster
+- :download:`cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a :ref:`Cluster
   discovery service (CDS) <config_cluster_manager_cds>`.
-- :download:`configs/lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` to provide a :ref:`Listener
+- :download:`lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` to provide a :ref:`Listener
   discovery service (CDS) <config_listeners_lds>`.
 
-Edit ``configs/cds.yaml`` in the dynamic configuration example folder and change the cluster address
+Edit ``cds.yaml`` inside the container and change the cluster address
 from ``service1`` to ``service2``:
 
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
@@ -99,6 +85,12 @@ from ``service1`` to ``service2``:
    :lines: 7-15
    :lineno-start: 7
    :emphasize-lines: 8
+
+You can do this using ``sed`` inside the container:
+
+.. code-block:: console
+
+   docker-compose exec -T proxy sed -i s/service1/service2/ /var/lib/envoy/cds.yaml
 
 Step 6: Check Envoy uses updated configuration
 **********************************************
