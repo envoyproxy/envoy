@@ -24,10 +24,12 @@ the administration server.
 The ``address`` key specifies the listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
 which in the demo configuration is ``0.0.0.0:9901``.
 
-You must set the ``access_log_path`` to specify where to send access logs, which in this example are
-simply discarded.
+You must set the ``access_log_path`` to specify where to send access logs.
+
+In this example, the logs are simply discarded.
 
 .. code-block:: yaml
+   :emphasize-lines: 2, 5-6
 
    admin:
      access_log_path: /dev/null
@@ -48,7 +50,7 @@ Admin endpoints: ``config_dump``
 The :ref:`config_dump <operations_admin_interface_config_dump>` endpoint dumps Envoy's configuration
 in ``json`` format.
 
-The following examples make use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse the output
+These examples make use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse the output
 from ``config_dump``.
 
 The following command allows you to see the types of config available:
@@ -63,15 +65,20 @@ The following command allows you to see the types of config available:
    type.googleapis.com/envoy.admin.v3.RoutesConfigDump
    type.googleapis.com/envoy.admin.v3.SecretsConfigDump
 
-As a further example, to dump the current ``listeners`` configuration, you could:
+To dump the ``socket_address`` of the first ``dynamic_listener`` currently configured, you could:
 
 .. code-block:: console
 
-   $ curl -s http://localhost:9901/config_dump | jq '.configs[2]'
+   $ curl -s http://localhost:19000/config_dump?resource=dynamic_listeners | jq '.configs[0].active_state.listener.address'
    {
-     "@type": "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
-     ...snip...
+     "socket_address": {
+       "address": "0.0.0.0",
+       "port_value": 10000
+     }
    }
+
+See the reference section for :ref:`config_dump <operations_admin_interface_config_dump>` for further information
+on available parameters and responses.
 
 .. _start_quick_start_admin_stats:
 
