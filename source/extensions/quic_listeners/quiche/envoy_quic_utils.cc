@@ -170,9 +170,9 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     ASSERT(rsa_public_key != nullptr);
     const unsigned rsa_key_length = RSA_size(rsa_public_key);
 #ifdef BORINGSSL_FIPS
-    if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
-      *error_details = "Invalid leaf cert, only RSA certificates with 2048-bit or 3072-bit keys "
-                       "are supported in FIPS mode";
+    if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8 && rsa_key_length != 4096 / 8) {
+      *error_details = "Invalid leaf cert, only RSA certificates with 2048-bit, 3072-bit or "
+                       "4096-bit keys are supported in FIPS mode";
       break;
     }
 #else

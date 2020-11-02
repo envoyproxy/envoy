@@ -1247,7 +1247,7 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   std::string error_msg(
       "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
 #ifdef BORINGSSL_FIPS
-      "with 2048-bit or 3072-bit keys are supported in FIPS mode"
+      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
 #else
       "with 2048-bit or larger keys are supported"
 #endif
@@ -1274,8 +1274,7 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
-// Validate that 4096-bit RSA certificates load successfully in non-FIPS builds, but are rejected
-// in FIPS builds.
+// Validate that 4096-bit RSA certificates load successfully.
 TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
@@ -1290,14 +1289,7 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-#ifdef BORINGSSL_FIPS
-  EXPECT_THROW_WITH_REGEX(
-      manager.createSslClientContext(store, client_context_config, nullptr), EnvoyException,
-      "Failed to load certificate chain from .*selfsigned_rsa_4096_cert.pem, only RSA certificates "
-      "with 2048-bit or 3072-bit keys are supported in FIPS mode");
-#else
   manager.createSslClientContext(store, client_context_config, nullptr);
-#endif
 }
 
 // Validate that P256 ECDSA certs load.
