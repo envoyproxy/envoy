@@ -1,4 +1,7 @@
 #!/bin/bash -e
+#
+# Requirements: expect
+#
 
 export NAME=tls
 export MANUAL=true
