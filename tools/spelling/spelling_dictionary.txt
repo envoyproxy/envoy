@@ -395,6 +395,7 @@ alignas
 alignof
 alloc
 alloca
+allocatable
 allocator
 allowlist
 allowlisted

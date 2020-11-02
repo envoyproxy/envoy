@@ -109,6 +109,7 @@ envoy_cc_library(
         "//include/envoy/network:dns_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 

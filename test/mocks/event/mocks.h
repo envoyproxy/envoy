@@ -9,6 +9,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/signal.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
@@ -174,6 +175,15 @@ public:
 
   // If not nullptr, will be set on dtor. This can help to verify that the timer was destroyed.
   bool* timer_destroyed_{};
+};
+
+class MockScaledRangeTimerManager : public ScaledRangeTimerManager {
+public:
+  TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
+    return TimerPtr{createTimer_(minimum, std::move(callback))};
+  }
+  MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
+  MOCK_METHOD(void, setScaleFactor, (double), (override));
 };
 
 class MockSchedulableCallback : public SchedulableCallback {
