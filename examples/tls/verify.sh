@@ -26,4 +26,8 @@ responds_with \
 curl -s http://localhost:10002  | jq  '.os.hostname' | grep '"service-https"'
 
 run_log "Test https passthrough"
+responds_without \
+    '"x-forwarded-proto"' \
+    -k \
+    https://localhost:10003
 curl -sk https://localhost:10003  | jq  '.os.hostname' | grep '"service-https"'
