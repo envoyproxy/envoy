@@ -3,8 +3,9 @@
 #include "envoy/event/file_event.h"
 
 #include "common/event/dispatcher_impl.h"
-#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
 #include "common/network/peer_buffer.h"
+
+#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"

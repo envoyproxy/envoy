@@ -2,6 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
+
 #include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -46,8 +47,7 @@ public:
     EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   }
 
-  Buffer::WatermarkBuffer&
-  getWatermarkBufferHelper(BufferedIoSocketHandleImpl& io_handle) {
+  Buffer::WatermarkBuffer& getWatermarkBufferHelper(BufferedIoSocketHandleImpl& io_handle) {
     return dynamic_cast<Buffer::WatermarkBuffer&>(*io_handle.getWriteBuffer());
   }
 

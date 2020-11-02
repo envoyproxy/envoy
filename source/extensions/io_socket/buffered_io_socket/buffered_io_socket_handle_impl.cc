@@ -6,8 +6,9 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
-#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
 #include "common/network/address_impl.h"
+
+#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
