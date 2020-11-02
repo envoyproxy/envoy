@@ -393,10 +393,10 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
             1);
 }
 
-// Only run on platforms that support BPF
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
-TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsWithBPF) { testMultipleQuicConnections(); }
-#endif
+// Ensure multiple quic connections work, regardless of platform BPF support
+TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsBPFDefaultMode) {
+  testMultipleQuicConnections();
+}
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
   // Note: This runtime override is a no-op on platforms without BPF
