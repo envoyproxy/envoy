@@ -22,7 +22,12 @@ set ret 1
 expect "\n"
 send "HELO\n"
 expect {
-  -ex "\[$backend\] HELO" { set ret 0 }
+  -ex "\[$backend\] HELO" {
+    send "GOODBYE\n"
+    expect {
+      -ex "\[$backend\] HELO" { set ret 0 }
+    }
+  }
 }
 exit \$ret
 EOF
