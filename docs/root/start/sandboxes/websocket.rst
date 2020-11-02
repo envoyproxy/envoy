@@ -15,12 +15,17 @@ Change directory to ``examples/websocket`` in the Envoy repository.
 Step 3: Create a certificate file for wss
 *****************************************
 
-.. code-block::
+.. code-block:: console
 
    $ pwd
    envoy/examples/websocket
    $ mkdir -p certs
    $ openssl req -batch -new -x509 -nodes -keyout certs/key.pem -out certs/cert.pem
+   Generating a RSA private key
+   ..................................................................................................................+++++
+   ......+++++
+   writing new private key to 'certs/key.pem'
+   -----
    $ openssl pkcs12 -export -passout pass: -out certs/output.pkcs12 -inkey certs/key.pem -in certs/cert.pem
 
 
@@ -29,15 +34,17 @@ Step 4: Build the sandbox
 
 .. code-block:: console
 
-  $ pwd
-  envoy/examples/tls
   $ docker-compose pull
   $ docker-compose up --build -d
   $ docker-compose ps
-
-         Name                            Command                 State          Ports
-  -----------------------------------------------------------------------------------------------
-
+              Name                             Command               State            Ports
+  ---------------------------------------------------------------------------------------------------
+  websocket_proxy-ws_1                /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
+  websocket_proxy-wss-passthrough_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:40000->10000/tcp
+  websocket_proxy-wss-ws_1            /docker-entrypoint.sh /usr ... Up      0.0.0.0:20000->10000/tcp
+  websocket_proxy-wss-wss_1           /docker-entrypoint.sh /usr ... Up      0.0.0.0:30000->10000/tcp
+  websocket_service-ws_1              websocat -E ws-listen:0.0. ... Up
+  websocket_service-wss_1             websocat wss-listen:0.0.0. ... Up
 
 Step 5: Test proxying ``ws`` -> ``ws``
 **************************************
