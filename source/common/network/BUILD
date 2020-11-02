@@ -471,13 +471,3 @@ envoy_cc_library(
         "//source/common/common:macros",
     ],
 )
-
-envoy_cc_library(
-    name = "peer_buffer_lib",
-    hdrs = ["peer_buffer.h"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/buffer:watermark_buffer_lib",
-        "//source/common/common:empty_string",
-    ],
-)

@@ -3,7 +3,8 @@
 #include <cstdint>
 
 #include "common/common/assert.h"
-#include "common/network/peer_buffer.h"
+
+#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,7 +12,7 @@ namespace IoSocket {
 namespace BufferedIoSocket {
 
 UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                               uint32_t events, Network::ReadWritable& io_source)
+                                               uint32_t events, ReadWritable& io_source)
     : schedulable_(dispatcher.createSchedulableCallback([this]() { cb_(); })), cb_([this, cb]() {
         auto ephemeral_events = event_listener_.getAndClearEphemeralEvents();
         ENVOY_LOG(trace, "User space event {} invokes callbacks on events = {}",

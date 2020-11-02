@@ -75,7 +75,7 @@ envoy_cc_test(
     name = "connection_impl_test",
     srcs = ["connection_impl_test.cc"],
     deps = [
-        "//source/common/buffer:buffer_lib",
+        ":buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
@@ -107,7 +107,7 @@ envoy_cc_test(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:dns_interface",
-        "//source/common/buffer:buffer_lib",
+        ":buffer_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/api/io_error.h"
-#include "envoy/api/os_sys_calls_common.h"
 
 #include "common/common/assert.h"
 
@@ -33,5 +32,6 @@ public:
 private:
   int errno_;
 };
+
 } // namespace Network
 } // namespace Envoy

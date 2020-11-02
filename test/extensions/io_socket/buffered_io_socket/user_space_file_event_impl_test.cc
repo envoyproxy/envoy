@@ -3,8 +3,8 @@
 #include "envoy/event/file_event.h"
 
 #include "common/event/dispatcher_impl.h"
-#include "common/network/peer_buffer.h"
 
+#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
 #include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
 
 #include "test/mocks/common.h"
@@ -30,7 +30,7 @@ public:
   MOCK_METHOD(void, called, (uint32_t));
 };
 
-class MockReadWritable : public Network::ReadWritable {
+class MockReadWritable : public ReadWritable {
 public:
   MOCK_METHOD(void, setWriteEnd, ());
   MOCK_METHOD(bool, isWriteEndSet, ());

@@ -177,7 +177,7 @@ TEST_F(BufferedIoSocketHandleTest, TestRecvDrain) {
 
 TEST_F(BufferedIoSocketHandleTest, FlowControl) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  Network::WritablePeer* handle_as_peer = io_handle_.get();
+  WritablePeer* handle_as_peer = io_handle_.get();
   internal_buffer.setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
   EXPECT_TRUE(io_handle_peer_->isWritable());
@@ -309,7 +309,7 @@ TEST_F(BufferedIoSocketHandleTest, TestEventResetClearCallback) {
 
 TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  Network::WritablePeer* handle_as_peer = io_handle_.get();
+  WritablePeer* handle_as_peer = io_handle_.get();
   internal_buffer.setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
   EXPECT_TRUE(io_handle_peer_->isWritable());

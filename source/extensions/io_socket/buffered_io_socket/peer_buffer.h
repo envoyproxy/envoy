@@ -4,7 +4,9 @@
 #include "envoy/common/pure.h"
 
 namespace Envoy {
-namespace Network {
+namespace Extensions {
+namespace IoSocket {
+namespace BufferedIoSocket {
 
 /**
  * The interface for the writer.
@@ -71,5 +73,7 @@ public:
    */
   virtual bool isReadable() const PURE;
 };
-} // namespace Network
+} // namespace BufferedIoSocket
+} // namespace IoSocket
+} // namespace Extensions
 } // namespace Envoy

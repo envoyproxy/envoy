@@ -6,7 +6,8 @@
 
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"
-#include "common/network/peer_buffer.h"
+
+#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
 
 namespace Envoy {
 
@@ -40,7 +41,7 @@ private:
 class UserSpaceFileEventImpl final : public Event::FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
   UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
-                         Network::ReadWritable& io_source);
+                         ReadWritable& io_source);
 
   ~UserSpaceFileEventImpl() override = default;
 
@@ -61,7 +62,7 @@ private:
   // Dispatcher::run().
   std::function<void()> cb_;
 
-  Network::ReadWritable& io_source_;
+  ReadWritable& io_source_;
 };
 } // namespace BufferedIoSocket
 } // namespace IoSocket

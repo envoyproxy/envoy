@@ -11,8 +11,8 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
 #include "common/network/io_socket_error_impl.h"
-#include "common/network/peer_buffer.h"
 
+#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
 #include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
 
 namespace Envoy {
@@ -30,7 +30,7 @@ namespace BufferedIoSocket {
  *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
  */
 class BufferedIoSocketHandleImpl final : public Network::IoHandle,
-                                         public Network::ReadWritable,
+                                         public ReadWritable,
                                          protected Logger::Loggable<Logger::Id::io> {
 public:
   BufferedIoSocketHandleImpl();
@@ -78,7 +78,7 @@ public:
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
 
-  // Network::WritablePeer
+  // WritablePeer
   void setWriteEnd() override { read_end_stream_ = true; }
   bool isWriteEndSet() override { return read_end_stream_; }
   void maybeSetNewData() override {
@@ -103,14 +103,14 @@ public:
   }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
-  // Network::ReadWritable
+  // ReadWritable
   bool isPeerShutDownWrite() const override { return read_end_stream_; }
   bool isReadable() const override {
     return isPeerShutDownWrite() || pending_received_data_.length() > 0;
   }
 
   // Set the peer which will populate the owned pending_received_data.
-  void setWritablePeer(Network::WritablePeer* writable_peer) {
+  void setWritablePeer(WritablePeer* writable_peer) {
     // Swapping writable peer is undefined behavior.
     ASSERT(!writable_peer_);
     ASSERT(!write_shutdown_);
@@ -136,7 +136,7 @@ private:
   Buffer::WatermarkBuffer pending_received_data_;
 
   // Destination of the write(). The value remains non-null until the peer is closed.
-  Network::WritablePeer* writable_peer_{nullptr};
+  WritablePeer* writable_peer_{nullptr};
 
   // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};
