@@ -12,9 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Invoke;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -23,7 +20,7 @@ namespace {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
-  HttpFilterTestBase() {}
+  HttpFilterTestBase() = default;
 
   void initialize(std::string&& yaml) {
     envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config{};
