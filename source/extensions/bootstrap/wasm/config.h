@@ -22,7 +22,7 @@ public:
   WasmService(Common::Wasm::PluginSharedPtr plugin, ThreadLocal::SlotPtr tls_slot)
       : plugin_(plugin), tls_slot_(std::move(tls_slot)) {}
 
-  ~WasmService() {
+  virtual ~WasmService() {
     if (tls_slot_ && tls_slot_->get()) {
       tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
                                      -> ThreadLocal::ThreadLocalObjectSharedPtr {
