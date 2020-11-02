@@ -106,6 +106,22 @@ TEST(GrpcCodecTest, decodeInvalidFrame) {
   EXPECT_EQ(size, buffer.length());
 }
 
+TEST(GrpcCodecTest, decodeInvalidFrameMakeSureNoFramesDecoded) {
+  std::string data(
+      "\000\000\000\000\000\000\000\000\000\000\000\000\000\00000000000000000000000000000000000\000"
+      "\000\000\000\000\000\000\000\000\000\000\000\000c_r000\000\000\000\000\000\000\000",
+      72);
+  std::vector<uint8_t> chunk(data.begin(), data.end());
+  Buffer::OwnedImpl buffer(data.data(), data.size());
+  std::vector<Frame> frames;
+  Decoder decoder;
+  ENVOY_LOG_MISC(trace, "Buffer: {}", buffer.toString());
+  EXPECT_FALSE(decoder.decode(buffer, frames));
+  // TODO: This shouldn't happen. When the decoder doesn't successfully decode, it should not put
+  // anything in frames.
+  EXPECT_NE(0, frames.size());
+}
+
 TEST(GrpcCodecTest, decodeEmptyFrame) {
   Buffer::OwnedImpl buffer("\0\0\0\0", 5);
 

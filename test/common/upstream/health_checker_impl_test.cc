@@ -3476,6 +3476,18 @@ public:
       }
       return spec;
     }
+    // Null dereference from health check fuzzer
+    static ChunkSpec badData() {
+      std::string data(
+          "\000\000\000\000\000\000\000\000\000\000\000\000\000\00000000000000000000000000000000000"
+          "\000\000\000\000\000\000\000\000\000\000\000\000\000c_r000\000\000\000\000\000\000\000",
+          72);
+      std::vector<uint8_t> chunk(data.begin(), data.end());
+      ChunkSpec spec;
+      spec.valid = true;
+      spec.data = chunk;
+      return spec;
+    }
     static ChunkSpec validChunk(grpc::health::v1::HealthCheckResponse::ServingStatus status) {
       ChunkSpec spec;
       spec.valid = true;
@@ -4408,6 +4420,21 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcFailUnknown) {
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
 
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::UNKNOWN);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// This used to through a null dereference
+TEST_F(GrpcHealthCheckerImplTest, GrpcFailNullDereference) {
+  setupHC();
+  expectSingleHealthcheck(HealthTransition::Changed);
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  respondResponseSpec(0, ResponseSpec{{{":status", "200"}, {"content-type", "application/grpc"}},
+                                      {GrpcHealthCheckerImplTest::ResponseSpec::badData()},
+                                      {}});
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_EQ(Host::Health::Unhealthy,
