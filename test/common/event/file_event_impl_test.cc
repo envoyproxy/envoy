@@ -65,9 +65,7 @@ public:
   int domain() {
     return std::get<0>(GetParam()) == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6;
   }
-  bool activateFdsNextEventLoop() {
-    return LibeventScheduler::supportsMultipleLoops() && std::get<1>(GetParam());
-  }
+  bool activateFdsNextEventLoop() { return std::get<1>(GetParam()); }
 
 protected:
   Api::OsSysCalls& os_sys_calls_;
@@ -183,9 +181,7 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
     EXPECT_CALL(fd_event, ready());
     EXPECT_CALL(closed_event, ready());
     // Second loop iteration: poll returned no new real events.
-    if (LibeventScheduler::supportsMultipleLoops()) {
-      EXPECT_CALL(prepare_watcher, ready());
-    }
+    EXPECT_CALL(prepare_watcher, ready());
   }
 
   file_event->activate(FileReadyType::Read);
@@ -245,10 +241,10 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
   EXPECT_CALL(fd_event, ready());
   EXPECT_CALL(write_event, ready());
   // Third loop iteration: poll returned no new real events.
-  EXPECT_CALL(prepare_watcher, ready()).WillOnce(Invoke([&dispatcher]() { dispatcher->exit(); }));
+  EXPECT_CALL(prepare_watcher, ready());
 
   file_event->activate(FileReadyType::Read);
-  dispatcher->run(Event::Dispatcher::RunType::RunUntilExit);
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   os_sys_calls_.close(fd);
 }
