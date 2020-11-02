@@ -62,8 +62,8 @@ actions {
     }
 }
 actions {
-    raise_go_away: true
+    raise_go_away: NO_ERROR
 }
 actions {
-    raise_go_away: false
+    raise_go_away: ERROR
 }

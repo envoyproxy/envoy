@@ -555,7 +555,8 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       break;
     }
     case test::common::upstream::Action::kRaiseGoAway: {
-      raiseGoAway(event.raise_go_away());
+      raiseGoAway(event.raise_go_away() == test::common::upstream::RaiseGoAway::NO_ERROR);
+      break;
     }
     default:
       break;
