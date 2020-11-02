@@ -32,6 +32,10 @@ Step 3: Create a certificate file for wss
 Step 4: Build the sandbox
 *************************
 
+This starts four proxies listening on ``localhost`` ports ``10000-40000``.
+
+It also starts two upstream services, one ``ws`` and one ``wss``.
+
 .. code-block:: console
 
   $ docker-compose pull
@@ -40,14 +44,33 @@ Step 4: Build the sandbox
               Name                             Command               State            Ports
   ---------------------------------------------------------------------------------------------------
   websocket_proxy-ws_1                /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
-  websocket_proxy-wss-passthrough_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:40000->10000/tcp
   websocket_proxy-wss-ws_1            /docker-entrypoint.sh /usr ... Up      0.0.0.0:20000->10000/tcp
   websocket_proxy-wss-wss_1           /docker-entrypoint.sh /usr ... Up      0.0.0.0:30000->10000/tcp
+  websocket_proxy-wss-passthrough_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:40000->10000/tcp
   websocket_service-ws_1              websocat -E ws-listen:0.0. ... Up
   websocket_service-wss_1             websocat wss-listen:0.0.0. ... Up
 
 Step 5: Test proxying ``ws`` -> ``ws``
 **************************************
+
+The proxy listening on port ``10000`` terminates the WebSocket connection without TLS and then proxies
+to an upstream socket, also without TLS.
+
+You can start an interactive session with the socket as follows:
+
+.. code-block:: console
+
+   $ docker run -ti --network=host solsson/websocat ws://localhost:10000
+   HELO
+   [ws] HELO
+   GOODBYE
+   [ws] HELO
+
+The socket server is a very trivial implementation, that simply outputs ``[ws] HELO`` in response to
+any input.
+
+Type ``Ctrl-c`` to exit the socket session.
+
 
 Step 6: Test proxying ``wss`` -> ``ws``
 ***************************************
