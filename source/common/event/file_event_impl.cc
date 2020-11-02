@@ -133,13 +133,6 @@ void FileEventImpl::unregisterEventIfEmulatedEdge(uint32_t event) {
          fmt::format("not allowed to unregister {}", event));
   if (trigger_ == FileTriggerType::EmulatedEdge) {
     auto new_event_mask = enabled_events_ & ~event;
-    if (event == FileReadyType::Write && injected_activation_events_ & FileReadyType::Read) {
-      // we cancel all the injected activation and merge the
-      // read event with the new registration mask
-      injected_activation_events_ = 0;
-      activation_cb_->cancel();
-      new_event_mask |= FileReadyType::Read;
-    }
     updateEvents(new_event_mask);
   }
 }
@@ -148,13 +141,6 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
   ASSERT(event == Event::FileReadyType::Write || event == Event::FileReadyType::Read);
   if (trigger_ == FileTriggerType::EmulatedEdge) {
     auto new_event_mask = enabled_events_ | event;
-    if (event == FileReadyType::Write && injected_activation_events_ & FileReadyType::Read) {
-      // we cancel all the injected activation and merge the
-      // read event with the new registration mask
-      injected_activation_events_ = 0;
-      activation_cb_->cancel();
-      new_event_mask |= FileReadyType::Read;
-    }
     updateEvents(new_event_mask);
   }
 }
