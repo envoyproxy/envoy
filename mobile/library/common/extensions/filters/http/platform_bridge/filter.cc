@@ -64,7 +64,7 @@ PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr c
   }
 
   // Set the instance_context to the result of the initialization call. Cleanup will ultimately
-  // occur during in the onDestroy() invocation below.
+  // occur within the onDestroy() invocation below.
   ENVOY_LOG(trace, "PlatformBridgeFilter({})->init_filter", filter_name_);
   platform_filter_.instance_context = platform_filter_.init_filter(platform_filter_.static_context);
   ASSERT(platform_filter_.instance_context,
