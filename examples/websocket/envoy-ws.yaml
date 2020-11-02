@@ -9,7 +9,6 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
           stat_prefix: ingress_ws_to_ws
           upgrade_configs:
           - upgrade_type: websocket
