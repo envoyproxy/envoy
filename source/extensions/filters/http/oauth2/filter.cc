@@ -33,6 +33,9 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 namespace {
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    authorization_handle(Http::CustomHeaders::get().Authorization);
+
 constexpr absl::string_view SignoutCookieValue =
     "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
@@ -72,7 +75,7 @@ std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_pro
 
 // Sets the auth token as the Bearer token in the authorization header.
 void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
-  headers.setReferenceKey(Http::CustomHeaders::get().Authorization, absl::StrCat("Bearer ", token));
+  headers.setInline(authorization_handle.handle(), absl::StrCat("Bearer ", token));
 }
 } // namespace
 
@@ -149,9 +152,9 @@ std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& heade
   ASSERT(headers.Path() != nullptr);
 
   // Start by looking for a bearer token in the Authorization header.
-  const auto authorization = headers.get(Http::CustomHeaders::get().Authorization);
-  if (!authorization.empty()) {
-    const auto value = StringUtil::trim(authorization[0]->value().getStringView());
+  const Http::HeaderEntry* authorization = headers.getInline(authorization_handle.handle());
+  if (authorization != nullptr) {
+    const auto value = StringUtil::trim(authorization->value().getStringView());
     const auto& bearer_prefix = bearerPrefix();
     if (absl::StartsWithIgnoreCase(value, bearer_prefix)) {
       const size_t start = bearer_prefix.length();

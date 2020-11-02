@@ -449,7 +449,8 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
   std::string legit_token{"legit_token"};
   EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
 
@@ -503,7 +504,8 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   std::string legit_token{"legit_token"};
   EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), true));
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), true));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Http::TestRequestHeaderMapImpl final_request_headers{
