@@ -293,6 +293,11 @@ void SslSocket::shutdownSsl() {
   if (info_->state() != Ssl::SocketState::ShutdownSent &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(rawSsl());
+    if (rc == 0 ) {
+      // See https://www.openssl.org/docs/manmaster/man3/SSL_shutdown.html
+      // if return value is 0,  Call SSL_read() to do a bidirectional shutdown.
+      callbacks_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    }
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
     drainErrorQueue();
     info_->setState(Ssl::SocketState::ShutdownSent);
