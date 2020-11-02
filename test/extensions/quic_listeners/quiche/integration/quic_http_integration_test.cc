@@ -394,7 +394,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
-TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsBPFDefaultMode) {
+TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
   testMultipleQuicConnections();
 }
 
