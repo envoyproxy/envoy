@@ -28,11 +28,10 @@ Step 3: Create a certificate file for wss
    -----
    $ openssl pkcs12 -export -passout pass: -out certs/output.pkcs12 -inkey certs/key.pem -in certs/cert.pem
 
-
 Step 4: Build the sandbox
 *************************
 
-This starts four proxies listening on ``localhost`` ports ``10000-40000``.
+This starts three proxies listening on ``localhost`` ports ``10000-30000``.
 
 It also starts two upstream services, one ``ws`` and one ``wss``.
 
@@ -44,9 +43,8 @@ It also starts two upstream services, one ``ws`` and one ``wss``.
               Name                             Command               State            Ports
   ---------------------------------------------------------------------------------------------------
   websocket_proxy-ws_1                /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
-  websocket_proxy-wss-ws_1            /docker-entrypoint.sh /usr ... Up      0.0.0.0:20000->10000/tcp
-  websocket_proxy-wss-wss_1           /docker-entrypoint.sh /usr ... Up      0.0.0.0:30000->10000/tcp
-  websocket_proxy-wss-passthrough_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:40000->10000/tcp
+  websocket_proxy-wss_1               /docker-entrypoint.sh /usr ... Up      0.0.0.0:20000->10000/tcp
+  websocket_proxy-wss-passthrough_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:30000->10000/tcp
   websocket_service-ws_1              websocat -E ws-listen:0.0. ... Up
   websocket_service-wss_1             websocat wss-listen:0.0.0. ... Up
 
@@ -56,12 +54,12 @@ Step 5: Test proxying ``ws`` -> ``ws``
 The proxy listening on port ``10000`` terminates the WebSocket connection without TLS and then proxies
 to an upstream socket, also without TLS.
 
-In order for Envoy to terminate the WebSocket connection, the ``upgrades_config`` setting of the
+In order for Envoy to terminate the WebSocket connection, the ``upgrade_configs`` setting of the
 ``HttpConnectionManager`` must be set:
 
 .. literalinclude:: _include/websocket/envoy-ws.yaml
    :language: yaml
-   :lines: 0-30
+   :lines: 1-30
    :linenos:
    :emphasize-lines: 14-15
 
@@ -80,21 +78,17 @@ any input.
 
 Type ``Ctrl-c`` to exit the socket session.
 
-
-Step 6: Test proxying ``wss`` -> ``ws``
-***************************************
-
-Step 7: Test proxying ``wss`` -> ``wss``
+Step 6: Test proxying ``wss`` -> ``wss``
 ****************************************
 
-The proxy listening on port ``30000`` terminates the WebSocket connection with TLS and then proxies
+The proxy listening on port ``20000`` terminates the WebSocket connection with TLS and then proxies
 to an upstream TLS WebSocket.
 
 You can start an interactive session with the socket as follows:
 
 .. code-block:: console
 
-   $ docker run -ti --network=host solsson/websocat wss://localhost:30000
+   $ docker run -ti --network=host solsson/websocat --insecure wss://localhost:20000
    HELO
    [wss] HELO
    GOODBYE
@@ -105,5 +99,22 @@ any input.
 
 Type ``Ctrl-c`` to exit the socket session.
 
-Step 8: Test proxying ``wss`` passthrough
+Step 7: Test proxying ``wss`` passthrough
 *****************************************
+
+The proxy listening on port ``30000`` passes through all TCP traffic to an upstream TLS WebSocket.
+
+You can start an interactive session with the socket as follows:
+
+.. code-block:: console
+
+   $ docker run -ti --network=host solsson/websocat --insecure wss://localhost:30000
+   HELO
+   [wss] HELO
+   GOODBYE
+   [wss] HELO
+
+The socket server is a very trivial implementation, that simply outputs ``[wss] HELO`` in response to
+any input.
+
+Type ``Ctrl-c`` to exit the socket session.
