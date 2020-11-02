@@ -781,7 +781,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
 
   // |end_stream| will be false if we decided to stop healthcheck before HTTP stream has ended -
   // invalid gRPC payload, unexpected message stream or wrong content-type.
-  if (end_stream) {
+  if (end_stream || !request_encoder_) {
     resetState();
   } else {
     // resetState() will be called by onResetStream().
@@ -789,7 +789,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
 
-  if (!parent_.reuse_connection_ || goaway) {
+  if (client_ && (!parent_.reuse_connection_ || goaway)) {
     client_->close();
   }
 }
