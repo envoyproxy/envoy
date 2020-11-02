@@ -33,6 +33,9 @@ Glossary
    Data plane
       ``NotDefined``
 
+   Delta update
+      ``NotDefined``
+
    Downstream
       ``NotDefined``
 
@@ -100,6 +103,9 @@ Glossary
       ``NotDefined``
 
    Sidecar
+      ``NotDefined``
+
+   State of the world update
       ``NotDefined``
 
    Static configuration
