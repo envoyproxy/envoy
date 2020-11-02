@@ -1507,8 +1507,9 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(encoder, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   Http::TestRequestHeaderMapImpl headers;
@@ -5837,8 +5838,9 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   // :authority header in the outgoing request should match the DNS name of
   // the selected upstream host
   EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&outgoing_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
@@ -5874,8 +5876,9 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   // :authority header in the outgoing request should match the :authority header of
   // the incoming request
   EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&incoming_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
