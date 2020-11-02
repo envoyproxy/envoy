@@ -280,7 +280,7 @@ public:
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
 
-  int64_t snapshotTimeMs() override { return snapshot_time_ms_; }
+  int64_t snapshotTimeMs() const override { return snapshot_time_ms_; }
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;

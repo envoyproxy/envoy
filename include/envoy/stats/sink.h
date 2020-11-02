@@ -42,9 +42,11 @@ public:
   virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
 
   /**
-   * @return a snapshot of all text readouts.
+   * @return the time in milliseconds when the snapshot was created.
+   *
+   * Stores converted timestamp here to avoid repeated conversions for every metric.
    */
-  virtual int64_t snapshotTimeMs() PURE;
+  virtual int64_t snapshotTimeMs() const PURE;
 };
 
 /**

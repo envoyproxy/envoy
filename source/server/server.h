@@ -397,7 +397,7 @@ public:
   const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
     return text_readouts_;
   }
-  int64_t snapshotTimeMs() override { return snapshot_time_ms_; }
+  int64_t snapshotTimeMs() const override { return snapshot_time_ms_; }
 
 private:
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
