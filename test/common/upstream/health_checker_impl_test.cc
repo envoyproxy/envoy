@@ -4426,7 +4426,7 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcFailUnknown) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-// This used to through a null dereference
+// This used to cause a null dereference
 TEST_F(GrpcHealthCheckerImplTest, GrpcFailNullDereference) {
   setupHC();
   expectSingleHealthcheck(HealthTransition::Changed);
