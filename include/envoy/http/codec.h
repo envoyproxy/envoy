@@ -107,8 +107,8 @@ public:
    * Encode headers, optionally indicating end of stream.
    * @param headers supplies the header map to encode. Must have required HTTP headers.
    * @param end_stream supplies whether this is a header only request.
-   * @return Status indicating whether encoding succeeded. Encoding will not succeed if request
-   * headers are missing required headers.
+   * @return Status indicating whether encoding succeeded. Encoding will fail if request
+   * headers are missing required HTTP headers (method, path for non-CONNECT, host for CONNECT).
    */
   virtual Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) PURE;
 
