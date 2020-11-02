@@ -47,6 +47,9 @@ Admin endpoints: ``config_dump``
 The :ref:`config_dump <operations_admin_interface_config_dump>` endpoint dumps Envoy's configuration
 in ``json`` format.
 
+The following examples make use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse the output
+from ``config_dump``.
+
 The following command allows you to see the types of config available:
 
 .. code-block:: console
