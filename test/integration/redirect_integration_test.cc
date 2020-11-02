@@ -163,6 +163,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
                    ->value());
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
               HasSubstr("302 internal_redirect test-header-value\n"));
   // No test header
@@ -263,6 +264,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
                    ->value());
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
               HasSubstr("302 internal_redirect test-header-value\n"));
   // No test header
