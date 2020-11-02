@@ -32,7 +32,7 @@ public:
       }
     }
 
-    if (tls_slot_->get()) {
+    if (tls_slot_->currentThreadRegistered() && tls_slot_->get()) {
       tls_slot_->getTyped<WasmHandle>().wasm()->log(plugin_, request_headers, response_headers,
                                                     response_trailers, stream_info);
     }
@@ -44,7 +44,7 @@ public:
   }
 
   ~WasmAccessLog() override {
-    if (tls_slot_->get()) {
+    if (tls_slot_->currentThreadRegistered() && tls_slot_->get()) {
       tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
                                      -> ThreadLocal::ThreadLocalObjectSharedPtr {
         object->asType<WasmHandle>().wasm()->startShutdown(plugin);

@@ -38,7 +38,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::
 }
 
 FilterConfig::~FilterConfig() {
-  if (tls_slot_->get()) {
+  if (tls_slot_->currentThreadRegistered() && tls_slot_->get()) {
     tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
                                    -> ThreadLocal::ThreadLocalObjectSharedPtr {
       object->asType<WasmHandle>().wasm()->startShutdown(plugin);
