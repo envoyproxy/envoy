@@ -3988,6 +3988,12 @@ TEST_P(SslSocketTest, CipherSuites) {
   client_params->clear_cipher_suites();
   server_params->clear_cipher_suites();
 
+  // Client connects to a server offering only deprecated cipher suites, connection fails.
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-SHA");
+  error_test_options.setExpectedServerStats("ssl.connection_error");
+  testUtilV2(error_test_options);
+  server_params->clear_cipher_suites();
+
   // Verify that ECDHE-RSA-CHACHA20-POLY1305 is not offered by default in FIPS builds.
   client_params->add_cipher_suites(common_cipher_suite);
 #ifdef BORINGSSL_FIPS
