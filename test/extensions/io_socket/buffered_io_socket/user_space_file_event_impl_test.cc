@@ -15,7 +15,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Event {
+namespace Extensions {
+namespace IoSocket {
+namespace BufferedIoSocket {
 namespace {
 
 using testing::NiceMock;
@@ -52,20 +54,20 @@ protected:
   NiceMock<MockReadWritable> io_source_;
   MockReadyCb ready_cb_;
   Api::ApiPtr api_;
-  DispatcherPtr dispatcher_;
-  std::unique_ptr<Event::UserSpaceFileEventImpl> user_file_event_;
+  Event::DispatcherPtr dispatcher_;
+  std::unique_ptr<UserSpaceFileEventImpl> user_file_event_;
 };
 
 TEST_F(UserSpaceFileEventImplTest, TestEnabledEventsTriggeredAfterCreate) {
   setWritable();
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
-  EXPECT_CALL(ready_cb_, called(FileReadyType::Write));
+  EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestRescheduleAfterTriggered) {
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     SCOPED_TRACE("1st schedule");
@@ -83,7 +85,7 @@ TEST_F(UserSpaceFileEventImplTest, TestRescheduleAfterTriggered) {
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestRescheduleIsDeduplicated) {
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     SCOPED_TRACE("1st schedule");
@@ -107,7 +109,7 @@ TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
     EXPECT_CALL(io_source_, isReadable()).WillOnce(Return(true)).RetiresOnSaturation();
     EXPECT_CALL(io_source_, isPeerWritable()).WillOnce(Return(false)).RetiresOnSaturation();
-    user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+    user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
         *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
     // user_file_event_->activate(e);
     EXPECT_CALL(ready_cb_, called(current_event));
@@ -120,7 +122,7 @@ TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
     EXPECT_CALL(io_source_, isReadable()).WillOnce(Return(false)).RetiresOnSaturation();
     EXPECT_CALL(io_source_, isPeerWritable()).WillOnce(Return(true)).RetiresOnSaturation();
-    user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+    user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
         *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
     // user_file_event_->activate(e);
     EXPECT_CALL(ready_cb_, called(current_event));
@@ -133,7 +135,7 @@ TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
     EXPECT_CALL(io_source_, isReadable()).WillOnce(Return(true)).RetiresOnSaturation();
     EXPECT_CALL(io_source_, isPeerWritable()).WillOnce(Return(true)).RetiresOnSaturation();
-    user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+    user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
         *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
     // user_file_event_->activate(e);
     EXPECT_CALL(ready_cb_, called(current_event));
@@ -144,7 +146,7 @@ TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents
 
 TEST_F(UserSpaceFileEventImplTest, TestActivateWillSchedule) {
   // IO is neither readable nor writable.
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -164,7 +166,7 @@ TEST_F(UserSpaceFileEventImplTest, TestActivateWillSchedule) {
 
 TEST_F(UserSpaceFileEventImplTest, TestActivateDedup) {
   // IO is neither readable nor writable.
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -186,7 +188,7 @@ TEST_F(UserSpaceFileEventImplTest, TestActivateDedup) {
 
 TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
   // IO is neither readable nor writable.
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -208,7 +210,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestEventClosedIsNotTriggeredUnlessManullyActivated) {
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
       Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);
   {
@@ -231,5 +233,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEventClosedIsNotTriggeredUnlessManullyAct
 }
 
 } // namespace
-} // namespace Event
+} // namespace BufferedIoSocket
+} // namespace IoSocket
+} // namespace Extensions
 } // namespace Envoy

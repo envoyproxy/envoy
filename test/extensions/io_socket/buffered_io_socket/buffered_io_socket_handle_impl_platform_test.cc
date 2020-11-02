@@ -9,7 +9,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Network {
+namespace Extensions {
+namespace IoSocket {
+namespace BufferedIoSocket {
 namespace {
 
 using testing::NiceMock;
@@ -23,8 +25,8 @@ public:
 class BufferedIoSocketHandlePlatformTest : public testing::Test {
 public:
   BufferedIoSocketHandlePlatformTest() {
-    io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+    io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
+    io_handle_peer_ = std::make_unique<BufferedIoSocketHandleImpl>();
     io_handle_->setWritablePeer(io_handle_peer_.get());
     io_handle_peer_->setWritablePeer(io_handle_.get());
   }
@@ -38,8 +40,8 @@ public:
     }
   }
 
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_;
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_;
+  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_peer_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   MockFileEventCallback cb_;
 };
@@ -53,5 +55,7 @@ TEST_F(BufferedIoSocketHandlePlatformTest, TestCreatePlatformDefaultTriggerTypeF
 }
 
 } // namespace
-} // namespace Network
+} // namespace BufferedIoSocket
+} // namespace IoSocket
+} // namespace Extensions
 } // namespace Envoy

@@ -14,7 +14,9 @@ using testing::_;
 using testing::NiceMock;
 
 namespace Envoy {
-namespace Network {
+namespace Extensions {
+namespace IoSocket {
+namespace BufferedIoSocket {
 namespace {
 
 MATCHER(IsInvalidateAddress, "") {
@@ -30,8 +32,8 @@ public:
 class BufferedIoSocketHandleTest : public testing::Test {
 public:
   BufferedIoSocketHandleTest() : buf_(1024) {
-    io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+    io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
+    io_handle_peer_ = std::make_unique<BufferedIoSocketHandleImpl>();
     io_handle_->setWritablePeer(io_handle_peer_.get());
     io_handle_peer_->setWritablePeer(io_handle_.get());
   }
@@ -45,7 +47,7 @@ public:
   }
 
   Buffer::WatermarkBuffer&
-  getWatermarkBufferHelper(Network::BufferedIoSocketHandleImpl& io_handle) {
+  getWatermarkBufferHelper(BufferedIoSocketHandleImpl& io_handle) {
     return dynamic_cast<Buffer::WatermarkBuffer&>(*io_handle.getWriteBuffer());
   }
 
@@ -54,8 +56,8 @@ public:
   // Owned by BufferedIoSocketHandle.
   NiceMock<Event::MockSchedulableCallback>* scheduable_cb_;
   MockFileEventCallback cb_;
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_;
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_;
+  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_peer_;
   absl::FixedArray<char> buf_;
 };
 
@@ -175,7 +177,7 @@ TEST_F(BufferedIoSocketHandleTest, TestRecvDrain) {
 
 TEST_F(BufferedIoSocketHandleTest, FlowControl) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  WritablePeer* handle_as_peer = io_handle_.get();
+  Network::WritablePeer* handle_as_peer = io_handle_.get();
   internal_buffer.setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
   EXPECT_TRUE(io_handle_peer_->isWritable());
@@ -307,7 +309,7 @@ TEST_F(BufferedIoSocketHandleTest, TestEventResetClearCallback) {
 
 TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  WritablePeer* handle_as_peer = io_handle_.get();
+  Network::WritablePeer* handle_as_peer = io_handle_.get();
   internal_buffer.setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
   EXPECT_TRUE(io_handle_peer_->isWritable());
@@ -747,8 +749,8 @@ TEST_F(BufferedIoSocketHandleTest, TestLastRoundtripTimeNullOpt) {
 class BufferedIoSocketHandleNotImplementedTest : public testing::Test {
 public:
   BufferedIoSocketHandleNotImplementedTest() {
-    io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+    io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
+    io_handle_peer_ = std::make_unique<BufferedIoSocketHandleImpl>();
     io_handle_->setWritablePeer(io_handle_peer_.get());
     io_handle_peer_->setWritablePeer(io_handle_.get());
   }
@@ -762,8 +764,8 @@ public:
     }
   }
 
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_;
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_;
+  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_peer_;
   Buffer::RawSlice slice_;
 };
 
@@ -813,5 +815,7 @@ TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnGetOption) {
   EXPECT_THAT(io_handle_->getOption(0, 0, nullptr, nullptr), IsNotSupportedResult());
 }
 } // namespace
-} // namespace Network
+} // namespace BufferedIoSocket
+} // namespace IoSocket
+} // namespace Extensions
 } // namespace Envoy
