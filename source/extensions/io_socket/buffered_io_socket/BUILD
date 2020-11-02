@@ -19,8 +19,8 @@ envoy_cc_library(
         "user_space_file_event_impl.h",
     ],
     deps = [
-        "//source/common/network:default_socket_interface_lib",
         "//source/common/event:dispatcher_includes",
+        "//source/common/network:default_socket_interface_lib",
         "//source/common/network:peer_buffer_lib",
     ],
 )

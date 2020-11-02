@@ -6,7 +6,9 @@
 #include "common/network/peer_buffer.h"
 
 namespace Envoy {
-namespace Event {
+namespace Extensions {
+namespace IoSocket {
+namespace BufferedIoSocket {
 
 UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                                uint32_t events, Network::ReadWritable& io_source)
@@ -34,23 +36,25 @@ void EventListenerImpl::onEventActivated(uint32_t activated_events) {
 
 void UserSpaceFileEventImpl::activate(uint32_t events) {
   // Only supported event types are set.
-  ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
+  ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
+                    Event::FileReadyType::Closed)) == events);
   event_listener_.onEventActivated(events);
   schedulable_->scheduleCallbackNextIteration();
 }
 
 void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   // Only supported event types are set.
-  ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
+  ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
+                    Event::FileReadyType::Closed)) == events);
   event_listener_.onEventEnabled(events);
   bool was_enabled = schedulable_->enabled();
   // Recalculate activated events.
   uint32_t events_to_notify = 0;
-  if ((events & FileReadyType::Read) && io_source_.isReadable()) {
-    events_to_notify |= FileReadyType::Read;
+  if ((events & Event::FileReadyType::Read) && io_source_.isReadable()) {
+    events_to_notify |= Event::FileReadyType::Read;
   }
-  if ((events & FileReadyType::Write) && io_source_.isPeerWritable()) {
-    events_to_notify |= FileReadyType::Write;
+  if ((events & Event::FileReadyType::Write) && io_source_.isPeerWritable()) {
+    events_to_notify |= Event::FileReadyType::Write;
   }
   if (events_to_notify != 0) {
     activate(events_to_notify);
@@ -60,6 +64,7 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   ENVOY_LOG(trace, "User space file event {} set events {}. Will {} reschedule.",
             static_cast<void*>(this), events, was_enabled ? "not " : "");
 }
-
-} // namespace Event
+} // namespace BufferedIoSocket
+} // namespace IoSocket
+} // namespace Extensions
 } // namespace Envoy

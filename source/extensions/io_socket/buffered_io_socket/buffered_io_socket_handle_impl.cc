@@ -13,8 +13,10 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Network {
 
+namespace Extensions {
+namespace IoSocket {
+namespace BufferedIoSocket {
 namespace {
 Api::SysCallIntResult makeInvalidSyscall() {
   return Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP};
@@ -70,15 +72,16 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
                                                           uint64_t num_slice) {
   if (!isOpen()) {
     return {0,
-            // TODO(lambdai): Add EBADF in IoSocketError and adopt it here.
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+            // TODO(lambdai): Add EBADF in Network::IoSocketError and adopt it here.
+            Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                            Network::IoSocketError::deleteIoError)};
   }
   if (pending_received_data_.length() == 0) {
     if (read_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
-      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                 IoSocketError::deleteIoError)};
+      return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                 Network::IoSocketError::deleteIoError)};
     }
   }
   absl::FixedArray<iovec> iov(num_slice);
@@ -100,15 +103,15 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffer,
                                                          uint64_t max_length) {
   if (!isOpen()) {
-    return {0,
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                               Network::IoSocketError::deleteIoError)};
   }
   if (pending_received_data_.length() == 0) {
     if (read_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
-      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                 IoSocketError::deleteIoError)};
+      return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                 Network::IoSocketError::deleteIoError)};
     }
   }
   // TODO(lambdai): Move at slice boundary to move to reduce the copy.
@@ -120,24 +123,24 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                            uint64_t num_slice) {
   if (!isOpen()) {
-    return {0,
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                               Network::IoSocketError::deleteIoError)};
   }
   // Closed peer.
   if (!writable_peer_) {
-    return {0,
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                               Network::IoSocketError::deleteIoError)};
   }
   // Error: write after close.
   if (writable_peer_->isWriteEndSet()) {
     // TODO(lambdai): EPIPE or ENOTCONN
-    return {0,
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                               Network::IoSocketError::deleteIoError)};
   }
   // The peer is valid but temporary not accepts new data. Likely due to flow control.
   if (!writable_peer_->isWritable()) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                               Network::IoSocketError::deleteIoError)};
   }
   // Write along with iteration. Buffer guarantee the fragment is always append-able.
   uint64_t bytes_written = 0;
@@ -154,24 +157,24 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buffer) {
   if (!isOpen()) {
-    return {0,
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                               Network::IoSocketError::deleteIoError)};
   }
   // Closed peer.
   if (!writable_peer_) {
-    return {0,
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                               Network::IoSocketError::deleteIoError)};
   }
   // Error: write after close.
   if (writable_peer_->isWriteEndSet()) {
     // TODO(lambdai): EPIPE or ENOTCONN
-    return {0,
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                               Network::IoSocketError::deleteIoError)};
   }
   // The peer is valid but temporary not accepts new data. Likely due to flow control.
   if (!writable_peer_->isWritable()) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                               Network::IoSocketError::deleteIoError)};
   }
   uint64_t total_bytes_to_write = buffer.length();
   writable_peer_->getWriteBuffer()->move(buffer);
@@ -181,33 +184,33 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
-                                                            const Address::Ip*,
-                                                            const Address::Instance&) {
-  return IoSocketError::ioResultSocketInvalidAddress();
+                                                            const Network::Address::Ip*,
+                                                            const Network::Address::Instance&) {
+  return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::recvmsg(Buffer::RawSlice*, const uint64_t,
                                                             uint32_t, RecvMsgOutput&) {
-  return IoSocketError::ioResultSocketInvalidAddress();
+  return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::recvmmsg(RawSliceArrays&, uint32_t,
                                                              RecvMsgOutput&) {
-  return IoSocketError::ioResultSocketInvalidAddress();
+  return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   if (!isOpen()) {
-    return {0,
-            Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INVAL), IoSocketError::deleteIoError)};
+    return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
+                               Network::IoSocketError::deleteIoError)};
   }
   // No data and the writer closed.
   if (pending_received_data_.length() == 0) {
     if (read_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
-      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                 IoSocketError::deleteIoError)};
+      return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                 Network::IoSocketError::deleteIoError)};
     }
   }
   auto max_bytes_to_read = std::min(pending_received_data_.length(), length);
@@ -222,17 +225,18 @@ bool BufferedIoSocketHandleImpl::supportsMmsg() const { return false; }
 
 bool BufferedIoSocketHandleImpl::supportsUdpGro() const { return false; }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::bind(Address::InstanceConstSharedPtr) {
+Api::SysCallIntResult BufferedIoSocketHandleImpl::bind(Network::Address::InstanceConstSharedPtr) {
   return makeInvalidSyscall();
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::listen(int) { return makeInvalidSyscall(); }
 
-IoHandlePtr BufferedIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
+Network::IoHandlePtr BufferedIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::connect(Address::InstanceConstSharedPtr) {
+Api::SysCallIntResult
+BufferedIoSocketHandleImpl::connect(Network::Address::InstanceConstSharedPtr) {
   // Buffered Io handle should always be considered as connected.
   // Use write or read to determine if peer is closed.
   return {0, 0};
@@ -250,11 +254,11 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::setBlocking(bool) { return mak
 
 absl::optional<int> BufferedIoSocketHandleImpl::domain() { return absl::nullopt; }
 
-Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::localAddress() {
+Network::Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::localAddress() {
   throw EnvoyException(fmt::format("getsockname failed for BufferedIoSocketHandleImpl"));
 }
 
-Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::peerAddress() {
+Network::Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::peerAddress() {
   throw EnvoyException(fmt::format("getsockname failed for BufferedIoSocketHandleImpl"));
 }
 
@@ -265,9 +269,10 @@ void BufferedIoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatch
   ASSERT(user_file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                       "file descriptor. This is not allowed.");
   ASSERT(trigger == Event::FileTriggerType::Edge, "Only support edge type.");
-  user_file_event_ = std::make_unique<Event::UserSpaceFileEventImpl>(dispatcher, cb, events, *this);
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(dispatcher, cb, events, *this);
 }
-IoHandlePtr BufferedIoSocketHandleImpl::duplicate() {
+
+Network::IoHandlePtr BufferedIoSocketHandleImpl::duplicate() {
   // duplicate() is supposed to be used on listener io handle while this implementation doesn't
   // support listen.
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -304,5 +309,7 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
   }
   return {0, 0};
 }
-} // namespace Network
+} // namespace BufferedIoSocket
+} // namespace IoSocket
+} // namespace Extensions
 } // namespace Envoy

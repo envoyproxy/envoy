@@ -10,11 +10,11 @@
 
 namespace Envoy {
 
-namespace Network {
-class BufferedIoSocketHandleImpl;
-}
+namespace Extensions {
+namespace IoSocket {
+namespace BufferedIoSocket {
 
-namespace Event {
+class BufferedIoSocketHandleImpl;
 
 // Return the enabled events except EV_CLOSED. This implementation is generally good since only
 // epoll supports EV_CLOSED but the entire envoy code base supports another poller. The event owner
@@ -37,7 +37,7 @@ private:
 
 // A FileEvent implementation which is used to drive BufferedIoSocketHandle.
 // Declare the class final to safely call virtual function setEnabled in constructor.
-class UserSpaceFileEventImpl final : public FileEvent, Logger::Loggable<Logger::Id::io> {
+class UserSpaceFileEventImpl final : public Event::FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
   UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
                          Network::ReadWritable& io_source);
@@ -48,7 +48,7 @@ public:
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
 
-  friend class Network::BufferedIoSocketHandleImpl;
+  friend class BufferedIoSocketHandleImpl;
 
 private:
   // Used to populate the event operations of enable and activate.
@@ -63,6 +63,7 @@ private:
 
   Network::ReadWritable& io_source_;
 };
-
-} // namespace Event
+} // namespace BufferedIoSocket
+} // namespace IoSocket
+} // namespace Extensions
 } // namespace Envoy
