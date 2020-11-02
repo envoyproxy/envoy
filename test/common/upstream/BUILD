@@ -46,10 +46,12 @@ envoy_cc_test(
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -733,5 +735,45 @@ envoy_cc_fuzz_test(
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "zone_aware_load_balancer_fuzz_proto",
+    srcs = ["zone_aware_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:load_balancer_fuzz_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "zone_aware_load_balancer_fuzz_lib",
+    srcs = ["zone_aware_load_balancer_fuzz_base.cc"],
+    hdrs = ["zone_aware_load_balancer_fuzz_base.h"],
+    deps = [
+        ":load_balancer_fuzz_lib",
+        ":zone_aware_load_balancer_fuzz_proto_cc_proto",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
+    ],
+)
+
+envoy_proto_library(
+    name = "round_robin_load_balancer_fuzz_proto",
+    srcs = ["round_robin_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "round_robin_load_balancer_fuzz_test",
+    srcs = ["round_robin_load_balancer_fuzz_test.cc"],
+    corpus = "//test/common/upstream:round_robin_load_balancer_corpus",
+    deps = [
+        ":round_robin_load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+        ":zone_aware_load_balancer_fuzz_lib",
+        "//test/fuzz:utility_lib",
     ],
 )

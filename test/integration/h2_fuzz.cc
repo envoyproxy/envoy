@@ -146,6 +146,13 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
         Http2Frame::makeMetadataFrameFromMetadataMap(stream_idx, metadata_map, metadata_flags);
     break;
   }
+  case test::integration::H2TestFrame::kStatus: {
+    const std::string status = proto_frame.status().status();
+    const uint32_t stream_idx = proto_frame.status().stream_index();
+    ENVOY_LOG_MISC(trace, "Sending status frame");
+    h2_frame = Http2Frame::makeHeadersFrameWithStatus(status, stream_idx);
+    break;
+  }
   case test::integration::H2TestFrame::kGeneric: {
     const absl::string_view frame_bytes = proto_frame.generic().frame_bytes();
     ENVOY_LOG_MISC(trace, "Sending generic frame");

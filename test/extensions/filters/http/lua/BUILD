@@ -15,8 +15,6 @@ envoy_extension_cc_test(
     name = "lua_filter_test",
     srcs = ["lua_filter_test.cc"],
     extension_name = "envoy.filters.http.lua",
-    # TODO(envoyproxy/windows-dev): diagnose clang-cl build test failure
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",

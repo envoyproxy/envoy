@@ -17,6 +17,7 @@ filegroup(
             "root/**/*.pb",
         ],
         exclude = [
+            "root/**/envoy-dynamic*.yaml",
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
