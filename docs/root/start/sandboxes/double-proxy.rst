@@ -24,7 +24,7 @@ This can be useful if the proxies are physically separated or transmit data over
 In order to  use the sandbox you will first need to generate the necessary SSL keys and certificates.
 
 This example walks through creating a certificate authority, and using it to create a domain key and sign
-certificates for the proxyies.
+certificates for the proxies.
 
 .. include:: _include/docker-env-setup.rst
 
@@ -92,45 +92,45 @@ Use the domain key to generate certificate signing requests for each of the prox
 .. code-block:: console
 
    $ openssl req -new -sha256 \
-	-key certs/example.com.key \
-	-subj "/C=US/ST=CA/O=MyExample, Inc./CN=proxy-postgres-frontend.example.com" \
-	-out certs/proxy-postgres-frontend.example.com.csr
+        -key certs/example.com.key \
+        -subj "/C=US/ST=CA/O=MyExample, Inc./CN=proxy-postgres-frontend.example.com" \
+        -out certs/proxy-postgres-frontend.example.com.csr
    $ openssl req -new -sha256 \
-	-key certs/example.com.key \
-	-subj "/C=US/ST=CA/O=MyExample, Inc./CN=proxy-postgres-backend.example.com" \
-	-out certs/proxy-postgres-backend.example.com.csr
+        -key certs/example.com.key \
+        -subj "/C=US/ST=CA/O=MyExample, Inc./CN=proxy-postgres-backend.example.com" \
+        -out certs/proxy-postgres-backend.example.com.csr
 
 Step 6: Sign the proxy certificates
 ***********************************
 
-You can now use the certificate authority that you created to sign the certificate requests:
+You can now use the certificate authority that you created to sign the certificate requests.
 
 Note the ``subjectAltName``. This is used for reciprocally matching and validating the certificates.
 
 .. code-block:: console
 
    $ openssl x509 -req \
-	-in certs/proxy-postgres-frontend.example.com.csr \
-	-CA certs/ca.crt \
-	-CAkey certs/ca.key \
-	-CAcreateserial \
+        -in certs/proxy-postgres-frontend.example.com.csr \
+        -CA certs/ca.crt \
+        -CAkey certs/ca.key \
+        -CAcreateserial \
         -extfile <(printf "subjectAltName=DNS:proxy-postgres-frontend.example.com") \
-	-out certs/postgres-frontend.example.com.crt \
-	-days 500 \
-	-sha256
+        -out certs/postgres-frontend.example.com.crt \
+        -days 500 \
+        -sha256
    Signature ok
    subject=C = US, ST = CA, O = "MyExample, Inc.", CN = proxy-postgres-frontend.example.com
    Getting CA Private Key
 
    $ openssl x509 -req \
-	-in certs/proxy-postgres-backend.example.com.csr \
-	-CA certs/ca.crt \
-	-CAkey certs/ca.key \
-	-CAcreateserial \
+        -in certs/proxy-postgres-backend.example.com.csr \
+        -CA certs/ca.crt \
+        -CAkey certs/ca.key \
+        -CAcreateserial \
         -extfile <(printf "subjectAltName=DNS:proxy-postgres-backend.example.com") \
-	-out certs/postgres-backend.example.com.crt \
-	-days 500 \
-	-sha256
+        -out certs/postgres-backend.example.com.crt \
+        -days 500 \
+        -sha256
    Signature ok
    subject=C = US, ST = CA, O = "MyExample, Inc.", CN = proxy-postgres-backend.example.com
    Getting CA Private Key
@@ -170,5 +170,5 @@ Checking the response at http://localhost:10000, you should see the output from 
 
 .. code-block:: console
 
-   $ curl http://localhost:10000
+   $ curl -s http://localhost:10000
    Connected to Postgres, version: PostgreSQL 13.0 (Debian 13.0-1.pgdg100+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 8.3.0-6) 8.3.0, 64-bit
