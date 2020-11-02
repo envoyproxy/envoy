@@ -22,17 +22,17 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  cluster: service-ws
+                  cluster: service_ws
           http_filters:
           - name: envoy.filters.http.router
 
   clusters:
-  - name: service-ws
+  - name: service_ws
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
     load_assignment:
-      cluster_name: service-ws
+      cluster_name: service_ws
       endpoints:
       - lb_endpoints:
         - endpoint:

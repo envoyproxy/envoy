@@ -9,16 +9,16 @@ static_resources:
       - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          cluster: service-wss-passthrough
+          cluster: service_wss_passthrough
           stat_prefix: wss_passthrough
 
   clusters:
-  - name: service-wss-passthrough
+  - name: service_wss_passthrough
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
     load_assignment:
-      cluster_name: service-wss-passthrough
+      cluster_name: service_wss_passthrough
       endpoints:
       - lb_endpoints:
         - endpoint:
