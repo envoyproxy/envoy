@@ -413,7 +413,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
     testing::InSequence s1;
     EXPECT_CALL(random_generator, random()).WillOnce(Return(std::numeric_limits<uint64_t>::max()));
     // Exiting dispatcher on client side connect event can cause a race, listener accept callback
-    // may not have been triggered, exit dispatcher here to prevent this
+    // may not have been triggered, exit dispatcher here to prevent this.
     EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce([&] { dispatcher_->exit(); });
   }
   {
