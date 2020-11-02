@@ -26,7 +26,10 @@ cc_library(
 
 genrule(
     name = "build",
-    srcs = glob(["wee8/**"]),
+    srcs = glob(
+        ["wee8/**"],
+        exclude = ["wee8/out/**"],
+    ),
     outs = [
         "libwee8.a",
     ],
