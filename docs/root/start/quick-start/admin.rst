@@ -63,7 +63,7 @@ As a further example, to dump the current ``listeners`` configuration, you could
 
 .. code-block:: console
 
-   $ curl -s http://localhost:19000/config_dump | jq '.configs[2]'
+   $ curl -s http://localhost:9901/config_dump | jq '.configs[2]'
    {
      "@type": "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
      ...snip...
