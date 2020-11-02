@@ -77,9 +77,9 @@ TEST(HttpJwtAuthnFilterFactoryTest, WrongPerRouteConfigType) {
                std::bad_cast);
 }
 
-TEST(HttpJwtAuthnFilterFactoryTest, BypassPerRouteConfig) {
+TEST(HttpJwtAuthnFilterFactoryTest, DisabledPerRouteConfig) {
   PerRouteConfig per_route;
-  per_route.set_bypass(true);
+  per_route.set_disabled(true);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FilterFactory factory;
@@ -88,7 +88,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, BypassPerRouteConfig) {
   EXPECT_NE(base_ptr, nullptr);
   const PerRouteFilterConfig* typed_ptr = dynamic_cast<const PerRouteFilterConfig*>(base_ptr.get());
   EXPECT_NE(typed_ptr, nullptr);
-  EXPECT_TRUE(typed_ptr->config().bypass());
+  EXPECT_TRUE(typed_ptr->config().disabled());
 }
 
 TEST(HttpJwtAuthnFilterFactoryTest, GoodPerRouteConfig) {

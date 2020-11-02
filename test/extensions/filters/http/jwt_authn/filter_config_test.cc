@@ -58,6 +58,100 @@ rules:
                   filter_state) == nullptr);
 }
 
+TEST(HttpJwtAuthnFilterConfigTest, FindByMatchDisabled) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+rules:
+- match:
+    path: /path1
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filter_conf->findVerifier(
+                  Http::TestRequestHeaderMapImpl{
+                      {":path", "/path1"},
+                  },
+                  filter_state) == nullptr);
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, FindByMatchWrongRequirementName) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+rules:
+- match:
+    path: /path1
+  requirement_name: rr
+requirement_map:
+  r1:
+    provider_name: provider1
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(FilterConfigImpl::create(proto_config, "", context), EnvoyException,
+                            "Wrong requirement_name: rr. It should be one of [r1]");
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, FindByMatchRequirementName) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+  provider2:
+    issuer: issuer2
+    local_jwks:
+      inline_string: jwks
+rules:
+- match:
+    path: /path1
+  requirement_name: r1
+- match:
+    path: /path2
+  requirement_name: r2
+requirement_map:
+  r1:
+    provider_name: provider1
+  r2:
+    provider_name: provider2
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  EXPECT_TRUE(filter_conf->findVerifier(
+                  Http::TestRequestHeaderMapImpl{
+                      {":path", "/path1"},
+                  },
+                  filter_state) != nullptr);
+  EXPECT_TRUE(filter_conf->findVerifier(
+                  Http::TestRequestHeaderMapImpl{
+                      {":path", "/path2"},
+                  },
+                  filter_state) != nullptr);
+}
+
 TEST(HttpJwtAuthnFilterConfigTest, VerifyTLSLifetime) {
   const char config[] = R"(
 providers:
@@ -189,7 +283,7 @@ requirement_map:
   std::string error_msg;
 
   per_route.Clear();
-  per_route.set_bypass(true);
+  per_route.set_disabled(true);
   std::tie(verifier, error_msg) =
       filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_EQ(verifier, nullptr);

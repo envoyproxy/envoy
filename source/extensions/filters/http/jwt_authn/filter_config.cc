@@ -4,6 +4,8 @@
 
 #include "common/common/empty_string.h"
 
+using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -21,19 +23,6 @@ void FilterConfigImpl::init() {
                                               shared_this->api_);
   });
 
-  for (const auto& rule : proto_config_.rules()) {
-    rule_pairs_.emplace_back(Matcher::create(rule),
-                             Verifier::create(rule.requires(), proto_config_.providers(), *this));
-  }
-
-  if (proto_config_.has_filter_state_rules()) {
-    filter_state_name_ = proto_config_.filter_state_rules().name();
-    for (const auto& it : proto_config_.filter_state_rules().requires()) {
-      filter_state_verifiers_.emplace(
-          it.first, Verifier::create(it.second, proto_config_.providers(), *this));
-    }
-  }
-
   std::vector<std::string> names;
   for (const auto& it : proto_config_.requirement_map()) {
     names.push_back(it.first);
@@ -43,11 +32,43 @@ void FilterConfigImpl::init() {
   // sort is just for unit-test since protobuf map order is not deterministic.
   std::sort(names.begin(), names.end());
   all_requirement_names_ = absl::StrJoin(names, ",");
+
+  for (const auto& rule : proto_config_.rules()) {
+    switch (rule.requirement_type_case()) {
+    case RequirementRule::RequirementTypeCase::kRequires:
+      rule_pairs_.emplace_back(Matcher::create(rule),
+                               Verifier::create(rule.requires(), proto_config_.providers(), *this));
+      break;
+    case RequirementRule::RequirementTypeCase::kRequirementName: {
+      // Use requirement_name to lookup requirment_map.
+      auto map_it = proto_config_.requirement_map().find(rule.requirement_name());
+      if (map_it == proto_config_.requirement_map().end()) {
+        throw EnvoyException(fmt::format("Wrong requirement_name: {}. It should be one of [{}]",
+                                         rule.requirement_name(), all_requirement_names_));
+      }
+      rule_pairs_.emplace_back(Matcher::create(rule),
+                               Verifier::create(map_it->second, proto_config_.providers(), *this));
+    } break;
+    case RequirementRule::RequirementTypeCase::REQUIREMENT_TYPE_NOT_SET:
+      rule_pairs_.emplace_back(Matcher::create(rule), nullptr);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
+  if (proto_config_.has_filter_state_rules()) {
+    filter_state_name_ = proto_config_.filter_state_rules().name();
+    for (const auto& it : proto_config_.filter_state_rules().requires()) {
+      filter_state_verifiers_.emplace(
+          it.first, Verifier::create(it.second, proto_config_.providers(), *this));
+    }
+  }
 }
 
 std::pair<const Verifier*, std::string>
 FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) const {
-  if (per_route.config().bypass()) {
+  if (per_route.config().disabled()) {
     return std::make_pair(nullptr, EMPTY_STRING);
   }
 

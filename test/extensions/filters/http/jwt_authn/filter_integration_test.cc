@@ -472,11 +472,11 @@ INSTANTIATE_TEST_SUITE_P(Protocols, PerRouteIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// This test verifies per-route config bypass.
-TEST_P(PerRouteIntegrationTest, PerRouteConfigBypass) {
-  // per-route config has bypass flag.
+// This test verifies per-route config disabled.
+TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabled) {
+  // per-route config has disabled flag.
   PerRouteConfig per_route;
-  per_route.set_bypass(true);
+  per_route.set_disabled(true);
   // Use a normal filter config that requires jwt_auth.
   setup(ExampleConfig, per_route);
 
