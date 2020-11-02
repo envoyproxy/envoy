@@ -40,6 +40,8 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   // all priority levels.
   while (hosts_made < std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel) &&
          port < 60000) {
+    // Make sure no health flags persisted from previous fuzz iterations
+    ASSERT(initialized_hosts_[port]->health() == Host::Health::Healthy);
     host_set.hosts_.push_back(initialized_hosts_[port]);
     ++port;
     ++hosts_made;
@@ -246,9 +248,10 @@ void LoadBalancerFuzzBase::replay(
       break;
     }
   }
+  clearStaticHostsState();
 }
 
-void LoadBalancerFuzzBase::clearStaticHostsHealthFlags() {
+void LoadBalancerFuzzBase::clearStaticHostsState() {
   // The only outstanding health flags set are those that are set from hosts being placed in
   // degraded and excluded. Thus, use the priority set pointer to know which flags to clear.
   for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size();
