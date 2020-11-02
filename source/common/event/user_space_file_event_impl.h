@@ -13,46 +13,22 @@ namespace Envoy {
 namespace Network {
 class BufferedIoSocketHandleImpl;
 }
+
 namespace Event {
-
-// The interface of populating event watcher and obtaining the active events. The events are the
-// combination of FileReadyType values. The event listener is populated by user event registration
-// and io events passively. Also the owner of this listener query the activated events by calling
-// triggeredEvents and getAndClearEphemeralEvents.
-class EventListener {
-public:
-  virtual ~EventListener() = default;
-
-  // Get the events which are ephemerally activated. Upon returning the ephemeral events are
-  // cleared.
-  virtual uint32_t getAndClearEphemeralEvents() PURE;
-
-  /**
-   * FileEvent::setEnabled is invoked.
-   * @param enabled_events supplied the event of setEnabled.
-   */
-  virtual void onEventEnabled(uint32_t enabled_events) PURE;
-
-  /**
-   * FileEvent::activate is invoked.
-   * @param enabled_events supplied the event of activate().
-   */
-  virtual void onEventActivated(uint32_t activated_events) PURE;
-};
 
 // Return the enabled events except EV_CLOSED. This implementation is generally good since only
 // epoll supports EV_CLOSED but the entire envoy code base supports another poller. The event owner
 // must assume EV_CLOSED is never activated. Also event owner must tolerate that OS could notify
 // events which are not actually triggered.
 // TODO(lambdai): Add support of delivering EV_CLOSED.
-class EventListenerImpl : public EventListener {
+class EventListenerImpl {
 public:
-  ~EventListenerImpl() override = default;
+  ~EventListenerImpl() = default;
 
-  void onEventEnabled(uint32_t enabled_events) override;
-  void onEventActivated(uint32_t activated_events) override;
+  void onEventEnabled(uint32_t enabled_events);
+  void onEventActivated(uint32_t activated_events);
 
-  uint32_t getAndClearEphemeralEvents() override { return std::exchange(ephemeral_events_, 0); }
+  uint32_t getAndClearEphemeralEvents() { return std::exchange(ephemeral_events_, 0); }
 
 private:
   // The events set by activate() and will be cleared after the io callback.

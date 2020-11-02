@@ -27,9 +27,9 @@ namespace Network {
  * 4. The peer BufferedIoSocket must be scheduled in the same thread to avoid data race because
  *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
  */
-class BufferedIoSocketHandleImpl : public IoHandle,
-                                   public ReadWritable,
-                                   protected Logger::Loggable<Logger::Id::io> {
+class BufferedIoSocketHandleImpl final : public IoHandle,
+                                         public ReadWritable,
+                                         protected Logger::Loggable<Logger::Id::io> {
 public:
   BufferedIoSocketHandleImpl();
 
