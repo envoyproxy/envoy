@@ -48,7 +48,8 @@ public:
 class TestConfig : public AdmissionControlFilterConfig {
 public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-             Random::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
+             Random::RandomGenerator& random, Stats::Scope& scope,
+             ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
              MockThreadLocalController& controller, std::shared_ptr<ResponseEvaluator> evaluator)
       : AdmissionControlFilterConfig(proto_config, runtime, random, scope, std::move(tls),
                                      std::move(evaluator)),
@@ -66,7 +67,8 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    auto tls = context_.threadLocal().allocateSlot();
+    auto tls =
+        ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(context_.threadLocal());
     evaluator_ = std::make_shared<MockResponseEvaluator>();
 
     return std::make_shared<TestConfig>(proto, runtime_, random_, scope_, std::move(tls),

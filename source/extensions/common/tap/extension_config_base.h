@@ -34,7 +34,7 @@ protected:
   // extension base class (with TLS logic, etc.) we must dynamic cast to the actual tap
   // configuration type that the extension expects (and is created by the configuration factory).
   template <class T> std::shared_ptr<T> currentConfigHelper() const {
-    return std::dynamic_pointer_cast<T>(tls_slot_->getTyped<TlsFilterConfig>().config_);
+    return std::dynamic_pointer_cast<T>(tls_slot_->config_);
   }
 
 private:
@@ -48,7 +48,7 @@ private:
 
   const envoy::extensions::common::tap::v3::CommonExtensionConfig proto_config_;
   TapConfigFactoryPtr config_factory_;
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::TypedSlot<TlsFilterConfig> tls_slot_;
   AdminHandlerSharedPtr admin_handler_;
 };
 

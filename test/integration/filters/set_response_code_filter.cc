@@ -18,14 +18,13 @@ class SetResponseCodeFilterConfig {
 public:
   SetResponseCodeFilterConfig(const std::string& prefix, uint32_t code, const std::string& body,
                               Server::Configuration::FactoryContext& context)
-      : prefix_(prefix), code_(code), body_(body), tls_slot_(context.threadLocal().allocateSlot()) {
-  }
+      : prefix_(prefix), code_(code), body_(body), tls_slot_(context.threadLocal()) {}
 
   const std::string prefix_;
   const uint32_t code_;
   const std::string body_;
   // Allocate a slot to validate that it is destroyed on a main thread only.
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::TypedSlot<> tls_slot_;
 };
 
 class SetResponseCodeFilter : public Http::PassThroughFilter {
