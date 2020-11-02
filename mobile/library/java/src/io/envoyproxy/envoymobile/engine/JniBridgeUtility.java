@@ -14,6 +14,11 @@ final class JniBridgeUtility {
   private JniBridgeUtility() {}
 
   public static byte[][] toJniHeaders(Map<String, List<String>> headers) {
+    // Perform no conversion on null headers.
+    if (headers == null) {
+      return null;
+    }
+
     // Create array with some room for potential headers that have more than one
     // value.
     final List<byte[]> convertedHeaders = new ArrayList<byte[]>(2 * headers.size());

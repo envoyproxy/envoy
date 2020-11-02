@@ -64,7 +64,7 @@ class JvmFilterContext {
    */
   public Object onRequestData(byte[] data, boolean endStream) {
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
-    return filter.onRequestData(dataBuffer, endStream);
+    return toJniFilterDataStatus(filter.onRequestData(dataBuffer, endStream));
   }
 
   /**
@@ -76,7 +76,7 @@ class JvmFilterContext {
   public Object onRequestTrailers(long trailerCount) {
     assert headerUtility.validateCount(trailerCount);
     final Map trailers = headerUtility.retrieveHeaders();
-    return toJniFilterHeadersStatus(filter.onRequestTrailers(trailers));
+    return toJniFilterTrailersStatus(filter.onRequestTrailers(trailers));
   }
 
   /**
@@ -101,7 +101,7 @@ class JvmFilterContext {
    */
   public Object onResponseData(byte[] data, boolean endStream) {
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
-    return filter.onResponseData(dataBuffer, endStream);
+    return toJniFilterDataStatus(filter.onResponseData(dataBuffer, endStream));
   }
 
   /**
@@ -113,7 +113,7 @@ class JvmFilterContext {
   public Object onResponseTrailers(long trailerCount) {
     assert headerUtility.validateCount(trailerCount);
     final Map trailers = headerUtility.retrieveHeaders();
-    return toJniFilterHeadersStatus(filter.onResponseTrailers(trailers));
+    return toJniFilterTrailersStatus(filter.onResponseTrailers(trailers));
   }
 
   /**
@@ -134,7 +134,8 @@ class JvmFilterContext {
       assert trailerUtility.validateCount(trailerCount);
       trailers = trailerUtility.retrieveHeaders();
     }
-    return filter.onResumeRequest(headers, dataBuffer, trailers, endStream);
+    return toJniFilterResumeStatus(
+        filter.onResumeRequest(headers, dataBuffer, trailers, endStream));
   }
 
   /**
@@ -155,7 +156,8 @@ class JvmFilterContext {
       assert trailerUtility.validateCount(trailerCount);
       trailers = trailerUtility.retrieveHeaders();
     }
-    return filter.onResumeResponse(headers, dataBuffer, trailers, endStream);
+    return toJniFilterResumeStatus(
+        filter.onResumeResponse(headers, dataBuffer, trailers, endStream));
   }
 
   /**
@@ -179,6 +181,34 @@ class JvmFilterContext {
   private static Object[] toJniFilterHeadersStatus(Object[] result) {
     assert result.length == 2;
     result[1] = toJniHeaders(result[1]);
+    return result;
+  }
+
+  private static Object[] toJniFilterDataStatus(Object[] result) {
+    if (result.length == 3) {
+      // Convert optionally-included headers on ResumeIteration.
+      result[2] = toJniHeaders(result[2]);
+      return result;
+    }
+    assert result.length == 2;
+    return result;
+  }
+
+  private static Object[] toJniFilterTrailersStatus(Object[] result) {
+    result[1] = toJniHeaders(result[1]);
+    if (result.length == 4) {
+      // Convert optionally-included headers on ResumeIteration.
+      result[2] = toJniHeaders(result[2]);
+      return result;
+    }
+    assert result.length == 2;
+    return result;
+  }
+
+  private static Object[] toJniFilterResumeStatus(Object[] result) {
+    assert result.length == 4;
+    result[1] = toJniHeaders(result[1]);
+    result[3] = toJniHeaders(result[3]);
     return result;
   }
 }
