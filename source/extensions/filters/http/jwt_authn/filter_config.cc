@@ -40,7 +40,7 @@ void FilterConfigImpl::init() {
                                Verifier::create(rule.requires(), proto_config_.providers(), *this));
       break;
     case RequirementRule::RequirementTypeCase::kRequirementName: {
-      // Use requirement_name to lookup requirment_map.
+      // Use requirement_name to lookup requirement_map.
       auto map_it = proto_config_.requirement_map().find(rule.requirement_name());
       if (map_it == proto_config_.requirement_map().end()) {
         throw EnvoyException(fmt::format("Wrong requirement_name: {}. It should be one of [{}]",
