@@ -105,9 +105,10 @@ class RequestEncoder : public virtual StreamEncoder {
 public:
   /**
    * Encode headers, optionally indicating end of stream.
-   * @param headers supplies the header map to encode. headers must have the required HTTP
-   * headers.
+   * @param headers supplies the header map to encode. Must have required HTTP headers.
    * @param end_stream supplies whether this is a header only request.
+   * @return Status indicating whether encoding succeeded. Encoding will not succeed if request
+   * headers are missing required headers.
    */
   virtual Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) PURE;
 

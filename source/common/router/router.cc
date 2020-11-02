@@ -329,6 +329,10 @@ void Filter::chargeUpstreamCode(Http::Code code,
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
+  // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers. This
+  // is validated by the filter manager.
+  ASSERT(headers.Method());
+  ASSERT(headers.Host());
   downstream_headers_ = &headers;
 
   // Extract debug configuration from filter state. This is used further along to determine whether
@@ -586,9 +590,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-
   upstream_requests_.front()->encodeHeaders(end_stream);
-
   if (end_stream) {
     onRequestComplete();
   }

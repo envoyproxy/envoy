@@ -2407,8 +2407,10 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
 
   // Invalid outbound data errors are impossible to trigger in normal processing, since bad
   // downstream data would have been rejected by the codec, and erroneous filter processing would
-  // cause a direct response by the filter manager. The old codecs will still throw an exception
-  // (that presently will be uncaught in contexts like sendLocalReply).
+  // cause a direct response by the filter manager. An invalid status is returned from new codecs
+  // which protects against future extensions or header modifications after the filter chain. The
+  // old codecs will still throw an exception (that presently will be uncaught in contexts like
+  // sendLocalReply).
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   if (testingNewCodec()) {
     EXPECT_THAT(

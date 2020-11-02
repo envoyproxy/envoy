@@ -653,26 +653,6 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
   EXPECT_THAT(status.message(), testing::HasSubstr("missing required"));
 }
 
-// TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
-//   stream_error_on_invalid_http_messaging_ = true;
-//   initialize();
-
-//   MockStreamCallbacks request_callbacks;
-//   request_encoder_->getStream().addCallbacks(request_callbacks);
-
-//   ON_CALL(client_connection_, write(_, _))
-//       .WillByDefault(
-//           Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data);
-//           }));
-
-//   EXPECT_TRUE(request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true).ok());
-//   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
-//   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
-//   auto status = server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
-//   EXPECT_TRUE(status.ok());
-//   expectDetailsResponse("http2.violation.of.messaging.rule");
-// }
-
 TEST_P(Http2CodecImplTest, TrailingHeaders) {
   initialize();
 
