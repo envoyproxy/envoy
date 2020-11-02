@@ -38,11 +38,8 @@ bring_up_example
 run_log "Interact with web socket ws -> ws"
 interact_ws 10000 ws ws
 
-run_log "Interact with web socket wss -> ws"
-interact_ws 20000 wss ws
-
 run_log "Interact with web socket wss -> wss"
-interact_ws 30000 wss wss
+interact_ws 20000 wss wss
 
 run_log "Interact with web socket wss passthrough"
-interact_ws 40000 wss wss
+interact_ws 30000 wss wss
