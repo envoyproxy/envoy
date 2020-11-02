@@ -1533,19 +1533,39 @@ void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
-  return connection_manager_.config_.tracingConfig()->operation_name_;
+  if (connection_manager_.config_.tracingConfig()) {
+    return connection_manager_.config_.tracingConfig()->operation_name_;
+  }
+
+  ENVOY_LOG(error, "tracingConfig()::operationName() called but tracing is not configured");
+  return Tracing::OperationName::Ingress;
 }
 
 const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
-  return tracing_custom_tags_.get();
+  if (connection_manager_.config_.tracingConfig()) {
+    return tracing_custom_tags_.get();
+  }
+
+  ENVOY_LOG(error, "tracingConfig()::customTags() called but tracing is not configured");
+  return nullptr;
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
-  return connection_manager_.config_.tracingConfig()->verbose_;
+  if (connection_manager_.config_.tracingConfig()) {
+    return connection_manager_.config_.tracingConfig()->verbose_;
+  }
+
+  ENVOY_LOG(error, "tracingConfig()::verbose() called but tracing is not configured");
+  return false;
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
-  return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
+  if (connection_manager_.config_.tracingConfig()) {
+    return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
+  }
+
+  ENVOY_LOG(error, "tracingConfig()::maxPathTagLength() called but tracing is not configured");
+  return Tracing::DefaultMaxPathTagLength;
 }
 
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {
