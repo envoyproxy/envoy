@@ -12,12 +12,15 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using namespace testing;
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+namespace {
 
 class TraceSegmentReporterTest : public testing::Test {
 public:
@@ -236,6 +239,7 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
   EXPECT_EQ(3U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 }
 
+} // namespace
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions

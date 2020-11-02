@@ -13,12 +13,15 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using namespace testing;
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+namespace {
 
 class TracerTest : public testing::Test {
 public:
@@ -183,6 +186,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 }
 
+} // namespace
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions

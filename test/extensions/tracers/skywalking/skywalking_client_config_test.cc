@@ -7,12 +7,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using namespace testing;
+using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+namespace {
 
 class SkyWalkingClientConfigTest : public testing::Test {
 public:
@@ -91,6 +93,7 @@ TEST_F(SkyWalkingClientConfigTest, BothLocalInfoAndClientConfigEmptyTest) {
   EXPECT_EQ(client_config_->serviceInstance(), "EnvoyProxy");
 }
 
+} // namespace
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions

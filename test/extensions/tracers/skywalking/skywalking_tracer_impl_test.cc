@@ -9,12 +9,15 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using namespace testing;
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+namespace {
 
 class SkyWalkingDriverTest : public testing::Test {
 public:
@@ -169,6 +172,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
   EXPECT_EQ(test_string, span->segmentContext()->serviceInstance());
 }
 
+} // namespace
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions

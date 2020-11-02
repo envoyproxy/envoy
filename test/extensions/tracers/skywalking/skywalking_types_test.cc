@@ -11,12 +11,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using namespace testing;
+using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+namespace {
 
 // Some constant strings for testing.
 constexpr absl::string_view TEST_SERVICE = "EnvoyIngressForTest";
@@ -334,6 +336,7 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   EXPECT_EQ(request_headers_no_upstream.get_("sw8"), expected_header_value);
 }
 
+} // namespace
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions

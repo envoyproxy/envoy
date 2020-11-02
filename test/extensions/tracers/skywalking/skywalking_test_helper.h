@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+namespace {
 
 /*
  * A simple helper class for auxiliary testing. Contains some simple static functions, such as
@@ -71,6 +72,7 @@ public:
   }
 };
 
+} // namespace
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions
