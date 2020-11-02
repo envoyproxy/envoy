@@ -60,9 +60,9 @@ In order for Envoy to terminate the WebSocket connection, the ``upgrade_configs`
 
 .. literalinclude:: _include/websocket/envoy-ws.yaml
    :language: yaml
-   :lines: 1-30
+   :lines: 1-29
    :linenos:
-   :emphasize-lines: 14-15
+   :emphasize-lines: 13-14
 
 You can start an interactive session with the socket as follows:
 
