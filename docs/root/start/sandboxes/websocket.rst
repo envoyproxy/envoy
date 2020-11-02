@@ -56,6 +56,15 @@ Step 5: Test proxying ``ws`` -> ``ws``
 The proxy listening on port ``10000`` terminates the WebSocket connection without TLS and then proxies
 to an upstream socket, also without TLS.
 
+In order for Envoy to terminate the WebSocket connection, the ``upgrades_config`` setting of the
+``HttpConnectionManager`` must be set:
+
+.. literalinclude:: _include/websocket/envoy-ws.yaml
+   :language: yaml
+   :lines: 0-30
+   :linenos:
+   :emphasize-lines: 14-15
+
 You can start an interactive session with the socket as follows:
 
 .. code-block:: console
@@ -77,6 +86,24 @@ Step 6: Test proxying ``wss`` -> ``ws``
 
 Step 7: Test proxying ``wss`` -> ``wss``
 ****************************************
+
+The proxy listening on port ``30000`` terminates the WebSocket connection with TLS and then proxies
+to an upstream TLS WebSocket.
+
+You can start an interactive session with the socket as follows:
+
+.. code-block:: console
+
+   $ docker run -ti --network=host solsson/websocat wss://localhost:30000
+   HELO
+   [wss] HELO
+   GOODBYE
+   [wss] HELO
+
+The socket server is a very trivial implementation, that simply outputs ``[wss] HELO`` in response to
+any input.
+
+Type ``Ctrl-c`` to exit the socket session.
 
 Step 8: Test proxying ``wss`` passthrough
 *****************************************
