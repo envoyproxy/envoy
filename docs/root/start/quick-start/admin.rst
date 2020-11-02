@@ -13,6 +13,11 @@ dynamic configuration can be particularly useful as it allows you to use the
 :ref:`config_dump <start_quick_start_admin_config_dump>` endpoint to see how Envoy is configured at
 a particular point in time.
 
+This guide provides configuration information, and some basic examples of using a couple of the admin
+endpoints.
+
+See the :ref:`admin docs <operations_admin_interface>` for information on all of the available endpoints.
+
 .. _start_quick_start_admin_config:
 
 ``admin``
