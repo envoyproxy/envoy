@@ -50,6 +50,24 @@ In this example, the logs are simply discarded.
 
    You may wish to restrict the network address the admin server listens to in your own deployment.
 
+
+``stats_prefix``
+----------------
+
+The Envoy ``HttpConnectionManager`` must be configured with ``stats_prefix``.
+
+This provides a key that can be filtered when querying the stats interface
+:ref:`as shown below <start_quick_start_admin_stats>`
+
+In the :download:`envoy-demo.yaml <_include/envoy-demo.yaml>` the listener is configured with the
+``stats_prefix`` of ``ingress_http``.
+
+.. literalinclude:: _include/envoy-demo.yaml
+    :language: yaml
+    :linenos:
+    :lines: 1-29
+    :emphasize-lines: 13-14
+
 .. _start_quick_start_admin_config_dump:
 
 Admin endpoints: ``config_dump``
@@ -195,6 +213,9 @@ You can also pass a ``format`` argument, for example to return ``json``:
 .. code-block:: console
 
    $ curl -s "http://localhost:19000/stats?filter=http.ingress_http.rq&format=json" | jq '.'
+
+.. code-block:: json
+
    {
      "stats": [
        {
