@@ -115,6 +115,24 @@ std::string ConfigHelper::tcpProxyConfig() {
 )EOF");
 }
 
+std::string ConfigHelper::startTlsConfig() {
+  return absl::StrCat(tcpProxyConfig(), fmt::format(R"EOF(
+      transport_socket:
+        name: "starttls"
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
+          max_cleartext_bytes: 100
+          cleartext_socket_config:
+          tls_socket_config:
+            common_tls_context:
+              tls_certificates:
+                certificate_chain:
+                  filename: {}
+                private_key:
+                  filename: {}
+)EOF", TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"), TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
+}
+
 std::string ConfigHelper::tlsInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.tls_inspector"

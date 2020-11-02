@@ -42,6 +42,7 @@ public:
   }
   void onConnected() override {}
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool startSecureTransport() override {RELEASE_ASSERT(false, ""); return false; }     
 };
 } // namespace
 

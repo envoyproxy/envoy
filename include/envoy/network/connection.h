@@ -307,6 +307,10 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  virtual std::string transportProtocol() const PURE;
+
+  virtual bool startSecureTransport() PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

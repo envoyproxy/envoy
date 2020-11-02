@@ -44,5 +44,5 @@ message StartTlsConfig {
   // exchanged in the initial clear-text phase and when that number
   // exceeds this configuration value, the connection is terminated.
   // Value of zero means no limit. Defaults to zero.
-  google.protobuf.UInt32Value max_cleartext_bytes = 3;
+  uint32 max_cleartext_bytes = 3;
 }

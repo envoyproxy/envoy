@@ -95,6 +95,7 @@ public:
    */
   virtual bool healthCheckFailed() PURE;
 
+  virtual Network::ConnectionHandler& connectionHandler() PURE; 
   /**
    * @return the server's hot restarter.
    */

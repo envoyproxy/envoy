@@ -90,6 +90,8 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override;
+std::string transportProtocol() const override;
+  bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
@@ -159,15 +161,15 @@ protected:
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
   Event::FileEventPtr file_event_;
+  void onFileEvent(uint32_t events);
+  void onReadReady();
+  void onWriteReady();
 
 private:
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 
-  void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
-  void onReadReady();
-  void onWriteReady();
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
 

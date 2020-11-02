@@ -239,6 +239,7 @@ public:
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   Random::RandomGenerator& random() override { return *random_generator_; }
+  Network::ConnectionHandler& connectionHandler() override {return *handler_;}
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }

@@ -1191,6 +1191,34 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "start_tls_integration_proto",
+    srcs = [":start_tls_integration_test.proto"],
+)
+
+envoy_cc_test(
+    name = "start_tls_integration_test",
+    srcs = [
+        "start_tls_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":start_tls_integration_proto_cc_proto",
+        ":integration_lib",
+        "//test/test_common:registry_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/starttls:config",
+        #"@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        #"@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        #"@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        #"@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        #"@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        #"@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "tcp_tunneling_integration_test",
     srcs = [

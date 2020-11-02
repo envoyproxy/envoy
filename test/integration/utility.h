@@ -172,6 +172,7 @@ class ConnectionStatusCallbacks : public Network::ConnectionCallbacks {
 public:
   bool connected() const { return connected_; }
   bool closed() const { return closed_; }
+  void reset() { connected_ = false; closed_ = false; }
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {

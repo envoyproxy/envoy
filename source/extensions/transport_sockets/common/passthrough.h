@@ -22,6 +22,7 @@ public:
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+bool startSecureTransport() override {RELEASE_ASSERT(false, ""); return false; }     
 
 protected:
   Network::TransportSocketPtr transport_socket_;

@@ -21,6 +21,8 @@ public:
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  // This method must never be called for RawBufferSocket
+  bool startSecureTransport() override {RELEASE_ASSERT(false, ""); return false; }
 
 private:
   TransportSocketCallbacks* callbacks_{};

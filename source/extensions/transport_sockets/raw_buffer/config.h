@@ -24,7 +24,7 @@ class UpstreamRawBufferSocketFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public RawBufferSocketFactory {
 public:
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+ Network::TransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 };
