@@ -24,7 +24,8 @@ the administration server.
 The ``address`` key specifies the listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
 which in the demo configuration is ``0.0.0.0:9901``.
 
-You must set the ``access_log_path``, which in  this example are simply discarded.
+You must set the ``access_log_path`` to specify where to send access logs, which in this example are
+simply discarded.
 
 .. code-block:: yaml
 
