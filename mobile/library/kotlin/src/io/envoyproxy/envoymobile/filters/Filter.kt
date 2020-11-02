@@ -54,7 +54,7 @@ internal class EnvoyHTTPFilterAdapter(
         is FilterDataStatus.Continue<*> -> arrayOf(result.status, result.data)
         is FilterDataStatus.StopIterationAndBuffer<*> -> arrayOf(result.status, data)
         is FilterDataStatus.StopIterationNoBuffer<*> -> arrayOf(result.status, data)
-        is FilterDataStatus.ResumeIteration<*> -> arrayOf(result.status, result.headers?.headers, result.data)
+        is FilterDataStatus.ResumeIteration<*> -> arrayOf(result.status, result.data, result.headers?.headers)
       }
     }
     return arrayOf(0, data)
@@ -67,7 +67,7 @@ internal class EnvoyHTTPFilterAdapter(
         is FilterDataStatus.Continue<*> -> arrayOf(result.status, result.data)
         is FilterDataStatus.StopIterationAndBuffer<*> -> arrayOf(result.status, data)
         is FilterDataStatus.StopIterationNoBuffer<*> -> arrayOf(result.status, data)
-        is FilterDataStatus.ResumeIteration<*> -> arrayOf(result.status, result.headers?.headers, result.data)
+        is FilterDataStatus.ResumeIteration<*> -> arrayOf(result.status, result.data, result.headers?.headers)
       }
     }
     return arrayOf(0, data)
@@ -79,7 +79,7 @@ internal class EnvoyHTTPFilterAdapter(
       return when (result) {
         is FilterTrailersStatus.Continue<*, *> -> arrayOf(result.status, result.trailers.headers)
         is FilterTrailersStatus.StopIteration<*, *> -> arrayOf(result.status, trailers)
-        is FilterTrailersStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.headers?.headers, result.data, result.trailers.headers)
+        is FilterTrailersStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.trailers.headers, result.headers?.headers, result.data)
       }
     }
     return arrayOf(0, trailers)
@@ -91,7 +91,7 @@ internal class EnvoyHTTPFilterAdapter(
       return when (result) {
         is FilterTrailersStatus.Continue<*, *> -> arrayOf(result.status, result.trailers.headers)
         is FilterTrailersStatus.StopIteration<*, *> -> arrayOf(result.status, trailers)
-        is FilterTrailersStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.headers?.headers, result.data, result.trailers.headers)
+        is FilterTrailersStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.trailers.headers, result.headers?.headers, result.data)
       }
     }
     return arrayOf(0, trailers)
