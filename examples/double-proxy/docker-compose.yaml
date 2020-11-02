@@ -27,8 +27,6 @@ services:
         aliases:
           - postgres
       postgres-in-between:
-        aliases:
-          - proxy-postgres-frontend.example.com
 
   proxy-postgres-backend:
     build:
