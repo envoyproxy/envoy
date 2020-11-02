@@ -230,15 +230,18 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
+  // Save the request headers for later modification if needed.
+  if (config_->forwardBearerToken()) {
+    request_headers_ = &headers;
+  }
+
   // If a bearer token is supplied as a header or param, we ingest it here and kick off the
   // user resolution immediately. Note this comes after HMAC validation, so technically this
   // header is sanitized in a way, as the validation check forces the correct Bearer Cookie value.
   access_token_ = extractAccessToken(headers);
   if (!access_token_.empty()) {
     found_bearer_token_ = true;
-    request_headers_ = &headers;
     finishFlow();
-
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -327,7 +330,9 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   validator_->setParams(headers, config_->tokenSecret());
   if (validator_->isValid()) {
     config_->stats().oauth_success_.inc();
-    setBearerToken(headers, validator_->token());
+    if (config_->forwardBearerToken() && !validator_->token().empty()) {
+      setBearerToken(headers, validator_->token());
+    }
     return true;
   }
 
@@ -373,7 +378,9 @@ void OAuth2Filter::finishFlow() {
   // We have fully completed the entire OAuth flow, whether through Authorization header or from
   // user redirection to the auth server.
   if (found_bearer_token_) {
-    setBearerToken(*request_headers_, access_token_);
+    if (config_->forwardBearerToken()) {
+      setBearerToken(*request_headers_, access_token_);
+    }
     config_->stats().oauth_success_.inc();
     decoder_callbacks_->continueDecoding();
     return;
