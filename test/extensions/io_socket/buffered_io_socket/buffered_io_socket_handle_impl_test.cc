@@ -2,7 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
-#include "common/network/buffered_io_socket_handle_impl.h"
+#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
 

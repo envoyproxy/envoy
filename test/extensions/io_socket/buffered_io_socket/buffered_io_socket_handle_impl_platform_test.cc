@@ -1,7 +1,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
 
-#include "common/network/buffered_io_socket_handle_impl.h"
+#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
 

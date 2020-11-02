@@ -10,7 +10,7 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
-#include "common/event/user_space_file_event_impl.h"
+#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/network/peer_buffer.h"
 

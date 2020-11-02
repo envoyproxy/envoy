@@ -481,13 +481,3 @@ envoy_cc_library(
         "//source/common/common:empty_string",
     ],
 )
-
-envoy_cc_library(
-    name = "buffered_io_socket_handle_lib",
-    srcs = ["buffered_io_socket_handle_impl.cc"],
-    hdrs = ["buffered_io_socket_handle_impl.h"],
-    deps = [
-        "default_socket_interface_lib",
-        ":peer_buffer_lib",
-    ],
-)
