@@ -1,8 +1,8 @@
 #include "extensions/transport_sockets/starttls/config.h"
 
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.h"
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "common/config/utility.h"
 
@@ -16,26 +16,26 @@ namespace StartTls {
 Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
-  const auto& outer_config =
-      MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&>(
-          message, context.messageValidationVisitor());
+  const auto& outer_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&>(
+      message, context.messageValidationVisitor());
 
   auto& raw_socket_config_factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::DownstreamTransportSocketConfigFactory>("raw_buffer");
 
   Network::TransportSocketFactoryPtr raw_socket_factory =
-      raw_socket_config_factory.createTransportSocketFactory(
-          outer_config.cleartext_socket_config() /* *wrapped_socket_config_proto_for_factory */, context, server_names);
+      raw_socket_config_factory.createTransportSocketFactory(outer_config.cleartext_socket_config(),
+                                                             context, server_names);
 
   auto& tls_socket_config_factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::DownstreamTransportSocketConfigFactory>("tls");
 
   Network::TransportSocketFactoryPtr tls_socket_factory =
-      tls_socket_config_factory.createTransportSocketFactory(
-          outer_config.tls_socket_config() /* *wrapped_socket_config_proto_for_factory */, context, server_names);
+      tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),
+                                                             context, server_names);
 
-  return std::make_unique<ServerStartTlsSocketFactory>(outer_config, server_names, std::move(raw_socket_factory),
-                                                       std::move(tls_socket_factory));
+  return std::make_unique<ServerStartTlsSocketFactory>(
+      outer_config, server_names, std::move(raw_socket_factory), std::move(tls_socket_factory));
 }
 
 ProtobufTypes::MessagePtr DownstreamStartTlsSocketFactory::createEmptyConfigProto() {

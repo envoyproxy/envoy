@@ -10,18 +10,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace StartTls {
 
-/*
-class StartTlsSocketConfigFactory
-    : public virtual Server::Configuration::TransportSocketConfigFactory {
-public:
-  ~StartTlsSocketConfigFactory() override = default;
-  std::string name() const override { return TransportSocketNames::get().StartTls; }
-};
-*/
-
 class DownstreamStartTlsSocketFactory
-    : public Server::Configuration::DownstreamTransportSocketConfigFactory/*,
-      public StartTlsSocketConfigFactory */{
+    : public Server::Configuration::DownstreamTransportSocketConfigFactory {
 public:
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
