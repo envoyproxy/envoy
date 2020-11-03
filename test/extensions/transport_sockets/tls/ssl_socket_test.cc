@@ -2600,11 +2600,11 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
+  EXPECT_CALL(*server_read_filter, onNewConnection());
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         Buffer::OwnedImpl data("hello");
-        server_connection->write(data, false);
-        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        server_connection->write(data, true);
       }));
 
   EXPECT_CALL(*client_read_filter, onNewConnection())
@@ -2616,10 +2616,14 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         return Network::FilterStatus::StopIteration;
       }));
+  EXPECT_CALL(*server_read_filter, onData(_, true));
 
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        dispatcher_->exit();
+      }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
