@@ -36,7 +36,7 @@ services:
       postgres-backend:
       postgres-in-between:
         aliases:
-          - proxy-postgres-backend.example.com
+        - proxy-postgres-backend.example.com
 
   postgres:
     image: postgres:latest
