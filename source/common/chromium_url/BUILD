@@ -26,6 +26,6 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/common/common:mem_block_builder_lib"
+        "//source/common/common:mem_block_builder_lib",
     ],
 )

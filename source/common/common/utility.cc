@@ -11,9 +11,9 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/mem_block_builder.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
+#include "common/common/mem_block_builder.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/container/node_hash_map.h"
@@ -508,7 +508,7 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
   const auto intervals = remove_characters.toVector();
   std::vector<absl::string_view> pieces;
   pieces.reserve(intervals.size());
-  for (const auto & [ left_bound, right_bound ] : intervals) {
+  for (const auto& [left_bound, right_bound] : intervals) {
     if (left_bound != pos) {
       ASSERT(right_bound <= str.size());
       pieces.push_back(str.substr(pos, left_bound - pos));
