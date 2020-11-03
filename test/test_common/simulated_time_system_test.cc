@@ -202,7 +202,7 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   // is delayed since it is rescheduled with a non-zero delta.
   advanceMsAndLoop(5);
   if (activateMode() == ActivateMode::DelayActivateTimers) {
-    if constexpr (isEventTypeLevelLike(Event::PlatformDefaultTriggerType)) {
+    if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
       // Force it to run again to pick up next iteration callbacks.
       // The event loop runs for a single iteration in NonBlock mode on Windows as a hack to work
       // around LEVEL trigger fd registrations constantly firing events and preventing the NonBlock
@@ -252,7 +252,7 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
   // re-enabled with a non-zero timeout.
   advanceMsAndLoop(5);
   if (activateMode() == ActivateMode::DelayActivateTimers) {
-    if constexpr (isEventTypeLevelLike(Event::PlatformDefaultTriggerType)) {
+    if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
       // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run
       // again to pick up next iteration callbacks.
       advanceMsAndLoop(0);
