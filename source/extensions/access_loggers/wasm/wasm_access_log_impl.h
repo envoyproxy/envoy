@@ -44,11 +44,13 @@ public:
   }
 
   ~WasmAccessLog() override {
-    tls_slot_->runOnAllThreads([plugin = plugin_](WasmHandle& handle) {
-      if (handle.wasm()) {
-        handle.wasm()->startShutdown(plugin);
-      }
-    });
+    if (tls_slot_->currentThreadRegistered()) {
+      tls_slot_->runOnAllThreads([plugin = plugin_](WasmHandle& handle) {
+        if (handle.wasm()) {
+          handle.wasm()->startShutdown(plugin);
+        }
+      });
+    }
   }
 
 private:

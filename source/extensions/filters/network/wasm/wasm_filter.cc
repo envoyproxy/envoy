@@ -34,11 +34,13 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::
 }
 
 FilterConfig::~FilterConfig() {
-  tls_slot_->runOnAllThreads([plugin = plugin_](WasmHandle& handle) {
-    if (handle.wasm()) {
-      handle.wasm()->startShutdown(plugin);
-    }
-  });
+  if (tls_slot_->currentThreadRegistered()) {
+    tls_slot_->runOnAllThreads([plugin = plugin_](WasmHandle& handle) {
+      if (handle.wasm()) {
+        handle.wasm()->startShutdown(plugin);
+      }
+    });
+  }
 }
 
 } // namespace Wasm

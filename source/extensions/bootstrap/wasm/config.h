@@ -26,7 +26,7 @@ public:
       : plugin_(plugin), tls_slot_(std::move(tls_slot)) {}
 
   virtual ~WasmService() {
-    if (!singleton_) {
+    if (!singleton_ && tls_slot_->currentThreadRegistered()) {
       tls_slot_->runOnAllThreads([plugin = plugin_](WasmHandle& handle) {
         if (handle.wasm()) {
           handle.wasm()->startShutdown(plugin);
