@@ -37,7 +37,7 @@ extensions/filters/common/original_src @snowp @klarose
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # tls transport socket extension
-/*/extensions/transport_sockets/tls @PiotrSikora @lizan @asraa
+/*/extensions/transport_sockets/tls @PiotrSikora @lizan @asraa @ggreenway
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
 # common transport socket
@@ -55,7 +55,7 @@ extensions/filters/common/original_src @snowp @klarose
 # postgres_proxy extension
 /*/extensions/filters/network/postgres_proxy @fabriziomello @cpakulski @dio
 # quic extension
-/*/extensions/quic_listeners/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin
+/*/extensions/quic_listeners/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # zookeeper_proxy extension
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
@@ -125,7 +125,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/retry/host @snowp @alyssawilk
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
 /*/extensions/filters/network/ext_authz @gsagula @dio
-/*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher
+/*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
 /*/extensions/filters/network/echo @htuch @alyssawilk
 /*/extensions/filters/udp/dns_filter @abaptiste @mattklein123
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
