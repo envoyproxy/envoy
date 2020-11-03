@@ -76,7 +76,7 @@ public:
    *
    * @param disable true if the stream should be read disabled, false otherwise.
    * @return returns true if the disable is performed, false otherwise
-             (e.g. if the connection is closed)
+   *         (e.g. if the connection is closed)
    */
   virtual bool readDisable(bool disable) PURE;
 
@@ -121,7 +121,7 @@ public:
    * @param config the tunneling config, if doing connect tunneling.
    * @param context the load balancing context for this connection.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
-   * @return may be null
+   * @return may be null if there is no cluster with the given name.
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(const std::string& cluster_name, Upstream::ClusterManager& cm,
