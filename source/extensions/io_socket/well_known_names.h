@@ -27,7 +27,7 @@ public:
   const std::string BufferedIoSocket = "buffered_io_socket";
 };
 
-using IoSocketShortNameValues = ConstSingleton<IoSocketShortNameValues>;
+using IoSocketShortNames = ConstSingleton<IoSocketShortNameValues>;
 
 } // namespace IoSocket
 } // namespace Extensions
