@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "common/grpc/google_async_client_cache.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -52,9 +53,10 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    auto async_client_cache_singleton = getAsyncClientCacheSingleton(context);
-    auto async_client_cache =
-        async_client_cache_singleton->getOrCreateAsyncClientCache(context, proto_config);
+    auto async_client_cache_singleton = Grpc::getAsyncClientCacheSingleton(context);
+    auto async_client_cache = async_client_cache_singleton->getOrCreateAsyncClientCache(
+        context.clusterManager().grpcAsyncClientManager(), context.scope(), context.threadLocal(),
+        proto_config.grpc_service());
     callback = [async_client_cache, filter_config, timeout_ms, proto_config,
                 transport_api_version = proto_config.transport_api_version()](
                    Http::FilterChainFactoryCallbacks& callbacks) {
@@ -104,15 +106,6 @@ ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
  */
 REGISTER_FACTORY(ExtAuthzFilterConfig,
                  Server::Configuration::NamedHttpFilterConfigFactory){"envoy.ext_authz"};
-
-SINGLETON_MANAGER_REGISTRATION(google_grpc_async_client_cache);
-
-Filters::Common::ExtAuthz::AsyncClientCacheSingletonSharedPtr
-getAsyncClientCacheSingleton(Server::Configuration::FactoryContext& context) {
-  return context.singletonManager().getTyped<Filters::Common::ExtAuthz::AsyncClientCacheSingleton>(
-      SINGLETON_MANAGER_REGISTERED_NAME(google_grpc_async_client_cache),
-      [] { return std::make_shared<Filters::Common::ExtAuthz::AsyncClientCacheSingleton>(); });
-}
 
 } // namespace ExtAuthz
 } // namespace HttpFilters

@@ -34,9 +34,6 @@ private:
       ProtobufMessage::ValidationVisitor& validator) override;
 };
 
-Filters::Common::ExtAuthz::AsyncClientCacheSingletonSharedPtr
-getAsyncClientCacheSingleton(Server::Configuration::FactoryContext& context);
-
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions
