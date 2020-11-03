@@ -35,9 +35,12 @@ FilterConfigPerRoute::FilterConfigPerRoute(
 ResponseMapFilter::ResponseMapFilter(ResponseMapFilterConfigSharedPtr config)
     : config_(config) {}
 
+/*
+ * Get FilterConfigPerRoute if one exists for the current route.
+ */
 const FilterConfigPerRoute*
 ResponseMapFilter::getRouteSpecificConfig(void) {
-  const auto& route = decoder_callbacks_->route();
+  const auto& route = encoder_callbacks_->route();
   if (route == nullptr) {
     return nullptr;
   }
@@ -51,24 +54,55 @@ ResponseMapFilter::getRouteSpecificConfig(void) {
   return per_route_config;
 }
 
+/*
+ * Called if there are any downstream headers to decode from the client or a previous filter.
+ *
+ * Not guaranteed to be called. In particular, if Envoy sends a local reply with HTTP 426
+ * as an upgrade response for HTTP/1.0 requests, we may never decode any of the client's
+ * original headers, because the request was rejected at the initial HTTP/1.0 line.
+ */
 Http::FilterHeadersStatus ResponseMapFilter::decodeHeaders(Http::RequestHeaderMap& request_headers,
                                                            bool end_stream) {
   ENVOY_LOG(trace, "response map filter: decodeHeaders with end_stream = {}", end_stream);
 
-  response_map_ = config_->response_map();
+  // Save a pointer to the request headers. We need to pass them to the response_map_
+  // matcher in encodeHeaders later.
   request_headers_ = &request_headers;
+  return Http::FilterHeadersStatus::Continue;
+}
 
-  // Find per-route config if it exists.
+/**
+ * Called if there are any response headers to encode from the upstream or a later filter.
+ *
+ * Not guaranteed to be called, since it is theoretically possible for something to go wrong
+ * in the HTTP codec on the request path that means it isn't necessary or desirable to provide
+ * an HTTP response (which would otherwise contain headers).
+ */
+Http::FilterHeadersStatus ResponseMapFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                           bool end_stream) {
+  ENVOY_LOG(trace,
+      "response map filter: encodeHeaders with http status = {}, end_stream = {}",
+      headers.getStatusValue(), end_stream);
+
+  // Save a pointer to the response headers. We need to pass them to the response_map_
+  // rewriter later.
+  response_headers_ = &headers;
+
+  // Default to using the response map from the global filter config. If there's
+  // per-route config, use its response map, if set.
+  response_map_ = config_->response_map();
+
+  // Find per-route config if it exists...
   const FilterConfigPerRoute* per_route_config = getRouteSpecificConfig();
   if (per_route_config != nullptr) {
-    // Possibly disable the response map entirely if set in the per-route config.
+    // ...and disable the filter, if set...
     if (per_route_config->disabled()) {
       ENVOY_LOG(trace, "response map filter: disabling due to per_route_config");
       disabled_ = true;
       return Http::FilterHeadersStatus::Continue;
     }
 
-    // Use a per-route response_map if it exists.
+    // ...or use a per-route response map, if set.
     const ResponseMap::ResponseMapPtr* response_map = per_route_config->response_map();
     if (response_map != nullptr) {
       ENVOY_LOG(trace, "response map filter: using per_route_config response map");
@@ -76,35 +110,23 @@ Http::FilterHeadersStatus ResponseMapFilter::decodeHeaders(Http::RequestHeaderMa
     }
   }
 
-  return Http::FilterHeadersStatus::Continue;
-}
-
-Http::FilterHeadersStatus ResponseMapFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                                           bool end_stream) {
-  ENVOY_LOG(trace,
-      "response map filter: encodeHeaders with http status = {}, end_stream = {}, disabled = {}",
-      headers.getStatusValue(), end_stream, disabled_);
-
-  // If this filter is disabled, continue without doing anything.
-  if (disabled_) {
+  // This should be impossible, because we only set response_map_ to the
+  // global filter config (guaranteed to exist if this filter exists)
+  // or to a non-null per-route config. Guard against it anyway.
+  if (response_map_ == nullptr) {
+    ENVOY_LOG(trace,
+        "response map filter: no response_map_ to match with, do_rewrite_ remains false");
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Save a reference to the response headers. If we end up rewriting the response,
-  // we'll need to set the content-length (and possibly other) headers later.
-  response_headers_ = &headers;
-
-  // The reponse_map_ pointer should have been set in decodeHeaders.
-  ASSERT(response_map_ != nullptr);
+  // Use the response_map_ to match on the request/response pair...
   const ResponseMap::ResponseMapPtr& response_map = *response_map_;
+  do_rewrite_ = response_map->match(
+      request_headers_, headers, encoder_callbacks_->streamInfo());
+  ENVOY_LOG(trace,
+      "response map filter: used response_map_, do_rewrite_ = {}", do_rewrite_);
 
-  // Check whether we should rewrite this response based on response headers.
-  do_rewrite_ = response_map->match(request_headers_, headers, encoder_callbacks_->streamInfo());
-
-  ENVOY_LOG(trace, "response map filter: do_rewrite_ {}", do_rewrite_);
-
-  // If we decided not to rewrite the response, simply pass through to other
-  // filters.
+  // ...and if we decided not to do a rewrite, simply pass through to other filters.
   if (!do_rewrite_) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -117,16 +139,13 @@ Http::FilterHeadersStatus ResponseMapFilter::encodeHeaders(Http::ResponseHeaderM
   }
 
   // Now that the stream is complete, rewrite the response body.
+  ENVOY_LOG(trace, "response map filter: encodeHeaders doing rewrite");
   doRewrite();
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus ResponseMapFilter::encodeData(Buffer::Instance& data,
                                                      bool end_stream) {
-  ENVOY_LOG(trace,
-      "response map filter: encodeData with data length {}, end_stream = {}, disabled = {}",
-      data.length(), end_stream, disabled_);
-
   // If this filter is disabled, continue without doing anything.
   if (disabled_) {
     return Http::FilterDataStatus::Continue;
@@ -151,6 +170,7 @@ Http::FilterDataStatus ResponseMapFilter::encodeData(Buffer::Instance& data,
   }
 
   // Now that the stream is complete, rewrite the response body.
+  ENVOY_LOG(trace, "response map filter: encodeData doing rewrite");
   doRewrite();
   return Http::FilterDataStatus::Continue;
 }
@@ -173,8 +193,15 @@ void ResponseMapFilter::doRewrite(void) {
   // if we did see a response, we should have drained any data we saw.
   ASSERT(encoding_buffer == nullptr || encoding_buffer->length() == 0);
 
-  // The reponse_map_ pointer should have been set in decodeHeaders.
-  ASSERT(response_map_ != nullptr);
+  // This should be impossible, because we only set response_map_ to the
+  // global filter config (guaranteed to exist if this filter exists)
+  // or to a non-null per-route config. Guard against it anyway.
+  if (response_map_ == nullptr) {
+    ENVOY_LOG(trace,
+        "response map filter: doRewrite has no response_map_ to rewrite with, doing nothing");
+    return;
+  }
+
   const ResponseMap::ResponseMapPtr& response_map = *response_map_;
 
   // Fill in new_body and new_content_type using the response map rewrite.
