@@ -56,8 +56,8 @@ curl -s http://localhost:19000/config_dump \
     | grep '"address": "service1"'
 
 run_log "Edit resource.go"
-sed -i s/service1/service2/ resource.go
-sed -i s/\"1\",/\"2\",/ resource.go
+sed -i'.bak' s/service1/service2/ resource.go
+sed -i'.bak' s/\"1\",/\"2\",/ resource.go
 
 run_log "Bring back up the control plane"
 docker-compose up --build -d go-control-plane

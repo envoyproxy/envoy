@@ -234,11 +234,6 @@ public:
    * @return bool whether the transport socket will use proxy protocol options.
    */
   virtual bool usesProxyProtocolOptions() const PURE;
-
-  /**
-   * Check whether matched transport socket which required to use secret information is available.
-   */
-  virtual bool isReady() const PURE;
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

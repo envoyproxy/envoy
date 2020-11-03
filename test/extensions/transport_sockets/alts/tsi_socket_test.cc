@@ -408,7 +408,6 @@ TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {
 
 TEST_F(TsiSocketFactoryTest, UsesProxyProtocolOptions) {
   EXPECT_FALSE(socket_factory_->usesProxyProtocolOptions());
-  EXPECT_TRUE(socket_factory_->isReady());
 }
 
 } // namespace

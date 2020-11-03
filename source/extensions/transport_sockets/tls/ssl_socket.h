@@ -106,12 +106,10 @@ public:
   ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
 
-  // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
-  bool isReady() const override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
@@ -137,7 +135,6 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
-  bool isReady() const override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
