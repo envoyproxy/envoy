@@ -134,7 +134,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
 
-  // Some tests try to read without initializing the file_event.
+  // Some tests try to write without initializing the file_event.
   if (result.wouldBlock() && file_event_) {
     file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
   }
@@ -410,7 +410,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 
   if (result.rc_ <= 0) {
     auto io_result = sysCallResultToIoCallResult(result);
-    if (io_result.wouldBlock() && file_event_) {
+  if (io_result.wouldBlock() && file_event_) {
       file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
     }
     return io_result;

@@ -1152,8 +1152,6 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
 
   // Randomly write 1-20 bytes and read 1-30 bytes per loop.
   for (int i = 0; i < 50; ++i) {
-    NiceMock<Api::MockOsSysCalls> os_sys_calls;
-    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     // The bytes to read this loop.
     int bytes_to_write = rand.random() % 20 + 1;
     // The bytes buffered at the beginning of this loop.

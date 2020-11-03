@@ -13,8 +13,6 @@ public:
   }
   ~TestThreadsafeSingletonInjector() { ThreadSafeSingleton<T>::instance_ = latched_instance_; }
 
-  T* get_latched_instance() { return latched_instance_; }
-
 private:
   T* latched_instance_;
 };
