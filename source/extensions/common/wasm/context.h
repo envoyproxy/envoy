@@ -425,6 +425,7 @@ protected:
 
   // HTTP filter state.
   bool http_request_started_ = false; // When decodeHeaders() is called the request is "started".
+  bool http_local_response_sent_ = false; // indicates if the local response is sent
   Http::RequestHeaderMap* request_headers_{};
   Http::ResponseHeaderMap* response_headers_{};
   ::Envoy::Buffer::Instance* request_body_buffer_{};
