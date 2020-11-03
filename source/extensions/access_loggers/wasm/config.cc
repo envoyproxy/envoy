@@ -36,24 +36,11 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
   auto access_log = std::make_shared<WasmAccessLog>(plugin, nullptr, std::move(filter));
 
   auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
-    auto tls_slot = context.threadLocal().allocateSlot();
-
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    tls_slot->set(
-        [base_wasm,
-         plugin](Event::Dispatcher& dispatcher) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
-          if (!base_wasm) {
-            // There is no way to prevent the connection at this point. The user could choose to use
-            // an HTTP Wasm plugin and only handle onLog() which would correctly close the
-            // connection in onRequestHeaders().
-            if (!plugin->fail_open_) {
-              ENVOY_LOG(critical, "Plugin configured to fail closed failed to load");
-            }
-            return nullptr;
-          }
-          return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(
-              Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher));
-        });
+    auto tls_slot = ThreadLocal::TypedSlot<WasmHandle>::makeUnique(context.threadLocal());
+    tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
+      return Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher);
+    });
     access_log->setTlsSlot(std::move(tls_slot));
   };
 

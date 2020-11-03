@@ -27,8 +27,8 @@ public:
 
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
-    if (tls_slot_->get()) {
-      wasm = tls_slot_->getTyped<WasmHandle>().wasm().get();
+    if (tls_slot_->get().wasm()) {
+      wasm = tls_slot_->get().wasm().get();
     }
     if (plugin_->fail_open_ && (!wasm || wasm->isFailed())) {
       return nullptr;
@@ -42,7 +42,7 @@ public:
 private:
   uint32_t root_context_id_{0};
   Envoy::Extensions::Common::Wasm::PluginSharedPtr plugin_;
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::TypedSlotPtr<WasmHandle> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 

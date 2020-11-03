@@ -5,9 +5,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Wasm {
 
+using Envoy::Extensions::Common::Wasm::WasmHandle;
+
 FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context)
-    : tls_slot_(context.threadLocal().allocateSlot()) {
+    : tls_slot_(ThreadLocal::TypedSlot<WasmHandle>::makeUnique(context.threadLocal())) {
   plugin_ = std::make_shared<Common::Wasm::Plugin>(
       config.config().name(), config.config().root_id(), config.config().vm_config().vm_id(),
       config.config().vm_config().runtime(),
@@ -17,15 +19,9 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::
   auto plugin = plugin_;
   auto callback = [plugin, this](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    tls_slot_->set(
-        [base_wasm,
-         plugin](Event::Dispatcher& dispatcher) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
-          if (!base_wasm) {
-            return nullptr;
-          }
-          return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(
-              Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher));
-        });
+    tls_slot_->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
+      return Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher);
+    });
   };
 
   if (!Common::Wasm::createWasm(
@@ -38,13 +34,11 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::
 }
 
 FilterConfig::~FilterConfig() {
-  if (tls_slot_->currentThreadRegistered() && tls_slot_->get()) {
-    tls_slot_->runOnAllThreads([plugin = plugin_](ThreadLocal::ThreadLocalObjectSharedPtr object)
-                                   -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      object->asType<WasmHandle>().wasm()->startShutdown(plugin);
-      return object;
-    });
-  }
+  tls_slot_->runOnAllThreads([plugin = plugin_](WasmHandle& handle) {
+    if (handle.wasm()) {
+      handle.wasm()->startShutdown(plugin);
+    }
+  });
 }
 
 } // namespace Wasm

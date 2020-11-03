@@ -43,10 +43,9 @@ void WasmFactory::createWasm(const envoy::extensions::wasm::v3::WasmService& con
     }
     // Per-thread WASM VM.
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    auto tls_slot = context.threadLocal().allocateSlot();
+    auto tls_slot = ThreadLocal::TypedSlot<WasmHandle>::makeUnique(context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(
-          Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher));
+      return Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher);
     });
     cb(std::make_unique<WasmService>(plugin, std::move(tls_slot)));
   };

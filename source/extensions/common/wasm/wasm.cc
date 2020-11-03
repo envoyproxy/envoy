@@ -478,6 +478,14 @@ WasmHandleSharedPtr getOrCreateThreadLocalWasm(const WasmHandleSharedPtr& base_w
                                                const PluginSharedPtr& plugin,
                                                Event::Dispatcher& dispatcher,
                                                CreateContextFn create_root_context_for_testing) {
+  if (!base_wasm || !base_wasm->wasm()) {
+    if (!plugin->fail_open_) {
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
+                          "Plugin configured to fail closed failed to load");
+    }
+    // ThreadLocalObject cannot be nullptr, so create a WasmHandle holding nullptr.
+    return std::make_shared<WasmHandle>(nullptr);
+  }
   return std::static_pointer_cast<WasmHandle>(proxy_wasm::getOrCreateThreadLocalWasm(
       std::static_pointer_cast<WasmHandle>(base_wasm), plugin,
       getCloneFactory(getWasmExtension(), dispatcher, create_root_context_for_testing)));
