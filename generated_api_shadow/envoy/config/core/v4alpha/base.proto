@@ -289,7 +289,7 @@ message HeaderValue {
           "envoy.config.core.v3.HeaderValue.ValueFormat.Tokenized";
 
       // Headers used as tokens when composing the tokenized string: this may be useful
-      // when one wishes to add a series of headers (e.g. headers containing info useful for debuggin purposes)
+      // when one wishes to add a series of headers (e.g. headers containing info useful for debugging purposes)
       // but wants to avoid the overhead that comes with a large number of additional headers.
       // The value of a header that uses a tokenized formatter is derived from the specified tokens, so when
       // using :ref:`tokenized format <envoy_api_msg_config.core.v4alpha.HeaderValue.ValueFormat.Tokenized>`,
