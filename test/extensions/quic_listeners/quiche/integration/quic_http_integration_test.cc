@@ -526,6 +526,7 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
 }
 
 TEST_P(QuicHttpIntegrationTest, RequestResponseWithTrailers) {
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   testTrailers(/*request_size=*/10, /*response_size=*/10, /*request_trailers_present=*/true,
                /*response_trailers_present=*/true);
 }

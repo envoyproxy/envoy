@@ -366,13 +366,13 @@ TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
 }
 
 TEST_P(EnvoyQuicClientStreamTest, ResetStream) {
-  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
 TEST_P(EnvoyQuicClientStreamTest, ReceiveResetStream) {
-  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
   quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
       quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
   EXPECT_TRUE(quic_stream_->rst_received());

@@ -241,12 +241,12 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
-  runResetCallbacks(quicRstErrorToEnvoyResetReason(frame.error_code));
+  runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
 }
 
 void EnvoyQuicServerStream::Reset(quic::QuicRstStreamErrorCode error) {
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
-  runResetCallbacks(quicRstErrorToEnvoyResetReason(error));
+  runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error));
   quic::QuicSpdyServerStreamBase::Reset(error);
 }
 
