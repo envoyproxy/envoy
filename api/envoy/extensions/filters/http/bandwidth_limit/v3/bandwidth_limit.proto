@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.bandwidth_limit.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/http_status.proto";
+import "envoy/type/v3/token_bucket.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3";
+option java_outer_classname = "LocalRateLimitProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Bandwidth limit]
+// Local Rate limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
+// [#extension: envoy.filters.http.bandwidth_limit]
+
+// [#next-free-field: 6]
+message BandwidthLimit {
+  // Defines the mode for the bandwidth limit filter. 
+  enum Enable_Mode {
+      // Filter is disabled.
+      Disabled = 0;
+      // Filter enabled for Ingress traffic only.
+      IngressOnly = 1;
+      // Filter enabled for Egress traffic only.
+      EgressOnly = 2;
+      // Filter enabled for both Ingress and Egress traffic.
+      IngressAndEgress = 3;
+  }
+
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The limit supplied in KiB/s.
+  //
+  // .. note::
+  //   It's fine for limit_kbps to be unset for the global configuration since the bandwidth limit
+  //   can be applied at a the virtual host or route level. Thus, the limit_kbps must be set for the
+  //   per route configuration otherwise the config will be rejected.
+  //
+  // .. note::
+  //   When using per route configuration, the limit becomes unique to that route.
+  //
+  uint64 limit_kbps = 2 [(validate.rules).uint64 = {gte: 1}];
+
+  // Optional key to use for tokenizing per route/vhost. If not specified, a default value will be used.
+  string token_key = 3 [(validate.rules).string = {min_len: 1}];
+
+  // If set, the bandwidth limit will be applied only when total dataplane bandwidth usage crosses this
+  // value. Defaults to 0 means disable limits are always applied.
+  uint64 enable_threshold_kbps = 4 [(validate.rules).uint64 = {gte: 1}];
+
+  // The enable mode for the bandwidth limit filter.
+  // Default is Disabled.
+  Enable_Mode enable_mode = 5 [(validate.rules).enum = {defined_only: true}];;
+}
