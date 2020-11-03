@@ -410,7 +410,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 
   if (result.rc_ <= 0) {
     auto io_result = sysCallResultToIoCallResult(result);
-  if (io_result.wouldBlock() && file_event_) {
+    if (io_result.wouldBlock() && file_event_) {
       file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
     }
     return io_result;
