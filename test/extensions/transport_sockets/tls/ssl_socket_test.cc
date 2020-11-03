@@ -2584,6 +2584,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->enableHalfClose(true);
   client_connection->addReadFilter(client_read_filter);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
@@ -2595,6 +2596,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
             stream_info_);
+        server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
@@ -2608,14 +2610,15 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   EXPECT_CALL(*client_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), false))
+  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), true))
       .WillOnce(Invoke([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
         read_buffer.drain(read_buffer.length());
-        return Network::FilterStatus::Continue;
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        return Network::FilterStatus::StopIteration;
       }));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -2665,6 +2668,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->enableHalfClose(true);
   client_connection->addReadFilter(client_read_filter);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
@@ -2676,10 +2680,10 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
             stream_info_);
+        server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
-
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         Buffer::OwnedImpl data("hello");
@@ -2694,14 +2698,15 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   EXPECT_CALL(*client_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), false))
+  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), true))
       .WillOnce(Invoke([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
         read_buffer.drain(read_buffer.length());
-        return Network::FilterStatus::Continue;
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        return Network::FilterStatus::StopIteration;
       }));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
