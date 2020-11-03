@@ -1,10 +1,12 @@
 name: Build envoy docs and deploy with github pages
 
 on:
-  push:
-    branches: [ zh ]
-  pull_request:
-    branches: [ zh ]
+  schedule:
+  - cron: "*/20 * * * *"
+#   push:
+#     branches: [ zh ]
+#   pull_request:
+#     branches: [ zh ]
     
 jobs:
   
@@ -21,5 +23,5 @@ jobs:
     - name: Deploy
       uses: peaceiris/actions-gh-pages@v3
       with:
-        personal_token: ${{ secrets.PERSONAL_TOKEN }}
+        deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
         publish_dir: ./generated/docs
