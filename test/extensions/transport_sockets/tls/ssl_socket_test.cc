@@ -4541,7 +4541,6 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_FALSE(client_cfg->isReady());
 
   ContextManagerImpl manager(time_system_);
-
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
@@ -5749,15 +5748,6 @@ TEST_P(SslSocketTest, TestConnectionFailsOnMultipleCertificatesNonePassOcspPolic
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
-}
-
-TEST_P(SslSocketTest, ClientSocketFactoryIsReadyTest) {
-  ContextManagerImpl manager(time_system_);
-  Stats::TestUtil::TestStore stats_store;
-  auto client_cfg = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
-  EXPECT_CALL(*client_cfg, isSecretReady()).WillOnce(Return(true));
-  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
-  EXPECT_TRUE(client_ssl_socket_factory.isReady());
 }
 
 } // namespace Tls

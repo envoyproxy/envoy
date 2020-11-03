@@ -123,10 +123,6 @@ bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
   return transport_socket_factory_->implementsSecureTransport();
 }
 
-bool UpstreamProxyProtocolSocketFactory::isReady() const {
-  return transport_socket_factory_->isReady();
-}
-
 } // namespace ProxyProtocol
 } // namespace TransportSockets
 } // namespace Extensions
