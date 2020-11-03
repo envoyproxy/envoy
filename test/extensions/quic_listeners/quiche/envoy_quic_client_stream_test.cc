@@ -175,9 +175,9 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
           EXPECT_EQ(more_response_body, buffer.toString());
           EXPECT_EQ(false, finished_reading);
         }));
-    quic::QuicStreamFrame frame(stream_id_, true, offset,
-                                absl::StrCat(bodyToStreamPayload(more_response_body),
-                                             spdyHeaderToHttp3StreamPayload(spdy_trailers_)));
+    std::string payload = absl::StrCat(bodyToStreamPayload(more_response_body),
+                                       spdyHeaderToHttp3StreamPayload(spdy_trailers_));
+    quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
     quic_stream_->OnStreamFrame(frame);
   } else {
     quic_stream_->OnStreamHeaderList(
