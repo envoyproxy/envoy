@@ -141,7 +141,7 @@ void AuthenticatorImpl::startVerify() {
 
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
   ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-  const Status status = jwt_->parseFromString(curr_token_->token());
+  Status status = jwt_->parseFromString(curr_token_->token());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -163,24 +163,9 @@ void AuthenticatorImpl::startVerify() {
     }
   }
 
-  // TODO(qiwzhang): Cross-platform-wise the below unix_timestamp code is wrong as the
-  // epoch is not guaranteed to be defined as the unix epoch. We should use
-  // the abseil time functionality instead or use the jwt_verify_lib to check
-  // the validity of a JWT.
-  // Check "exp" claim.
-  const uint64_t unix_timestamp =
-      std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
-          .count();
-  // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
-  // to 0.
-  if (jwt_->nbf_ > unix_timestamp) {
-    doneWithStatus(Status::JwtNotYetValid);
-    return;
-  }
-  // If the exp claim does *not* appear in the JWT then the exp field is defaulted
-  // to 0.
-  if (jwt_->exp_ > 0 && jwt_->exp_ < unix_timestamp) {
-    doneWithStatus(Status::JwtExpired);
+  status = jwt_->verifyTimeConstraint();
+  if (status != Status::Ok) {
+    doneWithStatus(status);
     return;
   }
 
@@ -247,7 +232,8 @@ void AuthenticatorImpl::onDestroy() {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  const Status status = ::google::jwt_verify::verifyJwt(*jwt_, *jwks_data_->getJwksObj());
+  const Status status =
+      ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
