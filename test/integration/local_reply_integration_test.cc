@@ -432,7 +432,7 @@ mappers:
         key: useful-info
         value_format:
           tokenized:
-            headers:
+            tokens:
               - key: response-flags
                 value: "%RESPONSE_FLAGS%"
               - key: response-code-details

@@ -415,7 +415,6 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   EXPECT_EQ(content_type_, "text/plain");
 }
 
-// Test addition of tokenized headers to local reply
 TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
   const std::string yaml = R"(
     mappers:
@@ -431,7 +430,7 @@ TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
             key: tokenized-foo-1
             value_format:
               tokenized:     
-                headers:
+                tokens:
                   - key: foo-1
                     value: bar1
                   - key: foo-2
@@ -441,7 +440,7 @@ TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
             key: tokenized-foo-2
             value_format:
               tokenized:
-                headers:
+                tokens:
                   - key: foo-3
                     value: bar3
                   - key: foo-4
@@ -451,7 +450,7 @@ TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
             key: tokenized-foo-3
             value_format:
               tokenized:
-                headers:
+                tokens:
                   - key: foo-5
                     value: bar5
                   - key: foo-6
@@ -477,7 +476,6 @@ TEST_F(LocalReplyTest, TestTokenizedHeadersAddition) {
   ASSERT_EQ(out[1]->value().getStringView(), "foo-5;bar5,foo-6;bar6");
 }
 
-// Test addition of headers and tokenized headers to local reply
 TEST_F(LocalReplyTest, TestHeadersAndTokenizedHeadersAddition) {
   const std::string yaml = R"(
     mappers:
@@ -497,7 +495,7 @@ TEST_F(LocalReplyTest, TestHeadersAndTokenizedHeadersAddition) {
             key: tokenized-foo
             value_format:
               tokenized:
-                headers:
+                tokens:
                   - key: foo-1
                     value: bar1
                   - key: foo-2
@@ -516,7 +514,6 @@ TEST_F(LocalReplyTest, TestHeadersAndTokenizedHeadersAddition) {
   EXPECT_EQ(response_headers_.get_("tokenized-foo"), "foo-1;bar1,foo-2;bar2");
 }
 
-// Test tokenized header exceeding max allowed size
 TEST_F(LocalReplyTest, TestPreventTokenizedHeadersThatExceedMaxSize) {
   std::string long_key(3000, 'k');
   std::string long_value(5000, 'v');
@@ -535,7 +532,7 @@ TEST_F(LocalReplyTest, TestPreventTokenizedHeadersThatExceedMaxSize) {
             key: tokenized-foo
             value_format:
               tokenized:
-                headers:
+                tokens:
                   - key: foo-1
                     value: bar1
                   - key: foo-2
@@ -552,14 +549,14 @@ TEST_F(LocalReplyTest, TestPreventTokenizedHeadersThatExceedMaxSize) {
         ->mutable_header()
         ->mutable_value_format()
         ->mutable_tokenized()
-        ->mutable_headers(i)
+        ->mutable_tokens(i)
         ->set_key(long_key);
     config_.mutable_mappers(0)
         ->mutable_headers_to_add(0)
         ->mutable_header()
         ->mutable_value_format()
         ->mutable_tokenized()
-        ->mutable_headers(i)
+        ->mutable_tokens(i)
         ->set_value(long_value);
   }
 
@@ -567,8 +564,7 @@ TEST_F(LocalReplyTest, TestPreventTokenizedHeadersThatExceedMaxSize) {
                             "exceeded max allowed size for tokenized header 'tokenized-foo'");
 }
 
-// Test that only either one of plain header value or formatted value is supported
-TEST_F(LocalReplyTest, TestEitherPlainOrFormatedHeaderValueIsSupported) {
+TEST_F(LocalReplyTest, TestPreventTokenizedValueFormatAndValue) {
   const std::string yaml = R"(
     mappers:
     - filter:
@@ -584,7 +580,7 @@ TEST_F(LocalReplyTest, TestEitherPlainOrFormatedHeaderValueIsSupported) {
             value: plain-foo
             value_format:
               tokenized:
-                headers:
+                tokens:
                   - key: foo-1
                     value: bar1
                   - key: foo-2
@@ -594,12 +590,13 @@ TEST_F(LocalReplyTest, TestEitherPlainOrFormatedHeaderValueIsSupported) {
           append: false
 )";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYaml(yaml, config_), EnvoyException,
-      "Unable to parse JSON as proto.*oneof field 'specifier' is already set.*");
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      Factory::create(config_, context_), EnvoyException,
+      "unsupported 'value' configuration for tokenized header 'tokenized-foo'");
 }
 
-// Test that nested tokenized headers are prevented
 TEST_F(LocalReplyTest, TestPreventNestedTokenizedHeaders) {
   const std::string yaml = R"(
     mappers:
@@ -615,13 +612,13 @@ TEST_F(LocalReplyTest, TestPreventNestedTokenizedHeaders) {
             key: tokenized-foo
             value_format:
               tokenized:
-                headers:
+                tokens:
                   - key: foo-1
                     value: bar1
                   - key: foo-2
                     value_format:
                       tokenized:
-                        headers:
+                        tokens:
                           - key: nested-foo
                             value: nested-bar              
                   - key: foo-3

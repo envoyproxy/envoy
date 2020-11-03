@@ -1026,7 +1026,7 @@ TEST(TokenizedHeaderParserTest, TokenizedHeadersAreCorrectlyEvaluated) {
     header_value_option->mutable_header()
         ->mutable_value_format()
         ->mutable_tokenized()
-        ->mutable_headers()
+        ->mutable_tokens()
         ->CopyFrom(headers);
 
     std::string hint = fmt::format("for test case with number: {}", test_case.number_);

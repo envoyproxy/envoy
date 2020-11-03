@@ -57,8 +57,6 @@ public:
       : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context.runtime(),
                                                     context.api().randomGenerator(),
                                                     context.messageValidationVisitor())) {
-    validateHeadersToAddConfiguration(config.headers_to_add());
-
     if (config.has_status_code()) {
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
@@ -102,38 +100,11 @@ public:
   }
 
 private:
-  static const int HeaderMaxSize = 16384;
   const AccessLog::FilterPtr filter_;
   absl::optional<Http::Code> status_code_;
   absl::optional<std::string> body_;
   HeaderParserPtr header_parser_;
   BodyFormatterPtr body_formatter_;
-
-  void validateHeadersToAddConfiguration(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>&
-          headers_to_add) {
-    for (const auto& header_value_option : headers_to_add) {
-      const envoy::config::core::v3::HeaderValue header = header_value_option.header();
-
-      if (header.has_value_format() && header.value_format().has_tokenized()) {
-        int total_size = 0;
-        for (const auto& tokenized_header : header.value_format().tokenized().headers()) {
-          // error out in case of nested tokenized headers
-          if (tokenized_header.has_value_format() &&
-              tokenized_header.value_format().has_tokenized()) {
-            throw EnvoyException(fmt::format("unsupported nested tokenized headers for '{}'",
-                                             tokenized_header.key()));
-          }
-          // error out in case max allowed size for header is exceeded
-          total_size += tokenized_header.key().size() + tokenized_header.value().size();
-          if (total_size > HeaderMaxSize) {
-            throw EnvoyException(
-                fmt::format("exceeded max allowed size for tokenized header '{}'", header.key()));
-          }
-        }
-      }
-    }
-  }
 };
 
 using ResponseMapperPtr = std::unique_ptr<ResponseMapper>;

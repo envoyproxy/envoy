@@ -229,14 +229,44 @@ HeaderFormatterPtr createTokenizedHeaderFormatter(
 
   return std::make_unique<TokenizedHeaderFormatter>(std::move(formatters), append);
 }
+
+void validateHeadersToAddConfiguration(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add) {
+  static const int HeaderMaxSize = 16384;
+  for (const auto& header_value_option : headers_to_add) {
+    const envoy::config::core::v3::HeaderValue header = header_value_option.header();
+
+    if (header.has_value_format() && header.value_format().has_tokenized()) {
+      // error out if both tokenized format and value are configured
+      if (header.value().size() > 0) {
+        throw EnvoyException(fmt::format(
+            "unsupported 'value' configuration for tokenized header '{}'", header.key()));
+      }
+
+      int total_size = 0;
+      for (const auto& token : header.value_format().tokenized().tokens()) {
+        // error out in case of nested tokenized headers
+        if (token.has_value_format() && token.value_format().has_tokenized()) {
+          throw EnvoyException(
+              fmt::format("unsupported nested tokenized headers for '{}'", token.key()));
+        }
+        // error out in case max allowed size for tokenized header is exceeded
+        total_size += token.key().size() + token.value().size();
+        if (total_size > HeaderMaxSize) {
+          throw EnvoyException(
+              fmt::format("exceeded max allowed size for tokenized header '{}'", header.key()));
+        }
+      }
+    }
+  }
+}
+
 } // namespace
 
 HeaderParserPtr HeaderParser::configure(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add) {
+  validateHeadersToAddConfiguration(headers_to_add);
 
-  // go through each header to add and
-  // check if it has a normal formatter, then proceed with current flow
-  // if it has a tokenized formatter, then use a new branch of the code to create a formatter
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
@@ -245,7 +275,7 @@ HeaderParserPtr HeaderParser::configure(
 
     if (header.has_value_format() && header.value_format().has_tokenized()) {
       HeaderFormatterPtr header_formatter =
-          createTokenizedHeaderFormatter(header.value_format().tokenized().headers(), append);
+          createTokenizedHeaderFormatter(header.value_format().tokenized().tokens(), append);
       header_parser->tokenized_headers_to_add_.emplace_back(std::make_pair(
           Http::LowerCaseString(header.key()), HeadersToAddEntry{std::move(header_formatter), ""}));
     } else {
