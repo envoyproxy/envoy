@@ -16,7 +16,7 @@ feature of the API, which is most useful for simple requirements. For more compl
     :maxdepth: 3
 
     install
-    quick-start
+    quick-start/index
     docker
     building
 
