@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
@@ -11,6 +9,8 @@ load(
 )
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@kafka_pip3//:requirements.bzl", "requirement")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
