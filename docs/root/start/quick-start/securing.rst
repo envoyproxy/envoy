@@ -25,7 +25,7 @@ Machines connecting to Envoy to proxy traffic are "downstream" to Envoy.
 
 Specifying a TLS context that clients can connect to is done using a ``DownstreamTLSContext``:
 
-.. literalinclude::
+.. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
    :linenos:
    :lines: 27-34
@@ -33,7 +33,7 @@ Specifying a TLS context that clients can connect to is done using a ``Downstrea
 
 Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSContext``:
 
-.. literalinclude::
+.. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
    :linenos:
    :lines: 106-111
