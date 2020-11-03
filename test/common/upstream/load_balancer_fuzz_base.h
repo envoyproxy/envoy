@@ -22,8 +22,8 @@ public:
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
-  void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
-  void
+  virtual void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
+  virtual void
   updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
                                const uint32_t num_degraded_hosts, const uint32_t num_excluded_hosts,
                                const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring);
@@ -33,10 +33,9 @@ public:
   // and lb_->chooseHost().
   void prefetch();
   void chooseHost();
-  ~LoadBalancerFuzzBase() = default;
   void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
 
-  void clearStaticHostsHealthFlags();
+  virtual void clearStaticHostsState();
 
   // These public objects shared amongst all types of load balancers will be used to construct load
   // balancers in specific load balancer fuzz classes
@@ -45,12 +44,14 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Random::PsuedoRandomGenerator64 random_;
   NiceMock<MockPrioritySet> priority_set_;
-  std::unique_ptr<LoadBalancerBase> lb_;
+  std::unique_ptr<LoadBalancer> lb_;
 
-private:
+  virtual ~LoadBalancerFuzzBase() = default;
+
+protected:
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
-  void
+  virtual void
   initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
                            const uint8_t priority_level, uint16_t& port);
 
@@ -58,6 +59,7 @@ private:
   // random uint64 against this number.
   uint8_t num_priority_levels_ = 0;
 
+private:
   // This map used when updating health flags - making sure the health flags are updated hosts in
   // localities Key - index of host within full host list, value - locality level host at index is
   // in
