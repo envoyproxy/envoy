@@ -3237,6 +3237,7 @@ TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   init_helper_.addCluster(cluster1);
 
   NiceMock<MockClusterMockPrioritySet> cluster2;
+  cluster2.info_->name_ = "cluster2";
   ON_CALL(cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster2);
 
@@ -3249,6 +3250,8 @@ TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   init_helper_.startInitializingSecondaryClusters();
 
   NiceMock<MockClusterMockPrioritySet> cluster3;
+  cluster3.info_->name_ = "cluster3";
+
   ON_CALL(cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   EXPECT_CALL(cluster3, initialize(_));
   init_helper_.addCluster(cluster3);
