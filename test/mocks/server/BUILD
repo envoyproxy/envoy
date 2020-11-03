@@ -23,6 +23,7 @@ envoy_cc_mock(
     hdrs = ["admin.h"],
     deps = [
         "//include/envoy/server:admin_interface",
+        "//test/mocks/network:socket_mocks",
         "//test/mocks/server:config_tracker_mocks",
     ],
 )
