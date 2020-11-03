@@ -408,7 +408,7 @@ private:
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
   std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
   std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
-   std::chrono::milliseconds snapshot_time_;
+  std::chrono::milliseconds snapshot_time_;
 };
 
 } // namespace Server
