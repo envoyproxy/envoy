@@ -55,6 +55,23 @@ struct JwtAuthnFilterStats {
 };
 
 /**
+ * The per-route filter config
+ */
+class PerRouteFilterConfig : public Envoy::Router::RouteSpecificFilterConfig {
+public:
+  PerRouteFilterConfig(
+      const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config)
+      : config_(config) {}
+
+  const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& config() const {
+    return config_;
+  }
+
+private:
+  const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig config_;
+};
+
+/**
  * The filter config interface. It is an interface so that we can mock it in tests.
  */
 class FilterConfig {
@@ -68,6 +85,10 @@ public:
   // Finds the matcher that matched the header
   virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                        const StreamInfo::FilterState& filter_state) const PURE;
+
+  // Finds the verifier based on per-route config. If fail, pair.second has the error message.
+  virtual std::pair<const Verifier*, std::string>
+  findPerRouteVerifier(const PerRouteFilterConfig& per_route) const PURE;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
@@ -123,6 +144,9 @@ public:
     return nullptr;
   }
 
+  std::pair<const Verifier*, std::string>
+  findPerRouteVerifier(const PerRouteFilterConfig& per_route) const override;
+
   // methods for AuthFactory interface. Factory method to help create authenticators.
   AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
                           const absl::optional<std::string>& provider, bool allow_failed,
@@ -168,6 +192,10 @@ private:
   std::string filter_state_name_;
   // The filter state verifier map from filter_state_rules.
   absl::flat_hash_map<std::string, VerifierConstPtr> filter_state_verifiers_;
+  // The requirement_name to verifier map.
+  absl::flat_hash_map<std::string, VerifierConstPtr> name_verifiers_;
+  // all requirement_names for debug
+  std::string all_requirement_names_;
   TimeSource& time_source_;
   Api::Api& api_;
 };
