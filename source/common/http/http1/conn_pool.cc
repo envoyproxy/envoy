@@ -90,10 +90,10 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
     parent_.codec_client_->close();
   } else {
     auto* pool = &parent_.parent();
-    parent_.parent().dispatcher_.post([pool]() -> void { pool->onUpstreamReady(); });
+    pool->dispatcher_.post([pool]() -> void { pool->onUpstreamReady(); });
     parent_.stream_wrapper_.reset();
 
-    parent_.parent().checkForDrained();
+    pool->checkForDrained();
   }
 }
 
