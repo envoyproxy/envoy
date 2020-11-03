@@ -185,12 +185,3 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test(
-    name = "google_async_client_cache_test",
-    srcs = ["google_async_client_cache_test.cc"],
-    deps = [
-        "//source/common/grpc:google_async_client_cache",
-        "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:global_lib",
-    ],
-)
