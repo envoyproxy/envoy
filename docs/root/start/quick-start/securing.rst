@@ -7,12 +7,17 @@ Securing Envoy
 Envoy provides a number of features to secure traffic in and out of your network, and
 between proxies and services within your network.
 
+TLS can be used to secure ``HTTP`` traffic and other ``HTTP``-based traffic, such as WebSockets.
+
+Envoy also has support for terminating other types of TLS traffic (such as ``SMTP``) and for
+transmitting generic ``TCP`` over ``TLS`` between proxies.
+
 .. warning::
 
    The following guide takes you through individual aspects of securing traffic.
 
    To secure traffic over a network that is untrusted, you are strongly advised to make
-   use of SNI *and* mTLS wherever you control both endpoints or where these protocols are available.
+   use of SNI *and* mTLS wherever you control both sides of the connection or where these protocols are available.
 
    The examples presented here use insecure certificates for demonstration purposes.
 
@@ -28,16 +33,18 @@ Specifying a TLS context that clients can connect to is done using a ``Downstrea
 .. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
    :linenos:
+   :lineno-start: 27
    :lines: 27-34
    :emphasize-lines: 5
 
 Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSContext``:
 
-.. literalinclude:: _include/envoy-demo-tls.yaml
+.. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
    :linenos:
-   :lines: 106-111
-   :emphasize-lines: 5
+   :lineno-start: 30
+   :lines: 30-37
+   :emphasize-lines: 3-5
 
 Secure an endpoint with SNI
 ---------------------------
