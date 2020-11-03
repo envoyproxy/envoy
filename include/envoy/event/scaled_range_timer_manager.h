@@ -57,7 +57,7 @@ public:
   // Test-only functions that need access to the internals of
   // ScaledTimerMinimum. These are declared here but only defined in tests.
   friend bool operator==(const ScaledTimerMinimum&, const ScaledTimerMinimum&);
-  friend void PrintTo(const ScaledTimerMinimum&, std::ostream*);
+  friend std::ostream& operator<<(std::ostream&, const ScaledTimerMinimum&);
 };
 
 /**

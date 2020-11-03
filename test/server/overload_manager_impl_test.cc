@@ -64,17 +64,18 @@ bool operator==(const ScaledTimerMinimum& lhs, const ScaledTimerMinimum& rhs) {
       static_cast<const Variant&>(lhs));
 }
 
-void PrintTo(const ScaledMinimum& minimum, std::ostream* output) {
-  (*output) << "ScaledMinimum { scale_factor_ = " << minimum.scale_factor_ << " }";
+void printTo(std::ostream& output, const ScaledMinimum& minimum) {
+  output << "ScaledMinimum { scale_factor_ = " << minimum.scale_factor_ << " }";
 }
-void PrintTo(const AbsoluteMinimum& minimum, std::ostream* output) {
-  (*output) << "AbsoluteMinimum { value = " << minimum.value_.count() << "ms }";
+void printTo(std::ostream& output, const AbsoluteMinimum& minimum) {
+  output << "AbsoluteMinimum { value = " << minimum.value_.count() << "ms }";
 }
 
-void PrintTo(const ScaledTimerMinimum& minimum, std::ostream* output) {
+std::ostream& operator<<(std::ostream& output, const ScaledTimerMinimum& minimum) {
   using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
-  absl::visit([&](const auto& minimum) { PrintTo(minimum, output); },
+  absl::visit([&](const auto& minimum) { printTo(output, minimum); },
               static_cast<const Variant&>(minimum));
+  return output;
 }
 
 } // namespace Event
