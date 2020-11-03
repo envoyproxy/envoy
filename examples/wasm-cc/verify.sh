@@ -30,7 +30,7 @@ run_log "Check for the compiled update"
 ls -l lib/*updated*wasm
 
 run_log "Edit the Docker recipe to use the updated binary"
-sed -i s/\\.\\/lib\\/envoy_filter_http_wasm_example.wasm/.\\/lib\\/envoy_filter_http_wasm_updated_example.wasm/ Dockerfile-proxy
+sed -i'.bak' s/\\.\\/lib\\/envoy_filter_http_wasm_example.wasm/.\\/lib\\/envoy_filter_http_wasm_updated_example.wasm/ Dockerfile-proxy
 
 run_log "Bring the proxy back up"
 docker-compose up --build -d proxy
