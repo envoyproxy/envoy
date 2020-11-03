@@ -43,10 +43,8 @@ public:
 
   /**
    * @return the time in milliseconds when the snapshot was created.
-   *
-   * Stores converted timestamp here to avoid repeated conversions for every metric.
    */
-  virtual int64_t snapshotTimeMs() const PURE;
+  virtual std::chrono::milliseconds snapshotTime() const PURE;
 };
 
 /**

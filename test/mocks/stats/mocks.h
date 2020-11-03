@@ -280,13 +280,13 @@ public:
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
 
-  int64_t snapshotTimeMs() const override { return snapshot_time_ms_; }
+  std::chrono::milliseconds snapshotTime() const override { return snapshot_time_; }
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;
   std::vector<std::reference_wrapper<const ParentHistogram>> histograms_;
   std::vector<std::reference_wrapper<const TextReadout>> text_readouts_;
-  int64_t snapshot_time_ms_;
+  std::chrono::milliseconds snapshot_time_;
 };
 
 class MockSink : public Sink {

@@ -174,9 +174,8 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
     text_readouts_.push_back(*text_readout);
   }
 
-  snapshot_time_ms_ = std::chrono::duration_cast<std::chrono::milliseconds>(
-                          time_source.systemTime().time_since_epoch())
-                          .count();
+  snapshot_time_ = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          time_source.systemTime().time_since_epoch());
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,

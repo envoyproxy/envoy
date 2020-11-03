@@ -397,7 +397,7 @@ public:
   const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
     return text_readouts_;
   }
-  int64_t snapshotTimeMs() const override { return snapshot_time_ms_; }
+  std::chrono::milliseconds snapshotTime() const override { return snapshot_time_; }
 
 private:
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
@@ -408,8 +408,7 @@ private:
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
   std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
   std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
-  // We store converted timestamp here to avoid repeated conversions for every metric.
-  int64_t snapshot_time_ms_;
+   std::chrono::milliseconds snapshot_time_;
 };
 
 } // namespace Server
