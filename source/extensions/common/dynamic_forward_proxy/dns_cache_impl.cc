@@ -55,7 +55,7 @@ DnsCacheImpl::LoadDnsCacheEntryResult
 DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                 LoadDnsCacheEntryCallbacks& callbacks) {
   ENVOY_LOG(debug, "thread local lookup for host '{}'", host);
-  ThreadLocalHostInfo& tls_host_info = tls_slot_.get().value();
+  ThreadLocalHostInfo& tls_host_info = *tls_slot_;
   auto tls_host = tls_host_info.host_map_->find(host);
   if (tls_host != tls_host_info.host_map_->end()) {
     ENVOY_LOG(debug, "thread local hit for host '{}'", host);

@@ -65,7 +65,7 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
 }
 
 int ThreadLocalState::getGlobalRef(uint64_t slot) {
-  LuaThreadLocal& tls = tls_slot_->get().value();
+  LuaThreadLocal& tls = **tls_slot_;
   ASSERT(tls.global_slots_.size() > slot);
   return tls.global_slots_[slot];
 }
