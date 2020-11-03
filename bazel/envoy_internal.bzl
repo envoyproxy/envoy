@@ -7,9 +7,6 @@ def envoy_copts(repository, test = False):
     posix_options = [
         "-Wall",
         "-Wextra",
-        "-Wno-sign-compare",
-        "-Wno-unused-variable",
-        "-Wno-unused-parameter",
         "-Werror",
         "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
