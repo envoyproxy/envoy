@@ -115,15 +115,15 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
+  if (data_to_write > 0) {
+    // Try to write as much as we can if there is pending data.
+    transport_socket_->doWrite(*write_buffer_, type == ConnectionCloseType::NoFlush ||
+                                                   !transport_socket_->canFlushClose());
+  }
+
   const bool delayed_close_timeout_set = delayed_close_timeout_.count() > 0;
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
       !transport_socket_->canFlushClose()) {
-    if (data_to_write > 0) {
-      // We aren't going to wait to flush, but try to write as much as we can if there is pending
-      // data.
-      transport_socket_->doWrite(*write_buffer_, true);
-    }
-
     if (type == ConnectionCloseType::FlushWriteAndDelay && delayed_close_timeout_set) {
       // The socket is being closed and either there is no more data to write or the data can not be
       // flushed (!transport_socket_->canFlushClose()). Since a delayed close has been requested,
