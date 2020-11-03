@@ -11,6 +11,7 @@
 #include "test/test_common/printers.h"
 
 #include "gtest/gtest.h"
+#include "src/proto/grpc/health/v1/health.pb.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -106,19 +107,38 @@ TEST(GrpcCodecTest, decodeInvalidFrame) {
   EXPECT_EQ(size, buffer.length());
 }
 
-TEST(GrpcCodecTest, decodeInvalidFrameMakeSureNoFramesDecoded) {
-  std::string data(
-      "\000\000\000\000\000\000\000\000\000\000\000\000\000\00000000000000000000000000000000000\000"
-      "\000\000\000\000\000\000\000\000\000\000\000\000c_r000\000\000\000\000\000\000\000",
-      72);
-  std::vector<uint8_t> chunk(data.begin(), data.end());
+// A frame of nothing followed by a frame of 0's followed then invalid
+TEST(GrpcCodecTest, decodeNullByteFrameWithInvalidFrameAfterward) {
+  const std::string data("\000\000\000\000\0000000", 9);
   Buffer::OwnedImpl buffer(data.data(), data.size());
   std::vector<Frame> frames;
   Decoder decoder;
   ENVOY_LOG_MISC(trace, "Buffer: {}", buffer.toString());
   EXPECT_FALSE(decoder.decode(buffer, frames));
-  // TODO: This shouldn't happen. When the decoder doesn't successfully decode, it should not put
-  // anything in frames.
+  // When the decoder doesn't successfully decode, it puts valid frames up until
+  // an invalid frame into output frame vector.
+  EXPECT_NE(0, frames.size());
+}
+
+// If there is valid frames followed by an invalid frame, the decoder will succesfully put the valid
+// frame in the output and return false due to the invalid frame
+TEST(GrpcCodecTest, decodeValidFramesWithInvalidFrameAfterward) {
+  // Decode a valid encoded structured response plus invalid data afterward
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
+  const auto data = Grpc::Common::serializeToGrpcFrame(response);
+  std::vector<uint8_t> buffer_vector = std::vector<uint8_t>(data->length(), 0);
+  data->copyOut(0, data->length(), &buffer_vector[0]);
+  for (size_t i = 0; i < 6; i++) {
+    buffer_vector.push_back(48); // Represents ASCII Character of 0
+  }
+  Buffer::OwnedImpl buffer(buffer_vector.data(), buffer_vector.size());
+  std::vector<Frame> frames;
+  Decoder decoder;
+  ENVOY_LOG_MISC(trace, "Buffer: {}", buffer.toString());
+  EXPECT_FALSE(decoder.decode(buffer, frames));
+  // When the decoder doesn't successfully decode, it puts valid frames up until
+  // an invalid frame into output frame vector.
   EXPECT_NE(0, frames.size());
 }
 

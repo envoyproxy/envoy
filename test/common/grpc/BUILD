@@ -55,6 +55,9 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "codec_test",
     srcs = ["codec_test.cc"],
+    external_deps = [
+        "grpc_health_proto",
+    ],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
