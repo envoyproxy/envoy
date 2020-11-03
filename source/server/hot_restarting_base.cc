@@ -37,7 +37,7 @@ sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std:
   initDomainSocketAddress(&address);
   Network::Address::PipeInstance addr(fmt::format(socket_path + "_{}_{}", role, base_id_ + id),
                                       socket_mode, nullptr);
-  SAFE_MEMCPY(address, addr.getSockAddr());
+  SAFE_MEMCPY(&address, &(addr.getSockAddr()));
   fchmod(my_domain_socket_, socket_mode);
 
   return address;

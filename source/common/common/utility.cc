@@ -11,6 +11,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/mem_block_builder.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/singleton/const_singleton.h"
@@ -43,7 +44,7 @@ const std::string errorDetails(int error_code) {
 #ifndef WIN32
   // clang-format off
   return strerror(error_code);
-  // clang-format on
+// clang-format on
 #else
   // Windows error codes do not correspond to POSIX errno values
   // Use FormatMessage, strip trailing newline, and return "Unknown error" on failure (as on POSIX).
@@ -507,7 +508,7 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
   const auto intervals = remove_characters.toVector();
   std::vector<absl::string_view> pieces;
   pieces.reserve(intervals.size());
-  for (const auto& [left_bound, right_bound] : intervals) {
+  for (const auto & [ left_bound, right_bound ] : intervals) {
     if (left_bound != pos) {
       ASSERT(right_bound <= str.size());
       pieces.push_back(str.substr(pos, left_bound - pos));
@@ -569,7 +570,8 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
 
 InlineString::InlineString(const char* str, size_t size) : size_(size) {
   RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
-  memcpy(data_, str, size);
+  MemBlockBuilder<char> mem_builder(data_, size);
+  mem_builder.appendData(absl::Span<char>(const_cast<char*>(str), size));
 }
 
 void ExceptionUtil::throwEnvoyException(const std::string& message) {
