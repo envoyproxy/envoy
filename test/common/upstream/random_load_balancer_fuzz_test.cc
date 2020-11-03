@@ -26,6 +26,7 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RandomLoadBalancerTestCase& in
         input.load_balancer_test_case().common_lb_config());
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException; {}", e.what());
+    load_balancer_fuzz.clearStaticHostsState();
     return;
   }
 
