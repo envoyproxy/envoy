@@ -40,6 +40,7 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
     // running. We should add support for this scenario, even though the
     // probability of it occurring is low.
     // TODO(kbaichoo): Implement a configurable call to sleep
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     break;
   }
   case FatalAction::Status::AlreadyRanOnThisThread:
@@ -47,7 +48,7 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
     // It can't be the the same signal since the bit would be saturated and when
     // we return from the handler we'll have restored the default signal handler
     // to exit the process.
-    std::cerr << "Our FatalActions triggered a different fatal signal.\n";
+    std::cerr << "Our FatalActions triggered a fatal signal.\n";
     break;
   default:
     // All the cases runSafeActions() returns have been covered.
