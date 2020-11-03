@@ -156,16 +156,16 @@ public:
   void set(InitializeCb cb) { slot_->set(cb); }
 
   /**
-   * @return a reference to the thread local object.
+   * @return an optional reference to the thread local object.
    */
-  T& get() { return slot_->getTyped<T>(); }
-  const T& get() const { return slot_->getTyped<T>(); }
+  OptRef<T> get() { return getOpt(slot_->get()); }
+  const OptRef<T> get() const { return getOpt(slot_->get()); }
 
   /**
    * @return a pointer to the thread local object.
    */
-  T* operator->() { return &get(); }
-  const T* operator->() const { return &get(); }
+  T* operator->() { return &(slot_->getTyped<T>()); }
+  const T* operator->() const { return &(slot_->getTyped<T>()); }
 
   /**
    * UpdateCb is passed a mutable pointer to the current stored data. Callers
@@ -182,14 +182,15 @@ public:
   }
 
 private:
+  static OptRef<T> getOpt(ThreadLocalObjectSharedPtr obj) {
+    if (obj) {
+      return OptRef<T>(obj->asType<T>());
+    }
+    return OptRef<T>();
+  }
+
   Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
-    return [cb](ThreadLocalObjectSharedPtr obj) {
-      if (obj) {
-        cb(OptRef<T>(obj->asType<T>()));
-      } else {
-        cb(OptRef<T>());
-      }
-    };
+    return [cb](ThreadLocalObjectSharedPtr obj) { cb(getOpt(obj)); };
   }
 
   const SlotPtr slot_;

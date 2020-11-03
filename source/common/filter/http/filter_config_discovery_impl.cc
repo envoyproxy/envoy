@@ -37,7 +37,7 @@ DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
 
 absl::optional<Envoy::Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
-  return tls_.get().config_;
+  return tls_->config_;
 }
 
 void DynamicFilterConfigProviderImpl::validateConfig(

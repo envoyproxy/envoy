@@ -21,6 +21,11 @@ template <class T> struct OptRef : public absl::optional<std::reference_wrapper<
     T& ref = **this;
     return &ref;
   }
+
+  const T* operator->() const {
+    const T& ref = **this;
+    return &ref;
+  }
 };
 
 } // namespace Envoy

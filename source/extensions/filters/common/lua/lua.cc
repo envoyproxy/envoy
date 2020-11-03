@@ -65,7 +65,7 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
 }
 
 int ThreadLocalState::getGlobalRef(uint64_t slot) {
-  LuaThreadLocal& tls = tls_slot_->get();
+  LuaThreadLocal& tls = tls_slot_->get().value();
   ASSERT(tls.global_slots_.size() > slot);
   return tls.global_slots_[slot];
 }
@@ -86,7 +86,7 @@ uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
 }
 
 CoroutinePtr ThreadLocalState::createCoroutine() {
-  lua_State* state = tls_slot_->get().state_.get();
+  lua_State* state = tlsState().get();
   return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
 }
 

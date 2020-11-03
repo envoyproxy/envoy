@@ -138,7 +138,7 @@ protected:
   ThreadStatus thread_status_;
 };
 
-TEST_F(CallbackNotInvokedAfterDeletionTest, WithArg) {
+TEST_F(CallbackNotInvokedAfterDeletionTest, WithData) {
   InSequence s;
   slot_->runOnAllThreads([this](OptRef<ThreadLocalObject> obj) {
     EXPECT_TRUE(obj.has_value());
@@ -183,7 +183,6 @@ struct StringSlotObject : public ThreadLocalObject {
 
 TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
   InSequence s;
-
   TypedSlot<StringSlotObject> slot(tls_);
 
   uint32_t update_called = 0;
@@ -193,7 +192,7 @@ TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
     s->str_ = "hello";
     return s;
   });
-  EXPECT_EQ("hello", slot.get().str_);
+  EXPECT_EQ("hello", slot.get()->str_);
 
   auto update_cb = [&update_called](OptRef<StringSlotObject> s) {
     ++update_called;
@@ -203,7 +202,30 @@ TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
   EXPECT_CALL(thread_dispatcher_, post(_));
   slot.runOnAllThreads(update_cb);
 
-  EXPECT_EQ("goodbye", slot.get().str_);
+  EXPECT_EQ("goodbye", slot.get()->str_);
+  EXPECT_EQ(2, update_called); // 1 worker, 1 main thread.
+
+  tls_.shutdownGlobalThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(ThreadLocalInstanceImplTest, NoDataCallback) {
+  InSequence s;
+  TypedSlot<StringSlotObject> slot(tls_);
+
+  uint32_t update_called = 0;
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot.set([](Event::Dispatcher&) -> std::shared_ptr<StringSlotObject> { return nullptr; });
+  EXPECT_FALSE(slot.get().has_value());
+
+  auto update_cb = [&update_called](OptRef<StringSlotObject> s) {
+    ++update_called;
+    EXPECT_FALSE(s.has_value());
+  };
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  slot.runOnAllThreads(update_cb);
+
+  EXPECT_FALSE(slot.get().has_value());
   EXPECT_EQ(2, update_called); // 1 worker, 1 main thread.
 
   tls_.shutdownGlobalThreading();

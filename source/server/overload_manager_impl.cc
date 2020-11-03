@@ -384,7 +384,9 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
   return true;
 }
 
-ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() { return tls_.get(); }
+ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
+  return tls_.get().value();
+}
 
 Event::ScaledRangeTimerManagerPtr
 OverloadManagerImpl::createScaledRangeTimerManager(Event::Dispatcher& dispatcher) const {
