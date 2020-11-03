@@ -24,33 +24,33 @@ public:
     max_cleartext_bytes_ = config.max_cleartext_bytes();
   }
 
-  virtual void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
+  void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
     passthrough_->setTransportSocketCallbacks(callbacks);
     callbacks_ = &callbacks;
   }
 
-  virtual std::string protocol() const override { return TransportProtocolNames::get().StartTls; }
+  std::string protocol() const override { return TransportProtocolNames::get().StartTls; }
 
-  virtual absl::string_view failureReason() const override { return passthrough_->failureReason(); }
+  absl::string_view failureReason() const override { return passthrough_->failureReason(); }
 
-  virtual void onConnected() override { passthrough_->onConnected(); }
-  virtual bool canFlushClose() override { return passthrough_->canFlushClose(); }
-  virtual Ssl::ConnectionInfoConstSharedPtr ssl() const override { return passthrough_->ssl(); }
+  void onConnected() override { passthrough_->onConnected(); }
+  bool canFlushClose() override { return passthrough_->canFlushClose(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return passthrough_->ssl(); }
 
-  virtual void closeSocket(Network::ConnectionEvent event) override {
+  void closeSocket(Network::ConnectionEvent event) override {
     return passthrough_->closeSocket(event);
   }
 
-  virtual Network::IoResult doRead(Buffer::Instance& buffer) override {
+  Network::IoResult doRead(Buffer::Instance& buffer) override {
     return passthrough_->doRead(buffer);
   }
 
-  virtual Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override {
+  Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override {
     return passthrough_->doWrite(buffer, end_stream);
   }
 
   // Method to enable TLS.
-  virtual bool startSecureTransport() override;
+  bool startSecureTransport() override;
 
 private:
   // Socket used in all transport socket operations.
