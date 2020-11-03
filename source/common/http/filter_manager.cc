@@ -1267,9 +1267,12 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
 
   if (headers != nullptr) {
-    // Copy headers to ensure original headers are not modified during
-    // setResponseHeaders. This call is needed to ensure that the headers are
-    // properly logged in access logs before the stream is destroyed.
+    // The call to setResponseHeaders is needed to ensure that the headers are properly logged in
+    // access logs before the stream is destroyed. Since the function expects a ResponseHeaderPtr&&,
+    // ownership of the headers must be passed. This cannot happen earlier in the flow (eg: in the
+    // call to setupRedirect) because at that point it is still possible for the headers to be used
+    // in a different logical branch. We work around this by creating a copy and passing ownership
+    // of the copy instead.
     ResponseHeaderMapPtr headers_copy = createHeaderMap<ResponseHeaderMapImpl>(*headers);
     parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers_copy));
     parent_.filter_manager_callbacks_.chargeStats(*headers);
