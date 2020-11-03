@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package test.integration.start_tls;
+package test.integration.starttls;
 
 message StartTlsFilterConfig{
 }

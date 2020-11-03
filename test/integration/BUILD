@@ -1192,20 +1192,20 @@ envoy_cc_test(
 )
 
 envoy_proto_library(
-    name = "start_tls_integration_proto",
-    srcs = [":start_tls_integration_test.proto"],
+    name = "starttls_integration_proto",
+    srcs = [":starttls_integration_test.proto"],
 )
 
 envoy_cc_test(
-    name = "start_tls_integration_test",
+    name = "starttls_integration_test",
     srcs = [
-        "start_tls_integration_test.cc",
+        "starttls_integration_test.cc",
     ],
     data = [
         "//test/config/integration/certs",
     ],
     deps = [
-        ":start_tls_integration_proto_cc_proto",
+        ":starttls_integration_proto_cc_proto",
         ":integration_lib",
         "//test/test_common:registry_lib",
         "//source/extensions/filters/network/tcp_proxy:config",

@@ -1,26 +1,28 @@
+#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.h"
+#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.validate.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/transport_sockets/raw_buffer/config.h"
-#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.h"
-#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.validate.h"
 #include "common/network/connection_impl.h"
 
-#include "test/integration/start_tls_integration_test.pb.h"
-#include "test/integration/start_tls_integration_test.pb.validate.h"
+#include "extensions/filters/network/common/factory_base.h"
+#include "extensions/transport_sockets/raw_buffer/config.h"
+
+#include "test/config/utility.h"
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/integration/starttls_integration_test.pb.h"
+#include "test/integration/starttls_integration_test.pb.validate.h"
 #include "test/test_common/registry.h"
-#include "test/config/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-// Simple filter for test purposes. This filter will be injected to the filter chain during
-// during tests. The filter reacts only to few keywords. 
-// The filter will be configured to sit on top of tcp_proxy and use starttls transport socket.
+// Simple filter for test purposes. This filter will be injected into the filter chain during
+// tests. The filter reacts only to few keywords. If received payload does not contain
+// allowed keyword, filter will stop iteration.
+// The filter will be configured to sit on top of tcp_proxy and use start-tls transport socket.
 // If it receives a data which is not known keyword it means that transport socket has not been
 // successfully converted to use TLS and filter receives either encrypted data or TLS handshake
 // messages.
@@ -48,20 +50,22 @@ private:
   std::set<std::string> allowed_messages_{"hello", "switch", "hola", "bye"};
 };
 
-Network::FilterStatus StartTlsSwitchFilter::onNewConnection() { return Network::FilterStatus::Continue; }
+Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
+  return Network::FilterStatus::Continue;
+}
 
 // Method checks the received payload.
 bool StartTlsSwitchFilter::onCommand(Buffer::Instance& buf) {
-  std::string message = buf.toString();
+  const std::string message = buf.toString();
   if (allowed_messages_.find(message) == allowed_messages_.end()) {
-        return false;
-    }
-  if (message == "switch") {
-  if (read_callbacks_->connection().transportProtocol() ==
-      Extensions::TransportSockets::TransportProtocolNames::get().StartTls) {
-    read_callbacks_->connection().startSecureTransport();
+    return false;
   }
-   }
+  if (message == "switch") {
+    if (read_callbacks_->connection().transportProtocol() ==
+        Extensions::TransportSockets::TransportProtocolNames::get().StartTls) {
+      read_callbacks_->connection().startSecureTransport();
+    }
+  }
   return true;
 }
 
@@ -76,13 +80,13 @@ Network::FilterStatus StartTlsSwitchFilter::onWrite(Buffer::Instance& buf, bool)
 
 // Config factory for StartTlsSwitchFilter.
 class StartTlsSwitchFilterConfigFactory : public Extensions::NetworkFilters::Common::FactoryBase<
-                                         test::integration::start_tls::StartTlsFilterConfig> {
+                                              test::integration::starttls::StartTlsFilterConfig> {
 public:
-  explicit StartTlsSwitchFilterConfigFactory(const std::string& name) :  FactoryBase(name) {}
+  explicit StartTlsSwitchFilterConfigFactory(const std::string& name) : FactoryBase(name) {}
 
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::start_tls::StartTlsFilterConfig& ,
-      Server::Configuration::FactoryContext&) override {
+  Network::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
+                                    Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<StartTlsSwitchFilter>());
     };
@@ -95,7 +99,7 @@ private:
 };
 
 // ClientTestConnection is used for simulating a client
-// which initiates a connection to Envoy in cleartext and then switches to TLS
+// which initiates a connection to Envoy in clear-text and then switches to TLS
 // without closing the socket.
 class ClientTestConnection : public Network::ClientConnectionImpl {
 public:
@@ -103,32 +107,27 @@ public:
                        const Network::Address::InstanceConstSharedPtr& remote_address,
                        const Network::Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options):
-  ClientConnectionImpl(dispatcher,
-                       remote_address,
-                       source_address,
-                       std::move(transport_socket),
-                       options){}
+                       const Network::ConnectionSocket::OptionsSharedPtr& options)
+      : ClientConnectionImpl(dispatcher, remote_address, source_address,
+                             std::move(transport_socket), options) {}
 
-  void setTransportSocket(
-                       Network::TransportSocketPtr&& transport_socket) {
-  transport_socket_ = std::move(transport_socket);
-  transport_socket_->setTransportSocketCallbacks(*this);
+  void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
+    transport_socket_ = std::move(transport_socket);
+    transport_socket_->setTransportSocketCallbacks(*this);
 
-  // Reset connection's state machine.
-  connecting_ = true;
+    // Reset connection's state machine.
+    connecting_ = true;
 
-  // Issue event which will trigger TLS handshake.
-      file_event_->activate(Event::FileReadyType::Write);
-}
+    // Issue event which will trigger TLS handshake.
+    file_event_->activate(Event::FileReadyType::Write);
+  }
 };
 
 // Fixture class for integration tests.
 class StartTlsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
-  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig()) {
-}
+  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig()) {}
   void initialize() override;
   void addStartTlsSwitchFilter(ConfigHelper& config_helper);
 
@@ -139,7 +138,7 @@ public:
 
   MockWatermarkBuffer* client_write_buffer_{nullptr};
   ConnectionStatusCallbacks connect_callbacks_;
-   
+
   // Config factory for StartTlsSwitchFilter.
   StartTlsSwitchFilterConfigFactory config_factory_{"startTls"};
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory>
@@ -158,110 +157,105 @@ void StartTlsIntegrationTest::initialize() {
         ON_CALL(*client_write_buffer_, drain(_))
             .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
         return client_write_buffer_;
-      }))
-;
+      }));
   config_helper_.renameListener("tcp_proxy");
   addStartTlsSwitchFilter(config_helper_);
 
-  // Setup factories and contexts for upstream cleartext raw buffer transport socket.
-  auto config = 
-  std::make_unique<envoy::config::transport_socket::raw_buffer::v2::RawBuffer>();
+  // Setup factories and contexts for upstream clear-text raw buffer transport socket.
+  auto config = std::make_unique<envoy::config::transport_socket::raw_buffer::v2::RawBuffer>();
 
-  auto factory = std::make_unique<Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory>();
-  cleartext_context_ = 
-  Network::TransportSocketFactoryPtr{
-      factory->createTransportSocketFactory(
-      *config,
-factory_context_ )};
+  auto factory =
+      std::make_unique<Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory>();
+  cleartext_context_ = Network::TransportSocketFactoryPtr{
+      factory->createTransportSocketFactory(*config, factory_context_)};
 
-    // Setup factories and contexts for tls transport socket.
-    tls_context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
-    tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
+  // Setup factories and contexts for tls transport socket.
+  tls_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
 
   BaseIntegrationTest::initialize();
 }
 
-  // Method adds StartTlsSwitchFilter into the filter chain.
-  // The filter is required to instruct StartTls transport
-  // socket to start using Tls.
-  void StartTlsIntegrationTest::addStartTlsSwitchFilter(ConfigHelper& config_helper) {
-    config_helper.addNetworkFilter(R"EOF(
+// Method adds StartTlsSwitchFilter into the filter chain.
+// The filter is required to instruct StartTls transport
+// socket to start using Tls.
+void StartTlsIntegrationTest::addStartTlsSwitchFilter(ConfigHelper& config_helper) {
+  config_helper.addNetworkFilter(R"EOF(
       name: startTls
       typed_config:
-        "@type": type.googleapis.com/test.integration.start_tls.StartTlsFilterConfig
+        "@type": type.googleapis.com/test.integration.starttls.StartTlsFilterConfig
     )EOF");
-    // double-check the filter was actually added
-    config_helper.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      ASSERT_EQ("startTls",
-                bootstrap.static_resources().listeners(0).filter_chains(0).filters(0).name());
-    });
-  }
+  // double-check the filter was actually added
+  config_helper.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ASSERT_EQ("startTls",
+              bootstrap.static_resources().listeners(0).filter_chains(0).filters(0).name());
+  });
+}
 
-// Test creates a client cleartext connection to Envoy and sends several messages.
+// Test creates a client clear-text connection to Envoy and sends several messages.
 // Then a special message is sent, which causes StartTlsSwitchFilter to
 // instruct StartTls transport socket to start using tls.
 // The Client connection starts using tls, performs tls handshake and few messages
 // are sent over tls.
 TEST_P(StartTlsIntegrationTest, SwitchToTlsTest) {
-    initialize();
-    
-    Network::Address::InstanceConstSharedPtr address =
-        Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-    std::unique_ptr<ClientTestConnection> conn = std::make_unique<ClientTestConnection>(*dispatcher_, 
-        address, Network::Address::InstanceConstSharedPtr(),
-        cleartext_context_->createTransportSocket(
-            std::make_shared<Network::TransportSocketOptionsImpl>(
-                absl::string_view(""), std::vector<std::string>(),
-                std::vector<std::string>())), nullptr);
+  initialize();
+
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
+  std::unique_ptr<ClientTestConnection> conn = std::make_unique<ClientTestConnection>(
+      *dispatcher_, address, Network::Address::InstanceConstSharedPtr(),
+      cleartext_context_->createTransportSocket(
+          std::make_shared<Network::TransportSocketOptionsImpl>(
+              absl::string_view(""), std::vector<std::string>(), std::vector<std::string>())),
+      nullptr);
 
   conn->enableHalfClose(true);
-   conn->addConnectionCallbacks(connect_callbacks_);
+  conn->addConnectionCallbacks(connect_callbacks_);
 
-  // Open cleartext cooonection.
+  // Open clear-text connection.
   conn->connect();
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_THAT(test_server_->server().listenerManager().numConnections(), 1);
-    
+
   Buffer::OwnedImpl buffer;
   buffer.add("hello");
   conn->write(buffer, false);
   while (client_write_buffer_->bytes_drained() != 5) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-}
+  }
   // Make sure the data makes it upstream.
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
   // Send a message to switch to tls on the receiver side.
-  // StartTlsSwitchFilter will switch transport socket on the 
-// receiver side upon receiving "switch" message.
+  // StartTlsSwitchFilter will switch transport socket on the
+  // receiver side upon receiving "switch" message.
   buffer.add("switch");
   conn->write(buffer, false);
   while (client_write_buffer_->bytes_drained() != 11) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-}
+  }
   // Make sure the data makes it upstream.
   ASSERT_TRUE(fake_upstream_connection->waitForData(11));
 
-  // Without closing the connection, switch to tls. 
+  // Without closing the connection, switch to tls.
   conn->setTransportSocket(
-        tls_context_->createTransportSocket(
-            std::make_shared<Network::TransportSocketOptionsImpl>(
-                absl::string_view(""), std::vector<std::string>(),
-                std::vector<std::string>{"envoyalpn"})));
-    connect_callbacks_.reset();
-    while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
+      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(),
+          std::vector<std::string>{"envoyalpn"})));
+  connect_callbacks_.reset();
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
-// Send few messages over encrypted connection.
+  // Send few messages over encrypted connection.
   buffer.add("hola");
   conn->write(buffer, false);
   while (client_write_buffer_->bytes_drained() != 15) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-}
+  }
   // Make sure the data makes it upstream.
   ASSERT_TRUE(fake_upstream_connection->waitForData(15));
 
@@ -269,7 +263,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsTest) {
   conn->write(buffer, false);
   while (client_write_buffer_->bytes_drained() != 18) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-}
+  }
   // Make sure the data makes it upstream.
   ASSERT_TRUE(fake_upstream_connection->waitForData(18));
 
@@ -279,4 +273,4 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsTest) {
 INSTANTIATE_TEST_SUITE_P(StartTlsIntegrationTestSuite, StartTlsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-} //namespace Envoy
+} // namespace Envoy
