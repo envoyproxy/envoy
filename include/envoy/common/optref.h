@@ -15,7 +15,7 @@ namespace Envoy {
 // a bit more awkward.
 template <class T> struct OptRef : public absl::optional<std::reference_wrapper<T>> {
   OptRef(T& t) : absl::optional<std::reference_wrapper<T>>(t) {}
-  OptRef() {}
+  OptRef() = default;
 
   /**
    * Helper to call a method on T. The caller is responsible for ensuring
