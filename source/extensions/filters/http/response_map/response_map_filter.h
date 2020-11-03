@@ -60,17 +60,23 @@ private:
  * Otherwise, we wait until encodeData, drain anything we get from the upstream,
  * and finally rewrite the response body.
  *
+ * Not all filter stages are guaranteed to be called. For example, if there are
+ * no request headers to parse (because, for example, Envoy responds locally
+ * with HTTP 426 to upgrade an HTTP/1.0 request before parsing headers), then
+ * decodeHeaders will never be called. Similarly, if there is no upstream
+ * response body, then encodeData will not be called.
+ *
  * The response map filter maintains three pieces of state:
  *
- *   disabled: set to true if a per-route config is found in the decode stage and
- *             the disabled flag is set. this disables rewrite behavior entirely.
+ *   disabled_: set to true if a per-route config is found in the decode stage and
+ *              the disabled flag is set. this disables rewrite behavior entirely.
  *
- *   do_rewrite: set to true if the chosen response mapper matched, and we should
- *               eventually do a response body (and/or header) rewrite.
+ *   do_rewrite_: set to true if the chosen response mapper matched, and we should
+ *                eventually do a response body (and/or header) rewrite.
  *
- *   response_map: set to a pointer to the response map that should be used to match
- *                 and rewrite. if a per-route config is found and its mapper is set,
- *                 use that. otherwise, use the globally configured mapper.
+ *   response_map_: set to a pointer to the response map that should be used to match
+ *                  and rewrite. if a per-route config is found and its mapper is set,
+ *                  use that. otherwise, use the globally configured mapper.
  */
 class ResponseMapFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
