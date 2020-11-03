@@ -205,7 +205,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
 
   // Sanitized return reference mocking
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(mock_request_headers, false));
@@ -414,7 +414,7 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
@@ -436,7 +436,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
        "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
   };
 
-  Http::TestRequestHeaderMapImpl expected_headers{
+  Http::TestRequestHeaderMapImpl expected_response_headers{
       {Http::Headers::get().Status.get(), "401"},
       {Http::Headers::get().ContentLength.get(), "18"},
       {Http::Headers::get().ContentType.get(), "text/plain"},
@@ -447,11 +447,28 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
+
+  Http::TestRequestHeaderMapImpl final_request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
+                                        "state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
+  };
+
+  EXPECT_EQ(request_headers, final_request_headers);
 }
 
 /**
@@ -475,7 +492,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
        "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
   };
 
-  Http::TestRequestHeaderMapImpl expected_headers{
+  Http::TestRequestHeaderMapImpl expected_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().Location.get(), "https://traffic.example.com/original_path"},
   };
@@ -485,10 +502,27 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), true));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Http::TestRequestHeaderMapImpl final_request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
+                                        "state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
+  };
+
+  EXPECT_EQ(request_headers, final_request_headers);
 }
 
 /**
