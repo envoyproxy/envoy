@@ -4,12 +4,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/token_bucket_impl.h"
-#include "common/http/header_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,8 +45,9 @@ public:
 
   /**
    * Called if the stream receives trailers.
+   * Returns true if the read buffer is not completely drained yet.
    */
-  Http::FilterTrailersStatus onTrailers();
+  bool onTrailers();
 
   /**
    * Like the owning filter, we must handle inline destruction, so we have a destroy() method which

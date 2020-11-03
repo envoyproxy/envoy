@@ -96,11 +96,10 @@ void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_st
   }
 }
 
-Http::FilterTrailersStatus StreamRateLimiter::onTrailers() {
+bool StreamRateLimiter::onTrailers() {
   saw_end_stream_ = true;
   saw_trailers_ = true;
-  return buffer_.length() > 0 ? Http::FilterTrailersStatus::StopIteration
-                              : Http::FilterTrailersStatus::Continue;
+  return buffer_.length() > 0;
 }
 } // namespace Common
 } // namespace HttpFilters
