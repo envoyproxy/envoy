@@ -387,11 +387,11 @@ FilterHeadersStatus ActiveStreamDecoderFilter::decodeHeaders(RequestHeaderMap& h
     ENVOY_STREAM_LOG(debug, "filter={} removed required headers", parent_,
                      static_cast<const void*>(this));
     parent_.stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
-    const std::string body = fmt::format("missing required header: {}", header_status.message());
     const std::string details =
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
                      header_status.message(), "}");
-    sendLocalReply(Http::Code::ServiceUnavailable, body, nullptr, absl::nullopt, details);
+    sendLocalReply(Http::Code::ServiceUnavailable, header_status.message(), nullptr, absl::nullopt,
+                   details);
     return FilterHeadersStatus::StopIteration;
   }
   return status;

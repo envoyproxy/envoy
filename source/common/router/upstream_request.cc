@@ -423,8 +423,13 @@ void UpstreamRequest::onPoolReady(
   if (!status.ok()) {
     // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
     // erroneously remove required headers.
-    resetStream();
-    onResetStream(Http::StreamResetReason::LocalReset, status.message());
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    const std::string details =
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
+                     status.message(), "}");
+    ENVOY_LOG_MISC(info, "{}", status.message());
+    parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
+                                        absl::nullopt, details);
     return;
   }
 
