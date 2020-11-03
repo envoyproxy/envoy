@@ -202,7 +202,10 @@ TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
   EXPECT_CALL(thread_dispatcher_, post(_));
   slot.runOnAllThreads(update_cb);
 
+  // Tests a few different ways of getting at the slot data.
   EXPECT_EQ("goodbye", slot.get()->str_);
+  EXPECT_EQ("goodbye", slot->str_);
+  EXPECT_EQ("goodbye", (*slot).str_);
   EXPECT_EQ(2, update_called); // 1 worker, 1 main thread.
 
   tls_.shutdownGlobalThreading();

@@ -822,7 +822,7 @@ void ClusterManagerImpl::updateClusterCounts() {
 }
 
 ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_.get().value();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
@@ -861,7 +861,7 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                                            absl::optional<Http::Protocol> protocol,
                                            LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_.get().value();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
@@ -887,7 +887,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                                           LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_.get().value();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
@@ -941,7 +941,7 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
 
 Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
                                                                  LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_.get().value();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
@@ -969,7 +969,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 }
 
 Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::string& cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_.get().value();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
     return entry->second->http_async_client_;
@@ -980,7 +980,7 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
 
 ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_.get().value();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
   return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
 }
 

@@ -162,18 +162,31 @@ public:
   const OptRef<T> get() const { return getOpt(slot_->get()); }
 
   /**
+   * Helper function to call methods on T. The caller is responsible
+   * for ensuring that get().has_value() is true.
+   *
    * @return a pointer to the thread local object.
    */
   T* operator->() { return &(slot_->getTyped<T>()); }
   const T* operator->() const { return &(slot_->getTyped<T>()); }
 
   /**
-   * UpdateCb is passed a mutable pointer to the current stored data. Callers
-   * can assume it's non-null if they have called set() prior to
-   * runOnAllThreads().
+   * Helper function to get access to a T&. The caller is responsible for
+   * ensuring that get().has_value() is true.
    *
-   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner, as the owner
-   * may be destructed in main thread before the update_cb gets called in a worker thread.
+   * @return a reference to the thread local object.
+   */
+  T& operator*() { return slot_->getTyped<T>(); }
+  const T& operator*() const { return slot_->getTyped<T>(); }
+
+  /**
+   * UpdateCb is passed a mutable pointer to the current stored data. Callers
+   * can assume that the passed-in OptRef has a value if they have called set(),
+   * yielding a non-null shared_ptr, prior to runOnAllThreads().
+   *
+   * NOTE: The update callback is not supposed to capture the TypedSlot, or its
+   * owner, as the owner may be destructed in main thread before the update_cb
+   * gets called in a worker thread.
    */
   using UpdateCb = std::function<void(OptRef<T> obj)>;
   void runOnAllThreads(const UpdateCb& cb) { slot_->runOnAllThreads(makeSlotUpdateCb(cb)); }

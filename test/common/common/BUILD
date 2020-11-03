@@ -188,6 +188,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "optref_test",
+    srcs = ["optref_test.cc"],
+)
+
+envoy_cc_test(
     name = "random_generator_test",
     srcs = ["random_generator_test.cc"],
     deps = [
