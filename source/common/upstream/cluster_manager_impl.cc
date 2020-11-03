@@ -613,6 +613,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   if (existing_active_cluster != active_clusters_.end() ||
       existing_warming_cluster != warming_clusters_.end()) {
     if (existing_active_cluster != active_clusters_.end()) {
+      ENVOY_LOG_MISC(debug, "lambdai: calling remove cluster {} ",
+                     existing_active_cluster->second->cluster_->info()->name());
       // The following init manager remove call is a NOP in the case we are already initialized.
       // It's just kept here to avoid additional logic.
       init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
@@ -634,7 +636,9 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   //       and easy to understand.
   const bool all_clusters_initialized =
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  loadCluster(cluster, version_info, true, warming_clusters_);
+  // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
+  // before destroy to avoid early initialization complete.
+  auto previous_cluster_guard = loadCluster(cluster, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
@@ -734,9 +738,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   return removed;
 }
 
-void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                     const std::string& version_info, bool added_via_api,
-                                     ClusterMap& cluster_map) {
+absl::optional<ClusterManagerImpl::ClusterDataPtr>
+ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                const std::string& version_info, bool added_via_api,
+                                ClusterMap& cluster_map) {
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
   auto& new_cluster = new_cluster_pair.first;
@@ -781,11 +786,20 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
       }
     });
   }
-
-  cluster_map[cluster_reference.info()->name()] = std::make_unique<ClusterData>(
-      cluster, version_info, added_via_api, std::move(new_cluster), time_source_);
-  const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
-
+  absl::optional<ClusterDataPtr> result;
+  auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
+  if (cluster_entry_it != cluster_map.end()) {
+    result = absl::make_optional<ClusterDataPtr>(std::move(cluster_entry_it->second));
+    cluster_entry_it->second = std::make_unique<ClusterData>(cluster, version_info, added_via_api,
+                                                             std::move(new_cluster), time_source_);
+  } else {
+    bool inserted = false;
+    std::tie(cluster_entry_it, inserted) =
+        cluster_map.emplace(cluster_reference.info()->name(),
+                            std::make_unique<ClusterData>(cluster, version_info, added_via_api,
+                                                          std::move(new_cluster), time_source_));
+    ASSERT(inserted);
+  }
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
   // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
   // because the thread_aware_lb_ field takes precedence over the subset lb).
@@ -808,6 +822,7 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
   }
 
   updateClusterCounts();
+  return result;
 }
 
 void ClusterManagerImpl::updateClusterCounts() {

@@ -1152,7 +1152,9 @@ TEST_P(AdsClusterV3Test, BasicClusterInitialWarming) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 }
 
-TEST_P(AdsClusterV3Test, ClusterUpdateWhenWarming) {
+// Update the only warming cluster. Verify that the new cluster is still warming and the cluster
+// manager as a whole is not initialized.
+TEST_P(AdsClusterV3Test, ClusterInitializationUpdateTheOnlyWarmingCluster) {
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
       envoy::config::core::v3::ApiVersion::V3);
@@ -1174,6 +1176,37 @@ TEST_P(AdsClusterV3Test, ClusterUpdateWhenWarming) {
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+}
+
+// Two cluster warming, update one of them. Verify that the clusters are eventually initialized.
+TEST_P(AdsClusterV3Test, ClusterInitializationUpdateOneOfThe2Warming) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0"), buildCluster("cluster_1")},
+      {buildCluster("cluster_0"), buildCluster("cluster_1")}, {}, "1", false);
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+
+  // Update lb policy to MAGLEV so that cluster update is not skipped due to the same hash.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")},
+      {buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")}, {}, "2", false);
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0", "cluster_1"},
+                                      {"cluster_0", "cluster_1"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url,
+      {buildClusterLoadAssignment("cluster_0"), buildClusterLoadAssignment("cluster_1")},
+      {buildClusterLoadAssignment("cluster_0"), buildClusterLoadAssignment("cluster_1")}, {}, "1",
+      false);
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
 }
 
 // Verify CDS is paused during cluster warming.
