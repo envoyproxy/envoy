@@ -1099,15 +1099,10 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  if (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    EXPECT_CALL(os_sys_calls, readv(_, _, _))
-        .WillOnce(Invoke([&](os_fd_t fd, const iovec* vec, int l) -> Api::SysCallSizeResult {
-          return os_calls.get_latched_instance()->readv(fd, vec, l);
-        }))
-        .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
-          return {-1, SOCKET_ERROR_AGAIN};
-        }));
-  }
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+        return {-1, SOCKET_ERROR_AGAIN};
+      }));
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
@@ -1157,6 +1152,8 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
 
   // Randomly write 1-20 bytes and read 1-30 bytes per loop.
   for (int i = 0; i < 50; ++i) {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     // The bytes to read this loop.
     int bytes_to_write = rand.random() % 20 + 1;
     // The bytes buffered at the beginning of this loop.
@@ -1199,6 +1196,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     EXPECT_CALL(os_sys_calls, writev(_, _, _))
         .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
           client_write_buffer_->drain(bytes_to_flush);
+          dispatcher_->exit();
           return {-1, SOCKET_ERROR_AGAIN};
         }))
         .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
@@ -1206,7 +1204,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
         }));
 
     client_connection_->write(buffer_to_write, false);
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
