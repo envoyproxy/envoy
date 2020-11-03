@@ -1,0 +1,31 @@
+[
+  {
+    "cluster": {
+      "@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+      "name": "example_proxy_cluster",
+      "type": "LOGICAL_DNS",
+      "connect_timeout": "5s",
+      "dns_lookup_family": "V4_ONLY",
+      "load_assignment": {
+        "cluster_name": "example_proxy_cluster",
+        "endpoints": [
+          {
+            "lb_endpoints": [
+              {
+                "endpoint": {
+                  "address": {
+                    "socket_address": {
+                      "address": "service1",
+                      "port_value": 8080
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "last_updated": "2020-10-25T20:37:05.838Z"
+  }
+]

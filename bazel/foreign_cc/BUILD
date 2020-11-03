@@ -318,7 +318,7 @@ envoy_cmake_external(
         "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
         "WAVM_ENABLE_STATIC_LINKING": "on",
         "WAVM_ENABLE_RELEASE_ASSERTS": "on",
-        "WAVM_ENABLE_UNWIND": "no",
+        "WAVM_ENABLE_UNWIND": "on",
         # Workaround for the issue with statically linked libstdc++
         # using -l:libstdc++.a.
         "CMAKE_CXX_FLAGS": "-lstdc++ -Wno-unused-command-line-argument",
@@ -335,6 +335,7 @@ envoy_cmake_external(
     static_libraries = select({
         "//conditions:default": [
             "libWAVM.a",
+            "libWAVMUnwind.a",
         ],
     }),
     deps = [":llvm"],
