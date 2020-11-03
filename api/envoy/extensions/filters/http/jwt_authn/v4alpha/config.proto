@@ -388,8 +388,18 @@ message RequirementRule {
   //
   config.route.v4alpha.RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
-  // Specify a Jwt Requirement. Please detail comment in message JwtRequirement.
-  JwtRequirement requires = 2;
+  // Specify a Jwt requirement.
+  // If not specified, Jwt verification is disabled.
+  oneof requirement_type {
+    // Specify a Jwt requirement. Please see detail comment in message JwtRequirement.
+    JwtRequirement requires = 2;
+
+    // Use requirement_name to specify a Jwt requirement.
+    // This requirement_name MUST be specified at the
+    // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
+    // in `JwtAuthentication`.
+    string requirement_name = 3 [(validate.rules).string = {min_len: 1}];
+  }
 }
 
 // This message specifies Jwt requirements based on stream_info.filterState.
@@ -462,6 +472,7 @@ message FilterStateRule {
 //              - provider_name: provider1
 //              - provider_name: provider2
 //
+// [#next-free-field: 6]
 message JwtAuthentication {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication";
@@ -528,4 +539,28 @@ message JwtAuthentication {
   // <http://www.w3.org/TR/cors/#cross-origin-request-with-preflight>`_ regardless of JWT
   // requirements specified in the rules.
   bool bypass_cors_preflight = 4;
+
+  // A map of unique requirement_names to JwtRequirements.
+  // :ref:`requirement_name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.PerRouteConfig.requirement_name>`
+  // in `PerRouteConfig` uses this map to specify a JwtRequirement.
+  map<string, JwtRequirement> requirement_map = 5;
+}
+
+// Specify per-route config.
+message PerRouteConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig";
+
+  oneof requirement_specifier {
+    option (validate.required) = true;
+
+    // Disable Jwt Authentication for this route.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // Use requirement_name to specify a JwtRequirement.
+    // This requirement_name MUST be specified at the
+    // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
+    // in `JwtAuthentication`. If no, the requests using this route will be rejected with 403.
+    string requirement_name = 2 [(validate.rules).string = {min_len: 1}];
+  }
 }
