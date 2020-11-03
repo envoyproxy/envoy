@@ -288,13 +288,22 @@ message HeaderValue {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.core.v3.HeaderValue.ValueFormat.Tokenized";
 
-      // Headers to tokenize
-      repeated HeaderValue headers = 1 [(validate.rules).repeated = {min_items: 1}];
+      // Headers used as tokens when composing the tokenized string: this may be useful
+      // when one wishes to add a series of headers (e.g. headers containing info useful for debuggin purposes)
+      // but wants to avoid the overhead that comes with a large number of additional headers.
+      // The value of a header that uses a tokenized formatter is derived from the specified tokens, so when
+      // using :ref:`tokenized format <envoy_api_msg_config.core.v4alpha.HeaderValue.ValueFormat.Tokenized>`,
+      // :ref:`value <envoy_api_field_config.core.v4alpha.HeaderValue.value>` shouldn't be configured.
+      // Nesting of tokenized headers is not supported: in other words, tokens cannot be headers that
+      // in turn use :ref:`tokenized format <envoy_api_msg_config.core.v4alpha.HeaderValue.ValueFormat.Tokenized>`.
+      repeated HeaderValue tokens = 1 [(validate.rules).repeated = {min_items: 1}];
     }
 
     oneof specifier {
       option (validate.required) = true;
 
+      // Formats the header's value as a tokenized string, where each token is composed of a header name and a header value separated by a semicolon.
+      // The tokenized string has format header-a;value-a,header-b;value-b;header-c;value-c etc.
       Tokenized tokenized = 1;
     }
   }
@@ -304,20 +313,17 @@ message HeaderValue {
       [(validate.rules).string =
            {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
-  oneof specifier {
-    option (validate.required) = true;
+  // Header value.
+  //
+  // The same :ref:`format specifier <config_access_log_format>` as used for
+  // :ref:`HTTP access logging <config_access_log>` applies here, however
+  // unknown header values are replaced with the empty string instead of `-`.
+  string value = 2 [
+    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+  ];
 
-    // Header value.
-    //
-    // The same :ref:`format specifier <config_access_log_format>` as used for
-    // :ref:`HTTP access logging <config_access_log>` applies here, however
-    // unknown header values are replaced with the empty string instead of `-`.
-    string value = 2 [
-      (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
-    ];
-
-    ValueFormat value_format = 3;
-  }
+  // Describes how the header value should be formatted.
+  ValueFormat value_format = 3;
 }
 
 // Header name/value pair plus option to control append behavior.
