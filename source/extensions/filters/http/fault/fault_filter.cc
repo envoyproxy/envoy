@@ -502,7 +502,8 @@ Http::FilterDataStatus FaultFilter::encodeData(Buffer::Instance& data, bool end_
 
 Http::FilterTrailersStatus FaultFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (response_limiter_ != nullptr) {
-    return response_limiter_->onTrailers();
+    return response_limiter_->onTrailers() ? Http::FilterTrailersStatus::StopIteration
+                                           : Http::FilterTrailersStatus::Continue;
   }
 
   return Http::FilterTrailersStatus::Continue;
