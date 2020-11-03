@@ -111,21 +111,22 @@ void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
   // preallocating the pointer array).
   message_.mutable_envoy_metrics()->Reserve(snapshot.counters().size() + snapshot.gauges().size() +
                                             snapshot.histograms().size());
+  int64_t snapshot_time_ms = snapshot.snapshotTime().count();
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      flushCounter(counter, snapshot.snapshotTime().count());
+      flushCounter(counter, snapshot_time_ms);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      flushGauge(gauge.get(), snapshot.snapshotTime().count());
+      flushGauge(gauge.get(), snapshot_time_ms);
     }
   }
 
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().used()) {
-      flushHistogram(histogram.get(), snapshot.snapshotTime().count());
+      flushHistogram(histogram.get(), snapshot_time_ms);
     }
   }
 
