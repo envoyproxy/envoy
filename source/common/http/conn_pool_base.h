@@ -83,6 +83,8 @@ public:
                uint64_t concurrent_stream_limit)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             concurrent_stream_limit) {
+    // The static cast makes sure we call the base class host() and not
+    // HttpConnPoolImplBase::host which is of a different type.
     Upstream::Host::CreateConnectionData data =
         static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)->host()->createConnection(
             parent.dispatcher(), parent.socketOptions(), parent.transportSocketOptions());
