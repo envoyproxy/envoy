@@ -613,8 +613,6 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   if (existing_active_cluster != active_clusters_.end() ||
       existing_warming_cluster != warming_clusters_.end()) {
     if (existing_active_cluster != active_clusters_.end()) {
-      ENVOY_LOG_MISC(debug, "lambdai: calling remove cluster {} ",
-                     existing_active_cluster->second->cluster_->info()->name());
       // The following init manager remove call is a NOP in the case we are already initialized.
       // It's just kept here to avoid additional logic.
       init_helper_.removeCluster(*existing_active_cluster->second->cluster_);

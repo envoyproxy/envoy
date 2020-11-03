@@ -34,11 +34,7 @@ public:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, bool added_via_api);
-  ~EdsClusterImpl() override {
-    ENVOY_LOG_MISC(debug, "lambdai: destroy");
-    probePoint();
-  }
-  void probePoint() { ENVOY_LOG_MISC(debug, "lambdai: probe"); }
+
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
 
