@@ -140,10 +140,12 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         case SSL_ERROR_WANT_READ:
           break;
         case SSL_ERROR_ZERO_RETURN:
+          // Graceful shutdown using close_notify TLS alert.
           end_stream = true;
           break;
         case SSL_ERROR_SYSCALL:
           if (result.error_.value() == 0) {
+            // Non-graceful shutdown by closing the underlying socket.
             end_stream = true;
             break;
           }
