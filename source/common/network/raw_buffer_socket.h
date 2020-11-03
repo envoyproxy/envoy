@@ -32,7 +32,6 @@ public:
   // Network::TransportSocketFactory
   TransportSocketPtr createTransportSocket(TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
   bool isReady() const override;
 };
 

@@ -66,10 +66,6 @@ bool TapSocketFactory::implementsSecureTransport() const {
   return transport_socket_factory_->implementsSecureTransport();
 }
 
-bool TapSocketFactory::usesProxyProtocolOptions() const {
-  return transport_socket_factory_->usesProxyProtocolOptions();
-}
-
 bool TapSocketFactory::isReady() const { return transport_socket_factory_->isReady(); }
 
 } // namespace Tap

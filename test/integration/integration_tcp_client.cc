@@ -37,8 +37,7 @@ using ::testing::NiceMock;
 IntegrationTcpClient::IntegrationTcpClient(
     Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
     Network::Address::IpVersion version, bool enable_half_close,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::Address::InstanceConstSharedPtr source_address)
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _, _))
@@ -52,7 +51,7 @@ IntegrationTcpClient::IntegrationTcpClient(
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      source_address, Network::Test::createRawBufferSocket(), options);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options);
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));

@@ -86,9 +86,7 @@ public:
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
-                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
-                    Network::Address::InstanceConstSharedPtr source_address =
-                        Network::Address::InstanceConstSharedPtr());
+                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr);
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);

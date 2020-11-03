@@ -24,7 +24,6 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   bool implementsSecureTransport() const override { return true; }
-  bool usesProxyProtocolOptions() const override { return false; }
   bool isReady() const override { return true; }
 };
 
