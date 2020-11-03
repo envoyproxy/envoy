@@ -275,8 +275,8 @@ void DnsCacheImpl::updateTlsHostsMap() {
     }
   }
 
-  tls_slot_.runOnAllThreads([new_host_map](ThreadLocalHostInfo& local_host_info) {
-    local_host_info.updateHostMap(new_host_map);
+  tls_slot_.runOnAllThreads([new_host_map](OptRef<ThreadLocalHostInfo> local_host_info) {
+    local_host_info->updateHostMap(new_host_map);
   });
 }
 

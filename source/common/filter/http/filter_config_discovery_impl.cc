@@ -53,8 +53,8 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
                                                      const std::string&,
                                                      Config::ConfigAppliedCb cb) {
   tls_.runOnAllThreads(
-      [config, cb](ThreadLocalConfig& tls) {
-        tls.config_ = config;
+      [config, cb](OptRef<ThreadLocalConfig> tls) {
+        tls->config_ = config;
         if (cb) {
           cb();
         }

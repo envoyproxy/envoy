@@ -442,9 +442,9 @@ void OverloadManagerImpl::flushResourceUpdates() {
     std::swap(*shared_updates, state_updates_to_flush_);
 
     tls_.runOnAllThreads(
-        [updates = std::move(shared_updates)](ThreadLocalOverloadStateImpl& overload_state) {
+        [updates = std::move(shared_updates)](OptRef<ThreadLocalOverloadStateImpl> overload_state) {
           for (const auto& [action, state] : *updates) {
-            overload_state.setState(action, state);
+            overload_state->setState(action, state);
           }
         });
   }

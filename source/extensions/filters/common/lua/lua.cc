@@ -71,14 +71,14 @@ int ThreadLocalState::getGlobalRef(uint64_t slot) {
 }
 
 uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
-  tls_slot_->runOnAllThreads([global](LuaThreadLocal& tls) {
-    lua_getglobal(tls.state_.get(), global.c_str());
-    if (lua_isfunction(tls.state_.get(), -1)) {
-      tls.global_slots_.push_back(luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX));
+  tls_slot_->runOnAllThreads([global](OptRef<LuaThreadLocal> tls) {
+    lua_getglobal(tls->state_.get(), global.c_str());
+    if (lua_isfunction(tls->state_.get(), -1)) {
+      tls->global_slots_.push_back(luaL_ref(tls->state_.get(), LUA_REGISTRYINDEX));
     } else {
       ENVOY_LOG(debug, "definition for '{}' not found in script", global);
-      lua_pop(tls.state_.get(), 1);
-      tls.global_slots_.push_back(LUA_REFNIL);
+      lua_pop(tls->state_.get(), 1);
+      tls->global_slots_.push_back(LUA_REFNIL);
     }
   });
 

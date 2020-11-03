@@ -66,10 +66,6 @@ public:
     void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& main_callback) override {
       parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
     }
-    void runOnAllThreads(const Event::PostCb& cb) override { parent_.runOnAllThreads(cb); }
-    void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& main_callback) override {
-      parent_.runOnAllThreads(cb, main_callback);
-    }
 
     void set(InitializeCb cb) override {
       if (parent_.defer_data) {

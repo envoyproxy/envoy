@@ -140,30 +140,21 @@ protected:
 
 TEST_F(CallbackNotInvokedAfterDeletionTest, WithArg) {
   InSequence s;
-  slot_->runOnAllThreads([this](ThreadLocalObject&) {
+  slot_->runOnAllThreads([this](OptRef<ThreadLocalObject> obj) {
+    EXPECT_TRUE(obj.has_value());
     // Callbacks happen on the main thread but not the workers, so track the total.
     total_callbacks_++;
   });
-  slot_->runOnAllThreads([this](ThreadLocalObject&) { ++thread_status_.thread_local_calls_; },
-                         [this]() {
-                           // Callbacks happen on the main thread but not the workers.
-                           EXPECT_EQ(thread_status_.thread_local_calls_, 1);
-                           thread_status_.all_threads_complete_ = true;
-                         });
-}
-
-TEST_F(CallbackNotInvokedAfterDeletionTest, WithoutArg) {
-  InSequence s;
-  slot_->runOnAllThreads([this]() {
-    // Callbacks happen on the main thread but not the workers, so track the total.
-    total_callbacks_++;
-  });
-  slot_->runOnAllThreads([this]() { ++thread_status_.thread_local_calls_; },
-                         [this]() {
-                           // Callbacks happen on the main thread but not the workers.
-                           EXPECT_EQ(thread_status_.thread_local_calls_, 1);
-                           thread_status_.all_threads_complete_ = true;
-                         });
+  slot_->runOnAllThreads(
+      [this](OptRef<ThreadLocalObject> obj) {
+        EXPECT_TRUE(obj.has_value());
+        ++thread_status_.thread_local_calls_;
+      },
+      [this]() {
+        // Callbacks happen on the main thread but not the workers.
+        EXPECT_EQ(thread_status_.thread_local_calls_, 1);
+        thread_status_.all_threads_complete_ = true;
+      });
 }
 
 // Test that the update callback is called as expected, for the worker and main threads.
@@ -175,7 +166,7 @@ TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
   uint32_t update_called = 0;
 
   TestThreadLocalObject& object_ref = setObject(slot);
-  auto update_cb = [&update_called](ThreadLocalObject&) { ++update_called; };
+  auto update_cb = [&update_called](OptRef<ThreadLocalObject>) { ++update_called; };
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref, onDestroy());
   slot.runOnAllThreads(update_cb);
@@ -204,9 +195,10 @@ TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
   });
   EXPECT_EQ("hello", slot.get().str_);
 
-  auto update_cb = [&update_called](StringSlotObject& s) {
+  auto update_cb = [&update_called](OptRef<StringSlotObject> s) {
     ++update_called;
-    s.str_ = "goodbye";
+    EXPECT_TRUE(s.has_value());
+    s->str_ = "goodbye";
   };
   EXPECT_CALL(thread_dispatcher_, post(_));
   slot.runOnAllThreads(update_cb);
@@ -232,7 +224,7 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   // Ensure that the thread local call back and all_thread_complete call back are called.
   ThreadStatus thread_status;
   tlsptr->runOnAllThreads(
-      [&thread_status](ThreadLocal::ThreadLocalObject&) { ++thread_status.thread_local_calls_; },
+      [&thread_status](OptRef<ThreadLocalObject>) { ++thread_status.thread_local_calls_; },
       [&thread_status]() {
         EXPECT_EQ(thread_status.thread_local_calls_, 2);
         thread_status.all_threads_complete_ = true;

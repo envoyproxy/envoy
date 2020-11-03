@@ -662,17 +662,17 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
   tls_.runOnAllThreads([new_cluster = cluster.cluster_->info(),
                         thread_aware_lb_factory = cluster.loadBalancerFactory()](
-                           ThreadLocalClusterManagerImpl& cluster_manager) {
-    if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    if (cluster_manager->thread_local_clusters_.count(new_cluster->name()) > 0) {
       ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
     } else {
       ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
     }
 
     auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
-        cluster_manager, new_cluster, thread_aware_lb_factory);
-    cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
-    for (auto& cb : cluster_manager.update_callbacks_) {
+        *cluster_manager, new_cluster, thread_aware_lb_factory);
+    cluster_manager->thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+    for (auto& cb : cluster_manager->update_callbacks_) {
       cb->onClusterAddOrUpdate(*thread_local_cluster);
     }
   });
@@ -688,13 +688,13 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
     active_clusters_.erase(existing_active_cluster);
 
     ENVOY_LOG(info, "removing cluster {}", cluster_name);
-    tls_.runOnAllThreads([cluster_name](ThreadLocalClusterManagerImpl& cluster_manager) {
-      ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
+    tls_.runOnAllThreads([cluster_name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+      ASSERT(cluster_manager->thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-      for (auto& cb : cluster_manager.update_callbacks_) {
+      for (auto& cb : cluster_manager->update_callbacks_) {
         cb->onClusterRemoval(cluster_name);
       }
-      cluster_manager.thread_local_clusters_.erase(cluster_name);
+      cluster_manager->thread_local_clusters_.erase(cluster_name);
     });
   }
 
@@ -913,8 +913,8 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
                                                          const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),
-                        hosts_removed](ThreadLocalClusterManagerImpl& cluster_manager) {
-    cluster_manager.removeHosts(name, hosts_removed);
+                        hosts_removed](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    cluster_manager->removeHosts(name, hosts_removed);
   });
 }
 
@@ -927,15 +927,15 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
                         update_params = HostSetImpl::updateHostsParams(*host_set),
                         locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
                         overprovisioning_factor = host_set->overprovisioningFactor()](
-                           ThreadLocalClusterManagerImpl& cluster_manager) {
-    cluster_manager.updateClusterMembership(name, priority, update_params, locality_weights,
-                                            hosts_added, hosts_removed, overprovisioning_factor);
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    cluster_manager->updateClusterMembership(name, priority, update_params, locality_weights,
+                                             hosts_added, hosts_removed, overprovisioning_factor);
   });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
-  tls_.runOnAllThreads([host](ThreadLocalClusterManagerImpl& cluster_manager) {
-    cluster_manager.onHostHealthFailure(host);
+  tls_.runOnAllThreads([host](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    cluster_manager->onHostHealthFailure(host);
   });
 }
 

@@ -386,7 +386,8 @@ public:
    * all threaded workers.
    */
   template <class T> void registerType() {
-    tls_slot_->runOnAllThreads([](LuaThreadLocal& tls) { T::registerType(tls.state_.get()); });
+    tls_slot_->runOnAllThreads(
+        [](OptRef<LuaThreadLocal> tls) { T::registerType(tls->state_.get()); });
   }
 
   /**

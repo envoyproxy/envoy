@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
@@ -93,8 +94,6 @@ protected:
   // Callers must use the TypedSlot API, below.
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
   virtual void runOnAllThreads(const UpdateCb& update_cb, const Event::PostCb& complete_cb) PURE;
-  virtual void runOnAllThreads(const Event::PostCb& cb) PURE;
-  virtual void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& complete_cb) PURE;
 };
 
 using SlotPtr = std::unique_ptr<Slot>;
@@ -169,26 +168,27 @@ public:
   const T* operator->() const { return &get(); }
 
   /**
-   * UpdateCb is passed a mutable reference to the current stored data.
+   * UpdateCb is passed a mutable pointer to the current stored data. Callers
+   * can assume it's non-null if they have called set() prior to
+   * runOnAllThreads().
    *
    * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner, as the owner
    * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
-  using UpdateCb = std::function<void(T& obj)>;
+  using UpdateCb = std::function<void(OptRef<T> obj)>;
   void runOnAllThreads(const UpdateCb& cb) { slot_->runOnAllThreads(makeSlotUpdateCb(cb)); }
   void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
     slot_->runOnAllThreads(makeSlotUpdateCb(cb), complete_cb);
   }
-  void runOnAllThreads(const Event::PostCb& cb) { slot_->runOnAllThreads(cb); }
-  void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& complete_cb) {
-    slot_->runOnAllThreads(cb, complete_cb);
-  }
 
 private:
   Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
-    return [cb](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
-      cb(obj->asType<T>());
-      return obj;
+    return [cb](ThreadLocalObjectSharedPtr obj) {
+      if (obj) {
+        cb(OptRef<T>(obj->asType<T>()));
+      } else {
+        cb(OptRef<T>());
+      }
     };
   }
 

@@ -205,8 +205,8 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     ASSERT(!merge_in_progress_);
     merge_in_progress_ = true;
     tls_cache_->runOnAllThreads(
-        [](TlsCache& tls_cache) {
-          for (const auto& id_hist : tls_cache.tls_histogram_cache_) {
+        [](OptRef<TlsCache> tls_cache) {
+          for (const auto& id_hist : tls_cache->tls_histogram_cache_) {
             const TlsHistogramSharedPtr& tls_hist = id_hist.second;
             tls_hist->beginMerge();
           }
@@ -303,7 +303,7 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
     tls_cache_->runOnAllThreads(
-        [scope_id](TlsCache& tls_cache) { tls_cache.eraseScope(scope_id); },
+        [scope_id](OptRef<TlsCache> tls_cache) { tls_cache->eraseScope(scope_id); },
         [central_cache]() { /* Holds onto central_cache until all tls caches are clear */ });
   }
 }
@@ -320,7 +320,7 @@ void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
     // contains a patch that will implement batching together to clear multiple
     // histograms.
     tls_cache_->runOnAllThreads(
-        [histogram_id](TlsCache& tls_cache) { tls_cache.eraseHistogram(histogram_id); });
+        [histogram_id](OptRef<TlsCache> tls_cache) { tls_cache->eraseHistogram(histogram_id); });
   }
 }
 
