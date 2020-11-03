@@ -373,6 +373,9 @@ bool ClientContextConfigImpl::isSecretReady() const {
       return false;
     }
   }
+  if (certificate_validation_context_provider_ == nullptr) {
+      return false;
+  }
   return certificate_validation_context_provider_->secret() != nullptr;
 }
 
