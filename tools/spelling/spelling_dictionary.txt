@@ -95,6 +95,7 @@ EINPROGRESS
 EINVAL
 ELB
 EMSGSIZE
+ENOENT
 ENOTFOUND
 ENOTSUP
 ENV
@@ -391,6 +392,7 @@ alignas
 alignof
 alloc
 alloca
+allocatable
 allocator
 allowlist
 allowlisted

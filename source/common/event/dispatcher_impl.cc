@@ -103,13 +103,13 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ConnectionPtr
+Network::ServerConnectionPtr
 DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
                                        Network::TransportSocketPtr&& transport_socket,
                                        StreamInfo::StreamInfo& stream_info) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
-                                                   std::move(transport_socket), stream_info, true);
+  return std::make_unique<Network::ServerConnectionImpl>(
+      *this, std::move(socket), std::move(transport_socket), stream_info, true);
 }
 
 Network::ClientConnectionPtr
@@ -162,8 +162,8 @@ Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& s
                                                     Network::TcpListenerCallbacks& cb,
                                                     bool bind_to_port, uint32_t backlog_size) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(*this, std::move(socket), cb, bind_to_port,
-                                                    backlog_size);
+  return std::make_unique<Network::TcpListenerImpl>(
+      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
 }
 
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,

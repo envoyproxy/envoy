@@ -34,20 +34,17 @@ To use this method you will need a minimum of 4-5GB of disk space available to a
 
 # Creating a Pull Request with documentation changes
 
-When you create a Pull Request the documentation is rendered by CircleCI.
-
-If you are logged in to CircleCI (it is possible to authenticate using your Github account), you can view
-the rendered changes.
+When you create a Pull Request the documentation is rendered by Azure Pipelines.
 
 To do this:
-- click `Details` in the `ci/circleci: docs` check at the bottom of the Pull Request.
-- click `ARTIFACTS` in the CircleCI dashboard
-- browse to the documentation root at `generated/docs/index.html`.
+1. Open docs job in Azure Pipelines.
+2. Navigate to "Upload Docs to GCS" log.
+3. Click on the link there.
 
 # How the Envoy website and docs are updated
 
 1. The docs are published to [docs/envoy/latest](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy/latest)
-   on every commit to master. This process is handled by CircleCI with the
+   on every commit to master. This process is handled by Azure Pipelines with the
   [`publish.sh`](https://github.com/envoyproxy/envoy/blob/master/docs/publish.sh) script.
 
 2. The docs are published to [docs/envoy](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy)

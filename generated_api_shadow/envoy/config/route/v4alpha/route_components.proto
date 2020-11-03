@@ -985,6 +985,10 @@ message RouteAction {
   // fires, the stream is terminated with a 408 Request Timeout error code if no
   // upstream response header has been received, otherwise a stream reset
   // occurs.
+  //
+  // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
+  // is configured, this timeout is scaled according to the value for
+  // :ref:`HTTP_DOWNSTREAM_CONNECTION_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_IDLE>`.
   google.protobuf.Duration idle_timeout = 24;
 
   // Indicates that the route has a retry policy. Note that if this is set,
@@ -1526,7 +1530,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RateLimit";
 
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RateLimit.Action";
@@ -1643,11 +1647,15 @@ message RateLimit {
       repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
     }
 
-    // The following descriptor entry is appended when the dynamic metadata contains a key value:
+    // The following descriptor entry is appended when the
+    // :ref:`dynamic metadata <well_known_dynamic_metadata>` contains a key value:
     //
     // .. code-block:: cpp
     //
-    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    //   ("<descriptor_key>", "<value_queried_from_dynamic_metadata>")
+    //
+    // .. attention::
+    //   This action has been deprecated in favor of the :ref:`metadata <envoy_api_msg_config.route.v4alpha.RateLimit.Action.MetaData>` action
     message DynamicMetaData {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.route.v3.RateLimit.Action.DynamicMetaData";
@@ -1662,6 +1670,38 @@ message RateLimit {
       // An optional value to use if *metadata_key* is empty. If not set and
       // no value is present under the metadata_key then no descriptor is generated.
       string default_value = 3;
+    }
+
+    // The following descriptor entry is appended when the metadata contains a key value:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    message MetaData {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.route.v3.RateLimit.Action.MetaData";
+
+      enum Source {
+        // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
+        DYNAMIC = 0;
+
+        // Query :ref:`route entry metadata <envoy_api_field_config.route.v4alpha.Route.metadata>`
+        ROUTE_ENTRY = 1;
+      }
+
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
+
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the metadata is of type string.
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+
+      // An optional value to use if *metadata_key* is empty. If not set and
+      // no value is present under the metadata_key then no descriptor is generated.
+      string default_value = 3;
+
+      // Source of metadata
+      Source source = 4 [(validate.rules).enum = {defined_only: true}];
     }
 
     oneof action_specifier {
@@ -1686,7 +1726,14 @@ message RateLimit {
       HeaderValueMatch header_value_match = 6;
 
       // Rate limit on dynamic metadata.
-      DynamicMetaData dynamic_metadata = 7;
+      //
+      // .. attention::
+      //   This field has been deprecated in favor of the :ref:`metadata <envoy_api_field_config.route.v4alpha.RateLimit.Action.metadata>` field
+      DynamicMetaData hidden_envoy_deprecated_dynamic_metadata = 7
+          [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+      // Rate limit on metadata.
+      MetaData metadata = 8;
     }
   }
 

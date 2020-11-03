@@ -641,7 +641,7 @@ TEST_F(RouterTest, AddCookie) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -693,7 +693,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -744,7 +744,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -2330,9 +2330,9 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   EXPECT_CALL(*per_try_timeout_, disableTimer());
-  EXPECT_CALL(*response_timeout_, disableTimer());
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(*response_timeout_, disableTimer());
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
