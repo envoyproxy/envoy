@@ -45,8 +45,6 @@ private:
     ThreadLocalObjectSharedPtr get() override;
     void runOnAllThreads(const UpdateCb& cb) override;
     void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) override;
-    void runOnAllThreads(const Event::PostCb& cb) override;
-    void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& complete_cb) override;
     bool currentThreadRegistered() override;
     void set(InitializeCb cb) override;
 

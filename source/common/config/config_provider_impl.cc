@@ -25,8 +25,8 @@ ConfigSubscriptionCommonBase::~ConfigSubscriptionCommonBase() {
 }
 
 void ConfigSubscriptionCommonBase::applyConfigUpdate(const ConfigUpdateCb& update_fn) {
-  tls_.runOnAllThreads([update_fn](ThreadLocalConfig& thread_local_config) {
-    thread_local_config.config_ = update_fn(thread_local_config.config_);
+  tls_.runOnAllThreads([update_fn](OptRef<ThreadLocalConfig> thread_local_config) {
+    thread_local_config->config_ = update_fn(thread_local_config->config_);
   });
 }
 

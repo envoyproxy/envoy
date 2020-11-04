@@ -255,7 +255,7 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() { return tls_-
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(new ConfigImpl(config_update_info_->routeConfiguration(),
                                                  factory_context_, validator_, false));
-  tls_.runOnAllThreads([new_config](ThreadLocalConfig& tls) { tls.config_ = new_config; });
+  tls_.runOnAllThreads([new_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = new_config; });
 
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.

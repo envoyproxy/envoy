@@ -59,7 +59,7 @@ public:
                                std::shared_ptr<ResponseEvaluator> response_evaluator);
   virtual ~AdmissionControlFilterConfig() = default;
 
-  virtual ThreadLocalController& getController() const { return tls_->get(); }
+  virtual ThreadLocalController& getController() const { return **tls_; }
 
   Random::RandomGenerator& random() const { return random_; }
   bool filterEnabled() const { return admission_control_feature_.enabled(); }

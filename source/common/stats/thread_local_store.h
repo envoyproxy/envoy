@@ -477,6 +477,7 @@ private:
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
   bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
+  TlsCache& tlsCache() { return **tls_cache_; }
 
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
