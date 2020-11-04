@@ -71,8 +71,8 @@ class TestActiveTcpClient : public ActiveTcpClient {
 public:
   using ActiveTcpClient::ActiveTcpClient;
 
-  ~TestActiveTcpClient() { parent().onConnDestroyed(); }
-  void clearCallbacks() {
+  ~TestActiveTcpClient() override { parent().onConnDestroyed(); }
+  void clearCallbacks() override {
     if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
         state_ == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
       parent().onConnReleased(*this);
