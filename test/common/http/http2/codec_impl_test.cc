@@ -648,9 +648,16 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
   initialize();
 
-  const auto status = request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true);
-  EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.message(), testing::HasSubstr("missing required"));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+    const auto status = request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true);
+
+    EXPECT_FALSE(status.ok());
+    EXPECT_THAT(status.message(), testing::HasSubstr("missing required"));
+  } else {
+    EXPECT_THROW(request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true).IgnoreError(),
+                 ServerCodecError);
+    EXPECT_EQ(1, server_stats_store_.counter("http2.rx_messaging_error").value());
+  }
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeaders) {
