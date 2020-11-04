@@ -386,27 +386,22 @@ public:
    * all threaded workers.
    */
   template <class T> void registerType() {
-    tls_slot_->runOnAllThreads([](ThreadLocal::ThreadLocalObjectSharedPtr previous) {
-      LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(previous);
-      T::registerType(tls.state_.get());
-      return previous;
-    });
+    tls_slot_->runOnAllThreads([](LuaThreadLocal& tls) { T::registerType(tls.state_.get()); });
   }
 
   /**
    * Return the number of bytes used by the runtime.
    */
   uint64_t runtimeBytesUsed() {
-    uint64_t bytes_used =
-        lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNT, 0) * 1024;
-    bytes_used += lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNTB, 0);
+    uint64_t bytes_used = lua_gc(tls_slot_->get().state_.get(), LUA_GCCOUNT, 0) * 1024;
+    bytes_used += lua_gc(tls_slot_->get().state_.get(), LUA_GCCOUNTB, 0);
     return bytes_used;
   }
 
   /**
    * Force a full runtime GC.
    */
-  void runtimeGC() { lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOLLECT, 0); }
+  void runtimeGC() { lua_gc(tls_slot_->get().state_.get(), LUA_GCCOLLECT, 0); }
 
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
@@ -416,7 +411,7 @@ private:
     std::vector<int> global_slots_;
   };
 
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::TypedSlotPtr<LuaThreadLocal> tls_slot_;
   uint64_t current_global_slot_{};
 };
 

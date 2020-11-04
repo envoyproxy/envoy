@@ -291,6 +291,15 @@ void SslSocket::shutdownSsl() {
   }
 }
 
+void SslSocket::shutdownBasic() {
+  if (info_->state() != Ssl::SocketState::ShutdownSent &&
+      callbacks_->connection().state() != Network::Connection::State::Closed) {
+    callbacks_->ioHandle().shutdown(ENVOY_SHUT_WR);
+    drainErrorQueue();
+    info_->setState(Ssl::SocketState::ShutdownSent);
+  }
+}
+
 void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Unregister the SSL connection object from private key method providers.
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
@@ -303,6 +312,10 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   if (info_->state() == Ssl::SocketState::HandshakeInProgress ||
       info_->state() == Ssl::SocketState::HandshakeComplete) {
     shutdownSsl();
+  } else {
+    // We're not in a state to do the full SSL shutdown so perform a basic shutdown to flush any
+    // outstanding alerts
+    shutdownBasic();
   }
 }
 
@@ -362,8 +375,6 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-bool ClientSslSocketFactory::isReady() const { return config_->isSecretReady(); }
-
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
                                                Envoy::Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
@@ -404,8 +415,6 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
-
-bool ServerSslSocketFactory::isReady() const { return true; }
 
 } // namespace Tls
 } // namespace TransportSockets
