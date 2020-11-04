@@ -18,9 +18,9 @@ if [ ! -d "${SOURCE_DIRECTORY}" ]; then
   exit 1
 fi
 
-if [[ -n "${SHORT_COMMIT_SHA}" ]]; then
-    UPLOAD_PATH="${SHORT_COMMIT_SHA}"
-    REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+if [[ "$TARGET_SUFFIX" == "docs" ]]; then
+    # docs upload to the last commit sha (first 7 chars) in the developers branch
+    UPLOAD_PATH="$(git log --pretty=%P -n 1 | cut -d' ' -f2 | head -c7)"
 else
     UPLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
 fi
@@ -31,7 +31,8 @@ echo "Uploading to gs://${GCS_LOCATION} ..."
 gsutil -mq rsync -dr "${SOURCE_DIRECTORY}" "gs://${GCS_LOCATION}"
 
 # For docs uploads, add a redirect `PR_NUMBER` -> `COMMIT_SHA`
-if [[ -n "$REDIRECT_PATH" ]]; then
+if [[ "$TARGET_SUFFIX" == "docs" ]]; then
+    REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
     TMP_REDIRECT="/tmp/docredirect/${REDIRECT_PATH}/docs"
     mkdir -p "$TMP_REDIRECT"
     echo "<meta http-equiv=\"refresh\" content=\"0; URL='https://storage.googleapis.com/${GCS_REDIRECT}/index.html'\" />" \
