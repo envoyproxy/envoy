@@ -35,8 +35,6 @@ public:
   void chooseHost();
   void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
 
-  virtual void clearStaticHostsState();
-
   // These public objects shared amongst all types of load balancers will be used to construct load
   // balancers in specific load balancer fuzz classes
   Stats::IsolatedStoreImpl stats_store_;
@@ -46,7 +44,22 @@ public:
   NiceMock<MockPrioritySet> priority_set_;
   std::unique_ptr<LoadBalancer> lb_;
 
-  virtual ~LoadBalancerFuzzBase() = default;
+  virtual ~LoadBalancerFuzzBase() {
+    // In an iteration, after this class is destructed, whether through an exception throw or
+    // finishing an action stream, must clear any state that could persist in static hosts.
+    // The only outstanding health flags set are those that are set from hosts being placed in
+    // degraded and excluded. Thus, use the priority set pointer to know which flags to clear.
+    for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size();
+         ++priority_level) {
+      MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
+      for (auto& host : host_set.degraded_hosts_) {
+        host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+      }
+      for (auto& host : host_set.excluded_hosts_) {
+        host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      }
+    }
+  };
 
 protected:
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant

@@ -68,17 +68,5 @@ void ZoneAwareLoadBalancerFuzzBase::addWeightsToHosts() {
   }
 }
 
-void ZoneAwareLoadBalancerFuzzBase::clearStaticHostsState() {
-  LoadBalancerFuzzBase::clearStaticHostsState();
-  // Clear out any set weights
-  for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size();
-       ++priority_level) {
-    MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
-    for (auto& host : host_set.hosts_) {
-      host->weight(1);
-    }
-  }
-}
-
 } // namespace Upstream
 } // namespace Envoy
