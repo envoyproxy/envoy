@@ -123,7 +123,7 @@ public:
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
-  const std::string authScopes() const {return auth_scopes_; }
+  const std::string authScopes() const { return auth_scopes_; }
 
 
 private:
@@ -137,9 +137,9 @@ private:
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;
+  const std::string auth_scopes_;
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
-  const std::string auth_scopes_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

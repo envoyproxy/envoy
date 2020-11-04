@@ -88,10 +88,11 @@ FilterConfig::FilterConfig(
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher()),
-      signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
+      signout_path_(proto_config.signout_path()), 
+      secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
-      forward_bearer_token_(proto_config.forward_bearer_token()),
       auth_scopes_(proto_config.auth_scopes()),
+      forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
   if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
