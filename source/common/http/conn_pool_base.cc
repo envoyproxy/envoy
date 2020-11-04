@@ -48,10 +48,11 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-    Http::Protocol protocol)
+    Random::RandomGenerator& random_generator, Http::Protocol protocol)
     : Envoy::ConnectionPool::ConnPoolImplBase(
           host, priority, dispatcher, options,
-          wrapTransportSocketOptions(transport_socket_options, protocol)) {}
+          wrapTransportSocketOptions(transport_socket_options, protocol)),
+      random_generator_(random_generator), protocol_(protocol) {}
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,

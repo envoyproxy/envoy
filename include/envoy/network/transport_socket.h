@@ -14,6 +14,7 @@
 namespace Envoy {
 namespace Network {
 
+class TransportSocketFactory;
 class Connection;
 enum class ConnectionEvent;
 
@@ -198,11 +199,13 @@ public:
   virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
 
   /**
-   * @param vector of bytes to which the option should append hash key data that will be used
-   *        to separate connections based on the option. Any data already in the key vector must
-   *        not be modified.
+   * @param key supplies a vector of bytes to which the option should append hash key data that will
+   *        be used to separate connections based on the option. Any data already in the key vector
+   *        must not be modified.
+   * @param factory supplies the factor which will be used for creating the transport socket.
    */
-  virtual void hashKey(std::vector<uint8_t>& key) const PURE;
+  virtual void hashKey(std::vector<uint8_t>& key,
+                       const Network::TransportSocketFactory& factory) const PURE;
 };
 
 // TODO(mattklein123): Rename to TransportSocketOptionsConstSharedPtr in a dedicated follow up.
@@ -226,6 +229,11 @@ public:
    */
   virtual TransportSocketPtr
   createTransportSocket(TransportSocketOptionsSharedPtr options) const PURE;
+
+  /**
+   * @return bool whether the transport socket will use proxy protocol options.
+   */
+  virtual bool usesProxyProtocolOptions() const PURE;
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
