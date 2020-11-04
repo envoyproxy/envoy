@@ -63,13 +63,16 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
 
   const auto initialize_cb = [&cluster, this] { onClusterInit(cluster); };
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
+    // Remove the previous cluster before the cluster object is destroyed.
+    primary_init_clusters_.remove_if(
+        [name_to_remove = cluster.info()->name()](Cluster* cluster_iter) {
+          return cluster_iter->info()->name() == name_to_remove;
+        });
     primary_init_clusters_.push_back(&cluster);
     cluster.initialize(initialize_cb);
   } else {
     ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
-    // Secondary clusters can be updated. Remove the previous cluster before the cluster object is
-    // destroyed. Note that only secondary cluster need this remove since primary clusters are
-    // immutable.
+    // Remove the previous cluster before the cluster object is destroyed.
     secondary_init_clusters_.remove_if(
         [name_to_remove = cluster.info()->name()](Cluster* cluster_iter) {
           return cluster_iter->info()->name() == name_to_remove;
