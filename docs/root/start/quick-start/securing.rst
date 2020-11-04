@@ -69,5 +69,19 @@ Connect to an endpoint securely with SNI
 Validate an endpoint's certificates when connecting
 ---------------------------------------------------
 
+.. literalinclude:: _include/envoy-demo-tls-validation.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 43
+   :lines: 43-53
+   :emphasize-lines: 6-9
+
+.. literalinclude:: _include/envoy-demo-tls-validation.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 43
+   :lines: 43-53
+   :emphasize-lines: 10-11
+
 Use mututal TLS (mTLS) to perform client certificate authentication
 -------------------------------------------------------------------
