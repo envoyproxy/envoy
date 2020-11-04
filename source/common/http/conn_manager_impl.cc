@@ -754,7 +754,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
   sendLocalReply(request_headers_ != nullptr &&
                      Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                  Http::Code::RequestTimeout, "request header timeout", nullptr, absl::nullopt,
-                 StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+                 StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {

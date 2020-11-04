@@ -115,6 +115,8 @@ struct ResponseCodeDetailValues {
   const std::string MaxDurationTimeout = "max_duration_timeout";
   // The per-stream total request timeout was exceeded.
   const std::string RequestOverallTimeout = "request_overall_timeout";
+  // The per-stream request header timeout was exceeded.
+  const std::string RequestHeaderTimeout = "request_header_timeout";
   // The request was rejected due to the Overload Manager reaching configured resource limits.
   const std::string Overload = "overload";
   // The HTTP/1.0 or HTTP/0.9 request was rejected due to HTTP/1.0 support not being configured.

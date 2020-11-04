@@ -540,7 +540,7 @@ TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
 
   // The upstream should send a 40x response and send a local reply.
   EXPECT_TRUE(connection_driver->closed());
-  EXPECT_THAT(response, HasSubstr("408"));
+  EXPECT_THAT(response, AllOf(HasSubstr("408"), HasSubstr("header")));
 }
 
 } // namespace Envoy
