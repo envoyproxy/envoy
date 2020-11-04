@@ -51,12 +51,10 @@ namespace {
 class ConnPoolImplForTest : public ConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
-                      Upstream::ClusterInfoConstSharedPtr cluster,
-                      NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb)
+                      Upstream::ClusterInfoConstSharedPtr cluster)
       : ConnPoolImpl(dispatcher, random_, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                      Upstream::ResourcePriority::Default, nullptr, nullptr),
-        api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
-        mock_upstream_ready_cb_(upstream_ready_cb) {}
+        api_(Api::createApiForTest()), mock_dispatcher_(dispatcher) {}
 
   ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_clients_.size());
@@ -111,22 +109,15 @@ public:
   }
 
   void expectEnableUpstreamReady() {
-    EXPECT_FALSE(upstream_ready_enabled_);
-    EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
-        .Times(1)
-        .RetiresOnSaturation();
+    EXPECT_CALL(mock_dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb_));
   }
 
-  void expectAndRunUpstreamReady() {
-    EXPECT_TRUE(upstream_ready_enabled_);
-    mock_upstream_ready_cb_->invokeCallback();
-    EXPECT_FALSE(upstream_ready_enabled_);
-  }
+  void expectAndRunUpstreamReady() { post_cb_(); }
 
   Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
+  Event::PostCb post_cb_;
   std::vector<TestCodecClient> test_clients_;
 };
 
@@ -136,9 +127,7 @@ public:
 class Http1ConnPoolImplTest : public testing::Test {
 public:
   Http1ConnPoolImplTest()
-      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        conn_pool_(
-            std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, upstream_ready_cb_)) {}
+      : conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_)) {}
 
   ~Http1ConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -146,7 +135,6 @@ public:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
@@ -291,11 +279,9 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
   cluster_->transport_socket_matcher_ =
       std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(factory));
 
-  new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
-  conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, upstream_ready_cb_);
+  conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_);
   NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_->expectClientCreate(Protocol::Http11);
@@ -646,6 +632,7 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->expectEnableUpstreamReady();
   callbacks2.outer_encoder_->encodeHeaders(
       TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
   // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
@@ -693,7 +680,6 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
 
   // Finishing request 1 will schedule binding the connection to request 2.
   conn_pool_->expectEnableUpstreamReady();
-
   callbacks.outer_encoder_->encodeHeaders(
       TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
   Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
@@ -712,6 +698,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   EXPECT_CALL(callbacks2.pool_ready_, ready());
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
+  conn_pool_->expectEnableUpstreamReady();
   callbacks2.outer_encoder_->encodeHeaders(
       TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
   // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
@@ -959,7 +946,9 @@ TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   r3.startRequest();
   EXPECT_EQ(3U, cluster_->stats_.upstream_rq_total_.value());
 
+  conn_pool_->expectEnableUpstreamReady();
   r2.completeResponse(false);
+  conn_pool_->expectEnableUpstreamReady();
   r3.completeResponse(false);
 
   // Disconnect both clients.

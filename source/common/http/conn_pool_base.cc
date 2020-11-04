@@ -50,10 +50,18 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-    std::vector<Http::Protocol> protocols)
+    Random::RandomGenerator& random_generator, std::vector<Http::Protocol> protocols)
     : Envoy::ConnectionPool::ConnPoolImplBase(
           host, priority, dispatcher, options,
-          wrapTransportSocketOptions(transport_socket_options, protocols)) {}
+          wrapTransportSocketOptions(transport_socket_options, protocols)),
+      random_generator_(random_generator) {
+  ASSERT(!protocols.empty());
+  // TODO(alyssawilk) the protocol function should probably be an optional and
+  // simply not set if there's more than one and ALPN has not been negotiated.
+  if (!protocols.empty()) {
+    protocol_ = protocols[0];
+  }
+}
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
