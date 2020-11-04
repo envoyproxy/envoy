@@ -43,14 +43,28 @@ Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSCo
    :language: yaml
    :linenos:
    :lineno-start: 92
-   :lines: 92-111
-   :emphasize-lines: 16-20
+   :lines: 92-110
+   :emphasize-lines: 16-19
 
 Secure an endpoint with SNI
 ---------------------------
 
+.. literalinclude:: _include/envoy-demo-tls-sni.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 27
+   :lines: 27-37
+   :emphasize-lines: 6-8
+
 Connect to an endpoint securely with SNI
 ----------------------------------------
+
+.. literalinclude:: _include/envoy-demo-tls-sni.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 109
+   :lines: 109-114
+   :emphasize-lines: 6
 
 Validate an endpoint's certificates when connecting
 ---------------------------------------------------
