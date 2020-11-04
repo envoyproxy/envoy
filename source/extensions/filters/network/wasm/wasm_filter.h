@@ -26,17 +26,21 @@ public:
   ~FilterConfig();
 
   std::shared_ptr<Context> createFilter() {
-    auto wasm = tls_slot_->get().wasm();
+    Wasm* wasm = nullptr;
+    auto handle = tls_slot_->get();
+    if (handle.has_value()) {
+      wasm = handle->wasm().get();
+    }
     if (plugin_->fail_open_ && (!wasm || wasm->isFailed())) {
       return nullptr;
     }
     if (wasm && !root_context_id_) {
       root_context_id_ = wasm->getRootContext(plugin_, false)->id();
     }
-    return std::make_shared<Context>(wasm.get(), root_context_id_, plugin_);
+    return std::make_shared<Context>(wasm, root_context_id_, plugin_);
   }
 
-  Envoy::Extensions::Common::Wasm::Wasm* wasmForTest() { return tls_slot_->get().wasm().get(); }
+  Envoy::Extensions::Common::Wasm::Wasm* wasmForTest() { return tls_slot_->get()->wasm().get(); }
 
 private:
   uint32_t root_context_id_{0};

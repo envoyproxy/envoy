@@ -32,9 +32,10 @@ public:
       }
     }
 
-    auto wasm = tls_slot_->get().wasm();
-    if (wasm) {
-      wasm->log(plugin_, request_headers, response_headers, response_trailers, stream_info);
+    auto handle = tls_slot_->get();
+    if (handle.has_value()) {
+      handle->wasm()->log(plugin_, request_headers, response_headers, response_trailers,
+                          stream_info);
     }
   }
 
@@ -45,9 +46,9 @@ public:
 
   ~WasmAccessLog() override {
     if (tls_slot_->currentThreadRegistered()) {
-      tls_slot_->runOnAllThreads([plugin = plugin_](WasmHandle& handle) {
-        if (handle.wasm()) {
-          handle.wasm()->startShutdown(plugin);
+      tls_slot_->runOnAllThreads([plugin = plugin_](OptRef<WasmHandle> handle) {
+        if (handle.has_value()) {
+          handle->wasm()->startShutdown(plugin);
         }
       });
     }
