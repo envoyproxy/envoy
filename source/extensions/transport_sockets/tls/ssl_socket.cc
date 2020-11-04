@@ -383,8 +383,6 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-bool ClientSslSocketFactory::isReady() const { return config_->isSecretReady(); }
-
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
                                                Envoy::Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
@@ -425,8 +423,6 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
-
-bool ServerSslSocketFactory::isReady() const { return true; }
 
 } // namespace Tls
 } // namespace TransportSockets
