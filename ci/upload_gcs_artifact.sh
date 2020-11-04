@@ -39,7 +39,7 @@ if [[ "$TARGET_SUFFIX" == "docs" ]]; then
 	 >  "${TMP_REDIRECT}/index.html"
     GCS_REDIRECT="${GCS_ARTIFACT_BUCKET}/${REDIRECT_PATH}"
     echo "Uploading redirect to gs://${GCS_REDIRECT} ..."
-    gsutil -mq rsync -dr "/tmp/docredirect/${REDIRECT_PATH}" "gs://${GCS_REDIRECT}"
+    gsutil -h "Cache-Control:no-cache,max-age=0" -mq rsync -dr "/tmp/docredirect/${REDIRECT_PATH}" "gs://${GCS_REDIRECT}"
 fi
 
 echo "Artifacts uploaded to: https://storage.googleapis.com/${GCS_LOCATION}/index.html"
