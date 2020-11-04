@@ -174,6 +174,7 @@ public:
   const Network::TransportSocketOptionsSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
+  bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
 protected:
   // Creates up to 3 connections, based on the prefetch ratio.
