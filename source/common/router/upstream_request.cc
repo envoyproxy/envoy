@@ -427,7 +427,6 @@ void UpstreamRequest::onPoolReady(
     const std::string details =
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
                      status.message(), "}");
-    ENVOY_LOG_MISC(info, "{}", status.message());
     parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
                                         absl::nullopt, details);
     return;

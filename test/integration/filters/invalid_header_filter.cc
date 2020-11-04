@@ -29,6 +29,11 @@ public:
     if (Http::HeaderUtility::isConnect(headers)) {
       headers.removeHost();
     }
+    if (!headers.get(Http::LowerCaseString("send-reply")).empty()) {
+      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
+                                         "InvalidHeaderFilter ready");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 };
