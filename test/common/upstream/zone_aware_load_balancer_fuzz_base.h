@@ -15,6 +15,14 @@ public:
   }
 
   ~ZoneAwareLoadBalancerFuzzBase() override {
+    // Clear out any set weights
+    for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size();
+         ++priority_level) {
+      MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
+      for (auto& host : host_set.hosts_) {
+        host->weight(1);
+      }
+    }
     // This deletes the load balancer first. If constructed with a local priority set, load balancer
     // with reference local priority set on destruction. Since local priority set is in a base
     // class, it will be initialized second and thus destructed first. Thus, in order to avoid a use
@@ -41,8 +49,6 @@ public:
   // If fuzzing Zone Aware Load Balancers, local priority set will get constructed sometimes. If not
   // constructed, a local_priority_set_.get() call will return a nullptr.
   std::shared_ptr<PrioritySetImpl> local_priority_set_;
-
-  void clearStaticHostsState() override;
 
 private:
   // This bytestring will be iterated through representing randomness in order to choose
