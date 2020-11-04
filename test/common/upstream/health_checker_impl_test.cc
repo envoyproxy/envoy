@@ -522,10 +522,9 @@ public:
   void expectSessionCreate(const HostWithHealthCheckMap& health_check_map) {
     // Expectations are in LIFO order.
     TestSessionPtr new_test_session(new TestSession());
+    new_test_session->timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    new_test_session->interval_timer_ = new Event::MockTimer(&dispatcher_);
     test_sessions_.emplace_back(std::move(new_test_session));
-    TestSession& test_session = *test_sessions_.back();
-    test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
     expectClientCreate(test_sessions_.size() - 1, health_check_map);
   }
 
@@ -540,7 +539,7 @@ public:
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(testing::AnyNumber())
         .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
-          uint32_t index = connection_index_.front();
+          const uint32_t index = connection_index_.front();
           connection_index_.pop_front();
           return test_sessions_[index]->client_connection_;
         }));
@@ -554,7 +553,7 @@ public:
                 EXPECT_EQ(health_check_config.port_value(),
                           conn_data.host_description_->healthCheckAddress()->ip()->port());
               }
-              uint32_t index = codec_index_.front();
+              const uint32_t index = codec_index_.front();
               codec_index_.pop_front();
               TestSession& test_session = *test_sessions_[index];
               std::shared_ptr<Upstream::MockClusterInfo> cluster{
@@ -3705,10 +3704,9 @@ public:
   void expectSessionCreate() {
     // Expectations are in LIFO order.
     TestSessionPtr new_test_session(new TestSession());
+    new_test_session->timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    new_test_session->interval_timer_ = new Event::MockTimer(&dispatcher_);
     test_sessions_.emplace_back(std::move(new_test_session));
-    TestSession& test_session = *test_sessions_.back();
-    test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
     expectClientCreate(test_sessions_.size() - 1);
   }
 
@@ -3722,7 +3720,7 @@ public:
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(testing::AnyNumber())
         .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
-          uint32_t index = connection_index_.front();
+          const uint32_t index = connection_index_.front();
           connection_index_.pop_front();
           return test_sessions_[index]->client_connection_;
         }));
@@ -3730,7 +3728,7 @@ public:
     EXPECT_CALL(*health_checker_, createCodecClient_(_))
         .WillRepeatedly(
             Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-              uint32_t index = codec_index_.front();
+              const uint32_t index = codec_index_.front();
               codec_index_.pop_front();
               TestSession& test_session = *test_sessions_[index];
               std::shared_ptr<Upstream::MockClusterInfo> cluster{

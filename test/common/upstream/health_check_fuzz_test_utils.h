@@ -11,8 +11,7 @@
 
 namespace Envoy {
 namespace Upstream {
-// TODO IN THIS PR, IF YOU ARE GOING TO EDIT THESE TO NICEMOCKS, MAKE SURE TO CHECKOUT MASTER FOR
-// THESE UNIT TESTS BEFORE I EVER STEPPED FOOT HERE AT GOOGLE
+
 class HealthCheckerTestBase {
 public:
   std::shared_ptr<MockClusterMockPrioritySet> cluster_{
