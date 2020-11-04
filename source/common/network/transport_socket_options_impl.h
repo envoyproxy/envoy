@@ -29,7 +29,8 @@ public:
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
     return inner_options_->proxyProtocolOptions();
   }
-  void hashKey(std::vector<uint8_t>& key) const override;
+  void hashKey(std::vector<uint8_t>& key,
+               const Network::TransportSocketFactory& factory) const override;
 
 private:
   const absl::optional<std::string> alpn_fallback_;
@@ -67,7 +68,8 @@ public:
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
     return proxy_protocol_options_;
   }
-  void hashKey(std::vector<uint8_t>& key) const override;
+  void hashKey(std::vector<uint8_t>& key,
+               const Network::TransportSocketFactory& factory) const override;
 
 private:
   const absl::optional<std::string> override_server_name_;
