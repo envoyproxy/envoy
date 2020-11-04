@@ -39,6 +39,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   Http::RequestMessagePtr request = createPostRequest();
   const std::string body = fmt::format(GetAccessTokenBodyFormatString, auth_code, encoded_client_id,
                                        encoded_secret, encoded_cb_url);
+  request->body().add(body);
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
 
