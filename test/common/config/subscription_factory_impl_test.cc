@@ -38,9 +38,9 @@ namespace {
 class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
-      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)),
-        subscription_factory_(local_info_, dispatcher_, cm_, random_, validation_visitor_, *api_,
-                              runtime_) {}
+      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_, random_)),
+        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, runtime_) {
+  }
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
@@ -311,7 +311,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
         return async_client_factory;
       }));
   EXPECT_CALL(random_, random());
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
   subscriptionFromConfigSource(config)->start({"static_cluster"});
@@ -326,7 +326,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
   NiceMock<Runtime::MockSnapshot> snapshot;
   EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
   EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
-  EXPECT_CALL(snapshot, countDeprecatedFeatureUse());
+  EXPECT_CALL(runtime_, countDeprecatedFeatureUse());
 
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");

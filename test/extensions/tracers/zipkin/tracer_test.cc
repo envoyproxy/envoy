@@ -395,15 +395,27 @@ TEST_F(ZipkinTracerTest, SharedSpanContext) {
   const SystemTime timestamp = time_system_.systemTime();
 
   NiceMock<Tracing::MockConfig> config;
-  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // Create parent span
   SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
   SpanContext parent_context(*parent_span);
 
+  // An CS annotation must have been added
+  EXPECT_EQ(1ULL, parent_span->annotations().size());
+  Annotation ann = parent_span->annotations()[0];
+  EXPECT_EQ(CLIENT_SEND, ann.value());
+
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
+
   SpanPtr child_span = tracer.startSpan(config, "child_span", timestamp, parent_context);
 
   EXPECT_EQ(parent_span->id(), child_span->id());
+
+  // An SR annotation must have been added
+  EXPECT_EQ(1ULL, child_span->annotations().size());
+  ann = child_span->annotations()[0];
+  EXPECT_EQ(SERVER_RECV, ann.value());
 }
 
 // This test checks that when configured to NOT use shared span context, a child span
@@ -419,15 +431,27 @@ TEST_F(ZipkinTracerTest, NotSharedSpanContext) {
   const SystemTime timestamp = time_system_.systemTime();
 
   NiceMock<Tracing::MockConfig> config;
-  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // Create parent span
   SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
   SpanContext parent_context(*parent_span);
 
+  // An CS annotation must have been added
+  EXPECT_EQ(1ULL, parent_span->annotations().size());
+  Annotation ann = parent_span->annotations()[0];
+  EXPECT_EQ(CLIENT_SEND, ann.value());
+
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
+
   SpanPtr child_span = tracer.startSpan(config, "child_span", timestamp, parent_context);
 
   EXPECT_EQ(parent_span->id(), child_span->parentId());
+
+  // An SR annotation must have been added
+  EXPECT_EQ(1ULL, child_span->annotations().size());
+  ann = child_span->annotations()[0];
+  EXPECT_EQ(SERVER_RECV, ann.value());
 }
 
 } // namespace

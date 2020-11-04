@@ -14,6 +14,7 @@ def envoy_copts(repository, test = False):
         "-Wformat",
         "-Wformat-security",
         "-Wvla",
+        "-Wno-deprecated-declarations",
     ]
 
     # Windows options for cleanest service compilation;
@@ -26,15 +27,23 @@ def envoy_copts(repository, test = False):
         "-Zc:__cplusplus",
         "-DWIN32",
         "-D_WIN32_WINNT=0x0A00",  # _WIN32_WINNT_WIN10
-        "-DNTDDI_VERSION=0x0A000000",  # NTDDI_WIN10
+        "-DNTDDI_VERSION=0x0A000005",  # NTDDI_WIN10_RS4
         "-DWIN32_LEAN_AND_MEAN",
         "-DNOUSER",
         "-DNOMCX",
         "-DNOIME",
         "-DNOCRYPT",
-        # this is to silence the incorrect MSVC compiler warning when trying to convert between
-        # std::optional data types while conversions between primitive types are producing no error
+        # Ignore unguarded gcc pragmas in quiche (unrecognized by MSVC)
+        # TODO(wrowe,sunjayBhatia): Drop this change when fixed in bazel/external/quiche.genrule_cmd
+        "-wd4068",
+        # Silence incorrect MSVC compiler warnings when converting between std::optional
+        # data types (while conversions between primitive types are producing no error)
         "-wd4244",
+        # Allow inline functions to be undefined
+        "-wd4506",
+        # Allow 'nodiscard' function return values to be discarded
+        # TODO(wrowe,sunjayBhatia): Drop this option when all causes are fixed
+        "-wd4834",
     ]
 
     return select({
@@ -48,8 +57,11 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:windows_opt_build": [],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
+               repository + "//bazel:clang_cl_opt_build": [] if test else ["-Z7", "-fstandalone-debug"],
+               repository + "//bazel:clang_cl_fastbuild_build": ["-fno-standalone-debug"],
+               repository + "//bazel:clang_cl_dbg_build": ["-fstandalone-debug"],
            }) + select({
-               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions"],
+               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions", "-Wrange-loop-analysis"],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
                "//conditions:default": [],
            }) + select({
@@ -57,10 +69,13 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + select({
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
-               "//conditions:default": ["-DTCMALLOC"],
-           }) + select({
-               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1"],
-               "//conditions:default": [],
+               repository + "//bazel:disable_tcmalloc_on_linux_x86_64": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
+               repository + "//bazel:gperftools_tcmalloc": ["-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": ["-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:debug_tcmalloc_on_linux_x86_64": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:linux_x86_64": ["-DTCMALLOC"],
+               "//conditions:default": ["-DGPERFTOOLS_TCMALLOC"],
            }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
@@ -115,6 +130,12 @@ def envoy_stdlib_deps():
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
+        repository + "//bazel:disable_tcmalloc_on_linux_x86_64": None,
+        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:gperftools_tcmalloc": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:linux_x86_64": envoy_external_dep_path("tcmalloc"),
         "//conditions:default": envoy_external_dep_path("gperftools"),
     })
 

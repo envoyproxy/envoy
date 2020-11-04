@@ -105,6 +105,18 @@ idle_timeout: 1s
   EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->idleTimeout().value());
 }
 
+TEST(ConfigTest, MaxDownstreamConnectionDuration) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+max_downstream_connection_duration: 10s
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  EXPECT_EQ(std::chrono::seconds(10), config_obj.maxDownstreamConnectionDuration().value());
+}
+
 TEST(ConfigTest, NoRouteConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -423,10 +435,10 @@ TEST(ConfigTest, WeightedClustersConfig) {
   Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
 
   NiceMock<Network::MockConnection> connection;
-  EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+  EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(0));
   EXPECT_EQ(std::string("cluster1"), config_obj.getRouteFromEntries(connection)->clusterName());
 
-  EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+  EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(2));
   EXPECT_EQ(std::string("cluster2"), config_obj.getRouteFromEntries(connection)->clusterName());
 }
 
@@ -463,7 +475,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
     HashedValue hv1(v1), hv2(v2);
 
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(0));
 
     const auto route = config_obj.getRouteFromEntries(connection);
     EXPECT_NE(nullptr, route);
@@ -490,7 +502,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
     HashedValue hv3(v3), hv4(v4);
 
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(2));
 
     const auto route = config_obj.getRouteFromEntries(connection);
     EXPECT_NE(nullptr, route);
@@ -556,7 +568,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
     HashedValue hv1(v1), hv2(v2);
 
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(0));
 
     const auto route = config_obj.getRouteFromEntries(connection);
     EXPECT_NE(nullptr, route);
@@ -589,7 +601,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
     HashedValue hv3(v3), hv4(v4);
 
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(2));
 
     const auto route = config_obj.getRouteFromEntries(connection);
     EXPECT_NE(nullptr, route);
@@ -1324,7 +1336,7 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   {
     Upstream::LoadBalancerContext* context;
 
-    EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
     EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster1", _, _))
         .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
@@ -1348,7 +1360,7 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   {
     Upstream::LoadBalancerContext* context;
 
-    EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(2));
     EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster2", _, _))
         .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());

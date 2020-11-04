@@ -83,6 +83,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
@@ -91,13 +92,46 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_test(
+    name = "apple_dns_impl_test",
+    srcs = select({
+        "//bazel:apple": ["apple_dns_impl_test.cc"],
+        "//conditions:default": [],
+    }),
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:dns_interface",
+        "//source/common/event:dispatcher_includes",
+        "//include/envoy/event:file_event_interface",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/mocks/event:event_mocks",
+    ] + select({
+        "//bazel:apple": [
+            "//source/common/network:dns_lib",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
+    args = [
+        # Used in createDnsResolver to force creation of DnsResolverImpl when running test on macOS.
+        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
@@ -166,6 +200,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
@@ -191,6 +226,15 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "raw_buffer_socket_test",
+    srcs = ["raw_buffer_socket_test.cc"],
+    deps = [
+        "//source/common/network:raw_buffer_socket_lib",
+        "//test/test_common:network_utility_lib",
     ],
 )
 
@@ -374,6 +418,18 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "io_socket_handle_impl_test",
     srcs = ["io_socket_handle_impl_test.cc"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "io_socket_handle_impl_integration_test",
+    srcs = ["io_socket_handle_impl_integration_test.cc"],
+    tags = ["requires-network"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",

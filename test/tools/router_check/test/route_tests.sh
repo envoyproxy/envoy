@@ -13,7 +13,7 @@ TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Re
 # Testing expected matches
 for t in "${TESTS[@]}"
 do
-  TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details")
+  "${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details"
 done
 
 # Testing coverage flag passes
@@ -48,14 +48,14 @@ if [[ "${COVERAGE_OUTPUT}" != *"Failed to meet coverage requirement: 100%"* ]] ;
 fi
 
 # Test the yaml test file support
-TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.yaml" "--details")
+"${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.yaml" "--details"
 
 # Test the proto text test file support
-TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.pb_text" "--details")
+"${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.pb_text" "--details"
 
 # Bad config file
 echo "testing bad config output"
-BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "-c" "${PATH_CONFIG}/Redirect.golden.proto.json" "-t" "${PATH_CONFIG}/TestRoutes.yaml") 2>&1) ||
+BAD_CONFIG_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Redirect.golden.proto.json" "-t" "${PATH_CONFIG}/TestRoutes.yaml" 2>&1) ||
   echo "${BAD_CONFIG_OUTPUT:-no-output}"
 if [[ "${BAD_CONFIG_OUTPUT}" != *"Protobuf message (type envoy.config.route.v3.RouteConfiguration reason INVALID_ARGUMENT:tests: Cannot find field.) has unknown fields"* ]]; then
   exit 1

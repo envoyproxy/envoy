@@ -119,7 +119,7 @@ public:
     connecting_ = true;
 
     // Issue event which will trigger TLS handshake.
-    file_event_->activate(Event::FileReadyType::Write);
+    ioHandle().activateFileEvents(Event::FileReadyType::Write);
   }
 };
 
@@ -223,7 +223,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsTest) {
   Buffer::OwnedImpl buffer;
   buffer.add("hello");
   conn->write(buffer, false);
-  while (client_write_buffer_->bytes_drained() != 5) {
+  while (client_write_buffer_->bytesDrained() != 5) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   // Make sure the data makes it upstream.
@@ -234,7 +234,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsTest) {
   // receiver side upon receiving "switch" message.
   buffer.add("switch");
   conn->write(buffer, false);
-  while (client_write_buffer_->bytes_drained() != 11) {
+  while (client_write_buffer_->bytesDrained() != 11) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   // Make sure the data makes it upstream.
@@ -253,7 +253,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsTest) {
   // Send few messages over encrypted connection.
   buffer.add("hola");
   conn->write(buffer, false);
-  while (client_write_buffer_->bytes_drained() != 15) {
+  while (client_write_buffer_->bytesDrained() != 15) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   // Make sure the data makes it upstream.
@@ -261,7 +261,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsTest) {
 
   buffer.add("bye");
   conn->write(buffer, false);
-  while (client_write_buffer_->bytes_drained() != 18) {
+  while (client_write_buffer_->bytesDrained() != 18) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   // Make sure the data makes it upstream.

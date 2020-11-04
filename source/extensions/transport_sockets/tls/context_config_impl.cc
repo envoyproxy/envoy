@@ -337,16 +337,8 @@ const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "ECDHE-ECDSA-AES128-GCM-SHA256:"
     "ECDHE-RSA-AES128-GCM-SHA256:"
 #endif
-    "ECDHE-ECDSA-AES128-SHA:"
-    "ECDHE-RSA-AES128-SHA:"
-    "AES128-GCM-SHA256:"
-    "AES128-SHA:"
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
-    "ECDHE-RSA-AES256-GCM-SHA384:"
-    "ECDHE-ECDSA-AES256-SHA:"
-    "ECDHE-RSA-AES256-SHA:"
-    "AES256-GCM-SHA384:"
-    "AES256-SHA";
+    "ECDHE-RSA-AES256-GCM-SHA384:";
 
 const std::string ClientContextConfigImpl::DEFAULT_CURVES =
 #ifndef BORINGSSL_FIPS
@@ -410,6 +402,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+      ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
 
@@ -502,6 +495,21 @@ ServerContextConfigImpl::getSessionTicketKey(const std::string& key_data) {
   ASSERT(key_data.begin() + pos == key_data.end());
 
   return dst_key;
+}
+
+Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
+        policy) {
+  switch (policy) {
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::LENIENT_STAPLING:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STRICT_STAPLING:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 } // namespace Tls

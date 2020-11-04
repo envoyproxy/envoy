@@ -111,16 +111,16 @@ tracing_enabled = os.name != 'nt'
 # Generate a demo config for the main front proxy. This sets up both HTTP and HTTPS listeners,
 # as well as a listener for the double proxy to connect to via SSL client authentication.
 generate_config(SCRIPT_DIR,
-                'envoy_front_proxy_v2.template.yaml',
-                '{}/envoy_front_proxy.v2.yaml'.format(OUT_DIR),
+                'envoy_front_proxy.template.yaml',
+                '{}/envoy_front_proxy.yaml'.format(OUT_DIR),
                 clusters=front_envoy_clusters,
                 tracing=tracing_enabled)
 
 # Generate a demo config for the double proxy. This sets up both an HTTP and HTTPS listeners,
 # and backhauls the traffic to the main front proxy.
 generate_config(SCRIPT_DIR,
-                'envoy_double_proxy_v2.template.yaml',
-                '{}/envoy_double_proxy.v2.yaml'.format(OUT_DIR),
+                'envoy_double_proxy.template.yaml',
+                '{}/envoy_double_proxy.yaml'.format(OUT_DIR),
                 tracing=tracing_enabled)
 
 # Generate a demo config for the service to service (local) proxy. This sets up several different
@@ -132,14 +132,12 @@ generate_config(SCRIPT_DIR,
 #                                  that Envoy proxies to listens on its own port.
 # optional mongo ports: built from mongos_servers above.
 generate_config(SCRIPT_DIR,
-                'envoy_service_to_service_v2.template.yaml',
+                'envoy_service_to_service.template.yaml',
                 '{}/envoy_service_to_service.yaml'.format(OUT_DIR),
                 internal_virtual_hosts=service_to_service_envoy_clusters,
                 external_virtual_hosts=external_virtual_hosts,
                 mongos_servers=mongos_servers)
 
-for google_ext in ['v2.yaml']:
-  shutil.copy(os.path.join(SCRIPT_DIR, 'google_com_proxy.%s' % google_ext), OUT_DIR)
-
-shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_connect.v3.yaml'), OUT_DIR)
-shutil.copy(os.path.join(SCRIPT_DIR, 'terminate_connect.v3.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'envoyproxy_io_proxy.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_connect.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'terminate_connect.yaml'), OUT_DIR)

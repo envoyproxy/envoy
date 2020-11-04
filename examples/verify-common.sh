@@ -55,7 +55,6 @@ cleanup_stack () {
     path="$1"
     run_log "Cleanup ($path)"
     docker-compose down
-    docker system prune -f
 }
 
 cleanup () {
@@ -116,6 +115,20 @@ responds_without_header () {
     }
 }
 
+wait_for () {
+    local i=1 returns=1 seconds="$1"
+    shift
+    while ((i<=seconds)); do
+	if "$@"; then
+	    returns=0
+	    break
+	else
+	    sleep 1
+	    ((i++))
+	fi
+    done
+    return "$returns"
+}
 
 trap 'cleanup' EXIT
 

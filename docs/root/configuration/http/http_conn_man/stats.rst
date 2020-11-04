@@ -105,7 +105,9 @@ Each codec has the option of adding per-codec statistics. Both http1 and http2 h
 Http1 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~
 
-All http1 statistics are rooted at *http1.*
+On the downstream side all http1 statistics are rooted at *http1.*
+
+On the upstream side all http1 statistics are rooted at *cluster.<name>.http1.*
 
 .. csv-table::
    :header: Name, Type, Description
@@ -119,7 +121,9 @@ All http1 statistics are rooted at *http1.*
 Http2 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~
 
-All http2 statistics are rooted at *http2.*
+On the downstream side all http2 statistics are rooted at *http2.*
+
+On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
 
 .. csv-table::
    :header: Name, Type, Description
@@ -139,6 +143,7 @@ All http2 statistics are rooted at *http2.*
    trailers, Counter, Total number of trailers seen on requests coming from downstream
    tx_flush_timeout, Counter, Total number of :ref:`stream idle timeouts <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
+   keepalive_timeout, Counter, Total number of connections closed due to :ref:`keepalive timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
    streams_active, Gauge, Active streams as observed by the codec
    pending_send_bytes, Gauge, Currently buffered body data in bytes waiting to be written when stream/connection window is opened.
 

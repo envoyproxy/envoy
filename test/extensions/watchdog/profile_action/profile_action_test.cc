@@ -15,6 +15,7 @@
 #include "extensions/watchdog/profile_action/config.h"
 #include "extensions/watchdog/profile_action/profile_action.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -35,8 +36,9 @@ class ProfileActionTest : public testing::Test {
 protected:
   ProfileActionTest()
       : time_system_(std::make_unique<Event::SimulatedTimeSystem>()),
-        api_(Api::createApiForTest(*time_system_)), dispatcher_(api_->allocateDispatcher("test")),
-        context_({*api_, *dispatcher_}), test_path_(generateTestPath()) {}
+        api_(Api::createApiForTest(stats_, *time_system_)),
+        dispatcher_(api_->allocateDispatcher("test")),
+        context_({*api_, *dispatcher_, stats_, "test"}), test_path_(generateTestPath()) {}
 
   // Generates a unique path for a testcase.
   static std::string generateTestPath() {
@@ -76,6 +78,7 @@ protected:
     outstanding_notifies_ -= 1;
   }
 
+  Stats::TestUtil::TestStore stats_;
   std::unique_ptr<Event::TestTimeSystem> time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -350,6 +353,72 @@ TEST_F(ProfileActionTest, ShouldSaturatedMaxProfiles) {
   // Profiler won't run in this case, so there should be no files generated.
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 0);
 #endif
+}
+
+// The attempted counter should be updated on profile attempts that don't
+// interfere with an existing profile the action is running.
+// The successfully captured profile should be updated only if we captured the profile.
+TEST_F(ProfileActionTest, ShouldUpdateCountersCorrectly) {
+  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  config.set_profile_path(test_path_);
+  config.mutable_profile_duration()->set_seconds(1);
+
+  // Create the ProfileAction before we start running the dispatcher
+  // otherwise the timer created will in ProfileActions ctor will
+  // not be thread safe.
+  action_ = std::make_unique<ProfileAction>(config, context_);
+  Thread::ThreadPtr thread = api_->threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
+  std::vector<std::pair<Thread::ThreadId, MonotonicTime>> tid_ltt_pairs;
+
+  // This will fail since no TIDs are provided.
+  dispatcher_->post([this, &tid_ltt_pairs]() -> void {
+    action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs,
+                 api_->timeSource().monotonicTime());
+    absl::MutexLock lock(&mutex_);
+    outstanding_notifies_ += 1;
+  });
+
+  {
+    absl::MutexLock lock(&mutex_);
+    waitForOutstandingNotify();
+    time_system_->advanceTimeWait(std::chrono::seconds(2));
+  }
+
+  // Check the counters are correct on a fail
+  EXPECT_EQ(TestUtility::findCounter(stats_, "test.profile_action.attempted")->value(), 1);
+  EXPECT_EQ(TestUtility::findCounter(stats_, "test.profile_action.successfully_captured")->value(),
+            0);
+
+  // Run a profile that will succeed.
+  const auto now = api_->timeSource().monotonicTime();
+  tid_ltt_pairs.emplace_back(Thread::ThreadId(10), now);
+
+  dispatcher_->post([this, &tid_ltt_pairs, &now]() -> void {
+    action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
+    absl::MutexLock lock(&mutex_);
+    outstanding_notifies_ += 1;
+  });
+
+  {
+    absl::MutexLock lock(&mutex_);
+    waitForOutstandingNotify();
+    time_system_->advanceTimeWait(std::chrono::seconds(2));
+  }
+
+#ifdef PROFILER_AVAILABLE
+  // Check the counters are correct on success
+  EXPECT_EQ(TestUtility::findCounter(stats_, "test.profile_action.attempted")->value(), 2);
+  EXPECT_EQ(TestUtility::findCounter(stats_, "test.profile_action.successfully_captured")->value(),
+            1);
+#else
+  EXPECT_EQ(TestUtility::findCounter(stats_, "test.profile_action.attempted")->value(), 2);
+  EXPECT_EQ(TestUtility::findCounter(stats_, "test.profile_action.successfully_captured")->value(),
+            0);
+#endif
+
+  dispatcher_->exit();
+  thread->join();
 }
 
 } // namespace

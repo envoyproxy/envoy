@@ -11,6 +11,11 @@ as well as the incoming request's HTTP headers. This filter also supports policy
 and shadow mode, shadow mode won't effect real users, it is used to test that a new set of policies
 work before rolling out to production.
 
+When a request is denied, the :ref:`RESPONSE_CODE_DETAILS<config_access_log_format_response_code_details>`
+will include the name of the matched policy that caused the deny in the format of `rbac_access_denied_matched_policy[policy_name]`
+(policy_name will be `none` if no policy matched), this helps to distinguish the deny from Envoy RBAC
+filter and the upstream backend.
+
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
 * This filter should be configured with the name *envoy.filters.http.rbac*.
 

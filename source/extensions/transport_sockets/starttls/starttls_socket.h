@@ -85,6 +85,7 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override { return false; }
+  bool usesProxyProtocolOptions() const override { return false; }
 
 private:
   Network::TransportSocketFactoryPtr raw_socket_factory_;

@@ -92,7 +92,7 @@ public:
    * @param stream_info info object for the server connection
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
-  virtual Network::ConnectionPtr
+  virtual Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
                          StreamInfo::StreamInfo& stream_info) PURE;
@@ -161,7 +161,7 @@ public:
    * @param cb supplies the udp listener callbacks to invoke for listener events.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
+  virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                                     Network::UdpListenerCallbacks& cb) PURE;
   /**
    * Allocates a timer. @see Timer for docs on how to use the timer.

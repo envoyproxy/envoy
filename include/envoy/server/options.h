@@ -254,6 +254,16 @@ public:
    * @return CommandLineOptionsPtr the protobuf representation of the options.
    */
   virtual CommandLineOptionsPtr toCommandLineOptions() const PURE;
+
+  /**
+   * @return the path of socket file.
+   */
+  virtual const std::string& socketPath() const PURE;
+
+  /**
+   * @return the mode of socket file.
+   */
+  virtual mode_t socketMode() const PURE;
 };
 
 } // namespace Server

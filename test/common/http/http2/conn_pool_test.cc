@@ -65,7 +65,7 @@ public:
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
         pool_(std::make_unique<TestConnPoolImpl>(
-            dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr)) {
+            dispatcher_, random_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr)) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -196,6 +196,7 @@ public:
   std::unique_ptr<TestConnPoolImpl> pool_;
   std::vector<TestCodecClient> test_clients_;
   NiceMock<Runtime::MockLoader> runtime_;
+  Random::MockRandomGenerator random_;
 };
 
 class ActiveTestRequest {
@@ -315,7 +316,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
   host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80");
-  pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, host_,
+  pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
                                              Upstream::ResourcePriority::Default, nullptr, nullptr);
 
   // This requires some careful set up of expectations ordering: the call to createTransportSocket
@@ -1318,7 +1319,7 @@ TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
 
 TEST_F(Http2ConnPoolImplTest, PrefetchWithoutMultiplexing) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // With one request per connection, and prefetch 1.5, the first request will
   // kick off 2 connections.
@@ -1348,7 +1349,7 @@ TEST_F(Http2ConnPoolImplTest, PrefetchOff) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.allow_prefetch", "false"}});
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // Despite the prefetch ratio, no prefetch will happen due to the runtime
   // disable.
@@ -1363,7 +1364,7 @@ TEST_F(Http2ConnPoolImplTest, PrefetchOff) {
 
 TEST_F(Http2ConnPoolImplTest, PrefetchWithMultiplexing) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // With two requests per connection, and prefetch 1.5, the first request will
   // only kick off 1 connection.
@@ -1384,7 +1385,7 @@ TEST_F(Http2ConnPoolImplTest, PrefetchWithMultiplexing) {
 
 TEST_F(Http2ConnPoolImplTest, PrefetchEvenWhenReady) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // With one request per connection, and prefetch 1.5, the first request will
   // kick off 2 connections.
@@ -1410,7 +1411,7 @@ TEST_F(Http2ConnPoolImplTest, PrefetchEvenWhenReady) {
 
 TEST_F(Http2ConnPoolImplTest, PrefetchAfterTimeout) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   expectClientsCreate(2);
   ActiveTestRequest r1(*this, 0, false);
@@ -1431,7 +1432,7 @@ TEST_F(Http2ConnPoolImplTest, PrefetchAfterTimeout) {
 
 TEST_F(Http2ConnPoolImplTest, CloseExcessWithPrefetch) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.00));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.00));
 
   // First request prefetches an additional connection.
   expectClientsCreate(1);
@@ -1442,7 +1443,7 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessWithPrefetch) {
   ActiveTestRequest r2(*this, 0, false);
 
   // Change the prefetch ratio to force the connection to no longer be excess.
-  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(2));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(2));
   // Closing off the second request should bring us back to 1 request in queue,
   // desired capacity 2, so will not close the connection.
   EXPECT_CALL(*this, onClientDestroy()).Times(0);
@@ -1450,6 +1451,19 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessWithPrefetch) {
 
   // Clean up.
   r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  pool_->drainConnections();
+  closeAllClients();
+}
+
+// Test that maybePrefetch is passed up to the base class implementation.
+TEST_F(Http2ConnPoolImplTest, MaybePrefetch) {
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+
+  EXPECT_FALSE(pool_->maybePrefetch(0));
+
+  expectClientsCreate(1);
+  EXPECT_TRUE(pool_->maybePrefetch(2));
+
   pool_->drainConnections();
   closeAllClients();
 }

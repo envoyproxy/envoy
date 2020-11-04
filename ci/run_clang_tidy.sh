@@ -37,7 +37,7 @@ function exclude_win32_impl() {
 # Do not run clang-tidy against macOS impl
 # TODO: We should run clang-tidy against macOS impl for completeness
 function exclude_macos_impl() {
-  grep -v source/common/filesystem/kqueue/
+  grep -v source/common/filesystem/kqueue/ | grep -v source/common/network/apple_dns_impl | grep -v test/common/network/apple_dns_impl_test
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
@@ -50,33 +50,64 @@ function exclude_headersplit_testdata() {
   grep -v tools/envoy_headersplit/
 }
 
+# Do not run clang-tidy against Chromium URL import, this needs to largely
+# reflect the upstream structure.
+function exclude_chromium_url() {
+  grep -v source/common/chromium_url/
+}
+
 # Exclude files in third_party which are temporary forks from other OSS projects.
 function exclude_third_party() {
   grep -v third_party/
 }
 
+# Exclude files which are part of the Wasm emscripten environment
+function exclude_wasm_emscripten() {
+  grep -v source/extensions/common/wasm/ext
+}
+
+# Exclude files which are part of the Wasm SDK
+function exclude_wasm_sdk() {
+  grep -v proxy_wasm_cpp_sdk
+}
+
+# Exclude files which are part of the Wasm Host environment
+function exclude_wasm_host() {
+  grep -v proxy_wasm_cpp_host
+}
+
+# Exclude proxy-wasm test_data.
+function exclude_wasm_test_data() {
+  grep -v wasm/test_data
+}
+
+# Exclude files which are part of the Wasm examples
+function exclude_wasm_examples() {
+  grep -v examples/wasm
+}
+
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party
+  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
 }
 
 function run_clang_tidy() {
   python3 "${LLVM_PREFIX}/share/clang/run-clang-tidy.py" \
-    -clang-tidy-binary=${CLANG_TIDY} \
-    -clang-apply-replacements-binary=${CLANG_APPLY_REPLACEMENTS} \
-    -export-fixes=${FIX_YAML} -j ${NUM_CPUS:-0} -p ${SRCDIR} -quiet \
-    ${APPLY_CLANG_TIDY_FIXES:+-fix} $@
+    -clang-tidy-binary="${CLANG_TIDY}" \
+    -clang-apply-replacements-binary="${CLANG_APPLY_REPLACEMENTS}" \
+    -export-fixes=${FIX_YAML} -j "${NUM_CPUS:-0}" -p "${SRCDIR}" -quiet \
+    ${APPLY_CLANG_TIDY_FIXES:+-fix} "$@"
 }
 
 function run_clang_tidy_diff() {
-  git diff $1 | filter_excludes | \
+  git diff "$1" | filter_excludes | \
     python3 "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
-      -clang-tidy-binary=${CLANG_TIDY} \
-      -export-fixes=${FIX_YAML} -j ${NUM_CPUS:-0} -p 1 -quiet
+      -clang-tidy-binary="${CLANG_TIDY}" \
+      -export-fixes="${FIX_YAML}" -j "${NUM_CPUS:-0}" -p 1 -quiet
 }
 
 if [[ $# -gt 0 ]]; then
-  echo "Running clang-tidy on: $@"
-  run_clang_tidy $@
+  echo "Running clang-tidy on: $*"
+  run_clang_tidy "$@"
 elif [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running a full clang-tidy"
   run_clang_tidy
@@ -87,15 +118,15 @@ else
     elif [[ "${BUILD_REASON}" == *CI ]]; then
       DIFF_REF="HEAD^"
     else
-      DIFF_REF=$(${ENVOY_SRCDIR}/tools/git/last_github_commit.sh)
+      DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
     fi
   fi
-  echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse ${DIFF_REF})), current HEAD ($(git rev-parse HEAD))"
-  run_clang_tidy_diff ${DIFF_REF}
+  echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse HEAD))"
+  run_clang_tidy_diff "${DIFF_REF}"
 fi
 
 if [[ -s "${FIX_YAML}" ]]; then
   echo "clang-tidy check failed, potentially fixed by clang-apply-replacements:"
-  cat ${FIX_YAML}
+  cat "${FIX_YAML}"
   exit 1
 fi

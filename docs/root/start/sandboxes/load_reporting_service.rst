@@ -14,30 +14,10 @@ In this example, all incoming requests are routed via Envoy to a simple goLang w
 We scale up two containers and randomly send requests to each. Envoy is configured to initiate the connection with LRS Server.
 LRS Server enables the stats by sending LoadStatsResponse. Sending requests to http_server will be counted towards successful requests and will be visible in LRS Server logs.
 
+.. include:: _include/docker-env-setup.rst
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
-The following documentation runs through the setup of an Envoy cluster organized
-as is described above.
-
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Build the sandbox**
+Step 3: Build the sandbox
+*************************
 
 Terminal 1 ::
 
@@ -53,13 +33,14 @@ Terminal 2 ::
     envoy/examples/load_reporting_service
     $ docker-compose ps
 
-                                Name                               Command               State                           Ports
-    --------------------------------------------------------------------------------------------------------------------------------------
-    load-reporting-service_http_service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:80->80/tcp, 0.0.0.0:8081->8081/tcp
-    load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:81->80/tcp, 0.0.0.0:8082->8081/tcp
-    load-reporting-service_lrs_server_1     go run main.go                   Up      0.0.0.0:18000->18000/tcp
+                  Name                               Command               State            Ports
+    ------------------------------------------------------------------------------------------------------------
+    load-reporting-service_http_service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:81->80/tcp
+    load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:80->80/tcp
+    load-reporting-service_lrs_server_1     go run main.go                 Up      0.0.0.0:18000->18000/tcp
 
-**Step 4: Start sending stream of HTTP requests**
+Step 4: Start sending stream of HTTP requests
+*********************************************
 
 Terminal 2 ::
 
@@ -69,7 +50,8 @@ Terminal 2 ::
 
 The script above (``send_requests.sh``) sends requests randomly to each Envoy, which in turn forwards the requests to the backend service.
 
-**Step 5: See Envoy Stats**
+Step 5: See Envoy Stats
+***********************
 
 You should see
 

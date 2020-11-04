@@ -58,7 +58,6 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   EXPECT_CALL(os_sys_calls_, sendmsg(fd, _, 0)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
 
-  EXPECT_CALL(os_sys_calls_, getsockname(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   wrapper_->domain();
 
   EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))
