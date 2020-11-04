@@ -1188,15 +1188,23 @@ TEST_P(AdsClusterV3Test, ClusterInitializationUpdateOneOfThe2Warming) {
 
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {buildCluster("cluster_0"), buildCluster("cluster_1")},
-      {buildCluster("cluster_0"), buildCluster("cluster_1")}, {}, "1", false);
+      cds_type_url,
+      {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
+       buildCluster("cluster_0"), buildCluster("cluster_1")},
+      {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
+       buildCluster("cluster_0"), buildCluster("cluster_1")},
+      {}, "1", false);
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
 
   // Update lb policy to MAGLEV so that cluster update is not skipped due to the same hash.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")},
-      {buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")}, {}, "2", false);
+      cds_type_url,
+      {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
+       buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")},
+      {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
+       buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")},
+      {}, "2", false);
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0", "cluster_1"},
                                       {"cluster_0", "cluster_1"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
@@ -1206,7 +1214,7 @@ TEST_P(AdsClusterV3Test, ClusterInitializationUpdateOneOfThe2Warming) {
       false);
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 }
 
 // Verify CDS is paused during cluster warming.

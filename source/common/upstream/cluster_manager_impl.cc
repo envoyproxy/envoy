@@ -77,7 +77,6 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
         [name_to_remove = cluster.info()->name()](Cluster* cluster_iter) {
           return cluster_iter->info()->name() == name_to_remove;
         });
-
     secondary_init_clusters_.push_back(&cluster);
     if (started_secondary_initialize_) {
       // This can happen if we get a second CDS update that adds new clusters after we have
