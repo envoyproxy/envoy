@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
@@ -93,8 +94,6 @@ protected:
   // Callers must use the TypedSlot API, below.
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
   virtual void runOnAllThreads(const UpdateCb& update_cb, const Event::PostCb& complete_cb) PURE;
-  virtual void runOnAllThreads(const Event::PostCb& cb) PURE;
-  virtual void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& complete_cb) PURE;
 };
 
 using SlotPtr = std::unique_ptr<Slot>;
@@ -157,39 +156,54 @@ public:
   void set(InitializeCb cb) { slot_->set(cb); }
 
   /**
-   * @return a reference to the thread local object.
+   * @return an optional reference to the thread local object.
    */
-  T& get() { return slot_->getTyped<T>(); }
-  const T& get() const { return slot_->getTyped<T>(); }
+  OptRef<T> get() { return getOpt(slot_->get()); }
+  const OptRef<T> get() const { return getOpt(slot_->get()); }
 
   /**
+   * Helper function to call methods on T. The caller is responsible
+   * for ensuring that get().has_value() is true.
+   *
    * @return a pointer to the thread local object.
    */
-  T* operator->() { return &get(); }
-  const T* operator->() const { return &get(); }
+  T* operator->() { return &(slot_->getTyped<T>()); }
+  const T* operator->() const { return &(slot_->getTyped<T>()); }
 
   /**
-   * UpdateCb is passed a mutable reference to the current stored data.
+   * Helper function to get access to a T&. The caller is responsible for
+   * ensuring that get().has_value() is true.
    *
-   * NOTE: The update callback is not supposed to capture the TypedSlot, or its owner, as the owner
-   * may be destructed in main thread before the update_cb gets called in a worker thread.
+   * @return a reference to the thread local object.
    */
-  using UpdateCb = std::function<void(T& obj)>;
+  T& operator*() { return slot_->getTyped<T>(); }
+  const T& operator*() const { return slot_->getTyped<T>(); }
+
+  /**
+   * UpdateCb is passed a mutable pointer to the current stored data. Callers
+   * can assume that the passed-in OptRef has a value if they have called set(),
+   * yielding a non-null shared_ptr, prior to runOnAllThreads().
+   *
+   * NOTE: The update callback is not supposed to capture the TypedSlot, or its
+   * owner, as the owner may be destructed in main thread before the update_cb
+   * gets called in a worker thread.
+   */
+  using UpdateCb = std::function<void(OptRef<T> obj)>;
   void runOnAllThreads(const UpdateCb& cb) { slot_->runOnAllThreads(makeSlotUpdateCb(cb)); }
   void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
     slot_->runOnAllThreads(makeSlotUpdateCb(cb), complete_cb);
   }
-  void runOnAllThreads(const Event::PostCb& cb) { slot_->runOnAllThreads(cb); }
-  void runOnAllThreads(const Event::PostCb& cb, const Event::PostCb& complete_cb) {
-    slot_->runOnAllThreads(cb, complete_cb);
-  }
 
 private:
+  static OptRef<T> getOpt(ThreadLocalObjectSharedPtr obj) {
+    if (obj) {
+      return OptRef<T>(obj->asType<T>());
+    }
+    return OptRef<T>();
+  }
+
   Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
-    return [cb](ThreadLocalObjectSharedPtr obj) -> ThreadLocalObjectSharedPtr {
-      cb(obj->asType<T>());
-      return obj;
-    };
+    return [cb](ThreadLocalObjectSharedPtr obj) { cb(getOpt(obj)); };
   }
 
   const SlotPtr slot_;

@@ -318,7 +318,7 @@ void ConnectionImpl::readDisable(bool disable) {
                  disable, read_disable_count_, static_cast<int>(state()), read_buffer_.length());
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
-  // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
+  // `EPOLLRDHUP` for an epoll backend). For backends that support it, this allows us to apply
   // back pressure at the kernel layer, but still get timely notification of a FIN. Note that
   // we are not guaranteed to get notified, so even if the remote has closed, we may not know
   // until we try to write. Further note that currently we optionally don't correctly handle half
@@ -818,7 +818,7 @@ void ClientConnectionImpl::connect() {
     ASSERT(SOCKET_FAILURE(result.rc_));
 #ifdef WIN32
     // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
-    // cannot be completed immediately. We do not check for EINPROGRESS as that error is for
+    // cannot be completed immediately. We do not check for `EINPROGRESS` as that error is for
     // blocking operations.
     if (result.errno_ == SOCKET_ERROR_AGAIN) {
 #else
