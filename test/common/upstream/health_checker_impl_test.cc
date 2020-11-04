@@ -3478,7 +3478,7 @@ public:
     }
     // Null dereference from health check fuzzer
     static ChunkSpec badData() {
-      std::string data("\000\000\000\000\000\000\000\000\000\000\000\000\000\0000000", 72);
+      std::string data("\000\000\000\000\0000000", 9);
       std::vector<uint8_t> chunk(data.begin(), data.end());
       ChunkSpec spec;
       spec.valid = true;
