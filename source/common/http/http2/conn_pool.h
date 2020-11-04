@@ -25,9 +25,6 @@ public:
 
   ~ConnPoolImpl() override;
 
-  // Http::ConnectionPool::Instance
-  Http::Protocol protocol() const override { return Http::Protocol::Http2; }
-
   // ConnPoolImplBase
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
 
@@ -55,8 +52,6 @@ public:
 
     bool closed_with_active_rq_{};
   };
-
-  Random::RandomGenerator& random_generator_;
 };
 
 /**
