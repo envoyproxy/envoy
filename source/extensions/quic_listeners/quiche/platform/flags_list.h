@@ -216,7 +216,7 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_ip_based_cwnd_exp, true,
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_listener_never_fake_epollout, false,
             "If true, QuicListener::OnSocketIsWritable will always return false, which means there "
-            "will never be a fake EPOLLOUT event in the next epoll iteration.")
+            "will never be a fake `EPOLLOUT` event in the next epoll iteration.")
 
 QUICHE_FLAG(bool,
             quic_reloadable_flag_quic_neuter_initial_packet_in_coalescer_with_initial_key_discarded,
