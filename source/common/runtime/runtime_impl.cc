@@ -432,18 +432,19 @@ RtdsSubscription::RtdsSubscription(
     : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
           rtds_layer.rtds_config().resource_api_version(), validation_visitor, "name"),
       parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
-      resource_name_(rtds_layer.name()),
+      stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
 
 void RtdsSubscription::createSubscription() {
   const auto resource_name = getResourceName();
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this, resource_decoder_);
+      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this,
+      resource_decoder_);
 }
 
 void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                       const std::string&) {
-  validateUpdateSize(resources.size());
+  validateUpdateSize(resources.size(), 0);
   const auto& runtime =
       dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
   if (runtime.name() != resource_name_) {
@@ -458,9 +459,16 @@ void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceR
 
 void RtdsSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(added_resources.size());
-  onConfigUpdate(added_resources, added_resources[0].get().version());
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
+  validateUpdateSize(added_resources.size(), removed_resources.size());
+
+  // This is a singleton subscription, so we can only have the subscribed resource added or removed,
+  // but not both.
+  if (!added_resources.empty()) {
+    onConfigUpdate(added_resources, added_resources[0].get().version());
+  } else {
+    onConfigRemoved(removed_resources);
+  }
 }
 
 void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -473,12 +481,27 @@ void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
 
 void RtdsSubscription::start() { subscription_->start({resource_name_}); }
 
-void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
-  if (num_resources != 1) {
+void RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
+                                          uint32_t removed_resources_num) {
+  if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
-    throw EnvoyException(fmt::format("Unexpected RTDS resource length: {}", num_resources));
-    // (would be a return false here)
+    throw EnvoyException(fmt::format("Unexpected RTDS resource length, number of added recources "
+                                     "{}, number of removed recources {}",
+                                     added_resources_num, removed_resources_num));
   }
+}
+
+void RtdsSubscription::onConfigRemoved(
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+  if (removed_resources[0] != resource_name_) {
+    throw EnvoyException(
+        fmt::format("Unexpected removal of unknown RTDS runtime layer {}, expected {}",
+                    removed_resources[0], resource_name_));
+  }
+  ENVOY_LOG(debug, "Clear RTDS snapshot for onConfigUpdate");
+  proto_.Clear();
+  parent_.loadNewSnapshot();
+  init_target_.ready();
 }
 
 void LoaderImpl::loadNewSnapshot() {

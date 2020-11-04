@@ -33,6 +33,7 @@ HEXDIG
 HEXDIGIT
 LTT
 OWS
+SkyWalking
 TIDs
 ceil
 CHACHA
@@ -392,6 +393,7 @@ alignas
 alignof
 alloc
 alloca
+allocatable
 allocator
 allowlist
 allowlisted
