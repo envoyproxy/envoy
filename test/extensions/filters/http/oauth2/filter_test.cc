@@ -35,6 +35,7 @@ static const std::string TEST_CALLBACK = "/_oauth";
 static const std::string TEST_CLIENT_ID = "1";
 static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
 static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
+static const std::string TEST_AUTH_SCOPES = "user openid email"
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -91,6 +92,7 @@ public:
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
     p.set_forward_bearer_token(true);
+    p.set_auth_scopes(TEST_AUTH_SCOPES);
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
     matcher->set_exact_match("OPTIONS");
@@ -240,7 +242,9 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
            TEST_CLIENT_ID +
-           "&scope=user&response_type=code&"
+           "&scope=" +
+           TEST_AUTH_SCOPES +
+           "&response_type=code&"
            "redirect_uri=http%3A%2F%2Ftraffic.example.com%2F"
            "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
   };

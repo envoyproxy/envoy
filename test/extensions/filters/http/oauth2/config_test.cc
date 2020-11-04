@@ -47,6 +47,7 @@ config:
   signout_path:
     path:
       exact: /signout
+  auth_scopes: user
     )EOF";
 
   OAuth2Config factory;
@@ -87,6 +88,7 @@ config:
   signout_path:
     path:
       exact: /signout
+  auth_scopes: user
     )EOF";
 
   OAuth2Config factory;
