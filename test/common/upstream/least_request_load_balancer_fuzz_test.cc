@@ -68,7 +68,6 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
         input.least_request_lb_config());
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException; {}", e.what());
-    zone_aware_load_balancer_fuzz.clearStaticHostsState();
     removeRequestsActiveForStaticHosts(zone_aware_load_balancer_fuzz.priority_set_);
     return;
   }
