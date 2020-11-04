@@ -1588,12 +1588,11 @@ envoy_cc_test(
         "cluster_upstream_extension_integration_test.cc",
     ],
     deps = [
-        "//test/integration/upstreams:per_host_upstream_config",
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
         "//source/common/protobuf",
+        "//test/integration/upstreams:per_host_upstream_config",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

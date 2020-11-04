@@ -3,7 +3,6 @@
 
 #include "common/buffer/buffer_impl.h"
 
-
 // #include "test/integration/upstreams/per_host_upstream_config.h"
 #include "test/integration/http_integration.h"
 
@@ -42,9 +41,12 @@ public:
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
       cluster->mutable_upstream_config()->set_name("envoy.filters.connection_pools.http.per_host");
       cluster->mutable_upstream_config()->mutable_typed_config();
-//      ->PackFrom(...);
-      populateMetadataTestData(*cluster->mutable_metadata(), "foo",
-                               "bar", "cluster-value");
+      populateMetadataTestData(*cluster->mutable_metadata(), "foo", "bar", "cluster-value");
+      populateMetadataTestData(*cluster->mutable_load_assignment()
+                                    ->mutable_endpoints(0)
+                                    ->mutable_lb_endpoints(0)
+                                    ->mutable_metadata(),
+                               "foo", "bar", "host-value");
     });
 
     HttpIntegrationTest::initialize();
@@ -55,32 +57,40 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterUpstreamExtensionIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ClusterUpstreamExtensionIntegrationTest, VerifyCasedHeaders) {
+TEST_P(ClusterUpstreamExtensionIntegrationTest,
+       VerifyRequestHeadersAreRewrittenByClusterAndHostMetadata) {
   initialize();
 
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  auto request = "GET / HTTP/1.1\r\nhost: host\r\nmy-header: foo\r\n\r\n";
-  ASSERT_TRUE(tcp_client->write(request, false));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
-  Envoy::FakeRawConnectionPtr upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  EXPECT_TRUE(upstream_request_->complete());
 
-  // Verify that the upstream request has proper cased headers.
-  std::string upstream_request;
-  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
-                                               &upstream_request));
-  ENVOY_LOG_MISC(debug, "lambdai: upstream request = {}", upstream_request);
-  EXPECT_TRUE(absl::StrContains(upstream_request, "X-cluster-foo: cluster-value"));
+  {
+    const auto header_values = upstream_request_->headers().get(Http::LowerCaseString("X-foo"));
+    ASSERT_EQ(1, header_values.size());
+    EXPECT_EQ("foo-common", header_values[0]->value().getStringView());
+  }
+  {
+    const auto cluster_header_values =
+        upstream_request_->headers().get(Http::LowerCaseString("X-cluster-foo"));
+    ASSERT_EQ(1, cluster_header_values.size());
+    EXPECT_EQ("cluster-value", cluster_header_values[0]->value().getStringView());
+  }
+  {
+    const auto host_header_values =
+        upstream_request_->headers().get(Http::LowerCaseString("X-host-foo"));
+    ASSERT_EQ(1, host_header_values.size());
+    EXPECT_EQ("host-value", host_header_values[0]->value().getStringView());
+  }
 
-//   // Verify that the downstream response has proper cased headers.
-//   auto response =
-//       "HTTP/1.1 503 Service Unavailable\r\ncontent-length: 0\r\nresponse-header: foo\r\n\r\n";
-//   ASSERT_TRUE(upstream_connection->write(response));
-
-//   // Verify that we're at least one proper cased header.
-//   tcp_client->waitForData("HTTP/1.1 503 Service Unavailable\r\nContent-Length:", true);
-
-  tcp_client->close();
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 } // namespace
 } // namespace Envoy
