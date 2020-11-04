@@ -1,5 +1,7 @@
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
+#include <chrono>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
@@ -38,20 +40,17 @@ void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v3::StreamMetricsMes
 }
 
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
-                                       TimeSource& time_source,
                                        const bool report_counters_as_deltas)
-    : grpc_metrics_streamer_(grpc_metrics_streamer), time_source_(time_source),
+    : grpc_metrics_streamer_(grpc_metrics_streamer),
       report_counters_as_deltas_(report_counters_as_deltas) {}
 
 void MetricsServiceSink::flushCounter(
-    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot) {
+    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot, int64_t snapshot_time_ms) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
   metrics_family->set_name(counter_snapshot.counter_.get().name());
   auto* metric = metrics_family->add_metric();
-  metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
-                               time_source_.systemTime().time_since_epoch())
-                               .count());
+  metric->set_timestamp_ms(snapshot_time_ms);
   auto* counter_metric = metric->mutable_counter();
   if (report_counters_as_deltas_) {
     counter_metric->set_value(counter_snapshot.delta_);
@@ -60,19 +59,18 @@ void MetricsServiceSink::flushCounter(
   }
 }
 
-void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
+void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge, int64_t snapshot_time_ms) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
   metrics_family->set_name(gauge.name());
   auto* metric = metrics_family->add_metric();
-  metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
-                               time_source_.systemTime().time_since_epoch())
-                               .count());
+  metric->set_timestamp_ms(snapshot_time_ms);
   auto* gauge_metric = metric->mutable_gauge();
   gauge_metric->set_value(gauge.value());
 }
 
-void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_histogram) {
+void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_histogram,
+                                        int64_t snapshot_time_ms) {
   // TODO(ramaraochavali): Currently we are sending both quantile information and bucket
   // information. We should make this configurable if it turns out that sending both affects
   // performance.
@@ -82,9 +80,7 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_hist
   summary_metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
   summary_metrics_family->set_name(envoy_histogram.name());
   auto* summary_metric = summary_metrics_family->add_metric();
-  summary_metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                       time_source_.systemTime().time_since_epoch())
-                                       .count());
+  summary_metric->set_timestamp_ms(snapshot_time_ms);
   auto* summary = summary_metric->mutable_summary();
   const Stats::HistogramStatistics& hist_stats = envoy_histogram.intervalStatistics();
   for (size_t i = 0; i < hist_stats.supportedQuantiles().size(); i++) {
@@ -98,9 +94,7 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_hist
   histogram_metrics_family->set_type(io::prometheus::client::MetricType::HISTOGRAM);
   histogram_metrics_family->set_name(envoy_histogram.name());
   auto* histogram_metric = histogram_metrics_family->add_metric();
-  histogram_metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                         time_source_.systemTime().time_since_epoch())
-                                         .count());
+  histogram_metric->set_timestamp_ms(snapshot_time_ms);
   auto* histogram = histogram_metric->mutable_histogram();
   histogram->set_sample_count(hist_stats.sampleCount());
   histogram->set_sample_sum(hist_stats.sampleSum());
@@ -119,21 +113,24 @@ void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
   // preallocating the pointer array).
   message_.mutable_envoy_metrics()->Reserve(snapshot.counters().size() + snapshot.gauges().size() +
                                             snapshot.histograms().size());
+  int64_t snapshot_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 snapshot.snapshotTime().time_since_epoch())
+                                 .count();
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      flushCounter(counter);
+      flushCounter(counter, snapshot_time_ms);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      flushGauge(gauge.get());
+      flushGauge(gauge.get(), snapshot_time_ms);
     }
   }
 
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().used()) {
-      flushHistogram(histogram.get());
+      flushHistogram(histogram.get(), snapshot_time_ms);
     }
   }
 

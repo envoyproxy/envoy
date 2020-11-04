@@ -52,6 +52,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
   Stats::TestUtil::TestStore store;
+  Event::SimulatedTimeSystem time_system;
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
@@ -59,7 +60,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   store.textReadout("text").set("is important");
 
   std::list<Stats::SinkPtr> sinks;
-  InstanceUtil::flushMetricsToSinks(sinks, store);
+  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
   // Make sure that counters have been latched even if there are no sinks.
   EXPECT_EQ(1UL, c.value());
   EXPECT_EQ(0, c.latch());
@@ -80,7 +81,7 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.textReadouts()[0].get().value(), "is important");
   }));
   c.inc();
-  InstanceUtil::flushMetricsToSinks(sinks, store);
+  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
 
   // Histograms don't currently work with the isolated store so test those with a mock store.
   NiceMock<Stats::MockStore> mock_store;
@@ -93,7 +94,7 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.histograms().size(), 1);
     EXPECT_TRUE(snapshot.textReadouts().empty());
   }));
-  InstanceUtil::flushMetricsToSinks(sinks, mock_store);
+  InstanceUtil::flushMetricsToSinks(sinks, mock_store, time_system);
 }
 
 class RunHelperTest : public testing::Test {

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
@@ -40,6 +41,11 @@ public:
    * @return a snapshot of all text readouts.
    */
   virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
+
+  /**
+   * @return the time in UTC since epoch when the snapshot was created.
+   */
+  virtual SystemTime snapshotTime() const PURE;
 };
 
 /**
