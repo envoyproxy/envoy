@@ -128,8 +128,6 @@ envoy_cc_test(
     name = "guarddog_impl_test",
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
-    # Fails intermittantly on local build
-    tags = ["flaky_on_windows"],
     deps = [
         "//include/envoy/common:time_interface",
         "//source/common/api:api_lib",
@@ -269,12 +267,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
-    tags = [
-        "nofips",
-        # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
-        # required by quic_stream_send_buffer.cc
-        "skip_on_windows",
-    ],
+    tags = ["nofips"],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",

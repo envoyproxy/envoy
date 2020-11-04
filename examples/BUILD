@@ -18,6 +18,7 @@ filegroup(
         ],
         exclude = [
             "cache/responses.yaml",
+            "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",
             "**/*docker-compose*.yaml",
         ],

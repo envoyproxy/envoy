@@ -7,6 +7,35 @@ OAuth2
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.oauth2.v3alpha.OAuth2>`
 * This filter should be configured with the name *envoy.filters.http.oauth2*.
 
+The OAuth filter's flow involves:
+
+* An unauthenticated user arrives at myapp.com, and the oauth filter redirects them to the
+  :ref:`authorization_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.authorization_endpoint>`
+  for login. The :ref:`client_id <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Credentials.client_id>`
+  and the :ref:`redirect_uri <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.redirect_uri>`
+  are sent as query string parameters in this first redirect.
+* After a successful login, the authn server should be configured to redirect the user back to the
+  :ref:`redirect_uri <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.redirect_uri>`
+  provided in the query string in the first step. In the below code example, we choose /callback as the configured match path.
+  An "authorization grant" is included in the query string for this second redirect.
+* Using this new grant and the :ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Credentials.token_secret>`,
+  the filter then attempts to retrieve an access token from
+  the :ref:`token_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.token_endpoint>`. The filter knows it has to do this
+  instead of reinitiating another login because the incoming request has a path that matches the
+  :ref:`redirect_path_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.redirect_path_matcher>` criteria.
+* Upon receiving an access token, the filter sets cookies so that subseqeuent requests can skip the full
+  flow. These cookies are calculated using the
+  :ref:`hmac_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Credentials.hmac_secret>`
+  to assist in encoding.
+* The filter calls continueDecoding() to unblock the filter chain.
+
+When the authn server validates the client and returns an authorization token back to the OAuth filter,
+no matter what format that token is, if
+:ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.forward_bearer_token>`
+is set to true the filter will send over a 
+cookie named `BearerToken` to the upstream. Additionally, the `Authorization` header will be populated
+with the same value.
+
 .. attention::
 
   The OAuth2 filter is currently under active development.
@@ -43,7 +72,7 @@ The following is an example configuring the filter.
         sds_config:
           path: "/etc/envoy/hmac.yaml"
 
-And the below code block is an example of how we employ it as one of
+Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`
 
@@ -86,10 +115,34 @@ And the below code block is an example of how we employ it as one of
                     sds_config:
                       path: "/etc/envoy/hmac.yaml"
           - name: envoy.router
+          tracing: {}
+          codec_type: "AUTO"
+          stat_prefix: ingress_http
+          route_config:
+            virtual_hosts:
+            - name: service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: service
+                  timeout: 5s
 
   clusters:
   - name: service
-    # ...
+    connect_timeout: 5s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080
   - name: auth
     connect_timeout: 5s
     type: LOGICAL_DNS
@@ -106,13 +159,44 @@ And the below code block is an example of how we employ it as one of
     tls_context:
       sni: auth.example.com
 
+Finally, the following code block illustrates sample contents inside a yaml file containing both credential secrets.
+Both the :ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Credentials.token_secret>`
+and the :ref:`hmac_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Credentials.hmac_secret>`
+can be defined in one shared file.
+
+.. code-block:: yaml
+
+  static_resources:
+    secrets:
+    - name: token
+      generic_secret:
+        secret: <Your token secret here>
+    - name: hmac
+      generic_secret:
+        secret: <Your hmac secret here>
+
+
 Notes
 -----
 
-This module does not currently provide much Cross-Site-Request-Forgery protection for the redirect
-loop to the OAuth server and back.
+When enabled, the OAuth filter does not protect against Cross-Site-Request-Forgery attacks on domains with
+cached authentication (in the form of cookies).
+It is recommended to pair this filter with the :ref:`CSRF Filter <envoy_v3_api_msg_extensions.filters.http.csrf.v3.CsrfPolicy>`
+to prevent malicious social engineering.
 
-The service must be served over HTTPS for this filter to work, as the cookies use `;secure`.
+The service must be served over HTTPS for this filter to work properly, as the cookies use `;secure`. Without https, your
+:ref:`authorization_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.authorization_endpoint>`
+provider will likely reject the incoming request, and your access cookies will not be cached to bypass future logins.
+
+The signout path will redirect the current user to '/', and clear all authentication cookies related to
+the HMAC validation. Consequently, the OAuth filter will then restart the full OAuth flow at the root path,
+sending the user to the configured auth endpoint.
+
+:ref:`pass_through_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.pass_through_matcher>` provides
+an interface for users to provide specific header matching criteria such that, when applicable, the OAuth flow is entirely skipped.
+When this occurs, the `oauth_success` metric is still incremented.
+
+Generally, allowlisting is inadvisable from a security standpoint.
 
 Statistics
 ----------
