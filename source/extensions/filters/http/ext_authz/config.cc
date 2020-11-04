@@ -53,17 +53,15 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    auto async_client_cache =
-        std::make_shared<Envoy::Grpc::AsyncClientCache>(
-            context.clusterManager().grpcAsyncClientManager(), context.scope(),
-            context.threadLocal());
+    auto async_client_cache = std::make_shared<Envoy::Grpc::AsyncClientCache>(
+        context.clusterManager().grpcAsyncClientManager(), context.scope(), context.threadLocal());
     async_client_cache->init(proto_config.grpc_service());
     callback = [async_client_cache, filter_config, timeout_ms, proto_config,
                 transport_api_version = proto_config.transport_api_version()](
                    Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          async_client_cache->getAsyncClient(),
-          std::chrono::milliseconds(timeout_ms), transport_api_version);
+          async_client_cache->getAsyncClient(), std::chrono::milliseconds(timeout_ms),
+          transport_api_version);
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
           std::make_shared<Filter>(filter_config, std::move(client))});
     };

@@ -184,4 +184,3 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
-

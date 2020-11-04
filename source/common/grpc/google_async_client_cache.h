@@ -10,9 +10,6 @@ namespace Grpc {
 
 // The RawAsyncClient client cache for Google grpc so channel is not created
 // for each request.
-// TODO(fpliu233): The cache will cause resource leak that a new channel is
-// created every time a new config is pushed. Improve gRPC channel cache with
-// better solution.
 // TODO(fpliu233): Remove when the cleaner and generic solution for gRPC is
 // live. Tracking in #2598 and #13417.
 class AsyncClientCache : public std::enable_shared_from_this<AsyncClientCache> {
