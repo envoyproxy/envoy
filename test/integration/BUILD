@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -13,6 +11,8 @@ load(
     "envoy_select_new_codecs_in_integration_tests",
     "envoy_sh_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
