@@ -32,9 +32,9 @@ public:
       }
     }
 
-    if (tls_slot_->get().wasm()) {
-      tls_slot_->get().wasm()->log(plugin_, request_headers, response_headers, response_trailers,
-                                   stream_info);
+    auto wasm = tls_slot_->get().wasm();
+    if (wasm) {
+      wasm->log(plugin_, request_headers, response_headers, response_trailers, stream_info);
     }
   }
 
