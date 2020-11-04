@@ -383,7 +383,7 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
 TEST_F(ConnectionHandlerTest, DisableListenerAfterStop) {
   InSequence s;
 
-  Network::TcpListenerCallbacks* listener_callbacks;
+  Network::ListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
