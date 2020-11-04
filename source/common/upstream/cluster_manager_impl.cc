@@ -67,6 +67,9 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
     cluster.initialize(initialize_cb);
   } else {
     ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
+    // Secondary clusters can be updated. Remove the previous cluster before the cluster object is
+    // destroyed. Note that only secondary cluster need this remove since primary clusters are
+    // immutable.
     secondary_init_clusters_.remove_if(
         [name_to_remove = cluster.info()->name()](Cluster* cluster_iter) {
           return cluster_iter->info()->name() == name_to_remove;
@@ -636,7 +639,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
   // before destroy to avoid early initialization complete.
-  auto previous_cluster_guard = loadCluster(cluster, version_info, true, warming_clusters_);
+  const auto previous_cluster = loadCluster(cluster, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
@@ -736,7 +739,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   return removed;
 }
 
-absl::optional<ClusterManagerImpl::ClusterDataPtr>
+ClusterManagerImpl::ClusterDataPtr
 ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                 const std::string& version_info, bool added_via_api,
                                 ClusterMap& cluster_map) {
@@ -784,12 +787,12 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
       }
     });
   }
-  absl::optional<ClusterDataPtr> result;
+  ClusterDataPtr result;
   auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
   if (cluster_entry_it != cluster_map.end()) {
-    result = absl::make_optional<ClusterDataPtr>(std::move(cluster_entry_it->second));
-    cluster_entry_it->second = std::make_unique<ClusterData>(cluster, version_info, added_via_api,
-                                                             std::move(new_cluster), time_source_);
+    result = std::exchange(cluster_entry_it->second,
+                           std::make_unique<ClusterData>(cluster, version_info, added_via_api,
+                                                         std::move(new_cluster), time_source_));
   } else {
     bool inserted = false;
     std::tie(cluster_entry_it, inserted) =

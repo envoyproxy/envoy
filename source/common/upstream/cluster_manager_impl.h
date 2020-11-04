@@ -479,12 +479,12 @@ private:
   static ClusterManagerStats generateStats(Stats::Scope& scope);
 
   /**
-   * @return absl::optional<ClusterDataPtr> contains the previous cluster in the cluster_map, or
-   * nullopt if cluster_map does not contain the same cluster.
+   * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
+   * nullptr if cluster_map did not contain the same cluster.
    */
-  absl::optional<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                             const std::string& version_info, bool added_via_api,
-                                             ClusterMap& cluster_map);
+  ClusterDataPtr loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                             const std::string& version_info, bool added_via_api,
+                             ClusterMap& cluster_map);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
