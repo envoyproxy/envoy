@@ -306,7 +306,7 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
 
 void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
-  health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+  health_checker_ = std::make_shared<NiceMock<TestGrpcHealthCheckerImpl>>(
       *cluster_, config, dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Test Grpc Health Checker");

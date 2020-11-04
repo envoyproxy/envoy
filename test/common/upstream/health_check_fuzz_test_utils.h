@@ -11,15 +11,18 @@
 
 namespace Envoy {
 namespace Upstream {
-
+// TODO IN THIS PR, IF YOU ARE GOING TO EDIT THESE TO NICEMOCKS, MAKE SURE TO CHECKOUT MASTER FOR
+// THESE UNIT TESTS BEFORE I EVER STEPPED FOOT HERE AT GOOGLE
 class HealthCheckerTestBase {
 public:
   std::shared_ptr<MockClusterMockPrioritySet> cluster_{
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::unique_ptr<MockHealthCheckEventLogger> event_logger_storage_{
-      std::make_unique<MockHealthCheckEventLogger>()};
-  MockHealthCheckEventLogger& event_logger_{*event_logger_storage_};
+  std::unique_ptr<NiceMock<MockHealthCheckEventLogger>> event_logger_storage_{
+      std::make_unique<NiceMock<MockHealthCheckEventLogger>>()};
+  NiceMock<MockHealthCheckEventLogger>& event_logger_{*event_logger_storage_};
+  // NiceMock<MockHealthCheckEventLogger>& event_logger_ = new
+  // NiceMock<MockHealthCheckEventLogger>(*event_logger_storage_);
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
@@ -41,8 +44,8 @@ public:
 class HttpHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
   struct TestSession {
-    Event::MockTimer* interval_timer_{};
-    Event::MockTimer* timeout_timer_{};
+    NiceMock<Event::MockTimer>* interval_timer_{};
+    NiceMock<Event::MockTimer>* timeout_timer_{};
     Http::MockClientConnection* codec_{};
     Stats::IsolatedStoreImpl stats_store_;
     Network::MockClientConnection* client_connection_{};

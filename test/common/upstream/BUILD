@@ -145,12 +145,12 @@ envoy_benchmark_test(
 )
 
 envoy_cc_test_library(
-    name = "health_checker_impl_test_lib",
+    name = "health_check_fuzz_utils_lib",
     srcs = [
-        "health_checker_impl_test_utils.cc",
+        "health_check_fuzz_test_utils.cc",
     ],
     hdrs = [
-        "health_checker_impl_test_utils.h",
+        "health_check_fuzz_test_utils.h",
     ],
     deps = [
         ":utility_lib",
@@ -169,7 +169,7 @@ envoy_cc_test(
         "health_checker_impl_test.cc",
     ],
     deps = [
-        ":health_checker_impl_test_lib",
+        ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:headers_lib",
@@ -710,7 +710,7 @@ envoy_cc_test_library(
     hdrs = ["health_check_fuzz.h"],
     deps = [
         ":health_check_fuzz_proto_cc_proto",
-        ":health_checker_impl_test_lib",
+        ":health_check_fuzz_utils_lib",
         ":utility_lib",
         "//test/fuzz:utility_lib",
     ],
