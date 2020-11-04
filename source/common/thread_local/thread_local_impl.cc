@@ -90,15 +90,6 @@ void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
   parent_.runOnAllThreads(dataCallback(cb));
 }
 
-void InstanceImpl::SlotImpl::runOnAllThreads(const Event::PostCb& cb,
-                                             const Event::PostCb& complete_cb) {
-  parent_.runOnAllThreads(wrapCallback(cb), complete_cb);
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(const Event::PostCb& cb) {
-  parent_.runOnAllThreads(wrapCallback(cb));
-}
-
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
   ASSERT(!parent_.shutdown_);
