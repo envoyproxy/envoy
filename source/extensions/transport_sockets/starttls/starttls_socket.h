@@ -73,7 +73,7 @@ private:
 class ServerStartTlsSocketFactory : public Network::TransportSocketFactory,
                                     Logger::Loggable<Logger::Id::config> {
 public:
-  virtual ~ServerStartTlsSocketFactory() {}
+  ~ServerStartTlsSocketFactory() override = default;
 
   ServerStartTlsSocketFactory(
       const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig& config,
