@@ -10,31 +10,32 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "config",
+    name = "per_host_upstream_config",
     srcs = [
-        "config.cc",
+        "per_host_upstream_config.cc",
     ],
     hdrs = [
-        "config.h",
+        "per_host_upstream_config.h",
     ],
     security_posture = "robust_to_untrusted_downstream",
     visibility = ["//visibility:public"],
     deps = [
-        ":upstream_request_lib",
-        "@envoy_api//envoy/extensions/upstreams/http/http/v3:pkg_cc_proto",
+        ":per_host_upstream_request_lib",
+        "//source/extensions/upstreams/http/http:upstream_request_lib",
+        "//source/extensions/upstreams/http/tcp:upstream_request_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "upstream_request_lib",
+    name = "per_host_upstream_request_lib",
     srcs = [
-        "upstream_request.cc",
+        "per_host_upstream_request.cc",
     ],
     hdrs = [
-        "upstream_request.h",
+        "per_host_upstream_request.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
+        ":per_host_tcp_upstream_request_lib",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:filter_interface",
@@ -51,5 +52,13 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "//source/extensions/upstreams/http/http:upstream_request_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "per_host_tcp_upstream_request_lib",
+    deps = [
+        "//source/extensions/upstreams/http/http:upstream_request_lib",
     ],
 )
