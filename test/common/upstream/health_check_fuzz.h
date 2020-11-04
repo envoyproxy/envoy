@@ -28,6 +28,8 @@ public:
   virtual void triggerIntervalTimer(bool expect_client_create) PURE;
   virtual void triggerTimeoutTimer(bool last_action) PURE;
   virtual void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) PURE;
+  // Only implemented by gRPC, otherwise no-op
+  virtual void raiseGoAway(bool no_error) PURE;
 
   virtual ~HealthCheckFuzz() = default;
 
@@ -45,6 +47,8 @@ public:
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
+  // No op
+  void raiseGoAway(bool) override {}
   ~HttpHealthCheckFuzz() override = default;
 
   // Determines whether the client gets reused or not after response
@@ -59,6 +63,8 @@ public:
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
+  // No op
+  void raiseGoAway(bool) override {}
   ~TcpHealthCheckFuzz() override = default;
 
   // Determines whether the client gets reused or not after response
@@ -78,7 +84,7 @@ public:
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
-  void raiseGoAway(bool no_error);
+  void raiseGoAway(bool no_error) override;
   ~GrpcHealthCheckFuzz() override = default;
 
   // Determines whether the client gets reused or not after response

@@ -20,6 +20,11 @@ public:
   // Event::Dispatcher
   const std::string& name() override { return impl_.name(); }
 
+  void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                        std::chrono::milliseconds min_touch_interval) override {
+    impl_.registerWatchdog(watchdog, min_touch_interval);
+  }
+
   TimeSource& timeSource() override { return impl_.timeSource(); }
 
   void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override {
