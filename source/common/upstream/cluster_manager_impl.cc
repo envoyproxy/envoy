@@ -636,7 +636,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
   // before destroy to avoid early initialization complete.
-  auto previous_cluster_guard = loadCluster(cluster, version_info, true, warming_clusters_);
+  const auto previous_cluster_guard = loadCluster(cluster, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
