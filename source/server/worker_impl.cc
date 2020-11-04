@@ -40,8 +40,8 @@ void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                              Network::ListenerConfig& listener, AddListenerCompletion completion) {
   // All listener additions happen via post. However, we must deal with the case where the listener
   // can not be created on the worker. There is a race condition where 2 processes can successfully
-  // bind to an address, but then fail to listen() with EADDRINUSE. During initial startup, we want
-  // to surface this.
+  // bind to an address, but then fail to listen() with `EADDRINUSE`. During initial startup, we
+  // want to surface this.
   dispatcher_->post([this, overridden_listener, &listener, completion]() -> void {
     try {
       handler_->addListener(overridden_listener, listener);
