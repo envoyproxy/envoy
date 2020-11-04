@@ -3149,7 +3149,7 @@ TEST_F(ClusterManagerInitHelperTest, TestUpdateWarming) {
   EXPECT_CALL(updated_sds, initialize(_));
   init_helper_.addCluster(updated_sds);
 
-  // The override cluser is added. Manually drop the previous cluster. In production flow this is
+  // The override cluster is added. Manually drop the previous cluster. In production flow this is
   // achieved by ClusterManagerImpl.
   sds.reset();
 
