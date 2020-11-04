@@ -5,6 +5,7 @@ Version history
 ================
 Changes
 -------
+* tls: fix detection of the upstream connection close event.
 
 1.14.6 (December 7, 2020)
 =========================
