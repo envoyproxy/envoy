@@ -2605,6 +2605,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, true);
+        EXPECT_EQ(data.length(), 0);
       }));
 
   EXPECT_CALL(*client_read_filter, onNewConnection())
@@ -2692,9 +2693,11 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, false);
+        EXPECT_EQ(data.length(), 0);
         // Close without sending close_notify alert.
         const SslHandshakerImpl* ssl_socket =
             dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
+        EXPECT_EQ(ssl_socket->state(), Ssl::SocketState::HandshakeComplete);
         SSL_set_quiet_shutdown(ssl_socket->ssl(), 1);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
       }));
