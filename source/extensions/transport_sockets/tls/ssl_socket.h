@@ -62,7 +62,11 @@ public:
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
-  bool startSecureTransport() override {RELEASE_ASSERT(false, ""); return false; }     
+  // startSecureTransport should not be called for this transport socket.
+  bool startSecureTransport() override {
+    RELEASE_ASSERT(false, "");
+    return false;
+  }
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks

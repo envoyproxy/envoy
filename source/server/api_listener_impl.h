@@ -136,7 +136,6 @@ protected:
       std::string transportProtocol() const override { return EMPTY_STRING; }
       bool startSecureTransport() override { return false; }
 
-
       SyntheticReadCallbacks& parent_;
       StreamInfo::StreamInfoImpl stream_info_;
       Network::ConnectionSocket::OptionsSharedPtr options_;

@@ -2,5 +2,5 @@ syntax = "proto3";
 
 package test.integration.starttls;
 
-message StartTlsFilterConfig{
+message StartTlsFilterConfig {
 }

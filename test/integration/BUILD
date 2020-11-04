@@ -1205,17 +1205,12 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":starttls_integration_proto_cc_proto",
         ":integration_lib",
-        "//test/test_common:registry_lib",
+        ":starttls_integration_proto_cc_proto",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/starttls:config",
-        #"@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        #"@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        #"@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        #"@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
-        #"@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
-        #"@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/transport_socket/raw_buffer/v2:pkg_cc_proto",
     ],
 )
 

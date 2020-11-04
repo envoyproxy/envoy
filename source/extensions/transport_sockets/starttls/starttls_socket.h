@@ -58,7 +58,7 @@ private:
   // can be converted to use ssl.
   Network::TransportSocketPtr oper_socket_;
   // Secure transport socket. It will replace raw buffer socket
-  // initially stored in oper_socket_, when startSecureTransport is called.
+  //  when startSecureTransport is called.
   Network::TransportSocketPtr ssl_socket_;
 
   Network::TransportSocketCallbacks* callbacks_{};

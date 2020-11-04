@@ -116,7 +116,9 @@ std::string ConfigHelper::tcpProxyConfig() {
 }
 
 std::string ConfigHelper::startTlsConfig() {
-  return absl::StrCat(tcpProxyConfig(), fmt::format(R"EOF(
+  return absl::StrCat(
+      tcpProxyConfig(),
+      fmt::format(R"EOF(
       transport_socket:
         name: "starttls"
         typed_config:
@@ -130,7 +132,9 @@ std::string ConfigHelper::startTlsConfig() {
                   filename: {}
                 private_key:
                   filename: {}
-)EOF", TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"), TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
+)EOF",
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
 std::string ConfigHelper::tlsInspectorFilter() {
