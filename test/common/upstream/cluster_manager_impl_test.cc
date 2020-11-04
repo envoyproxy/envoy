@@ -3134,6 +3134,33 @@ TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
   cluster1.initialize_callback_();
 }
 
+// Verify that primary cluster can be updated in warming state.
+TEST_F(ClusterManagerInitHelperTest, TestUpdateWarming) {
+  InSequence s;
+
+  auto sds = std::make_unique<NiceMock<MockClusterMockPrioritySet>>();
+  ON_CALL(*sds, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*sds, initialize(_));
+  init_helper_.addCluster(*sds);
+  init_helper_.onStaticLoadComplete();
+
+  NiceMock<MockClusterMockPrioritySet> updated_sds;
+  ON_CALL(updated_sds, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(updated_sds, initialize(_));
+  init_helper_.addCluster(updated_sds);
+
+  // The override cluser is added. Manually drop the previous cluster. In production flow this is
+  // achieved by ClusterManagerImpl.
+  sds.reset();
+
+  ReadyWatcher primary_initialized;
+  init_helper_.setPrimaryClustersInitializedCb([&]() -> void { primary_initialized.ready(); });
+
+  EXPECT_CALL(*this, onClusterInit(Ref(updated_sds)));
+  EXPECT_CALL(primary_initialized, ready());
+  updated_sds.initialize_callback_();
+}
+
 TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   InSequence s;
 
