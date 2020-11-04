@@ -346,12 +346,13 @@ public:
     return spdlog::details::make_unique<EscapeMessageNewLine>();
   }
 
+  constexpr static char Placeholder = '_';
+
+private:
   using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
   const static ReplacementMap& replacements() {
     CONSTRUCT_ON_FIRST_USE(ReplacementMap, ReplacementMap{{"\n", "\\n"}});
   }
-
-  constexpr static char Placeholder = '_';
 };
 
 } // namespace CustomFlagFormatter
