@@ -189,6 +189,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   if (self_ip == nullptr) {
     message.msg_control = nullptr;
     message.msg_controllen = 0;
+    const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    auto io_result = sysCallResultToIoCallResult(result);
+    if (io_result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+    }
+    return io_result;
   } else {
     const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
@@ -229,13 +235,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       pktinfo->ipi6_ifindex = 0;
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
+    const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    auto io_result = sysCallResultToIoCallResult(result);
+    if (io_result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+    }
+    return io_result;
   }
-  const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-  auto io_result = sysCallResultToIoCallResult(result);
-  if (io_result.wouldBlock() && file_event_) {
-    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-  }
-  return io_result;
 }
 
 Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
