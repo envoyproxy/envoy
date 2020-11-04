@@ -12,7 +12,7 @@ bool StartTlsSocket::startSecureTransport() {
   if (!using_ssl_) {
     ssl_socket_->setTransportSocketCallbacks(*callbacks_);
     ssl_socket_->onConnected();
-    passthrough_ = std::move(ssl_socket_);
+    oper_socket_ = std::move(ssl_socket_);
     using_ssl_ = true;
   }
   return true;

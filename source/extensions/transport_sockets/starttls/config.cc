@@ -34,8 +34,8 @@ Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransp
       tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),
                                                              context, server_names);
 
-  return std::make_unique<ServerStartTlsSocketFactory>(
-      outer_config, server_names, std::move(raw_socket_factory), std::move(tls_socket_factory));
+  return std::make_unique<ServerStartTlsSocketFactory>(outer_config, std::move(raw_socket_factory),
+                                                       std::move(tls_socket_factory));
 }
 
 ProtobufTypes::MessagePtr DownstreamStartTlsSocketFactory::createEmptyConfigProto() {

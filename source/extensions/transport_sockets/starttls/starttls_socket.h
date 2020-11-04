@@ -20,33 +20,33 @@ public:
                  Network::TransportSocketPtr raw_socket, // RawBufferSocket
                  Network::TransportSocketPtr ssl_socket, // SslSocket
                  const Network::TransportSocketOptionsSharedPtr&)
-      : passthrough_(std::move(raw_socket)), ssl_socket_(std::move(ssl_socket)) {
+      : oper_socket_(std::move(raw_socket)), ssl_socket_(std::move(ssl_socket)) {
     max_cleartext_bytes_ = config.max_cleartext_bytes();
   }
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
-    passthrough_->setTransportSocketCallbacks(callbacks);
+    oper_socket_->setTransportSocketCallbacks(callbacks);
     callbacks_ = &callbacks;
   }
 
   std::string protocol() const override { return TransportProtocolNames::get().StartTls; }
 
-  absl::string_view failureReason() const override { return passthrough_->failureReason(); }
+  absl::string_view failureReason() const override { return oper_socket_->failureReason(); }
 
-  void onConnected() override { passthrough_->onConnected(); }
-  bool canFlushClose() override { return passthrough_->canFlushClose(); }
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return passthrough_->ssl(); }
+  void onConnected() override { oper_socket_->onConnected(); }
+  bool canFlushClose() override { return oper_socket_->canFlushClose(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return oper_socket_->ssl(); }
 
   void closeSocket(Network::ConnectionEvent event) override {
-    return passthrough_->closeSocket(event);
+    return oper_socket_->closeSocket(event);
   }
 
   Network::IoResult doRead(Buffer::Instance& buffer) override {
-    return passthrough_->doRead(buffer);
+    return oper_socket_->doRead(buffer);
   }
 
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override {
-    return passthrough_->doWrite(buffer, end_stream);
+    return oper_socket_->doWrite(buffer, end_stream);
   }
 
   // Method to enable TLS.
@@ -56,9 +56,9 @@ private:
   // Socket used in all transport socket operations.
   // initially it is set to use raw buffer socket but
   // can be converted to use ssl.
-  Network::TransportSocketPtr passthrough_;
+  Network::TransportSocketPtr oper_socket_;
   // Secure transport socket. It will replace raw buffer socket
-  // initially stored in passthrough_, when startSecureTransport is called.
+  // initially stored in oper_socket_, when startSecureTransport is called.
   Network::TransportSocketPtr ssl_socket_;
 
   Network::TransportSocketCallbacks* callbacks_{};
@@ -77,10 +77,9 @@ public:
 
   ServerStartTlsSocketFactory(
       const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig& config,
-      const std::vector<std::string>& server_names,
       Network::TransportSocketFactoryPtr raw_socket_factory,
       Network::TransportSocketFactoryPtr tls_socket_factory)
-      : server_names_(server_names), raw_socket_factory_(std::move(raw_socket_factory)),
+      : raw_socket_factory_(std::move(raw_socket_factory)),
         tls_socket_factory_(std::move(tls_socket_factory)), config_(config) {}
 
   Network::TransportSocketPtr
@@ -88,7 +87,6 @@ public:
   bool implementsSecureTransport() const override { return false; }
 
 private:
-  const std::vector<std::string> server_names_;
   Network::TransportSocketFactoryPtr raw_socket_factory_;
   Network::TransportSocketFactoryPtr tls_socket_factory_;
   envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig config_;
