@@ -98,7 +98,7 @@ protected:
                                false));
 
     // The filter should encode data in chunks sized according to the buffer limit.
-    int chunks_count = std::ceil(float(body_size) / float(buffer_limit_));
+    const int chunks_count = (body_size + buffer_limit_ - 1) / buffer_limit_;
     // The size of all chunks except the last one is equal to the buffer_limit_.
     EXPECT_CALL(decoder_callbacks_,
                 encodeData(testing::Property(&Buffer::Instance::toString,
@@ -106,7 +106,7 @@ protected:
                            false))
         .Times(chunks_count - 1);
 
-    uint64_t last_chunk_size =
+    const uint64_t last_chunk_size =
         body_size % buffer_limit_ == 0 ? buffer_limit_ : body_size % buffer_limit_;
     EXPECT_CALL(decoder_callbacks_,
                 encodeData(testing::Property(&Buffer::Instance::toString,
@@ -136,7 +136,8 @@ protected:
     ASSERT(body_size > 0);
 
     // Make request require validation
-    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                     Http::CustomHeaders::get().CacheControlValues.NoCache);
 
     // Decoding the request should find a cached response that requires validation.
     // As far as decoding the request is concerned, this is the same as a cache miss with the
@@ -166,7 +167,7 @@ protected:
     EXPECT_THAT(not_modified_response_headers, IsSupersetOfHeaders(updated_response_headers));
 
     // The filter should inject data in chunks sized according to the buffer limit.
-    int chunks_count = std::ceil(float(body_size) / float(buffer_limit_));
+    const int chunks_count = (body_size + buffer_limit_ - 1) / buffer_limit_;
     // The size of all chunks except the last one is equal to the buffer_limit_.
     EXPECT_CALL(encoder_callbacks_,
                 injectEncodedDataToFilterChain(
@@ -175,7 +176,7 @@ protected:
                     false))
         .Times(chunks_count - 1);
 
-    uint64_t last_chunk_size =
+    const uint64_t last_chunk_size =
         body_size % buffer_limit_ == 0 ? buffer_limit_ : body_size % buffer_limit_;
     EXPECT_CALL(encoder_callbacks_,
                 injectEncodedDataToFilterChain(
@@ -205,7 +206,7 @@ protected:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 
-  uint64_t buffer_limit_ = 1024;
+  const uint64_t buffer_limit_ = 1024;
 
   // Etag and last modified date header values, used for cache validation tests.
   std::string response_last_modified_, response_date_, etag_ = "abc123";
@@ -301,7 +302,7 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
 
 TEST_F(CacheFilterTest, CacheHitWithBody) {
   request_headers_.setHost("CacheHitWithBody");
-  uint64_t body_size = 3;
+  const uint64_t body_size = 3;
   const std::string body = std::string(body_size, 'a');
 
   {
@@ -331,7 +332,7 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
 
 TEST_F(CacheFilterTest, SuccessfulValidation) {
   request_headers_.setHost("SuccessfulValidation");
-  uint64_t body_size = 3;
+  const uint64_t body_size = 3;
   const std::string body = std::string(body_size, 'a');
   {
     // Create filter for request 1
@@ -390,7 +391,8 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make request require validation.
-    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                     Http::CustomHeaders::get().CacheControlValues.NoCache);
 
     // Decoding the request should find a cached response that requires validation.
     // As far as decoding the request is concerned, this is the same as a cache miss with the
@@ -721,7 +723,7 @@ TEST_F(CacheChunkSizeTest, DivisibleByBufferLimit) {
 // correct number of chunks.
 TEST_F(CacheChunkSizeTest, NotDivisbleByBufferLimit) {
   request_headers_.setHost("NotDivisbleByBufferLimit");
-  uint64_t body_size = buffer_limit_ * 4.5;
+  const uint64_t body_size = buffer_limit_ * 4.5;
   const std::string body = std::string(body_size, 'a');
 
   {
@@ -791,7 +793,7 @@ TEST_F(CacheChunkSizeTest, EqualBufferLimitWithValidation) {
 // correct number of chunks, in the case where validation takes place.
 TEST_F(CacheChunkSizeTest, DivisibleByBufferLimitWithValidation) {
   request_headers_.setHost("DivisibleByBufferLimitWithValidation");
-  uint64_t body_size = buffer_limit_ * 3;
+  const uint64_t body_size = buffer_limit_ * 3;
   const std::string body = std::string(body_size, 'a');
 
   {
@@ -829,7 +831,7 @@ TEST_F(CacheChunkSizeTest, DivisibleByBufferLimitWithValidation) {
 // correct number of chunks, in the case where validation takes place.
 TEST_F(CacheChunkSizeTest, NotDivisbleByBufferLimitWithValidation) {
   request_headers_.setHost("NotDivisbleByBufferLimitWithValidation");
-  uint64_t body_size = buffer_limit_ * 4.5;
+  const uint64_t body_size = buffer_limit_ * 4.5;
   const std::string body = std::string(body_size, 'a');
 
   {
@@ -886,7 +888,8 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                     Http::CustomHeaders::get().CacheControlValues.NoCache);
     testDecodeRequestMiss(filter);
 
     // Make sure validation conditional headers are added
@@ -914,7 +917,8 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                     Http::CustomHeaders::get().CacheControlValues.NoCache);
     testDecodeRequestMiss(filter);
 
     // Make sure validation conditional headers are added
@@ -944,7 +948,8 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                     Http::CustomHeaders::get().CacheControlValues.NoCache);
     testDecodeRequestMiss(filter);
 
     // Make sure validation conditional headers are added
@@ -968,7 +973,8 @@ TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                     Http::CustomHeaders::get().CacheControlValues.NoCache);
     testDecodeRequestMiss(filter);
 
     // Make sure validation conditional headers are added
@@ -995,7 +1001,8 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                     Http::CustomHeaders::get().CacheControlValues.NoCache);
     testDecodeRequestMiss(filter);
 
     // Make sure validation conditional headers are added
@@ -1007,8 +1014,8 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
 
 TEST_F(CacheChunkSizeTest, HandleDownstreamWatermarkCallbacks) {
   request_headers_.setHost("DownstreamPressureHandling");
-  int chunks_count = 3;
-  uint64_t body_size = buffer_limit_ * chunks_count;
+  const int chunks_count = 3;
+  const uint64_t body_size = buffer_limit_ * chunks_count;
   const std::string body = std::string(body_size, 'a');
   {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -1031,7 +1038,8 @@ TEST_F(CacheChunkSizeTest, HandleDownstreamWatermarkCallbacks) {
   {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     // Set require validation.
-    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                     Http::CustomHeaders::get().CacheControlValues.NoCache);
 
     // Cached response requiring validation is treated as a cache miss.
     testDecodeRequestMiss(filter);

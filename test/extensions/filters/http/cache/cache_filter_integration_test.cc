@@ -35,7 +35,7 @@ public:
            "@type": "type.googleapis.com/envoy.source.extensions.filters.http.cache.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  uint64_t buffer_limit_ = 1024;
+  const uint64_t buffer_limit_ = 1024;
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, CacheIntegrationTest,
