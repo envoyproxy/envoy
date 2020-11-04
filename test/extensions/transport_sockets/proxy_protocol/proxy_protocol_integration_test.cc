@@ -104,6 +104,36 @@ TEST_P(ProxyProtocolIntegrationTest, TestV1ProxyProtocol) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
+TEST_P(ProxyProtocolIntegrationTest, TestV1ProxyProtocolMultipleConnections) {
+  if (GetParam() != Network::Address::IpVersion::v4) {
+    return;
+  }
+
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
+        "envoy.transport_sockets.raw_buffer");
+  initialize();
+  auto listener_port = lookupPort("listener_0");
+
+  auto loopback2 = Network::Utility::resolveUrl("tcp://127.0.0.2:0");
+  auto tcp_client2 = makeTcpConnection(listener_port, nullptr, loopback2);
+
+  auto tcp_client = makeTcpConnection(listener_port);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+  FakeRawConnectionPtr conn2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn2));
+
+  std::string data1, data2;
+  ASSERT_TRUE(
+      fake_upstream_connection_->waitForData(FakeRawConnection::waitForAtLeastBytes(32), &data1));
+  ASSERT_TRUE(conn2->waitForData(FakeRawConnection::waitForAtLeastBytes(32), &data2));
+
+  EXPECT_NE(data1, data2);
+
+  tcp_client->close();
+  tcp_client2->close();
+}
+
 // Test header is sent unencrypted using a TLS inner socket
 TEST_P(ProxyProtocolIntegrationTest, TestTLSSocket) {
   setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, "envoy.transport_sockets.tls");

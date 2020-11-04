@@ -513,6 +513,12 @@ public:
     };
   }
 
+  // Creates a ValidatorFunction which returns true when data_to_wait_for is
+  // contains at least bytes_read bytes.
+  static ValidatorFunction waitForAtLeastBytes(uint32_t bytes) {
+    return [bytes](const std::string& data) -> bool { return data.size() >= bytes; };
+  }
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeRawConnection& parent) : parent_(parent) {}
