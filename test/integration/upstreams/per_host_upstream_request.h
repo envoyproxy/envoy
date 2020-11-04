@@ -17,12 +17,14 @@
 
 namespace Envoy {
 
-class PerHostHttpConnPool : public Router::GenericConnPool, public Envoy::Http::ConnectionPool::Callbacks {
+class PerHostHttpConnPool : public Router::GenericConnPool,
+                            public Envoy::Http::ConnectionPool::Callbacks {
 public:
   // GenericConnPool
-  PerHostHttpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-               absl::optional<Envoy::Http::Protocol> downstream_protocol,
-               Upstream::LoadBalancerContext* ctx) {
+  PerHostHttpConnPool(Upstream::ClusterManager& cm, bool is_connect,
+                      const Router::RouteEntry& route_entry,
+                      absl::optional<Envoy::Http::Protocol> downstream_protocol,
+                      Upstream::LoadBalancerContext* ctx) {
     ASSERT(!is_connect);
     conn_pool_ = cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(),
                                            downstream_protocol, ctx);
@@ -51,8 +53,9 @@ private:
 
 class PerHostHttpUpstream : public Router::GenericUpstream {
 public:
-  PerHostHttpUpstream(Router::UpstreamToDownstream& upstream_request, Envoy::Http::RequestEncoder* encoder,
-               Upstream::HostDescriptionConstSharedPtr host)
+  PerHostHttpUpstream(Router::UpstreamToDownstream& upstream_request,
+                      Envoy::Http::RequestEncoder* encoder,
+                      Upstream::HostDescriptionConstSharedPtr host)
       : sub_upstream_(upstream_request, encoder), host_(host) {}
 
   // GenericUpstream
@@ -67,19 +70,30 @@ public:
   void encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override {
     auto dup = Envoy::Http::RequestHeaderMapImpl::create();
     Envoy::Http::HeaderMapImpl::copyFrom(*dup, headers);
-    dup->setCopy(Envoy::Http::LowerCaseString("X-istio-test"), "lambdai");
-    // Sanitize original port header.
-    dup->remove(Envoy::Http::LowerCaseString("X-istio-original-port"));
-    if (auto filter_metadata = host_->cluster().metadata().filter_metadata().find("istio");
+    dup->setCopy(Envoy::Http::LowerCaseString("X-foo"), "foo-common");
+    if (auto filter_metadata = host_->cluster().metadata().filter_metadata().find("foo");
         filter_metadata != host_->cluster().metadata().filter_metadata().end()) {
       ENVOY_LOG_MISC(warn, "lambdai: find filter_metadata from {}",
                      host_->cluster().metadata().DebugString());
       const ProtobufWkt::Struct& data_struct = filter_metadata->second;
       const auto& fields = data_struct.fields();
-      if (auto iter = fields.find("original_port"); iter != fields.end()) {
+      if (auto iter = fields.find("bar"); iter != fields.end()) {
         if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
-          dup->setCopy(Envoy::Http::LowerCaseString("X-istio-original-port"),
-                       iter->second.string_value());
+          dup->setCopy(Envoy::Http::LowerCaseString("X-cluster-foo"), iter->second.string_value());
+        }
+      }
+    }
+    if (host_->metadata() != nullptr) {
+      if (auto filter_metadata = host_->metadata()->filter_metadata().find("foo");
+          filter_metadata != host_->metadata()->filter_metadata().end()) {
+        //   ENVOY_LOG_MISC(warn, "lambdai: find filter_metadata from {}",
+        //                  host_->metadata().DebugString());
+        const ProtobufWkt::Struct& data_struct = filter_metadata->second;
+        const auto& fields = data_struct.fields();
+        if (auto iter = fields.find("bar"); iter != fields.end()) {
+          if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
+            dup->setCopy(Envoy::Http::LowerCaseString("X-host-foo"), iter->second.string_value());
+          }
         }
       }
     }
@@ -98,6 +112,5 @@ private:
   Extensions::Upstreams::Http::Http::HttpUpstream sub_upstream_;
   Upstream::HostDescriptionConstSharedPtr host_{};
 };
-
 
 } // namespace Envoy

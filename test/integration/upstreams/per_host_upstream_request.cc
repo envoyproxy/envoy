@@ -49,20 +49,19 @@ absl::optional<Envoy::Http::Protocol> PerHostHttpConnPool::protocol() const {
 }
 
 void PerHostHttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                                 absl::string_view transport_failure_reason,
-                                 Upstream::HostDescriptionConstSharedPtr host) {
+                                        absl::string_view transport_failure_reason,
+                                        Upstream::HostDescriptionConstSharedPtr host) {
   callbacks_->onPoolFailure(reason, transport_failure_reason, host);
 }
 
 void PerHostHttpConnPool::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
-                               Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info) {
+                                      Upstream::HostDescriptionConstSharedPtr host,
+                                      const StreamInfo::StreamInfo& info) {
   conn_pool_stream_handle_ = nullptr;
-  auto upstream =
-      std::make_unique<PerHostHttpUpstream>(callbacks_->upstreamToDownstream(), &request_encoder, host);
+  auto upstream = std::make_unique<PerHostHttpUpstream>(callbacks_->upstreamToDownstream(),
+                                                        &request_encoder, host);
   callbacks_->onPoolReady(std::move(upstream), host,
                           request_encoder.getStream().connectionLocalAddress(), info);
 }
-
 
 } // namespace Envoy

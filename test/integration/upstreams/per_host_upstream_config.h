@@ -10,9 +10,7 @@ namespace Envoy {
  */
 class PerHostGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
-  std::string name() const override {
-    return "envoy.filters.connection_pools.http.per_host";
-  }
+  std::string name() const override { return "envoy.filters.connection_pools.http.per_host"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
   createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
@@ -20,12 +18,9 @@ public:
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return nullptr;
-  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
 };
 
 DECLARE_FACTORY(PerHostGenericConnPoolFactory);
-
 
 } // namespace Envoy

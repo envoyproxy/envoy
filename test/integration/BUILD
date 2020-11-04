@@ -1581,3 +1581,23 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "cluster_upstream_extension_integration_test",
+    srcs = [
+        "cluster_upstream_extension_integration_test.cc",
+    ],
+    deps = [
+        "//test/integration/upstreams:per_host_upstream_config",
+        ":http_integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/protobuf",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
