@@ -39,12 +39,12 @@ Specifying a TLS context that clients can connect to is done using a ``Downstrea
 
 Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSContext``:
 
-.. literalinclude:: _include/envoy-demo-tls-sni.yaml
+.. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 30
-   :lines: 30-37
-   :emphasize-lines: 3-5
+   :lineno-start: 92
+   :lines: 92-111
+   :emphasize-lines: 16-20
 
 Secure an endpoint with SNI
 ---------------------------

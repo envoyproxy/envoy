@@ -29,10 +29,10 @@ static_resources:
         name: envoy.transport_sockets.tls
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          filter_chain_match:
+            server_names:
+            - my-service-name.example.com
           common_tls_context:
-            filter_chain_match:
-              server_names:
-              - my-service-name.example.com
             tls_certificates:
               # The following self-signed certificate pair is generated using:
               # $ openssl req -x509 -newkey rsa:2048 -keyout a/front-proxy-key.pem -out  a/front-proxy-crt.pem -days 3650 -nodes -subj '/CN=front-envoy'
