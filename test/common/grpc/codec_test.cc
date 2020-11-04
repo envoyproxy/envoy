@@ -106,10 +106,10 @@ TEST(GrpcCodecTest, decodeInvalidFrame) {
   EXPECT_EQ(size, buffer.length());
 }
 
-// TODO: Should this test really pass? This test shows that null bytes in the bytestring
-// successfully decode into a frame with length 0.
-// A frame constructed from null bytes followed by an invalid frame
+// This test shows that null bytes in the bytestring successfully decode into a frame with length 0.
+// Should this test really pass?
 TEST(GrpcCodecTest, DecodeMultipleFramesInvalid) {
+  // A frame constructed from null bytes followed by an invalid frame
   const std::string data("\000\000\000\000\0000000", 9);
   Buffer::OwnedImpl buffer(data.data(), data.size());
 
@@ -124,9 +124,7 @@ TEST(GrpcCodecTest, DecodeMultipleFramesInvalid) {
   // Buffer does not get drained due to it returning false.
   EXPECT_EQ(size, buffer.length());
   // Only part of the buffer represented a frame. Thus, the frame length should not equal the buffer
-  // length.
-  EXPECT_NE(size, frames[0].length_);
-  // The frame put into the output vector has no length.
+  // length. The frame put into the output vector has no length.
   EXPECT_EQ(0, frames[0].length_);
 }
 
