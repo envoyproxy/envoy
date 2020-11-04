@@ -5,3 +5,4 @@ Changes
 -------
 
 * http: fixed bugs in datadog and squash filter's handling of responses with no bodies.
+* tls: fix detection of the upstream connection close event.
