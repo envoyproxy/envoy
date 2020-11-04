@@ -35,9 +35,9 @@ if [[ "$TARGET_SUFFIX" == "docs" ]]; then
     REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
     TMP_REDIRECT="/tmp/docredirect/${REDIRECT_PATH}/docs"
     mkdir -p "$TMP_REDIRECT"
+    GCS_REDIRECT="${GCS_ARTIFACT_BUCKET}/${REDIRECT_PATH}"
     echo "<meta http-equiv=\"refresh\" content=\"0; URL='https://storage.googleapis.com/${GCS_REDIRECT}/index.html'\" />" \
 	 >  "${TMP_REDIRECT}/index.html"
-    GCS_REDIRECT="${GCS_ARTIFACT_BUCKET}/${REDIRECT_PATH}"
     echo "Uploading redirect to gs://${GCS_REDIRECT} ..."
     gsutil -mq rsync -dr "/tmp/docredirect/${REDIRECT_PATH}" "gs://${GCS_REDIRECT}"
 fi
