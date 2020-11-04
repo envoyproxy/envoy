@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.engine
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.Assert.fail
 import org.junit.Test
 
 private const val TEST_CONFIG =
@@ -46,10 +47,15 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("virtual_clusters: [test]")
   }
 
-  @Test(expected = EnvoyConfiguration.ConfigurationException::class)
+  @Test
   fun `resolve templates with invalid templates will throw on build`() {
     val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, emptyList(), 567, "v1.2.3", "com.mydomain.myapp", "[test]")
 
-    envoyConfiguration.resolveTemplate("{{ }}", "")
+    try {
+      envoyConfiguration.resolveTemplate("{{ missing }}", "")
+      fail("Unresolved configuration keys should trigger exception.")
+    } catch (e: EnvoyConfiguration.ConfigurationException) {
+      assertThat(e.message).contains("missing")
+    }
   }
 }

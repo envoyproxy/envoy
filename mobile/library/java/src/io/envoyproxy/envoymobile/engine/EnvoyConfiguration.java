@@ -1,6 +1,8 @@
 package io.envoyproxy.envoymobile.engine;
 
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 
@@ -16,6 +18,8 @@ public class EnvoyConfiguration {
   public final String appVersion;
   public final String appId;
   public final String virtualClusters;
+
+  private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
   /**
    * Create a new instance of the configuration.
@@ -80,13 +84,16 @@ public class EnvoyConfiguration {
             .replace("{{ app_id }}", appId)
             .replace("{{ virtual_clusters }}", virtualClusters);
 
-    if (resolvedConfiguration.contains("{{")) {
-      throw new ConfigurationException();
+    final Matcher unresolvedKeys = UNRESOLVED_KEY_PATTERN.matcher(resolvedConfiguration);
+    if (unresolvedKeys.find()) {
+      throw new ConfigurationException(unresolvedKeys.group(1));
     }
     return resolvedConfiguration;
   }
 
   static class ConfigurationException extends RuntimeException {
-    ConfigurationException() { super("Unresolved Template Key"); }
+    ConfigurationException(String unresolvedKey) {
+      super("Unresolved template key: " + unresolvedKey);
+    }
   }
 }
