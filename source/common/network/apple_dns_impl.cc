@@ -321,7 +321,7 @@ AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo(DnsLookupFamily d
 
   // TODO: explore caching: there are caching flags in the dns_sd.h flags, allow expired answers
   // from the cache?
-  // TODO: explore validation via DNSSEC?
+  // TODO: explore validation via `DNSSEC`?
   return DnsServiceSingleton::get().dnsServiceGetAddrInfo(
       &individual_sd_ref_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0, protocol,
       dns_name_.c_str(),

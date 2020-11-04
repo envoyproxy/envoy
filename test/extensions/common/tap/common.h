@@ -13,7 +13,7 @@ namespace data {
 namespace tap {
 namespace v3 {
 
-// TODO(mattklein123): AFAICT gtest has built in printing for proto messages but it doesn't seem
+// TODO(mattklein123): `AFAICT` gtest has built in printing for proto messages but it doesn't seem
 // to work unless this is here.
 std::ostream& operator<<(std::ostream& os, const TraceWrapper& trace);
 

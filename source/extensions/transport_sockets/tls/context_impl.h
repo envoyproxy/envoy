@@ -169,7 +169,7 @@ protected:
                      const Ocsp::OcspResponseWrapper* ocsp_response) const;
 
   struct TlsContext {
-    // Each certificate specified for the context has its own SSL_CTX. SSL_CTXs
+    // Each certificate specified for the context has its own SSL_CTX. `SSL_CTXs`
     // are identical with the exception of certificate material, and can be
     // safely substituted via SSL_set_SSL_CTX() during the
     // SSL_CTX_set_select_certificate_cb() callback following ClientHello.

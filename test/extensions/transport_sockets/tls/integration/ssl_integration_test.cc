@@ -363,7 +363,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsa) {
   checkStats();
 }
 
-// Server with RSA/ECDSAs certificates and a client with RSA/ECDSA cipher suites works.
+// Server with RSA/`ECDSAs` certificates and a client with RSA/ECDSA cipher suites works.
 TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsa) {
   server_rsa_cert_ = true;
   server_ecdsa_cert_ = true;

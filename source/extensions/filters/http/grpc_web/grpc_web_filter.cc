@@ -203,7 +203,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
   }
 
   // Trailers are expected to come all in once, and will be encoded into one single trailers frame.
-  // Trailers in the trailers frame are separated by CRLFs.
+  // Trailers in the trailers frame are separated by `CRLFs`.
   Buffer::OwnedImpl temp;
   trailers.iterate([&temp](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     temp.add(header.key().getStringView().data(), header.key().size());
