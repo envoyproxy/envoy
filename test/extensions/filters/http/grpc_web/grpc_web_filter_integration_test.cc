@@ -146,6 +146,5 @@ TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
   codec_client_->close();
 }
 
-
 } // namespace
 } // namespace Envoy
