@@ -1343,6 +1343,7 @@ TEST_F(ClientContextConfigImplTest, SecretNotReady) {
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   // When sds secret is not downloaded, config is not ready.
   EXPECT_FALSE(client_context_config.isReady());
+  EXPECT_FALSE(client_context_config.isSecretReady());
   // Set various callbacks to config.
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   client_context_config.setSecretUpdateCallback(

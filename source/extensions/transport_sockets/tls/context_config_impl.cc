@@ -377,11 +377,12 @@ ClientContextConfigImpl::ClientContextConfigImpl(
 
 bool ClientContextConfigImpl::isSecretReady() const {
   for (const auto& provider : tls_certificate_providers_) {
-    if (provider->secret() == nullptr) {
+    if (provider == nullptr || provider->secret() == nullptr) {
       return false;
     }
   }
-  return certificate_validation_context_provider_->secret() != nullptr;
+  return certificate_validation_context_provider_ != nullptr &&
+         certificate_validation_context_provider_->secret() != nullptr;
 }
 
 const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
