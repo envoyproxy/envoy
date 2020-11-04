@@ -28,6 +28,7 @@ Bug Fixes
 * http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
 * proxy_proto: fixed a bug where the wrong downstream address got sent to upstream connections.
+* tls: fix detection of the upstream connection close event.
 * tls: fix read resumption after triggering buffer high-watermark and all remaining request/response bytes are stored in the SSL connection's internal buffers.
 * watchdog: touch the watchdog before most event loop operations to avoid misses when handling bursts of callbacks.
 

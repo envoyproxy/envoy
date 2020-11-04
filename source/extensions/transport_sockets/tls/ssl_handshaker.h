@@ -67,7 +67,7 @@ public:
   // Ssl::Handshaker
   Network::PostIoAction doHandshake() override;
 
-  Ssl::SocketState state() { return state_; }
+  Ssl::SocketState state() const { return state_; }
   void setState(Ssl::SocketState state) { state_ = state; }
   SSL* ssl() const { return ssl_.get(); }
   Ssl::HandshakeCallbacks* handshakeCallbacks() { return handshake_callbacks_; }
