@@ -28,7 +28,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerato
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http11),
+                           transport_socket_options, {Protocol::Http11}),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
