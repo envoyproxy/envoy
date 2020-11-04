@@ -227,7 +227,7 @@ namespace CustomFlagFormatter {
 void EscapeMessageNewLine::format(const spdlog::details::log_msg& msg, const std::tm&,
                                   spdlog::memory_buf_t& dest) {
   auto escaped = absl::StrReplaceAll(absl::string_view(msg.payload.data(), msg.payload.size()),
-                                     {{"\n", "\\n"}});
+                                     replacements());
   dest.append(escaped.data(), escaped.data() + escaped.size());
 }
 
