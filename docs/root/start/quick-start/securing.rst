@@ -81,7 +81,7 @@ Validate an endpoint's certificates when connecting
    :linenos:
    :lineno-start: 43
    :lines: 43-53
-   :emphasize-lines: 10-11
+   :emphasize-lines: 6-7, 10-11
 
 Use mututal TLS (mTLS) to perform client certificate authentication
 -------------------------------------------------------------------
