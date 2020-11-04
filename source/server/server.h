@@ -397,7 +397,7 @@ public:
   const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
     return text_readouts_;
   }
-  std::chrono::milliseconds snapshotTime() const override { return snapshot_time_; }
+  SystemTime snapshotTime() const override { return snapshot_time_; }
 
 private:
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
@@ -408,7 +408,7 @@ private:
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
   std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
   std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
-  std::chrono::milliseconds snapshot_time_;
+  SystemTime snapshot_time_;
 };
 
 } // namespace Server

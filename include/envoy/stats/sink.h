@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
@@ -42,9 +43,9 @@ public:
   virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
 
   /**
-   * @return the time in milliseconds when the snapshot was created.
+   * @return the time in UTC since epoch when the snapshot was created.
    */
-  virtual std::chrono::milliseconds snapshotTime() const PURE;
+  virtual SystemTime snapshotTime() const PURE;
 };
 
 /**

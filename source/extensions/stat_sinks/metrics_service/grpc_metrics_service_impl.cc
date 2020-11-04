@@ -1,5 +1,7 @@
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
+#include <chrono>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
@@ -111,7 +113,9 @@ void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
   // preallocating the pointer array).
   message_.mutable_envoy_metrics()->Reserve(snapshot.counters().size() + snapshot.gauges().size() +
                                             snapshot.histograms().size());
-  int64_t snapshot_time_ms = snapshot.snapshotTime().count();
+  int64_t snapshot_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 snapshot.snapshotTime().time_since_epoch())
+                                 .count();
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
       flushCounter(counter, snapshot_time_ms);

@@ -2,6 +2,7 @@
 
 #include <csignal>
 #include <cstdint>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <string>
@@ -174,8 +175,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
     text_readouts_.push_back(*text_readout);
   }
 
-  snapshot_time_ = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time_source.systemTime().time_since_epoch());
+  snapshot_time_ = time_source.systemTime();
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
