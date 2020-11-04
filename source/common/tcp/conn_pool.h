@@ -84,8 +84,8 @@ public:
     Network::ClientConnection& connection_;
   };
 
-  ActiveTcpClient(ConnPoolImpl& parent, const Upstream::HostConstSharedPtr& host,
-                  uint64_t concurrent_stream_limit);
+  ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
+                  const Upstream::HostConstSharedPtr& host, uint64_t concurrent_stream_limit);
   ~ActiveTcpClient() override;
 
   // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
@@ -106,9 +106,9 @@ public:
       close();
     }
   }
-  void clearCallbacks();
+  virtual void clearCallbacks();
 
-  ConnPoolImpl& parent_;
+  Envoy::ConnectionPool::ConnPoolImplBase& parent_;
   ConnectionPool::UpstreamCallbacks* callbacks_{};
   Network::ClientConnectionPtr connection_;
   ConnectionPool::ConnectionStatePtr connection_state_;
@@ -123,11 +123,7 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                Network::TransportSocketOptionsSharedPtr transport_socket_options)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
-                                                transport_socket_options),
-        upstream_ready_cb_(dispatcher.createSchedulableCallback([this]() {
-          upstream_ready_enabled_ = false;
-          onUpstreamReady();
-        })) {}
+                                                transport_socket_options) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
@@ -196,18 +192,8 @@ public:
   }
 
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
-  virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) {
-    if (client.state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY) {
-      if (!pending_streams_.empty() && !upstream_ready_enabled_) {
-        upstream_ready_cb_->scheduleCallbackCurrentIteration();
-      }
-    }
-  }
+  virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnDestroyed() {}
-
-protected:
-  Event::SchedulableCallbackPtr upstream_ready_cb_;
-  bool upstream_ready_enabled_{};
 };
 
 } // namespace Tcp
