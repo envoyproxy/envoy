@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/registry/registry.h"
 #include "envoy/router/router.h"
 
 namespace Envoy {
@@ -18,9 +17,8 @@ public:
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
 };
-
-DECLARE_FACTORY(PerHostGenericConnPoolFactory);
-
 } // namespace Envoy

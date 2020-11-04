@@ -20,6 +20,4 @@ Router::GenericConnPoolPtr PerHostGenericConnPoolFactory::createGenericConnPool(
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 
-REGISTER_FACTORY(PerHostGenericConnPoolFactory, Router::GenericConnPoolFactory);
-
 } // namespace Envoy

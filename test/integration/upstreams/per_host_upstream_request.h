@@ -73,8 +73,6 @@ public:
     dup->setCopy(Envoy::Http::LowerCaseString("X-foo"), "foo-common");
     if (auto filter_metadata = host_->cluster().metadata().filter_metadata().find("foo");
         filter_metadata != host_->cluster().metadata().filter_metadata().end()) {
-      ENVOY_LOG_MISC(warn, "lambdai: find filter_metadata from {}",
-                     host_->cluster().metadata().DebugString());
       const ProtobufWkt::Struct& data_struct = filter_metadata->second;
       const auto& fields = data_struct.fields();
       if (auto iter = fields.find("bar"); iter != fields.end()) {
@@ -86,8 +84,6 @@ public:
     if (host_->metadata() != nullptr) {
       if (auto filter_metadata = host_->metadata()->filter_metadata().find("foo");
           filter_metadata != host_->metadata()->filter_metadata().end()) {
-        //   ENVOY_LOG_MISC(warn, "lambdai: find filter_metadata from {}",
-        //                  host_->metadata().DebugString());
         const ProtobufWkt::Struct& data_struct = filter_metadata->second;
         const auto& fields = data_struct.fields();
         if (auto iter = fields.find("bar"); iter != fields.end()) {

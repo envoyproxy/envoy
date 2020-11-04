@@ -1,10 +1,13 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/router/router.h"
 
 #include "common/buffer/buffer_impl.h"
 
-// #include "test/integration/upstreams/per_host_upstream_config.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/upstreams/per_host_upstream_config.h"
+#include "test/test_common/registry.h"
 
 #include "fake_upstream.h"
 #include "gtest/gtest.h"
@@ -23,6 +26,7 @@ public:
     setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   }
+  
   void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata, const std::string& k1,
                                 const std::string& k2, const std::string& value) {
 
@@ -48,9 +52,9 @@ public:
                                     ->mutable_metadata(),
                                "foo", "bar", "host-value");
     });
-
     HttpIntegrationTest::initialize();
   }
+  PerHostGenericConnPoolFactory per_host_upstream_factory_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterUpstreamExtensionIntegrationTest,
@@ -60,6 +64,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterUpstreamExtensionIntegrationTest,
 TEST_P(ClusterUpstreamExtensionIntegrationTest,
        VerifyRequestHeadersAreRewrittenByClusterAndHostMetadata) {
   initialize();
+  Registry::InjectFactory<Router::GenericConnPoolFactory> registration(per_host_upstream_factory_);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
