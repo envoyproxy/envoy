@@ -67,6 +67,22 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   Upstream::HostDescriptionConstSharedPtr host_;
 };
 
+class TestActiveTcpClient : public ActiveTcpClient {
+public:
+  using ActiveTcpClient::ActiveTcpClient;
+
+  ~TestActiveTcpClient() override { parent().onConnDestroyed(); }
+  void clearCallbacks() override {
+    if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
+        state_ == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
+      parent().onConnReleased(*this);
+    }
+    ActiveTcpClient::clearCallbacks();
+  }
+
+  Envoy::Tcp::ConnPoolImpl& parent() { return *static_cast<ConnPoolImpl*>(&parent_); }
+};
+
 /**
  * A wrapper around a ConnectionPoolImpl which tracks when the bridge between
  * the pool and the consumer of the connection is released and destroyed.
@@ -143,7 +159,13 @@ protected:
       parent_.onConnReleasedForTest();
     }
 
+    Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
+      return std::make_unique<TestActiveTcpClient>(
+          *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), 1);
+    }
+
     void onConnDestroyed() override { parent_.onConnDestroyedForTest(); }
+    Event::PostCb post_cb_;
     ConnPoolBase& parent_;
   };
 
@@ -202,12 +224,11 @@ void ConnPoolBase::expectEnableUpstreamReady(bool run) {
   if (!test_new_connection_pool_) {
     dynamic_cast<OriginalConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
   } else {
-    if (!run) {
-      EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
-          .Times(1)
-          .RetiresOnSaturation();
+    Event::PostCb& post_cb = dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->post_cb_;
+    if (run) {
+      post_cb();
     } else {
-      mock_upstream_ready_cb_->invokeCallback();
+      EXPECT_CALL(mock_dispatcher_, post(_)).WillOnce(testing::SaveArg<0>(&post_cb));
     }
   }
 }
@@ -219,7 +240,9 @@ class TcpConnPoolImplTest : public testing::TestWithParam<bool> {
 public:
   TcpConnPoolImplTest()
       : test_new_connection_pool_(GetParam()),
-        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        upstream_ready_cb_(test_new_connection_pool_
+                               ? nullptr
+                               : new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
         conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_) {}
 
@@ -244,7 +267,9 @@ class TcpConnPoolImplDestructorTest : public testing::TestWithParam<bool> {
 public:
   TcpConnPoolImplDestructorTest()
       : test_new_connection_pool_(GetParam()),
-        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
+        upstream_ready_cb_(test_new_connection_pool_
+                               ? nullptr
+                               : new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
     if (test_new_connection_pool_) {
       conn_pool_ = std::make_unique<ConnPoolImpl>(

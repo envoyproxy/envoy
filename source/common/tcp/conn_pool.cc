@@ -12,7 +12,8 @@
 namespace Envoy {
 namespace Tcp {
 
-ActiveTcpClient::ActiveTcpClient(ConnPoolImpl& parent, const Upstream::HostConstSharedPtr& host,
+ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
+                                 const Upstream::HostConstSharedPtr& host,
                                  uint64_t concurrent_stream_limit)
     : Envoy::ConnectionPool::ActiveClient(parent, host->cluster().maxRequestsPerConnection(),
                                           concurrent_stream_limit),
@@ -24,6 +25,12 @@ ActiveTcpClient::ActiveTcpClient(ConnPoolImpl& parent, const Upstream::HostConst
   connection_->addConnectionCallbacks(*this);
   connection_->detectEarlyCloseWhenReadDisabled(false);
   connection_->addReadFilter(std::make_shared<ConnReadFilter>(*this));
+  connection_->setConnectionStats({host->cluster().stats().upstream_cx_rx_bytes_total_,
+                                   host->cluster().stats().upstream_cx_rx_bytes_buffered_,
+                                   host->cluster().stats().upstream_cx_tx_bytes_total_,
+                                   host->cluster().stats().upstream_cx_tx_bytes_buffered_,
+                                   &host->cluster().stats().bind_errors_, nullptr});
+
   connection_->connect();
 }
 
@@ -37,13 +44,12 @@ ActiveTcpClient::~ActiveTcpClient() {
     parent_.onStreamClosed(*this, true);
     parent_.checkForDrained();
   }
-  parent_.onConnDestroyed();
 }
 
 void ActiveTcpClient::clearCallbacks() {
-  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
-      state_ == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
-    parent_.onConnReleased(*this);
+  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
+    auto* pool = &parent_;
+    pool->dispatcher().post([pool]() -> void { pool->onUpstreamReady(); });
   }
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;
