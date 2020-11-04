@@ -34,7 +34,6 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase
         zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config());
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException; {}", e.what());
-    zone_aware_load_balancer_fuzz.clearStaticHostsState();
     return;
   }
 
