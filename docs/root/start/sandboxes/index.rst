@@ -14,6 +14,7 @@ features. The following sandboxes are available:
     cache
     cors
     csrf
+    dynamic-configuration-filesystem
     dynamic-configuration-control-plane
     ext_authz
     fault_injection
@@ -28,3 +29,4 @@ features. The following sandboxes are available:
     redis
     wasm-cc
     zipkin_tracing
+    skywalking_tracing
