@@ -4473,15 +4473,15 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
 
-  // With multiple matching fallbacks specified, a single match will match.
-  server_ctx->add_alpn_protocols("foo");
+  // With multiple fallbacks specified, a single match will match.
   transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
       "", std::vector<std::string>{}, std::vector<std::string>{},
       std::vector<std::string>{"foo", "test"});
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
 
-  // With multiple fallbacks specified, a single match will match.
+  // With multiple matching fallbacks specified, a single match will match.
+  server_ctx->add_alpn_protocols("foo");
   transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
       "", std::vector<std::string>{}, std::vector<std::string>{},
       std::vector<std::string>{"foo", "test"});
