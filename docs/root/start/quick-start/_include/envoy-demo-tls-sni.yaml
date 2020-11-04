@@ -25,13 +25,13 @@ static_resources:
                 route:
                   host_rewrite_literal: www.envoyproxy.io
                   cluster: service_envoyproxy_io
+      filter_chain_match:
+        server_names:
+          - my-service-name.example.com
       transport_socket:
         name: envoy.transport_sockets.tls
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-          filter_chain_match:
-            server_names:
-            - my-service-name.example.com
           common_tls_context:
             tls_certificates:
               # The following self-signed certificate pair is generated using:

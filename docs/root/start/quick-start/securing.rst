@@ -53,8 +53,8 @@ Secure an endpoint with SNI
    :language: yaml
    :linenos:
    :lineno-start: 27
-   :lines: 27-37
-   :emphasize-lines: 6-8
+   :lines: 27-35
+   :emphasize-lines: 2-4
 
 Connect to an endpoint securely with SNI
 ----------------------------------------
