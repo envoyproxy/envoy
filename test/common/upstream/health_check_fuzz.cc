@@ -104,6 +104,9 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
       .WillByDefault(testing::Return(input.http_verify_cluster()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  if (input.upstream_cx_total_inc()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
   expectStreamCreate(0);
   // This sets up the possibility of testing hosts that never become healthy
@@ -317,6 +320,9 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   allocGrpcHealthCheckerFromProto(input.health_check_config());
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  if (input.upstream_cx_total_inc()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
   ON_CALL(dispatcher_, createClientConnection_(_, _, _, _))
       .WillByDefault(testing::InvokeWithoutArgs(
