@@ -1192,7 +1192,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host) {
 
   // Drain all HTTP connection pool connections in the case of a host health failure. If outlier/
-  // health is due to ECMP flow hashing issues for example, a new set of connections might do
+  // health is due to `ECMP` flow hashing issues for example, a new set of connections might do
   // better.
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
   // more granular host set changes, we should be able to capture single host changes and make them
