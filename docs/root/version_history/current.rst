@@ -26,6 +26,7 @@ Bug Fixes
 
 * dns: fix a bug where custom resolvers provided in configuration were not preserved after network issues.
 * http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
+* http: reject requests with missing required headers after filter chain processing.
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
 * proxy_proto: fixed a bug where the wrong downstream address got sent to upstream connections.
 * tls: fix detection of the upstream connection close event.

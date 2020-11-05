@@ -117,7 +117,8 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientStreamTests, EnvoyQuicClientStreamTest,
 
 TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
-  quic_stream_->encodeHeaders(request_headers_, false);
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_TRUE(result.ok());
   quic_stream_->encodeData(request_body_, false);
   quic_stream_->encodeTrailers(request_trailers_);
 
@@ -167,7 +168,8 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
     EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
     return;
   }
-  quic_stream_->encodeHeaders(request_headers_, true);
+  const auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
         EXPECT_EQ("200", headers->getStatusValue());
@@ -220,7 +222,8 @@ TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
   quic_session_.OnWindowUpdateFrame(window_update);
 
   request_headers_.addCopy(":content-length", "32770"); // 32KB + 2 byte
-  quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
+  const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
+  EXPECT_TRUE(result.ok());
   // Encode 32kB request body. first 16KB should be written out right away. The
   // rest should be buffered. The high watermark is 16KB, so this call should
   // make the send buffer reach its high watermark.
@@ -288,7 +291,8 @@ TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
                           quiche::QuicheOptional<quic::EncryptionLevel>) {
         return quic::QuicConsumedData{0u, state != quic::NO_FIN};
       }));
-  quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
+  const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
+  EXPECT_TRUE(result.ok());
 
   // Encode 16kB -10 bytes request body. Because the high watermark is 16KB, with previously
   // buffered headers, this call should make the send buffers reach their high watermark.
