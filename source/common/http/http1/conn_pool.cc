@@ -28,43 +28,12 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerato
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http11),
-      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
-        upstream_ready_enabled_ = false;
-        onUpstreamReady();
-      })),
-      random_generator_(random_generator) {}
+                           transport_socket_options, random_generator, {Protocol::Http11}) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
 Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
-}
-
-void ConnPoolImpl::onDownstreamReset(ActiveClient& client) {
-  // If we get a downstream reset to an attached client, we just blow it away.
-  client.codec_client_->close();
-}
-
-void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
-  ENVOY_CONN_LOG(debug, "response complete", *client.codec_client_);
-
-  if (!client.stream_wrapper_->encode_complete_) {
-    ENVOY_CONN_LOG(debug, "response before request complete", *client.codec_client_);
-    onDownstreamReset(client);
-  } else if (client.stream_wrapper_->close_connection_ || client.codec_client_->remoteClosed()) {
-    ENVOY_CONN_LOG(debug, "saw upstream close connection", *client.codec_client_);
-    onDownstreamReset(client);
-  } else {
-    client.stream_wrapper_.reset();
-
-    if (!pending_streams_.empty() && !upstream_ready_enabled_) {
-      upstream_ready_enabled_ = true;
-      upstream_ready_cb_->scheduleCallbackCurrentIteration();
-    }
-
-    checkForDrained();
-  }
 }
 
 ConnPoolImpl::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
@@ -87,7 +56,7 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
     close_connection_ =
         HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
     if (close_connection_) {
-      parent_.parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
+      parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
     }
   } else {
     // If Connection: close OR
@@ -100,7 +69,7 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
                                  Headers::get().ConnectionValues.KeepAlive)) ||
         (absl::EqualsIgnoreCase(headers->getProxyConnectionValue(),
                                 Headers::get().ConnectionValues.Close))) {
-      parent_.parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
+      parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
       close_connection_ = true;
     }
   }
@@ -108,8 +77,24 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
 }
 
 void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
+  ASSERT(!decode_complete_);
   decode_complete_ = encode_complete_;
-  parent_.parent().onResponseComplete(parent_);
+
+  ENVOY_CONN_LOG(debug, "response complete", *parent_.codec_client_);
+
+  if (!parent_.stream_wrapper_->encode_complete_) {
+    ENVOY_CONN_LOG(debug, "response before request complete", *parent_.codec_client_);
+    parent_.codec_client_->close();
+  } else if (parent_.stream_wrapper_->close_connection_ || parent_.codec_client_->remoteClosed()) {
+    ENVOY_CONN_LOG(debug, "saw upstream close connection", *parent_.codec_client_);
+    parent_.codec_client_->close();
+  } else {
+    auto* pool = &parent_.parent();
+    pool->dispatcher_.post([pool]() -> void { pool->onUpstreamReady(); });
+    parent_.stream_wrapper_.reset();
+
+    pool->checkForDrained();
+  }
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)

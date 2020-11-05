@@ -138,3 +138,9 @@ a resource from an update implying that the resource is gone. Envoy supports a "
 xDS (including ADS), where updates only contain resources added/changed/removed. Delta xDS is a
 new protocol, with request/response APIs different from SotW.
 :ref:`More details about delta <config_overview_delta>`.
+
+xDS TTL
+-------
+
+Certain xDS updates might want to set a TTL to guard against control plane unavailability, read more
+:ref:`here <config_overview_ttl>`.
