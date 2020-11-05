@@ -163,17 +163,22 @@ void AuthenticatorImpl::startVerify() {
     }
   }
 
-  status = jwt_->verifyTimeConstraint();
-  if (status != Status::Ok) {
-    doneWithStatus(status);
-    return;
-  }
-
   // Check the issuer is configured or not.
   jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
                          : jwks_cache_.findByIssuer(jwt_->iss_);
   // isIssuerSpecified() check already make sure the issuer is in the cache.
   ASSERT(jwks_data_ != nullptr);
+
+  // Default is 60 seconds
+  uint64_t clock_skew = ::google::jwt_verify::kClockSkewInSecond;
+  if (jwks_data_->getJwtProvider().clock_skew() > 0) {
+    clock_skew = jwks_data_->getJwtProvider().clock_skew();
+  }
+  status = jwt_->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now()), clock_skew);
+  if (status != Status::Ok) {
+    doneWithStatus(status);
+    return;
+  }
 
   // Check if audience is allowed
   bool is_allowed = check_audience_ ? check_audience_->areAudiencesAllowed(jwt_->audiences_)
