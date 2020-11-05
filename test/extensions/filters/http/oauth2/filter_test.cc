@@ -461,8 +461,8 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
   Http::TestRequestHeaderMapImpl final_request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
-                                        "state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
+                                        "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
