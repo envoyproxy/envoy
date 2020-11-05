@@ -12,11 +12,7 @@ Minor Behavior Changes
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
-* overload: prevent segfault when disabling listener.
-
-  This prevents the stop_listening overload action from causing
-  segmentation faults that can occur if the action is enabled after the
-  listener has already shut down.
+* listener: fix crash when disabling or re-enabling listeners due to overload while processing LDS updates.
 
 Removed Config or Runtime
 -------------------------
