@@ -344,7 +344,11 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   for (size_t i = 1; i <= count; ++i) {
     sendCHLO(quic::test::TestConnectionId(i));
   }
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // Rerun event loop until all connections are established. Especially on Windows, this test fails
+  // as non-blocking mode doesn't always pick up all connection events immediately.
+  while (connection_handler_.numConnections() < count) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   // The first kNumSessionsToCreatePerLoop were processed immediately, the next
   // kNumSessionsToCreatePerLoop were buffered for the next run of the event loop, and the last one
