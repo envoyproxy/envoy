@@ -122,16 +122,16 @@ Use mututal TLS (mTLS) to enforce client certificate authentication
    :language: yaml
    :linenos:
    :lineno-start: 27
-   :lines: 27-43
-   :emphasize-lines: 13-15
+   :lines: 27-39
+   :emphasize-lines: 6, 8-10
 
 
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
    :lineno-start: 27
-   :lines: 27-43
-   :emphasize-lines: 13, 16-17
+   :lines: 27-39
+   :emphasize-lines: 7, 11-12
 
 
 Use mututal TLS (mTLS) to connect with client certificates
@@ -142,11 +142,4 @@ Use mututal TLS (mTLS) to connect with client certificates
    :linenos:
    :lineno-start: 45
    :lines: 45-74
-   :emphasize-lines: 21-25
-
-.. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
-   :language: yaml
-   :linenos:
-   :lineno-start: 64
-   :lines: 64-74
-   :emphasize-lines: 7-9
+   :emphasize-lines: 21-28

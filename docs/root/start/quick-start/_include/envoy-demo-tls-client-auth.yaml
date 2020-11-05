@@ -31,16 +31,16 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           require_client_certificate: true
           common_tls_context:
-            tls_certificates:
-              certificate_chain:
-                filename: certs/servercert.pem
-              private_key:
-                filename: certs/serverkey.pem
             validation_context:
               trusted_ca:
                 filename: certs/cacert.pem
               match_subject_alt_names:
               - exact: proxy-postgres-frontend.example.com
+            tls_certificates:
+              certificate_chain:
+                filename: certs/servercert.pem
+              private_key:
+                filename: certs/serverkey.pem
 
   clusters:
   - name: service_envoyproxy_io
