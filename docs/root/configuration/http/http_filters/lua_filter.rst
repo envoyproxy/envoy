@@ -124,7 +124,7 @@ follow:
 
 .. code-block:: yaml
 
-  typed_per_filter_config::
+  typed_per_filter_config:
     envoy.filters.http.lua:
       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       disabled: true
