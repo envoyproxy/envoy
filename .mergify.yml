@@ -7,7 +7,7 @@ pull_request_rules:
     actions:
       merge:
         method: merge
-  - name: Automatic merge on approval by helight
+  - name: Automatic merge on approval by xuzhenwen
     conditions:
       - "approved-reviews-by=helight"
       - "#approved-reviews-by>=1"
@@ -15,9 +15,17 @@ pull_request_rules:
     actions:
       merge:
         method: merge
-  - name: Automatic merge when approved by lhb008
+  - name: Automatic merge when approved by majinghe
     conditions:
       - "approved-reviews-by=lhb008"
+      - "#approved-reviews-by>=1"
+      - base=zh
+    actions:
+      merge:
+        method: merge
+  - name: Automatic merge when approved by zhangxiaohui
+    conditions:
+      - "approved-reviews-by=addozhang"
       - "#approved-reviews-by>=1"
       - base=zh
     actions:
