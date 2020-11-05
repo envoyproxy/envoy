@@ -26,7 +26,7 @@ public:
     setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   }
-  
+
   void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata, const std::string& k1,
                                 const std::string& k2, const std::string& value) {
 
@@ -37,10 +37,6 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) { UNREFERENCED_PARAMETER(hcm); });
-
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
       cluster->mutable_upstream_config()->set_name("envoy.filters.connection_pools.http.per_host");

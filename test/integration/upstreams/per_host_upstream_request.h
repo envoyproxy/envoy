@@ -1,15 +1,13 @@
 #pragma once
 
-#include <cstdint>
 #include <memory>
-#include <string>
-#include <string_view>
 
-#include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/http/metadata_interface.h"
+#include "envoy/http/protocol.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/host_description.h"
 
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
 #include "common/http/header_map_impl.h"
 #include "common/router/upstream_request.h"
 

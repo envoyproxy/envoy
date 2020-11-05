@@ -1,22 +1,5 @@
 #include "test/integration/upstreams/per_host_upstream_request.h"
 
-#include <cstdint>
-#include <memory>
-
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
-#include "envoy/grpc/status.h"
-#include "envoy/http/conn_pool.h"
-#include "envoy/upstream/cluster_manager.h"
-#include "envoy/upstream/upstream.h"
-
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
 #include "common/router/router.h"
 
 using Envoy::Router::GenericConnectionPoolCallbacks;
