@@ -113,7 +113,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
   }
 
   if (request_headers.EnvoyRetriableStatusCodes()) {
-    for (const auto code :
+    for (const auto& code :
          StringUtil::splitToken(request_headers.getEnvoyRetriableStatusCodesValue(), ",")) {
       unsigned int out;
       if (absl::SimpleAtoi(code, &out)) {
@@ -128,7 +128,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
     // to provide HeaderMatcher serialized into a string. To avoid this extra
     // complexity we only support name-only header matchers via request
     // header. Anything more sophisticated needs to be provided via config.
-    for (const auto header_name : StringUtil::splitToken(
+    for (const auto& header_name : StringUtil::splitToken(
              request_headers.EnvoyRetriableHeaderNames()->value().getStringView(), ",")) {
       envoy::config::route::v3::HeaderMatcher header_matcher;
       header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
@@ -152,7 +152,7 @@ void RetryStateImpl::enableBackoffTimer() {
 std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config) {
   uint32_t ret = 0;
   bool all_fields_valid = true;
-  for (const auto retry_on : StringUtil::splitToken(config, ",", false, true)) {
+  for (const auto& retry_on : StringUtil::splitToken(config, ",", false, true)) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnValues._5xx) {
       ret |= RetryPolicy::RETRY_ON_5XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.GatewayError) {
@@ -180,7 +180,7 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
 std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header) {
   uint32_t ret = 0;
   bool all_fields_valid = true;
-  for (const auto retry_on : StringUtil::splitToken(retry_grpc_on_header, ",", false, true)) {
+  for (const auto& retry_on : StringUtil::splitToken(retry_grpc_on_header, ",", false, true)) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Cancelled) {
       ret |= RetryPolicy::RETRY_ON_GRPC_CANCELLED;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.DeadlineExceeded) {
