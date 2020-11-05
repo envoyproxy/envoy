@@ -1235,6 +1235,98 @@ dynamic_warming_clusters:
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  const std::string json = fmt::sprintf(
+      R"EOF(
+  {
+    "dynamic_resources": {
+      "cds_config": {
+        "api_config_source": {
+          "api_type": "0",
+          "refresh_delay": "30s",
+          "cluster_names": ["cds_cluster"]
+        }
+      }
+    },
+    "static_resources": {
+      %s
+    }
+  }
+  )EOF",
+      clustersJson({
+          defaultStaticClusterJson("cds_cluster"),
+      }));
+
+  MockCdsApi* cds = new MockCdsApi();
+  std::shared_ptr<MockClusterMockPrioritySet> cds_cluster(
+      new NiceMock<MockClusterMockPrioritySet>());
+  cds_cluster->info_->name_ = "cds_cluster";
+
+  // This part tests static init.
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cds_cluster, nullptr)));
+  ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
+  EXPECT_CALL(*cds, setInitializedCb(_));
+  EXPECT_CALL(*cds_cluster, initialize(_));
+
+  create(parseBootstrapFromV3Json(json));
+
+  ReadyWatcher initialized;
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  // This part tests CDS init.
+  std::shared_ptr<MockClusterMockPrioritySet> cluster3(new NiceMock<MockClusterMockPrioritySet>());
+  cluster3->info_->name_ = "cluster3";
+
+  const std::string no_health_check_yaml = R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+
+  const std::string health_check_cluster_yaml = no_health_check_yaml + R"EOF(
+    health_checks:
+    - timeout: 1s
+      interval: 1s
+      unhealthy_threshold: 2
+      healthy_threshold: 2
+      http_health_check:
+        path: "/healthcheck"
+  )EOF";
+
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(factory_.dispatcher_,
+              createClientConnection_(
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(initialized, ready()).Times(0);
+
+  ENVOY_LOG_MISC(debug, "lambdai: adding health check cluster");
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+      parseClusterFromV3Yaml(health_check_cluster_yaml), "heath_check"));
+
+  ENVOY_LOG_MISC(debug, "lambdai: adding no health check cluster");
+  EXPECT_CALL(initialized, ready());
+
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(no_health_check_yaml),
+                                                   "no_heath_check"));
+
+}
+
 TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
   create(defaultConfig());
