@@ -117,7 +117,7 @@ When connecting to an Envoy endpoint that is protected by SNI, this must match e
 When connecting to an endpoint that is not protected by SNI, this configuration is ignored, so it is
 generally advisable to always set this to the DNS name of the endpoint you are connecting to.
 
-Use mututal TLS (mTLS) to perform client certificate authentication
+Use mututal TLS (mTLS) to enforce client certificate authentication
 -------------------------------------------------------------------
 
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
