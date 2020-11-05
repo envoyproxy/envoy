@@ -462,6 +462,7 @@ void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
 void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
   test_session_->client_connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
+    received_no_error_goaway_ = false; // from resetState()
     // Close events will always blow away the client
     ENVOY_LOG_MISC(trace, "Triggering interval timer after close event");
     // Interval timer is guaranteed to be enabled from a close event - calls
