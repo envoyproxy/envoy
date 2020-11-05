@@ -12,6 +12,7 @@ Minor Behavior Changes
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
+* listener: fix crash when disabling or re-enabling listeners due to overload while processing LDS updates.
 
 Removed Config or Runtime
 -------------------------
