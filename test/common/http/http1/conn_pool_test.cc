@@ -52,8 +52,10 @@ class ConnPoolImplForTest : public Event::TestUsingSimulatedTime, public ConnPoo
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster)
-      : ConnPoolImpl(dispatcher, random_, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource()),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+      : ConnPoolImpl(
+            dispatcher, random_,
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource()),
+            Upstream::ResourcePriority::Default, nullptr, nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher) {}
 
   ~ConnPoolImplForTest() override {
