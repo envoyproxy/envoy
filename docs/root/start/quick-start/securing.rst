@@ -84,6 +84,11 @@ certificate is valid for.
 Secure an endpoint with SNI
 ---------------------------
 
+SNI is an extension to the TLS protocol through which a client indicates the hostname of the server
+that they are connecting to during the TLS negotiation.
+
+To enforce SNI on a listening connection, you should set the ``filter_chain_match`` of the ``listener``:
+
 .. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
    :linenos:
@@ -94,12 +99,18 @@ Secure an endpoint with SNI
 Connect to an endpoint securely with SNI
 ----------------------------------------
 
+When connecting to a TLS endpoint that is protected by SNI you can set ``sni`` in the configuration
+of the ``UpstreamTLSContext``.
+
 .. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
    :linenos:
    :lineno-start: 109
    :lines: 109-114
    :emphasize-lines: 6
+
+When connecting to an Envoy endpoint, this must match exactly one of the ``server_names`` set in
+the endpoints ``filter_chain_match``.
 
 Use mututal TLS (mTLS) to perform client certificate authentication
 -------------------------------------------------------------------
