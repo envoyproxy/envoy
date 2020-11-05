@@ -28,9 +28,15 @@ GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(
               .getMethodDescriptorForVersion(transport_api_version)),
       transport_api_version_(transport_api_version) {}
 
-void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v3::StreamMetricsMessage& message) {
+void GrpcMetricsStreamerImpl::send(
+    Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics) {
+  envoy::service::metrics::v3::StreamMetricsMessage message;
+  message.mutable_envoy_metrics()->Reserve(metrics.size());
+  message.mutable_envoy_metrics()->MergeFrom(metrics);
+
   if (stream_ == nullptr) {
     stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
+    // for perf reasons, the identifier is only sent on establishing the stream.
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
   }
@@ -39,14 +45,16 @@ void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v3::StreamMetricsMes
   }
 }
 
-MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
-                                       const bool report_counters_as_deltas)
+MetricsServiceSink::MetricsServiceSink(
+    const GrpcMetricsStreamerSharedPtr<envoy::service::metrics::v3::StreamMetricsResponse>&
+        grpc_metrics_streamer,
+    const bool report_counters_as_deltas)
     : grpc_metrics_streamer_(grpc_metrics_streamer),
       report_counters_as_deltas_(report_counters_as_deltas) {}
 
 void MetricsServiceSink::flushCounter(
     const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot, int64_t snapshot_time_ms) {
-  io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
+  io::prometheus::client::MetricFamily* metrics_family = metrics_.Add();
   metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
   metrics_family->set_name(counter_snapshot.counter_.get().name());
   auto* metric = metrics_family->add_metric();
@@ -60,7 +68,7 @@ void MetricsServiceSink::flushCounter(
 }
 
 void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge, int64_t snapshot_time_ms) {
-  io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
+  io::prometheus::client::MetricFamily* metrics_family = metrics_.Add();
   metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
   metrics_family->set_name(gauge.name());
   auto* metric = metrics_family->add_metric();
@@ -76,7 +84,7 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_hist
   // performance.
 
   // Add summary information for histograms.
-  io::prometheus::client::MetricFamily* summary_metrics_family = message_.add_envoy_metrics();
+  io::prometheus::client::MetricFamily* summary_metrics_family = metrics_.Add();
   summary_metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
   summary_metrics_family->set_name(envoy_histogram.name());
   auto* summary_metric = summary_metrics_family->add_metric();
@@ -90,7 +98,7 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_hist
   }
 
   // Add bucket information for histograms.
-  io::prometheus::client::MetricFamily* histogram_metrics_family = message_.add_envoy_metrics();
+  io::prometheus::client::MetricFamily* histogram_metrics_family = metrics_.Add();
   histogram_metrics_family->set_type(io::prometheus::client::MetricType::HISTOGRAM);
   histogram_metrics_family->set_name(envoy_histogram.name());
   auto* histogram_metric = histogram_metrics_family->add_metric();
@@ -106,13 +114,13 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_hist
 }
 
 void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
-  message_.clear_envoy_metrics();
+  metrics_.Clear();
 
   // TODO(mrice32): there's probably some more sophisticated preallocation we can do here where we
   // actually preallocate the submessages and then pass ownership to the proto (rather than just
   // preallocating the pointer array).
-  message_.mutable_envoy_metrics()->Reserve(snapshot.counters().size() + snapshot.gauges().size() +
-                                            snapshot.histograms().size());
+  metrics_.Reserve(snapshot.counters().size() + snapshot.gauges().size() +
+                   snapshot.histograms().size());
   int64_t snapshot_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                  snapshot.snapshotTime().time_since_epoch())
                                  .count();
@@ -134,11 +142,7 @@ void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
     }
   }
 
-  grpc_metrics_streamer_->send(message_);
-  // for perf reasons, clear the identifier after the first flush.
-  if (message_.has_identifier()) {
-    message_.clear_identifier();
-  }
+  grpc_metrics_streamer_->send(metrics_);
 }
 
 } // namespace MetricsService

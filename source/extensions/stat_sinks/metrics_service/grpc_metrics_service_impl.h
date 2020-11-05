@@ -23,8 +23,8 @@ namespace MetricsService {
 /**
  * Interface for metrics streamer.
  */
-class GrpcMetricsStreamer
-    : public Grpc::AsyncStreamCallbacks<envoy::service::metrics::v3::StreamMetricsResponse> {
+template <class ResponseProto>
+class GrpcMetricsStreamer : public Grpc::AsyncStreamCallbacks<ResponseProto> {
 public:
   ~GrpcMetricsStreamer() override = default;
 
@@ -32,31 +32,34 @@ public:
    * Send Metrics Message.
    * @param message supplies the metrics to send.
    */
-  virtual void send(envoy::service::metrics::v3::StreamMetricsMessage& message) PURE;
+  virtual void
+  send(Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics) PURE;
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
-  void
-  onReceiveMessage(std::unique_ptr<envoy::service::metrics::v3::StreamMetricsResponse>&&) override {
-  }
+  void onReceiveMessage(std::unique_ptr<ResponseProto>&&) override {}
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override{};
 };
 
-using GrpcMetricsStreamerSharedPtr = std::shared_ptr<GrpcMetricsStreamer>;
+template <class ResponseProto>
+using GrpcMetricsStreamerSharedPtr = std::shared_ptr<GrpcMetricsStreamer<ResponseProto>>;
 
 /**
  * Production implementation of GrpcMetricsStreamer
  */
-class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
+class GrpcMetricsStreamerImpl
+    : public Singleton::Instance,
+      public GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
   GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
                           const LocalInfo::LocalInfo& local_info,
                           envoy::config::core::v3::ApiVersion transport_api_version);
 
   // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v3::StreamMetricsMessage& message) override;
+  void
+  send(Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics) override;
 
   // Grpc::AsyncStreamCallbacks
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; }
@@ -79,7 +82,8 @@ using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 class MetricsServiceSink : public Stats::Sink {
 public:
   // MetricsService::Sink
-  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
+  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr<
+                         envoy::service::metrics::v3::StreamMetricsResponse>& grpc_metrics_streamer,
                      const bool report_counters_as_deltas);
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
@@ -90,8 +94,9 @@ public:
   void flushHistogram(const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time_ms);
 
 private:
-  GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
-  envoy::service::metrics::v3::StreamMetricsMessage message_;
+  GrpcMetricsStreamerSharedPtr<envoy::service::metrics::v3::StreamMetricsResponse>
+      grpc_metrics_streamer_;
+  Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily> metrics_;
   const bool report_counters_as_deltas_;
 };
 
