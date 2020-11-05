@@ -3,8 +3,4 @@
 
 Changes
 -------
-* overload: prevent segfault when disabling listener.
-
-  This prevents the stop_listening overload action from causing
-  segmentation faults that can occur if the action is enabled after the
-  listener has already shut down.
+* listener: fix crash when disabling or re-enabling listeners due to overload while processing LDS updates.
