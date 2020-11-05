@@ -261,7 +261,6 @@ TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr
   return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
 }
 
-bool TsiSocketFactory::isReady() const { return true; }
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

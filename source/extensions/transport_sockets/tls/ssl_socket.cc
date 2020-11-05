@@ -140,10 +140,18 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         case SSL_ERROR_WANT_READ:
           break;
         case SSL_ERROR_ZERO_RETURN:
+          // Graceful shutdown using close_notify TLS alert.
           end_stream = true;
           break;
+        case SSL_ERROR_SYSCALL:
+          if (result.error_.value() == 0) {
+            // Non-graceful shutdown by closing the underlying socket.
+            end_stream = true;
+            break;
+          }
+          FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
-        // Renegotiation has started. We don't handle renegotiation so just fall through.
+          // Renegotiation has started. We don't handle renegotiation so just fall through.
         default:
           drainErrorQueue();
           action = PostIoAction::Close;
@@ -375,8 +383,6 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   stats_.ssl_context_update_by_sds_.inc();
 }
 
-bool ClientSslSocketFactory::isReady() const { return config_->isSecretReady(); }
-
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
                                                Envoy::Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
@@ -417,8 +423,6 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
-
-bool ServerSslSocketFactory::isReady() const { return true; }
 
 } // namespace Tls
 } // namespace TransportSockets
