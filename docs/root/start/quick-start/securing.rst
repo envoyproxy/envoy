@@ -162,4 +162,4 @@ When connecting to an upstream with client certificates you can set them as foll
    :linenos:
    :lineno-start: 45
    :lines: 45-69
-   :emphasize-lines: 21-28
+   :emphasize-lines: 21-25
