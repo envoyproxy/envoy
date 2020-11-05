@@ -19,6 +19,8 @@ transmitting generic ``TCP`` over ``TLS`` between proxies.
    To secure traffic over a network that is untrusted, you are strongly advised to make
    use of SNI *and* mTLS wherever you control both sides of the connection or where these protocols are available.
 
+   You are also strongly encouraged to validate all certificates wherever possible.
+
    The examples presented here use insecure certificates for demonstration purposes.
 
    It is your responsibility to ensure the integrity of your certificate chain, and outside the scope of this guide.
