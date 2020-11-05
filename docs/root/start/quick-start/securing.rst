@@ -21,8 +21,6 @@ transmitting generic ``TCP`` over ``TLS`` between proxies.
 
    You are also strongly encouraged to validate all certificates wherever possible.
 
-   The examples presented here use insecure certificates for demonstration purposes.
-
    It is your responsibility to ensure the integrity of your certificate chain, and outside the scope of this guide.
 
 Upstream and downstream TLS contexts
