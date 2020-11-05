@@ -396,8 +396,8 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
-                                        "state=blah"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
+                                        "&state=blah"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -430,8 +430,8 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
-                                        "state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
+                                        "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -486,8 +486,8 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
-                                        "state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
+                                        "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -550,7 +550,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
            TEST_CLIENT_ID +
-           "&scope=user&response_type=code&"
+           "&scope=" +
+           TEST_AUTH_SCOPES +
+           "&response_type=code&"
            "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"
            "_oauth&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"
            "3Fname%3Dadmin%26level%3Dtrace"},
