@@ -83,7 +83,6 @@ $ git checkout <自定义分支名>
 label   |  描述  | 说明 |
 --------|--------|-----|
 kind/page | 页面  | 拥有该 label 的 issue 对应着一个任务         |
-status/suspending | 未开放翻译的任务  | 拥有该 `label` 的 issue 表明该翻译任务暂时未开放，不可认领    |
 status/pending | 待领取的任务  | 拥有该 label 的 issue 是一个`可以被领取`的任务，加入组织后，您可以通过 `/accept` 指令领取该任务。    |
 status/waiting-for-pr | 待提交的任务 | 输入 `/accept` 指令后，任务会进入该状态。在您完成翻译并创建 PR 后，您可以通过 `/pushed` 指令更新任务的状态。 |
 status/reviewing | 校对中的任务 | 输入 `/pushed` 指令后，任务会进入该状态。此时您需要关注校对人员给您的 PR 提出的修改建议。在 PR 被合并后，您可以输入 `/merged` 指令，以完成该任务。 |
@@ -122,11 +121,11 @@ $ git checkout <自定义分支名>
 
 ### 3 翻译
 
-翻译任务相关内容，在此过程中，可以参考并共同完善[术语表]()。
+翻译任务相关内容，在此过程中，可以参考并共同完善[术语表](https://github.com/cloudnativeto/envoy/tree/zh/docs/root/term.md)。
 
 ### 4 本地构建和预览
 
-> 我们建议您先在本地构建并预览效果，但如果有困难也可以跳过这一步，直接提交 PR 进行在线构建和预览。
+> 由于 Envoy 文档的特殊性，本次翻译没有设置 netlify 做预览，只配置了 github action 做定时的翻译发布（每天两次）。当提交PR 之后，等待 reviewer review 之后将代码合入之后，才会在定时发布之后看到[翻译效果](https://cloudnative.to/envoy/)
 
 
 ### 5 提交 PR
@@ -141,15 +140,6 @@ zh-translation: <file_full_path>
 ref: https://github.com/cloudnativeto/envoy/issues/<issueID>
 
 - [x] Docs
-- [ ] Configuration Infrastructure
-- [ ] Installation
-- [ ] Networking
-- [ ] Performance and Scalability
-- [ ] Policies and Telemetry
-- [ ] Security
-- [ ] Test and Release
-- [ ] User Experience
-- [ ] Developer Infrastructure
 ```
 
 其中，标题中的 `<file_full_path>` 是翻译的源文件路径；内容中的 `ref` 是当前翻译任务的 issue 链接。
@@ -180,7 +170,7 @@ ref: https://github.com/cloudnativeto/envoy/issues/<issueID>
 
 - 打开 PR 提交的中文翻译，打开对应 issue 中指定的源文件，逐段进行走查；
 
-- 词汇检查：检查译文中出现的术语、常用词汇是否遵照了[术语表]()的要求进行翻译；
+- 词汇检查：检查译文中出现的术语、常用词汇是否遵照了[术语表](https://github.com/cloudnativeto/envoy/tree/zh/docs/root/term.md)的要求进行翻译；
 
 - 格式检查：中文字符和英文字符用一个空格分隔、中文字符和数字用一个空格分隔、英文复数变单数。
 
