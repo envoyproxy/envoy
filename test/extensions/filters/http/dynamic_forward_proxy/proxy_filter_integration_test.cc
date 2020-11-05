@@ -13,7 +13,6 @@ namespace Envoy {
 namespace {
 
 class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                   public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}

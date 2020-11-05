@@ -8,8 +8,7 @@ namespace HttpFilters {
 namespace Fault {
 namespace {
 
-class FaultIntegrationTest : public Event::TestUsingSimulatedTime,
-                             public HttpProtocolIntegrationTest {
+class FaultIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initializeFilter(const std::string& filter_config) {
     config_helper_.addFilter(filter_config);
