@@ -70,5 +70,3 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names:
-            - exact: proxy-postgres-backend.example.com

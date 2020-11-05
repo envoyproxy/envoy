@@ -118,6 +118,11 @@ generally advisable to always set this to the DNS name of the endpoint you are c
 Use mututal TLS (mTLS) to enforce client certificate authentication
 -------------------------------------------------------------------
 
+By using mutual TLS (mTLS), Envoy also provides a way to authenticate connecting clients.
+
+At a minimum you will need to set ``require_client_certificate`` and specify a mutually trusted certificate
+authority:
+
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
@@ -125,6 +130,9 @@ Use mututal TLS (mTLS) to enforce client certificate authentication
    :lines: 27-39
    :emphasize-lines: 6, 8-10
 
+You can further restrict the authentication of connecting clients by specifying the allowed
+"Subject Alternative Names" in ``match_subject_alt_names``, similar to validating upstream certificates
+described above.
 
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
@@ -137,9 +145,11 @@ Use mututal TLS (mTLS) to enforce client certificate authentication
 Use mututal TLS (mTLS) to connect with client certificates
 ----------------------------------------------------------
 
+When connecting to an upstream with client certificates you can set them as follows:
+
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
    :lineno-start: 45
-   :lines: 45-74
+   :lines: 45-72
    :emphasize-lines: 21-28
