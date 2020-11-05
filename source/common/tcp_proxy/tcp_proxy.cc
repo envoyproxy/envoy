@@ -20,6 +20,7 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/application_protocol.h"
 #include "common/network/proxy_protocol_filter_state.h"
@@ -431,7 +432,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
         downstreamConnection()->streamInfo().filterState());
   }
 
-  if (!maybeTunnel(cluster_name)) {
+  if (!maybeTunnel(*thread_local_cluster, cluster_name)) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
@@ -440,47 +441,32 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-bool Filter::maybeTunnel(const std::string& cluster_name) {
-  if (!config_->tunnelingConfig()) {
-    generic_conn_pool_ =
-        std::make_unique<TcpConnPool>(cluster_name, cluster_manager_, this, *upstream_callbacks_);
-    if (generic_conn_pool_->valid()) {
-      connecting_ = true;
-      connect_attempts_++;
-      generic_conn_pool_->newStream(this);
-      // Because we never return open connections to the pool, this either has a handle waiting on
-      // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
-      return true;
-    } else {
-      generic_conn_pool_.reset();
-    }
+bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::string& cluster_name) {
+  GenericConnPoolFactory* factory = nullptr;
+  if (cluster.info()->upstreamConfig().has_value()) {
+    factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
+        cluster.info()->upstreamConfig().value());
   } else {
-    auto* cluster = cluster_manager_.get(cluster_name);
-    if (!cluster) {
-      return false;
-    }
-    // TODO(snowp): Ideally we should prevent this from being configured, but that's tricky to get
-    // right since whether a cluster is invalid depends on both the tcp_proxy config + cluster
-    // config.
-    if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) == 0) {
-      ENVOY_LOG(error, "Attempted to tunnel over HTTP/1.1, this is not supported. Set "
-                       "http2_protocol_options on the cluster.");
-      return false;
-    }
-
-    generic_conn_pool_ = std::make_unique<HttpConnPool>(cluster_name, cluster_manager_, this,
-                                                        config_->tunnelingConfig()->hostname(),
-                                                        *upstream_callbacks_);
-    if (generic_conn_pool_->valid()) {
-      generic_conn_pool_->newStream(this);
-      return true;
-    } else {
-      generic_conn_pool_.reset();
-    }
+    factory = Envoy::Config::Utility::getFactoryByName<GenericConnPoolFactory>(
+        "envoy.filters.connection_pools.tcp.generic");
+  }
+  if (!factory) {
+    return false;
   }
 
+  generic_conn_pool_ = factory->createGenericConnPool(
+      cluster_name, cluster_manager_, config_->tunnelingConfig(), this, *upstream_callbacks_);
+  if (generic_conn_pool_) {
+    connecting_ = true;
+    connect_attempts_++;
+    generic_conn_pool_->newStream(*this);
+    // Because we never return open connections to the pool, this either has a handle waiting on
+    // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
+    return true;
+  }
   return false;
 }
+
 void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   generic_conn_pool_.reset();

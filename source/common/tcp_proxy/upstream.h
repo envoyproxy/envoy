@@ -3,27 +3,12 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/tcp/upstream.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace TcpProxy {
-
-class GenericConnectionPoolCallbacks;
-class GenericUpstream;
-
-// An API for wrapping either an HTTP or a TCP connection pool.
-class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
-public:
-  virtual ~GenericConnPool() = default;
-
-  // Called to create a new HTTP stream or TCP connection. The implementation
-  // is then responsible for calling either onPoolReady or onPoolFailure on the
-  // supplied GenericConnectionPoolCallbacks.
-  virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
-  // Returns true if there was a valid connection pool, false otherwise.
-  virtual bool valid() const PURE;
-};
 
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
@@ -32,9 +17,10 @@ public:
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~TcpConnPool() override;
 
+  bool valid() const { return conn_pool_ != nullptr; }
+
   // GenericConnPool
-  bool valid() const override;
-  void newStream(GenericConnectionPoolCallbacks* callbacks) override;
+  void newStream(GenericConnectionPoolCallbacks& callbacks) override;
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -53,14 +39,18 @@ class HttpUpstream;
 
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
+  using TunnelingConfig =
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
+
   HttpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
-               Upstream::LoadBalancerContext* context, std::string hostname,
+               Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~HttpConnPool() override;
 
+  bool valid() const { return conn_pool_ != nullptr; }
+
   // GenericConnPool
-  bool valid() const override;
-  void newStream(GenericConnectionPoolCallbacks* callbacks) override;
+  void newStream(GenericConnectionPoolCallbacks& callbacks) override;
 
   // Http::ConnectionPool::Callbacks,
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -77,39 +67,6 @@ private:
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   std::unique_ptr<HttpUpstream> upstream_;
-};
-
-// An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
-// connection pool.
-class GenericConnectionPoolCallbacks {
-public:
-  virtual ~GenericConnectionPoolCallbacks() = default;
-
-  virtual void onGenericPoolReady(StreamInfo::StreamInfo* info,
-                                  std::unique_ptr<GenericUpstream>&& upstream,
-                                  Upstream::HostDescriptionConstSharedPtr& host,
-                                  const Network::Address::InstanceConstSharedPtr& local_address,
-                                  Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
-  virtual void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
-                                    Upstream::HostDescriptionConstSharedPtr host) PURE;
-};
-
-// Interface for a generic Upstream, which can communicate with a TCP or HTTP
-// upstream.
-class GenericUpstream {
-public:
-  virtual ~GenericUpstream() = default;
-  // Calls readDisable on the upstream connection. Returns false if readDisable could not be
-  // performed (e.g. if the connection is closed)
-  virtual bool readDisable(bool disable) PURE;
-  // Encodes data upstream.
-  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
-  // Adds a callback to be called when the data is sent to the kernel.
-  virtual void addBytesSentCallback(Network::Connection::BytesSentCb cb) PURE;
-  // Called when a Network::ConnectionEvent is received on the downstream connection, to allow the
-  // upstream to do any cleanup.
-  virtual Tcp::ConnectionPool::ConnectionData*
-  onDownstreamEvent(Network::ConnectionEvent event) PURE;
 };
 
 class TcpUpstream : public GenericUpstream {
@@ -149,7 +106,7 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
-  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl);
+  virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl);
 
   Http::ResponseDecoder& responseDecoder() { return response_decoder_; }
 
