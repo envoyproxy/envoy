@@ -67,6 +67,3 @@ static_resources:
               filename: certs/clientcert.pem
             private_key:
               filename: certs/clientkey.pem
-          validation_context:
-            trusted_ca:
-              filename: certs/cacert.pem

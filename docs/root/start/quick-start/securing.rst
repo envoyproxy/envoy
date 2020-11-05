@@ -1,27 +1,29 @@
 .. _start_quick_start_securing:
 
-
 Securing Envoy
 ==============
 
 Envoy provides a number of features to secure traffic in and out of your network, and
 between proxies and services within your network.
 
-TLS can be used to secure ``HTTP`` traffic and other ``HTTP``-based traffic, such as WebSockets.
+TLS can be used to secure all types of ``HTTP`` traffic, including WebSockets.
 
-Envoy also has support for terminating other types of TLS traffic (such as ``SMTP``) and for
-transmitting generic ``TCP`` over ``TLS`` between proxies.
+Envoy also has support for transmitting generic ``TCP`` traffic over ``TLS``.
 
 .. warning::
 
    The following guide takes you through individual aspects of securing traffic.
 
    To secure traffic over a network that is untrusted, you are strongly advised to make
-   use of SNI *and* mTLS wherever you control both sides of the connection or where these protocols are available.
+   use of :ref:`SNI <start_quick_start_securing_sni>` *and* :ref:`mTLS <start_quick_start_securing_mtls>`
+   wherever you control both sides of the connection or where these protocols are available.
 
-   You are also strongly encouraged to validate all certificates wherever possible.
+   You are also strongly encouraged to :ref:`validate <start_quick_start_securing_validation>` all certificates
+   wherever possible.
 
    It is your responsibility to ensure the integrity of your certificate chain, and outside the scope of this guide.
+
+.. _start_quick_start_securing_contexts:
 
 Upstream and downstream TLS contexts
 ------------------------------------
@@ -37,7 +39,7 @@ Specifying a TLS context that clients can connect to is done using a ``Downstrea
    :lines: 27-37
    :emphasize-lines: 5
 
-Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSContext``:
+Connecting to an "upstream" TLS service is conversely done with an ``UpstreamTLSContext``:
 
 .. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
@@ -45,6 +47,8 @@ Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSCo
    :lineno-start: 39
    :lines: 39-57
    :emphasize-lines: 16-19
+
+.. _start_quick_start_securing_validation:
 
 Validate an endpoint's certificates when connecting
 ---------------------------------------------------
@@ -80,6 +84,7 @@ certificate is valid for.
    If the "Subject Alternative Names" for a certificate are for a wildcard domain, eg ``*.example.com``,
    this is what you should use when matching with ``match_subject_alt_names``.
 
+.. _start_quick_start_securing_sni:
 
 Secure an endpoint with SNI
 ---------------------------
@@ -95,6 +100,8 @@ To enforce SNI on a listening connection, you should set the ``filter_chain_matc
    :lineno-start: 27
    :lines: 27-35
    :emphasize-lines: 2-4
+
+.. _start_quick_start_securing_sni_client:
 
 Connect to an endpoint securely with SNI
 ----------------------------------------
@@ -114,6 +121,8 @@ When connecting to an Envoy endpoint that is protected by SNI, this must match e
 
 When connecting to an endpoint that is not protected by SNI, this configuration is ignored, so it is
 generally advisable to always set this to the DNS name of the endpoint you are connecting to.
+
+.. _start_quick_start_securing_mtls:
 
 Use mututal TLS (mTLS) to enforce client certificate authentication
 -------------------------------------------------------------------
@@ -141,6 +150,7 @@ described above.
    :lines: 27-39
    :emphasize-lines: 7, 11-12
 
+.. _start_quick_start_securing_mtls_client:
 
 Use mututal TLS (mTLS) to connect with client certificates
 ----------------------------------------------------------
@@ -151,5 +161,5 @@ When connecting to an upstream with client certificates you can set them as foll
    :language: yaml
    :linenos:
    :lineno-start: 45
-   :lines: 45-72
+   :lines: 45-69
    :emphasize-lines: 21-28
