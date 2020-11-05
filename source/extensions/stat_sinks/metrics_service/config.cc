@@ -35,7 +35,7 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
               grpc_service, server.scope(), false),
           server.localInfo(), transport_api_version);
 
-  return std::make_unique<MetricsServiceSink>(
+  return std::make_unique<MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsResponse>>(
       grpc_metrics_streamer,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false));
 }
