@@ -38,8 +38,10 @@ void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8
   }
 
   const auto& alpn_fallback = options.applicationProtocolFallback();
-  if (alpn_fallback.has_value()) {
-    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(*alpn_fallback), key);
+  if (!alpn_fallback.empty()) {
+    for (const auto& protocol : alpn_fallback) {
+      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
+    }
   }
 
   // Proxy protocol options should only be included in the hash if the upstream
@@ -67,6 +69,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
+  std::vector<std::string> alpn_fallback;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   bool needs_transport_socket_options = false;
@@ -100,8 +103,8 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
 
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
-        server_name, std::move(subject_alt_names), std::move(application_protocols), absl::nullopt,
-        proxy_protocol_options);
+        server_name, std::move(subject_alt_names), std::move(application_protocols),
+        std::move(alpn_fallback), proxy_protocol_options);
   } else {
     return nullptr;
   }

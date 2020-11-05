@@ -397,6 +397,22 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "mixed_conn_pool_test",
+    srcs = ["mixed_conn_pool_test.cc"],
+    deps = [
+        "//source/common/http:conn_pool_base_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+    ],
+)
+
 envoy_proto_library(
     name = "path_utility_fuzz_proto",
     srcs = ["path_utility_fuzz.proto"],

@@ -43,7 +43,8 @@ public:
                        Event::Dispatcher& dispatcher,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                       Random::RandomGenerator& random_generator, Http::Protocol protocol);
+                       Random::RandomGenerator& random_generator,
+                       std::vector<Http::Protocol> protocol);
 
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }

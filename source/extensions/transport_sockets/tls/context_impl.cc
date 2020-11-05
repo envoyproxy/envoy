@@ -963,9 +963,9 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con);
   }
 
-  if (options && !has_alpn_defined && options->applicationProtocolFallback().has_value()) {
+  if (options && !has_alpn_defined && !options->applicationProtocolFallback().empty()) {
     // If ALPN hasn't already been set (either through TLS context or override), use the fallback.
-    parseAndSetAlpn({*options->applicationProtocolFallback()}, *ssl_con);
+    parseAndSetAlpn(options->applicationProtocolFallback(), *ssl_con);
   }
 
   if (allow_renegotiation_) {
