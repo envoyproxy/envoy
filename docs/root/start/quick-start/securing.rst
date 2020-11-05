@@ -107,12 +107,15 @@ of the ``UpstreamTLSContext``.
 .. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 109
-   :lines: 109-114
+   :lineno-start: 56
+   :lines: 56-61
    :emphasize-lines: 6
 
-When connecting to an Envoy endpoint, this must match exactly one of the ``server_names`` set in
-the endpoints ``filter_chain_match``.
+When connecting to an Envoy endpoint that is protected by SNI, this must match exactly one of the
+``server_names`` set in the endpoints ``filter_chain_match``.
+
+When connecting to an endpoint that is not protected by SNI, this configuration is ignored, so it is
+generally advisable to always set this to the DNS name of the endpoint you are connecting to.
 
 Use mututal TLS (mTLS) to perform client certificate authentication
 -------------------------------------------------------------------
