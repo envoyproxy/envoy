@@ -35,7 +35,7 @@ static const std::string TEST_CALLBACK = "/_oauth";
 static const std::string TEST_CLIENT_ID = "1";
 static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
 static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
-static const std::string TEST_AUTH_SCOPES = "user openid email"
+static const std::string TEST_AUTH_SCOPES = "user openid email";
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
