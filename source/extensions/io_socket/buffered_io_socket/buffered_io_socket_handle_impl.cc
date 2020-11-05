@@ -269,7 +269,7 @@ void BufferedIoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatch
                                                      uint32_t events) {
   ASSERT(user_file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                       "file descriptor. This is not allowed.");
-  ASSERT(trigger == Event::FileTriggerType::Edge, "Only support edge type.");
+  ASSERT(trigger != Event::FileTriggerType::Level, "Native level trigger is not supported yet.");
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(dispatcher, cb, events, *this);
 }
 

@@ -22,7 +22,7 @@ namespace BufferedIoSocket {
 /**
  * Network::IoHandle implementation which provides a buffer as data source. It is designed to used
  * by Network::ConnectionImpl. Some known limitations include
- * 1. It doesn't not include a file descriptor. Do not use "fdDoNotUse".
+ * 1. It doesn't include a file descriptor. Do not use "fdDoNotUse".
  * 2. It doesn't support socket options. Wrap this in ConnectionSocket and implement the socket
  * getter/setter options.
  * 3. It doesn't support UDP interface.
