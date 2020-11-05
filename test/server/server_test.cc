@@ -1235,18 +1235,14 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
                 Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
                           Instance* /*server*/) { return std::make_unique<UnsafeFatalAction>(); }));
         absl::Notification abort_called;
-        std::cout << "Starting Server" << std::endl;
         auto server_thread =
             startTestServer("test/server/test_data/server/fatal_actions.yaml", false);
-        std::cout << "Server started" << std::endl;
         // Trigger SIGABRT, wait for the ABORT
         server_->dispatcher().post([&] {
-          std::cout << "Dispatched function running" << std::endl;
           abort();
           abort_called.Notify();
         });
 
-        std::cout << "Test thread waiting on server's dispatcher to abort." << std::endl;
         abort_called.WaitForNotification();
       },
       "");
