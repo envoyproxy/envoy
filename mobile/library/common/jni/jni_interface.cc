@@ -485,11 +485,12 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_onResume =
-      env->GetMethodID(jcls_JvmCallbackContext, method, "(J)Ljava/lang/Object;");
+      env->GetMethodID(jcls_JvmCallbackContext, method, "(J[BJZ)Ljava/lang/Object;");
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
   jobjectArray result = static_cast<jobjectArray>(
-      env->CallObjectMethod(j_context, jmid_onResume, headers_length, j_in_data, trailers_length));
+      env->CallObjectMethod(j_context, jmid_onResume, headers_length, j_in_data, trailers_length,
+                            end_stream ? JNI_TRUE : JNI_FALSE));
 
   env->DeleteLocalRef(jcls_JvmCallbackContext);
 
