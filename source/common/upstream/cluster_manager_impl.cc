@@ -64,12 +64,10 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   const auto initialize_cb = [&cluster, this] { onClusterInit(cluster); };
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
     // Remove the previous cluster before the cluster object is destroyed.
-    ENVOY_LOG_MISC(debug, "lambdai: before remove primary size = {}", primary_init_clusters_.size());
     primary_init_clusters_.remove_if(
         [name_to_remove = cluster.info()->name()](Cluster* cluster_iter) {
           return cluster_iter->info()->name() == name_to_remove;
         });
-    ENVOY_LOG_MISC(debug, "lambdai: after remove primary size = {}", primary_init_clusters_.size());
     primary_init_clusters_.push_back(&cluster);
     cluster.initialize(initialize_cb);
   } else {

@@ -1273,12 +1273,8 @@ TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
 
   create(parseBootstrapFromV3Json(json));
 
-  ReadyWatcher initialized;
-  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  // This part tests CDS init.
-  std::shared_ptr<MockClusterMockPrioritySet> cluster3(new NiceMock<MockClusterMockPrioritySet>());
-  cluster3->info_->name_ = "cluster3";
+  ReadyWatcher cm_initialized;
+  cluster_manager_->setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
   const std::string no_health_check_yaml = R"EOF(
     name: fake_cluster
@@ -1296,7 +1292,20 @@ TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
                 port_value: 11001
   )EOF";
 
-  const std::string health_check_cluster_yaml = no_health_check_yaml + R"EOF(
+  const std::string health_check_cluster_yaml = R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: foo.com
+                port_value: 11001    
     health_checks:
     - timeout: 1s
       interval: 1s
@@ -1306,23 +1315,33 @@ TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
         path: "/healthcheck"
   )EOF";
 
-  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(factory_.dispatcher_,
-              createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
-      .WillOnce(Return(connection));
-  EXPECT_CALL(initialized, ready()).Times(0);
+  {
+    SCOPED_TRACE("Add a primary cluster that never ready.");
 
-  ENVOY_LOG_MISC(debug, "lambdai: adding health check cluster");
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
-      parseClusterFromV3Yaml(health_check_cluster_yaml), "heath_check"));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _));
+    EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+        parseClusterFromV3Yaml(health_check_cluster_yaml), "heath_check"));
 
-  ENVOY_LOG_MISC(debug, "lambdai: adding no health check cluster");
-  EXPECT_CALL(initialized, ready());
+    // Mark all the rest of the clusters ready. Now the only warming cluster is the above one.
+    EXPECT_CALL(cm_initialized, ready()).Times(0);
+    cds_cluster->initialize_callback_();
+  }
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(no_health_check_yaml),
-                                                   "no_heath_check"));
+  {
+    SCOPED_TRACE("Modify primary cluster by immediate initialized cluster");
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _));
+    EXPECT_CALL(*cds, initialize());
+    EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(no_health_check_yaml),
+                                                     "no_heath_check"));
+  }
+  {
+    SCOPED_TRACE("All clusters are ready. Mark cds ready. Cluster manager should be initialized.");
+    EXPECT_CALL(cm_initialized, ready());
+    cds->initialized_callback_();
+  }
 
+  factory_.tls_.shutdownThread();
+  cluster_manager_->shutdown();
 }
 
 TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
