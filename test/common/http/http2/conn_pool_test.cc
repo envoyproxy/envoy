@@ -329,7 +329,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
       .WillOnce(Invoke(
           [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
-            EXPECT_EQ(options->applicationProtocolFallback(),
+            EXPECT_EQ(options->applicationProtocolFallback()[0],
                       Http::Utility::AlpnNames::get().Http2);
             return std::make_unique<Network::RawBufferSocket>();
           }));
