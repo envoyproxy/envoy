@@ -46,6 +46,41 @@ Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSCo
    :lines: 39-57
    :emphasize-lines: 16-19
 
+Validate an endpoint's certificates when connecting
+---------------------------------------------------
+
+When Envoy connects to an upstream TLS service, it does not, by default, validate the certificates
+that it is presented with.
+
+You can use the ``validation_context`` to specify how Envoy should validate these certificates.
+
+Firstly, you can ensure that the certificates are from a mutually trusted certificate authority:
+
+.. literalinclude:: _include/envoy-demo-tls-validation.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 43
+   :lines: 43-53
+   :emphasize-lines: 6-9
+
+You can also ensure that the "Subject Alternative Names" for the cerficate match.
+
+This is commonly used by web certificates (X.509) to identify the domain or domains that a
+certificate is valid for.
+
+.. literalinclude:: _include/envoy-demo-tls-validation.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 43
+   :lines: 43-53
+   :emphasize-lines: 6-7, 10-11
+
+.. note::
+
+   If the "Subject Alternative Names" for a certificate are for a wildcard domain, eg ``*.example.com``,
+   this is what you should use when matching with ``match_subject_alt_names``.
+
+
 Secure an endpoint with SNI
 ---------------------------
 
@@ -65,23 +100,6 @@ Connect to an endpoint securely with SNI
    :lineno-start: 109
    :lines: 109-114
    :emphasize-lines: 6
-
-Validate an endpoint's certificates when connecting
----------------------------------------------------
-
-.. literalinclude:: _include/envoy-demo-tls-validation.yaml
-   :language: yaml
-   :linenos:
-   :lineno-start: 43
-   :lines: 43-53
-   :emphasize-lines: 6-9
-
-.. literalinclude:: _include/envoy-demo-tls-validation.yaml
-   :language: yaml
-   :linenos:
-   :lineno-start: 43
-   :lines: 43-53
-   :emphasize-lines: 6-7, 10-11
 
 Use mututal TLS (mTLS) to perform client certificate authentication
 -------------------------------------------------------------------
