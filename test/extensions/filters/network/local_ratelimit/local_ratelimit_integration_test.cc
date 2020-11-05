@@ -3,8 +3,7 @@
 namespace Envoy {
 namespace {
 
-class LocalRateLimitIntegrationTest : public Event::TestUsingSimulatedTime,
-                                      public testing::TestWithParam<Network::Address::IpVersion>,
+class LocalRateLimitIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public BaseIntegrationTest {
 public:
   LocalRateLimitIntegrationTest()
