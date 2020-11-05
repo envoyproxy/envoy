@@ -34,7 +34,7 @@ Specifying a TLS context that clients can connect to is done using a ``Downstrea
    :language: yaml
    :linenos:
    :lineno-start: 27
-   :lines: 27-34
+   :lines: 27-37
    :emphasize-lines: 5
 
 Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSContext``:
@@ -42,8 +42,8 @@ Connecting to an upstream TLS service is conversely done with an ``UpstreamTLSCo
 .. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 92
-   :lines: 92-110
+   :lineno-start: 39
+   :lines: 39-57
    :emphasize-lines: 16-19
 
 Secure an endpoint with SNI
@@ -102,9 +102,19 @@ Use mututal TLS (mTLS) to perform client certificate authentication
    :emphasize-lines: 13, 16-17
 
 
+Use mututal TLS (mTLS) to connect with client certificates
+----------------------------------------------------------
+
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
    :lineno-start: 45
    :lines: 45-74
-   :emphasize-lines: 14-25
+   :emphasize-lines: 21-25
+
+.. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 64
+   :lines: 64-74
+   :emphasize-lines: 7-9
