@@ -42,6 +42,25 @@ protected:
     response_last_modified_ = formatter_.now(time_source_);
   }
 
+  void setBufferLimit(uint64_t buffer_limit) {
+    buffer_limit_ = buffer_limit;
+    ON_CALL(encoder_callbacks_, encoderBufferLimit())
+        .WillByDefault(::testing::Return(buffer_limit_));
+  }
+
+  uint64_t getBufferLimit() const { return buffer_limit_; }
+
+  void generateExpectedDataChunks(const std::string& body) {
+    ASSERT(!body.empty());
+    expected_data_chunks_.clear();
+
+    size_t i = 0;
+    while (i < body.size()) {
+      expected_data_chunks_.push_back(body.substr(i, buffer_limit_));
+      i += buffer_limit_;
+    }
+  }
+
   void testDecodeRequestMiss(CacheFilterSharedPtr filter) {
     // The filter should not encode any headers or data as no cached response exists.
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
@@ -102,7 +121,7 @@ protected:
     // The size of all chunks except the last one is equal to the buffer_limit_.
     EXPECT_CALL(decoder_callbacks_,
                 encodeData(testing::Property(&Buffer::Instance::toString,
-                                             testing::Eq(std::string(buffer_limit_, 'a'))),
+                                             testing::Eq(std::string(getBufferLimit(), 'a'))),
                            false))
         .Times(chunks_count - 1);
 
@@ -131,11 +150,12 @@ protected:
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
   }
 
-  // This function assumes that there is a body created using std::string(body_size, 'a').
-  void testSuccessfulValidation(CacheFilterSharedPtr filter, uint64_t body_size) {
-    ASSERT(body_size > 0);
+  // This function tests successful validation and verifies that |filter| injects body data in
+  // correct chunks.
+  void testSuccessfulValidation(CacheFilterSharedPtr filter, const std::string& body) {
+    generateExpectedDataChunks(body);
 
-    // Make request require validation
+    // Make request require validation.
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                      Http::CustomHeaders::get().CacheControlValues.NoCache);
 
@@ -144,13 +164,13 @@ protected:
     // exception of injecting validation precondition headers.
     testDecodeRequestMiss(filter);
 
-    // Make sure validation conditional headers are added
+    // Make sure validation conditional headers are added.
     const Http::TestRequestHeaderMapImpl injected_headers = {
         {"if-none-match", etag_}, {"if-modified-since", response_last_modified_}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
 
-    // Encode 304 response
-    // Advance time to make sure the cached date is updated with the 304 date
+    // Encode 304 response.
+    // Advance time to make sure the cached date is updated with the 304 date.
     time_source_.advanceTimeWait(std::chrono::seconds(10));
     const std::string not_modified_date = formatter_.now(time_source_);
     Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
@@ -161,28 +181,20 @@ protected:
     EXPECT_EQ(filter->encodeHeaders(not_modified_response_headers, true),
               Http::FilterHeadersStatus::ContinueAndDontEndStream);
 
-    // Check for the cached response headers with updated date
+    // Check for the cached response headers with updated date.
     Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
     updated_response_headers.setDate(not_modified_date);
     EXPECT_THAT(not_modified_response_headers, IsSupersetOfHeaders(updated_response_headers));
 
     // The filter should inject data in chunks sized according to the buffer limit.
-    const int chunks_count = (body_size + buffer_limit_ - 1) / buffer_limit_;
-    // The size of all chunks except the last one is equal to the buffer_limit_.
-    EXPECT_CALL(encoder_callbacks_,
-                injectEncodedDataToFilterChain(
-                    testing::Property(&Buffer::Instance::toString,
-                                      testing::Eq(std::string(buffer_limit_, 'a'))),
-                    false))
-        .Times(chunks_count - 1);
-
-    const uint64_t last_chunk_size =
-        body_size % buffer_limit_ == 0 ? buffer_limit_ : body_size % buffer_limit_;
-    EXPECT_CALL(encoder_callbacks_,
-                injectEncodedDataToFilterChain(
-                    testing::Property(&Buffer::Instance::toString,
-                                      testing::Eq(std::string(last_chunk_size, 'a'))),
-                    true));
+    // Verify that each data chunk injected matches the expectation.
+    for (size_t i = 0u; i < expected_data_chunks_.size(); i++) {
+      EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(
+                                          testing::Property(&Buffer::Instance::toString,
+                                                            testing::Eq(expected_data_chunks_[i])),
+                                          i == expected_data_chunks_.size() - 1u ? true : false))
+          .Times(1);
+    }
 
     // The cache getBody callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.
@@ -190,6 +202,7 @@ protected:
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
   }
+
   void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
 
   SimpleHttpCache simple_cache_;
@@ -206,8 +219,6 @@ protected:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 
-  const uint64_t buffer_limit_ = 1024;
-
   // Etag and last modified date header values, used for cache validation tests.
   std::string response_last_modified_, response_date_, etag_ = "abc123";
 
@@ -215,6 +226,10 @@ protected:
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
   const Seconds delay_ = Seconds(10);
   const std::string age = std::to_string(delay_.count());
+
+private:
+  uint64_t buffer_limit_ = 1024;
+  std::vector<std::string> expected_data_chunks_;
 };
 
 TEST_F(CacheFilterTest, UncacheableRequest) {
@@ -332,8 +347,8 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
 
 TEST_F(CacheFilterTest, SuccessfulValidation) {
   request_headers_.setHost("SuccessfulValidation");
-  const uint64_t body_size = 3;
-  const std::string body = std::string(body_size, 'a');
+  const std::string body = "123";
+
   {
     // Create filter for request 1
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -357,7 +372,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     // Create filter for request 2
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
-    testSuccessfulValidation(filter, body_size);
+    testSuccessfulValidation(filter, body);
 
     filter->onDestroy();
   }
@@ -658,7 +673,7 @@ using CacheChunkSizeTest = CacheFilterTest;
 // Test that a body with size exactly equal to the buffer limit will be encoded in 1 chunk.
 TEST_F(CacheChunkSizeTest, EqualBufferLimit) {
   request_headers_.setHost("EqualBufferLimit");
-  const std::string body = std::string(buffer_limit_, 'a');
+  const std::string body = std::string(getBufferLimit(), 'a');
 
   {
     // Create filter for request 1.
@@ -680,7 +695,7 @@ TEST_F(CacheChunkSizeTest, EqualBufferLimit) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // The body should be encoded in a single chunk.
-    testDecodeRequestHitWithBody(filter, buffer_limit_);
+    testDecodeRequestHitWithBody(filter, getBufferLimit());
 
     filter->onDestroy();
   }
@@ -690,7 +705,7 @@ TEST_F(CacheChunkSizeTest, EqualBufferLimit) {
 // correct number of chunks.
 TEST_F(CacheChunkSizeTest, DivisibleByBufferLimit) {
   request_headers_.setHost("DivisibleByBufferLimit");
-  uint64_t body_size = buffer_limit_ * 3;
+  const uint64_t body_size = getBufferLimit() * 3;
   const std::string body = std::string(body_size, 'a');
 
   {
@@ -723,7 +738,7 @@ TEST_F(CacheChunkSizeTest, DivisibleByBufferLimit) {
 // correct number of chunks.
 TEST_F(CacheChunkSizeTest, NotDivisbleByBufferLimit) {
   request_headers_.setHost("NotDivisbleByBufferLimit");
-  const uint64_t body_size = buffer_limit_ * 4.5;
+  const uint64_t body_size = getBufferLimit() * 4.5;
   const std::string body = std::string(body_size, 'a');
 
   {
@@ -756,7 +771,7 @@ TEST_F(CacheChunkSizeTest, NotDivisbleByBufferLimit) {
 // case where validation takes place.
 TEST_F(CacheChunkSizeTest, EqualBufferLimitWithValidation) {
   request_headers_.setHost("EqualBufferLimitWithValidation");
-  const std::string body = std::string(buffer_limit_, 'a');
+  const std::string body = std::string(getBufferLimit(), 'a');
 
   {
     // Create filter for request 1.
@@ -782,8 +797,7 @@ TEST_F(CacheChunkSizeTest, EqualBufferLimitWithValidation) {
     // Create filter for request 2
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
-    // The body should be encoded in a single chunk.
-    testSuccessfulValidation(filter, buffer_limit_);
+    testSuccessfulValidation(filter, body);
 
     filter->onDestroy();
   }
@@ -793,8 +807,9 @@ TEST_F(CacheChunkSizeTest, EqualBufferLimitWithValidation) {
 // correct number of chunks, in the case where validation takes place.
 TEST_F(CacheChunkSizeTest, DivisibleByBufferLimitWithValidation) {
   request_headers_.setHost("DivisibleByBufferLimitWithValidation");
-  const uint64_t body_size = buffer_limit_ * 3;
-  const std::string body = std::string(body_size, 'a');
+
+  setBufferLimit(5);
+  const std::string body = "1234567890abcde";
 
   {
     // Create filter for request 1.
@@ -820,8 +835,7 @@ TEST_F(CacheChunkSizeTest, DivisibleByBufferLimitWithValidation) {
     // Create filter for request 2
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
-    // The body should be encoded in 3 chunks.
-    testSuccessfulValidation(filter, body_size);
+    testSuccessfulValidation(filter, body);
 
     filter->onDestroy();
   }
@@ -831,8 +845,9 @@ TEST_F(CacheChunkSizeTest, DivisibleByBufferLimitWithValidation) {
 // correct number of chunks, in the case where validation takes place.
 TEST_F(CacheChunkSizeTest, NotDivisbleByBufferLimitWithValidation) {
   request_headers_.setHost("NotDivisbleByBufferLimitWithValidation");
-  const uint64_t body_size = buffer_limit_ * 4.5;
-  const std::string body = std::string(body_size, 'a');
+  setBufferLimit(5);
+
+  const std::string body = "1234567890abcdefg";
 
   {
     // Create filter for request 1.
@@ -858,8 +873,7 @@ TEST_F(CacheChunkSizeTest, NotDivisbleByBufferLimitWithValidation) {
     // Create filter for request 2
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
-    // The body should be encoded in 5 chunks.
-    testSuccessfulValidation(filter, body_size);
+    testSuccessfulValidation(filter, body);
 
     filter->onDestroy();
   }
@@ -1015,7 +1029,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
 TEST_F(CacheChunkSizeTest, HandleDownstreamWatermarkCallbacks) {
   request_headers_.setHost("DownstreamPressureHandling");
   const int chunks_count = 3;
-  const uint64_t body_size = buffer_limit_ * chunks_count;
+  const uint64_t body_size = getBufferLimit() * chunks_count;
   const std::string body = std::string(body_size, 'a');
   {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -1075,7 +1089,7 @@ TEST_F(CacheChunkSizeTest, HandleDownstreamWatermarkCallbacks) {
     EXPECT_CALL(encoder_callbacks_,
                 injectEncodedDataToFilterChain(
                     testing::Property(&Buffer::Instance::toString,
-                                      testing::Eq(std::string(buffer_limit_, 'a'))),
+                                      testing::Eq(std::string(getBufferLimit(), 'a'))),
                     false))
         .Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1085,7 +1099,7 @@ TEST_F(CacheChunkSizeTest, HandleDownstreamWatermarkCallbacks) {
     EXPECT_CALL(encoder_callbacks_,
                 injectEncodedDataToFilterChain(
                     testing::Property(&Buffer::Instance::toString,
-                                      testing::Eq(std::string(buffer_limit_, 'a'))),
+                                      testing::Eq(std::string(getBufferLimit(), 'a'))),
                     _))
         .Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1095,7 +1109,7 @@ TEST_F(CacheChunkSizeTest, HandleDownstreamWatermarkCallbacks) {
     EXPECT_CALL(encoder_callbacks_,
                 injectEncodedDataToFilterChain(
                     testing::Property(&Buffer::Instance::toString,
-                                      testing::Eq(std::string(buffer_limit_, 'a'))),
+                                      testing::Eq(std::string(getBufferLimit(), 'a'))),
                     _))
         .Times(2);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
