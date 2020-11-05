@@ -26,9 +26,6 @@ public:
 
   ~ConnPoolImpl() override;
 
-  // ConnectionPool::Instance
-  Http::Protocol protocol() const override { return Http::Protocol::Http11; }
-
   // ConnPoolImplBase
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
 
@@ -51,7 +48,7 @@ protected:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason, absl::string_view) override {
-      parent_.parent().onDownstreamReset(parent_);
+      parent_.codec_client_->close();
     }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
@@ -68,7 +65,7 @@ protected:
   public:
     ActiveClient(ConnPoolImpl& parent);
 
-    ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
+    ConnPoolImpl& parent() { return *static_cast<ConnPoolImpl*>(&parent_); }
 
     // ConnPoolImplBase::ActiveClient
     bool closingWithIncompleteStream() const override;
@@ -76,13 +73,6 @@ protected:
 
     StreamWrapperPtr stream_wrapper_;
   };
-
-  void onDownstreamReset(ActiveClient& client);
-  void onResponseComplete(ActiveClient& client);
-
-  Event::SchedulableCallbackPtr upstream_ready_cb_;
-  bool upstream_ready_enabled_{false};
-  Random::RandomGenerator& random_generator_;
 };
 
 /**

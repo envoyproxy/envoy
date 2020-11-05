@@ -23,7 +23,7 @@ public:
         host->weight(1);
       }
     }
-
+    
     // This deletes the load balancer first. If constructed with a local priority set, load balancer
     // with reference local priority set on destruction. Since local priority set is in a base
     // class, it will be initialized second and thus destructed first. Thus, in order to avoid a use
