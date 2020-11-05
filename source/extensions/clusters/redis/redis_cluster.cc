@@ -160,6 +160,19 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
 void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
 
+  Network::Address::InstanceConstSharedPtr(ip_address);
+  try {
+    ip_address = Network::Utility::parseInternetAddress(dns_address_, port_, false);
+  } catch (const EnvoyException& e) {
+  }
+
+  if (ip_address != nullptr) {
+    ENVOY_LOG(trace, "start resolve redis without dns for {}", ip_address);
+    parent_.redis_discovery_session_.registerAddress(ip_address);
+    parent_.redis_discovery_session_.startResolveRedis();
+    return;
+  }
+
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status,
@@ -260,6 +273,11 @@ void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
     ASSERT(res.address_ != nullptr);
     discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*(res.address_), port));
   }
+}
+
+void RedisCluster::RedisDiscoverySession::registerAddress(
+    Network::Address::InstanceConstSharedPtr address) {
+  discovery_address_list_.push_back(address);
 }
 
 void RedisCluster::RedisDiscoverySession::startResolveRedis() {
