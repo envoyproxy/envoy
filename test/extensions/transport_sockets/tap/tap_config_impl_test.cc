@@ -58,7 +58,11 @@ public:
     EXPECT_CALL(matcher_, onNewStream(_))
         .WillOnce(Invoke([this](TapCommon::Matcher::MatchStatusVector& statuses) {
           statuses_ = &statuses;
-          statuses[0].matches_ = true;
+          if (fail_match_) {
+            statuses[0].matches_ = false;
+          } else {
+            statuses[0].matches_ = true;
+          }
           statuses[0].might_change_status_ = false;
         }));
     EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(streaming));
@@ -79,6 +83,7 @@ public:
   TapCommon::Matcher::MatchStatusVector* statuses_;
   NiceMock<Network::MockConnection> connection_;
   Event::SimulatedTimeSystem time_system_;
+  bool fail_match_{};
 };
 
 // Verify the full streaming flow.
@@ -135,6 +140,15 @@ socket_streamed_trace_segment:
     timestamp: 1970-01-01T00:00:02Z
     closed: {}
 )EOF")));
+  time_system_.setSystemTime(std::chrono::seconds(2));
+  tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(PerSocketTapperImplTest, NonMatchingFlow) {
+  fail_match_ = true;
+  setup(true);
+
+  EXPECT_CALL(*sink_manager_, submitTrace_(_)).Times(0);
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
 }

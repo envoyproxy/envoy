@@ -25,9 +25,14 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * dns: fix a bug where custom resolvers provided in configuration were not preserved after network issues.
+* dns_filter: correctly associate DNS response IDs when multiple queries are received.
 * http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
+* http: reject requests with missing required headers after filter chain processing.
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
+* proxy_proto: fixed a bug where the wrong downstream address got sent to upstream connections.
+* tls: fix detection of the upstream connection close event.
 * tls: fix read resumption after triggering buffer high-watermark and all remaining request/response bytes are stored in the SSL connection's internal buffers.
+* watchdog: touch the watchdog before most event loop operations to avoid misses when handling bursts of callbacks.
 
 Removed Config or Runtime
 -------------------------
@@ -55,6 +60,7 @@ New Features
 * signal: added an extension point for custom actions to run on the thread that has encountered a fatal error. Actions are configurable via :ref:`fatal_actions <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.fatal_actions>`.
 * tcp: added a new :ref:`envoy.overload_actions.reject_incoming_connections <config_overload_manager_overload_actions>` action to reject incoming TCP connections.
 * tls: added support for RSA certificates with 4096-bit keys in FIPS mode.
+* tracing: added SkyWalking tracer.
 * xds: added support for resource TTLs. A TTL is specified on the :ref:`Resource <envoy_api_msg_Resource>`. For SotW, a :ref:`Resource <envoy_api_msg_Resource>` can be embedded
   in the list of resources to specify the TTL.
 

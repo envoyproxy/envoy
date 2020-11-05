@@ -133,6 +133,35 @@ struct DnsParserCounters {
         query_parsing_failure(query_parsing) {}
 };
 
+// The flags have been verified with dig and this structure should not be modified. The flag
+// order here does not match the RFC, but takes byte ordering into account so that serialization
+// does not bitwise operations.
+PACKED_STRUCT(struct DnsHeaderFlags {
+  unsigned rcode : 4;  // return code
+  unsigned cd : 1;     // checking disabled
+  unsigned ad : 1;     // authenticated data
+  unsigned z : 1;      // z - bit (must be zero in queries per RFC1035)
+  unsigned ra : 1;     // recursion available
+  unsigned rd : 1;     // recursion desired
+  unsigned tc : 1;     // truncated response
+  unsigned aa : 1;     // authoritative answer
+  unsigned opcode : 4; // operation code
+  unsigned qr : 1;     // query or response
+});
+
+/**
+ * Structure representing the DNS header as it appears in a packet
+ * See https://www.ietf.org/rfc/rfc1035.txt for more details
+ */
+PACKED_STRUCT(struct DnsHeader {
+  uint16_t id;
+  struct DnsHeaderFlags flags;
+  uint16_t questions;
+  uint16_t answers;
+  uint16_t authority_rrs;
+  uint16_t additional_rrs;
+});
+
 /**
  * DnsQueryContext contains all the data necessary for responding to a query from a given client.
  */
@@ -152,10 +181,18 @@ public:
   uint64_t retry_;
   uint16_t id_;
   Network::DnsResolver::ResolutionStatus resolution_status_;
+  DnsHeader header_;
+  DnsHeader response_header_;
   DnsQueryPtrVec queries_;
   DnsAnswerMap answers_;
   DnsAnswerMap additional_;
   bool in_callback_;
+
+  /**
+   * @param context the query context for which we are querying the response code
+   * @return uint16_t the response code flag value from a parsed dns object
+   */
+  uint16_t getQueryResponseCode() { return static_cast<uint16_t>(header_.flags.rcode); }
 };
 
 using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
@@ -167,44 +204,6 @@ using DnsFilterResolverCallback = std::function<void(
  */
 class DnsMessageParser : public Logger::Loggable<Logger::Id::filter> {
 public:
-  enum class DnsQueryParseState {
-    Init,
-    Flags,     // 2 bytes
-    Questions, // 2 bytes
-    Answers,   // 2 bytes
-    Authority, // 2 bytes
-    Authority2 // 2 bytes
-  };
-
-  // The flags have been verified with dig and this structure should not be modified. The flag
-  // order here does not match the RFC, but takes byte ordering into account so that serialization
-  // does not bitwise operations.
-  PACKED_STRUCT(struct DnsHeaderFlags {
-    unsigned rcode : 4;  // return code
-    unsigned cd : 1;     // checking disabled
-    unsigned ad : 1;     // authenticated data
-    unsigned z : 1;      // z - bit (must be zero in queries per RFC1035)
-    unsigned ra : 1;     // recursion available
-    unsigned rd : 1;     // recursion desired
-    unsigned tc : 1;     // truncated response
-    unsigned aa : 1;     // authoritative answer
-    unsigned opcode : 4; // operation code
-    unsigned qr : 1;     // query or response
-  });
-
-  /**
-   * Structure representing the DNS header as it appears in a packet
-   * See https://www.ietf.org/rfc/rfc1035.txt for more details
-   */
-  PACKED_STRUCT(struct DnsHeader {
-    uint16_t id;
-    struct DnsHeaderFlags flags;
-    uint16_t questions;
-    uint16_t answers;
-    uint16_t authority_rrs;
-    uint16_t additional_rrs;
-  });
-
   DnsMessageParser(bool recurse, TimeSource& timesource, uint64_t retry_count,
                    Random::RandomGenerator& random, Stats::Histogram& latency_histogram)
       : recursion_available_(recurse), timesource_(timesource), retry_count_(retry_count),
@@ -352,11 +351,6 @@ public:
                             Network::Address::InstanceConstSharedPtr ipaddr);
 
   /**
-   * @return uint16_t the response code flag value from a parsed dns object
-   */
-  uint16_t getQueryResponseCode() { return static_cast<uint16_t>(header_.flags.rcode); }
-
-  /**
    * @brief Parse the incoming query and create a context object for the filter
    *
    * @param client_request a structure containing addressing information and the buffer received
@@ -371,6 +365,15 @@ public:
   bool parseDnsObject(DnsQueryContextPtr& context, const Buffer::InstancePtr& buffer);
 
 private:
+  enum class DnsQueryParseState {
+    Init,
+    Flags,     // 2 bytes
+    Questions, // 2 bytes
+    Answers,   // 2 bytes
+    Authority, // 2 bytes
+    Authority2 // 2 bytes
+  };
+
   /**
    * @brief Adds a new DNS SRV Answer record for a given service to the service map
    *
@@ -420,11 +423,8 @@ private:
   TimeSource& timesource_;
   uint64_t retry_count_;
   Stats::Histogram& query_latency_histogram_;
-  DnsHeader header_;
-  DnsHeader response_header_;
   Random::RandomGenerator& rng_;
 };
-
 } // namespace DnsFilter
 } // namespace UdpFilters
 } // namespace Extensions
