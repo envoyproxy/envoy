@@ -346,8 +346,8 @@ filegroup(
 
 envoy_cc_test(
     name = "server_test",
+    size = "large",  # Increase test timeout.
     srcs = ["server_test.cc"],
-    args = ["--test_timeout=600"],
     data = [
         ":runtime_test_data",
         ":server_test_data",
