@@ -257,5 +257,17 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
+void DispatcherImpl::runFatalActionsOnTrackedObject(
+    const FatalAction::FatalActionPtrList& actions) const {
+  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+    return;
+  }
+
+  // Run the actions
+  for (const auto& action : actions) {
+    action->run(current_object_);
+  }
+}
+
 } // namespace Event
 } // namespace Envoy

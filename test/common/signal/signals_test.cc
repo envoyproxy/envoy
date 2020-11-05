@@ -46,7 +46,7 @@ public:
   bool isAsyncSignalSafe() const override { return true; }
 
 private:
-  std::string echo_msg_;
+  const std::string echo_msg_;
 };
 
 // Use this to test failing while in a signal handler.

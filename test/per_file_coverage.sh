@@ -20,7 +20,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:0.0"
 "source/common/common:96.1"
 "source/common/common/posix:94.1"
-"source/common/signal:90.4"
+"source/common/signal:83.1" # Death tests don't report LCOV
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:93.7"
 "source/extensions:96.3"

@@ -93,16 +93,7 @@ public:
   }
 
   void
-  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override {
-    if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
-      return;
-    }
-
-    // Run the actions
-    for (const auto& action : actions) {
-      action->run(current_object_);
-    }
-  }
+  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override;
 
 private:
   TimerPtr createTimerInternal(TimerCb cb);

@@ -51,9 +51,10 @@ void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
 
 /**
  * Tries to run all of the safe fatal actions. Only one thread will
- * be allowed to run the fatal functions. This returns true if the caller should
- * continue running the failure functions and have ran the safe actions.
- * Otherwise it returns false.
+ * be allowed to run the fatal functions.
+ *
+ * Returns a FatalAction::Status which the caller should use to
+ * determine how to proceed.
  */
 FatalAction::Status runSafeActions();
 
@@ -61,8 +62,8 @@ FatalAction::Status runSafeActions();
  * Tries to run all of the unsafe fatal actions. Call this only
  * after calling runSafeActions.
  *
- * Returns whether the thread was successfully able to run the
- * unsafe actions.
+ * Returns a FatalAction::Status which the caller should use to determine
+ * how to proceed.
  */
 FatalAction::Status runUnsafeActions();
 
