@@ -128,8 +128,6 @@ envoy_cc_test(
     name = "guarddog_impl_test",
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
-    # Fails intermittantly on local build
-    tags = ["flaky_on_windows"],
     deps = [
         "//include/envoy/common:time_interface",
         "//source/common/api:api_lib",
@@ -138,6 +136,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:watchdog_config_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",

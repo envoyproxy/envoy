@@ -40,6 +40,10 @@ def api_dependencies():
         name = "com_github_openzipkin_zipkinapi",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
+    external_http_archive(
+        name = "com_github_apache_skywalking_data_collect_protocol",
+        build_file_content = SKYWALKING_DATA_COLLECT_PROTOCOL_BUILD_CONTENT,
+    )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
@@ -98,6 +102,33 @@ api_cc_py_proto_library(
 go_proto_library(
     name = "zipkin_go_proto",
     proto = ":zipkin",
+    visibility = ["//visibility:public"],
+)
+"""
+
+SKYWALKING_DATA_COLLECT_PROTOCOL_BUILD_CONTENT = """
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_proto_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+
+proto_library(
+    name = "protocol",
+    srcs = [
+        "common/Common.proto",
+        "language-agent/Tracing.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_proto_library(
+    name = "protocol_cc_proto",
+    deps = [":protocol"],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "protocol_go_proto",
+    proto = ":protocol",
     visibility = ["//visibility:public"],
 )
 """
