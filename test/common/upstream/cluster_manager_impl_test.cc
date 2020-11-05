@@ -1234,8 +1234,6 @@ dynamic_warming_clusters:
 }
 
 TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
-  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
-
   const std::string json = fmt::sprintf(
       R"EOF(
   {
@@ -1276,7 +1274,7 @@ TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
   ReadyWatcher cm_initialized;
   cluster_manager_->setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
-  const std::string no_health_check_yaml = R"EOF(
+  const std::string ready_cluster_yaml = R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
     type: STATIC
@@ -1292,7 +1290,7 @@ TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
                 port_value: 11001
   )EOF";
 
-  const std::string health_check_cluster_yaml = R"EOF(
+  const std::string warming_cluster_yaml = R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
     type: STRICT_DNS
@@ -1305,22 +1303,14 @@ TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
             address:
               socket_address:
                 address: foo.com
-                port_value: 11001    
-    health_checks:
-    - timeout: 1s
-      interval: 1s
-      unhealthy_threshold: 2
-      healthy_threshold: 2
-      http_health_check:
-        path: "/healthcheck"
+                port_value: 11001
   )EOF";
 
   {
-    SCOPED_TRACE("Add a primary cluster that never ready.");
-
+    SCOPED_TRACE("Add a primary cluster staying in warming.");
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _));
-    EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
-        parseClusterFromV3Yaml(health_check_cluster_yaml), "heath_check"));
+    EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(warming_cluster_yaml),
+                                                     "warming"));
 
     // Mark all the rest of the clusters ready. Now the only warming cluster is the above one.
     EXPECT_CALL(cm_initialized, ready()).Times(0);
@@ -1328,20 +1318,18 @@ TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
   }
 
   {
-    SCOPED_TRACE("Modify primary cluster by immediate initialized cluster");
+    SCOPED_TRACE("Modify the only warming primary cluster to immediate ready.");
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _));
     EXPECT_CALL(*cds, initialize());
-    EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(no_health_check_yaml),
-                                                     "no_heath_check"));
+    EXPECT_TRUE(
+        cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(ready_cluster_yaml), "ready"));
   }
   {
-    SCOPED_TRACE("All clusters are ready. Mark cds ready. Cluster manager should be initialized.");
+    SCOPED_TRACE("All clusters are ready.");
     EXPECT_CALL(cm_initialized, ready());
     cds->initialized_callback_();
   }
-
-  factory_.tls_.shutdownThread();
-  cluster_manager_->shutdown();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()));
 }
 
 TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
