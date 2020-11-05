@@ -416,9 +416,21 @@ void UpstreamRequest::onPoolReady(
     }
   }
 
-  upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
-
+  const Http::Status status =
+      upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
   calling_encode_headers_ = false;
+
+  if (!status.ok()) {
+    // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
+    // erroneously remove required headers.
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    const std::string details =
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
+                     status.message(), "}");
+    parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
+                                        absl::nullopt, details);
+    return;
+  }
 
   if (!paused_for_connect_) {
     encodeBodyAndTrailers();

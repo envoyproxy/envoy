@@ -182,7 +182,7 @@ public:
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
 
-    request_.request_encoder_->encodeHeaders(request_headers, end_stream);
+    request_.request_encoder_->encodeHeaders(request_headers, end_stream).IgnoreError();
     request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_.stream_state_ = StreamState::PendingHeaders;
   }
@@ -219,9 +219,11 @@ public:
           }
           state.response_encoder_->encodeHeaders(headers, end_stream);
         } else {
-          state.request_encoder_->encodeHeaders(
-              fromSanitizedHeaders<TestRequestHeaderMapImpl>(directional_action.headers()),
-              end_stream);
+          state.request_encoder_
+              ->encodeHeaders(
+                  fromSanitizedHeaders<TestRequestHeaderMapImpl>(directional_action.headers()),
+                  end_stream)
+              .IgnoreError();
         }
         if (end_stream) {
           state.closeLocal();

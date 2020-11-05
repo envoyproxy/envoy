@@ -117,7 +117,7 @@ TEST_F(TcpUpstreamTest, Basic) {
   // Swallow the request headers and generate response headers.
   EXPECT_CALL(connection_, write(_, false)).Times(0);
   EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(200, _, _, false));
-  tcp_upstream_->encodeHeaders(request_, false);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
 
   // Proxy the data.
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
@@ -154,7 +154,7 @@ TEST_F(TcpUpstreamTest, V1Header) {
 
   // encodeHeaders now results in the proxy proto header being sent.
   EXPECT_CALL(connection_, write(BufferEqual(&expected_data), false));
-  tcp_upstream_->encodeHeaders(request_, false);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
 
   // Data is proxied as usual.
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
@@ -177,7 +177,7 @@ TEST_F(TcpUpstreamTest, V2Header) {
 
   // encodeHeaders now results in the proxy proto header being sent.
   EXPECT_CALL(connection_, write(BufferEqual(&expected_data), false));
-  tcp_upstream_->encodeHeaders(request_, false);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
 
   // Data is proxied as usual.
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
@@ -187,7 +187,7 @@ TEST_F(TcpUpstreamTest, V2Header) {
 
 TEST_F(TcpUpstreamTest, TrailersEndStream) {
   // Swallow the headers.
-  tcp_upstream_->encodeHeaders(request_, false);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
 
   EXPECT_CALL(connection_, write(BufferStringEqual(""), true));
   Envoy::Http::TestRequestTrailerMapImpl trailers{{"foo", "bar"}};
@@ -196,7 +196,7 @@ TEST_F(TcpUpstreamTest, TrailersEndStream) {
 
 TEST_F(TcpUpstreamTest, HeaderEndStreamHalfClose) {
   EXPECT_CALL(connection_, write(BufferStringEqual(""), true));
-  tcp_upstream_->encodeHeaders(request_, true);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, true).ok());
 }
 
 TEST_F(TcpUpstreamTest, ReadDisable) {

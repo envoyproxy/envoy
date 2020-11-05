@@ -274,7 +274,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   stream_info.setDownstreamRemoteAddress(local_address_);
   stream_info.onUpstreamHostSelected(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
-  request_encoder->encodeHeaders(*request_headers, true);
+  auto status = request_encoder->encodeHeaders(*request_headers, true);
+  // Encoding will only fail if required request headers are missing.
+  ASSERT(status.ok());
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
@@ -691,7 +693,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   Router::FilterUtility::setUpstreamScheme(
       headers_message->headers(), host_->transportSocketFactory().implementsSecureTransport());
 
-  request_encoder_->encodeHeaders(headers_message->headers(), false);
+  auto status = request_encoder_->encodeHeaders(headers_message->headers(), false);
+  // Encoding will only fail if required headers are missing.
+  ASSERT(status.ok());
 
   grpc::health::v1::HealthCheckRequest request;
   if (parent_.service_name_.has_value()) {

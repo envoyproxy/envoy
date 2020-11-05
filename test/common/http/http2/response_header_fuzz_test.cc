@@ -27,7 +27,7 @@ void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Setup a single stream to inject frames as a reply to.
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  codec.request_encoder_->encodeHeaders(request_headers, true);
+  codec.request_encoder_->encodeHeaders(request_headers, true).IgnoreError();
 
   // Send frames.
   status = codec.write(WellKnownFrames::defaultSettingsFrame(), connection);

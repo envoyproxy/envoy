@@ -123,7 +123,9 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
        {Http::Headers::get().Scheme, scheme},
        {Http::Headers::get().Path, "/"},
        {Http::Headers::get().Host, hostname_}});
-  request_encoder_->encodeHeaders(*headers, false);
+  const auto status = request_encoder_->encodeHeaders(*headers, false);
+  // Encoding can only fail on missing required request headers.
+  ASSERT(status.ok());
 }
 
 void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {

@@ -365,7 +365,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
-void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   const HeaderEntry* host = headers.Host();
@@ -397,6 +397,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   encodeHeadersBase(headers, absl::nullopt, end_stream);
+  return okStatus();
 }
 
 http_parser_settings ConnectionImpl::settings_{
