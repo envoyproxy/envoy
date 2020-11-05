@@ -85,3 +85,26 @@ Validate an endpoint's certificates when connecting
 
 Use mututal TLS (mTLS) to perform client certificate authentication
 -------------------------------------------------------------------
+
+.. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 27
+   :lines: 27-43
+   :emphasize-lines: 13-15
+
+
+.. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 27
+   :lines: 27-43
+   :emphasize-lines: 13, 16-17
+
+
+.. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 45
+   :lines: 45-74
+   :emphasize-lines: 14-25
