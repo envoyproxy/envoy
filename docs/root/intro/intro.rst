@@ -1,20 +1,20 @@
 .. _intro:
 
-Introduction
+引言
 ============
 
 .. toctree::
   :maxdepth: 2
 
-  what_is_envoy
-  arch_overview/arch_overview
+  Envoy 是什么？
+  架构概览/架构概览
   life_of_a_request
-  deployment_types/deployment_types
-  getting_help
+  部署类型/部署类型
+  获取帮助
 
 .. These pages are only here for redirects from log lines from shipping versions of Envoy, so hide them.
 .. toctree::
   :hidden:
 
-  version_history
-  deprecated
+  历史版本
+  不推荐使用
