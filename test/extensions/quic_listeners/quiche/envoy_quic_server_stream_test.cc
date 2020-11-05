@@ -191,8 +191,18 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
         EXPECT_EQ("/", headers->getPathValue());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->getMethodValue());
       }));
-  quic_stream_->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
-                                   request_headers);
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    spdy::SpdyHeaderBlock spdy_headers;
+    spdy_headers[":authority"] = host_;
+    spdy_headers[":method"] = "GET";
+    spdy_headers[":path"] = "/";
+    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_headers);
+    quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
+    quic_stream_->OnStreamFrame(frame);
+  } else {
+    quic_stream_->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
+                                     request_headers);
+  }
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
@@ -215,8 +225,8 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
         EXPECT_TRUE(headers->get(key2).empty());
       }));
   if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    quic::QuicStreamFrame frame(stream_id_, true, offset,
-                                spdyHeaderToHttp3StreamPayload(spdy_trailers_));
+    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
+    quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
     quic_stream_->OnStreamFrame(frame);
   } else {
     quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(),
