@@ -301,8 +301,11 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   const size_t pos = path.find('?');
   if (pos != std::string::npos) {
     args = path.substr(pos + 1);
-    path = path.substr(0, pos);
+    path.resize(pos);
   }
+
+  // Deal with custom verbs.
+  path += ':';
 
   struct RequestInfo request_info;
   std::vector<VariableBinding> variable_bindings;

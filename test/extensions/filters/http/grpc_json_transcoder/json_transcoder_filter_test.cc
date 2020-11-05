@@ -698,6 +698,62 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryNotGrpcResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(request_data, true));
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPathWithColon) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "GET"}, {":path", "/echoPath/token:value"}};
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(testing::Invoke([&decoder, &frames](Buffer::Instance& data, bool end_stream) {
+        EXPECT_TRUE(end_stream);
+        decoder.decode(data, frames);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/bookstore.Bookstore/EchoPathArg", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  bookstore::EchoBodyRequest expected_request;
+  expected_request.set_arg("token:value");
+
+  bookstore::EchoBodyRequest request;
+  request.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_THAT(request, ProtoEq(expected_request));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPathWithoutColon) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "GET"}, {":path", "/echoPath/token/value"}};
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(testing::Invoke([&decoder, &frames](Buffer::Instance& data, bool end_stream) {
+        EXPECT_TRUE(end_stream);
+        decoder.decode(data, frames);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/bookstore.Bookstore/EchoPathArg", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  bookstore::EchoBodyRequest expected_request;
+  expected_request.set_arg("token/value");
+
+  bookstore::EchoBodyRequest request;
+  request.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_THAT(request, ProtoEq(expected_request));
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutput) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/index"}};
 
