@@ -158,3 +158,13 @@ The Envoy admin endpoint should also be available at http://localhost:9901
 .. code-block:: console
 
    $ curl -v localhost:9901
+
+Validating your Envoy configuration
+-----------------------------------
+
+You can start Envoy in validation mode, which allows you to check that Envoy is
+able to start with your configuration, without actually starting the service.
+
+
+Logging and debugging
+---------------------
