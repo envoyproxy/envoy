@@ -1,8 +1,10 @@
 name: Build envoy docs and deploy with github pages
 
 on:
+  push:
+     branches: [ zh ]
   schedule:
-  - cron: "* */6 * * *"
+  - cron: "* */4 * * *"
 #   push:
 #     branches: [ zh ]
 #   pull_request:
