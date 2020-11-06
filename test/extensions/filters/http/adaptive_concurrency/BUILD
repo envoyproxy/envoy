@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
         "//source/extensions/filters/http/adaptive_concurrency/controller:controller_lib",
         "//test/mocks/http:http_mocks",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg_cc_proto",
     ],

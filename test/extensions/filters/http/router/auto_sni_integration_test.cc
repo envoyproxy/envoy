@@ -13,7 +13,6 @@
 namespace Envoy {
 namespace {
 class AutoSniIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                               public Event::TestUsingSimulatedTime,
                                public HttpIntegrationTest {
 public:
   AutoSniIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
