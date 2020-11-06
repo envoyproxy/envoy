@@ -28,6 +28,7 @@ private val FILTERED_HEADERS = setOf(
   "server",
   "filter-demo",
   "buffer-filter-demo",
+  "async-filter-demo",
   "x-envoy-upstream-service-time"
 )
 
@@ -44,6 +45,7 @@ class MainActivity : Activity() {
     engine = AndroidEngineBuilder(application)
       .addFilter { DemoFilter() }
       .addFilter { BufferDemoFilter() }
+      .addFilter { AsyncDemoFilter() }
       .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
       .build()
 
