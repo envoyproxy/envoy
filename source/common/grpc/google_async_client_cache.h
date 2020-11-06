@@ -41,5 +41,24 @@ private:
 
 using AsyncClientCacheSharedPtr = std::shared_ptr<AsyncClientCache>;
 
+class AsyncClientCacheSingleton : public Singleton::Instance {
+public:
+  AsyncClientCacheSingleton() = default;
+  AsyncClientCacheSharedPtr
+  getOrCreateAsyncClientCache(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
+                              ThreadLocal::SlotAllocator& tls,
+                              const ::envoy::config::core::v3::GrpcService& grpc_proto_config);
+
+private:
+  // The tls slots with client cache stored with key as hash of
+  // envoy::config::core::v3::GrpcService::GoogleGrpc config.
+  absl::flat_hash_map<std::size_t, AsyncClientCacheSharedPtr> async_clients_;
+};
+
+using AsyncClientCacheSingletonSharedPtr = std::shared_ptr<AsyncClientCacheSingleton>;
+
+AsyncClientCacheSingletonSharedPtr
+getAsyncClientCacheSingleton(Server::Configuration::FactoryContext& context);
+
 } // namespace Grpc
 } // namespace Envoy

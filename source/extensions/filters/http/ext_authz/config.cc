@@ -53,9 +53,12 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    auto async_client_cache = std::make_shared<Envoy::Grpc::AsyncClientCache>(
-        context.clusterManager().grpcAsyncClientManager(), context.scope(), context.threadLocal());
-    async_client_cache->init(proto_config.grpc_service());
+    Grpc::AsyncClientCacheSingletonSharedPtr async_client_cache_singleton =
+        Grpc::getAsyncClientCacheSingleton(context);
+    Grpc::AsyncClientCacheSharedPtr async_client_cache =
+        async_client_cache_singleton->getOrCreateAsyncClientCache(
+            context.clusterManager().grpcAsyncClientManager(), context.scope(),
+            context.threadLocal(), proto_config.grpc_service());
     callback = [async_client_cache, filter_config, timeout_ms, proto_config,
                 transport_api_version = proto_config.transport_api_version()](
                    Http::FilterChainFactoryCallbacks& callbacks) {
