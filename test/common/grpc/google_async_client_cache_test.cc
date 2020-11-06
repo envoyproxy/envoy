@@ -11,7 +11,9 @@ namespace {
 
 class AsyncClientCacheTest : public testing::Test {
 public:
-  AsyncClientCacheTest() {}
+  AsyncClientCacheTest() {
+    client_cache_singleton_ = std::make_unique<AsyncClientCacheSingleton>();
+  }
 
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;
@@ -25,15 +27,36 @@ public:
         }));
   }
 
+  void expectCacheAndClientEqual(const AsyncClientCacheSharedPtr& expected_client_cache,
+                                 const RawAsyncClientSharedPtr& expected_client,
+                                 const ::envoy::config::core::v3::GrpcService config) {
+    AsyncClientCacheSharedPtr actual_client_cache =
+        client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
+                                                             config);
+    EXPECT_EQ(expected_client_cache, actual_client_cache);
+    EXPECT_EQ(expected_client, actual_client_cache->getAsyncClient());
+  }
+
+  void expectCacheAndClientNotEqual(const AsyncClientCacheSharedPtr& expected_client_cache,
+                                    const RawAsyncClientSharedPtr& expected_client,
+                                    const ::envoy::config::core::v3::GrpcService config) {
+    AsyncClientCacheSharedPtr actual_client_cache =
+        client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
+                                                             config);
+    EXPECT_NE(expected_client_cache, actual_client_cache);
+    EXPECT_NE(expected_client, actual_client_cache->getAsyncClient());
+  }
+
   NiceMock<ThreadLocal::MockInstance> tls_;
   Grpc::MockAsyncClientManager async_client_manager_;
   Grpc::MockAsyncClient* async_client_ = nullptr;
   Grpc::MockAsyncClientFactory* factory_ = nullptr;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  std::unique_ptr<AsyncClientCacheSingleton> client_cache_singleton_;
+  std::unique_ptr<AsyncClientCache> client_cache_;
 };
 
 TEST_F(AsyncClientCacheTest, Deduplication) {
-  auto client_cache_singleton = std::make_unique<AsyncClientCacheSingleton>();
   Stats::IsolatedStoreImpl scope;
   testing::InSequence s;
 
@@ -42,44 +65,36 @@ TEST_F(AsyncClientCacheTest, Deduplication) {
   config.mutable_google_grpc()->set_credentials_factory_name("test_credential01");
 
   expectClientCreation();
-  Grpc::RawAsyncClientSharedPtr test_client_01 =
-      client_cache_singleton
-          ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
-          ->getAsyncClient();
-  // Fetches the existing client.
-  EXPECT_EQ(test_client_01,
-            client_cache_singleton
-                ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
-                ->getAsyncClient());
+  AsyncClientCacheSharedPtr test_client_cache_01 =
+      client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
+                                                           config);
+  RawAsyncClientSharedPtr test_client_01 = test_client_cache_01->getAsyncClient();
+  // Fetches the existing client and they should be equal.
+  expectCacheAndClientEqual(test_client_cache_01, test_client_01, config);
 
   config.mutable_google_grpc()->set_credentials_factory_name("test_credential02");
   expectClientCreation();
   // Different credentials use different clients.
-  EXPECT_NE(test_client_01,
-            client_cache_singleton
-                ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
-                ->getAsyncClient());
-  Grpc::RawAsyncClientSharedPtr test_client_02 =
-      client_cache_singleton
-          ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
-          ->getAsyncClient();
+  expectCacheAndClientNotEqual(test_client_cache_01, test_client_01, config);
+
+  AsyncClientCacheSharedPtr test_client_cache_02 =
+      client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
+                                                           config);
+  RawAsyncClientSharedPtr test_client_02 = test_client_cache_02->getAsyncClient();
 
   config.mutable_google_grpc()->set_credentials_factory_name("test_credential02");
   // No creation, fetching the existing one.
-  EXPECT_EQ(test_client_02,
-            client_cache_singleton
-                ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
-                ->getAsyncClient());
+  expectCacheAndClientEqual(test_client_cache_02, test_client_02, config);
 
   // Different targets use different clients.
   config.mutable_google_grpc()->set_target_uri("dns://test02");
   expectClientCreation();
   EXPECT_NE(test_client_01,
-            client_cache_singleton
+            client_cache_singleton_
                 ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
                 ->getAsyncClient());
   EXPECT_NE(test_client_02,
-            client_cache_singleton
+            client_cache_singleton_
                 ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
                 ->getAsyncClient());
 }

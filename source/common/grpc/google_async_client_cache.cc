@@ -37,7 +37,7 @@ AsyncClientCacheSharedPtr AsyncClientCacheSingleton::getOrCreateAsyncClientCache
 SINGLETON_MANAGER_REGISTRATION(google_grpc_async_client_cache);
 
 AsyncClientCacheSingletonSharedPtr
-getAsyncClientCacheSingleton(Server::Configuration::FactoryContext& context) {
+getAsyncClientCacheSingleton(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<Envoy::Grpc::AsyncClientCacheSingleton>(
       SINGLETON_MANAGER_REGISTERED_NAME(google_grpc_async_client_cache),
       [] { return std::make_shared<Envoy::Grpc::AsyncClientCacheSingleton>(); });

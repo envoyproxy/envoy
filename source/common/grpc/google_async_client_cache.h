@@ -58,7 +58,7 @@ private:
 using AsyncClientCacheSingletonSharedPtr = std::shared_ptr<AsyncClientCacheSingleton>;
 
 AsyncClientCacheSingletonSharedPtr
-getAsyncClientCacheSingleton(Server::Configuration::FactoryContext& context);
+getAsyncClientCacheSingleton(Server::Configuration::ServerFactoryContext& context);
 
 } // namespace Grpc
 } // namespace Envoy
