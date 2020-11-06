@@ -10,7 +10,7 @@ namespace Network {
 // A wrapper around another TransportSocketOptions that overrides the ALPN fallback.
 class AlpnDecoratingTransportSocketOptions : public TransportSocketOptions {
 public:
-  AlpnDecoratingTransportSocketOptions(std::string&& alpn,
+  AlpnDecoratingTransportSocketOptions(std::vector<std::string>&& alpn,
                                        TransportSocketOptionsSharedPtr inner_options)
       : alpn_fallback_(std::move(alpn)), inner_options_(std::move(inner_options)) {}
   // Network::TransportSocketOptions
@@ -23,7 +23,7 @@ public:
   const std::vector<std::string>& applicationProtocolListOverride() const override {
     return inner_options_->applicationProtocolListOverride();
   }
-  const absl::optional<std::string>& applicationProtocolFallback() const override {
+  const std::vector<std::string>& applicationProtocolFallback() const override {
     return alpn_fallback_;
   }
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
@@ -33,7 +33,7 @@ public:
                const Network::TransportSocketFactory& factory) const override;
 
 private:
-  const absl::optional<std::string> alpn_fallback_;
+  const std::vector<std::string> alpn_fallback_;
   const TransportSocketOptionsSharedPtr inner_options_;
 };
 
@@ -42,8 +42,7 @@ public:
   TransportSocketOptionsImpl(
       absl::string_view override_server_name = "",
       std::vector<std::string>&& override_verify_san_list = {},
-      std::vector<std::string>&& override_alpn = {},
-      absl::optional<std::string>&& fallback_alpn = {},
+      std::vector<std::string>&& override_alpn = {}, std::vector<std::string>&& fallback_alpn = {},
       absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt)
       : override_server_name_(override_server_name.empty()
                                   ? absl::nullopt
@@ -62,7 +61,7 @@ public:
   const std::vector<std::string>& applicationProtocolListOverride() const override {
     return override_alpn_list_;
   }
-  const absl::optional<std::string>& applicationProtocolFallback() const override {
+  const std::vector<std::string>& applicationProtocolFallback() const override {
     return alpn_fallback_;
   }
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
@@ -75,7 +74,7 @@ private:
   const absl::optional<std::string> override_server_name_;
   const std::vector<std::string> override_verify_san_list_;
   const std::vector<std::string> override_alpn_list_;
-  const absl::optional<std::string> alpn_fallback_;
+  const std::vector<std::string> alpn_fallback_;
   const absl::optional<Network::ProxyProtocolData> proxy_protocol_options_;
 };
 
