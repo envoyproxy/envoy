@@ -16,10 +16,16 @@ a particular point in time.
 This guide provides configuration information, and some basic examples of using a couple of the admin
 endpoints.
 
-See the :ref:`admin docs <operations_admin_interface>` for information on all of the available endpoints.
+.. note::
 
-Some of the examples below make use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse the output
-from the admin server.
+   This guide highlights a couple of the available admin endpoints.
+
+   See the :ref:`admin docs <operations_admin_interface>` for information on all of the available endpoints.
+
+.. note:: Requirements
+
+   Some of the examples below make use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse the output
+   from the admin server.
 
 .. _start_quick_start_admin_config:
 
@@ -32,7 +38,8 @@ the administration server.
 The ``address`` key specifies the listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
 which in the demo configuration is ``0.0.0.0:9901``.
 
-You must set the ``access_log_path`` to specify where to send access logs.
+You must set the :ref:`access_log_path <envoy_v3_api_field_config.bootstrap.v3.Admin.access_log_path>` to
+specify where to send admin access logs.
 
 In this example, the logs are simply discarded.
 
@@ -44,23 +51,33 @@ In this example, the logs are simply discarded.
      address:
        socket_address:
          address: 0.0.0.0
-	 port_value: 9901
+         port_value: 9901
 
 .. warning::
 
-   You may wish to restrict the network address the admin server listens to in your own deployment.
+   The Envoy admin endpoint can expose critical and security information about the running service, and
+   can also be used to shut it down.
+
+   As the endpoint is not authenticated it is essential that you limit access to it.
+
+   You may wish to restrict the network address the admin server listens to in your own deployment as part
+   of your strategy to limit access to this endpoint.
 
 
-``stats_prefix``
-----------------
+``stat_prefix``
+---------------
 
-The Envoy ``HttpConnectionManager`` must be configured with ``stats_prefix``.
+The Envoy
+:ref:`HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`
+must be configured with
+:ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`.
 
 This provides a key that can be filtered when querying the stats interface
 :ref:`as shown below <start_quick_start_admin_stats>`
 
 In the :download:`envoy-demo.yaml <_include/envoy-demo.yaml>` the listener is configured with the
-``stats_prefix`` of ``ingress_http``.
+:ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+of ``ingress_http``.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
@@ -73,10 +90,10 @@ In the :download:`envoy-demo.yaml <_include/envoy-demo.yaml>` the listener is co
 Admin endpoints: ``config_dump``
 --------------------------------
 
-The :ref:`config_dump <operations_admin_interface_config_dump>` endpoint dumps Envoy's configuration
-in ``json`` format.
+The :ref:`config_dump <operations_admin_interface_config_dump>` endpoint returns Envoy's runtime
+configuration in ``json`` format.
 
-The following command allows you to see the types of config available:
+The following command allows you to see the types of configuration available:
 
 .. code-block:: console
 
@@ -88,7 +105,9 @@ The following command allows you to see the types of config available:
    type.googleapis.com/envoy.admin.v3.RoutesConfigDump
    type.googleapis.com/envoy.admin.v3.SecretsConfigDump
 
-To dump the ``socket_address`` of the first ``dynamic_listener`` currently configured, you could:
+To dump the :ref:`socket_address <envoy_v3_api_msg_config.core.v3.SocketAddress>` of the first
+:ref:`dynamic_listener <envoy_v3_api_field_admin.v3.ListenersConfigDump.dynamic_listeners>` currently configured,
+you could:
 
 .. code-block:: console
 
@@ -100,8 +119,10 @@ To dump the ``socket_address`` of the first ``dynamic_listener`` currently confi
      }
    }
 
-See the reference section for :ref:`config_dump <operations_admin_interface_config_dump>` for further information
-on available parameters and responses.
+.. note::
+
+   See the reference section for :ref:`config_dump <operations_admin_interface_config_dump>` for further information
+   on available parameters and responses.
 
 .. _start_quick_start_admin_stats:
 
@@ -131,7 +152,8 @@ To see the top-level categories of stats available, you can:
    vhost
    workers
 
-The stats endpoint accepts a ``filter`` ``regex`` argument:
+The stats endpoint accepts a :ref:`filter <operations_admin_interface_stats>` argument, which
+is evaluated as a regular expression:
 
 .. code-block:: console
 
@@ -208,31 +230,29 @@ The stats endpoint accepts a ``filter`` ``regex`` argument:
    http.ingress_http.downstream_rq_time: P0(nan,1.0) P25(nan,1.075) P50(nan,2.05) P75(nan,16.25) P90(nan,16.7) P95(nan,16.85) P99(nan,16.97) P99.5(nan,16.985) P99.9(nan,16.997) P100(nan,17.0)
 
 
-You can also pass a ``format`` argument, for example to return ``json``:
+You can also pass a :ref:`format <operations_admin_interface_stats>` argument, for example to return ``json``:
 
 .. code-block:: console
 
-   $ curl -s "http://localhost:19000/stats?filter=http.ingress_http.rq&format=json" | jq '.'
+   $ curl -s "http://localhost:19000/stats?filter=http.ingress_http.rq&format=json" | jq '.stats'
 
 .. code-block:: json
 
-   {
-     "stats": [
-       {
-         "value": 0,
-	 "name": "http.ingress_http.rq_direct_response"
-       },
-       {
-         "value": 0,
-	 "name": "http.ingress_http.rq_redirect"
-       },
-       {
-         "value": 0,
-	 "name": "http.ingress_http.rq_reset_after_downstream_response_started"
-       },
-       {
-         "value": 3,
-	 "name": "http.ingress_http.rq_total"
-       }
-     ]
-   }
+   [
+     {
+       "value": 0,
+       "name": "http.ingress_http.rq_direct_response"
+     },
+     {
+       "value": 0,
+       "name": "http.ingress_http.rq_redirect"
+     },
+     {
+       "value": 0,
+       "name": "http.ingress_http.rq_reset_after_downstream_response_started"
+     },
+     {
+       "value": 3,
+       "name": "http.ingress_http.rq_total"
+     }
+   ]
