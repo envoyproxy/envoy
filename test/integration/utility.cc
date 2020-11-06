@@ -110,7 +110,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   if (!content_type.empty()) {
     headers.setContentType(content_type);
   }
-  encoder.encodeHeaders(headers, body.empty());
+  const auto status = encoder.encodeHeaders(headers, body.empty());
+  ASSERT(status.ok());
   if (!body.empty()) {
     Buffer::OwnedImpl body_buffer(body);
     encoder.encodeData(body_buffer, true);

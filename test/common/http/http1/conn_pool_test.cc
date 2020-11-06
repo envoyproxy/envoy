@@ -203,8 +203,10 @@ struct ActiveTestRequest {
   }
 
   void startRequest() {
-    callbacks_.outer_encoder_->encodeHeaders(
-        TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+    EXPECT_TRUE(
+        callbacks_.outer_encoder_
+            ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+            .ok());
   }
 
   Http1ConnPoolImplTest& parent_;
@@ -275,7 +277,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
       .WillOnce(Invoke(
           [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
-            EXPECT_EQ(options->applicationProtocolFallback(),
+            EXPECT_EQ(options->applicationProtocolFallback()[0],
                       Http::Utility::AlpnNames::get().Http11);
             return std::make_unique<Network::RawBufferSocket>();
           }));
@@ -629,15 +631,19 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks2.pool_ready_, ready());
 
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
   Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   conn_pool_->expectAndRunUpstreamReady();
   conn_pool_->expectEnableUpstreamReady();
-  callbacks2.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks2.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
   // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
   response_headers = std::make_unique<TestResponseHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
@@ -683,8 +689,10 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
 
   // Finishing request 1 will schedule binding the connection to request 2.
   conn_pool_->expectEnableUpstreamReady();
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
   Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
@@ -702,8 +710,10 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   conn_pool_->expectEnableUpstreamReady();
-  callbacks2.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks2.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
   // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
   response_headers = std::make_unique<TestResponseHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
@@ -735,8 +745,10 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(*conn_pool_, onClientDestroy());
@@ -769,8 +781,10 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
 
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   // Response with 'proxy-connection: close' which should cause the connection to go away, even if
@@ -807,8 +821,10 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeaderLegacy) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
 
   // Response with 'proxy-connection: close' which should cause the connection to go away, even if
   // there are other tokens in that header.
@@ -842,8 +858,10 @@ TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
 
   // Response without 'connection: keep-alive' which should cause the connection to go away.
   EXPECT_CALL(*conn_pool_, onClientDestroy());
@@ -879,8 +897,10 @@ TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAliveLegacy) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
 
   // Response without 'connection: keep-alive' which should cause the connection to go away.
   EXPECT_CALL(*conn_pool_, onClientDestroy());
@@ -915,8 +935,10 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(*conn_pool_, onClientDestroy());
@@ -1022,8 +1044,10 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  callbacks.outer_encoder_->encodeHeaders(
-      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+  EXPECT_TRUE(
+      callbacks.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
 
   inner_decoder->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);

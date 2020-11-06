@@ -28,7 +28,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerato
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, random_generator, Protocol::Http11) {}
+                           transport_socket_options, random_generator, {Protocol::Http11}) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
