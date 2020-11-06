@@ -70,10 +70,10 @@ message Matcher {
         SinglePredicate single_predicate = 1;
 
         // A list of predicates to be OR-ed together.
-        PredicateList or = 2;
+        PredicateList or_matcher = 2;
 
         // A list of predicates to be AND-ed together.
-        PredicateList and = 3;
+        PredicateList and_matcher = 3;
       }
     }
 
