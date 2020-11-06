@@ -167,7 +167,7 @@ and specify a mutually trusted certificate authority:
 You can further restrict the authentication of connecting clients by specifying the allowed
 "Subject Alternative Names" in
 :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`,
-similar to validating upstream certificates described above.
+similar to validating upstream certificates :ref:`described above <start_quick_start_securing_validation>`.
 
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
