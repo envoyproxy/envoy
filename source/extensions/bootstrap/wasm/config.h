@@ -28,8 +28,10 @@ public:
 
   virtual ~WasmService() {
     if (singleton_) {
+      // Singleton Wasm Service is running only on the main thread.
       singleton_->wasm()->startShutdown(plugin_);
     } else if (tls_slot_->currentThreadRegistered()) {
+      // Start graceful shutdown of Wasm plugin, unless Envoy is already shutting down.
       tls_slot_->runOnAllThreads([plugin = plugin_](OptRef<WasmHandle> handle) {
         if (handle.has_value()) {
           handle->wasm()->startShutdown(plugin);
