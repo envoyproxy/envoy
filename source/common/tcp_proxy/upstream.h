@@ -50,7 +50,7 @@ public:
                Http::CodecClient::Type type);
   ~HttpConnPool() override;
 
-  bool valid() const { return conn_pool_ != nullptr; }
+  bool valid() const { return conn_pool_ != nullptr && type_ <= Http::CodecClient::Type::HTTP2; }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
