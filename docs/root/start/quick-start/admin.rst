@@ -3,7 +3,7 @@
 Envoy admin interface
 =====================
 
-The optional admin interface provided by Envoy allows you to dump configuration and statistics, change the
+The optional admin interface provided by Envoy allows you to view configuration and statistics, change the
 behaviour of the server, and tap traffic according to specific filter rules.
 
 The admin interface can be configured for static and dynamic setups.
@@ -105,7 +105,7 @@ The following command allows you to see the types of configuration available:
    type.googleapis.com/envoy.admin.v3.RoutesConfigDump
    type.googleapis.com/envoy.admin.v3.SecretsConfigDump
 
-To dump the :ref:`socket_address <envoy_v3_api_msg_config.core.v3.SocketAddress>` of the first
+To view the :ref:`socket_address <envoy_v3_api_msg_config.core.v3.SocketAddress>` of the first
 :ref:`dynamic_listener <envoy_v3_api_field_admin.v3.ListenersConfigDump.dynamic_listeners>` currently configured,
 you could:
 
