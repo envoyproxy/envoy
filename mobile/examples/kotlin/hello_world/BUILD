@@ -18,6 +18,7 @@ android_binary(
 kt_android_library(
     name = "hello_envoy_kt_lib",
     srcs = [
+        "AsyncDemoFilter.kt",
         "BufferDemoFilter.kt",
         "DemoFilter.kt",
         "MainActivity.kt",
