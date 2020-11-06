@@ -18,7 +18,7 @@ internal class CounterImpl : Counter {
   // TODO: potentially raise error to platform if the operation is not successful.
   override fun increment(count: Int) {
     envoyEngine.get()?.recordCounter(
-      elements.joinToString(separator = ".") { it.element }, count
+      elements.joinToString(separator = ".") { it.value }, count
     )
   }
 }
