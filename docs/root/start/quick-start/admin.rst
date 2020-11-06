@@ -13,16 +13,14 @@ dynamic configuration can be particularly useful as it allows you to use the
 :ref:`config_dump <start_quick_start_admin_config_dump>` endpoint to see how Envoy is configured at
 a particular point in time.
 
-This guide provides configuration information, and some basic examples of using a couple of the admin
-endpoints.
-
 .. note::
 
-   This guide highlights a couple of the available admin endpoints.
+   This guide provides configuration information, and some basic examples of using a couple of the admin
+   endpoints.
 
    See the :ref:`admin docs <operations_admin_interface>` for information on all of the available endpoints.
 
-.. note:: Requirements
+.. admonition:: Requirements
 
    Some of the examples below make use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse the output
    from the admin server.
@@ -55,7 +53,7 @@ In this example, the logs are simply discarded.
 
 .. warning::
 
-   The Envoy admin endpoint can expose critical and security information about the running service, and
+   The Envoy admin endpoint can expose private information about the running service, and
    can also be used to shut it down.
 
    As the endpoint is not authenticated it is essential that you limit access to it.
