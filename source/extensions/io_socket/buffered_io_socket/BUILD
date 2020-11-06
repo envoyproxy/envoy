@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -36,5 +37,18 @@ envoy_cc_extension(
         ":peer_buffer_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/network:default_socket_interface_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "b_factory",
+    srcs = [
+        "b_factory.cc",
+    ],
+    hdrs = [
+        "b_factory.h",
+    ],
+    deps = [
+        "//source/extensions/io_socket:client_connection_factory",
     ],
 )

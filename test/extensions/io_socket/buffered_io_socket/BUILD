@@ -46,3 +46,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "b_factory_test",
+    srcs = ["b_factory_test.cc"],
+    deps = [
+        "//source/extensions/io_socket/buffered_io_socket:b_factory",
+        "//test/test_common:registry_lib",
+    ],
+)
