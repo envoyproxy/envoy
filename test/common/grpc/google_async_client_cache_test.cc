@@ -89,14 +89,8 @@ TEST_F(AsyncClientCacheTest, Deduplication) {
   // Different targets use different clients.
   config.mutable_google_grpc()->set_target_uri("dns://test02");
   expectClientCreation();
-  EXPECT_NE(test_client_01,
-            client_cache_singleton_
-                ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
-                ->getAsyncClient());
-  EXPECT_NE(test_client_02,
-            client_cache_singleton_
-                ->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_, config)
-                ->getAsyncClient());
+  expectCacheAndClientNotEqual(test_client_cache_01, test_client_01, config);
+  expectCacheAndClientNotEqual(test_client_cache_02, test_client_02, config);
 }
 
 } // namespace
