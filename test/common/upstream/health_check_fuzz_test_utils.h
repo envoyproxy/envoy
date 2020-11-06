@@ -20,8 +20,6 @@ public:
   std::unique_ptr<NiceMock<MockHealthCheckEventLogger>> event_logger_storage_{
       std::make_unique<NiceMock<MockHealthCheckEventLogger>>()};
   NiceMock<MockHealthCheckEventLogger>& event_logger_{*event_logger_storage_};
-  // NiceMock<MockHealthCheckEventLogger>& event_logger_ = new
-  // NiceMock<MockHealthCheckEventLogger>(*event_logger_storage_);
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
