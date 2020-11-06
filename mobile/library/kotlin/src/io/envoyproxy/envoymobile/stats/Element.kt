@@ -8,16 +8,15 @@ import java.util.regex.Pattern
  * Element values must conform to the [Element.ELEMENT_REGEX].
  */
 
-class Element(val element: String) {
+class Element(internal val value: String) {
   init {
-    if (!Pattern.compile(ELEMENT_REGEX).matcher(element).matches()) {
-      throw IllegalArgumentException(
-        "Element values must conform to the regex $ELEMENT_REGEX"
-      )
+    require(ELEMENT_PATTERN.matcher(value).matches()) {
+      "Element values must conform to the regex $ELEMENT_REGEX"
     }
   }
 
   companion object {
     private const val ELEMENT_REGEX = "^[A-Za-z_]+$"
+    private val ELEMENT_PATTERN = Pattern.compile(ELEMENT_REGEX)
   }
 }

@@ -17,19 +17,19 @@ internal class GaugeImpl : Gauge {
 
   override fun set(value: Int) {
     envoyEngine.get()?.recordGaugeSet(
-      elements.joinToString(separator = ".") { it.element }, value
+      elements.joinToString(separator = ".") { it.value }, value
     )
   }
 
   override fun add(amount: Int) {
     envoyEngine.get()?.recordGaugeAdd(
-      elements.joinToString(separator = ".") { it.element }, amount
+      elements.joinToString(separator = ".") { it.value }, amount
     )
   }
 
   override fun sub(amount: Int) {
     envoyEngine.get()?.recordGaugeSub(
-      elements.joinToString(separator = ".") { it.element }, amount
+      elements.joinToString(separator = ".") { it.value }, amount
     )
   }
 }
