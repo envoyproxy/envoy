@@ -76,19 +76,9 @@ Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
     // works, but incurs another indirection of lambda at runtime. As the
     // duplicated logic is only an if-statement and a bool function, it doesn't
     // seem worth factoring that out to a helper function.
-    if (still_alive_guard.expired()) {
-      return;
+    if (!still_alive_guard.expired()) {
+      cb(getWorker(index));
     }
-    auto obj = getWorker(index);
-    auto new_obj = cb(obj);
-    // The API definition for runOnAllThreads allows for replacing the object
-    // via the callback return value. However, this never occurs in the codebase
-    // as of Oct 2020, and we plan to remove this API. To avoid PR races, we
-    // will add an assert to ensure such a dependency does not emerge.
-    //
-    // TODO(jmarantz): remove this once we phase out use of the untyped slot
-    // API, rename it, and change all call-sites to use TypedSlot.
-    ASSERT(obj.get() == new_obj.get());
   };
 }
 
@@ -98,15 +88,6 @@ void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, const Event::Po
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
   parent_.runOnAllThreads(dataCallback(cb));
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(const Event::PostCb& cb,
-                                             const Event::PostCb& complete_cb) {
-  parent_.runOnAllThreads(wrapCallback(cb), complete_cb);
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(const Event::PostCb& cb) {
-  parent_.runOnAllThreads(wrapCallback(cb));
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
