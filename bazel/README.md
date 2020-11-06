@@ -134,6 +134,11 @@ for how to update or override dependencies.
     For other common issues, see the
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
 
+    > The paths in this document are given as
+    examples, make sure to verify you are using the correct paths for your environment. Also note
+    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
+    to do the equivalent if using a different shell.
+
     [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
     by python.org. The POSIX flavor available via MSYS2, the Windows Store flavor and other distributions
     will not work. Add a symlink for `python3.exe` pointing to the installed `python.exe` for Envoy scripts
@@ -177,6 +182,7 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
+    set MSYS2_PATH_TYPE=inherit
     ```
 
     Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
@@ -203,17 +209,16 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
 
-    Lastly, persist environment variable changes. NOTE: The paths in this document are given as
-    examples, make sure to verify you are using the correct paths for your environment. Also note
-    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
-    to do the equivalent if using a different shell.
+    Lastly, persist environment variable changes.
     ```
     setx PATH "%PATH%"
     setx BAZEL_SH "%BAZEL_SH%"
     setx MSYS2_ARG_CONV_EXCL "%MSYS2_ARG_CONV_EXCL%"
     setx BAZEL_VC "%BAZEL_VC%"
     setx TMPDIR "%TMPDIR%"
+    setx MSYS2_PATH_TYPE "%MSYS2_PATH_TYPE%"
     ```
+    > On Windows the supported/recommended shell to interact with bazel is MSYS2. This means that all the bazel commands (i.e. build, test) should be executed from MSYS2.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.

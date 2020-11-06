@@ -58,7 +58,7 @@ REAL_TIME_ALLOWLIST = (
     "./test/test_common/simulated_time_system.cc", "./test/test_common/simulated_time_system.h",
     "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
     "./test/test_common/utility.cc", "./test/test_common/utility.h",
-    "./test/integration/integration.h")
+    "./test/integration/integration.h", "./test/tools/wee8_compile/wee8_compile.cc")
 
 # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
 # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
@@ -121,7 +121,7 @@ BUILD_URLS_ALLOWLIST = (
     "./generated_api_shadow/bazel/repository_locations.bzl",
     "./generated_api_shadow/bazel/envoy_http_archive.bzl",
     "./bazel/repository_locations.bzl",
-    "./bazel/crates.bzl",
+    "./bazel/external/cargo/crates.bzl",
     "./api/bazel/repository_locations.bzl",
     "./api/bazel/envoy_http_archive.bzl",
 )

@@ -5,10 +5,6 @@ Redis Filter
 
 In this example, we show how a :ref:`Redis filter <config_network_filters_redis_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a Redis filter that routes egress requests to redis server.
 
-
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Build the sandbox
@@ -27,7 +23,7 @@ Terminal 1
       Name                   Command               State                             Ports
   ------------------------------------------------------------------------------------------------------------------
   redis_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
-  redis_redis_1   docker-entrypoint.sh redis       Up      0.0.0.0:6379->6379/tcp
+  redis_redis_1   docker-entrypoint.sh redis       Up      6379/tcp
 
 Step 4: Issue Redis commands
 ****************************
