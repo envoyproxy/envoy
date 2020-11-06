@@ -8,7 +8,7 @@ between proxies and services within your network.
 
 Transport Layer Security (``TLS``) can be used to secure all types of ``HTTP`` traffic, including ``WebSockets``.
 
-Envoy also has support for transmitting generic ``TCP`` traffic over ``TLS``.
+Envoy also has support for transmitting and receiving generic ``TCP`` traffic over ``TLS``.
 
 .. warning::
 
@@ -42,8 +42,9 @@ You will also need to provide valid certificates.
    :emphasize-lines: 28-37
    :caption: :download:`envoy-demo-tls.yaml <_include/envoy-demo-tls.yaml>`
 
-Connecting to an "upstream" ``TLS`` service is conversely done with an
-:ref:`UpstreamTLSContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`:
+Connecting to an "upstream" ``TLS`` service is conversely done by adding an
+:ref:`UpstreamTLSContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`
+to the :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
 .. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
@@ -58,10 +59,11 @@ Connecting to an "upstream" ``TLS`` service is conversely done with an
 Validate an endpoint's certificates when connecting
 ---------------------------------------------------
 
-When Envoy connects to an upstream TLS service, it does not, by default, validate the certificates
+When Envoy connects to an upstream ``TLS`` service, it does not, by default, validate the certificates
 that it is presented with.
 
-You can use the ``validation_context`` to specify how Envoy should validate these certificates.
+You can use the :ref:`validation_context <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
+to specify how Envoy should validate these certificates.
 
 Firstly, you can ensure that the certificates are from a mutually trusted certificate authority:
 
@@ -71,6 +73,7 @@ Firstly, you can ensure that the certificates are from a mutually trusted certif
    :lineno-start: 43
    :lines: 43-53
    :emphasize-lines: 6-9
+   :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
 You can also ensure that the "Subject Alternative Names" for the cerficate match.
 
@@ -83,21 +86,29 @@ certificate is valid for.
    :lineno-start: 43
    :lines: 43-53
    :emphasize-lines: 6-7, 10-11
+   :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
 .. note::
 
    If the "Subject Alternative Names" for a certificate are for a wildcard domain, eg ``*.example.com``,
    this is what you should use when matching with ``match_subject_alt_names``.
 
+.. note::
+
+   See :ref:`here <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>` to view all
+   of the possible configurations for certificate validation.
+
 .. _start_quick_start_securing_sni:
 
 Secure an endpoint with SNI
 ---------------------------
 
-SNI is an extension to the TLS protocol through which a client indicates the hostname of the server
-that they are connecting to during the TLS negotiation.
+``SNI`` is an extension to the ``TLS`` protocol through which a client indicates the hostname of the server
+that they are connecting to during the ``TLS`` negotiation.
 
-To enforce SNI on a listening connection, you should set the ``filter_chain_match`` of the ``listener``:
+To enforce ``SNI`` on a listening connection, you should set the
+:ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` of the
+:ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`:
 
 .. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
@@ -105,14 +116,16 @@ To enforce SNI on a listening connection, you should set the ``filter_chain_matc
    :lineno-start: 27
    :lines: 27-35
    :emphasize-lines: 2-4
+   :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
 
 .. _start_quick_start_securing_sni_client:
 
 Connect to an endpoint securely with SNI
 ----------------------------------------
 
-When connecting to a TLS endpoint that is protected by SNI you can set ``sni`` in the configuration
-of the ``UpstreamTLSContext``.
+When connecting to a ``TLS`` endpoint that is protected by ``SNI`` you can set
+:ref:`sni <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>` in the configuration
+of the :ref:`UpstreamTLSContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
 
 .. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
@@ -120,22 +133,28 @@ of the ``UpstreamTLSContext``.
    :lineno-start: 56
    :lines: 56-61
    :emphasize-lines: 6
+   :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
 
-When connecting to an Envoy endpoint that is protected by SNI, this must match exactly one of the
-``server_names`` set in the endpoints ``filter_chain_match``.
+When connecting to an Envoy endpoint that is protected by ``SNI``, this must match one of the
+:ref:`server_names <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>` set in the endpoint's
+:ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`, as
+:ref:`described above <start_quick_start_securing_sni>`.
 
-When connecting to an endpoint that is not protected by SNI, this configuration is ignored, so it is
-generally advisable to always set this to the DNS name of the endpoint you are connecting to.
+.. note::
+
+   When connecting to a ``TLS`` endpoint that is not protected by ``SNI``, this configuration is ignored, so it is
+   generally advisable to always set this to the DNS name of the endpoint you are connecting to.
 
 .. _start_quick_start_securing_mtls:
 
 Use mututal TLS (mTLS) to enforce client certificate authentication
 -------------------------------------------------------------------
 
-By using mutual TLS (mTLS), Envoy also provides a way to authenticate connecting clients.
+With mutual TLS (mTLS), Envoy also provides a way to authenticate connecting clients.
 
-At a minimum you will need to set ``require_client_certificate`` and specify a mutually trusted certificate
-authority:
+At a minimum you will need to set
+:ref:`require_client_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
+and specify a mutually trusted certificate authority:
 
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
@@ -143,10 +162,12 @@ authority:
    :lineno-start: 27
    :lines: 27-39
    :emphasize-lines: 6, 8-10
+   :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
 You can further restrict the authentication of connecting clients by specifying the allowed
-"Subject Alternative Names" in ``match_subject_alt_names``, similar to validating upstream certificates
-described above.
+"Subject Alternative Names" in
+:ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`,
+similar to validating upstream certificates described above.
 
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
@@ -154,6 +175,12 @@ described above.
    :lineno-start: 27
    :lines: 27-39
    :emphasize-lines: 7, 11-12
+   :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
+
+.. note::
+
+   See :ref:`here <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>` to view all
+   of the possible configurations for certificate validation.
 
 .. _start_quick_start_securing_mtls_client:
 
@@ -168,3 +195,4 @@ When connecting to an upstream with client certificates you can set them as foll
    :lineno-start: 45
    :lines: 45-69
    :emphasize-lines: 21-25
+   :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
