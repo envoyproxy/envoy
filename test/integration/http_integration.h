@@ -26,8 +26,7 @@ public:
                          Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecClient::Type type);
 
-  IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers,
-                                                    const bool end_stream = true);
+  IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
                                                   uint64_t body_size);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,

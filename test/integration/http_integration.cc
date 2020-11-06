@@ -83,12 +83,11 @@ void IntegrationCodecClient::flushWrite() {
 }
 
 IntegrationStreamDecoderPtr
-IntegrationCodecClient::makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers,
-                                              const bool end_stream) {
+IntegrationCodecClient::makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, end_stream).IgnoreError();
+  encoder.encodeHeaders(headers, true).IgnoreError();
   flushWrite();
   return response;
 }
