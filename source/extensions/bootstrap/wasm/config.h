@@ -20,13 +20,16 @@ using Envoy::Extensions::Common::Wasm::WasmHandle;
 
 class WasmService {
 public:
-  WasmService(Common::Wasm::WasmHandleSharedPtr singleton) : singleton_(std::move(singleton)) {}
+  WasmService(Common::Wasm::PluginSharedPtr plugin, Common::Wasm::WasmHandleSharedPtr singleton)
+      : plugin_(plugin), singleton_(std::move(singleton)) {}
   WasmService(Common::Wasm::PluginSharedPtr plugin,
               ThreadLocal::TypedSlotPtr<WasmHandle>&& tls_slot)
       : plugin_(plugin), tls_slot_(std::move(tls_slot)) {}
 
   virtual ~WasmService() {
-    if (!singleton_ && tls_slot_->currentThreadRegistered()) {
+    if (singleton_) {
+      singleton_->wasm()->startShutdown(plugin_);
+    } else if (tls_slot_->currentThreadRegistered()) {
       tls_slot_->runOnAllThreads([plugin = plugin_](OptRef<WasmHandle> handle) {
         if (handle.has_value()) {
           handle->wasm()->startShutdown(plugin);

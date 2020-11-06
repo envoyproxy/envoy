@@ -37,8 +37,8 @@ void WasmFactory::createWasm(const envoy::extensions::wasm::v3::WasmService& con
     }
     if (singleton) {
       // Return a Wasm VM which will be stored as a singleton by the Server.
-      cb(std::make_unique<WasmService>(
-          Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, context.dispatcher())));
+      cb(std::make_unique<WasmService>(plugin, Common::Wasm::getOrCreateThreadLocalWasm(
+                                                   base_wasm, plugin, context.dispatcher())));
       return;
     }
     // Per-thread WASM VM.
