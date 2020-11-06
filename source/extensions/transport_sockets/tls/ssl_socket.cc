@@ -36,9 +36,11 @@ public:
   absl::string_view failureReason() const override { return NotReadyReason; }
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
-  Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
+  Network::IoResult doRead(Buffer::Instance&) override {
+    return {PostIoAction::Close, 0, false, absl::nullopt};
+  }
   Network::IoResult doWrite(Buffer::Instance&, bool) override {
-    return {PostIoAction::Close, 0, false};
+    return {PostIoAction::Close, 0, false, absl::nullopt};
   }
   void onConnected() override {}
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
@@ -113,7 +115,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     if (action == PostIoAction::Close || info_->state() != Ssl::SocketState::HandshakeComplete) {
       // end_stream is false because either a hard error occurred (action == Close) or
       // the handshake isn't complete, so a half-close cannot occur yet.
-      return {action, 0, false};
+      return {action, 0, false, absl::nullopt};
     }
   }
 
@@ -173,7 +175,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
-  return {action, bytes_read, end_stream};
+  return {action, bytes_read, end_stream, absl::nullopt};
 }
 
 void SslSocket::onPrivateKeyMethodComplete() {
@@ -232,7 +234,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       info_->state() != Ssl::SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || info_->state() != Ssl::SocketState::HandshakeComplete) {
-      return {action, 0, false};
+      return {action, 0, false, absl::nullopt};
     }
   }
 
@@ -270,7 +272,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       // Renegotiation has started. We don't handle renegotiation so just fall through.
       default:
         drainErrorQueue();
-        return {PostIoAction::Close, total_bytes_written, false};
+        return {PostIoAction::Close, total_bytes_written, false, absl::nullopt};
       }
 
       break;
@@ -281,7 +283,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
     shutdownSsl();
   }
 
-  return {PostIoAction::KeepOpen, total_bytes_written, false};
+  return {PostIoAction::KeepOpen, total_bytes_written, false, absl::nullopt};
 }
 
 void SslSocket::onConnected() { ASSERT(info_->state() == Ssl::SocketState::PreHandshake); }

@@ -25,6 +25,10 @@ namespace {
 
 constexpr absl::string_view kTransportSocketConnectTimeoutTerminationDetails =
     "transport socket timeout was reached";
+constexpr absl::string_view kDownstreamConnectionTerminationDetails =
+    "downstream connection was terminated";
+constexpr absl::string_view kUpstreamConnectionTerminationDetails =
+    "upstream connection was terminated";
 
 }
 
@@ -588,6 +592,20 @@ void ConnectionImpl::onReadReady() {
     result.action_ = PostIoAction::Close;
   }
 
+  if (result.io_error_.has_value()) {
+    ASSERT(result.action_ == PostIoAction::Close);
+    if (dynamic_cast<ServerConnectionImpl*>(this)) {
+      stream_info_.setConnectionTerminationDetails(kDownstreamConnectionTerminationDetails);
+      stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+    } else {
+      stream_info_.setUpstreamTransportFailureReason(kUpstreamConnectionTerminationDetails);
+      stream_info_.setConnectionTerminationDetails(kUpstreamConnectionTerminationDetails);
+      stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionTermination);
+    }
+    // Force "end_stream" so that filters can process this error.
+    result.end_stream_read_ = true;
+  }
+
   read_end_stream_ |= result.end_stream_read_;
   if (result.bytes_processed_ != 0 || result.end_stream_read_ ||
       (latched_dispatch_buffered_data && read_buffer_.length() > 0)) {
@@ -650,6 +668,18 @@ void ConnectionImpl::onWriteReady() {
   ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
+
+  if (result.io_error_.has_value()) {
+    ASSERT(result.action_ == PostIoAction::Close);
+    if (dynamic_cast<ServerConnectionImpl*>(this)) {
+      stream_info_.setConnectionTerminationDetails(kDownstreamConnectionTerminationDetails);
+      stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+    } else {
+      stream_info_.setUpstreamTransportFailureReason(kUpstreamConnectionTerminationDetails);
+      stream_info_.setConnectionTerminationDetails(kUpstreamConnectionTerminationDetails);
+      stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionTermination);
+    }
+  }
 
   // NOTE: If the delayed_close_timer_ is set, it must only trigger after a delayed_close_timeout_
   // period of inactivity from the last write event. Therefore, the timer must be reset to its

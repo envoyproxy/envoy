@@ -26,6 +26,8 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
     return IoErrorCode::Interrupt;
   case SOCKET_ERROR_ADDR_NOT_AVAIL:
     return IoErrorCode::AddressNotAvailable;
+  case SOCKET_ERROR_ECONNRESET:
+    return IoErrorCode::ConnectionResetByPeer;
   default:
     ENVOY_LOG_MISC(debug, "Unknown error code {} details {}", errno_, getErrorDetails());
     return IoErrorCode::UnknownError;
