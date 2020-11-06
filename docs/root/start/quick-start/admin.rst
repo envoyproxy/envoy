@@ -127,7 +127,7 @@ you could:
 Admin endpoints: ``stats``
 --------------------------
 
-The admin stats endpoint allows you to retrieve runtime information about Envoy.
+The :ref:`admin stats <operations_stats>` endpoint allows you to retrieve runtime information about Envoy.
 
 The stats are provided as ``key: value`` pairs, where the keys use a hierarchical dotted notation,
 and the values are one of ``counter``, ``histogram`` or ``gauge`` types.
