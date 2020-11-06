@@ -25,6 +25,7 @@ public:
   }
   bool implementsSecureTransport() const override { return true; }
   bool isReady() const override { return true; }
+  bool usesProxyProtocolOptions() const override { return false; }
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to

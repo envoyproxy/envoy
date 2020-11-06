@@ -111,6 +111,8 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool isReady() const override;
+  bool usesProxyProtocolOptions() const override { return false; }
+
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
@@ -135,6 +137,8 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool isReady() const override;
+  bool usesProxyProtocolOptions() const override { return false; }
+
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 

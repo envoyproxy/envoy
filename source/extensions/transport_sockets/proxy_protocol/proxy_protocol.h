@@ -50,6 +50,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool isReady() const override;
+  bool usesProxyProtocolOptions() const override { return true; }
 
 private:
   Network::TransportSocketFactoryPtr transport_socket_factory_;

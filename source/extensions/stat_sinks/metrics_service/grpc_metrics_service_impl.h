@@ -80,18 +80,18 @@ class MetricsServiceSink : public Stats::Sink {
 public:
   // MetricsService::Sink
   MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
-                     TimeSource& time_system, const bool report_counters_as_deltas);
+                     const bool report_counters_as_deltas);
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
-  void flushCounter(const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot);
-  void flushGauge(const Stats::Gauge& gauge);
-  void flushHistogram(const Stats::ParentHistogram& envoy_histogram);
+  void flushCounter(const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
+                    int64_t snapshot_time_ms);
+  void flushGauge(const Stats::Gauge& gauge, int64_t snapshot_time_ms);
+  void flushHistogram(const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time_ms);
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
   envoy::service::metrics::v3::StreamMetricsMessage message_;
-  TimeSource& time_source_;
   const bool report_counters_as_deltas_;
 };
 

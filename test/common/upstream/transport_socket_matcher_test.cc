@@ -31,6 +31,7 @@ namespace {
 class FakeTransportSocketFactory : public Network::TransportSocketFactory {
 public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(bool, usesProxyProtocolOptions, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsSharedPtr), (const));
   MOCK_METHOD(bool, isReady, (), (const));
@@ -47,6 +48,7 @@ class FooTransportSocketFactory
       Logger::Loggable<Logger::Id::upstream> {
 public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(bool, usesProxyProtocolOptions, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsSharedPtr), (const));
   MOCK_METHOD(bool, isReady, (), (const));

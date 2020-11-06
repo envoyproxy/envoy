@@ -91,7 +91,8 @@ void Cluster::startPreInit() {
 void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predicate) {
   // Post the priority set to worker threads.
   // TODO(mattklein123): Remove "this" capture.
-  tls_.runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()]() {
+  tls_.runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()](
+                           OptRef<ThreadLocal::ThreadLocalObject>) {
     PriorityContextPtr priority_context = linearizePrioritySet(skip_predicate);
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
     ASSERT(cluster != nullptr);
