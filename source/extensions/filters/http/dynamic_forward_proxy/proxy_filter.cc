@@ -1,5 +1,12 @@
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+
+#include "common/runtime/runtime_features.h"
+
+#include "extensions/clusters/well_known_names.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -13,12 +20,14 @@ struct ResponseStringValues {
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
 };
 
+using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
+
 using ResponseStrings = ConstSingleton<ResponseStringValues>;
 
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 ProxyFilterConfig::ProxyFilterConfig(
-    const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::FilterConfig& proto_config,
+    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     Upstream::ClusterManager& cluster_manager)
     : dns_cache_manager_(cache_manager_factory.get()),
@@ -26,9 +35,9 @@ ProxyFilterConfig::ProxyFilterConfig(
       cluster_manager_(cluster_manager) {}
 
 ProxyPerRouteConfig::ProxyPerRouteConfig(
-    const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig& config)
-    : host_rewrite_(config.host_rewrite()),
-      host_rewrite_header_(Http::LowerCaseString(config.auto_host_rewrite_header())) {}
+    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config)
+    : host_rewrite_(config.host_rewrite_literal()),
+      host_rewrite_header_(Http::LowerCaseString(config.host_rewrite_header())) {}
 
 void ProxyFilter::onDestroy() {
   // Make sure we destroy any active cache load handle in case we are getting reset and deferred
@@ -37,7 +46,7 @@ void ProxyFilter::onDestroy() {
   circuit_breaker_.reset();
 }
 
-Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry;
   if (!route || !(route_entry = route->routeEntry())) {
@@ -50,20 +59,40 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
   }
   cluster_info_ = cluster->info();
 
-  auto& resource = cluster_info_->resourceManager(route_entry->priority()).pendingRequests();
-  if (!resource.canCreate()) {
-    ENVOY_STREAM_LOG(debug, "pending request overflow", *decoder_callbacks_);
-    cluster_info_->stats().upstream_rq_pending_overflow_.inc();
-    decoder_callbacks_->sendLocalReply(
+  // We only need to do DNS lookups for hosts in dynamic forward proxy clusters,
+  // since the other cluster types do their own DNS management.
+  const absl::optional<CustomClusterType>& cluster_type = cluster_info_->clusterType();
+  if (!cluster_type) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  if (cluster_type->name() !=
+      Envoy::Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  const bool should_use_dns_cache_circuit_breakers =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_dns_cache_circuit_breakers");
+
+  circuit_breaker_ = config_->cache().canCreateDnsRequest(
+      !should_use_dns_cache_circuit_breakers
+          ? absl::make_optional(std::reference_wrapper<ResourceLimit>(
+                cluster_info_->resourceManager(route_entry->priority()).pendingRequests()))
+          : absl::nullopt);
+
+  if (circuit_breaker_ == nullptr) {
+    if (!should_use_dns_cache_circuit_breakers) {
+      cluster_info_->stats().upstream_rq_pending_overflow_.inc();
+    }
+    ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
+    this->decoder_callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
         absl::nullopt, ResponseStrings::get().PendingRequestOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(resource);
 
   uint16_t default_port = 80;
   if (cluster_info_->transportSocketMatcher()
-          .resolve(envoy::api::v2::core::Metadata())
+          .resolve(nullptr)
           .factory_.implementsSecureTransport()) {
     default_port = 443;
   }
@@ -74,15 +103,17 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
   if (config != nullptr) {
     const auto& host_rewrite = config->hostRewrite();
     if (!host_rewrite.empty()) {
-      headers.Host()->value(host_rewrite);
+      headers.setHost(host_rewrite);
     }
 
     const auto& host_rewrite_header = config->hostRewriteHeader();
     if (!host_rewrite_header.get().empty()) {
-      const auto* header = headers.get(host_rewrite_header);
-      if (header != nullptr) {
-        const auto& header_value = header->value().getStringView();
-        headers.Host()->value(header_value);
+      const auto header = headers.get(host_rewrite_header);
+      if (!header.empty()) {
+        // This is an implicitly untrusted header, so per the API documentation only the first
+        // value is used.
+        const auto& header_value = header[0]->value().getStringView();
+        headers.setHost(header_value);
       }
     }
   }

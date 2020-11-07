@@ -3,13 +3,15 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2alpha/certs.pb.h"
+#include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/pure.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
 
-using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v2alpha::CertificateDetails>;
+using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v3::CertificateDetails>;
 
 /**
  * SSL Context is used as a template for SSL connection configuration.
@@ -32,6 +34,12 @@ public:
    * @return certificate details conforming to proto admin.v2alpha.certs.
    */
   virtual std::vector<CertificateDetailsPtr> getCertChainInformation() const PURE;
+
+  /**
+   * @return the number of seconds in this context until the next OCSP response will
+   * expire, or `absl::nullopt` if no OCSP responses exist.
+   */
+  virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

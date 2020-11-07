@@ -1,0 +1,30 @@
+{
+  eliminate new/free mismatch warnings altogether, as something in the current toolchain generates this scenario.
+  Memcheck:Free
+  fun:free
+  ...
+}
+{
+   re2 cond-jump failure
+   Memcheck:Cond
+   fun:_ZNK3re210SparseSetTIvE8containsEi
+   ...
+}
+{
+   re2 uninit-value
+   Memcheck:Value8
+   fun:_ZNK3re210SparseSetTIvE8containsEi
+   ...
+}
+{
+   re2 cond-jump failure
+   Memcheck:Cond
+   fun:_ZNK3re211SparseArrayIiE9has_indexEi
+   ...
+}
+{
+   re2 uninit-value
+   Memcheck:Value8
+   fun:_ZNK3re211SparseArrayIiE9has_indexEi
+   ...
+}

@@ -27,6 +27,7 @@ public:
    */
   void setReadBufferReady() override {}
   void raiseEvent(Network::ConnectionEvent) override {}
+  void flushWriteBuffer() override {}
 
 private:
   Network::TransportSocketCallbacks& parent_;

@@ -40,7 +40,7 @@ public:
    * @param remove_characters set of intervals of character-indices to be removed from name.
    * @return bool indicates whether a tag was found in the name.
    */
-  virtual bool extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
+  virtual bool extractTag(absl::string_view stat_name, TagVector& tags,
                           IntervalSet<size_t>& remove_characters) const PURE;
 
   /**

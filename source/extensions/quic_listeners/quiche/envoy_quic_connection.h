@@ -1,14 +1,16 @@
 #pragma once
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/quic_connection.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include <memory>
 
@@ -52,6 +54,10 @@ protected:
   Network::Connection& envoyConnection() const {
     ASSERT(envoy_connection_ != nullptr);
     return *envoy_connection_;
+  }
+
+  void setConnectionSocket(Network::ConnectionSocketPtr&& connection_socket) {
+    connection_socket_ = std::move(connection_socket);
   }
 
 private:

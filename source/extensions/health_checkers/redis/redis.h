@@ -3,7 +3,11 @@
 #include <chrono>
 
 #include "envoy/api/api.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "common/upstream/health_checker_base_impl.h"
 
@@ -22,9 +26,9 @@ namespace RedisHealthChecker {
 class RedisHealthChecker : public Upstream::HealthCheckerImplBase {
 public:
   RedisHealthChecker(
-      const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
+      const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
       const envoy::config::health_checker::redis::v2::Redis& redis_config,
-      Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
       Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
@@ -40,8 +44,8 @@ public:
   }
 
 protected:
-  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
-    return envoy::data::core::v2alpha::HealthCheckerType::REDIS;
+  envoy::data::core::v3::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v3::REDIS;
   }
 
 private:
@@ -50,7 +54,7 @@ private:
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,
         public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
     ~RedisActiveHealthCheckSession() override;
@@ -71,7 +75,7 @@ private:
       return true;
     } // Redirection errors are treated as check successes.
     NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
-      return NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+      return NetworkFilters::Common::Redis::Client::ReadPolicy::Primary;
     }
 
     // Batching
@@ -85,10 +89,11 @@ private:
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return false; }
 
-    // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
+    // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
-    bool onRedirection(const NetworkFilters::Common::Redis::RespValue& value) override;
+    bool onRedirection(NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&,
+                       bool) override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
@@ -120,6 +125,7 @@ private:
   Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
   Type type_;
   const std::string key_;
+  const std::string auth_username_;
   const std::string auth_password_;
 };
 

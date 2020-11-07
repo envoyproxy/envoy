@@ -1,4 +1,3 @@
-import glob
 import os
 
 
@@ -12,8 +11,8 @@ def ProtoFileCanonicalFromLabel(label):
     A string with the path, e.g. for @envoy_api//envoy/type/matcher:metadata.proto
     this would be envoy/type/matcher/matcher.proto.
   """
-  assert (label.startswith('@envoy_api//'))
-  return label[len('@envoy_api//'):].replace(':', '/')
+  assert (label.startswith('@envoy_api_canonical//'))
+  return label[len('@envoy_api_canonical//'):].replace(':', '/')
 
 
 def BazelBinPathForOutputArtifact(label, suffix, root=''):
@@ -25,16 +24,8 @@ def BazelBinPathForOutputArtifact(label, suffix, root=''):
     root: location of bazel-bin/, if not specified, PWD.
 
   Returns:
-    Path in bazel-bin/external/envoy_api for label output with given suffix.
+    Path in bazel-bin/external/envoy_api_canonical for label output with given suffix.
   """
-  # We use ** glob matching here to deal with the fact that we have something
-  # like
-  # bazel-bin/external/envoy_api/envoy/admin/v2alpha/pkg/envoy/admin/v2alpha/certs.proto.proto
-  # and we don't want to have to do a nested loop and slow bazel query to
-  # recover the canonical package part of the path.
-  # While we may have reformatted the file multiple times due to the transitive
-  # dependencies in the aspect above, they all look the same. So, just pick an
-  # arbitrary match and we're done.
-  glob_pattern = os.path.join(
-      root, 'bazel-bin/external/envoy_api/**/%s%s' % (ProtoFileCanonicalFromLabel(label), suffix))
-  return glob.glob(glob_pattern, recursive=True)[0]
+  proto_file_path = ProtoFileCanonicalFromLabel(label)
+  return os.path.join(root, 'bazel-bin/external/envoy_api_canonical',
+                      os.path.dirname(proto_file_path), 'pkg', proto_file_path + suffix)

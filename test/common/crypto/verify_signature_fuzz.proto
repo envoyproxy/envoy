@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package test.common.crypto;
+
+message VerifySignatureFuzzTestCase {
+  string key = 1;
+  string hash_func = 2;
+  string signature = 3;
+  string data = 4;
+}

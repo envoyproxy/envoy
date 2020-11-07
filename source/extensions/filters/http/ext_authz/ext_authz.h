@@ -5,13 +5,12 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/type/http_status.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -19,7 +18,7 @@
 #include "common/common/matchers.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
-#include "common/runtime/runtime_features.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -31,11 +30,6 @@ namespace HttpFilters {
 namespace ExtAuthz {
 
 /**
- * Type of requests the filter should apply to.
- */
-enum class FilterRequestType { Internal, External, Both };
-
-/**
  * All stats for the Ext Authz filter. @see stats_macros.h
  */
 
@@ -43,6 +37,8 @@ enum class FilterRequestType { Internal, External, Both };
   COUNTER(ok)                                                                                      \
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
+  COUNTER(timeout)                                                                                 \
+  COUNTER(disabled)                                                                                \
   COUNTER(failure_mode_allowed)
 
 /**
@@ -57,28 +53,39 @@ struct ExtAuthzFilterStats {
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
-               const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context,
+  FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
+               Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
                const std::string& stats_prefix)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
-        status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
-        scope_(scope), runtime_(runtime), http_context_(http_context),
+        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
+        status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
+        runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
                                   Runtime::FractionalPercent(config.filter_enabled(), runtime_))
                             : absl::nullopt),
+        filter_enabled_metadata_(
+            config.has_filter_enabled_metadata()
+                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                : absl::nullopt),
+        deny_at_disable_(config.has_deny_at_disable()
+                             ? absl::optional<Runtime::FeatureFlag>(
+                                   Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
+                             : absl::nullopt),
         pool_(scope_.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
-        stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
-        ext_authz_denied_(pool_.add("ext_authz.denied")),
-        ext_authz_error_(pool_.add("ext_authz.error")),
-        ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
+        stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+        ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
+        ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
+        ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
+        ext_authz_timeout_(pool_.add(createPoolStatName(config.stat_prefix(), "timeout"))),
+        ext_authz_failure_mode_allowed_(
+            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -90,13 +97,20 @@ public:
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
-  const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
+  bool packAsBytes() const { return pack_as_bytes_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
-  bool filterEnabled() { return filter_enabled_.has_value() ? filter_enabled_->enabled() : true; }
+  bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
+    const bool enabled = filter_enabled_.has_value() ? filter_enabled_->enabled() : true;
+    const bool enabled_metadata =
+        filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
+    return enabled && enabled_metadata;
+  }
 
-  Runtime::Loader& runtime() { return runtime_; }
+  bool denyAtDisable() {
+    return deny_at_disable_.has_value() ? deny_at_disable_->enabled() : false;
+  }
 
   Stats::Scope& scope() { return scope_; }
 
@@ -123,22 +137,35 @@ private:
     return Http::Code::Forbidden;
   }
 
-  ExtAuthzFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    const std::string final_prefix = prefix + "ext_authz.";
+  ExtAuthzFilterStats generateStats(const std::string& prefix,
+                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
+    const std::string final_prefix = absl::StrCat(prefix, "ext_authz.", filter_stats_prefix);
     return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+
+  // This generates ext_authz.<optional filter_stats_prefix>.name, for example: ext_authz.waf.ok
+  // when filter_stats_prefix is "waf", and ext_authz.ok when filter_stats_prefix is empty.
+  const std::string createPoolStatName(const std::string& filter_stats_prefix,
+                                       const std::string& name) {
+    return absl::StrCat("ext_authz",
+                        filter_stats_prefix.empty() ? EMPTY_STRING
+                                                    : absl::StrCat(".", filter_stats_prefix),
+                        ".", name);
   }
 
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
+  const bool pack_as_bytes_;
   const Http::Code status_on_error_;
-  const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+  const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
+  const absl::optional<Runtime::FeatureFlag> deny_at_disable_;
 
   // TODO(nezdolik): stop using pool as part of deprecating cluster scope stats.
   Stats::StatNamePool pool_;
@@ -156,6 +183,7 @@ public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
+  const Stats::StatName ext_authz_timeout_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
 };
 
@@ -169,10 +197,13 @@ class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   using ContextExtensionsMap = Protobuf::Map<std::string, std::string>;
 
-  FilterConfigPerRoute(const envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute& config)
+  FilterConfigPerRoute(
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config)
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
+        disable_request_body_buffering_(config.has_check_settings() &&
+                                        config.check_settings().disable_request_body_buffering()),
         disabled_(config.disabled()) {}
 
   void merge(const FilterConfigPerRoute& other);
@@ -186,10 +217,13 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool disableRequestBodyBuffering() const { return disable_request_body_buffering_; }
+
 private:
   // We save the context extensions as a protobuf map instead of an std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
+  bool disable_request_body_buffering_;
   bool disabled_;
 };
 
@@ -201,16 +235,17 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::StreamDecoderFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
+  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // ExtAuthz::RequestCallbacks
@@ -218,9 +253,17 @@ public:
 
 private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
-  void initiateCall(const Http::HeaderMap& headers);
+  void initiateCall(const Http::RequestHeaderMap& headers,
+                    const Router::RouteConstSharedPtr& route);
   void continueDecoding();
-  bool isBufferFull();
+  bool isBufferFull() const;
+
+  // This holds a set of flags defined in per-route configuration.
+  struct PerRouteFlags {
+    const bool skip_check_;
+    const bool skip_request_body_buffering_;
+  };
+  PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
@@ -236,7 +279,7 @@ private:
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  Http::HeaderMap* request_headers_;
+  Http::RequestHeaderMap* request_headers_;
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
@@ -246,7 +289,8 @@ private:
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
   bool buffer_data_{};
-  envoy::service::auth::v2::CheckRequest check_request_{};
+  bool skip_check_{false};
+  envoy::service::auth::v3::CheckRequest check_request_{};
 };
 
 } // namespace ExtAuthz

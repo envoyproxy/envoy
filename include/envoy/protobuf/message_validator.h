@@ -12,11 +12,20 @@ namespace ProtobufMessage {
 
 /**
  * Exception class for reporting validation errors due to the presence of unknown
- * fields in a protobuf
+ * fields in a protobuf.
  */
 class UnknownProtoFieldException : public EnvoyException {
 public:
   UnknownProtoFieldException(const std::string& message) : EnvoyException(message) {}
+};
+
+/**
+ * Exception class for reporting validation errors due to the presence of deprecated
+ * fields in a protobuf.
+ */
+class DeprecatedProtoFieldException : public EnvoyException {
+public:
+  DeprecatedProtoFieldException(const std::string& message) : EnvoyException(message) {}
 };
 
 /**
@@ -30,9 +39,23 @@ public:
 
   /**
    * Invoked when an unknown field is encountered.
-   * @param description human readable description of the field
+   * @param description human readable description of the field.
    */
   virtual void onUnknownField(absl::string_view description) PURE;
+
+  /**
+   * If true, skip this validation visitor in the interest of speed when
+   * possible.
+   **/
+  virtual bool skipValidation() PURE;
+
+  /**
+   * Invoked when deprecated field is encountered.
+   * @param description human readable description of the field.
+   * @param soft_deprecation is set to true, visitor would log a warning message, otherwise would
+   * throw an exception.
+   */
+  virtual void onDeprecatedField(absl::string_view description, bool soft_deprecation) PURE;
 };
 
 class ValidationContext {

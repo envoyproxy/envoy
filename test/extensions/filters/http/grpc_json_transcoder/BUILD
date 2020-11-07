@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -22,10 +22,22 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "http_body_utils_test",
+    srcs = ["http_body_utils_test.cc"],
+    extension_name = "envoy.filters.http.grpc_json_transcoder",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/extensions/filters/http/grpc_json_transcoder:http_body_utils_lib",
+        "//test/proto:bookstore_proto_cc_proto",
     ],
 )
 
@@ -64,7 +76,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.grpc_json_transcoder",
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:config",
-        "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/config/filter/http/transcoder/v2:pkg_cc_proto",
+        "//test/mocks/server:factory_context_mocks",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )

@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -9,7 +7,20 @@ load(
     "envoy_extension_cc_test",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.stat_sinks.metrics_service",
+    deps = [
+        "//include/envoy/registry",
+        "//source/extensions/stat_sinks/metrics_service:config",
+        "//test/test_common:utility_lib",
+    ],
+)
 
 envoy_extension_cc_test(
     name = "metrics_service_test",
@@ -26,6 +37,7 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -33,6 +45,8 @@ envoy_extension_cc_test(
     name = "metrics_service_integration_test",
     srcs = ["metrics_service_integration_test.cc"],
     extension_name = "envoy.stat_sinks.metrics_service",
+    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
+    tags = ["flaky_on_windows"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
@@ -42,7 +56,8 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/metrics/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
     ],
 )

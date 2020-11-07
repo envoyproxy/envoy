@@ -1,9 +1,9 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/common/pure.h"
+#include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/macros.h"
@@ -12,15 +12,27 @@
 namespace Envoy {
 namespace Server {
 
-enum class OverloadActionState {
-  /**
-   * Indicates that an overload action is active because at least one of its triggers has fired.
-   */
-  Active,
-  /**
-   * Indicates that an overload action is inactive because none of its triggers have fired.
-   */
-  Inactive
+/**
+ * Tracks the state of an overload action. The state is a number between 0 and 1 that represents the
+ * level of saturation. The values are categorized in two groups:
+ * - Saturated (value = 1): indicates that an overload action is active because at least one of its
+ *   triggers has reached saturation.
+ * - Scaling (0 <= value < 1): indicates that an overload action is not saturated.
+ */
+class OverloadActionState {
+public:
+  static constexpr OverloadActionState inactive() { return OverloadActionState(0); }
+
+  static constexpr OverloadActionState saturated() { return OverloadActionState(1.0); }
+
+  explicit constexpr OverloadActionState(float value)
+      : action_value_(std::min(1.0f, std::max(0.0f, value))) {}
+
+  float value() const { return action_value_; }
+  bool isSaturated() const { return action_value_ == 1; }
+
+private:
+  float action_value_;
 };
 
 /**
@@ -28,30 +40,25 @@ enum class OverloadActionState {
  */
 using OverloadActionCb = std::function<void(OverloadActionState)>;
 
+enum class OverloadTimerType {
+  // Timers created with this type will never be scaled. This should only be used for testing.
+  UnscaledRealTimerForTest,
+  // The amount of time an HTTP connection to a downstream client can remain idle (no streams). This
+  // corresponds to the HTTP_DOWNSTREAM_CONNECTION_IDLE TimerType in overload.proto.
+  HttpDownstreamIdleConnectionTimeout,
+};
+
 /**
  * Thread-local copy of the state of each configured overload action.
  */
 class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
-  const OverloadActionState& getState(const std::string& action) {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      it = actions_.insert(std::make_pair(action, OverloadActionState::Inactive)).first;
-    }
-    return it->second;
-  }
+  // Get a thread-local reference to the value for the given action key.
+  virtual const OverloadActionState& getState(const std::string& action) PURE;
 
-  void setState(const std::string& action, OverloadActionState state) {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      actions_[action] = state;
-    } else {
-      it->second = state;
-    }
-  }
-
-private:
-  std::unordered_map<std::string, OverloadActionState> actions_;
+  // Get a scaled timer whose minimum corresponds to the configured value for the given timer type.
+  virtual Event::TimerPtr createScaledTimer(OverloadTimerType timer_type,
+                                            Event::TimerCb callback) PURE;
 };
 
 /**
@@ -68,8 +75,15 @@ public:
   // Overload action to stop accepting new connections.
   const std::string StopAcceptingConnections = "envoy.overload_actions.stop_accepting_connections";
 
+  // Overload action to reject (accept and then close) new connections.
+  const std::string RejectIncomingConnections =
+      "envoy.overload_actions.reject_incoming_connections";
+
   // Overload action to try to shrink the heap by releasing free memory.
   const std::string ShrinkHeap = "envoy.overload_actions.shrink_heap";
+
+  // Overload action to reduce some subset of configured timeouts.
+  const std::string ReduceTimeouts = "envoy.overload_actions.reduce_timeouts";
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
@@ -91,7 +105,7 @@ public:
 
   /**
    * Register a callback to be invoked when the specified overload action changes state
-   * (ie. becomes activated or inactivated). Must be called before the start method is called.
+   * (i.e., becomes activated or inactivated). Must be called before the start method is called.
    * @param action const std::string& the name of the overload action to register for
    * @param dispatcher Event::Dispatcher& the dispatcher on which callbacks will be posted
    * @param callback OverloadActionCb the callback to post when the overload action
@@ -106,17 +120,6 @@ public:
    * an alternative to registering a callback for overload action state changes.
    */
   virtual ThreadLocalOverloadState& getThreadLocalOverloadState() PURE;
-
-  /**
-   * Convenience method to get a statically allocated reference to the inactive overload
-   * action state. Useful for code that needs to initialize a reference either to an
-   * entry in the ThreadLocalOverloadState map (if overload behavior is enabled) or to
-   * some other static memory location set to the inactive state (if overload behavior
-   * is disabled).
-   */
-  static const OverloadActionState& getInactiveState() {
-    CONSTRUCT_ON_FIRST_USE(OverloadActionState, OverloadActionState::Inactive);
-  }
 };
 
 } // namespace Server

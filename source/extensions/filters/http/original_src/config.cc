@@ -1,11 +1,13 @@
 #include "extensions/filters/http/original_src/config.h"
 
+#include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace OriginalSrc {
 
-Config::Config(const envoy::config::filter::http::original_src::v2alpha1::OriginalSrc& config)
+Config::Config(const envoy::extensions::filters::http::original_src::v3::OriginalSrc& config)
     : mark_(config.mark()) {}
 
 } // namespace OriginalSrc

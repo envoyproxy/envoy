@@ -1,3 +1,5 @@
+#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -39,14 +41,14 @@ private:
 
 class MockedCallbacks : public Server::ResourceMonitor::Callbacks {
 public:
-  MOCK_METHOD1(onSuccess, void(const Server::ResourceUsage&));
-  MOCK_METHOD1(onFailure, void(const EnvoyException&));
+  MOCK_METHOD(void, onSuccess, (const Server::ResourceUsage&));
+  MOCK_METHOD(void, onFailure, (const EnvoyException&));
 };
 
 class InjectedResourceMonitorTest : public testing::Test {
 protected:
   InjectedResourceMonitorTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(resource_filename_), monitor_(createMonitor()) {}
 

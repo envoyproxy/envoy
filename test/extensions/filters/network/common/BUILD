@@ -1,0 +1,21 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = [
+        "utility_test.cc",
+    ],
+    deps = [
+        "//source/extensions/filters/network/common:utility_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

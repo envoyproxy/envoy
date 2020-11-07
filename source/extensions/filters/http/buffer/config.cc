@@ -4,7 +4,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.validate.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
@@ -15,7 +16,7 @@ namespace HttpFilters {
 namespace BufferFilter {
 
 Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::buffer::v2::Buffer& proto_config, const std::string&,
+    const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config, const std::string&,
     Server::Configuration::FactoryContext&) {
   ASSERT(proto_config.has_max_request_bytes());
 
@@ -27,7 +28,7 @@ Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 BufferFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config,
+    const envoy::extensions::filters::http::buffer::v3::BufferPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const BufferFilterSettings>(proto_config);
 }
@@ -35,7 +36,8 @@ BufferFilterFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the buffer filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(BufferFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(BufferFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.buffer"};
 
 } // namespace BufferFilter
 } // namespace HttpFilters

@@ -1,14 +1,16 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -26,7 +28,7 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
   // Mock out socket() system call to test both V4 and V6 address conversion.
   testing::NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls{&os_sys_calls};
-  ON_CALL(os_sys_calls, socket(_, _, _)).WillByDefault(Return(Api::SysCallIntResult{1, 0}));
+  ON_CALL(os_sys_calls, socket(_, _, _)).WillByDefault(Return(Api::SysCallSocketResult{1, 0}));
   ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
   quic::QuicSocketAddress quic_uninitialized_addr;
@@ -39,25 +41,23 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
     Network::Address::InstanceConstSharedPtr envoy_addr =
         quicAddressToEnvoyAddressInstance(quic_addr);
     EXPECT_EQ(quic_addr.ToString(), envoy_addr->asStringView());
-    EXPECT_EQ(quic_addr, envoyAddressInstanceToQuicSocketAddress(envoy_addr));
+    EXPECT_EQ(quic_addr, envoyIpAddressToQuicSocketAddress(envoy_addr->ip()));
   }
 }
 
 TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   spdy::SpdyHeaderBlock headers_block;
-  headers_block[":host"] = "www.google.com";
+  headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
-  Http::HeaderMapImplPtr envoy_headers = spdyHeaderBlockToEnvoyHeaders(headers_block);
+  auto envoy_headers = spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block);
   EXPECT_EQ(headers_block.size(), envoy_headers->size());
-  EXPECT_EQ("www.google.com",
-            envoy_headers->get(Http::LowerCaseString(":host"))->value().getStringView());
-  EXPECT_EQ("/index.hml",
-            envoy_headers->get(Http::LowerCaseString(":path"))->value().getStringView());
-  EXPECT_EQ("https", envoy_headers->get(Http::LowerCaseString(":scheme"))->value().getStringView());
+  EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
+  EXPECT_EQ("/index.hml", envoy_headers->getPathValue());
+  EXPECT_EQ("https", envoy_headers->getSchemeValue());
 
   quic::QuicHeaderList quic_headers = quic::test::AsHeaderList(headers_block);
-  Http::HeaderMapImplPtr envoy_headers2 = quicHeadersToEnvoyHeaders(quic_headers);
+  auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
 }
 

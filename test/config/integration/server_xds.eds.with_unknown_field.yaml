@@ -1,6 +1,6 @@
 version_info: "0"
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+- "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
   cluster_name: cluster_1
   foo: bar
   endpoints:

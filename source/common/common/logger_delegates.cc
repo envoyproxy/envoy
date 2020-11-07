@@ -12,8 +12,12 @@ namespace Logger {
 
 FileSinkDelegate::FileSinkDelegate(const std::string& log_path,
                                    AccessLog::AccessLogManager& log_manager,
-                                   DelegatingLogSinkPtr log_sink)
-    : SinkDelegate(log_sink), log_file_(log_manager.createAccessLog(log_path)) {}
+                                   DelegatingLogSinkSharedPtr log_sink)
+    : SinkDelegate(log_sink), log_file_(log_manager.createAccessLog(log_path)) {
+  setDelegate();
+}
+
+FileSinkDelegate::~FileSinkDelegate() { restoreDelegate(); }
 
 void FileSinkDelegate::log(absl::string_view msg) {
   // Log files have internal locking to ensure serial, non-interleaved

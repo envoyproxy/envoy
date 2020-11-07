@@ -1,8 +1,9 @@
-#include "envoy/config/filter/network/zookeeper_proxy/v1alpha1/zookeeper_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.validate.h"
 
 #include "extensions/filters/network/zookeeper_proxy/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -14,7 +15,7 @@ namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
 using ZooKeeperProxyProtoConfig =
-    envoy::config::filter::network::zookeeper_proxy::v1alpha1::ZooKeeperProxy;
+    envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy;
 
 TEST(ZookeeperFilterConfigTest, ValidateFail) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -48,7 +49,7 @@ stat_prefix: test_prefix
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config, false, true);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   ZooKeeperConfigFactory factory;

@@ -8,3 +8,13 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+namespace quiche {
+namespace test {
+
+using QuicheTest = ::testing::Test;
+
+template <class T> using QuicheTestWithParamImpl = ::testing::TestWithParam<T>;
+
+} // namespace test
+} // namespace quiche

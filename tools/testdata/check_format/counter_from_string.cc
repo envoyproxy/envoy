@@ -1,7 +1,7 @@
 namespace Envoy {
 
 void init(Stats::Scope& scope) {
-  scope.counter("hello");
+  scope.counterFromString("hello");
 }
 
 } // namespace Envoy

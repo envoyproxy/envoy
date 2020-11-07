@@ -1,6 +1,0 @@
-{
-  eliminate new/free mismatch warnings altogether, as something in the current toolchain generates this scenario.
-  Memcheck:Free
-  fun:free
-  ...
-}

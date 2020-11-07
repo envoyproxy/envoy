@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -12,9 +15,9 @@ namespace Upstream {
  */
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
-  StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+  StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                        Network::DnsResolverSharedPtr dns_resolver,
-                       Server::Configuration::TransportSocketFactoryContext& factory_context,
+                       Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                        Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
@@ -24,8 +27,8 @@ private:
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
                   const std::string& url,
-                  const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                  const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
+                  const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+                  const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
     void startResolve();
 
@@ -35,8 +38,8 @@ private:
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
-    const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
+    const envoy::config::endpoint::v3::LocalityLbEndpoints locality_lb_endpoint_;
+    const envoy::config::endpoint::v3::LbEndpoint lb_endpoint_;
     HostMap all_hosts_;
   };
 
@@ -67,10 +70,10 @@ public:
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().StrictDns) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

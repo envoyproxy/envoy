@@ -13,4 +13,6 @@ Operations and administration
   runtime
   fs_flags
   traffic_tapping
+  certificates
   performance
+  tools/tools

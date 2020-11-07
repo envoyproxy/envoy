@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -15,13 +15,13 @@ namespace ExtAuthz {
  * Config registration for the  external authorization filter. @see NamedNetworkFilterConfigFactory.
  */
 class ExtAuthzConfigFactory
-    : public Common::FactoryBase<envoy::config::filter::network::ext_authz::v2::ExtAuthz> {
+    : public Common::FactoryBase<envoy::extensions::filters::network::ext_authz::v3::ExtAuthz> {
 public:
   ExtAuthzConfigFactory() : FactoryBase(NetworkFilterNames::get().ExtAuthorization) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::ext_authz::v2::ExtAuthz& proto_config,
+      const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 

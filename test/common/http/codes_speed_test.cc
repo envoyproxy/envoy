@@ -9,8 +9,8 @@
 #include "envoy/stats/stats.h"
 
 #include "common/http/codes.h"
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "benchmark/benchmark.h"
 
@@ -76,24 +76,7 @@ public:
 } // namespace Http
 } // namespace Envoy
 
-static void BM_AddResponsesFakeSymtab(benchmark::State& state) {
-  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::FakeSymbolTableImpl> context;
-
-  for (auto _ : state) {
-    context.addResponses();
-  }
-}
-BENCHMARK(BM_AddResponsesFakeSymtab);
-
-static void BM_ResponseTimingFakeSymtab(benchmark::State& state) {
-  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::FakeSymbolTableImpl> context;
-
-  for (auto _ : state) {
-    context.responseTiming();
-  }
-}
-BENCHMARK(BM_ResponseTimingFakeSymtab);
-
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AddResponsesRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
 
@@ -103,6 +86,7 @@ static void BM_AddResponsesRealSymtab(benchmark::State& state) {
 }
 BENCHMARK(BM_AddResponsesRealSymtab);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_ResponseTimingRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
 
@@ -111,13 +95,3 @@ static void BM_ResponseTimingRealSymtab(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_ResponseTimingRealSymtab);
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  benchmark::Initialize(&argc, argv);
-
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}

@@ -1,0 +1,63 @@
+expression {
+  call_expr {
+    function: "_==_"
+    args {
+      call_expr {
+        function: "_[_]"
+	args {
+	  select_expr {
+	    operand {
+	      ident_expr {
+	        name: "metadata"
+	      }
+	    }
+	    field: "filter_metadata"
+	  }
+	  const_expr {
+	    string_value: "other"
+	  }
+        }
+	const_expr {
+	  string_value: "label"
+	}
+      }
+      const_expr {
+        string_value: "prod"
+      }
+    }
+  }
+}
+request_headers {
+  headers{key: ":method" value : "GET"}
+  headers{key: ":path" value : "/"}
+  headers{key: ":scheme" value : "http"}
+  headers{key: ":authority" value : "foo.com"}
+  headers {key: "foo" value: "bar"}
+  headers {}
+  headers {}
+  headers {}
+  headers {}
+}
+response_headers {
+  headers {
+    key: ":status"
+    value : "200"
+  }
+}
+trailers {
+  headers {}
+}
+stream_info {
+  start_time: 1522796769123
+  upstream_metadata {
+    filter_metadata {
+      key: "other"
+      value: {
+        fields {
+          key: "label"
+          value: { string_value: "prod" }
+        }
+      }
+    }
+  }
+}

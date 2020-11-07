@@ -1,57 +1,99 @@
 #include "common/http/conn_pool_base.h"
 
+#include "common/common/assert.h"
+#include "common/http/utility.h"
+#include "common/network/transport_socket_options_impl.h"
+#include "common/runtime/runtime_features.h"
+#include "common/stats/timespan_impl.h"
+#include "common/upstream/upstream_impl.h"
+
 namespace Envoy {
 namespace Http {
-ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
-                                                 ConnectionPool::Callbacks& callbacks)
-    : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
-  parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
-  parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
+
+Network::TransportSocketOptionsSharedPtr
+wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                           std::vector<Protocol> protocols) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_default_alpn")) {
+    return transport_socket_options;
+  }
+
+  std::vector<std::string> fallbacks;
+  for (auto protocol : protocols) {
+    // If configured to do so, we override the ALPN to use for the upstream connection to match the
+    // selected protocol.
+    switch (protocol) {
+    case Http::Protocol::Http10:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    case Http::Protocol::Http11:
+      fallbacks.push_back(Http::Utility::AlpnNames::get().Http11);
+      break;
+    case Http::Protocol::Http2:
+      fallbacks.push_back(Http::Utility::AlpnNames::get().Http2);
+      break;
+    case Http::Protocol::Http3:
+      // TODO(snowp): Add once HTTP/3 upstream support is added.
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      break;
+    }
+  }
+
+  if (transport_socket_options) {
+    return std::make_shared<Network::AlpnDecoratingTransportSocketOptions>(
+        std::move(fallbacks), transport_socket_options);
+  } else {
+    return std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{}, std::move(fallbacks));
+  }
 }
 
-ConnPoolImplBase::PendingRequest::~PendingRequest() {
-  parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
+HttpConnPoolImplBase::HttpConnPoolImplBase(
+    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    Random::RandomGenerator& random_generator, std::vector<Http::Protocol> protocols)
+    : Envoy::ConnectionPool::ConnPoolImplBase(
+          host, priority, dispatcher, options,
+          wrapTransportSocketOptions(transport_socket_options, protocols)),
+      random_generator_(random_generator) {
+  ASSERT(!protocols.empty());
+  // TODO(alyssawilk) the protocol function should probably be an optional and
+  // simply not set if there's more than one and ALPN has not been negotiated.
+  if (!protocols.empty()) {
+    protocol_ = protocols[0];
+  }
 }
 
 ConnectionPool::Cancellable*
-ConnPoolImplBase::newPendingRequest(StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks) {
-  ENVOY_LOG(debug, "queueing request due to no available connections");
-  PendingRequestPtr pending_request(new PendingRequest(*this, decoder, callbacks));
-  pending_request->moveIntoList(std::move(pending_request), pending_requests_);
-  return pending_requests_.front().get();
+HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
+                                Http::ConnectionPool::Callbacks& callbacks) {
+  HttpAttachContext context({&response_decoder, &callbacks});
+  return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
 }
 
-void ConnPoolImplBase::purgePendingRequests(
-    const Upstream::HostDescriptionConstSharedPtr& host_description,
-    absl::string_view failure_reason) {
-  // NOTE: We move the existing pending requests to a temporary list. This is done so that
-  //       if retry logic submits a new request to the pool, we don't fail it inline.
-  pending_requests_to_purge_ = std::move(pending_requests_);
-  while (!pending_requests_to_purge_.empty()) {
-    PendingRequestPtr request =
-        pending_requests_to_purge_.front()->removeFromList(pending_requests_to_purge_);
-    host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-    request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                      failure_reason, host_description);
-  }
+bool HttpConnPoolImplBase::hasActiveConnections() const {
+  return (!pending_streams_.empty() || (num_active_streams_ > 0));
 }
 
-void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
-  ENVOY_LOG(debug, "cancelling pending request");
-  if (!pending_requests_to_purge_.empty()) {
-    // If pending_requests_to_purge_ is not empty, it means that we are called from
-    // with-in a onPoolFailure callback invoked in purgePendingRequests (i.e. purgePendingRequests
-    // is down in the call stack). Remove this request from the list as it is cancelled,
-    // and there is no need to call its onPoolFailure callback.
-    request.removeFromList(pending_requests_to_purge_);
-  } else {
-    request.removeFromList(pending_requests_);
-  }
+ConnectionPool::Cancellable*
+HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context) {
+  Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
+  Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
+  ENVOY_LOG(debug, "queueing stream due to no available connections");
+  Envoy::ConnectionPool::PendingStreamPtr pending_stream(
+      new HttpPendingStream(*this, decoder, callbacks));
+  LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
+  return pending_streams_.front().get();
+}
 
-  host_->cluster().stats().upstream_rq_cancelled_.inc();
-  checkForDrained();
+void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
+                                       Envoy::ConnectionPool::AttachContext& context) {
+  ActiveClient* http_client = static_cast<ActiveClient*>(&client);
+  auto& http_context = typedContext<HttpAttachContext>(context);
+  Http::ResponseDecoder& response_decoder = *http_context.decoder_;
+  Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
+  Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
+  callbacks.onPoolReady(new_encoder, client.real_host_description_,
+                        http_client->codec_client_->streamInfo());
 }
 
 } // namespace Http

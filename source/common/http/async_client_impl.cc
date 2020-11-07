@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -18,23 +20,26 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
-const AsyncStreamImpl::NullShadowPolicy AsyncStreamImpl::RouteEntryImpl::shadow_policy_;
+const Router::InternalRedirectPolicyImpl AsyncStreamImpl::RouteEntryImpl::internal_redirect_policy_;
+const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
-const envoy::api::v2::core::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
+const envoy::config::core::v3::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
 const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
     AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
+const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
+    AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random,
+                                 Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context)
     : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
@@ -48,7 +53,8 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
+AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
+                                            AsyncClient::Callbacks& callbacks,
                                             const AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, options);
@@ -57,7 +63,7 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 
   // The request may get immediately failed. If so, we will return nullptr.
   if (!new_request->remote_closed_) {
-    new_request->moveIntoList(std::move(new_request), active_streams_);
+    LinkedList::moveIntoList(std::move(new_request), active_streams_);
     return async_request;
   } else {
     new_request->cleanup();
@@ -68,7 +74,7 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
                                             const AsyncClient::StreamOptions& options) {
   std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, options)};
-  new_stream->moveIntoList(std::move(new_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(new_stream), active_streams_);
   return active_streams_.front().get();
 }
 
@@ -88,10 +94,12 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
-void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                                    absl::string_view) {
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
             *headers);
   ASSERT(!remote_closed_);
+  encoded_response_headers_ = true;
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
   // At present, the router cleans up stream state as soon as the remote is closed, making a
@@ -115,7 +123,7 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   closeLocal(end_stream);
 }
 
-void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
+void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   ENVOY_LOG(debug, "async http request response trailers:\n{}", *trailers);
   ASSERT(!remote_closed_);
   stream_callbacks_.onTrailers(std::move(trailers));
@@ -125,12 +133,12 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
   closeLocal(true);
 }
 
-void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
-  if (Http::Headers::get().MethodValues.Head == headers.Method()->value().getStringView()) {
+void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
+  if (Http::Headers::get().MethodValues.Head == headers.getMethodValue()) {
     is_head_request_ = true;
   }
 
-  is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+  is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
   headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
@@ -159,7 +167,7 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   closeLocal(end_stream);
 }
 
-void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
+void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
   // See explanation in sendData.
   if (local_closed_) {
     return;
@@ -230,11 +238,10 @@ void AsyncStreamImpl::resetStream() {
   cleanup();
 }
 
-AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
+AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
                                    const AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
-
   if (nullptr != options.parent_span_) {
     const std::string child_span_name =
         options.child_span_name_.empty()
@@ -245,66 +252,70 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
   }
+  child_span_->setSampled(options.sampled_);
 }
 
 void AsyncRequestImpl::initialize() {
-  sendHeaders(request_->headers(), !request_->body());
-  if (request_->body()) {
+  child_span_->injectContext(request_->headers());
+  sendHeaders(request_->headers(), request_->body().length() == 0);
+  if (request_->body().length() != 0) {
     // It's possible this will be a no-op due to a local response synchronously generated in
     // sendHeaders; guards handle this within AsyncStreamImpl.
-    sendData(*request_->body(), true);
+    sendData(request_->body(), true);
   }
   // TODO(mattklein123): Support request trailers.
 }
 
 void AsyncRequestImpl::onComplete() {
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
+
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
                                                    response_->trailers(), streamInfo(),
                                                    Tracing::EgressConfig::get());
 
-  callbacks_.onSuccess(std::move(response_));
+  callbacks_.onSuccess(*this, std::move(response_));
 }
 
-void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
+void AsyncRequestImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   streamInfo().response_code_ = response_code;
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 
 void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
-  if (!response_->body()) {
-    response_->body() = std::make_unique<Buffer::OwnedImpl>();
-  }
   streamInfo().addBytesReceived(data.length());
-  response_->body()->move(data);
+  response_->body().move(data);
 }
 
-void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
+void AsyncRequestImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
 }
 
 void AsyncRequestImpl::onReset() {
   if (!cancelled_) {
-    // Add tags about reset.
-    child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    // Set "error reason" tag related to reset. The tagging for "error true" is done inside the
+    // Tracing::HttpTracerUtility::finalizeUpstreamSpan.
     child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
   }
 
-  // Finalize the span based on whether we received a response or not
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_,
+                                          remoteClosed() ? &response_->headers() : nullptr);
+
+  // Finalize the span based on whether we received a response or not.
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(
       *child_span_, remoteClosed() ? &response_->headers() : nullptr,
       remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
 
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.
-    callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+    callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
   }
 }
 
 void AsyncRequestImpl::cancel() {
   cancelled_ = true;
 
-  // Add tags about the cancellation
+  // Add tags about the cancellation.
   child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
 
   reset();

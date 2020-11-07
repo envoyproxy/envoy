@@ -1,5 +1,7 @@
 #include "common/grpc/async_client_impl.h"
 
+#include "envoy/config/core/v3/grpc_service.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
@@ -11,10 +13,12 @@ namespace Envoy {
 namespace Grpc {
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
-                                 const envoy::api::v2::core::GrpcService& config,
+                                 const envoy::config::core::v3::GrpcService& config,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
-      initial_metadata_(config.initial_metadata()), time_source_(time_source) {}
+      host_name_(config.envoy_grpc().authority()), time_source_(time_source),
+      metadata_parser_(
+          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -29,14 +33,14 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
                                        const Http::AsyncClient::RequestOptions& options) {
   auto* const async_request = new AsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
-  std::unique_ptr<AsyncStreamImpl> grpc_stream{async_request};
+  AsyncStreamImplPtr grpc_stream{async_request};
 
   grpc_stream->initialize(true);
   if (grpc_stream->hasResetStream()) {
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(grpc_stream), active_streams_);
   return async_request;
 }
 
@@ -52,7 +56,7 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(grpc_stream), active_streams_);
   return active_streams_.front().get();
 }
 
@@ -81,32 +85,35 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 
   // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
-  headers_message_ =
-      Common::prepareHeaders(parent_.remote_cluster_name_, service_full_name_, method_name_,
-                             absl::optional<std::chrono::milliseconds>(options_.timeout));
+  headers_message_ = Common::prepareHeaders(
+      parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
+      service_full_name_, method_name_, options_.timeout);
   // Fill service-wide initial metadata.
-  for (const auto& header_value : parent_.initial_metadata_) {
-    headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
-                                        header_value.value());
-  }
+  parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
+                                            options_.parent_context.stream_info);
+
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }
 
 // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
-void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
-  callbacks_.onReceiveInitialMetadata(end_stream ? std::make_unique<Http::HeaderMapImpl>()
+  callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
                                                  : std::move(headers));
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
     if (end_stream && grpc_status) {
-      // There is actually no use-after-move problem here,
-      // because it will only be executed when end_stream is equal to true.
-      onTrailers(std::move(headers)); // NOLINT(bugprone-use-after-move)
+      // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
+      // we can potentially optimize in the future.
+
+      // TODO(mattklein123): clang-tidy is showing a use after move when passing to
+      // onReceiveInitialMetadata() above. This looks like an actual bug that I will fix in a
+      // follow up.
+      onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }
     // Technically this should be
@@ -117,7 +124,9 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     return;
   }
   if (end_stream) {
-    onTrailers(std::move(headers));
+    // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
+    // we can potentially optimize in the future.
+    onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
   }
 }
 
@@ -147,7 +156,7 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
 
 // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
-void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
+void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   auto grpc_status = Common::getGrpcStatus(*trailers);
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
   callbacks_.onReceiveTrailingMetadata(std::move(trailers));
@@ -159,7 +168,7 @@ void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::string& message) {
-  callbacks_.onReceiveTrailingMetadata(std::make_unique<Http::HeaderMapImpl>());
+  callbacks_.onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
   callbacks_.onRemoteClose(grpc_status, message);
   resetStream();
 }
@@ -235,19 +244,19 @@ void AsyncRequestImpl::cancel() {
   this->resetStream();
 }
 
-void AsyncRequestImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
+void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   current_span_->injectContext(metadata);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 
-void AsyncRequestImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&&) {}
+void AsyncRequestImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {}
 
 bool AsyncRequestImpl::onReceiveMessageRaw(Buffer::InstancePtr&& response) {
   response_ = std::move(response);
   return true;
 }
 
-void AsyncRequestImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&&) {}
+void AsyncRequestImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) {}
 
 void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));

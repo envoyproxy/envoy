@@ -19,22 +19,21 @@ TEST(Hash, djb2CaseInsensitiveHash) {
   EXPECT_EQ(5381U, HashUtil::djb2CaseInsensitiveHash(""));
 }
 
-TEST(Hash, murmurHash2_64) {
-  EXPECT_EQ(9631199822919835226U, MurmurHash::murmurHash2_64("foo"));
-  EXPECT_EQ(11474628671133349555U, MurmurHash::murmurHash2_64("bar"));
-  EXPECT_EQ(16306510975912980159U, MurmurHash::murmurHash2_64("foo\nbar"));
-  EXPECT_EQ(12847078931730529320U, MurmurHash::murmurHash2_64("lyft"));
-  EXPECT_EQ(6142509188972423790U, MurmurHash::murmurHash2_64(""));
+TEST(Hash, murmurHash2) {
+  EXPECT_EQ(9631199822919835226U, MurmurHash::murmurHash2("foo"));
+  EXPECT_EQ(11474628671133349555U, MurmurHash::murmurHash2("bar"));
+  EXPECT_EQ(16306510975912980159U, MurmurHash::murmurHash2("foo\nbar"));
+  EXPECT_EQ(12847078931730529320U, MurmurHash::murmurHash2("lyft"));
+  EXPECT_EQ(6142509188972423790U, MurmurHash::murmurHash2(""));
 }
 
 #if __GLIBCXX__ >= 20130411 && __GLIBCXX__ <= 20180726
 TEST(Hash, stdhash) {
-  EXPECT_EQ(std::hash<std::string>()(std::string("foo")), MurmurHash::murmurHash2_64("foo"));
-  EXPECT_EQ(std::hash<std::string>()(std::string("bar")), MurmurHash::murmurHash2_64("bar"));
-  EXPECT_EQ(std::hash<std::string>()(std::string("foo\nbar")),
-            MurmurHash::murmurHash2_64("foo\nbar"));
-  EXPECT_EQ(std::hash<std::string>()(std::string("lyft")), MurmurHash::murmurHash2_64("lyft"));
-  EXPECT_EQ(std::hash<std::string>()(std::string("")), MurmurHash::murmurHash2_64(""));
+  EXPECT_EQ(std::hash<std::string>()(std::string("foo")), MurmurHash::murmurHash2("foo"));
+  EXPECT_EQ(std::hash<std::string>()(std::string("bar")), MurmurHash::murmurHash2("bar"));
+  EXPECT_EQ(std::hash<std::string>()(std::string("foo\nbar")), MurmurHash::murmurHash2("foo\nbar"));
+  EXPECT_EQ(std::hash<std::string>()(std::string("lyft")), MurmurHash::murmurHash2("lyft"));
+  EXPECT_EQ(std::hash<std::string>()(std::string("")), MurmurHash::murmurHash2(""));
 }
 #endif
 

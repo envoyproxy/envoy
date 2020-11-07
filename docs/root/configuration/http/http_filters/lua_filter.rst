@@ -17,19 +17,21 @@ and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Beca
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
 <https://luajit.org/extensions.html>`_ for more details.
 
-The filter only supports loading Lua code in-line in the configuration. If local filesystem code
-is desired, a trivial in-line script can be used to load the rest of the code from the local
-environment.
+.. note::
+
+  `moonjit <https://github.com/moonjit/moonjit/>`_ is a continuation of LuaJIT development, which
+  supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
+  by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
 
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
-  there is no truly global data. Any globals create and populated at load time will be visible
+  there is no truly global data. Any globals created and populated at load time will be visible
   from each worker thread in isolation. True global support may be added via an API in the future.
 * All scripts are run as coroutines. This means that they are written in a synchronous style even
   though they may perform complex asynchronous tasks. This makes the scripts substantially easier
   to write. All network/async processing is performed by Envoy via a set of APIs. Envoy will
-  yield the script as appropriate and resume it when async tasks are complete.
+  suspend execution of the script as appropriate and resume it when async tasks are complete.
 * **Do not perform blocking operations from scripts.** It is critical for performance that
   Envoy APIs are used for all IO.
 
@@ -54,8 +56,109 @@ API.
 Configuration
 -------------
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
-* This filter should be configured with the name *envoy.lua*.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
+* This filter should be configured with the name *envoy.filters.http.lua*.
+
+A simple example of configuring Lua HTTP filter that contains only :ref:`inline_code
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` is as follow:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    inline_code: |
+      -- Called on the request path.
+      function envoy_on_request(request_handle)
+        -- Do something.
+      end
+      -- Called on the response path.
+      function envoy_on_response(response_handle)
+        -- Do something.
+      end
+
+By default, Lua script defined in ``inline_code`` will be treated as a ``GLOBAL`` script. Envoy will
+execute it for every HTTP request.
+
+Per-Route Configuration
+-----------------------
+
+The Lua HTTP filter also can be disabled or overridden on a per-route basis by providing a
+:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration
+on the virtual host, route, or weighted cluster.
+
+LuaPerRoute provides two ways of overriding the `GLOBAL` Lua script:
+
+* By providing a name reference to the defined :ref:`named Lua source codes map
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
+* By providing inline :ref:`source code
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` (This allows the
+  code to be sent through RDS).
+
+As a concrete example, given the following Lua filter configuration:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    inline_code: |
+      function envoy_on_request(request_handle)
+        -- do something
+      end
+    source_codes:
+      hello.lua:
+        inline_string: |
+          function envoy_on_request(request_handle)
+            request_handle:logInfo("Hello World.")
+          end
+      bye.lua:
+        inline_string: |
+          function envoy_on_response(response_handle)
+            response_handle:logInfo("Bye Bye.")
+          end
+
+The HTTP Lua filter can be disabled on some virtual host, route, or weighted cluster by the
+:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration as
+follow:
+
+.. code-block:: yaml
+
+  typed_per_filter_config:
+    envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      disabled: true
+
+We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
+The ``GLOBAL`` Lua script will be overridden by the referenced script:
+
+.. code-block:: yaml
+
+  typed_per_filter_config:
+    envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      name: hello.lua
+
+.. attention::
+
+  The name ``GLOBAL`` is reserved for :ref:`Lua.inline_code
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use
+  ``GLOBAL`` as name for other Lua scripts.
+
+Or we can define a new Lua script in the LuaPerRoute configuration directly to override the `GLOBAL`
+Lua script as follows:
+
+.. code-block:: yaml
+
+  typed_per_filter_config:
+    envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      source_code:
+        inline_string: |
+          function envoy_on_response(response_handle)
+            response_handle:logInfo("Goodbye.")
+          end
+
 
 Script examples
 ---------------
@@ -74,7 +177,7 @@ more details on the supported API.
 
   -- Called on the response path.
   function envoy_on_response(response_handle)
-    -- Wait for the entire response body and a response header with the body size.
+    -- Wait for the entire response body and add a response header with the body size.
     response_handle:headers():add("response_body_size", response_handle:body():length())
     -- Remove a response header named 'foo'
     response_handle:headers():remove("foo")
@@ -123,6 +226,54 @@ more details on the supported API.
       "nope")
   end
 
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Log information about the request
+    request_handle:logInfo("Authority: "..request_handle:headers():get(":authority"))
+    request_handle:logInfo("Method: "..request_handle:headers():get(":method"))
+    request_handle:logInfo("Path: "..request_handle:headers():get(":path"))
+  end
+
+  function envoy_on_response(response_handle)
+    -- Log response status code
+    response_handle:logInfo("Status: "..response_handle:headers():get(":status"))
+  end
+
+A common use-case is to rewrite upstream response body, for example: an upstream sends non-2xx
+response with JSON data, but the application requires HTML page to be sent to browsers.
+
+There are two ways of doing this, the first one is via the `body()` API.
+
+.. code-block:: lua
+
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body():setBytes("<html><b>Not Found<b></html>")
+      response_handle:headers():replace("content-length", content_length)
+      response_handle:headers():replace("content-type", "text/html")
+    end
+
+
+Or, through `bodyChunks()` API, which let Envoy to skip buffering the upstream response data.
+
+.. code-block:: lua
+
+    function envoy_on_response(response_handle)
+
+      -- Sets the content-length.
+      response_handle:headers():replace("content-length", 28)
+      response_handle:headers():replace("content-type", "text/html")
+
+      local last
+      for chunk in response_handle:bodyChunks() do
+        -- Clears each received chunk.
+        chunk:setBytes("")
+        last = chunk
+      end
+
+      last:setBytes("<html><b>Not Found<b></html>")
+    end
+
 .. _config_http_filters_lua_stream_handle_api:
 
 Complete example
@@ -145,8 +296,9 @@ script defines:
   end
 
 A script can define either or both of these functions. During the request path, Envoy will
-run *envoy_on_request* as a coroutine, passing an API handle. During the response path, Envoy will
-run *envoy_on_response* as a coroutine, passing an API handle.
+run *envoy_on_request* as a coroutine, passing a handle to the request API. During the
+response path, Envoy will run *envoy_on_response* as a coroutine, passing handle to the
+response API.
 
 .. attention::
 
@@ -161,7 +313,7 @@ headers()
 
 .. code-block:: lua
 
-  headers = handle:headers()
+  local headers = handle:headers()
 
 Returns the stream's headers. The headers can be modified as long as they have not been sent to
 the next filter in the header chain. For example, they can be modified after an *httpCall()* or
@@ -175,11 +327,12 @@ body()
 
 .. code-block:: lua
 
-  body = handle:body()
+  local body = handle:body()
 
-Returns the stream's body. This call will cause Envoy to yield the script until the entire body
-has been buffered. Note that all buffering must adhere to the flow control policies in place.
-Envoy will not buffer more data than is allowed by the connection manager.
+Returns the stream's body. This call will cause Envoy to suspend execution of the script until
+the entire body has been received in a buffer. Note that all buffering must adhere to the
+flow-control policies in place. Envoy will not buffer more data than is allowed by the connection
+manager.
 
 Returns a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
 
@@ -188,11 +341,11 @@ bodyChunks()
 
 .. code-block:: lua
 
-  iterator = handle:bodyChunks()
+  local iterator = handle:bodyChunks()
 
 Returns an iterator that can be used to iterate through all received body chunks as they arrive.
-Envoy will yield the script in between chunks, but *will not buffer* them. This can be used by
-a script to inspect data as it is streaming by.
+Envoy will suspend executing the script in between chunks, but *will not buffer* them. This can be
+used by a script to inspect data as it is streaming by.
 
 .. code-block:: lua
 
@@ -207,7 +360,7 @@ trailers()
 
 .. code-block:: lua
 
-  trailers = handle:trailers()
+  local trailers = handle:trailers()
 
 Returns the stream's trailers. May return nil if there are no trailers. The trailers may be
 modified before they are sent to the next filter.
@@ -233,13 +386,16 @@ httpCall()
 
 .. code-block:: lua
 
-  headers, body = handle:httpCall(cluster, headers, body, timeout)
+  local headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
 
-Makes an HTTP call to an upstream host. Envoy will yield the script until the call completes or
-has an error. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
+Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
 the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
 data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
+
+*asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
+regardless of the response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
+until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.
@@ -252,7 +408,7 @@ respond()
   handle:respond(headers, body)
 
 Respond immediately and do not continue further filter iteration. This call is *only valid in
-the request flow*. Additionally, a response is only possible if request headers have not yet been
+the request flow*. Additionally, a response is only possible if the request headers have not yet been
 passed to subsequent filters. Meaning, the following Lua code is invalid:
 
 .. code-block:: lua
@@ -274,17 +430,17 @@ metadata()
 
 .. code-block:: lua
 
-  metadata = handle:metadata()
+  local metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
-under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
-:ref:`route entry <envoy_api_msg_route.Route>`.
+under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
+:ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
 .. code-block:: yaml
 
   metadata:
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         foo: bar
         baz:
           - bad
@@ -297,7 +453,7 @@ streamInfo()
 
 .. code-block:: lua
 
-  streamInfo = handle:streamInfo()
+  local streamInfo = handle:streamInfo()
 
 Returns :repo:`information <include/envoy/stream_info/stream_info.h>` related to the current request.
 
@@ -308,7 +464,7 @@ connection()
 
 .. code-block:: lua
 
-  connection = handle:connection()
+  local connection = handle:connection()
 
 Returns the current request's underlying :repo:`connection <include/envoy/network/connection.h>`.
 
@@ -319,7 +475,7 @@ importPublicKey()
 
 .. code-block:: lua
 
-  pubkey = handle:importPublicKey(keyder, keyderLength)
+  local pubkey = handle:importPublicKey(keyder, keyderLength)
 
 Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature.
 
@@ -330,15 +486,25 @@ verifySignature()
 
 .. code-block:: lua
 
-  ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
+  local ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
 
-Verify signature using provided parameters. *hashFunction* is the variable for hash function which be used
+Verify signature using provided parameters. *hashFunction* is the variable for the hash function which be used
 for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported.
 *pubkey* is the public key. *signature* is the signature to be verified. *signatureLength* is
 the length of the signature. *data* is the content which will be hashed. *dataLength* is the length of data.
 
 The function returns a pair. If the first element is *true*, the second element will be empty
 which means signature is verified; otherwise, the second element will store the error message.
+
+.. _config_http_filters_lua_stream_handle_api_base64_escape:
+
+base64Escape()
+^^^^^^^^^^^^^^
+.. code-block:: lua
+
+  local base64_encoded = handle:base64Escape("input string")
+
+Encodes the input string as base64. This can be useful for escaping binary data.
 
 .. _config_http_filters_lua_header_wrapper:
 
@@ -378,9 +544,9 @@ that supplies the header value.
 
 .. attention::
 
-  In the currently implementation, headers cannot be modified during iteration. Additionally, if
-  it is desired to modify headers after iteration, the iteration must be completed. Meaning, do
-  not use `break` or any other mechanism to exit the loop early. This may be relaxed in the future.
+  In the current implementation, headers cannot be modified during iteration. Additionally, if
+  it is necessary to modify headers after an iteration, the iteration must first be completed. This means that
+  `break` or any other way to exit the loop early must not be used. This may be more flexible in the future.
 
 remove()
 ^^^^^^^^
@@ -411,7 +577,7 @@ length()
 
 .. code-block:: lua
 
-  size = buffer:length()
+  local size = buffer:length()
 
 Gets the size of the buffer in bytes. Returns an integer.
 
@@ -426,6 +592,17 @@ Get bytes from the buffer. By default Envoy will not copy all buffer bytes to Lu
 cause a buffer segment to be copied. *index* is an integer and supplies the buffer start index to
 copy. *length* is an integer and supplies the buffer length to copy. *index* + *length* must be
 less than the buffer length.
+
+.. _config_http_filters_lua_buffer_wrapper_api_set_bytes:
+
+setBytes()
+^^^^^^^^^^
+
+.. code-block:: lua
+
+  buffer:setBytes(string)
+
+Set the content of wrapped buffer with the input string.
 
 .. _config_http_filters_lua_metadata_wrapper:
 
@@ -452,7 +629,7 @@ __pairs()
   end
 
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
-key. *value* is *metadata* entry value.
+key. *value* is a *metadata* entry value.
 
 .. _config_http_filters_lua_stream_info_wrapper:
 
@@ -469,6 +646,26 @@ protocol()
 Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
 used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
 
+downstreamLocalAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamLocalAddress()
+
+Returns the string representation of :repo:`downstream remote address <include/envoy/stream_info/stream_info.h>`
+used by the current request.
+
+downstreamDirectRemoteAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamDirectRemoteAddress()
+
+Returns the string representation of :repo:`downstream directly connected address <include/envoy/stream_info/stream_info.h>`
+used by the current request. This is equivalent to the address of the physical connection.
+
 dynamicMetadata()
 ^^^^^^^^^^^^^^^^^
 
@@ -477,6 +674,17 @@ dynamicMetadata()
   streamInfo:dynamicMetadata()
 
 Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
+
+downstreamSslConnection()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamSslConnection()
+
+Returns :repo:`information <include/envoy/ssl/connection.h>` related to the current SSL connection.
+
+Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
 .. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
 
@@ -505,21 +713,21 @@ set()
 
 Sets key-value pair of a *filterName*'s metadata. *filterName* is a key specifying the target filter name,
 e.g. *envoy.lb*. The type of *key* is *string*. The type of *value* is any Lua type that can be mapped
-to a metadata value: *table*, *numeric*, *boolean*, *string* and *nil*. When using a *table* as an argument,
+to a metadata value: *table*, *numeric*, *boolean*, *string* or *nil*. When using a *table* as an argument,
 its keys can only be *string* or *numeric*.
 
 .. code-block:: lua
 
   function envoy_on_request(request_handle)
     local headers = request_handle:headers()
-    request_handle:streamInfo():dynamicMetadata():set("envoy.lua", "request.info", {
-      auth: headers:get("authorization),
+    request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
+      auth: headers:get("authorization"),
       token: headers:get("x-request-token"),
     })
   end
 
   function envoy_on_response(response_handle)
-    local meta = response_handle:streamInfo():dynamicMetadata()["request.info"]
+    local meta = response_handle:streamInfo():dynamicMetadata():get("envoy.filters.http.lua")["request.info"]
     response_handle:logInfo("Auth: "..meta.auth..", token: "..meta.token)
   end
 
@@ -533,7 +741,7 @@ __pairs()
   end
 
 Iterates through every *dynamicMetadata* entry. *key* is a string that supplies a *dynamicMetadata*
-key. *value* is *dynamicMetadata* entry value.
+key. *value* is a *dynamicMetadata* entry value.
 
 .. _config_http_filters_lua_connection_wrapper:
 
@@ -541,7 +749,7 @@ Connection object API
 ---------------------
 
 ssl()
-^^^^^^^^
+^^^^^
 
 .. code-block:: lua
 
@@ -554,6 +762,207 @@ ssl()
 Returns :repo:`SSL connection <include/envoy/ssl/connection.h>` object when the connection is
 secured and *nil* when it is not.
 
-.. note::
+Returns an :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
-  Currently the SSL connection object has no exposed APIs.
+.. _config_http_filters_lua_ssl_socket_info:
+
+SSL connection object API
+-------------------------
+
+peerCertificatePresented()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  if downstreamSslConnection:peerCertificatePresented() then
+    print("peer certificate is presented")
+  end
+
+Returns a bool representing whether the peer certificate is presented.
+
+peerCertificateValidated()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  if downstreamSslConnection:peerCertificateVaidated() then
+    print("peer certificate is valiedated")
+  end
+
+Returns bool whether the peer certificate was validated.
+
+uriSanLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  -- For example, uriSanLocalCertificate contains {"san1", "san2"}
+  local certs = downstreamSslConnection:uriSanLocalCertificate()
+
+  -- The following prints san1,san2
+  handle:logTrace(table.concat(certs, ","))
+
+Returns the URIs (as a table) in the SAN field of the local certificate. Returns an empty table if
+there is no local certificate, or no SAN field, or no URI SAN entries.
+
+sha256PeerCertificateDigest()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sha256PeerCertificateDigest()
+
+Returns the SHA256 digest of the peer certificate. Returns ``""`` if there is no peer certificate
+which can happen in TLS (non-mTLS) connections.
+
+serialNumberPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:serialNumberPeerCertificate()
+
+Returns the serial number field of the peer certificate. Returns ``""`` if there is no peer
+certificate, or no serial number.
+
+issuerPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:issuerPeerCertificate()
+
+Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
+peer certificate, or no issuer.
+
+subjectPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:subjectPeerCertificate()
+
+Return the subject field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
+peer certificate, or no subject.
+
+uriSanPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:uriSanPeerCertificate()
+
+Returns the URIs (as a table) in the SAN field of the peer certificate. Returns an empty table if
+there is no peer certificate, or no SAN field, or no URI SAN entries.
+
+subjectLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:subjectLocalCertificate()
+
+Returns the subject field of the local certificate in RFC 2253 format. Returns ``""`` if there is no
+local certificate, or no subject.
+
+urlEncodedPemEncodedPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificate()
+
+Returns the URL-encoded PEM-encoded representation of the peer certificate. Returns ``""`` if there
+is no peer certificate or encoding fails.
+
+urlEncodedPemEncodedPeerCertificateChain()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
+
+Returnns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
+leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails.
+
+dnsSansPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:dnsSansPeerCertificate()
+
+Returns the DNS entries (as a table) in the SAN field of the peer certificate. Returns an empty
+table if there is no peer certificate, or no SAN field, or no DNS SAN entries.
+
+dnsSansLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:dnsSansLocalCertificate()
+
+Returns the DNS entries (as a table) in the SAN field of the local certificate. Returns an empty
+table if there is no local certificate, or no SAN field, or no DNS SAN entries.
+
+validFromPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:validFromPeerCertificate()
+
+Returns the time (timestamp-since-epoch in seconds) that the peer certificate was issued and should
+be considered valid from. Returns ``0`` if there is no peer certificate.
+
+In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
+
+expirationPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:validFromPeerCertificate()
+
+Returns the time (timestamp-since-epoch in seconds) that the peer certificate expires and should not
+be considered valid after. Returns ``0`` if there is no peer certificate.
+
+In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
+
+sessionId()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sessionId()
+
+Returns the hex-encoded TLS session ID as defined in RFC 5246.
+
+ciphersuiteId()
+^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:ciphersuiteId()
+
+Returns the standard ID (hex-encoded) for the ciphers used in the established TLS connection.
+Returns ``"0xffff"`` if there is no current negotiated ciphersuite.
+
+ciphersuiteString()
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:ciphersuiteString()
+
+Returns the OpenSSL name for the set of ciphers used in the established TLS connection. Returns
+``""`` if there is no current negotiated ciphersuite.
+
+tlsVersion()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
+
+Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS connection.

@@ -1,7 +1,7 @@
 #include "extensions/access_loggers/grpc/tcp_config.h"
 
-#include "envoy/config/accesslog/v2/als.pb.validate.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -26,16 +26,17 @@ TcpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
                                                  Server::Configuration::FactoryContext& context) {
   GrpcCommon::validateProtoDescriptors();
 
-  const auto& proto_config =
-      MessageUtil::downcastAndValidate<const envoy::config::accesslog::v2::TcpGrpcAccessLogConfig&>(
-          config, context.messageValidationVisitor());
+  const auto& proto_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig&>(
+      config, context.messageValidationVisitor());
 
   return std::make_shared<TcpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
-                                            GrpcCommon::getGrpcAccessLoggerCacheSingleton(context));
+                                            GrpcCommon::getGrpcAccessLoggerCacheSingleton(context),
+                                            context.scope());
 }
 
 ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::accesslog::v2::TcpGrpcAccessLogConfig>();
+  return std::make_unique<envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig>();
 }
 
 std::string TcpGrpcAccessLogFactory::name() const { return AccessLogNames::get().TcpGrpc; }
@@ -43,7 +44,8 @@ std::string TcpGrpcAccessLogFactory::name() const { return AccessLogNames::get()
 /**
  * Static registration for the TCP gRPC access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(TcpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory);
+REGISTER_FACTORY(TcpGrpcAccessLogFactory,
+                 Server::Configuration::AccessLogInstanceFactory){"envoy.tcp_grpc_access_log"};
 
 } // namespace TcpGrpc
 } // namespace AccessLoggers

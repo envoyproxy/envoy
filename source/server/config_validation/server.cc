@@ -2,16 +2,15 @@
 
 #include <memory>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "common/common/utility.h"
-#include "common/common/version.h"
 #include "common/config/utility.h"
 #include "common/event/real_time_system.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
+#include "common/version/version.h"
 
 #include "server/ssl_context_manager.h"
 
@@ -43,15 +42,17 @@ ValidationInstance::ValidationInstance(
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
     Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields()),
-      stats_store_(store),
-      api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
-      dispatcher_(api_->allocateDispatcher()),
+                                             !options.rejectUnknownDynamicFields(),
+                                             !options.ignoreUnknownDynamicFields()),
+      stats_store_(store), api_(new Api::ValidationImpl(thread_factory, store, time_system,
+                                                        file_system, random_generator_)),
+      dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system), server_context_(*this) {
+      http_context_(stats_store_.symbolTable()), time_system_(time_system),
+      server_contexts_(*this) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -75,13 +76,13 @@ void ValidationInstance::initialize(const Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap);
 
-  bootstrap.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap.node(), local_address, options.serviceZone(), options.serviceClusterName(),
@@ -93,17 +94,16 @@ void ValidationInstance::initialize(const Options& options,
       messageValidationContext().staticValidationVisitor(), *api_);
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
-  runtime_loader_ = component_factory.createRuntime(*this, initial_config);
+  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+      component_factory.createRuntime(*this, initial_config));
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
-  ssl_context_manager_ =
-      createContextManager(Ssl::ContextManagerFactory::name(), api_->timeSource());
+  ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      accessLogManager(), singletonManager(), time_system_);
+      admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
+      localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
+      grpc_context_, accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
-  runtime_loader_->initialize(clusterManager());
-  http_context_.setTracer(config_.httpTracer());
+  runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
 

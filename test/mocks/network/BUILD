@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -17,6 +17,27 @@ envoy_cc_mock(
         "//source/common/network:filter_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
+
+envoy_cc_mock(
+    name = "io_handle_mocks",
+    srcs = ["io_handle.cc"],
+    hdrs = ["io_handle.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:io_handle_interface",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "socket_mocks",
+    srcs = ["socket.cc"],
+    hdrs = ["socket.h"],
+    deps = [
+        ":io_handle_mocks",
+        "//include/envoy/network:socket_interface",
     ],
 )
 
@@ -40,7 +61,7 @@ envoy_cc_mock(
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

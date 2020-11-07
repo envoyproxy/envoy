@@ -1,5 +1,4 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_python//python:defs.bzl", "py_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
@@ -8,13 +7,15 @@ load(
     "envoy_py_test_binary",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 exports_files([
     "gen_git_sha.sh",
-    "check_format.py",
-    "header_order.py",
-    "envoy_build_fixer.py",
+    "code_format/check_format.py",
+    "code_format/header_order.py",
+    "code_format/envoy_build_fixer.py",
     "check_repositories.sh",
 ])
 
@@ -23,6 +24,14 @@ envoy_py_test_binary(
     srcs = [
         "socket_passing.py",
     ],
+)
+
+py_library(
+    name = "run_command",
+    srcs = [
+        "run_command.py",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 envoy_cc_binary(

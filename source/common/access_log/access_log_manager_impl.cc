@@ -5,14 +5,23 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
-#include "common/common/stack_array.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace AccessLog {
 
+AccessLogManagerImpl::~AccessLogManagerImpl() {
+  for (auto& [log_key, log_file_ptr] : access_logs_) {
+    ENVOY_LOG(debug, "destroying access logger {}", log_key);
+    log_file_ptr.reset();
+  }
+  ENVOY_LOG(debug, "destroyed access loggers");
+}
+
 void AccessLogManagerImpl::reopen() {
-  for (auto& access_log : access_logs_) {
-    access_log.second->reopen();
+  for (auto& iter : access_logs_) {
+    iter.second->reopen();
   }
 }
 
@@ -83,9 +92,7 @@ AccessLogFileImpl::~AccessLogFileImpl() {
 }
 
 void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
-  uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  buffer.getRawSlices(slices.begin(), num_slices);
+  Buffer::RawSliceVector slices = buffer.getRawSlices();
 
   // We must do the actual writes to disk under lock, so that we don't intermix chunks from
   // different AccessLogFileImpl pointing to the same underlying file. This can happen either via
@@ -196,7 +203,8 @@ void AccessLogFileImpl::write(absl::string_view data) {
 }
 
 void AccessLogFileImpl::createFlushStructures() {
-  flush_thread_ = thread_factory_.createThread([this]() -> void { flushThreadFunc(); });
+  flush_thread_ = thread_factory_.createThread([this]() -> void { flushThreadFunc(); },
+                                               Thread::Options{"AccessLogFlush"});
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 

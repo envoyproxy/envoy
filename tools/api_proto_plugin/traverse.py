@@ -50,12 +50,14 @@ def TraverseMessage(type_context, msg_proto, visitor):
       if nested_msg.options.map_entry
   }
   nested_msgs = [
-      TraverseMessage(type_context.ExtendNestedMessage(index, nested_msg.name), nested_msg, visitor)
-      for index, nested_msg in enumerate(msg_proto.nested_type)
+      TraverseMessage(
+          type_context.ExtendNestedMessage(index, nested_msg.name, nested_msg.options.deprecated),
+          nested_msg, visitor) for index, nested_msg in enumerate(msg_proto.nested_type)
   ]
   nested_enums = [
-      TraverseEnum(type_context.ExtendNestedEnum(index, nested_enum.name), nested_enum, visitor)
-      for index, nested_enum in enumerate(msg_proto.enum_type)
+      TraverseEnum(
+          type_context.ExtendNestedEnum(index, nested_enum.name, nested_enum.options.deprecated),
+          nested_enum, visitor) for index, nested_enum in enumerate(msg_proto.enum_type)
   ]
   return visitor.VisitMessage(msg_proto, type_context, nested_msgs, nested_enums)
 
@@ -77,11 +79,11 @@ def TraverseFile(file_proto, visitor):
       for index, service in enumerate(file_proto.service)
   ]
   msgs = [
-      TraverseMessage(package_type_context.ExtendMessage(index, msg.name), msg, visitor)
-      for index, msg in enumerate(file_proto.message_type)
+      TraverseMessage(package_type_context.ExtendMessage(index, msg.name, msg.options.deprecated),
+                      msg, visitor) for index, msg in enumerate(file_proto.message_type)
   ]
   enums = [
-      TraverseEnum(package_type_context.ExtendEnum(index, enum.name), enum, visitor)
-      for index, enum in enumerate(file_proto.enum_type)
+      TraverseEnum(package_type_context.ExtendEnum(index, enum.name, enum.options.deprecated), enum,
+                   visitor) for index, enum in enumerate(file_proto.enum_type)
   ]
   return visitor.VisitFile(file_proto, package_type_context, services, msgs, enums)

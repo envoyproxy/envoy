@@ -1,6 +1,6 @@
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
@@ -15,14 +15,13 @@ public:
   TransportSockeMatchIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::HTTP_PROXY_CONFIG),
-        num_hosts_{2} {
+                            ConfigHelper::httpProxyConfig()) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
@@ -33,7 +32,7 @@ name: "tls_socket"
 match:
   mtlsReady: "true"
 transport_socket:
-  name: "tls"
+  name: tls
   typed_config:
     "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
     common_tls_context:
@@ -47,7 +46,7 @@ transport_socket:
         TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
       }
       // Setup the client Envoy TLS config.
-      cluster->clear_hosts();
+      cluster->clear_load_assignment();
       auto* load_assignment = cluster->mutable_load_assignment();
       load_assignment->set_cluster_name(cluster->name());
       auto* endpoints = load_assignment->add_endpoints();
@@ -72,7 +71,7 @@ transport_socket:
       }
     });
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
 
@@ -96,7 +95,7 @@ transport_socket:
     HttpIntegrationTest::initialize();
   }
 
-  void configureRoute(envoy::api::v2::route::Route* route, const std::string& host_type) {
+  void configureRoute(envoy::config::route::v3::Route* route, const std::string& host_type) {
     auto* match = route->mutable_match();
     match->set_prefix("/");
 
@@ -113,29 +112,6 @@ transport_socket:
         .set_string_value(host_type);
   };
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::api::v2::auth::DownstreamTlsContext tls_context;
-    const std::string yaml = absl::StrFormat(
-        R"EOF(
-common_tls_context:
-  tls_certificates:
-  - certificate_chain: { filename: "%s" }
-    private_key: { filename: "%s" }
-  validation_context:
-    trusted_ca: { filename: "%s" }
-require_client_certificate: true
-)EOF",
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    TestUtility::loadFromYaml(yaml, tls_context);
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
-    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
-  }
-
   bool isTLSUpstream(int index) { return index % 2 == 0; }
 
   void createUpstreams() override {
@@ -143,12 +119,12 @@ require_client_certificate: true
       auto endpoint = upstream_address_fn_(i);
       if (isTLSUpstream(i)) {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
-            createUpstreamSslContext(), endpoint->ip()->port(), FakeHttpConnection::Type::HTTP1,
-            endpoint->ip()->version(), timeSystem()));
+            HttpIntegrationTest::createUpstreamTlsContext(), endpoint->ip()->port(),
+            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
       } else {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem()));
+            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
       }
     }
   }
@@ -158,17 +134,17 @@ require_client_certificate: true
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   }
 
-  const uint32_t num_hosts_;
-  Http::TestHeaderMapImpl type_a_request_headers_{{":method", "GET"},
-                                                  {":path", "/test"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"x-type", "a"}};
-  Http::TestHeaderMapImpl type_b_request_headers_{{":method", "GET"},
-                                                  {":path", "/test"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"x-type", "b"}};
+  const uint32_t num_hosts_{2};
+  Http::TestRequestHeaderMapImpl type_a_request_headers_{{":method", "GET"},
+                                                         {":path", "/test"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"x-type", "a"}};
+  Http::TestRequestHeaderMapImpl type_b_request_headers_{{":method", "GET"},
+                                                         {":path", "/test"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"x-type", "b"}};
   const std::string host_type_header_{"x-host-type"};
   const std::string host_header_{"x-host"};
   const std::string type_header_{"x-type"};
@@ -183,10 +159,10 @@ TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextSucceed) {
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
     response->waitForEndStream();
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
     response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
     response->waitForEndStream();
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
 
@@ -198,10 +174,10 @@ TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextFailsWithoutSocketMatc
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
     response->waitForEndStream();
-    EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("503", response->headers().getStatusValue());
     response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
     response->waitForEndStream();
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
 } // namespace Envoy

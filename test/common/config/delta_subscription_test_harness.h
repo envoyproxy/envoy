@@ -2,15 +2,22 @@
 
 #include <queue>
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+
 #include "common/config/grpc_subscription_impl.h"
+#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/version_converter.h"
 #include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
+#include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
@@ -33,13 +40,14 @@ public:
         async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_));
-    grpc_mux_ = std::make_shared<GrpcMuxDelta>(
+    EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+    xds_context_ = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-        random_, stats_store_, rate_limit_settings_, local_info_, false);
+        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
+        local_info_);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        grpc_mux_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
-        init_fetch_timeout, false);
+        xds_context_, callbacks_, resource_decoder_, stats_,
+        Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
@@ -83,8 +91,8 @@ public:
                          const std::set<std::string>& unsubscribe, const Protobuf::int32 error_code,
                          const std::string& error_message,
                          std::map<std::string, std::string> initial_resource_versions) {
-    envoy::api::v2::DeltaDiscoveryRequest expected_request;
-    expected_request.mutable_node()->CopyFrom(node_);
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) expected_request;
+    expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(node_));
     std::copy(
         subscribe.begin(), subscribe.end(),
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_subscribe()));
@@ -110,7 +118,7 @@ public:
                 sendMessageRaw_(
                     Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
-          envoy::api::v2::DeltaDiscoveryRequest message;
+          API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
           EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
           const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {
@@ -121,22 +129,22 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    auto response = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_system_version_info(version);
     response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-    Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
+    Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
       if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
           last_cluster_names_.end()) {
-        envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
+        envoy::config::endpoint::v3::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(*load_assignment);
+        resource->mutable_resource()->PackFrom(API_DOWNGRADE(*load_assignment));
       }
     }
     Protobuf::RepeatedPtrField<std::string> removed_resources;
@@ -148,8 +156,8 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
-    auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(response));
+    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
+        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -186,17 +194,19 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
   Event::MockDispatcher dispatcher_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
-  std::shared_ptr<GrpcMux> grpc_mux_;
-  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
+  NewGrpcMuxImplSharedPtr xds_context_;
+  GrpcSubscriptionImplPtr subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
-  envoy::api::v2::core::Node node_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
+  envoy::config::core::v3::Node node_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};

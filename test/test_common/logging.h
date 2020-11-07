@@ -8,6 +8,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/synchronization/mutex.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -19,7 +20,7 @@ namespace Envoy {
  * The log_level is the minimum log severity required to print messages.
  * Messages below this loglevel will be suppressed.
  *
- * Note that during the scope of this object, command-line overrides, eg
+ * Note that during the scope of this object, command-line overrides, e.g.,
  * --log-level trace, will not take effect.
  *
  * Also note: instantiating this setter should only occur when the system is
@@ -34,6 +35,7 @@ public:
 
 private:
   std::vector<spdlog::level::level_enum> previous_levels_;
+  FancyLogLevelMap previous_fancy_levels_;
 };
 
 /**
@@ -48,7 +50,7 @@ private:
  */
 class LogRecordingSink : public Logger::SinkDelegate {
 public:
-  explicit LogRecordingSink(Logger::DelegatingLogSinkPtr log_sink);
+  explicit LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink);
   ~LogRecordingSink() override;
 
   // Logger::SinkDelegate
@@ -58,7 +60,8 @@ public:
   const std::vector<std::string>& messages() const { return messages_; }
 
 private:
-  std::vector<std::string> messages_;
+  absl::Mutex mtx_;
+  std::vector<std::string> messages_ ABSL_GUARDED_BY(mtx_);
 };
 
 using StringPair = std::pair<std::string, std::string>;
@@ -91,8 +94,8 @@ using ExpectedLogMessages = std::vector<StringPair>;
   do {                                                                                             \
     ASSERT_FALSE(expected_messages.empty()) << "Expected messages cannot be empty.";               \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    Envoy::Logger::DelegatingLogSinkPtr sink_ptr = Envoy::Logger::Registry::getSink();             \
-    sink_ptr->set_should_escape(escaped);                                                          \
+    Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
+    sink_ptr->setShouldEscape(escaped);                                                            \
     Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
     stmt;                                                                                          \
     if (log_recorder.messages().empty()) {                                                         \

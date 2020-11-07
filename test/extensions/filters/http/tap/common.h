@@ -19,15 +19,15 @@ public:
         createPerTapSinkHandleManager_(trace_id)};
   }
 
-  MOCK_METHOD1(createPerRequestTapper_, HttpPerRequestTapper*(uint64_t stream_id));
-  MOCK_METHOD1(createPerTapSinkHandleManager_,
-               Extensions::Common::Tap::PerTapSinkHandleManager*(uint64_t trace_id));
-  MOCK_CONST_METHOD0(maxBufferedRxBytes, uint32_t());
-  MOCK_CONST_METHOD0(maxBufferedTxBytes, uint32_t());
-  MOCK_CONST_METHOD0(createMatchStatusVector,
-                     Extensions::Common::Tap::Matcher::MatchStatusVector());
-  MOCK_CONST_METHOD0(rootMatcher, const Extensions::Common::Tap::Matcher&());
-  MOCK_CONST_METHOD0(streaming, bool());
+  MOCK_METHOD(HttpPerRequestTapper*, createPerRequestTapper_, (uint64_t stream_id));
+  MOCK_METHOD(Extensions::Common::Tap::PerTapSinkHandleManager*, createPerTapSinkHandleManager_,
+              (uint64_t trace_id));
+  MOCK_METHOD(uint32_t, maxBufferedRxBytes, (), (const));
+  MOCK_METHOD(uint32_t, maxBufferedTxBytes, (), (const));
+  MOCK_METHOD(Extensions::Common::Tap::Matcher::MatchStatusVector, createMatchStatusVector, (),
+              (const));
+  MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
+  MOCK_METHOD(bool, streaming, (), (const));
 };
 
 } // namespace TapFilter

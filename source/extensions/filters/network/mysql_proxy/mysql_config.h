@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/network/mysql_proxy/v1alpha1/mysql_proxy.pb.h"
-#include "envoy/config/filter/network/mysql_proxy/v1alpha1/mysql_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
+#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
@@ -15,14 +15,14 @@ namespace MySQLProxy {
 /**
  * Config registration for the MySQL proxy filter.
  */
-class MySQLConfigFactory : public Common::FactoryBase<
-                               envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy> {
+class MySQLConfigFactory
+    : public Common::FactoryBase<envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy> {
 public:
   MySQLConfigFactory() : FactoryBase(NetworkFilterNames::get().MySQLProxy) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy& proto_config,
+      const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 

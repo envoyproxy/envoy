@@ -10,11 +10,11 @@
 
 namespace epoll_server {
 
-#define EPOLL_LOG_IMPL(severity) QUIC_LOG_IMPL(severity)
-#define EPOLL_VLOG_IMPL(verbosity) QUIC_VLOG_IMPL(verbosity)
+#define EPOLL_LOG_IMPL(severity) QUICHE_LOG_IMPL(severity)
+#define EPOLL_VLOG_IMPL(verbosity) QUICHE_VLOG_IMPL(verbosity)
 
-#define EPOLL_PLOG_IMPL(severity) QUIC_PLOG_IMPL(severity)
+#define EPOLL_PLOG_IMPL(severity) QUICHE_PLOG_IMPL(severity)
 
-#define EPOLL_DVLOG_IMPL(verbosity) QUIC_DVLOG_IMPL(verbosity)
+#define EPOLL_DVLOG_IMPL(verbosity) QUICHE_DVLOG_IMPL(verbosity)
 
 } // namespace epoll_server

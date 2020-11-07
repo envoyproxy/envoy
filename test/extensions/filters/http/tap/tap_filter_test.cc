@@ -1,7 +1,9 @@
+#include "extensions/filters/http/tap/config.h"
 #include "extensions/filters/http/tap/tap_filter.h"
 
 #include "test/extensions/filters/http/tap/common.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -19,7 +21,7 @@ namespace {
 
 class MockFilterConfig : public FilterConfig {
 public:
-  MOCK_METHOD0(currentConfig, HttpTapConfigSharedPtr());
+  MOCK_METHOD(HttpTapConfigSharedPtr, currentConfig, ());
   FilterStats& stats() override { return stats_; }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -28,13 +30,13 @@ public:
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
 public:
-  MOCK_METHOD1(onRequestHeaders, void(const Http::HeaderMap& headers));
-  MOCK_METHOD1(onRequestBody, void(const Buffer::Instance& data));
-  MOCK_METHOD1(onRequestTrailers, void(const Http::HeaderMap& headers));
-  MOCK_METHOD1(onResponseHeaders, void(const Http::HeaderMap& headers));
-  MOCK_METHOD1(onResponseBody, void(const Buffer::Instance& data));
-  MOCK_METHOD1(onResponseTrailers, void(const Http::HeaderMap& headers));
-  MOCK_METHOD0(onDestroyLog, bool());
+  MOCK_METHOD(void, onRequestHeaders, (const Http::RequestHeaderMap& headers));
+  MOCK_METHOD(void, onRequestBody, (const Buffer::Instance& data));
+  MOCK_METHOD(void, onRequestTrailers, (const Http::RequestTrailerMap& headers));
+  MOCK_METHOD(void, onResponseHeaders, (const Http::ResponseHeaderMap& headers));
+  MOCK_METHOD(void, onResponseBody, (const Buffer::Instance& data));
+  MOCK_METHOD(void, onResponseTrailers, (const Http::ResponseTrailerMap& headers));
+  MOCK_METHOD(bool, onDestroyLog, ());
 };
 
 class TapFilterTest : public testing::Test {
@@ -70,20 +72,20 @@ TEST_F(TapFilterTest, NoConfig) {
   InSequence s;
   setup(false);
 
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   Buffer::OwnedImpl request_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
-  Http::TestHeaderMapImpl request_trailers;
+  Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(response_headers));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   Buffer::OwnedImpl response_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   Http::MetadataMap metadata;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata));
@@ -96,25 +98,25 @@ TEST_F(TapFilterTest, Config) {
   InSequence s;
   setup(true);
 
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(*http_per_request_tapper_, onRequestHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  Buffer::OwnedImpl request_body;
+  Buffer::OwnedImpl request_body("hello");
   EXPECT_CALL(*http_per_request_tapper_, onRequestBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
-  Http::TestHeaderMapImpl request_trailers;
+  Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_CALL(*http_per_request_tapper_, onRequestTrailers(_));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(response_headers));
   EXPECT_CALL(*http_per_request_tapper_, onResponseHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl response_body;
+  Buffer::OwnedImpl response_body("hello");
   EXPECT_CALL(*http_per_request_tapper_, onResponseBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_CALL(*http_per_request_tapper_, onResponseTrailers(_));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 
@@ -124,6 +126,51 @@ TEST_F(TapFilterTest, Config) {
 
   // Workaround InSequence/shared_ptr mock leak.
   EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(http_tap_config_.get()));
+}
+
+TEST(TapFilterConfigTest, InvalidProto) {
+  const std::string filter_config =
+      R"EOF(
+  common_config:
+    static_config:
+      match:
+        any_match: true
+      output_config:
+        sinks:
+          - format: JSON_BODY_AS_STRING
+            streaming_admin: {}
+)EOF";
+
+  envoy::extensions::filters::http::tap::v3::Tap config;
+  TestUtility::loadFromYaml(filter_config, config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TapFilterFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+                            EnvoyException,
+                            "Error: Specifying admin streaming output without configuring admin.");
+}
+
+TEST(TapFilterConfigTest, NeitherMatchNorMatchConfig) {
+  const std::string filter_config =
+      R"EOF(
+  common_config:
+    static_config:
+      output_config:
+        sinks:
+          - format: PROTO_BINARY
+            file_per_tap:
+              path_prefix: abc
+)EOF";
+
+  envoy::extensions::filters::http::tap::v3::Tap config;
+  TestUtility::loadFromYaml(filter_config, config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TapFilterFactory factory;
+
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+                            EnvoyException,
+                            fmt::format("Neither match nor match_config is set in TapConfig: {}",
+                                        config.common_config().static_config().DebugString()));
 }
 
 } // namespace

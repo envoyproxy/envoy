@@ -1,8 +1,9 @@
 #include "extensions/grpc_credentials/aws_iam/config.h"
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/grpc_credential/v2alpha/aws_iam.pb.validate.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/grpc_credential/v3/aws_iam.pb.h"
+#include "envoy/config/grpc_credential/v3/aws_iam.pb.validate.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
@@ -11,10 +12,10 @@
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 
-#include "extensions/filters/http/common/aws/credentials_provider_impl.h"
-#include "extensions/filters/http/common/aws/region_provider_impl.h"
-#include "extensions/filters/http/common/aws/signer_impl.h"
-#include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/aws/credentials_provider_impl.h"
+#include "extensions/common/aws/region_provider_impl.h"
+#include "extensions/common/aws/signer_impl.h"
+#include "extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,7 +23,7 @@ namespace GrpcCredentials {
 namespace AwsIam {
 
 std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChannelCredentials(
-    const envoy::api::v2::core::GrpcService& grpc_service_config, Api::Api& api) {
+    const envoy::config::core::v3::GrpcService& grpc_service_config, Api::Api& api) {
 
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
@@ -31,7 +32,8 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
   std::shared_ptr<grpc::CallCredentials> call_creds;
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {
-    case envoy::api::v2::core::GrpcService::GoogleGrpc::CallCredentials::kFromPlugin: {
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::CallCredentials::
+        CredentialSpecifierCase::kFromPlugin: {
       if (credential.from_plugin().name() == GrpcCredentialsNames::get().AwsIam) {
         AwsIamGrpcCredentialsFactory credentials_factory;
         // We don't deal with validation failures here at runtime today, see
@@ -41,12 +43,11 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
                 credential.from_plugin(), ProtobufMessage::getNullValidationVisitor(),
                 credentials_factory);
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
-            const envoy::config::grpc_credential::v2alpha::AwsIamConfig&>(
+            const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
-        auto credentials_provider =
-            std::make_shared<HttpFilters::Common::Aws::DefaultCredentialsProviderChain>(
-                api, HttpFilters::Common::Aws::Utility::metadataFetcher);
-        auto signer = std::make_unique<HttpFilters::Common::Aws::SignerImpl>(
+        auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
+            api, Common::Aws::Utility::metadataFetcher);
+        auto signer = std::make_unique<Common::Aws::SignerImpl>(
             config.service_name(), getRegion(config), credentials_provider, api.timeSource());
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<AwsIamHeaderAuthenticator>(std::move(signer)));
@@ -72,13 +73,12 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
 }
 
 std::string AwsIamGrpcCredentialsFactory::getRegion(
-    const envoy::config::grpc_credential::v2alpha::AwsIamConfig& config) {
-  std::unique_ptr<HttpFilters::Common::Aws::RegionProvider> region_provider;
+    const envoy::config::grpc_credential::v3::AwsIamConfig& config) {
+  Common::Aws::RegionProviderPtr region_provider;
   if (!config.region().empty()) {
-    region_provider =
-        std::make_unique<HttpFilters::Common::Aws::StaticRegionProvider>(config.region());
+    region_provider = std::make_unique<Common::Aws::StaticRegionProvider>(config.region());
   } else {
-    region_provider = std::make_unique<HttpFilters::Common::Aws::EnvironmentRegionProvider>();
+    region_provider = std::make_unique<Common::Aws::EnvironmentRegionProvider>();
   }
 
   if (!region_provider->getRegion().has_value()) {
@@ -129,18 +129,15 @@ AwsIamHeaderAuthenticator::buildMessageToSign(absl::string_view service_url,
 void AwsIamHeaderAuthenticator::signedHeadersToMetadata(
     const Http::HeaderMap& headers, std::multimap<grpc::string, grpc::string>& metadata) {
 
-  headers.iterate(
-      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        auto* md = static_cast<std::multimap<grpc::string, grpc::string>*>(context);
-        const auto& key = entry.key().getStringView();
-        // Skip pseudo-headers
-        if (key.empty() || key[0] == ':') {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        md->emplace(key, entry.value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &metadata);
+  headers.iterate([&metadata](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    const auto& key = entry.key().getStringView();
+    // Skip pseudo-headers
+    if (key.empty() || key[0] == ':') {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    metadata.emplace(key, entry.value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
 }
 
 REGISTER_FACTORY(AwsIamGrpcCredentialsFactory, Grpc::GoogleGrpcCredentialsFactory);

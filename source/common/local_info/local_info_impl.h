@@ -2,14 +2,17 @@
 
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/local_info/local_info.h"
+
+#include "common/config/version_converter.h"
 
 namespace Envoy {
 namespace LocalInfo {
 
 class LocalInfoImpl : public LocalInfo {
 public:
-  LocalInfoImpl(const envoy::api::v2::core::Node& node,
+  LocalInfoImpl(const envoy::config::core::v3::Node& node,
                 const Network::Address::InstanceConstSharedPtr& address,
                 absl::string_view zone_name, absl::string_view cluster_name,
                 absl::string_view node_name)
@@ -29,10 +32,10 @@ public:
   const std::string& zoneName() const override { return node_.locality().zone(); }
   const std::string& clusterName() const override { return node_.cluster(); }
   const std::string& nodeName() const override { return node_.id(); }
-  const envoy::api::v2::core::Node& node() const override { return node_; }
+  const envoy::config::core::v3::Node& node() const override { return node_; }
 
 private:
-  envoy::api::v2::core::Node node_;
+  envoy::config::core::v3::Node node_;
   Network::Address::InstanceConstSharedPtr address_;
 };
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/platform.h"
-#include "envoy/network/listen_socket.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/socket.h"
 
 #include "common/common/logger.h"
 #include "common/protobuf/protobuf.h"
@@ -26,11 +26,14 @@ public:
   static std::unique_ptr<Socket::Options> buildIpFreebindOptions();
   static std::unique_ptr<Socket::Options> buildIpTransparentOptions();
   static std::unique_ptr<Socket::Options> buildSocketMarkOptions(uint32_t mark);
+  static std::unique_ptr<Socket::Options> buildSocketNoSigpipeOptions();
   static std::unique_ptr<Socket::Options> buildTcpFastOpenOptions(uint32_t queue_length);
   static std::unique_ptr<Socket::Options> buildLiteralOptions(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options);
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>& socket_options);
   static std::unique_ptr<Socket::Options> buildIpPacketInfoOptions();
   static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
+  static std::unique_ptr<Socket::Options> buildReusePortOptions();
+  static std::unique_ptr<Socket::Options> buildUdpGroOptions();
 };
 } // namespace Network
 } // namespace Envoy

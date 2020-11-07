@@ -7,3 +7,4 @@ Listener filters
 
   */empty/*
   */v2alpha1/*
+  */v2/*

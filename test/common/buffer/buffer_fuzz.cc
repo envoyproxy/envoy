@@ -7,12 +7,12 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/common/stack_array.h"
 #include "common/memory/stats.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "test/fuzz/utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
@@ -68,6 +68,12 @@ void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragme
 // walk off the edge; the caller should be guaranteeing this.
 class StringBuffer : public Buffer::Instance {
 public:
+  void addDrainTracker(std::function<void()> drain_tracker) override {
+    // Not implemented well.
+    ASSERT(false);
+    drain_tracker();
+  }
+
   void add(const void* data, uint64_t size) override {
     FUZZ_ASSERT(start_ + size_ + size <= data_.size());
     ::memcpy(mutableEnd(), data, size);
@@ -114,14 +120,10 @@ public:
     size_ -= size;
   }
 
-  uint64_t getRawSlices(Buffer::RawSlice* out, uint64_t out_size) const override {
-    if (out_size == 0) {
-      return 1;
-    }
-    // Sketchy, but probably will work for test purposes.
-    out->mem_ = const_cast<char*>(start());
-    out->len_ = size_;
-    return 1;
+  Buffer::RawSliceVector
+  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override {
+    ASSERT(!max_slices.has_value() || max_slices.value() >= 1);
+    return {{const_cast<char*>(start()), size_}};
   }
 
   uint64_t length() const override { return size_; }
@@ -130,6 +132,8 @@ public:
     // Sketchy, but probably will work for test purposes.
     return mutableStart();
   }
+
+  Buffer::SliceDataPtr extractMutableFrontSlice() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 
@@ -140,15 +144,6 @@ public:
     src.size_ -= length;
   }
 
-  Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override {
-    FUZZ_ASSERT(start_ + size_ + max_length <= data_.size());
-    Buffer::RawSlice slice{mutableEnd(), max_length};
-    Api::IoCallUint64Result result = io_handle.readv(max_length, &slice, 1);
-    FUZZ_ASSERT(result.ok() && result.rc_ > 0);
-    size_ += result.rc_;
-    return result;
-  }
-
   uint64_t reserve(uint64_t length, Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
     FUZZ_ASSERT(num_iovecs > 0);
     FUZZ_ASSERT(start_ + size_ + length <= data_.size());
@@ -157,7 +152,8 @@ public:
     return 1;
   }
 
-  ssize_t search(const void* data, uint64_t size, size_t start) const override {
+  ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {
+    UNREFERENCED_PARAMETER(length);
     return asStringView().find({static_cast<const char*>(data), size}, start);
   }
 
@@ -166,15 +162,6 @@ public:
   }
 
   std::string toString() const override { return std::string(data_.data() + start_, size_); }
-
-  Api::IoCallUint64Result write(Network::IoHandle& io_handle) override {
-    const Buffer::RawSlice slice{const_cast<char*>(start()), size_};
-    Api::IoCallUint64Result result = io_handle.writev(&slice, 1);
-    FUZZ_ASSERT(result.ok());
-    start_ += result.rc_;
-    size_ -= result.rc_;
-    return result;
-  }
 
   absl::string_view asStringView() const { return {start(), size_}; }
 
@@ -350,7 +337,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     std::string data(max_length, insert_value);
     const ssize_t rc = ::write(pipe_fds[1], data.data(), max_length);
     FUZZ_ASSERT(rc > 0);
-    Api::IoCallUint64Result result = target_buffer.read(io_handle, max_length);
+    Api::IoCallUint64Result result = io_handle.read(target_buffer, max_length);
     FUZZ_ASSERT(result.rc_ == static_cast<uint64_t>(rc));
     FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     break;
@@ -365,7 +352,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     do {
       const bool empty = target_buffer.length() == 0;
       const std::string previous_data = target_buffer.toString();
-      const auto result = target_buffer.write(io_handle);
+      const auto result = io_handle.write(target_buffer);
       FUZZ_ASSERT(result.ok());
       rc = result.rc_;
       ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,
@@ -382,14 +369,14 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     break;
   }
   case test::common::buffer::Action::kGetRawSlices: {
-    const uint64_t slices_needed = target_buffer.getRawSlices(nullptr, 0);
+    const uint64_t slices_needed = target_buffer.getRawSlices().size();
     const uint64_t slices_tested =
         std::min(slices_needed, static_cast<uint64_t>(action.get_raw_slices()));
     if (slices_tested == 0) {
       break;
     }
-    std::vector<Buffer::RawSlice> raw_slices{slices_tested};
-    const uint64_t slices_obtained = target_buffer.getRawSlices(raw_slices.data(), slices_tested);
+    Buffer::RawSliceVector raw_slices = target_buffer.getRawSlices(/*max_slices=*/slices_tested);
+    const uint64_t slices_obtained = raw_slices.size();
     FUZZ_ASSERT(slices_obtained <= slices_needed);
     uint64_t offset = 0;
     const std::string data = target_buffer.toString();

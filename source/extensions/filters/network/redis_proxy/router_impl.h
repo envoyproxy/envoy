@@ -7,12 +7,11 @@
 #include <set>
 #include <string>
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
-
-#include "common/common/to_lower_table.h"
 
 #include "extensions/filters/network/common/redis/supported_commands.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
@@ -27,8 +26,8 @@ using Upstreams = std::map<std::string, ConnPool::InstanceSharedPtr>;
 
 class MirrorPolicyImpl : public MirrorPolicy {
 public:
-  MirrorPolicyImpl(const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::
-                       Route::RequestMirrorPolicy&,
+  MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                       PrefixRoutes::Route::RequestMirrorPolicy&,
                    const ConnPool::InstanceSharedPtr, Runtime::Loader& runtime);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; };
@@ -37,18 +36,17 @@ public:
 
 private:
   const std::string runtime_key_;
-  const absl::optional<envoy::type::FractionalPercent> default_value_;
+  const absl::optional<envoy::type::v3::FractionalPercent> default_value_;
   const bool exclude_read_commands_;
   ConnPool::InstanceSharedPtr upstream_;
   Runtime::Loader& runtime_;
-  const ToLowerTable to_lower_table_;
 };
 
 class Prefix : public Route {
 public:
-  Prefix(
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route route,
-      Upstreams& upstreams, Runtime::Loader& runtime);
+  Prefix(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route
+             route,
+         Upstreams& upstreams, Runtime::Loader& runtime);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; }
   const MirrorPolicies& mirrorPolicies() const override { return mirror_policies_; };
@@ -66,7 +64,7 @@ using PrefixSharedPtr = std::shared_ptr<Prefix>;
 
 class PrefixRoutes : public Router {
 public:
-  PrefixRoutes(const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes&
+  PrefixRoutes(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes&
                    prefix_routes,
                Upstreams&& upstreams, Runtime::Loader& runtime);
 
@@ -74,7 +72,6 @@ public:
 
 private:
   TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;
-  const ToLowerTable to_lower_table_;
   const bool case_insensitive_;
   Upstreams upstreams_;
   RouteSharedPtr catch_all_route_;

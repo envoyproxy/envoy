@@ -1,9 +1,11 @@
 #include "extensions/filters/http/jwt_authn/filter.h"
 
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/str_split.h"
 #include "jwt_verify_lib/status.h"
 
 using ::google::jwt_verify::Status;
@@ -13,11 +15,30 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-struct RcDetailsValues {
-  // The jwt_authn filter rejected the request
-  const std::string JwtAuthnAccessDenied = "jwt_authn_access_denied";
-};
-using RcDetails = ConstSingleton<RcDetailsValues>;
+namespace {
+
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    access_control_request_method_handle(Http::CustomHeaders::get().AccessControlRequestMethod);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    origin_handle(Http::CustomHeaders::get().Origin);
+
+bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Options &&
+         !headers.getInlineValue(origin_handle.handle()).empty() &&
+         !headers.getInlineValue(access_control_request_method_handle.handle()).empty();
+}
+
+// The prefix used in the response code detail sent from jwt authn filter.
+constexpr absl::string_view kRcDetailJwtAuthnPrefix = "jwt_authn_access_denied";
+
+std::string generateRcDetails(absl::string_view error_msg) {
+  // Replace space with underscore since RCDetails may be written to access log.
+  // Some log processors assume each log segment is separated by whitespace.
+  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{",
+                      absl::StrJoin(absl::StrSplit(error_msg, ' '), "_"), "}");
+}
+
+} // namespace
 
 Filter::Filter(FilterConfigSharedPtr config)
     : stats_(config->stats()), config_(std::move(config)) {}
@@ -29,17 +50,44 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
 
   state_ = Calling;
   stopped_ = false;
-  // Verify the JWT token, onComplete() will be called when completed.
-  const auto* verifier =
-      config_->findVerifier(headers, decoder_callbacks_->streamInfo().filterState());
-  if (!verifier) {
+
+  if (config_->bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
+    // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
+    // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
+    ENVOY_LOG(debug, "CORS preflight request bypassed regardless of JWT requirements");
+    stats_.cors_preflight_bypassed_.inc();
+    onComplete(Status::Ok);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  const Verifier* verifier = nullptr;
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(
+          HttpFilterNames::get().JwtAuthn, decoder_callbacks_->route());
+  if (per_route_config != nullptr) {
+    std::string error_msg;
+    std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config);
+    if (!error_msg.empty()) {
+      stats_.denied_.inc();
+      state_ = Responded;
+      decoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
+                                         absl::StrCat("Failed JWT authentication: ", error_msg),
+                                         nullptr, absl::nullopt, generateRcDetails(error_msg));
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  } else {
+    verifier = config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
+  }
+
+  if (verifier == nullptr) {
     onComplete(Status::Ok);
   } else {
+    // Verify the JWT token, onComplete() will be called when completed.
     context_ = Verifier::createContext(headers, decoder_callbacks_->activeSpan(), this);
     verifier->verify(context_);
   }
@@ -57,7 +105,7 @@ void Filter::setPayload(const ProtobufWkt::Struct& payload) {
 }
 
 void Filter::onComplete(const Status& status) {
-  ENVOY_LOG(debug, "Called Filter : check complete {}",
+  ENVOY_LOG(debug, "Jwt authentication completed with: {}",
             ::google::jwt_verify::getStatusString(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
@@ -70,8 +118,9 @@ void Filter::onComplete(const Status& status) {
     Http::Code code =
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
-    decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
-                                       absl::nullopt, RcDetails::get().JwtAuthnAccessDenied);
+    decoder_callbacks_->sendLocalReply(
+        code, ::google::jwt_verify::getStatusString(status), nullptr, absl::nullopt,
+        generateRcDetails(::google::jwt_verify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();
@@ -89,7 +138,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
   if (state_ == Calling) {
     return Http::FilterTrailersStatus::StopIteration;

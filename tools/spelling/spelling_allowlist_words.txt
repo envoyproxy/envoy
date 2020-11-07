@@ -1,0 +1,2 @@
+# One word per line, these words are not spell checked.
+# you can add a comment to each word to explain why you don't need to do a spell check.

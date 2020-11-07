@@ -31,11 +31,13 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::jwt>,
 public:
   AuthenticatorImpl(const CheckAudience* check_audience,
                     const absl::optional<std::string>& provider, bool allow_failed,
-                    JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager,
+                    bool allow_missing, JwksCache& jwks_cache,
+                    Upstream::ClusterManager& cluster_manager,
                     CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source)
       : jwks_cache_(jwks_cache), cm_(cluster_manager),
         create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
-        provider_(provider), is_allow_failed_(allow_failed), time_source_(time_source) {}
+        provider_(provider), is_allow_failed_(allow_failed), is_allow_missing_(allow_missing),
+        time_source_(time_source) {}
 
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
@@ -49,6 +51,9 @@ public:
   TimeSource& timeSource() { return time_source_; }
 
 private:
+  // Returns the name of the authenticator. For debug logging only.
+  std::string name() const;
+
   // Verify with a specific public key.
   void verifyKey();
 
@@ -91,8 +96,22 @@ private:
   // specific provider or not when it is allow missing or failed.
   const absl::optional<std::string> provider_;
   const bool is_allow_failed_;
+  const bool is_allow_missing_;
   TimeSource& time_source_;
 };
+
+std::string AuthenticatorImpl::name() const {
+  if (provider_) {
+    return provider_.value() + (is_allow_missing_ ? "-OPTIONAL" : "");
+  }
+  if (is_allow_failed_) {
+    return "_IS_ALLOW_FAILED_";
+  }
+  if (is_allow_missing_) {
+    return "_IS_ALLOW_MISSING_";
+  }
+  return "_UNKNOWN_";
+}
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
                                std::vector<JwtLocationConstPtr>&& tokens,
@@ -104,7 +123,8 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
   set_payload_cb_ = std::move(set_payload_cb);
   callback_ = std::move(callback);
 
-  ENVOY_LOG(debug, "JWT authentication starts (allow_failed={})", is_allow_failed_);
+  ENVOY_LOG(debug, "{}: JWT authentication starts (allow_failed={}), tokens size={}", name(),
+            is_allow_failed_, tokens_.size());
   if (tokens_.empty()) {
     doneWithStatus(Status::JwtMissed);
     return;
@@ -115,20 +135,32 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
 
 void AuthenticatorImpl::startVerify() {
   ASSERT(!tokens_.empty());
+  ENVOY_LOG(debug, "{}: startVerify: tokens size {}", name(), tokens_.size());
   curr_token_ = std::move(tokens_.back());
   tokens_.pop_back();
+
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+  ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
   const Status status = jwt_->parseFromString(curr_token_->token());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
   }
 
-  ENVOY_LOG(debug, "Verifying JWT token of issuer {}", jwt_->iss_);
-  // Check if token extracted from the location contains the issuer specified by config.
-  if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
-    doneWithStatus(Status::JwtUnknownIssuer);
-    return;
+  ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
+  if (!jwt_->iss_.empty()) {
+    // Check if token extracted from the location contains the issuer specified by config.
+    if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
+      doneWithStatus(Status::JwtUnknownIssuer);
+      return;
+    }
+  } else {
+    // If provider is not specified, in allow_missing_or_failed or allow_missing case,
+    // the issuer specified in "iss" payload is required in order to lookup provider.
+    if (!provider_) {
+      doneWithStatus(Status::JwtUnknownIssuer);
+      return;
+    }
   }
 
   // TODO(qiwzhang): Cross-platform-wise the below unix_timestamp code is wrong as the
@@ -241,12 +273,25 @@ void AuthenticatorImpl::verifyKey() {
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
-  ENVOY_LOG(debug, "JWT token verification completed with: {}",
+  ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
-  // if on allow missing or failed this should verify all tokens, otherwise stop on ok.
-  if ((Status::Ok == status && !is_allow_failed_) || tokens_.empty()) {
+
+  // If a request has multiple tokens, all of them must be valid. Otherwise it may have
+  // following security hole: a request has a good token and a bad one, it will pass
+  // verification, forwarded to the backend, and the backend may mistakenly use the bad
+  // token as the good one that passed the verification.
+
+  // Unless allowing failed or missing, all tokens must be verified successfully.
+  if ((Status::Ok != status && !is_allow_failed_ && !is_allow_missing_) || tokens_.empty()) {
     tokens_.clear();
-    callback_(is_allow_failed_ ? Status::Ok : status);
+    if (is_allow_failed_) {
+      callback_(Status::Ok);
+    } else if (is_allow_missing_ && status == Status::JwtMissed) {
+      callback_(Status::Ok);
+    } else {
+      callback_(status);
+    }
+
     callback_ = nullptr;
     return;
   }
@@ -257,12 +302,13 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        const absl::optional<std::string>& provider,
-                                       bool allow_failed, JwksCache& jwks_cache,
+                                       bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
                                        CreateJwksFetcherCb create_jwks_fetcher_cb,
                                        TimeSource& time_source) {
-  return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, jwks_cache,
-                                             cluster_manager, create_jwks_fetcher_cb, time_source);
+  return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, allow_missing,
+                                             jwks_cache, cluster_manager, create_jwks_fetcher_cb,
+                                             time_source);
 }
 
 } // namespace JwtAuthn

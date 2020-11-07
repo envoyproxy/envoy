@@ -22,7 +22,7 @@ public:
   /**
    * @return uint64_t the number of active connections owned by the handler.
    */
-  virtual uint64_t numConnections() PURE;
+  virtual uint64_t numConnections() const PURE;
 
   /**
    * Increment the return value of numConnections() by one.
@@ -38,10 +38,12 @@ public:
   virtual void decNumConnections() PURE;
 
   /**
-   * Adds a listener to the handler.
+   * Adds a listener to the handler, optionally replacing the existing listener.
+   * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    */
-  virtual void addListener(ListenerConfig& config) PURE;
+  virtual void addListener(absl::optional<uint64_t> overridden_listener,
+                           ListenerConfig& config) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed
@@ -49,6 +51,24 @@ public:
    * @param listener_tag supplies the tag passed to addListener().
    */
   virtual void removeListeners(uint64_t listener_tag) PURE;
+
+  /**
+   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag``. This will be
+   * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
+   * removed.
+   */
+  virtual UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) PURE;
+
+  /**
+   * Remove the filter chains and the connections in the listener. All connections owned
+   * by the filter chains will be closed. Once all the connections are destroyed(connections
+   * could be deferred deleted!), invoke the completion.
+   * @param listener_tag supplies the tag passed to addListener().
+   * @param filter_chains supplies the filter chains to be removed.
+   */
+  virtual void removeFilterChains(uint64_t listener_tag,
+                                  const std::list<const FilterChain*>& filter_chains,
+                                  std::function<void()> completion) PURE;
 
   /**
    * Stop listeners using the listener tag as a key. This will not close any connections and is used
@@ -75,9 +95,15 @@ public:
   virtual void enableListeners() PURE;
 
   /**
+   * Set the fraction of connections the listeners should reject.
+   * @param reject_fraction a value between 0 (reject none) and 1 (reject all).
+   */
+  virtual void setListenerRejectFraction(float reject_fraction) PURE;
+
+  /**
    * @return the stat prefix used for per-handler stats.
    */
-  virtual const std::string& statPrefix() PURE;
+  virtual const std::string& statPrefix() const PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.
@@ -97,12 +123,38 @@ public:
     virtual Listener* listener() PURE;
 
     /**
-     * Destroy the actual Listener it wraps.
+     * Temporarily stop listening according to implementation's own definition.
      */
-    virtual void destroy() PURE;
+    virtual void pauseListening() PURE;
+
+    /**
+     * Resume listening according to implementation's own definition.
+     */
+    virtual void resumeListening() PURE;
+
+    /**
+     * Stop listening according to implementation's own definition.
+     */
+    virtual void shutdownListener() PURE;
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;
+
+  /**
+   * Used by ConnectionHandler to manage UDP listeners.
+   */
+  class ActiveUdpListener : public virtual ActiveListener, public Network::UdpListenerCallbacks {
+  public:
+    ~ActiveUdpListener() override = default;
+
+    /**
+     * Returns the worker index that ``data`` should be delivered to. The return value must be in
+     * the range [0, concurrency).
+     */
+    virtual uint32_t destination(const Network::UdpRecvData& data) const PURE;
+  };
+
+  using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
 };
 
 using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
@@ -117,15 +169,16 @@ public:
   /**
    * Creates an ActiveUdpListener object and a corresponding UdpListener
    * according to given config.
+   * @param worker_index The index of the worker this listener is being created on.
    * @param parent is the owner of the created ActiveListener objects.
    * @param dispatcher is used to create actual UDP listener.
    * @param config provides information needed to create ActiveUdpListener and
    * UdpListener objects.
    * @return the ActiveUdpListener created.
    */
-  virtual ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          Network::ListenerConfig& config) const PURE;
+  virtual ConnectionHandler::ActiveUdpListenerPtr
+  createActiveUdpListener(uint32_t worker_index, ConnectionHandler& parent,
+                          Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
 
   /**
    * @return true if the UDP passing through listener doesn't form stateful connections.

@@ -62,7 +62,7 @@ MockDecoderFilter::MockDecoderFilter() {
 MockDecoderFilter::~MockDecoderFilter() = default;
 
 MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
-  route_.reset(new NiceMock<Router::MockRoute>());
+  route_ = std::make_shared<NiceMock<Router::MockRoute>>();
 
   ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
   ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
@@ -80,7 +80,7 @@ MockEncoderFilter::MockEncoderFilter() {
 MockEncoderFilter::~MockEncoderFilter() = default;
 
 MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
-  route_.reset(new NiceMock<Router::MockRoute>());
+  route_ = std::make_shared<NiceMock<Router::MockRoute>>();
 
   ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
   ON_CALL(*this, connection()).WillByDefault(Return(&connection_));

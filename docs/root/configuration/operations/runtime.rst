@@ -7,7 +7,7 @@ The :ref:`runtime configuration <arch_overview_runtime>` specifies a virtual fil
 contains re-loadable configuration elements. This virtual file system can be realized via a series
 of local file system, static bootstrap configuration, RTDS and admin console derived overlays.
 
-* :ref:`v2 API reference <envoy_api_msg_config.bootstrap.v2.Runtime>`
+* :ref:`v3 API reference <envoy_v3_api_msg_config.bootstrap.v3.Runtime>`
 
 .. _config_virtual_filesystem:
 
@@ -20,11 +20,12 @@ Layering
 ++++++++
 
 The runtime can be viewed as a virtual file system consisting of multiple layers. The :ref:`layered
-runtime <envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap configuration specifies this
+runtime <envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime>` bootstrap configuration specifies this
 layering. Runtime settings in later layers override earlier layers. A typical configuration might
 be:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.LayeredRuntime
 
   layers:
   - name: static_layer_0
@@ -38,7 +39,7 @@ be:
   - name: admin_layer_0
     admin_layer: {}
 
-In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap
+In the deprecated :ref:`runtime <envoy_v3_api_msg_config.bootstrap.v3.Runtime>` bootstrap
 configuration, the layering was implicit and fixed:
 
 1. :ref:`Static bootstrap configuration <config_runtime_bootstrap>`
@@ -69,7 +70,7 @@ Static bootstrap
 ++++++++++++++++
 
 A static base runtime may be specified in the :ref:`bootstrap configuration
-<envoy_api_field_config.bootstrap.v2.Runtime.base>` via a :ref:`protobuf JSON representation
+<envoy_v3_api_field_config.bootstrap.v3.Runtime.base>` via a :ref:`protobuf JSON representation
 <config_runtime_proto_json>`.
 
 .. _config_runtime_local_disk:
@@ -90,9 +91,9 @@ Overrides
 ~~~~~~~~~
 
 An arbitrary number of disk file system layers can be overlaid in the :ref:`layered
-runtime <envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap configuration.
+runtime <envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime>` bootstrap configuration.
 
-In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap configuration,
+In the deprecated :ref:`runtime <envoy_v3_api_msg_config.bootstrap.v3.Runtime>` bootstrap configuration,
 there was a distinguished file system override. Assume that the folder ``/srv/runtime/v1`` points to
 the actual file system path where global runtime configurations are stored. The following would be a
 typical configuration setting for runtime:
@@ -108,7 +109,7 @@ Where ``/srv/runtime/current`` is a symbolic link to ``/srv/runtime/v1``.
 Cluster-specific subdirectories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap configuration,
+In the deprecated :ref:`runtime <envoy_v3_api_msg_config.bootstrap.v3.Runtime>` bootstrap configuration,
 the *override_subdirectory* is used along with the :option:`--service-cluster` CLI option. Assume
 that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will first look for the
 *health_check.min_interval* key in the following full file system path:
@@ -118,9 +119,9 @@ that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will firs
 If found, the value will override any value found in the primary lookup path. This allows the user
 to customize the runtime values for individual clusters on top of global defaults.
 
-With the :ref:`layered runtime <envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap
+With the :ref:`layered runtime <envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime>` bootstrap
 configuration, it is possible to specialize on service cluster via the :ref:`append_service_cluster
-<envoy_api_field_config.bootstrap.v2.RuntimeLayer.DiskLayer.append_service_cluster>` option at any
+<envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.DiskLayer.append_service_cluster>` option at any
 disk layer.
 
 .. _config_runtime_symbolic_link_swap:
@@ -144,10 +145,10 @@ Runtime Discovery Service (RTDS)
 ++++++++++++++++++++++++++++++++
 
 One or more runtime layers may be specified and delivered by specifying a :ref:`rtds_layer
-<envoy_api_field_config.bootstrap.v2.RuntimeLayer.rtds_layer>`. This points the runtime layer at a
+<envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`. This points the runtime layer at a
 regular :ref:`xDS <xds_protocol>` endpoint, subscribing to a single xDS resource for the given
 layer. The resource type for these layers is a :ref:`Runtime message
-<envoy_api_msg_service.discovery.v2.Runtime>`.
+<envoy_v3_api_msg_service.runtime.v3.Runtime>`.
 
 .. _config_runtime_admin:
 
@@ -167,7 +168,7 @@ built into the code, except for any values added via `/runtime_modify`.
   secured <operations_admin_interface_security>`.
 
 At most one admin layer may be specified. If a non-empty :ref:`layered runtime
-<envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap configuration is specified with an
+<envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime>` bootstrap configuration is specified with an
 absent admin layer, any mutating admin console actions will elicit a 503 response.
 
 .. _config_runtime_atomicity:
@@ -201,7 +202,7 @@ modeling a JSON object with the following rules:
 
 * Dot separators map to tree edges.
 * Scalar leaves (integer, strings, booleans, doubles) are represented with their respective JSON type.
-* :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` is represented with via its
+* :ref:`FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>` is represented with via its
   `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
 
 An example representation of a setting for the *health_check.min_interval* key in YAML is:
@@ -225,6 +226,8 @@ Lines starting with ``#`` as the first character are treated as comments.
 Comments can be used to provide context on an existing value. Comments are also useful in an
 otherwise empty file to keep a placeholder for deployment in a time of need.
 
+.. _config_runtime_deprecation:
+
 Using runtime overrides for deprecated features
 -----------------------------------------------
 
@@ -238,19 +241,30 @@ increments the :ref:`deprecated_feature_use <runtime_stats>` runtime stat.
 Users are encouraged to go to :ref:`deprecated <deprecated>` to see how to
 migrate to the new code path and make sure it is suitable for their use case.
 
-In the second phase the message and filename will be added to
-:repo:`runtime_features.cc <source/common/runtime/runtime_features.cc>`
-and use of that configuration field will cause the config to be rejected by default. 
-This fail-by-default mode can be overridden in runtime configuration by setting
-envoy.deprecated_features.filename.proto:fieldname or envoy.deprecated_features.filename.proto:enum_value
+In the second phase the field will be tagged as disallowed_by_default
+and use of that configuration field will cause the config to be rejected by default.
+This disallowed mode can be overridden in runtime configuration by setting
+envoy.deprecated_features:full_fieldname or envoy.deprecated_features:full_enum_value
 to true. For example, for a deprecated field
-``Foo.Bar.Eep`` in ``baz.proto`` set ``envoy.deprecated_features.baz.proto:Eep`` to
-``true``. Use of this override is **strongly discouraged**.
-Fatal-by-default configuration indicates that the removal of the old code paths is imminent. It is
-far better for both Envoy users and for Envoy contributors if any bugs or feature gaps with the new
-code paths are flushed out ahead of time, rather than after the code is removed!
+``Foo.Bar.Eep`` set ``envoy.deprecated_features:Foo.bar.Eep`` to
+``true``. There is a production example using static runtime to allow both fail-by-default fields here:
+:repo:`configs/using_deprecated_config.yaml`. The disallowed mode can also be overridden in runtime
+configuration by setting ``envoy.features.enable_all_deprecated_feature`` to ``true``, which allows
+the use of all deprecated fields.
+Use of these overrides is **strongly discouraged** so please use with caution and switch to the new fields
+as soon as possible. Fatal-by-default configuration indicates that the removal of the old code paths is
+imminent. It is far better for both Envoy users and for Envoy contributors if any bugs or feature gaps
+with the new code paths are flushed out ahead of time, rather than after the code is removed!
 
 .. _runtime_stats:
+
+.. attention::
+
+   Versions of Envoy prior to 1.14.1 cannot parse runtime booleans from integer values and require
+   an explicit "true" or "false". Mistakenly placing an integer such as "0" to represent "false"
+   will lead to usage of the default value. This is especially important to keep in mind for case of
+   runtime overrides for :ref:`deprecated features<deprecated>`, as it will can potentially result
+   in unexpected Envoy behaviors.
 
 Statistics
 ----------
@@ -263,6 +277,7 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
 
   admin_overrides_active, Gauge, 1 if any admin overrides are active otherwise 0
   deprecated_feature_use, Counter, Total number of times deprecated features were used. Detailed information about the feature used will be logged to warning logs in the form "Using deprecated option 'X' from file Y".
+  deprecated_feature_seen_since_process_start, Gauge, Number of times deprecated features were used. This is not carried over during hot restarts.
   load_error, Counter, Total number of load attempts that resulted in an error in any layer
   load_success, Counter, Total number of load attempts that were successful at all layers
   num_keys, Gauge, Number of keys currently loaded

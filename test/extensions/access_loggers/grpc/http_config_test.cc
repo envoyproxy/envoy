@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/stats/scope.h"
@@ -5,7 +7,7 @@
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,7 +33,7 @@ public:
     ASSERT_NE(nullptr, message_);
 
     EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
         }));
 
@@ -43,7 +45,7 @@ public:
 
   AccessLog::FilterPtr filter_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  envoy::config::accesslog::v2::HttpGrpcAccessLogConfig http_grpc_access_log_;
+  envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig http_grpc_access_log_;
   ProtobufTypes::MessagePtr message_;
   Server::Configuration::AccessLogInstanceFactory* factory_{};
 };

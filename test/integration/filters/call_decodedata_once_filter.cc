@@ -1,9 +1,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 
 #include "gtest/gtest.h"
@@ -15,12 +15,12 @@ class CallDecodeDataOnceFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "call-decodedata-once-filter";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
-    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
-    Http::HeaderEntry* entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
-    ASSERT(entry_content != nullptr && entry_added != nullptr);
-    content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
-    added_size_ = std::stoul(std::string(entry_added->value().getStringView()));
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override {
+    const auto entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    const auto entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
+    ASSERT(!entry_content.empty() && !entry_added.empty());
+    content_size_ = std::stoul(std::string(entry_content[0]->value().getStringView()));
+    added_size_ = std::stoul(std::string(entry_added[0]->value().getStringView()));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -31,7 +31,7 @@ public:
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
 

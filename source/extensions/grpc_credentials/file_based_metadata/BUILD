@@ -1,14 +1,14 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # File Based Metadata gRPC Credentials
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
@@ -24,7 +24,7 @@ envoy_cc_extension(
         "//source/common/grpc:common_lib",
         "//source/common/grpc:google_grpc_creds_lib",
         "//source/extensions/grpc_credentials:well_known_names",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/grpc_credential/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/grpc_credential/v3:pkg_cc_proto",
     ],
 )

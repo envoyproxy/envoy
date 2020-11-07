@@ -92,7 +92,7 @@ TEST_F(CompactProtocolTest, ReadMessageBegin) {
 
     EXPECT_THROW_WITH_MESSAGE(
         proto.readMessageBegin(buffer, metadata_), EnvoyException,
-        fmt::format("invalid compact protocol message type {}", invalid_msg_type));
+        absl::StrCat("invalid compact protocol message type ", invalid_msg_type));
     expectDefaultMetadata();
     EXPECT_EQ(buffer.length(), 4);
   }
@@ -1163,7 +1163,7 @@ TEST_F(CompactProtocolTest, WriteFieldBegin) {
 
     EXPECT_THROW_WITH_MESSAGE(proto.writeFieldBegin(buffer, "unused", field_type, 1),
                               EnvoyException,
-                              fmt::format("unknown protocol field type {}", invalid_field_type));
+                              absl::StrCat("unknown protocol field type ", invalid_field_type));
   }
 }
 

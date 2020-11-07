@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
 namespace Envoy {
@@ -24,8 +25,8 @@ public:
    * @param message supplies the complete request to shadow.
    * @param timeout supplies the shadowed request timeout.
    */
-  virtual void shadow(const std::string& cluster, Http::MessagePtr&& request,
-                      std::chrono::milliseconds timeout) PURE;
+  virtual void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
+                      const Http::AsyncClient::RequestOptions& options) PURE;
 };
 
 using ShadowWriterPtr = std::unique_ptr<ShadowWriter>;

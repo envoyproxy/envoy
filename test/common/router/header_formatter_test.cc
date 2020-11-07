@@ -1,21 +1,27 @@
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
 #include "common/config/utility.h"
+#include "common/http/header_utility.h"
+#include "common/network/address_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -30,9 +36,10 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::route::Route route;
-  TestUtility::loadFromYaml(yaml, route);
+static envoy::config::route::v3::Route parseRouteFromV3Yaml(const std::string& yaml,
+                                                            bool avoid_boosting = true) {
+  envoy::config::route::v3::Route route;
+  TestUtility::loadFromYaml(yaml, route, false, avoid_boosting);
   return route;
 }
 
@@ -70,6 +77,26 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressVariab
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS", "127.0.0.2:0");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalPortVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for IPv4 address
+  auto address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
+  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "8443");
+
+  // Validate for IPv6 address
+  address =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
+  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "9443");
+
+  // Validate for Pipe
+  address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithoutPortVariable) {
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
@@ -80,6 +107,29 @@ TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariabl
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.host_.reset();
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithHostnameVariable) {
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char*, size_t) -> Api::SysCallIntResult {
+          return {-1, ENAMETOOLONG};
+        }));
+    testFormatting("HOSTNAME", "-");
+  }
+
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+          StringUtil::strlcpy(name, "myhostname", 11);
+          return {0, 0};
+        }));
+    testFormatting("HOSTNAME", "myhostname");
+  }
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
@@ -250,7 +300,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsVersionNoTls) {
   testFormatting(stream_info, "DOWNSTREAM_TLS_VERSION", EMPTY_STRING);
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha256Fingerprint) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
@@ -260,7 +310,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint) {
                  "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f");
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprintEmpty) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha256FingerprintEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha;
@@ -269,10 +319,35 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprintEmp
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_256", EMPTY_STRING);
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprintNoTls) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha256FingerprintNoTls) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_256", EMPTY_STRING);
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha1Fingerprint) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
+  ON_CALL(*connection_info, sha1PeerCertificateDigest()).WillByDefault(ReturnRef(expected_sha));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_1",
+                 "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha1FingerprintEmpty) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string expected_sha;
+  ON_CALL(*connection_info, sha1PeerCertificateDigest()).WillByDefault(ReturnRef(expected_sha));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_1", EMPTY_STRING);
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha1FingerprintNoTls) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+  testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_1", EMPTY_STRING);
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSerial) {
@@ -432,8 +507,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
 
-  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
-      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           namespace:
@@ -453,7 +528,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Prove we're testing the expected types.
   const auto& nested_struct =
-      Envoy::Config::Metadata::metadataValue(*metadata, "namespace", "nested").struct_value();
+      Envoy::Config::Metadata::metadataValue(metadata.get(), "namespace", "nested").struct_value();
   EXPECT_EQ(nested_struct.fields().at("str_key").kind_case(), ProtobufWkt::Value::kStringValue);
   EXPECT_EQ(nested_struct.fields().at("bool_key1").kind_case(), ProtobufWkt::Value::kBoolValue);
   EXPECT_EQ(nested_struct.fields().at("bool_key2").kind_case(), ProtobufWkt::Value::kBoolValue);
@@ -511,8 +586,9 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 // size checks on user defined headers.
 TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
   {
-    envoy::api::v2::RouteConfiguration route;
-    envoy::api::v2::core::HeaderValueOption* header = route.mutable_request_headers_to_add()->Add();
+    envoy::config::route::v3::RouteConfiguration route;
+    envoy::config::core::v3::HeaderValueOption* header =
+        route.mutable_request_headers_to_add()->Add();
     std::string long_string(16385, 'a');
     header->mutable_header()->set_key("header_name");
     header->mutable_header()->set_value(long_string);
@@ -521,9 +597,9 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
                             "Proto constraint validation failed.*");
   }
   {
-    envoy::api::v2::RouteConfiguration route;
+    envoy::config::route::v3::RouteConfiguration route;
     for (int i = 0; i < 1001; ++i) {
-      envoy::api::v2::core::HeaderValueOption* header =
+      envoy::config::core::v3::HeaderValueOption* header =
           route.mutable_request_headers_to_add()->Add();
       header->mutable_header()->set_key("header_name");
       header->mutable_header()->set_value("value");
@@ -541,30 +617,51 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestMetadata) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  envoy::config::core::v3::Metadata metadata;
+  ProtobufWkt::Struct struct_obj;
+
+  auto& fields_map = *struct_obj.mutable_fields();
+  fields_map["foo"] = ValueUtil::stringValue("bar");
+  (*metadata.mutable_filter_metadata())["envoy.lb"] = struct_obj;
+
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  testFormatting(stream_info, "DYNAMIC_METADATA([\"envoy.lb\", \"foo\"])", "bar");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
-  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
-  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing").asString());
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
-                       StreamInfo::FilterState::StateType::ReadOnly);
-  EXPECT_EQ(1, filter_state.getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(1, filter_state->getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
-  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "");
 }
@@ -682,6 +779,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%DOWNSTREAM_REMOTE_ADDRESS%", {"127.0.0.1:0"}, {}},
       {"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.1"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
+      {"%DOWNSTREAM_LOCAL_PORT%", {"0"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"value"}, {}},
       {"[%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"[value"}, {}},
@@ -695,6 +793,8 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
+      {"%RESPONSE_FLAGS%", {"LR"}, {}},
+      {"%RESPONSE_CODE_DETAILS%", {"via_upstream"}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -791,13 +891,13 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
-  Http::HeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
 
   // Upstream metadata with percent signs in the key.
-  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
-      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           ns:
@@ -811,15 +911,24 @@ TEST(HeaderParserTest, TestParseInternal) {
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(stream_info, startTime()).WillByDefault(Return(start_time));
 
-  Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
-  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
+
+  ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
+      .WillByDefault(Return(true));
+
+  absl::optional<std::string> rc_details{"via_upstream"};
+  ON_CALL(stream_info, responseCodeDetails()).WillByDefault(ReturnRef(rc_details));
 
   for (const auto& test_case : test_cases) {
-    Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
-    envoy::api::v2::core::HeaderValueOption* header = to_add.Add();
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
+    envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
     header->mutable_header()->set_key("x-header");
     header->mutable_header()->set_value(test_case.input_);
 
@@ -832,7 +941,7 @@ TEST(HeaderParserTest, TestParseInternal) {
 
     HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
 
-    Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+    Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
     req_header_parser->evaluateHeaders(header_map, stream_info);
 
     std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
@@ -848,7 +957,7 @@ TEST(HeaderParserTest, TestParseInternal) {
 }
 
 TEST(HeaderParserTest, EvaluateHeaders) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -865,16 +974,79 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
   EXPECT_TRUE(header_map.has("x-client-ip-port"));
 }
 
+TEST(HeaderParserTest, EvaluateHeadersWithNullStreamInfo) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "x-client-ip"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    append: true
+  - header:
+      key: "x-client-ip-port"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+    append: true
+)EOF";
+
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  req_header_parser->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-client-ip-port"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", header_map.get_("x-client-ip"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("x-client-ip-port"));
+}
+
+TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> headers_values;
+
+  auto& first_entry = *headers_values.Add();
+  first_entry.set_key("key");
+
+  // This tests when we have "StreamInfoHeaderFormatter", but stream info is null.
+  first_entry.set_value("%DOWNSTREAM_REMOTE_ADDRESS%");
+
+  HeaderParserPtr req_header_parser_add = HeaderParser::configure(headers_values, /*append=*/true);
+  req_header_parser_add->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("key"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
+
+  headers_values.Clear();
+  auto& set_entry = *headers_values.Add();
+  set_entry.set_key("key");
+  set_entry.set_value("great");
+
+  HeaderParserPtr req_header_parser_set = HeaderParser::configure(headers_values, /*append=*/false);
+  req_header_parser_set->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("key"));
+  EXPECT_EQ("great", header_map.get_("key"));
+
+  headers_values.Clear();
+  auto& empty_entry = *headers_values.Add();
+  empty_entry.set_key("empty");
+  empty_entry.set_value("");
+
+  HeaderParserPtr req_header_parser_empty =
+      HeaderParser::configure(headers_values, /*append=*/false);
+  req_header_parser_empty->evaluateHeaders(header_map, nullptr);
+  EXPECT_FALSE(header_map.has("empty"));
+}
+
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -887,12 +1059,12 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>();
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -900,7 +1072,7 @@ request_headers_to_add:
 }
 
 TEST(HeaderParserTest, EvaluateStaticHeaders) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -913,8 +1085,8 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("static-header"));
@@ -957,10 +1129,11 @@ request_headers_to_add:
 request_headers_to_remove: ["x-nope"]
   )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml);
+  const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
+  Http::TestRequestHeaderMapImpl header_map{
+      {":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
@@ -970,8 +1143,8 @@ request_headers_to_remove: ["x-nope"]
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
   // Metadata with percent signs in the key.
-  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
-      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           namespace:
@@ -979,11 +1152,14 @@ request_headers_to_remove: ["x-nope"]
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
-  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   req_header_parser->evaluateHeaders(header_map, stream_info);
 
@@ -1019,7 +1195,7 @@ request_headers_to_remove: ["x-nope"]
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -1048,14 +1224,14 @@ request_headers_to_add:
 )EOF";
 
   // Disable append mode.
-  envoy::api::v2::route::Route route = parseRouteFromV2Yaml(ymal);
+  envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
   route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route.request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{
+  Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -1077,19 +1253,16 @@ request_headers_to_add:
 
   using CountMap = absl::flat_hash_map<std::string, int>;
   CountMap counts;
-  header_map.iterate(
-      [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
-        CountMap* m = static_cast<CountMap*>(cb_v);
-        absl::string_view key = header.key().getStringView();
-        CountMap::iterator i = m->find(key);
-        if (i == m->end()) {
-          m->insert({std::string(key), 1});
-        } else {
-          i->second++;
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &counts);
+  header_map.iterate([&counts](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    absl::string_view key = header.key().getStringView();
+    CountMap::iterator i = counts.find(key);
+    if (i == counts.end()) {
+      counts.insert({std::string(key), 1});
+    } else {
+      i->second++;
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   EXPECT_EQ(1, counts["static-header"]);
   EXPECT_EQ(1, counts["x-client-ip"]);
@@ -1141,10 +1314,11 @@ response_headers_to_add:
 response_headers_to_remove: ["x-nope"]
 )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml);
+  const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
+  Http::TestRequestHeaderMapImpl header_map{
+      {":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
@@ -1172,11 +1346,10 @@ response_headers_to_remove: ["x-nope"]
 
   // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
   // combine set-cookie headers
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(header_map, "set-cookie", out);
+  const auto out = header_map.get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "foo");
-  ASSERT_EQ(out[1], "bar");
+  ASSERT_EQ(out[0]->value().getStringView(), "foo");
+  ASSERT_EQ(out[1]->value().getStringView(), "bar");
 }
 
 TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {
@@ -1191,10 +1364,10 @@ request_headers_to_add:
 request_headers_to_remove: ["x-foo-header"]
 )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml);
+  const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
-  Http::TestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
+  Http::TestRequestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -1213,10 +1386,10 @@ response_headers_to_add:
 response_headers_to_remove: ["x-foo-header"]
 )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml);
+  const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
-  Http::TestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
+  Http::TestResponseHeaderMapImpl header_map{{"x-foo-header", "foo"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   resp_header_parser->evaluateHeaders(header_map, stream_info);

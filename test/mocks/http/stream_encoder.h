@@ -2,6 +2,8 @@
 
 #include "envoy/http/codec.h"
 
+#include "common/http/status.h"
+
 #include "test/mocks/http/stream.h"
 
 #include "gmock/gmock.h"
@@ -9,18 +11,48 @@
 namespace Envoy {
 namespace Http {
 
-class MockStreamEncoder : public StreamEncoder {
+class MockHttp1StreamEncoderOptions : public Http1StreamEncoderOptions {
 public:
-  MockStreamEncoder();
-  ~MockStreamEncoder() override;
+  MockHttp1StreamEncoderOptions();
+  ~MockHttp1StreamEncoderOptions() override;
+
+  MOCK_METHOD(void, disableChunkEncoding, ());
+};
+
+class MockRequestEncoder : public RequestEncoder {
+public:
+  MockRequestEncoder();
+  ~MockRequestEncoder() override;
+
+  // Http::RequestEncoder
+  MOCK_METHOD(Status, encodeHeaders, (const RequestHeaderMap& headers, bool end_stream));
+  MOCK_METHOD(void, encodeTrailers, (const RequestTrailerMap& trailers));
 
   // Http::StreamEncoder
-  MOCK_METHOD1(encode100ContinueHeaders, void(const HeaderMap& headers));
-  MOCK_METHOD2(encodeHeaders, void(const HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(encodeTrailers, void(const HeaderMap& trailers));
-  MOCK_METHOD1(encodeMetadata, void(const MetadataMapVector& metadata_map_vector));
-  MOCK_METHOD0(getStream, Stream&());
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(Stream&, getStream, (), ());
+
+  testing::NiceMock<MockStream> stream_;
+};
+
+class MockResponseEncoder : public ResponseEncoder {
+public:
+  MockResponseEncoder();
+  ~MockResponseEncoder() override;
+
+  // Http::ResponseEncoder
+  MOCK_METHOD(void, encode100ContinueHeaders, (const ResponseHeaderMap& headers));
+  MOCK_METHOD(void, encodeHeaders, (const ResponseHeaderMap& headers, bool end_stream));
+  MOCK_METHOD(void, encodeTrailers, (const ResponseTrailerMap& trailers));
+
+  // Http::StreamEncoder
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(bool, streamErrorOnInvalidHttpMessage, (), (const));
+  MOCK_METHOD(Stream&, getStream, (), ());
 
   testing::NiceMock<MockStream> stream_;
 };

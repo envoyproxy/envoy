@@ -6,15 +6,17 @@ binary program restarts. The metrics are tracked as:
  * Counters: strictly increasing 64-bit integers.
  * Gauges: 64-bit integers that can rise and fall.
  * Histograms: mapping ranges of values to frequency. The ranges are auto-adjusted as
-   data accumulates. Unliked counters and gauges, histogram data is not retained across
+   data accumulates. Unlike counters and gauges, histogram data is not retained across
    binary program restarts.
+ * TextReadouts: Unicode strings. Unlike counters and gauges, text readout data
+   is not retained across binary program restarts.
 
 In order to support restarting the Envoy binary program without losing counter and gauge
 values, they are passed from parent to child in an RPC protocol.
 They were previously held in shared memory, which imposed various restrictions.
 Unlike the shared memory implementation, the RPC passing *requires a mode-bit specified
 when constructing gauges indicating whether it should be accumulated across hot-restarts*.
-    
+
 ## Performance and Thread Local Storage
 
 A key tenant of the Envoy architecture is high performance on machines with
@@ -40,8 +42,8 @@ This implementation is complicated so here is a rough overview of the threading 
    shared across all worker threads.
  * Per thread caches are checked, and if empty, they are populated from the central cache.
  * Scopes are entirely owned by the caller. The store only keeps weak pointers.
- * When a scope is destroyed, a cache flush operation is run on all threads to flush any cached
-   data owned by the destroyed scope.
+ * When a scope is destroyed, a cache flush operation is posted on all threads to flush any
+   cached data owned by the destroyed scope.
  * Scopes use a unique incrementing ID for the cache key. This ensures that if a new scope is
    created at the same address as a recently deleted scope, cache references will not accidentally
    reference the old scope which may be about to be cache flushed.
@@ -75,11 +77,23 @@ followed.
    accumulates in to *interval* histograms.
  * Finally the main *interval* histogram is merged to *cumulative* histogram.
 
+`ParentHistogram`s are held weakly a set in ThreadLocalStore. Like other stats,
+they keep an embedded reference count and are removed from the set and destroyed
+when the last strong reference disappears. Consequently, we must hold a lock for
+the set when decrementing histogram reference counts. A similar process occurs for
+other types of stats, but in those cases it is taken care of in `AllocatorImpl`.
+There are strong references to `ParentHistograms` in TlsCacheEntry::parent_histograms_.
+
+Thread-local `TlsHistogram`s are created on behalf of a `ParentHistogram`
+whenever accessed from a worker thread. They are strongly referenced in the
+`ParentHistogram` as well as in a cache in the `ThreadLocalStore`, to help
+maintain data continuity as scopes are re-created during operation.
+
 ## Stat naming infrastructure and memory consumption
 
 Stat names are replicated in several places in various forms.
 
- * Held with the stat values, in `CounterImpl` and `GaugeImpl`, which are defined in
+ * Held with the stat values, in `CounterImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
    [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/allocator_impl.cc)
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
@@ -130,26 +144,46 @@ across the codebase.
 `const StatName` member variables. Most names should be established during
 process initializion or in response to xDS updates.
 
-`StatNameSet` provides some associative lookups at runtime, using two maps: a
-static map and a dynamic map.
+`StatNameSet` provides some associative lookups at runtime. The associations
+should be created before the set is used for requests, via
+`StatNameSet::rememberBuiltin`. This is useful in scenarios where stat-names are
+derived from data in a request, but there are limited set of known tokens, such
+as SSL ciphers or Redis commands.
 
-### Current State and Strategy To Deploy Symbol Tables
+### Dynamic stat tokens
 
-As of September 5, 2019, the symbol table API has been integrated into the
-production code, using a temporary ["fake" symbol table
-implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h). This
-fake has enabled us to incrementally transform the codebase to pre-symbolize
-names as much as possible, avoiding contention in the hot-path.
+While stats are usually composed of tokens that are known at compile-time, there
+are scenarios where the names are newly discovered from data in requests. To
+avoid taking locks in this case, tokens can be formed dynamically using
+`StatNameDynamicStorage` or `StatNameDynamicPool`. In this case we lose
+substring sharing but we avoid taking locks. Dynamically generated tokens can
+be combined with symbolized tokens from `StatNameSet` or `StatNamePool` using
+`SymbolTable::join()`.
 
-There are no longer any explicit production calls to create counters
-or gauges directly from a string via `Stats::Scope::counter(const
-std::string&)`, though they are ubiquitous in tests. There is also a
-`check_format` protection against reintroducting production calls to
-`counter()`.
+Relative to using symbolized tokens, The cost of using dynamic tokens is:
 
-However, there are still several ways to create hot-path contention
-looking up stats by name, and there is no bulletproof way to prevent it from
-occurring.
+ * the StatName must be allocated and populated from the string data every time
+   `StatNameDynamicPool::add()` is called or `StatNameDynamicStorage` is constructed.
+ * the resulting `StatName`s are as long as the string, rather than benefiting from
+   a symbolized representation, which is typically 4 bytes or less per token.
+
+However, the cost of using dynamic tokens is on par with the cost of not using
+a StatName system at all, only adding one re-encoding. And it is hard to quantify
+the benefit of avoiding mutex contention when there are large numbers of threads.
+
+### Symbol Table Memory Layout
+
+Below is a diagram
+[(source)](https://docs.google.com/drawings/d/1eG6CHSUFQ5zkk-j-kcFCUay2-D_ktF39Tbzql5ypUDc/edit)
+showing the memory layout for a few scenarios of constructing and joining symbolized
+`StatName` and dynamic `StatName`.
+
+![Symbol Table Memory Diagram](symtab.png)
+
+### Symbol Contention Risk
+
+There are several ways to create hot-path contention looking up stats by name,
+and there is no bulletproof way to prevent it from occurring.
  * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests.
  * An explicit symbol-table lookup, via `StatNamePool` or `StatNameSet` can be
    made in the hot path.
@@ -157,12 +191,45 @@ occurring.
 It is difficult to search for those scenarios in the source code or prevent them
 with a format-check, but we can determine whether symbol-table lookups are
 occurring during via an admin endpoint that shows 20 recent lookups by name, at
-`ENVOY_HOST:ADMIN_PORT/stats?recentlookups`. This works only when real symbol
-tables are enabled, via command-line option `--use-fake-symbol-table 0`.
+`ENVOY_HOST:ADMIN_PORT/stats?recentlookups`.
 
-Once we are confident we've removed all hot-path symbol-table lookups, ideally
-through usage of real symbol tables in production, examining that endpoint, we
-can enable real symbol tables by default.
+As of October 6, 2020, the "fake" symbol table implementation has been removed
+from the system, and the "--use-fake-symbol-table" option is now a no-op,
+triggering a warning if set to "1". The option will be removed in a later
+release.
+
+### Symbol Table Class Overview
+
+Class | Superclass | Description
+-----| ---------- | ---------
+SymbolTable | | Abstract class providing an interface for symbol tables
+SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
+SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
+StatName | | Provides an API and a view into a StatName (dynamic orsymbolized). Like absl::string_view, the backing store must be separately maintained.
+StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
+StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
+StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free(). 
+StatNameDynamicStorage | StatNameStorageBase | Holds StatName storage for a dynamic (not symbolized) StatName.
+StatNamePool | | Holds backing store for any number of symbolized StatNames.
+StatNameDynamicPool | | Holds backing store for any number of dynamic StatNames.
+StatNameList | | Provides packed backing store for an ordered collection of StatNames, that are only accessed sequentially. Used for MetricImpl.
+StatNameStorageSet | | Implements a set of StatName with lookup via StatName. Used for rejected stats.
+StatNameSet | | Implements a set of StatName with lookup via string_view. Used to remember well-known names during startup, e.g. Redis commands.
+
+### Hot Restart
+
+Continuity of stat counters and gauges over hot-restart is supported. This occurs via
+a sequence of RPCs from parent to child, issued while child is in lame-duck. These
+RPCs contain a map of stat-name strings to values.
+
+One implementation complexity is that when decoding these names in the child, we
+must know which segments of the stat names were encoded dynamically. This is
+implemented by sending an auxiliary map of stat-name strings to lists of spans,
+where the spans identify dynamic segments.
+
+Dynamic segments are rare, used only by Dynamo, Mongo, IP Tagging Filter, Fault
+Filter, and `x-envoy-upstream-alt-stat-name` as of this writing. So in most
+cases this dynamic-segment map is empty.
 
 ## Tags and Tag Extraction
 

@@ -1,6 +1,8 @@
 #include "common/grpc/typed_async_client.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/common/assert.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/utility.h"

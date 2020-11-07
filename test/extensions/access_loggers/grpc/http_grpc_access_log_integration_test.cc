@@ -1,10 +1,12 @@
-#include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/service/accesslog/v2/als.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/accesslog/v3/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -17,19 +19,18 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class AccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class AccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
@@ -37,20 +38,30 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                   hcm) {
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           auto* access_log = hcm.add_access_log();
-          access_log->set_name("envoy.http_grpc_access_log");
+          access_log->set_name("grpc_accesslog");
 
-          envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config;
+          envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
+          common_config->set_transport_api_version(apiVersion());
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
           access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();
+  }
+
+  static ProtobufTypes::MessagePtr scrubHiddenEnvoyDeprecated(const Protobuf::Message& message) {
+    ProtobufTypes::MessagePtr mutable_clone;
+    mutable_clone.reset(message.New());
+    mutable_clone->MergeFrom(message);
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(*mutable_clone);
+    return mutable_clone;
   }
 
   ABSL_MUST_USE_RESULT
@@ -65,15 +76,15 @@ public:
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
-    envoy::service::accesslog::v2::StreamAccessLogsMessage request_msg;
+    envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-    EXPECT_EQ("POST", access_log_request_->headers().Method()->value().getStringView());
-    EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
-              access_log_request_->headers().Path()->value().getStringView());
-    EXPECT_EQ("application/grpc",
-              access_log_request_->headers().ContentType()->value().getStringView());
+    EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
+    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.accesslog.{}.AccessLogService",
+                                                  "StreamAccessLogs", apiVersion()),
+              access_log_request_->headers().getPathValue());
+    EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
-    envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
+    envoy::service::accesslog::v3::StreamAccessLogsMessage expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
@@ -86,8 +97,15 @@ public:
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
     log_entry->mutable_request()->clear_request_id();
-    EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
-
+    if (request_msg.has_identifier()) {
+      auto* node = request_msg.mutable_identifier()->mutable_node();
+      node->clear_extensions();
+      node->clear_user_agent_build_version();
+    }
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
+    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
+                                        /*ignore_repeated_field_ordering=*/false));
     return AssertionSuccess();
   }
 
@@ -105,7 +123,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
@@ -120,6 +138,7 @@ identifier:
     locality:
       zone: zone_name
     build_version: {}
+    user_agent_name: "envoy"
   log_name: foo
 http_logs:
   log_entry:
@@ -143,7 +162,7 @@ http_logs:
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogRequest(R"EOF(
 http_logs:
   log_entry:
@@ -166,7 +185,7 @@ http_logs:
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
   access_log_request_->startGrpcStream();
-  envoy::service::accesslog::v2::StreamAccessLogsResponse response_msg;
+  envoy::service::accesslog::v3::StreamAccessLogsResponse response_msg;
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
   switch (clientType()) {
@@ -182,7 +201,7 @@ http_logs:
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
                                                 downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogStream());
   ASSERT_TRUE(waitForAccessLogRequest(fmt::format(R"EOF(
 identifier:
@@ -192,6 +211,7 @@ identifier:
     locality:
       zone: zone_name
     build_version: {}
+    user_agent_name: "envoy"
   log_name: foo
 http_logs:
   log_entry:
@@ -211,7 +231,6 @@ http_logs:
       response_headers_bytes: 54
 )EOF",
                                                   VersionInfo::version())));
-
   cleanup();
 }
 

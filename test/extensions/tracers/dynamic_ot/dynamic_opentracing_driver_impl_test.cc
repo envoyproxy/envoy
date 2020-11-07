@@ -40,13 +40,13 @@ public:
   Stats::IsolatedStoreImpl stats_;
 
   const std::string operation_name_{"test"};
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
   NiceMock<Tracing::MockConfig> config_;
 };
 
-TEST_F(DynamicOpenTracingDriverTest, formatErrorMessage) {
+TEST_F(DynamicOpenTracingDriverTest, FormatErrorMessage) {
   const std::error_code error_code = std::make_error_code(std::errc::permission_denied);
   EXPECT_EQ(error_code.message(), DynamicOpenTracingDriver::formatErrorMessage(error_code, ""));
   EXPECT_EQ(error_code.message() + ": abc",
@@ -70,19 +70,27 @@ TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
   }
 }
 
+// This test fails under gcc, please see https://github.com/envoyproxy/envoy/issues/7647
+// for more details.
+#ifndef GCC_COMPILER
 TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   setupValidDriver();
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
-  first_span->finishSpan();
-  driver_->tracer().Close();
+  {
+    Tracing::SpanPtr first_span = driver_->startSpan(
+        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    first_span->finishSpan();
+    driver_->tracer().Close();
+  }
+
+  driver_ = nullptr;
 
   const Json::ObjectSharedPtr spans_json =
       TestEnvironment::jsonLoadFromString(TestEnvironment::readFileToStringForTest(spans_file_));
   EXPECT_NE(spans_json, nullptr);
   EXPECT_EQ(spans_json->asObjectArray().size(), 1);
 }
+#endif
 
 } // namespace
 } // namespace DynamicOt

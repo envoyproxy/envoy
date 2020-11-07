@@ -3,12 +3,12 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -17,7 +17,6 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/stream_info/filter_state.h"
-#include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -27,7 +26,10 @@
 #include "common/network/hash_policy.h"
 #include "common/network/utility.h"
 #include "common/stream_info/stream_info_impl.h"
+#include "common/tcp_proxy/upstream.h"
 #include "common/upstream/load_balancer_impl.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -43,6 +45,7 @@ namespace TcpProxy {
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(idle_timeout)                                                                            \
+  COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
@@ -85,7 +88,8 @@ public:
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
-
+using TunnelingConfig =
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 /**
  * Filter configuration.
  *
@@ -99,10 +103,14 @@ public:
    */
   class SharedConfig {
   public:
-    SharedConfig(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
+    SharedConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+    const absl::optional<TunnelingConfig> tunnelingConfig() { return tunneling_config_; }
+    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
+      return max_downstream_connection_duration_;
+    }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -113,11 +121,13 @@ public:
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
+    absl::optional<TunnelingConfig> tunneling_config_;
+    absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
 
-  Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
+  Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
          Server::Configuration::FactoryContext& context);
 
   /**
@@ -137,6 +147,12 @@ public:
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
   }
+  const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
+    return shared_config_->maxDownstreamConnectinDuration();
+  }
+  const absl::optional<TunnelingConfig> tunnelingConfig() {
+    return shared_config_->tunnelingConfig();
+  }
   UpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const {
@@ -146,9 +162,10 @@ public:
 
 private:
   struct RouteImpl : public Route {
-    RouteImpl(const Config& parent,
-              const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
-                  config);
+    RouteImpl(
+        const Config& parent,
+        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
+            config);
 
     // Route
     bool matches(Network::Connection& connection) const override;
@@ -168,7 +185,7 @@ private:
   class WeightedClusterEntry : public Route {
   public:
     WeightedClusterEntry(const Config& parent,
-                         const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::
+                         const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::
                              WeightedCluster::ClusterWeight& config);
 
     uint64_t clusterWeight() const { return cluster_weight_; }
@@ -199,7 +216,7 @@ private:
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
-  Runtime::RandomGenerator& random_generator_;
+  Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
 };
 
@@ -225,33 +242,27 @@ private:
  */
 class Filter : public Network::ReadFilter,
                public Upstream::LoadBalancerContextBase,
-               Tcp::ConnectionPool::Callbacks,
-               protected Logger::Loggable<Logger::Id::filter> {
+               protected Logger::Loggable<Logger::Id::filter>,
+               public GenericConnectionPoolCallbacks {
 public:
-  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
-         TimeSource& time_source);
+  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~Filter() override;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
-  Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
+  Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
-  // Tcp::ConnectionPool::Callbacks
-  void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
-                     Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                   Upstream::HostDescriptionConstSharedPtr host) override;
+  // GenericConnectionPoolCallbacks
+  void onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<GenericUpstream>&& upstream,
+                          Upstream::HostDescriptionConstSharedPtr& host,
+                          const Network::Address::InstanceConstSharedPtr& local_address,
+                          Ssl::ConnectionInfoConstSharedPtr ssl_info) override;
+  void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                            Upstream::HostDescriptionConstSharedPtr host) override;
 
   // Upstream::LoadBalancerContext
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (route_) {
-      return route_->metadataMatchCriteria();
-    }
-    return nullptr;
-  }
-
-  // Upstream::LoadBalancerContext
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
@@ -301,7 +312,7 @@ public:
     bool on_high_watermark_called_{false};
   };
 
-  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
+  StreamInfo::StreamInfo& getStreamInfo();
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -334,25 +345,36 @@ protected:
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
+  bool maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::string& cluster_name);
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamEvent(Network::ConnectionEvent event);
+  void onUpstreamConnection();
   void onIdleTimeout();
   void resetIdleTimer();
   void disableIdleTimer();
+  void onMaxDownstreamConnectionDuration();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-  Tcp::ConnectionPool::Cancellable* upstream_handle_{};
-  Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
+  Event::TimerPtr connection_duration_timer_;
+
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  StreamInfo::StreamInfoImpl stream_info_;
+  // The upstream handle (either TCP or HTTP). This is set in onGenericPoolReady and should persist
+  // until either the upstream or downstream connection is terminated.
+  std::unique_ptr<GenericUpstream> upstream_;
+  // The connection pool used to set up |upstream_|.
+  // This will be non-null from when an upstream connection is attempted until
+  // it either succeeds or fails.
+  std::unique_ptr<GenericConnPool> generic_conn_pool_;
   RouteConstSharedPtr route_;
+  Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
@@ -399,7 +421,7 @@ private:
   // This must be a map instead of set because there is no way to move elements
   // out of a set, and these elements get passed to deferredDelete() instead of
   // being deleted in-place. The key and value will always be equal.
-  std::unordered_map<Drainer*, DrainerPtr> drainers_;
+  absl::node_hash_map<Drainer*, DrainerPtr> drainers_;
 };
 
 } // namespace TcpProxy

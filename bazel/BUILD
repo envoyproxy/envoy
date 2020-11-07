@@ -1,16 +1,15 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-
 envoy_package()
-
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
+    "test_for_benchmark_wrapper.sh",
 ])
 
 genrule(
@@ -40,12 +39,6 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
-)
-
-sh_binary(
-    name = "fuzzit_wrapper",
-    srcs = ["fuzzit_wrapper.sh"],
-    data = ["@fuzzit_linux//:fuzzit"],
 )
 
 # A target to optionally link C++ standard library dynamically in sanitizer runs.
@@ -92,6 +85,33 @@ config_setting(
 )
 
 config_setting(
+    name = "clang_cl_opt_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "opt",
+    },
+)
+
+config_setting(
+    name = "clang_cl_dbg_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "dbg",
+    },
+)
+
+config_setting(
+    name = "clang_cl_fastbuild_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "fastbuild",
+    },
+)
+
+config_setting(
     name = "opt_build",
     values = {"compilation_mode": "opt"},
 )
@@ -107,6 +127,11 @@ config_setting(
 )
 
 config_setting(
+    name = "no_debug_info",
+    values = {"define": "no_debug_info=1"},
+)
+
+config_setting(
     name = "asan_build",
     values = {"define": "ENVOY_CONFIG_ASAN=1"},
 )
@@ -114,6 +139,11 @@ config_setting(
 config_setting(
     name = "tsan_build",
     values = {"define": "ENVOY_CONFIG_TSAN=1"},
+)
+
+config_setting(
+    name = "msan_build",
+    values = {"define": "ENVOY_CONFIG_MSAN=1"},
 )
 
 config_setting(
@@ -150,6 +180,37 @@ config_setting(
 config_setting(
     name = "debug_tcmalloc",
     values = {"define": "tcmalloc=debug"},
+)
+
+config_setting(
+    name = "gperftools_tcmalloc",
+    values = {"define": "tcmalloc=gperftools"},
+)
+
+# As select() can't be nested we need these specialized settings to avoid ambiguity when choosing
+# tcmalloc's flavor for x86_64 builds.
+config_setting(
+    name = "disable_tcmalloc_on_linux_x86_64",
+    values = {
+        "define": "tcmalloc=disabled",
+        "cpu": "k8",
+    },
+)
+
+config_setting(
+    name = "gperftools_tcmalloc_on_linux_x86_64",
+    values = {
+        "define": "tcmalloc=gperftools",
+        "cpu": "k8",
+    },
+)
+
+config_setting(
+    name = "debug_tcmalloc_on_linux_x86_64",
+    values = {
+        "define": "tcmalloc=debug",
+        "cpu": "k8",
+    },
 )
 
 config_setting(
@@ -191,6 +252,11 @@ config_setting(
     values = {"define": "path_normalization_by_default=true"},
 )
 
+config_setting(
+    name = "enable_new_codecs_in_integration_tests",
+    values = {"define": "use_new_codecs_in_integration_tests=true"},
+)
+
 cc_proto_library(
     name = "grpc_health_proto",
     deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
@@ -204,6 +270,11 @@ config_setting(
 config_setting(
     name = "enable_log_debug_assert_in_release",
     values = {"define": "log_debug_assert_in_release=enabled"},
+)
+
+config_setting(
+    name = "disable_known_issue_asserts",
+    values = {"define": "disable_known_issue_asserts=true"},
 )
 
 config_setting(
@@ -231,8 +302,37 @@ config_setting(
 )
 
 config_setting(
+    name = "zlib_ng",
+    constraint_values = [
+        "@bazel_tools//platforms:linux",
+    ],
+    values = {"define": "zlib=ng"},
+)
+
+config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},
+)
+
+# TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
+config_setting(
+    name = "wasm_all",
+    values = {"define": "wasm=enabled"},
+)
+
+config_setting(
+    name = "wasm_wavm",
+    values = {"define": "wasm=wavm"},
+)
+
+config_setting(
+    name = "wasm_v8",
+    values = {"define": "wasm=v8"},
+)
+
+config_setting(
+    name = "wasm_none",
+    values = {"define": "wasm=disabled"},
 )
 
 # Alias pointing to the selected version of BoringSSL:
@@ -259,6 +359,11 @@ config_setting(
 config_setting(
     name = "linux_ppc",
     values = {"cpu": "ppc"},
+)
+
+config_setting(
+    name = "linux_s390x",
+    values = {"cpu": "s390x"},
 )
 
 config_setting(
@@ -318,6 +423,24 @@ config_setting(
     values = {"define": "manual_stamp=manual_stamp"},
 )
 
+config_setting(
+    name = "android_logger",
+    values = {"define": "logger=android"},
+)
+
+config_setting(
+    name = "libfuzzer_coverage",
+    define_values = {
+        "FUZZING_ENGINE": "libfuzzer",
+        "ENVOY_CONFIG_COVERAGE": "1",
+    },
+)
+
+config_setting(
+    name = "libfuzzer",
+    values = {"define": "FUZZING_ENGINE=libfuzzer"},
+)
+
 alias(
     name = "apple",
     actual = select(
@@ -344,6 +467,7 @@ alias(
             ":linux_x86_64": ":linux_x86_64",
             ":linux_aarch64": ":linux_aarch64",
             ":linux_ppc": ":linux_ppc",
+            ":linux_s390x": "linux_s390x",
             ":linux_mips64": ":linux_mips64",
             # If we're not on an linux platform return a value that will never match in the select() statement calling this
             # since it would have already been matched above.
@@ -364,4 +488,9 @@ alias(
             "//conditions:default": ":darwin_x86_64",
         },
     ),
+)
+
+alias(
+    name = "remote_jdk11",
+    actual = "@bazel_tools//tools/jdk:remote_jdk11",
 )

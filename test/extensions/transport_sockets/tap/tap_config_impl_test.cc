@@ -7,6 +7,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 using testing::_;
+using testing::ByMove;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -32,16 +33,16 @@ public:
         createPerTapSinkHandleManager_(trace_id)};
   }
 
-  MOCK_METHOD1(createPerSocketTapper_, PerSocketTapper*(const Network::Connection& connection));
-  MOCK_METHOD1(createPerTapSinkHandleManager_,
-               Extensions::Common::Tap::PerTapSinkHandleManager*(uint64_t trace_id));
-  MOCK_CONST_METHOD0(maxBufferedRxBytes, uint32_t());
-  MOCK_CONST_METHOD0(maxBufferedTxBytes, uint32_t());
-  MOCK_CONST_METHOD0(createMatchStatusVector,
-                     Extensions::Common::Tap::Matcher::MatchStatusVector());
-  MOCK_CONST_METHOD0(rootMatcher, const Extensions::Common::Tap::Matcher&());
-  MOCK_CONST_METHOD0(streaming, bool());
-  MOCK_CONST_METHOD0(timeSource, TimeSource&());
+  MOCK_METHOD(PerSocketTapper*, createPerSocketTapper_, (const Network::Connection& connection));
+  MOCK_METHOD(Extensions::Common::Tap::PerTapSinkHandleManager*, createPerTapSinkHandleManager_,
+              (uint64_t trace_id));
+  MOCK_METHOD(uint32_t, maxBufferedRxBytes, (), (const));
+  MOCK_METHOD(uint32_t, maxBufferedTxBytes, (), (const));
+  MOCK_METHOD(Extensions::Common::Tap::Matcher::MatchStatusVector, createMatchStatusVector, (),
+              (const));
+  MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
+  MOCK_METHOD(bool, streaming, (), (const));
+  MOCK_METHOD(TimeSource&, timeSource, (), (const));
 };
 
 class PerSocketTapperImplTest : public testing::Test {
@@ -52,12 +53,16 @@ public:
     ON_CALL(connection_, id()).WillByDefault(Return(1));
     EXPECT_CALL(*config_, createPerTapSinkHandleManager_(1)).WillOnce(Return(sink_manager_));
     EXPECT_CALL(*config_, createMatchStatusVector())
-        .WillOnce(Return(TapCommon::Matcher::MatchStatusVector(1)));
+        .WillOnce(Return(ByMove(TapCommon::Matcher::MatchStatusVector(1))));
     EXPECT_CALL(*config_, rootMatcher()).WillRepeatedly(ReturnRef(matcher_));
     EXPECT_CALL(matcher_, onNewStream(_))
         .WillOnce(Invoke([this](TapCommon::Matcher::MatchStatusVector& statuses) {
           statuses_ = &statuses;
-          statuses[0].matches_ = true;
+          if (fail_match_) {
+            statuses[0].matches_ = false;
+          } else {
+            statuses[0].matches_ = true;
+          }
           statuses[0].might_change_status_ = false;
         }));
     EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(streaming));
@@ -78,6 +83,7 @@ public:
   TapCommon::Matcher::MatchStatusVector* statuses_;
   NiceMock<Network::MockConnection> connection_;
   Event::SimulatedTimeSystem time_system_;
+  bool fail_match_{};
 };
 
 // Verify the full streaming flow.
@@ -134,6 +140,15 @@ socket_streamed_trace_segment:
     timestamp: 1970-01-01T00:00:02Z
     closed: {}
 )EOF")));
+  time_system_.setSystemTime(std::chrono::seconds(2));
+  tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(PerSocketTapperImplTest, NonMatchingFlow) {
+  fail_match_ = true;
+  setup(true);
+
+  EXPECT_CALL(*sink_manager_, submitTrace_(_)).Times(0);
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
 }

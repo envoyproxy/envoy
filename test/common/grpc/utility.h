@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "test/test_common/environment.h"
 
@@ -9,7 +9,7 @@ namespace Grpc {
 
 class TestUtility {
 public:
-  static void setTestSslGoogleGrpcConfig(envoy::api::v2::core::GrpcService& config,
+  static void setTestSslGoogleGrpcConfig(envoy::config::core::v3::GrpcService& config,
                                          bool use_client_cert) {
     auto* google_grpc = config.mutable_google_grpc();
     auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();

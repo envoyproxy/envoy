@@ -8,11 +8,13 @@
 
 #include "common/common/assert.h"
 #include "common/common/hex.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/util.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -34,9 +36,24 @@ public:
 
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
-   * the corresponding abstraction to a Zipkin-compliant JSON.
+   * the corresponding abstraction to a ProtobufWkt::Struct.
+   * @param replacements A container that is used to hold the required replacements when this object
+   * is serialized.
    */
-  virtual const std::string toJson() PURE;
+  virtual const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const PURE;
+
+  /**
+   * Serializes the a type as a Zipkin-compliant JSON representation as a string.
+   *
+   * @return a stringified JSON.
+   */
+  const std::string toJson() const {
+    Util::Replacements replacements;
+    return absl::StrReplaceAll(
+        MessageUtil::getJsonStringFromMessage(toStruct(replacements), /* pretty_print */ false,
+                                              /* always_print_primitive_fields */ true),
+        replacements);
+  };
 };
 
 /**
@@ -90,11 +107,11 @@ public:
   void setServiceName(const std::string& service_name) { service_name_ = service_name; }
 
   /**
-   * Serializes the endpoint as a Zipkin-compliant JSON representation as a string.
+   * Represents the endpoint as a protobuf struct.
    *
-   * @return a stringified JSON.
+   * @return a protobuf struct.
    */
-  const std::string toJson() override;
+  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string service_name_;
@@ -182,11 +199,11 @@ public:
   bool isSetEndpoint() const { return endpoint_.has_value(); }
 
   /**
-   * Serializes the annotation as a Zipkin-compliant JSON representation as a string.
+   * Represents the annotation as a protobuf struct.
    *
-   * @return a stringified JSON.
+   * @return a protobuf struct.
    */
-  const std::string toJson() override;
+  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   uint64_t timestamp_{0};
@@ -280,11 +297,11 @@ public:
   void setValue(const std::string& value) { value_ = value; }
 
   /**
-   * Serializes the binary annotation as a Zipkin-compliant JSON representation as a string.
-   *
-   * @return a stringified JSON.
+   * Represents the binary annotation as a protobuf struct.
+   * @param replacements Used to hold the required replacements on serialization step.
+   * @return a protobuf struct.
    */
-  const std::string toJson() override;
+  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string key_;
@@ -536,13 +553,11 @@ public:
   void setServiceName(const std::string& service_name);
 
   /**
-   * Serializes the span as a Zipkin-compliant JSON representation as a string.
-   * The resulting JSON string can be used as part of an HTTP POST call to
-   * send the span to Zipkin.
+   * Represents the binary annotation as a protobuf struct.
    *
-   * @return a stringified JSON.
+   * @return a protobuf struct.
    */
-  const std::string toJson() override;
+  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
   /**
    * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked

@@ -36,7 +36,7 @@ struct HealthyAndDegradedLoad {
 // Phantom type indicating that the type is related to host availability.
 struct Availability {};
 
-// Mapping from a priority how available the given priority is, eg. the ratio of healthy host to
+// Mapping from a priority how available the given priority is, e.g., the ratio of healthy host to
 // total hosts.
 using PriorityAvailability = Phantom<std::vector<uint32_t>, Availability>;
 

@@ -1,16 +1,16 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # Client SSL authorization L4 network filter
 # Public docs: docs/root/configuration/network_filters/client_ssl_auth_filter.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "client_ssl_auth",
@@ -32,7 +32,7 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/client_ssl_auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -46,6 +46,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/client_ssl_auth/v3:pkg_cc_proto",
     ],
 )

@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
@@ -14,9 +15,14 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/load_balancer.h"
+#include "test/mocks/upstream/priority_set.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -81,6 +87,19 @@ public:
     return nullptr;
   }
 
+  Router::MetadataMatchCriteriaConstPtr
+  filterMatchCriteria(const std::set<std::string>& names) const override {
+    auto new_criteria = std::make_unique<TestMetadataMatchCriteria>(*this);
+    for (auto it = new_criteria->matches_.begin(); it != new_criteria->matches_.end();) {
+      if (names.count(it->get()->name()) == 0) {
+        it = new_criteria->matches_.erase(it);
+      } else {
+        it++;
+      }
+    }
+    return new_criteria;
+  }
+
 private:
   std::vector<Router::MetadataMatchCriterionConstSharedPtr> matches_;
 };
@@ -96,7 +115,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
 private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;
@@ -106,7 +125,9 @@ enum class UpdateOrder { RemovesFirst, Simultaneous };
 
 class SubsetLoadBalancerTest : public testing::TestWithParam<UpdateOrder> {
 public:
-  SubsetLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
+  SubsetLoadBalancerTest()
+      : scope_(stats_store_.createScope("testprefix")),
+        stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     stats_.max_host_weight_.set(1UL);
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
@@ -173,9 +194,9 @@ public:
       configureHostSet(failover_host_metadata, *priority_set_.getMockHostSet(1));
     }
 
-    lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_,
-                                     runtime_, random_, subset_info_, ring_hash_lb_config_,
-                                     least_request_lb_config_, common_config_));
+    lb_ = std::make_shared<SubsetLoadBalancer>(
+        lb_type_, priority_set_, nullptr, stats_, *scope_, runtime_, random_, subset_info_,
+        ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -200,7 +221,7 @@ public:
     host_set_.healthy_hosts_ = host_set_.hosts_;
     host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
-    local_hosts_.reset(new HostVector());
+    local_hosts_ = std::make_shared<HostVector>();
     std::vector<HostVector> local_hosts_per_locality_vector;
     for (const auto& local_host_metadata : local_host_metadata_per_locality) {
       HostVector local_locality_hosts;
@@ -222,13 +243,14 @@ public:
             std::make_shared<ExcludedHostVector>(), HostsPerLocalityImpl::empty()),
         {}, {}, {}, absl::nullopt);
 
-    lb_.reset(new SubsetLoadBalancer(
-        lb_type_, priority_set_, &local_priority_set_, stats_, stats_store_, runtime_, random_,
-        subset_info_, ring_hash_lb_config_, least_request_lb_config_, common_config_));
+    lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, &local_priority_set_,
+                                               stats_, *scope_, runtime_, random_, subset_info_,
+                                               ring_hash_lb_config_, maglev_lb_config_,
+                                               least_request_lb_config_, common_config_);
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
-    envoy::api::v2::core::Metadata m;
+    envoy::config::core::v3::Metadata m;
     for (const auto& m_it : metadata) {
       Config::Metadata::mutableMetadataValue(m, Config::MetadataFilters::get().ENVOY_LB, m_it.first)
           .set_string_value(m_it.second);
@@ -237,7 +259,7 @@ public:
     return makeTestHost(info_, url, m);
   }
   HostSharedPtr makeHost(const std::string& url, const HostListMetadata& metadata) {
-    envoy::api::v2::core::Metadata m;
+    envoy::config::core::v3::Metadata m;
     for (const auto& m_it : metadata) {
       auto& metadata = Config::Metadata::mutableMetadataValue(
           m, Config::MetadataFilters::get().ENVOY_LB, m_it.first);
@@ -260,6 +282,34 @@ public:
     }
 
     return default_subset;
+  }
+
+  SubsetSelectorPtr
+  makeSelector(const std::set<std::string>& selector_keys,
+               envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
+                   LbSubsetSelectorFallbackPolicy fallback_policy,
+               const std::set<std::string>& fallback_keys_subset,
+               bool single_host_per_subset = false) {
+    Protobuf::RepeatedPtrField<std::string> selector_keys_mapped;
+    for (const auto& it : selector_keys) {
+      selector_keys_mapped.Add(std::string(it));
+    }
+
+    Protobuf::RepeatedPtrField<std::string> fallback_keys_subset_mapped;
+    for (const auto& it : fallback_keys_subset) {
+      fallback_keys_subset_mapped.Add(std::string(it));
+    }
+
+    return std::make_shared<SubsetSelectorImpl>(
+        selector_keys_mapped, fallback_policy, fallback_keys_subset_mapped, single_host_per_subset);
+  }
+
+  SubsetSelectorPtr makeSelector(
+      const std::set<std::string>& selector_keys,
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
+          LbSubsetSelectorFallbackPolicy fallback_policy =
+              envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
+    return makeSelector(selector_keys, fallback_policy, {});
   }
 
   void modifyHosts(HostVector add, HostVector remove, absl::optional<uint32_t> add_in_locality = {},
@@ -362,7 +412,7 @@ public:
 
   void doLbTypeTest(LoadBalancerType type) {
     EXPECT_CALL(subset_info_, fallbackPolicy())
-        .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+        .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
     lb_type_ = type;
     init({{"tcp://127.0.0.1:80", {{"version", "1.0"}}}});
@@ -375,9 +425,8 @@ public:
     EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
   }
 
-  envoy::api::v2::core::Metadata buildMetadata(const std::string& version,
-                                               bool is_default = false) const {
-    envoy::api::v2::core::Metadata metadata;
+  MetadataConstSharedPtr buildMetadata(const std::string& version, bool is_default = false) const {
+    envoy::config::core::v3::Metadata metadata;
 
     if (!version.empty()) {
       Envoy::Config::Metadata::mutableMetadataValue(
@@ -391,7 +440,26 @@ public:
           .set_string_value("true");
     }
 
-    return metadata;
+    return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
+  }
+
+  MetadataConstSharedPtr buildMetadataWithStage(const std::string& version,
+                                                const std::string& stage = "") const {
+    envoy::config::core::v3::Metadata metadata;
+
+    if (!version.empty()) {
+      Envoy::Config::Metadata::mutableMetadataValue(
+          metadata, Config::MetadataFilters::get().ENVOY_LB, "version")
+          .set_string_value(version);
+    }
+
+    if (!stage.empty()) {
+      Envoy::Config::Metadata::mutableMetadataValue(
+          metadata, Config::MetadataFilters::get().ENVOY_LB, "stage")
+          .set_string_value(stage);
+    }
+
+    return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
   }
 
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
@@ -399,12 +467,14 @@ public:
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  envoy::api::v2::Cluster::RingHashLbConfig ring_hash_lb_config_;
-  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config_;
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::RingHashLbConfig ring_hash_lb_config_;
+  envoy::config::cluster::v3::Cluster::MaglevLbConfig maglev_lb_config_;
+  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopePtr scope_;
   ClusterStats stats_;
   PrioritySetImpl local_priority_set_;
   HostVectorSharedPtr local_hosts_;
@@ -414,7 +484,7 @@ public:
 
 TEST_F(SubsetLoadBalancerTest, NoFallback) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   init();
 
@@ -433,7 +503,7 @@ TEST_F(SubsetLoadBalancerTest, DeregisterCallbacks) {
 
 TEST_P(SubsetLoadBalancerTest, NoFallbackAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   init();
 
@@ -446,7 +516,7 @@ TEST_P(SubsetLoadBalancerTest, NoFallbackAfterUpdate) {
 
 TEST_F(SubsetLoadBalancerTest, FallbackAnyEndpoint) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
   init();
 
@@ -457,7 +527,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackAnyEndpoint) {
 
 TEST_P(SubsetLoadBalancerTest, FallbackAnyEndpointAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
   init();
 
@@ -472,7 +542,7 @@ TEST_P(SubsetLoadBalancerTest, FallbackAnyEndpointAfterUpdate) {
 
 TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
@@ -489,7 +559,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {
 
 TEST_F(SubsetLoadBalancerTest, FallbackPanicMode) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
   EXPECT_CALL(subset_info_, panicModeAny()).WillRepeatedly(Return(true));
 
   // The default subset will be empty.
@@ -509,7 +579,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackPanicMode) {
 
 TEST_P(SubsetLoadBalancerTest, FallbackPanicModeWithUpdates) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
   EXPECT_CALL(subset_info_, panicModeAny()).WillRepeatedly(Return(true));
 
   // The default subset will be empty.
@@ -529,7 +599,7 @@ TEST_P(SubsetLoadBalancerTest, FallbackPanicModeWithUpdates) {
 
 TEST_P(SubsetLoadBalancerTest, FallbackDefaultSubsetAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
@@ -551,7 +621,7 @@ TEST_P(SubsetLoadBalancerTest, FallbackDefaultSubsetAfterUpdate) {
 
 TEST_F(SubsetLoadBalancerTest, FallbackEmptyDefaultSubsetConvertsToAnyEndpoint) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   EXPECT_CALL(subset_info_, defaultSubset())
       .WillRepeatedly(ReturnRef(ProtobufWkt::Struct::default_instance()));
@@ -566,7 +636,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackEmptyDefaultSubsetConvertsToAnyEndpoint) 
 
 TEST_F(SubsetLoadBalancerTest, FallbackOnUnknownMetadata) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
   init();
 
@@ -579,11 +649,11 @@ TEST_F(SubsetLoadBalancerTest, FallbackOnUnknownMetadata) {
 
 TEST_F(SubsetLoadBalancerTest, BalancesSubset) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -607,11 +677,11 @@ TEST_F(SubsetLoadBalancerTest, BalancesSubset) {
 
 TEST_P(SubsetLoadBalancerTest, BalancesSubsetAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -647,11 +717,11 @@ TEST_P(SubsetLoadBalancerTest, BalancesSubsetAfterUpdate) {
 
 TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabled) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
   EXPECT_CALL(subset_info_, listAsAny()).WillRepeatedly(Return(true));
 
@@ -675,11 +745,11 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabled) {
 
 TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
   EXPECT_CALL(subset_info_, listAsAny()).WillRepeatedly(Return(true));
 
@@ -715,11 +785,11 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
 
 TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleListsForSingleHost) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {std::make_shared<SubsetSelector>(
-      SubsetSelector{{"version", "hardware"},
-                     envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version", "hardware"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
   EXPECT_CALL(subset_info_, listAsAny()).WillRepeatedly(Return(true));
 
@@ -755,11 +825,11 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleListsForSingleHost) {
 
 TEST_P(SubsetLoadBalancerTest, ListAsAnyDisable) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   init({});
@@ -779,11 +849,11 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyDisable) {
 // Test that adding backends to a failover group causes no problems.
 TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -814,10 +884,12 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   TestLoadBalancerContext context_default({{"default", "true"}});
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"default"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"default"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -825,7 +897,7 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
 
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   // Add hosts initial hosts.
   init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
@@ -894,6 +966,115 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
 }
 
+TEST_P(SubsetLoadBalancerTest, EmptySubsetsPurged) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector({"version"}),
+                                                     makeSelector({"version", "stage"})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  // Simple add and remove.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"stage", "prod"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+
+  host_set_.hosts_[0]->metadata(buildMetadataWithStage("1.3"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+
+  // Move host that was in the version + stage subset into a new version only subset.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.4"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_removed_.value());
+
+  // Create a new version + stage subset.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.5", "devel"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(7U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_removed_.value());
+
+  // Now move it back to its original version + stage subset.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.0", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(9U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(6U, stats_.lb_subsets_removed_.value());
+
+  // Finally, remove the original version + stage subset again.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.6"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(10U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(8U, stats_.lb_subsets_removed_.value());
+}
+
+TEST_P(SubsetLoadBalancerTest, EmptySubsetsPurgedCollapsed) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector({"version"}),
+                                                     makeSelector({"version", "stage"})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  // Init subsets.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"stage", "prod"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+
+  // Get rid of 1.0.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.2", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+
+  // Get rid of stage prod.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.2"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(1U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_removed_.value());
+
+  // Add stage prod back.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.2", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_removed_.value());
+}
+
+TEST_P(SubsetLoadBalancerTest, EmptySubsetsPurgedVersionChanged) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector({"version"}),
+                                                     makeSelector({"version", "stage"})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  // Init subsets.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"stage", "prod"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+
+  // Get rid of 1.0.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.2", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+
+  // Change versions.
+  host_set_.hosts_[0]->metadata(buildMetadataWithStage("1.3"));
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.4", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(7U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_removed_.value());
+}
+
 TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   TestLoadBalancerContext context_10({{"version", "1.0"}});
   TestLoadBalancerContext context_12({{"version", "1.2"}});
@@ -904,13 +1085,15 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
 
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"default"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"default"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   // Add hosts initial hosts.
@@ -987,11 +1170,11 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   init({
@@ -1022,14 +1205,15 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingUnknownHost) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(
-          SubsetSelector{{"stage", "version"},
-                         envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+      makeSelector(
+          {"stage", "version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1050,13 +1234,15 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingUnknownHost) {
 
 TEST_F(SubsetLoadBalancerTest, UpdateModifyingOnlyHostHealth) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"hardware"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"hardware"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1090,13 +1276,15 @@ TEST_F(SubsetLoadBalancerTest, UpdateModifyingOnlyHostHealth) {
 
 TEST_F(SubsetLoadBalancerTest, BalancesDisjointSubsets) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"hardware"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"hardware"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1118,14 +1306,15 @@ TEST_F(SubsetLoadBalancerTest, BalancesDisjointSubsets) {
 
 TEST_F(SubsetLoadBalancerTest, BalancesOverlappingSubsets) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(
-          SubsetSelector{{"stage", "version"},
-                         envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+      makeSelector(
+          {"stage", "version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1158,14 +1347,15 @@ TEST_F(SubsetLoadBalancerTest, BalancesOverlappingSubsets) {
 
 TEST_F(SubsetLoadBalancerTest, BalancesNestedSubsets) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(
-          SubsetSelector{{"stage", "version"},
-                         envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"stage"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+      makeSelector(
+          {"stage", "version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"stage"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1196,11 +1386,11 @@ TEST_F(SubsetLoadBalancerTest, BalancesNestedSubsets) {
 
 TEST_F(SubsetLoadBalancerTest, IgnoresUnselectedMetadata) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1222,11 +1412,11 @@ TEST_F(SubsetLoadBalancerTest, IgnoresUnselectedMetadata) {
 TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1240,9 +1430,9 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
-                                   random_, subset_info_, ring_hash_lb_config_,
-                                   least_request_lb_config_, common_config_));
+  lb_ = std::make_shared<SubsetLoadBalancer>(
+      lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
@@ -1271,11 +1461,10 @@ TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesMaglev) { doLbTypeTest(LoadBalan
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"x"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"x"}, envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1318,11 +1507,10 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"x"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"x"}, envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1377,14 +1565,14 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1434,14 +1622,14 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1504,11 +1692,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
@@ -1559,11 +1747,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
@@ -1627,7 +1815,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
 
 TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
   init();
 
   ProtobufWkt::Value str_value;
@@ -1661,9 +1849,9 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
-                                   random_, subset_info_, ring_hash_lb_config_,
-                                   least_request_lb_config_, common_config_));
+  lb_ = std::make_shared<SubsetLoadBalancer>(
+      lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -1684,9 +1872,9 @@ TEST_F(SubsetLoadBalancerTest, DoesNotCheckHostHealth) {
 
   EXPECT_CALL(*mock_host, weight()).WillRepeatedly(Return(1));
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
-                                   random_, subset_info_, ring_hash_lb_config_,
-                                   least_request_lb_config_, common_config_));
+  lb_ = std::make_shared<SubsetLoadBalancer>(
+      lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
@@ -1707,9 +1895,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
-                                   random_, subset_info_, ring_hash_lb_config_,
-                                   least_request_lb_config_, common_config_));
+  lb_ = std::make_shared<SubsetLoadBalancer>(
+      lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -1720,9 +1908,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
 
 TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
   EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
   EXPECT_CALL(subset_info_, localityWeightAware()).WillRepeatedly(Return(true));
@@ -1742,9 +1930,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
       },
       host_set_, {50, 50});
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
-                                   random_, subset_info_, ring_hash_lb_config_,
-                                   least_request_lb_config_, common_config_));
+  lb_ = std::make_shared<SubsetLoadBalancer>(
+      lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   // Since we scale the locality weights by number of hosts removed, we expect to see the second
@@ -1764,9 +1952,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
 
 TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
   EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
   EXPECT_CALL(subset_info_, localityWeightAware()).WillRepeatedly(Return(true));
@@ -1787,9 +1975,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       },
       host_set_, {2, 2});
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
-                                   random_, subset_info_, ring_hash_lb_config_,
-                                   least_request_lb_config_, common_config_));
+  lb_ = std::make_shared<SubsetLoadBalancer>(
+      lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
   TestLoadBalancerContext context({{"version", "1.0"}});
 
   // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
@@ -1804,9 +1992,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
 
 // Regression for bug where missing locality weights crashed scaling and locality aware subset LBs.
 TEST_F(SubsetLoadBalancerTest, ScaleLocalityWeightsWithNoLocalityWeights) {
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
   EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
   EXPECT_CALL(subset_info_, localityWeightAware()).WillRepeatedly(Return(true));
@@ -1819,18 +2007,18 @@ TEST_F(SubsetLoadBalancerTest, ScaleLocalityWeightsWithNoLocalityWeights) {
       },
       host_set_);
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
-                                   random_, subset_info_, ring_hash_lb_config_,
-                                   least_request_lb_config_, common_config_));
+  lb_ = std::make_shared<SubsetLoadBalancer>(
+      lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
 }
 
 TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   init({
@@ -1848,11 +2036,11 @@ TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackPerSelector) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1876,13 +2064,39 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackPerSelector) {
   EXPECT_EQ(4U, stats_.lb_subsets_selected_.value());
 }
 
-TEST_P(SubsetLoadBalancerTest, SubsetSelectorFallbackOverridesTopLevelOne) {
+TEST_P(SubsetLoadBalancerTest, FallbackNotDefinedForIntermediateSelector) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK})};
+      makeSelector(
+          {"stage"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"stage", "version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT)};
+
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  init({{"tcp://127.0.0.1:80", {{"version", "1.0"}, {"stage", "dev"}}},
+        {"tcp://127.0.0.1:81", {{"version", "1.0"}, {"stage", "canary"}}}});
+
+  TestLoadBalancerContext context_match_host0({{"stage", "dev"}});
+  TestLoadBalancerContext context_stage_nx({{"stage", "test"}});
+
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_stage_nx));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_stage_nx));
+}
+
+TEST_P(SubsetLoadBalancerTest, SubsetSelectorFallbackOverridesTopLevelOne) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1897,11 +2111,11 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorFallbackOverridesTopLevelOne) {
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackMatchesTopLevelOne) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1917,15 +2131,18 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackMatchesTopLevelOne) {
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAnyFallbackPerSelector) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"app"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"foo"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET),
+      makeSelector(
+          {"app"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT),
+      makeSelector(
+          {"foo"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1953,14 +2170,14 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAnyFallbackPerSelector) {
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1983,11 +2200,11 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAfterUpdate) {
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorAnyAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT})};
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT)};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -2009,26 +2226,32 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorAnyAfterUpdate) {
 
 TEST_P(SubsetLoadBalancerTest, FallbackForCompoundSelector) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
   const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"foo", "bar"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED}),
-      std::make_shared<SubsetSelector>(
-          SubsetSelector{{"version", "hardware", "stage"},
-                         envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK}),
-      std::make_shared<SubsetSelector>(SubsetSelector{
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED),
+      makeSelector(
+          {"version", "hardware", "stage"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK),
+      makeSelector(
           {"version", "hardware"},
-          envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET})};
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET),
+      makeSelector(
+          {"version", "stage"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET,
+          {"version"})};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   // Add hosts initial hosts.
   init({{"tcp://127.0.0.1:80", {{"version", "1.0"}, {"hardware", "c32"}}},
         {"tcp://127.0.0.1:81", {{"version", "1.0"}, {"hardware", "c32"}, {"foo", "bar"}}},
-        {"tcp://127.0.0.1:82", {{"version", "2.0"}, {"hardware", "c32"}, {"stage", "dev"}}}});
+        {"tcp://127.0.0.1:82", {{"version", "2.0"}, {"hardware", "c32"}, {"stage", "dev"}}},
+        {"tcp://127.0.0.1:83", {{"version", "2.0"}}}});
 
   TestLoadBalancerContext context_match_host0({{"version", "1.0"}, {"hardware", "c32"}});
   TestLoadBalancerContext context_ver_nx({{"version", "x"}, {"hardware", "c32"}});
@@ -2039,6 +2262,8 @@ TEST_P(SubsetLoadBalancerTest, FallbackForCompoundSelector) {
   TestLoadBalancerContext context_match_host2(
       {{"version", "2.0"}, {"hardware", "c32"}, {"stage", "dev"}});
   TestLoadBalancerContext context_ver_20({{"version", "2.0"}});
+  TestLoadBalancerContext context_ver_stage_match_host2({{"version", "2.0"}, {"stage", "dev"}});
+  TestLoadBalancerContext context_ver_stage_nx({{"version", "2.0"}, {"stage", "canary"}});
 
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_ver_nx));
@@ -2047,9 +2272,206 @@ TEST_P(SubsetLoadBalancerTest, FallbackForCompoundSelector) {
   EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_match_host2));
   EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_match_host2));
   EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_20));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_match_host2));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_match_host2));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_ver_stage_nx));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_nx));
+}
+
+TEST_P(SubsetLoadBalancerTest, KeysSubsetFallbackChained) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      makeSelector(
+          {"stage"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK),
+      makeSelector(
+          {"stage", "version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET,
+          {"stage"}),
+      makeSelector(
+          {"stage", "version", "hardware"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET,
+          {"version", "stage"})};
+
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  init({{"tcp://127.0.0.1:80", {{"version", "1.0"}, {"hardware", "c32"}, {"stage", "dev"}}},
+        {"tcp://127.0.0.1:81", {{"version", "2.0"}, {"hardware", "c64"}, {"stage", "dev"}}},
+        {"tcp://127.0.0.1:82", {{"version", "1.0"}, {"hardware", "c32"}, {"stage", "test"}}}});
+
+  TestLoadBalancerContext context_match_host0(
+      {{"version", "1.0"}, {"hardware", "c32"}, {"stage", "dev"}});
+  TestLoadBalancerContext context_hw_nx(
+      {{"version", "2.0"}, {"hardware", "arm"}, {"stage", "dev"}});
+  TestLoadBalancerContext context_ver_hw_nx(
+      {{"version", "1.2"}, {"hardware", "arm"}, {"stage", "dev"}});
+
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_hw_nx));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_hw_nx));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_ver_hw_nx));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_ver_hw_nx));
+}
+
+TEST_P(SubsetLoadBalancerTest, KeysSubsetFallbackToNotExistingSelector) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"stage", "version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET,
+      {"stage"})};
+
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  init({{"tcp://127.0.0.1:80", {{"version", "1.0"}, {"stage", "dev"}}}});
+
+  TestLoadBalancerContext context_nx({{"version", "1.0"}, {"stage", "test"}});
+
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_nx));
+  EXPECT_EQ(1U, stats_.lb_subsets_fallback_.value());
 }
 
 INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerTest,
+                         testing::ValuesIn({UpdateOrder::RemovesFirst, UpdateOrder::Simultaneous}));
+
+class SubsetLoadBalancerSingleHostPerSubsetTest : public SubsetLoadBalancerTest {
+public:
+  SubsetLoadBalancerSingleHostPerSubsetTest()
+      : default_subset_selectors_({
+            makeSelector({"key"}, true),
+        }) {
+    ON_CALL(subset_info_, subsetSelectors()).WillByDefault(ReturnRef(default_subset_selectors_));
+    ON_CALL(subset_info_, fallbackPolicy())
+        .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+  }
+
+  using SubsetLoadBalancerTest::init;
+  void init() {
+    init({
+        {"tcp://127.0.0.1:80", {}},
+        {"tcp://127.0.0.1:81", {{"key", "a"}}},
+        {"tcp://127.0.0.1:82", {{"key", "b"}}},
+
+    });
+  }
+
+  using SubsetLoadBalancerTest::makeSelector;
+  SubsetSelectorPtr makeSelector(const std::set<std::string>& selector_keys,
+                                 bool single_host_per_subset) {
+    return makeSelector(
+        selector_keys,
+        envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED, {},
+        single_host_per_subset);
+  }
+
+  std::vector<SubsetSelectorPtr> default_subset_selectors_;
+};
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectMultipleSelectors) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      makeSelector({"version"}, false),
+      makeSelector({"test"}, true),
+  };
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
+                            "subset_lb selector: single_host_per_subset cannot be set when there "
+                            "are multiple subset selectors.");
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectMultipleKeys) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      makeSelector({"version", "test"}, true),
+  };
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
+                            "subset_lb selector: single_host_per_subset cannot bet set when there "
+                            "isn't exactly 1 key or if that key is empty.");
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectEmptyKey) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      makeSelector({""}, true),
+  };
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
+                            "subset_lb selector: single_host_per_subset cannot bet set when there "
+                            "isn't exactly 1 key or if that key is empty.");
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, DuplicateMetadataStat) {
+  init({
+      {"tcp://127.0.0.1:80", {{"key", "a"}}},
+      {"tcp://127.0.0.1:81", {{"key", "a"}}},
+      {"tcp://127.0.0.1:82", {{"key", "a"}}},
+      {"tcp://127.0.0.1:83", {{"key", "b"}}},
+  });
+  // The first 'a' is the original, the next 2 instances of 'a' are duplicates (counted
+  // in stat), and 'b' is another non-duplicate.
+  for (auto& gauge : stats_store_.gauges()) {
+    ENVOY_LOG_MISC(error, "name {} value {}", gauge->name(), gauge->value());
+  }
+  EXPECT_EQ(2, TestUtility::findGauge(stats_store_,
+                                      "testprefix.lb_subsets_single_host_per_subset_duplicate")
+                   ->value());
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, Match) {
+  init();
+
+  TestLoadBalancerContext host_1({{"key", "a"}});
+  TestLoadBalancerContext host_2({{"key", "b"}});
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_1));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_1));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_2));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_2));
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, FallbackOnUnknownMetadata) {
+  init();
+
+  TestLoadBalancerContext context_unknown_key({{"unknown", "unknown"}});
+  TestLoadBalancerContext context_unknown_value({{"key", "unknown"}});
+
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_unknown_value));
+}
+
+TEST_P(SubsetLoadBalancerSingleHostPerSubsetTest, Update) {
+  init();
+
+  TestLoadBalancerContext host_a({{"key", "a"}});
+  TestLoadBalancerContext host_b({{"key", "b"}});
+  TestLoadBalancerContext host_c({{"key", "c"}});
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_c)); // fallback
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_c)); // fallback
+
+  HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"key", "c"}});
+
+  // Remove b, add c
+  modifyHosts({added_host}, {host_set_.hosts_.back()});
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_c));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_c));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b)); // fallback
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_b)); // fallback
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_b)); // fallback
+}
+
+INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerSingleHostPerSubsetTest,
                          testing::ValuesIn({UpdateOrder::RemovesFirst, UpdateOrder::Simultaneous}));
 
 } // namespace SubsetLoadBalancerTest

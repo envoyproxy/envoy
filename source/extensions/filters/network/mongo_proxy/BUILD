@@ -1,16 +1,16 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # Mongo proxy L4 network filter (observability and fault injection).
 # Public docs: docs/root/configuration/network_filters/mongo_proxy_filter.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "bson_interface",
@@ -79,7 +79,6 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "//source/extensions/filters/common/fault:fault_config_lib",
         "//source/extensions/filters/network:well_known_names",
-        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:pkg_cc_proto",
     ],
 )
 
@@ -90,6 +89,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 
@@ -113,6 +113,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/mongo_proxy/v3:pkg_cc_proto",
     ],
 )

@@ -114,6 +114,30 @@ TEST(UtilityTest, TestLongExpirationTime) {
   EXPECT_EQ(TEST_LONG_VALIDITY_CERT_NOT_AFTER, formatted);
 }
 
+TEST(UtilityTest, GetLastCryptoError) {
+  // Clearing the error stack leaves us with no error to get.
+  ERR_clear_error();
+  EXPECT_FALSE(Utility::getLastCryptoError().has_value());
+
+  ERR_put_error(ERR_LIB_SSL, 0, ERR_R_MALLOC_FAILURE, __FILE__, __LINE__);
+  EXPECT_EQ(Utility::getLastCryptoError().value(),
+            "error:10000041:SSL routines:OPENSSL_internal:malloc failure");
+
+  // We consumed the last error, so back to not having an error to get.
+  EXPECT_FALSE(Utility::getLastCryptoError().has_value());
+}
+
+TEST(UtilityTest, TestGetCertificationExtensionValue) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
+  EXPECT_EQ("\xc\x9Something", Utility::getCertificateExtensionValue(*cert, "1.2.3.4.5.6.7.8"));
+  EXPECT_EQ("\x30\x3\x1\x1\xFF", Utility::getCertificateExtensionValue(*cert, "1.2.3.4.5.6.7.9"));
+  EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, "1.2.3.4.5.6.7.10"));
+  EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, "1.2.3.4"));
+  EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, ""));
+  EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, "foo"));
+}
+
 } // namespace
 } // namespace Tls
 } // namespace TransportSockets

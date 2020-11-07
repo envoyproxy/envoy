@@ -1,10 +1,12 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_cc//cc:defs.bzl", "cc_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -32,6 +34,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
@@ -51,17 +54,49 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["protobuf"],
+    external_deps = [
+        "protobuf",
+        "yaml_cpp",
+    ],
     deps = [
         ":message_validator_lib",
         ":protobuf",
+        ":type_util_lib",
+        ":well_known_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
-        "//source/common/json:json_loader_lib",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "//source/common/config:api_type_oracle_lib",
+        "//source/common/config:version_converter_lib",
+        "//source/common/protobuf:visitor_lib",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
+        "@envoy_api//envoy/annotations:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "type_util_lib",
+    srcs = ["type_util.cc"],
+    hdrs = ["type_util.h"],
+    deps = [
+        "//source/common/protobuf",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "visitor_lib",
+    srcs = ["visitor.cc"],
+    hdrs = ["visitor.h"],
+    deps = [":protobuf"],
+)
+
+envoy_cc_library(
+    name = "well_known_lib",
+    hdrs = ["well_known.h"],
 )

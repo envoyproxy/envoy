@@ -2,15 +2,18 @@
 
 #include <memory>
 
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using Envoy::Http::LowerCaseString;
 
 namespace Envoy {
@@ -34,7 +37,7 @@ using JwtConstValues = ConstSingleton<JwtConstValueStruct>;
 // A base JwtLocation object to store token and specified_issuers.
 class JwtLocationBase : public JwtLocation {
 public:
-  JwtLocationBase(const std::string& token, const std::unordered_set<std::string>& issuers)
+  JwtLocationBase(const std::string& token, const absl::node_hash_set<std::string>& issuers)
       : token_(token), specified_issuers_(issuers) {}
 
   // Get the token string
@@ -49,13 +52,13 @@ private:
   // Extracted token.
   const std::string token_;
   // Stored issuers specified the location.
-  const std::unordered_set<std::string>& specified_issuers_;
+  const absl::node_hash_set<std::string>& specified_issuers_;
 };
 
 // The JwtLocation for header extraction.
 class JwtHeaderLocation : public JwtLocationBase {
 public:
-  JwtHeaderLocation(const std::string& token, const std::unordered_set<std::string>& issuers,
+  JwtHeaderLocation(const std::string& token, const absl::node_hash_set<std::string>& issuers,
                     const LowerCaseString& header)
       : JwtLocationBase(token, issuers), header_(header) {}
 
@@ -69,7 +72,7 @@ private:
 // The JwtLocation for param extraction.
 class JwtParamLocation : public JwtLocationBase {
 public:
-  JwtParamLocation(const std::string& token, const std::unordered_set<std::string>& issuers,
+  JwtParamLocation(const std::string& token, const absl::node_hash_set<std::string>& issuers,
                    const std::string&)
       : JwtLocationBase(token, issuers) {}
 
@@ -82,13 +85,15 @@ public:
  * The class implements Extractor interface
  *
  */
-class ExtractorImpl : public Extractor {
+class ExtractorImpl : public Logger::Loggable<Logger::Id::jwt>, public Extractor {
 public:
   ExtractorImpl(const JwtProvider& provider);
 
-  ExtractorImpl(const JwtAuthentication& config);
+  ExtractorImpl(
+      const std::vector<const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider*>&
+          providers);
 
-  std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const override;
+  std::vector<JwtLocationConstPtr> extract(const Http::RequestHeaderMap& headers) const override;
 
   void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
 
@@ -115,7 +120,7 @@ private:
     // The value prefix. e.g. for "Bearer <token>", the value_prefix is "Bearer ".
     std::string value_prefix_;
     // Issuers that specified this header.
-    std::unordered_set<std::string> specified_issuers_;
+    absl::node_hash_set<std::string> specified_issuers_;
   };
   using HeaderLocationSpecPtr = std::unique_ptr<HeaderLocationSpec>;
   // The map of (header + value_prefix) to HeaderLocationSpecPtr
@@ -124,7 +129,7 @@ private:
   // ParamMap value type to store issuers that specified this header.
   struct ParamLocationSpec {
     // Issuers that specified this param.
-    std::unordered_set<std::string> specified_issuers_;
+    absl::node_hash_set<std::string> specified_issuers_;
   };
   // The map of a parameter key to set of issuers specified the parameter
   std::map<std::string, ParamLocationSpec> param_locations_;
@@ -132,14 +137,14 @@ private:
   std::vector<LowerCaseString> forward_payload_headers_;
 };
 
-ExtractorImpl::ExtractorImpl(const JwtAuthentication& config) {
-  for (const auto& it : config.providers()) {
-    const auto& provider = it.second;
-    addProvider(provider);
+ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
+
+ExtractorImpl::ExtractorImpl(const JwtProviderList& providers) {
+  for (const auto& provider : providers) {
+    ASSERT(provider);
+    addProvider(*provider);
   }
 }
-
-ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
 
 void ExtractorImpl::addProvider(const JwtProvider& provider) {
   for (const auto& header : provider.from_headers()) {
@@ -150,7 +155,7 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
   }
   // If not specified, use default locations.
   if (provider.from_headers().empty() && provider.from_params().empty()) {
-    addHeaderConfig(provider.issuer(), Http::Headers::get().Authorization,
+    addHeaderConfig(provider.issuer(), Http::CustomHeaders::get().Authorization,
                     JwtConstValues::get().BearerPrefix);
     addQueryParamConfig(provider.issuer(), JwtConstValues::get().AccessTokenParam);
   }
@@ -161,6 +166,7 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
 
 void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
                                     const std::string& value_prefix) {
+  ENVOY_LOG(debug, "addHeaderConfig for issuer {} at {}", issuer, header_name.get());
   const std::string map_key = header_name.get() + value_prefix;
   auto& header_location_spec = header_locations_[map_key];
   if (!header_location_spec) {
@@ -174,15 +180,18 @@ void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::st
   param_location_spec.specified_issuers_.insert(issuer);
 }
 
-std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& headers) const {
+std::vector<JwtLocationConstPtr>
+ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   std::vector<JwtLocationConstPtr> tokens;
 
   // Check header locations first
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
-    const Http::HeaderEntry* entry = headers.get(location_spec->header_);
-    if (entry) {
-      auto value_str = entry->value().getStringView();
+    ENVOY_LOG(debug, "extract {}", location_it.first);
+    const auto result =
+        Http::HeaderUtility::getAllOfHeaderAsString(headers, location_spec->header_);
+    if (result.result().has_value()) {
+      auto value_str = result.result().value();
       if (!location_spec->value_prefix_.empty()) {
         const auto pos = value_str.find(location_spec->value_prefix_);
         if (pos == absl::string_view::npos) {
@@ -202,7 +211,7 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
   }
 
   // Check query parameter locations.
-  const auto& params = Http::Utility::parseQueryString(headers.Path()->value().getStringView());
+  const auto& params = Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
   for (const auto& location_it : param_locations_) {
     const auto& param_key = location_it.first;
     const auto& location_spec = location_it.second;
@@ -253,12 +262,12 @@ void ExtractorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
 
 } // namespace
 
-ExtractorConstPtr Extractor::create(const JwtAuthentication& config) {
-  return std::make_unique<ExtractorImpl>(config);
-}
-
 ExtractorConstPtr Extractor::create(const JwtProvider& provider) {
   return std::make_unique<ExtractorImpl>(provider);
+}
+
+ExtractorConstPtr Extractor::create(const JwtProviderList& providers) {
+  return std::make_unique<ExtractorImpl>(providers);
 }
 
 } // namespace JwtAuthn

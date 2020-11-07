@@ -32,6 +32,11 @@ public:
   // @param length supplies the GRPC data frame length.
   // @param output the buffer to store the encoded data. Its size must be 5.
   void newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& output);
+
+  // Prepend the gRPC frame into the buffer.
+  // @param flags supplies the GRPC data frame flags.
+  // @param buffer the buffer with the message payload.
+  void prependFrameHeader(uint8_t flags, Buffer::Instance& buffer);
 };
 
 // Wire format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame

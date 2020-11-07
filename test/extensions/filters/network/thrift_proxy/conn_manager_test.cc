@@ -1,6 +1,7 @@
 #include <memory>
 
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -11,11 +12,11 @@
 #include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/header_transport_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -36,7 +37,7 @@ namespace ThriftProxy {
 
 class TestConfigImpl : public ConfigImpl {
 public:
-  TestConfigImpl(envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy proto_config,
+  TestConfigImpl(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config,
                  Server::Configuration::MockFactoryContext& context,
                  ThriftFilters::DecoderFilterSharedPtr decoder_filter, ThriftFilterStats& stats)
       : ConfigImpl(proto_config, context), decoder_filter_(decoder_filter), stats_(stats) {}
@@ -95,7 +96,7 @@ public:
 
     proto_config_.set_stat_prefix("test");
 
-    decoder_filter_.reset(new NiceMock<ThriftFilters::MockDecoderFilter>());
+    decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
 
     config_ = std::make_unique<TestConfigImpl>(proto_config_, context_, decoder_filter_, stats_);
     if (custom_transport_) {
@@ -235,6 +236,26 @@ public:
     }
   }
 
+  void writeVoidFramedBinaryMessage(Buffer::Instance& buffer, int32_t seq_id) {
+    Buffer::OwnedImpl msg;
+    ProtocolPtr proto =
+        NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
+    MessageMetadata metadata;
+    metadata.setMethodName("name");
+    metadata.setMessageType(MessageType::Reply);
+    metadata.setSequenceId(seq_id);
+
+    proto->writeMessageBegin(msg, metadata);
+    proto->writeStructBegin(msg, "");
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0);
+    proto->writeStructEnd(msg);
+    proto->writeMessageEnd(msg);
+
+    TransportPtr transport =
+        NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
+    transport->encodeFrame(buffer, metadata, msg);
+  }
+
   void writeFramedBinaryTApplicationException(Buffer::Instance& buffer, int32_t seq_id) {
     Buffer::OwnedImpl msg;
     ProtocolPtr proto =
@@ -293,16 +314,16 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   ThriftFilterStats stats_;
-  envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy proto_config_;
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
 
   std::unique_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<ConnectionManager> filter_;
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
@@ -653,6 +674,40 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
 
   writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
+  initializeFilter();
+  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  writeVoidFramedBinaryMessage(write_buffer_, 0x0F);
 
   FramedTransportImpl transport;
   BinaryProtocolImpl proto;
@@ -1311,9 +1366,9 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
       }));
   EXPECT_CALL(*decoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        const Http::HeaderEntry* header = metadata->headers().get(key);
-        EXPECT_NE(nullptr, header);
-        EXPECT_EQ("value", header->value().getStringView());
+        const auto header = metadata->headers().get(key);
+        EXPECT_FALSE(header.empty());
+        EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
       }));
 
@@ -1335,7 +1390,7 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
   EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
-TEST_F(ThriftConnectionManagerTest, transportEndWhenRemoteClose) {
+TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   initializeFilter();
   writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 

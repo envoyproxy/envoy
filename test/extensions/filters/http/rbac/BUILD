@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -10,6 +8,8 @@ load(
     "envoy_extension_cc_test",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_extension_cc_test(
@@ -18,7 +18,10 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.rbac",
     deps = [
         "//source/extensions/filters/http/rbac:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )
 
@@ -33,6 +36,8 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/rbac:route_config_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )
 
@@ -44,7 +49,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/rbac:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
-        "@envoy_api//envoy/config/filter/http/rbac/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -55,5 +61,6 @@ envoy_extension_cc_mock(
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )

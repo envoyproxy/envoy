@@ -20,8 +20,8 @@ protected:
   ListenerImplTestBase()
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
-            Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+            Network::Test::getCanonicalLoopbackAddress(version_), Socket::Type::Stream)),
+        api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   Event::DispatcherImpl& dispatcherImpl() {
     // We need access to the concrete impl type in order to instantiate a

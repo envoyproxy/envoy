@@ -1,8 +1,10 @@
-#include "envoy/config/filter/network/rbac/v2/rbac.pb.validate.h"
+#include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
 #include "extensions/filters/network/rbac/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
@@ -31,10 +33,10 @@ public:
 
 private:
   void checkRule(const std::string& policy_json) {
-    envoy::config::rbac::v2::Policy policy_proto{};
+    envoy::config::rbac::v3::Policy policy_proto{};
     TestUtility::loadFromJson(policy_json, policy_proto);
 
-    envoy::config::filter::network::rbac::v2::RBAC config{};
+    envoy::extensions::filters::network::rbac::v3::RBAC config{};
     config.set_stat_prefix("test");
     (*config.mutable_rules()->mutable_policies())["foo"] = policy_proto;
 
@@ -49,10 +51,10 @@ private:
 };
 
 TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
-  envoy::config::rbac::v2::Policy policy;
+  envoy::config::rbac::v3::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
-  envoy::config::filter::network::rbac::v2::RBAC config;
+  envoy::extensions::filters::network::rbac::v3::RBAC config;
   config.set_stat_prefix("stats");
   (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
@@ -66,9 +68,8 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
 
 TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::config::filter::network::rbac::v2::RBAC*>(
-      factory.createEmptyConfigProto().get());
-  EXPECT_NE(nullptr, config);
+  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::network::rbac::v3::RBAC*>(
+                         factory.createEmptyConfigProto().get()));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, InvalidPermission) {

@@ -1,11 +1,16 @@
+#include "envoy/http/metadata_interface.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "common/common/random_generator.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
-#include "common/runtime/runtime_impl.h"
+
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "http2_frame.h"
 #include "nghttp2/nghttp2.h"
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
@@ -127,14 +132,14 @@ public:
   void submitMetadata(const MetadataMapVector& metadata_map_vector) {
     // Creates metadata payload.
     encoder_.createPayload(metadata_map_vector);
-    while (encoder_.hasNextFrame()) {
-      int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE,
-                                            encoder_.nextEndMetadata(), STREAM_ID, nullptr);
-      EXPECT_EQ(0, result);
-      // Sends METADATA to nghttp2.
-      result = nghttp2_session_send(session_);
+    for (uint8_t flags : encoder_.payloadFrameFlagBytes()) {
+      int result =
+          nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flags, STREAM_ID, nullptr);
       EXPECT_EQ(0, result);
     }
+    // Triggers nghttp2 to populate the payloads of the METADATA frames.
+    int result = nghttp2_session_send(session_);
+    EXPECT_EQ(0, result);
   }
 
   nghttp2_session* session_ = nullptr;
@@ -150,7 +155,7 @@ public:
   // Application data passed to nghttp2.
   UserData user_data_;
 
-  Runtime::RandomGeneratorImpl random_generator_;
+  Random::RandomGeneratorImpl random_generator_;
 };
 
 TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
@@ -167,7 +172,8 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   });
 
   // metadata_map exceeds size limit.
-  EXPECT_FALSE(encoder_.createPayload(metadata_map_vector));
+  EXPECT_LOG_CONTAINS("error", "exceeds the max bound.",
+                      EXPECT_FALSE(encoder_.createPayload(metadata_map_vector)));
 
   std::string payload = std::string(1024 * 1024 + 1, 'a');
   EXPECT_FALSE(
@@ -303,7 +309,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorLarge) {
 TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
   MetadataMapVector metadata_map_vector;
   for (int i = 0; i < 10; i++) {
-    Runtime::RandomGeneratorImpl random;
+    Random::RandomGeneratorImpl random;
     int value_size_1 = random.random() % (2 * Http::METADATA_MAX_PAYLOAD_SIZE) + 1;
     int value_size_2 = random.random() % (2 * Http::METADATA_MAX_PAYLOAD_SIZE) + 1;
     MetadataMap metadata_map = {
@@ -326,25 +332,48 @@ TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
   cleanUp();
 }
 
-TEST_F(MetadataEncoderDecoderTest, TestFrameCountUpperBound) {
-  int size = 10;
+TEST_F(MetadataEncoderDecoderTest, EncodeDecodeFrameTest) {
+  MetadataMap metadataMap = {
+      {"Connections", "15"},
+      {"Timeout Seconds", "10"},
+  };
+  MetadataMapPtr metadataMapPtr = std::make_unique<MetadataMap>(metadataMap);
   MetadataMapVector metadata_map_vector;
-  for (int i = 0; i < size; i++) {
-    MetadataMap metadata_map = {
-        {"header_key1", std::string(5, 'a')},
-        {"header_key2", std::string(5, 'b')},
-    };
-    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-    metadata_map_vector.push_back(std::move(metadata_map_ptr));
-  }
+  metadata_map_vector.push_back(std::move(metadataMapPtr));
+  Http2Frame http2FrameFromUltility = Http2Frame::makeMetadataFrameFromMetadataMap(
+      1, metadataMap, Http2Frame::MetadataFlags::EndMetadata);
+  MetadataDecoder decoder([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
+    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+  });
+  decoder.receiveMetadata(http2FrameFromUltility.data() + 9, http2FrameFromUltility.size() - 9);
+  decoder.onMetadataFrameComplete(true);
+}
 
-  // Verifies the encoding/decoding result in decoder's callback functions.
+using MetadataEncoderDecoderDeathTest = MetadataEncoderDecoderTest;
+
+// Crash if a caller tries to pack more frames than the encoder has data for.
+TEST_F(MetadataEncoderDecoderDeathTest, PackTooManyFrames) {
+  MetadataMap metadata_map = {
+      {"header_key1", std::string(5, 'a')},
+      {"header_key2", std::string(5, 'b')},
+  };
+  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+
   initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
     this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
   });
+  submitMetadata(metadata_map_vector);
 
-  encoder_.createPayload(metadata_map_vector);
-  EXPECT_LE(size, encoder_.frameCountUpperBound());
+  // Try to send an extra METADATA frame. Submitting the frame to nghttp2 should succeed, but
+  // pack_extension_callback should fail, and that failure will propagate through
+  // nghttp2_session_send. How to handle the failure is up to the HTTP/2 codec (in practice, it will
+  // throw a CodecProtocolException).
+  int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, 0, STREAM_ID, nullptr);
+  EXPECT_EQ(0, result);
+  EXPECT_DEATH(nghttp2_session_send(session_),
+               "No payload remaining to pack into a METADATA frame.");
 
   cleanUp();
 }

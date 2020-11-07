@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
@@ -18,7 +19,7 @@ namespace Http {
 class RestApiFetcher : public Http::AsyncClient::Callbacks {
 protected:
   RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
-                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                 Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                  std::chrono::milliseconds refresh_interval,
                  std::chrono::milliseconds request_timeout);
   ~RestApiFetcher() override;
@@ -32,12 +33,12 @@ protected:
    * This will be called when a fetch is about to happen. It should be overridden to fill the
    * request message with a valid request.
    */
-  virtual void createRequest(Message& request) PURE;
+  virtual void createRequest(RequestMessage& request) PURE;
 
   /**
    * This will be called when a 200 response is returned by the API with the response message.
    */
-  virtual void parseResponse(const Message& response) PURE;
+  virtual void parseResponse(const ResponseMessage& response) PURE;
 
   /**
    * This will be called either in the success case or in the failure case for each fetch. It can
@@ -62,10 +63,13 @@ private:
   void requestComplete();
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& response) override;
-  void onFailure(Http::AsyncClient::FailureReason reason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
+  void onFailure(const Http::AsyncClient::Request&,
+                 Http::AsyncClient::FailureReason reason) override;
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                    const Http::ResponseHeaderMap*) override {}
 
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds request_timeout_;
   Event::TimerPtr refresh_timer_;

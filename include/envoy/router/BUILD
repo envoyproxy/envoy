@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -13,7 +13,8 @@ envoy_cc_library(
     hdrs = ["rds.h"],
     deps = [
         ":router_interface",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "//include/envoy/http:filter_interface",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -30,7 +31,8 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,6 +44,8 @@ envoy_cc_library(
         ":rds_interface",
         "//include/envoy/common:time_interface",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -50,19 +54,26 @@ envoy_cc_library(
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":internal_redirect_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:conn_pool_interface",
         "//include/envoy/common:matchers_interface",
+        "//include/envoy/common:time_interface",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",
+        "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:hash_policy_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -83,13 +94,17 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_library(
     name = "shadow_writer_interface",
     hdrs = ["shadow_writer.h"],
-    deps = ["//include/envoy/http:message_interface"],
+    deps = [
+        "//include/envoy/http:async_client_interface",
+        "//include/envoy/http:message_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -98,5 +113,15 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/stream_info:filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "internal_redirect_interface",
+    hdrs = ["internal_redirect.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:minimal_logger_lib",
     ],
 )

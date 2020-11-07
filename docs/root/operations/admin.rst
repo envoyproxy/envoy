@@ -6,7 +6,7 @@ Administration interface
 Envoy exposes a local administration interface that can be used to query and
 modify different aspects of the server:
 
-* :ref:`v2 API reference <envoy_api_msg_config.bootstrap.v2.Admin>`
+* :ref:`v3 API reference <envoy_v3_api_msg_config.bootstrap.v3.Admin>`
 
 .. _operations_admin_interface_security:
 
@@ -35,6 +35,33 @@ modify different aspects of the server:
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
 
+.. note::
+
+  For an endpoint with *?format=json*, it dumps data as a JSON-serialized proto. Fields with default
+  values are not rendered. For example for */clusters?format=json*, the circuit breakers thresholds
+  priority field is omitted when its value is :ref:`DEFAULT priority
+  <envoy_v3_api_enum_value_config.core.v3.RoutingPriority.DEFAULT>` as shown below:
+
+  .. code-block:: json
+
+    {
+     "thresholds": [
+      {
+       "max_connections": 1,
+       "max_pending_requests": 1024,
+       "max_requests": 1024,
+       "max_retries": 1
+      },
+      {
+       "priority": "HIGH",
+       "max_connections": 1,
+       "max_pending_requests": 1024,
+       "max_requests": 1024,
+       "max_retries": 1
+      }
+     ]
+    }
+
 .. http:get:: /
 
   Render an HTML home page with a table of links to all available options.
@@ -48,7 +75,7 @@ modify different aspects of the server:
 .. http:get:: /certs
 
   List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until
-  expiration in JSON format conforming to the :ref:`certificate proto definition <envoy_api_msg_admin.v2alpha.Certificates>`.
+  expiration in JSON format conforming to the :ref:`certificate proto definition <envoy_v3_api_msg_admin.v3.Certificates>`.
 
 .. _operations_admin_interface_clusters:
 
@@ -68,10 +95,10 @@ modify different aspects of the server:
     - :ref:`circuit breakers<config_cluster_manager_cluster_circuit_breakers>` settings for all priority settings.
 
     - Information about :ref:`outlier detection<arch_overview_outlier_detection>` if a detector is installed. Currently
-      :ref:`average success rate <envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_average_success_rate>`,
-      and :ref:`ejection threshold<envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
+      :ref:`average success rate <envoy_v3_api_field_data.cluster.v3.OutlierEjectSuccessRate.cluster_average_success_rate>`,
+      and :ref:`ejection threshold<envoy_v3_api_field_data.cluster.v3.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
-      :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`.
+      :ref/`interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`.
 
     - ``added_via_api`` flag -- ``false`` if the cluster was added via static configuration, ``true``
       if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
@@ -94,8 +121,8 @@ modify different aspects of the server:
       zone, String, Service zone
       canary, Boolean, Whether the host is a canary
       success_rate, Double, "Request success rate (0-100). -1 if there was not enough
-      :ref:`request volume<envoy_api_field_cluster.OutlierDetection.success_rate_request_volume>`
-      in the :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`
+      :ref:`request volume<envoy_v3_api_field_config.cluster.v3.OutlierDetection.success_rate_request_volume>`
+      in the :ref:`interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`
       to calculate it"
 
   Host health status
@@ -115,23 +142,73 @@ modify different aspects of the server:
 .. http:get:: /clusters?format=json
 
   Dump the */clusters* output in a JSON-serialized proto. See the
-  :ref:`definition <envoy_api_msg_admin.v2alpha.Clusters>` for more information.
+  :ref:`definition <envoy_v3_api_msg_admin.v3.Clusters>` for more information.
 
 .. _operations_admin_interface_config_dump:
 
 .. http:get:: /config_dump
 
   Dump currently loaded configuration from various Envoy components as JSON-serialized proto
-  messages. See the :ref:`response definition <envoy_api_msg_admin.v2alpha.ConfigDump>` for more
+  messages. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.ConfigDump>` for more
   information.
+
+.. warning::
+  Configuration may include :ref:`TLS certificates <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`. Before
+  dumping the configuration, Envoy will attempt to redact the ``private_key`` and ``password``
+  fields from any certificates it finds. This relies on the configuration being a strongly-typed
+  protobuf message. If your Envoy configuration uses deprecated ``config`` fields (of type
+  ``google.protobuf.Struct``), please update to the recommended ``typed_config`` fields (of type
+  ``google.protobuf.Any``) to ensure sensitive data is redacted properly.
 
 .. warning::
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
 
+.. _operations_admin_interface_config_dump_include_eds:
+
+.. http:get:: /config_dump?include_eds
+
+  Dump currently loaded configuration including EDS. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.EndpointsConfigDump>` for more
+  information.
+
+.. _operations_admin_interface_config_dump_by_mask:
+
+.. http:get:: /config_dump?mask={}
+
+  Specify a subset of fields that you would like to be returned. The mask is parsed as a
+  ``ProtobufWkt::FieldMask`` and applied to each top level dump such as
+  :ref:`BootstrapConfigDump <envoy_v3_api_msg_admin.v3.BootstrapConfigDump>` and
+  :ref:`ClustersConfigDump <envoy_v3_api_msg_admin.v3.ClustersConfigDump>`.
+  This behavior changes if both resource and mask query parameters are specified. See
+  below for details.
+
+.. _operations_admin_interface_config_dump_by_resource:
+
+.. http:get:: /config_dump?resource={}
+
+  Dump only the currently loaded configuration that matches the specified resource. The resource must
+  be a repeated field in one of the top level config dumps such as
+  :ref:`static_listeners <envoy_v3_api_field_admin.v3.ListenersConfigDump.static_listeners>` from
+  :ref:`ListenersConfigDump <envoy_v3_api_msg_admin.v3.ListenersConfigDump>` or
+  :ref:`dynamic_active_clusters <envoy_v3_api_field_admin.v3.ClustersConfigDump.dynamic_active_clusters>` from
+  :ref:`ClustersConfigDump <envoy_v3_api_msg_admin.v3.ClustersConfigDump>`. If you need a non-repeated
+  field, use the mask query parameter documented above. If you want only a subset of fields from the repeated
+  resource, use both as documented below.
+
+.. _operations_admin_interface_config_dump_by_resource_and_mask:
+
+.. http:get:: /config_dump?resource={}&mask={}
+
+  When both resource and mask query parameters are specified, the mask is applied to every element
+  in the desired repeated field so that only a subset of fields are returned. The mask is parsed
+  as a ``ProtobufWkt::FieldMask``.
+
+  For example, get the names of all active dynamic clusters with
+  ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
+
 .. http:get:: /contention
 
-  Dump current Envoy mutex contention stats (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) in JSON
+  Dump current Envoy mutex contention stats (:ref:`MutexStats <envoy_v3_api_msg_admin.v3.MutexStats>`) in JSON
   format, if mutex tracing is enabled. See :option:`--enable-mutex-tracing`.
 
 .. http:post:: /cpuprofiler
@@ -162,6 +239,24 @@ modify different aspects of the server:
 
   See :option:`--hot-restart-version`.
 
+.. _operations_admin_interface_init_dump:
+
+.. http:get:: /init_dump
+
+  Dump currently information of unready targets of various Envoy components as JSON-serialized proto
+  messages. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps>` for more
+  information.
+
+.. _operations_admin_interface_init_dump_by_mask:
+
+.. http:get:: /init_dump?mask={}
+
+  When mask query parameters is specified, the mask value is the desired component to dump unready targets.
+  The mask is parsed as a ``ProtobufWkt::FieldMask``.
+
+  For example, get the unready targets of all listeners with
+  ``/init_dump?mask=listener``
+
 .. _operations_admin_interface_listeners:
 
 .. http:get:: /listeners
@@ -173,7 +268,7 @@ modify different aspects of the server:
 .. http:get:: /listeners?format=json
 
   Dump the */listeners* output in a JSON-serialized proto. See the
-  :ref:`definition <envoy_api_msg_admin.v2alpha.Listeners>` for more information.
+  :ref:`definition <envoy_v3_api_msg_admin.v3.Listeners>` for more information.
 
 .. _operations_admin_interface_logging:
 
@@ -187,9 +282,11 @@ modify different aspects of the server:
 
   .. note::
 
-    Generally only used during development.
+    Generally only used during development. With `--enable-fine-grain-logging` being set, the logger is represented
+    by the path of the file it belongs to (to be specific, the path determined by `__FILE__`), so the logger list
+    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level.
 
-.. http:post:: /memory
+.. http:get:: /memory
 
   Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
 
@@ -206,14 +303,20 @@ modify different aspects of the server:
 .. _operations_admin_interface_drain:
 
 .. http:post:: /drain_listeners
-   
+
    :ref:`Drains <arch_overview_draining>` all listeners.
 
    .. http:post:: /drain_listeners?inboundonly
 
-   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in 
-   :ref:`Listener <envoy_api_msg_Listener>` is used to determine whether a listener 
+   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in
+   :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener
    is inbound or outbound.
+
+   .. http:post:: /drain_listeners?graceful
+
+   When draining listeners, enter a graceful drain period prior to closing listeners.
+   This behaviour and duration is configurable via server options or CLI
+   (:option:`--drain-time-s` and :option:`--drain-strategy`).
 
 .. attention::
 
@@ -258,10 +361,26 @@ modify different aspects of the server:
         "cpuset_threads": false
       },
       "uptime_current_epoch": "6s",
-      "uptime_all_epochs": "6s"
+      "uptime_all_epochs": "6s",
+      "node": {
+        "id": "node1",
+        "cluster": "cluster1",
+        "user_agent_name": "envoy",
+        "user_agent_build_version": {
+          "version": {
+            "major_number": 1,
+            "minor_number": 15,
+            "patch": 0
+          }
+        },
+        "metadata": {},
+        "extensions": [],
+        "client_features": [],
+        "listening_addresses": []
+      }
     }
 
-  See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+  See the :ref:`ServerInfo proto <envoy_v3_api_msg_admin.v3.ServerInfo>` for an
   explanation of the output.
 
 .. http:get:: /ready
@@ -275,7 +394,7 @@ modify different aspects of the server:
 
     LIVE
 
-  See the `state` field of the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+  See the `state` field of the :ref:`ServerInfo proto <envoy_v3_api_msg_admin.v3.ServerInfo>` for an
   explanation of the output.
 
 .. _operations_admin_interface_stats:
@@ -484,11 +603,11 @@ modify different aspects of the server:
   format, as expected by the Hystrix dashboard.
 
   If invoked from a browser or a terminal, the response will be shown as a continuous stream,
-  sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
-  :ref:`stats_flush_interval <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_flush_interval>`
+  sent in intervals defined by the :ref:`Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>`
+  :ref:`stats_flush_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_interval>`
 
   This handler is enabled only when a Hystrix sink is enabled in the config file as documented
-  :ref:`here <envoy_api_msg_config.metrics.v2.HystrixSink>`.
+  :ref:`here <envoy_v3_api_msg_config.metrics.v3.HystrixSink>`.
 
   As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics shown in the dashboard
   had to be adapted:
@@ -515,3 +634,7 @@ modify different aspects of the server:
   been configured to accept admin configuration. See:
 
   * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`
+
+.. http:post:: /reopen_logs
+
+  Triggers reopen of all access logs. Behavior is similar to SIGUSR1 handling.

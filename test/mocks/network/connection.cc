@@ -62,6 +62,7 @@ template <class T> static void initializeMockConnection(T& connection) {
     connection.raiseEvent(Network::ConnectionEvent::LocalClose);
   }));
   ON_CALL(connection, remoteAddress()).WillByDefault(ReturnRef(connection.remote_address_));
+  ON_CALL(connection, directRemoteAddress()).WillByDefault(ReturnRef(connection.remote_address_));
   ON_CALL(connection, localAddress()).WillByDefault(ReturnRef(connection.local_address_));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
@@ -80,6 +81,14 @@ MockConnection::MockConnection() {
   initializeMockConnection(*this);
 }
 MockConnection::~MockConnection() = default;
+
+MockServerConnection::MockServerConnection() {
+  remote_address_ = Utility::resolveUrl("tcp://10.0.0.1:443");
+  local_address_ = Utility::resolveUrl("tcp://10.0.0.2:40000");
+  initializeMockConnection(*this);
+}
+
+MockServerConnection::~MockServerConnection() = default;
 
 MockClientConnection::MockClientConnection() {
   remote_address_ = Utility::resolveUrl("tcp://10.0.0.1:443");

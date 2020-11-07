@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -10,6 +8,8 @@ load(
     "envoy_extension_cc_test",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_extension_cc_test(
@@ -17,11 +17,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.transport_sockets.alts",
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/transport_sockets/alts:config",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
     ],
 )
 
@@ -76,6 +76,8 @@ envoy_extension_cc_test(
     extension_name = "envoy.transport_sockets.alts",
     external_deps = [
         "grpc_alts_fake_handshaker_server",
+        "grpc_alts_handshaker_proto",
+        "grpc_alts_transport_security_common_proto",
     ],
     deps = [
         "//source/common/common:utility_lib",
@@ -87,6 +89,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
     ],

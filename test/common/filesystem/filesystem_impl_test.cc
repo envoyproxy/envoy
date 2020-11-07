@@ -1,7 +1,9 @@
 #include <chrono>
+#include <filesystem>
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/environment.h"
@@ -18,7 +20,7 @@ static constexpr FlagSet DefaultFlags{
 
 class FileSystemImplTest : public testing::Test {
 protected:
-  int getFd(File* file) {
+  filesystem_os_id_t getFd(File* file) {
 #ifdef WIN32
     auto file_impl = dynamic_cast<FileImplWin32*>(file);
 #else
@@ -37,7 +39,7 @@ protected:
 #endif
 };
 
-TEST_F(FileSystemImplTest, fileExists) {
+TEST_F(FileSystemImplTest, FileExists) {
   EXPECT_FALSE(file_system_.fileExists("/dev/blahblahblah"));
 #ifdef WIN32
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
@@ -49,7 +51,7 @@ TEST_F(FileSystemImplTest, fileExists) {
 #endif
 }
 
-TEST_F(FileSystemImplTest, directoryExists) {
+TEST_F(FileSystemImplTest, DirectoryExists) {
   EXPECT_FALSE(file_system_.directoryExists("/dev/blahblah"));
 #ifdef WIN32
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
@@ -61,28 +63,24 @@ TEST_F(FileSystemImplTest, directoryExists) {
 #endif
 }
 
-TEST_F(FileSystemImplTest, fileSize) {
-#ifdef WIN32
-  EXPECT_EQ(0, file_system_.fileSize("NUL"));
-#else
-  EXPECT_EQ(0, file_system_.fileSize("/dev/null"));
-#endif
+TEST_F(FileSystemImplTest, FileSize) {
+  EXPECT_EQ(0, file_system_.fileSize(std::string(Platform::null_device_path)));
   EXPECT_EQ(-1, file_system_.fileSize("/dev/blahblahblah"));
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
   EXPECT_EQ(data.length(), file_system_.fileSize(file_path));
 }
 
-TEST_F(FileSystemImplTest, fileReadToEndSuccess) {
+TEST_F(FileSystemImplTest, FileReadToEndSuccess) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
   EXPECT_EQ(data, file_system_.fileReadToEnd(file_path));
 }
 
-// Files are read into std::string; verify that all bytes (eg non-ascii characters) come back
+// Files are read into std::string; verify that all bytes (e.g., non-ascii characters) come back
 // unmodified
-TEST_F(FileSystemImplTest, fileReadToEndSuccessBinary) {
+TEST_F(FileSystemImplTest, FileReadToEndSuccessBinary) {
   std::string data;
   for (unsigned i = 0; i < 256; i++) {
     data.push_back(i);
@@ -97,13 +95,23 @@ TEST_F(FileSystemImplTest, fileReadToEndSuccessBinary) {
   }
 }
 
-TEST_F(FileSystemImplTest, fileReadToEndDoesNotExist) {
+TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
   unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
   EXPECT_THROW(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
                EnvoyException);
 }
 
-TEST_F(FileSystemImplTest, fileReadToEndBlacklisted) {
+TEST_F(FileSystemImplTest, FileReadToEndNotReadable) {
+  const std::string data = "test string\ntest";
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
+
+  std::filesystem::permissions(file_path, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::remove);
+  EXPECT_THROW(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
+               EnvoyException);
+}
+
+TEST_F(FileSystemImplTest, FileReadToEndDenylisted) {
   EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
   EXPECT_THROW(file_system_.fileReadToEnd("/proc/cpuinfo"), EnvoyException);
   EXPECT_THROW(file_system_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
@@ -117,9 +125,46 @@ TEST_F(FileSystemImplTest, CanonicalPathSuccess) { EXPECT_EQ("/", canonicalPath(
 TEST_F(FileSystemImplTest, CanonicalPathFail) {
   const Api::SysCallStringResult result = canonicalPath("/_some_non_existent_file");
   EXPECT_TRUE(result.rc_.empty());
-  EXPECT_STREQ("No such file or directory", ::strerror(result.errno_));
+  EXPECT_EQ("No such file or directory", errorDetails(result.errno_));
 }
 #endif
+
+TEST_F(FileSystemImplTest, SplitPathFromFilename) {
+  PathSplitResult result;
+  result = file_system_.splitPathFromFilename("/foo/bar/baz");
+  EXPECT_EQ(result.directory_, "/foo/bar");
+  EXPECT_EQ(result.file_, "baz");
+  result = file_system_.splitPathFromFilename("/foo/bar");
+  EXPECT_EQ(result.directory_, "/foo");
+  EXPECT_EQ(result.file_, "bar");
+  result = file_system_.splitPathFromFilename("/foo");
+  EXPECT_EQ(result.directory_, "/");
+  EXPECT_EQ(result.file_, "foo");
+  result = file_system_.splitPathFromFilename("/");
+  EXPECT_EQ(result.directory_, "/");
+  EXPECT_EQ(result.file_, "");
+  EXPECT_THROW(file_system_.splitPathFromFilename("nopathdelimeter"), EnvoyException);
+#ifdef WIN32
+  result = file_system_.splitPathFromFilename("c:\\foo/bar");
+  EXPECT_EQ(result.directory_, "c:\\foo");
+  EXPECT_EQ(result.file_, "bar");
+  result = file_system_.splitPathFromFilename("c:/foo\\bar");
+  EXPECT_EQ(result.directory_, "c:/foo");
+  EXPECT_EQ(result.file_, "bar");
+  result = file_system_.splitPathFromFilename("c:\\foo");
+  EXPECT_EQ(result.directory_, "c:\\");
+  EXPECT_EQ(result.file_, "foo");
+  result = file_system_.splitPathFromFilename("c:foo");
+  EXPECT_EQ(result.directory_, "c:");
+  EXPECT_EQ(result.file_, "foo");
+  result = file_system_.splitPathFromFilename("c:");
+  EXPECT_EQ(result.directory_, "c:");
+  EXPECT_EQ(result.file_, "");
+  result = file_system_.splitPathFromFilename("\\\\?\\C:\\");
+  EXPECT_EQ(result.directory_, "\\\\?\\C:\\");
+  EXPECT_EQ(result.file_, "");
+#endif
+}
 
 TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_FALSE(file_system_.illegalPath("/"));
@@ -132,6 +177,40 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_FALSE(file_system_.illegalPath("/sys"));
   EXPECT_FALSE(file_system_.illegalPath("/sys/"));
   EXPECT_FALSE(file_system_.illegalPath("/_some_non_existent_file"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\.\foo)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\z\foo)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\?\nul)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(\\?\C:\foo)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(C:\foo)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(C:\foo/bar\baz)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/foo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:zfoo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/foo/bar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/foo/b*ar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/foo/b?ar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(C:/i/x"x)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(std::string("C:/i\0j", 6)));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/\177"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/\alarm"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/../j"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/./j"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/.j"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/j."));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/j "));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i///"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/NUL"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul.ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul.ext.ext2"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul .ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1/whoops"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1.ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1  .ext"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM1  ext"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM1foo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM0"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM"));
 #else
   EXPECT_TRUE(file_system_.illegalPath("/dev"));
   EXPECT_TRUE(file_system_.illegalPath("/dev/"));
@@ -163,15 +242,27 @@ TEST_F(FileSystemImplTest, Open) {
   EXPECT_TRUE(file->isOpen());
 }
 
+TEST_F(FileSystemImplTest, OpenReadOnly) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+  static constexpr FlagSet ReadOnlyFlags{1 << Filesystem::File::Operation::Read |
+                                         1 << Filesystem::File::Operation::Create |
+                                         1 << Filesystem::File::Operation::Append};
+  FilePtr file = file_system_.createFile(new_file_path);
+  const Api::IoCallBoolResult result = file->open(ReadOnlyFlags);
+  EXPECT_TRUE(result.rc_);
+  EXPECT_TRUE(file->isOpen());
+}
+
 TEST_F(FileSystemImplTest, OpenTwice) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  EXPECT_EQ(getFd(file.get()), -1);
+  EXPECT_EQ(getFd(file.get()), INVALID_HANDLE);
 
   const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
-  const int initial_fd = getFd(file.get());
+  const filesystem_os_id_t initial_fd = getFd(file.get());
   EXPECT_TRUE(result1.rc_);
   EXPECT_TRUE(file->isOpen());
 
@@ -247,8 +338,7 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   EXPECT_TRUE(bool_result2.rc_);
   const Api::IoCallSizeResult size_result = file->write(" new data");
   EXPECT_EQ(-1, size_result.rc_);
-  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, size_result.err_->getErrorCode());
-  EXPECT_EQ("Bad file descriptor", size_result.err_->getErrorDetails());
+  EXPECT_EQ(IoFileError::IoErrorCode::BadFd, size_result.err_->getErrorCode());
 }
 
 TEST_F(FileSystemImplTest, NonExistingFileAndReadOnly) {
@@ -273,11 +363,29 @@ TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
     std::string data(" new data");
     const Api::IoCallSizeResult result = file->write(data);
     EXPECT_TRUE(result.rc_ < 0);
-    EXPECT_EQ(result.err_->getErrorDetails(), "Bad file descriptor");
+#ifdef WIN32
+    EXPECT_EQ(IoFileError::IoErrorCode::Permission, result.err_->getErrorCode());
+#else
+    EXPECT_EQ(IoFileError::IoErrorCode::BadFd, result.err_->getErrorCode());
+#endif
   }
 
   auto contents = TestEnvironment::readFileToStringForTest(file_path);
   EXPECT_EQ("existing file", contents);
+}
+
+TEST_F(FileSystemImplTest, TestIoFileError) {
+  IoFileError error1(HANDLE_ERROR_PERM);
+  EXPECT_EQ(IoFileError::IoErrorCode::Permission, error1.getErrorCode());
+  EXPECT_EQ(errorDetails(HANDLE_ERROR_PERM), error1.getErrorDetails());
+
+  IoFileError error2(HANDLE_ERROR_INVALID);
+  EXPECT_EQ(IoFileError::IoErrorCode::BadFd, error2.getErrorCode());
+  EXPECT_EQ(errorDetails(HANDLE_ERROR_INVALID), error2.getErrorDetails());
+
+  int not_known_error = 42;
+  IoFileError error3(not_known_error);
+  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, error3.getErrorCode());
 }
 
 } // namespace Filesystem

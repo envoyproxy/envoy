@@ -1,14 +1,17 @@
 #pragma once
 
-#include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/config_provider_manager.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/config_provider_impl.h"
-#include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -16,35 +19,53 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType> class MockSubscriptionCallbacks : public SubscriptionCallbacks {
+class MockSubscriptionCallbacks : public SubscriptionCallbacks {
 public:
-  MockSubscriptionCallbacks() {
-    ON_CALL(*this, resourceName(testing::_))
-        .WillByDefault(testing::Invoke([](const ProtobufWkt::Any& resource) -> std::string {
-          return resourceName_(TestUtility::anyConvert<ResourceType>(resource));
-        }));
-  }
-  ~MockSubscriptionCallbacks() override = default;
-  static std::string resourceName_(const envoy::api::v2::ClusterLoadAssignment& resource) {
-    return resource.cluster_name();
-  }
-  template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
+  MockSubscriptionCallbacks();
+  ~MockSubscriptionCallbacks() override;
 
-  MOCK_METHOD2_T(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string& version_info));
-  MOCK_METHOD3_T(onConfigUpdate,
-                 void(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info));
-  MOCK_METHOD2_T(onConfigUpdateFailed,
-                 void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
+  MOCK_METHOD(void, onConfigUpdate,
+              (const std::vector<DecodedResourceRef>& resources, const std::string& version_info));
+  MOCK_METHOD(void, onConfigUpdate,
+              (const std::vector<DecodedResourceRef>& added_resources,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               const std::string& system_version_info));
+  MOCK_METHOD(void, onConfigUpdateFailed,
+              (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
+};
+
+class MockOpaqueResourceDecoder : public OpaqueResourceDecoder {
+public:
+  MockOpaqueResourceDecoder();
+  ~MockOpaqueResourceDecoder() override;
+
+  MOCK_METHOD(ProtobufTypes::MessagePtr, decodeResource, (const ProtobufWkt::Any& resource));
+  MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
+};
+
+class MockUntypedConfigUpdateCallbacks : public UntypedConfigUpdateCallbacks {
+public:
+  MockUntypedConfigUpdateCallbacks();
+  ~MockUntypedConfigUpdateCallbacks() override;
+
+  MOCK_METHOD(void, onConfigUpdate,
+              (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+               const std::string& version_info));
+  MOCK_METHOD(
+      void, onConfigUpdate,
+      (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+       const std::string& system_version_info));
+  MOCK_METHOD(void, onConfigUpdateFailed,
+              (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
 };
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD1(start, void(const std::set<std::string>& resources));
-  MOCK_METHOD1(updateResourceInterest, void(const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD(void, start,
+              (const std::set<std::string>& resources, const bool use_prefix_matching));
+  MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD(void, requestOnDemandUpdate, (const std::set<std::string>& add_these_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -52,14 +73,27 @@ public:
   MockSubscriptionFactory();
   ~MockSubscriptionFactory() override;
 
-  MOCK_METHOD4(subscriptionFromConfigSource,
-               SubscriptionPtr(const envoy::api::v2::core::ConfigSource& config,
-                               absl::string_view type_url, Stats::Scope& scope,
-                               SubscriptionCallbacks& callbacks));
-  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+  MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
+              (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+               Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+               OpaqueResourceDecoder& resource_decoder));
+  MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
+              (const udpa::core::v1::ResourceLocator& collection_locator,
+               const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+               Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+               OpaqueResourceDecoder& resource_decoder));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   MockSubscription* subscription_{};
   SubscriptionCallbacks* callbacks_{};
+};
+
+class MockGrpcMuxWatch : public GrpcMuxWatch {
+public:
+  MockGrpcMuxWatch();
+  ~MockGrpcMuxWatch() override;
+
+  MOCK_METHOD(void, cancel, ());
 };
 
 class MockGrpcMux : public GrpcMux {
@@ -67,28 +101,38 @@ public:
   MockGrpcMux();
   ~MockGrpcMux() override;
 
-  MOCK_METHOD0(start, void());
-  MOCK_METHOD5(addOrUpdateWatch,
-               Watch*(const std::string& type_url, Watch* watch,
-                      const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                      std::chrono::milliseconds init_fetch_timeout));
-  MOCK_METHOD2(removeWatch, void(const std::string& type_url, Watch* watch));
-  MOCK_METHOD1(pause, void(const std::string& type_url));
-  MOCK_METHOD1(resume, void(const std::string& type_url));
-  MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
-  MOCK_METHOD0(disableInitFetchTimeoutTimer, void());
+  MOCK_METHOD(void, start, (), (override));
+  MOCK_METHOD(ScopedResume, pause, (const std::string& type_url), (override));
+  MOCK_METHOD(ScopedResume, pause, (const std::vector<std::string> type_urls), (override));
+
+  MOCK_METHOD(void, addSubscription,
+              (const std::set<std::string>& resources, const std::string& type_url,
+               SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
+               std::chrono::milliseconds init_fetch_timeout));
+  MOCK_METHOD(void, updateResourceInterest,
+              (const std::set<std::string>& resources, const std::string& type_url));
+
+  MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
+              (const std::string& type_url, const std::set<std::string>& resources,
+               SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+               const bool use_prefix_matching));
+
+  MOCK_METHOD(void, requestOnDemandUpdate,
+              (const std::string& type_url, const std::set<std::string>& add_these_names));
 };
 
-class MockGrpcStreamCallbacks : public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
+class MockGrpcStreamCallbacks
+    : public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   MockGrpcStreamCallbacks();
   ~MockGrpcStreamCallbacks() override;
 
-  MOCK_METHOD0(onStreamEstablished, void());
-  MOCK_METHOD0(onEstablishmentFailure, void());
-  MOCK_METHOD1(onDiscoveryResponse,
-               void(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message));
-  MOCK_METHOD0(onWriteable, void());
+  MOCK_METHOD(void, onStreamEstablished, ());
+  MOCK_METHOD(void, onEstablishmentFailure, ());
+  MOCK_METHOD(void, onDiscoveryResponse,
+              (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message,
+               ControlPlaneStats& control_plane_stats));
+  MOCK_METHOD(void, onWriteable, ());
 };
 
 class MockConfigProviderManager : public ConfigProviderManager {
@@ -96,20 +140,29 @@ public:
   MockConfigProviderManager() = default;
   ~MockConfigProviderManager() override = default;
 
-  MOCK_METHOD4(createXdsConfigProvider,
-               ConfigProviderPtr(const Protobuf::Message& config_source_proto,
-                                 Server::Configuration::FactoryContext& factory_context,
-                                 const std::string& stat_prefix,
-                                 const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
-  MOCK_METHOD3(createStaticConfigProvider,
-               ConfigProviderPtr(const Protobuf::Message& config_proto,
-                                 Server::Configuration::FactoryContext& factory_context,
-                                 const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
-  MOCK_METHOD3(
-      createStaticConfigProvider,
-      ConfigProviderPtr(std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
-                        Server::Configuration::FactoryContext& factory_context,
-                        const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+  MOCK_METHOD(ConfigProviderPtr, createXdsConfigProvider,
+              (const Protobuf::Message& config_source_proto,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               Init::Manager& init_manager, const std::string& stat_prefix,
+               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+  MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
+              (const Protobuf::Message& config_proto,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+  MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
+              (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+};
+
+class MockTypedFactory : public TypedFactory {
+public:
+  ~MockTypedFactory() override;
+
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(std::string, configType, ());
+  MOCK_METHOD(std::string, name, (), (const));
+  MOCK_METHOD(std::string, category, (), (const));
 };
 
 } // namespace Config

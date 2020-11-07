@@ -15,12 +15,17 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "absl/strings/str_join.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
+
+// Min/max TLS version recognized by the underlying TLS/SSL library.
+const unsigned Config::TLS_MIN_SUPPORTED_VERSION = TLS1_VERSION;
+const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
 
 Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
@@ -32,6 +37,8 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
   }
 
+  SSL_CTX_set_min_proto_version(ssl_ctx_.get(), TLS_MIN_SUPPORTED_VERSION);
+  SSL_CTX_set_max_proto_version(ssl_ctx_.get(), TLS_MAX_SUPPORTED_VERSION);
   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
   SSL_CTX_set_select_certificate_cb(
@@ -48,7 +55,8 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
         Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
-        filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
+        filter->onServername(
+            absl::NullSafeStringView(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)));
 
         // Return an error to stop the handshake; we have what we wanted already.
         *out_alert = SSL_AD_USER_CANCELLED;
@@ -70,7 +78,6 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->ne
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
-  ASSERT(file_event_ == nullptr);
   cb_ = &cb;
 
   ParseState parse_state = onRead();
@@ -85,8 +92,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
     // do nothing but create the event
-    file_event_ = cb.dispatcher().createFileEvent(
-        socket.ioHandle().fd(),
+    socket.ioHandle().initializeFileEvent(
+        cb.dispatcher(),
         [this](uint32_t events) {
           if (events & Event::FileReadyType::Closed) {
             config_->stats().connection_closed_.inc();
@@ -108,7 +115,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
             break;
           }
         },
-        Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
+        Event::PlatformDefaultTriggerType,
+        Event::FileReadyType::Read | Event::FileReadyType::Closed);
     return Network::FilterStatus::StopIteration;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -130,6 +138,7 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
     }
     protocols.emplace_back(reinterpret_cast<const char*>(CBS_data(&name)), CBS_len(&name));
   }
+  ENVOY_LOG(trace, "tls:onALPN(), ALPN: {}", absl::StrJoin(protocols, ","));
   cb_->socket().setRequestedApplicationProtocols(protocols);
   alpn_found_ = true;
 }
@@ -150,7 +159,7 @@ ParseState Filter::onRead() {
   // there is no way for a listener-filter to pass payload data to the ConnectionImpl and filters
   // that get created later.
   //
-  // The file_event_ in this class gets events every time new data is available on the socket,
+  // We request from the file descriptor to get events every time new data is available,
   // even if previous data has not been read, which is always the case due to MSG_PEEK. When
   // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
   // socket, so that new event is immediately signaled as readable because it is new and the socket
@@ -158,14 +167,13 @@ ParseState Filter::onRead() {
   //
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.recv(cb_->socket().ioHandle().fd(), buf_,
-                                                         config_->maxClientHelloSize(), MSG_PEEK);
+  const auto result = cb_->socket().ioHandle().recv(buf_, config_->maxClientHelloSize(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
-  if (result.rc_ == -1 && result.errno_ == EAGAIN) {
-    return ParseState::Continue;
-  } else if (result.rc_ < 0) {
+  if (!result.ok()) {
+    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      return ParseState::Continue;
+    }
     config_->stats().read_error_.inc();
     return ParseState::Error;
   }
@@ -183,7 +191,7 @@ ParseState Filter::onRead() {
 
 void Filter::done(bool success) {
   ENVOY_LOG(trace, "tls inspector: done: {}", success);
-  file_event_.reset();
+  cb_->socket().ioHandle().resetFileEvents();
   cb_->continueFilterChain(success);
 }
 

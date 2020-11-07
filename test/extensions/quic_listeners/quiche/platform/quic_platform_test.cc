@@ -7,9 +7,9 @@
 #include <netinet/in.h>
 
 #include <fstream>
-#include <unordered_set>
 
 #include "common/memory/stats.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
@@ -25,16 +25,16 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
-#include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
-#include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
@@ -49,7 +49,6 @@
 #include "quiche/quic/platform/api/quic_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
-#include "quiche/quic/platform/api/quic_optional.h"
 #include "quiche/quic/platform/api/quic_pcc_sender.h"
 #include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
@@ -57,7 +56,6 @@
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
-#include "quiche/quic/platform/api/quic_string_piece.h"
 #include "quiche/quic/platform/api/quic_system_event_loop.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
@@ -95,11 +93,6 @@ protected:
 };
 
 TEST_F(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
-
-TEST_F(QuicPlatformTest, QuicArraysize) {
-  int array[] = {0, 1, 2, 3, 4};
-  EXPECT_EQ(5, QUIC_ARRAYSIZE(array));
-}
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
@@ -176,21 +169,10 @@ TEST_F(QuicPlatformTest, QuicQueue) {
   EXPECT_EQ(10, queue.back());
 }
 
-TEST_F(QuicPlatformTest, QuicDeque) {
-  QuicDeque<int> deque;
-  deque.push_back(10);
-  EXPECT_EQ(10, deque.back());
-}
-
 TEST_F(QuicPlatformTest, QuicInlinedVector) {
   QuicInlinedVector<int, 5> vec;
   vec.push_back(3);
   EXPECT_EQ(3, vec[0]);
-}
-
-TEST_F(QuicPlatformTest, QuicEndian) {
-  EXPECT_EQ(0x1234, QuicEndian::NetToHost16(QuicEndian::HostToNet16(0x1234)));
-  EXPECT_EQ(0x12345678, QuicEndian::NetToHost32(QuicEndian::HostToNet32(0x12345678)));
 }
 
 TEST_F(QuicPlatformTest, QuicEstimateMemoryUsage) {
@@ -257,16 +239,15 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
+#if !defined(ENVOY_CONFIG_COVERAGE) && !defined(GCC_COMPILER)
+  // This doesn't work in coverage build because part of the stacktrace will be overwritten by
+  // __llvm_coverage_mapping
+  // Stack trace under gcc with optimizations on (-c opt) doesn't include the test name
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
+#endif
 }
 
 TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
-
-TEST_F(QuicPlatformTest, QuicStringPiece) {
-  std::string s = "bar";
-  QuicStringPiece sp(s);
-  EXPECT_EQ('b', sp[0]);
-}
 
 TEST_F(QuicPlatformTest, QuicThread) {
   class AdderThread : public QuicThread {
@@ -299,8 +280,8 @@ TEST_F(QuicPlatformTest, QuicThread) {
   EXPECT_EQ(1, value);
 
   // QuicThread will panic if it's started but not joined.
-  EXPECT_DEATH_LOG_TO_STDERR({ AdderThread(&value, 2).Start(); },
-                             "QuicThread should be joined before destruction");
+  EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
+               "QuicThread should be joined before destruction");
 }
 
 TEST_F(QuicPlatformTest, QuicUint128) {
@@ -347,7 +328,7 @@ TEST_F(QuicPlatformTest, QuicLog) {
   EXPECT_LOG_CONTAINS("info", "i=1", QUIC_VLOG(1) << "i=" << (i = 1));
   EXPECT_EQ(1, i);
 
-  errno = EINVAL;
+  errno = SOCKET_ERROR_INVAL;
   EXPECT_LOG_CONTAINS("info", "i=3:", QUIC_PLOG(INFO) << "i=" << (i = 3));
   EXPECT_EQ(3, i);
 }
@@ -416,9 +397,9 @@ TEST_F(QuicPlatformTest, QuicCHECK) {
                      "CHECK failed:.* Supposed to fail in debug mode.");
   EXPECT_DEBUG_DEATH({ DCHECK(false); }, "CHECK failed");
 
-  EXPECT_DEATH_LOG_TO_STDERR({ CHECK(false) << " Supposed to fail in all modes."; },
-                             "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH_LOG_TO_STDERR({ CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH({ CHECK(false) << " Supposed to fail in all modes."; },
+               "CHECK failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH({ CHECK(false); }, "CHECK failed");
 }
 
 // Test the behaviors of the cross products of
@@ -427,16 +408,16 @@ TEST_F(QuicPlatformTest, QuicCHECK) {
 TEST_F(QuicPlatformTest, QuicFatalLog) {
 #ifdef NDEBUG
   // Release build
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(FATAL) << "Should abort 0", "Should abort 0");
+  EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 0", "Should abort 0");
   QUIC_LOG(DFATAL) << "Should not abort";
   QUIC_DLOG(FATAL) << "Should compile out";
   QUIC_DLOG(DFATAL) << "Should compile out";
 #else
   // Debug build
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(FATAL) << "Should abort 1", "Should abort 1");
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(DFATAL) << "Should abort 2", "Should abort 2");
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_DLOG(FATAL) << "Should abort 3", "Should abort 3");
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_DLOG(DFATAL) << "Should abort 4", "Should abort 4");
+  EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 1", "Should abort 1");
+  EXPECT_DEATH(QUIC_LOG(DFATAL) << "Should abort 2", "Should abort 2");
+  EXPECT_DEATH(QUIC_DLOG(FATAL) << "Should abort 3", "Should abort 3");
+  EXPECT_DEATH(QUIC_DLOG(DFATAL) << "Should abort 4", "Should abort 4");
 #endif
 }
 
@@ -454,7 +435,7 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
   QUIC_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_NOTREACHED(), "not reached");
+  EXPECT_DEATH(QUIC_NOTREACHED(), "not reached");
 #endif
 }
 
@@ -487,9 +468,9 @@ TEST_F(QuicPlatformTest, QuicCertUtils) {
   unsigned char* der = nullptr;
   int len = i2d_X509(x509_cert.get(), &der);
   ASSERT_GT(len, 0);
-  QuicStringPiece out;
+  quiche::QuicheStringPiece out;
   QuicCertUtils::ExtractSubjectNameFromDERCert(
-      QuicStringPiece(reinterpret_cast<const char*>(der), len), &out);
+      quiche::QuicheStringPiece(reinterpret_cast<const char*>(der), len), &out);
   EXPECT_EQ("0z1\v0\t\x6\x3U\x4\x6\x13\x2US1\x13"
             "0\x11\x6\x3U\x4\b\f\nCalifornia1\x16"
             "0\x14\x6\x3U\x4\a\f\rSan Francisco1\r"
@@ -506,12 +487,25 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
   // Set log level to INFO to see the test output path in log.
   GetLogger().set_level(INFO);
 
-  EXPECT_LOG_NOT_CONTAINS("warn", "",
-                          QuicRecordTestOutput("quic_test_output.1", "output 1 content\n"));
-  EXPECT_LOG_NOT_CONTAINS("error", "",
-                          QuicRecordTestOutput("quic_test_output.2", "output 2 content\n"));
+  EXPECT_LOG_NOT_CONTAINS("warn", "", QuicRecordTrace("quic_test_output.1", "output 1 content\n"));
+  EXPECT_LOG_NOT_CONTAINS("error", "", QuicRecordTrace("quic_test_output.2", "output 2 content\n"));
   EXPECT_LOG_CONTAINS("info", "Recorded test output into",
-                      QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
+                      QuicRecordTrace("quic_test_output.3", "output 3 content\n"));
+
+  std::string content4{"output 4 content\n"};
+  const testing::TestInfo* test_info = testing::UnitTest::GetInstance()->current_test_info();
+
+  std::string timestamp = absl::FormatTime("%Y%m%d%H%M%S", absl::Now(), absl::LocalTimeZone());
+
+  std::string filename = fmt::sprintf("%s.%s.%s.%s.qtr", test_info->name(),
+                                      test_info->test_case_name(), "quic_test_output.4", timestamp);
+
+  EXPECT_LOG_CONTAINS("info", "Recorded test output into", QuicSaveTestOutput(filename, content4));
+
+  std::string content;
+  EXPECT_TRUE(QuicLoadTestOutput(filename, &content));
+  EXPECT_EQ("output 4 content\n", content);
+  EXPECT_FALSE(QuicLoadTestOutput("nonexisting_file", &content));
 }
 
 TEST_F(QuicPlatformTest, ApproximateNowInUsec) {
@@ -603,12 +597,12 @@ TEST_F(QuicPlatformTest, QuicFlags) {
 }
 
 TEST_F(QuicPlatformTest, QuicPccSender) {
-  EXPECT_DEATH_LOG_TO_STDERR(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
-                                                   /*unacked_packets=*/nullptr, /*random=*/nullptr,
-                                                   /*stats=*/nullptr,
-                                                   /*initial_congestion_window=*/0,
-                                                   /*max_congestion_window=*/0),
-                             "PccSender is not supported.");
+  EXPECT_DEATH(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
+                                     /*unacked_packets=*/nullptr, /*random=*/nullptr,
+                                     /*stats=*/nullptr,
+                                     /*initial_congestion_window=*/0,
+                                     /*max_congestion_window=*/0),
+               "PccSender is not supported.");
 }
 
 class FileUtilsTest : public testing::Test {
@@ -618,7 +612,7 @@ public:
   }
 
 protected:
-  void SetUp() override { Envoy::TestUtility::createDirectory(dir_path_); }
+  void SetUp() override { Envoy::TestEnvironment::createPath(dir_path_); }
 
   void TearDown() override {
     while (!files_to_remove_.empty()) {
@@ -631,7 +625,7 @@ protected:
   void addSubDirs(std::list<std::string> sub_dirs) {
     for (const std::string& dir_name : sub_dirs) {
       const std::string full_path = dir_path_ + "/" + dir_name;
-      Envoy::TestUtility::createDirectory(full_path);
+      Envoy::TestEnvironment::createPath(full_path);
       files_to_remove_.push(full_path);
     }
   }
@@ -668,7 +662,7 @@ TEST_F(FileUtilsTest, ReadFileContents) {
 }
 
 TEST_F(QuicPlatformTest, PickUnsedPort) {
-  int port = QuicPickUnusedPortOrDie();
+  int port = QuicPickServerPortForTestsOrDie();
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
   for (auto ip_version : supported_versions) {
@@ -676,10 +670,9 @@ TEST_F(QuicPlatformTest, PickUnsedPort) {
         Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
     Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
         Envoy::Network::Utility::getAddressWithPort(*addr, port);
-    Envoy::Network::IoHandlePtr io_handle =
-        addr_with_port->socket(Envoy::Network::Address::SocketType::Datagram);
+    Envoy::Network::SocketImpl sock(Envoy::Network::Socket::Type::Datagram, addr_with_port);
     // binding of given port should success.
-    EXPECT_EQ(0, addr_with_port->bind(io_handle->fd()).rc_);
+    EXPECT_EQ(0, sock.bind(addr_with_port).rc_);
   }
 }
 
@@ -688,13 +681,13 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   // Actually create sockets.
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillRepeatedly([](int domain, int type, int protocol) {
-    int fd = ::socket(domain, type, protocol);
-    return Envoy::Api::SysCallIntResult{fd, errno};
+    os_fd_t fd = ::socket(domain, type, protocol);
+    return Envoy::Api::SysCallSocketResult{fd, errno};
   });
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
-      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
-  EXPECT_DEATH_LOG_TO_STDERR(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
+      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
+  EXPECT_DEATH(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
@@ -726,13 +719,6 @@ TEST_F(QuicPlatformTest, TestQuicMacros) {
   int a QUIC_UNUSED;
 }
 
-TEST_F(QuicPlatformTest, TestQuicOptional) {
-  QuicOptional<int32_t> maybe_a;
-  EXPECT_FALSE(maybe_a.has_value());
-  maybe_a = 1;
-  EXPECT_EQ(1, *maybe_a);
-}
-
 TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
@@ -748,7 +734,7 @@ TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str2(1024, 'a');
   // str2 is copied.
   buffer.add(str2);
-  EXPECT_EQ(1u, buffer.getRawSlices(nullptr, 0));
+  EXPECT_EQ(1u, buffer.getRawSlices().size());
   buffer.addBufferFragment(fragment);
 
   quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
@@ -784,7 +770,7 @@ TEST(EnvoyQuicMemSliceTest, ConstructQuicMemSliceSpan) {
 
 TEST(EnvoyQuicMemSliceTest, QuicMemSliceStorage) {
   std::string str(512, 'a');
-  struct iovec iov = {const_cast<char*>(str.data()), str.length()};
+  iovec iov = {const_cast<char*>(str.data()), str.length()};
   SimpleBufferAllocator allocator;
   QuicMemSliceStorage storage(&iov, 1, &allocator, 1024);
   // Test copy constructor.

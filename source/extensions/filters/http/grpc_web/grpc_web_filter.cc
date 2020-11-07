@@ -17,6 +17,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    accept_handle(Http::CustomHeaders::get().Accept);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    grpc_accept_encoding_handle(Http::CustomHeaders::get().GrpcAcceptEncoding);
+
 struct RcDetailsValues {
   // The grpc web filter couldn't decode the data as the size wasn't a multiple of 4.
   const std::string GrpcDecodeFailedDueToSize = "grpc_base_64_decode_failed_bad_size";
@@ -38,7 +43,10 @@ const absl::flat_hash_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() con
   return *types;
 }
 
-bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
+bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
     return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
@@ -48,8 +56,7 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
 
 // Implements StreamDecoderFilter.
 // TODO(fengli): Implements the subtypes of gRPC-Web content-type other than proto, like +json, etc.
-Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  const Http::HeaderEntry* content_type = headers.ContentType();
+Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (!isGrpcWebRequest(headers)) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -61,28 +68,28 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   headers.removeContentLength();
   setupStatTracking(headers);
 
-  if (content_type != nullptr && (Http::Headers::get().ContentTypeValues.GrpcWebText ==
-                                      content_type->value().getStringView() ||
-                                  Http::Headers::get().ContentTypeValues.GrpcWebTextProto ==
-                                      content_type->value().getStringView())) {
+  const absl::string_view content_type = headers.getContentTypeValue();
+  if (content_type == Http::Headers::get().ContentTypeValues.GrpcWebText ||
+      content_type == Http::Headers::get().ContentTypeValues.GrpcWebTextProto) {
     // Checks whether gRPC-Web client is sending base64 encoded request.
     is_text_request_ = true;
   }
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 
-  const Http::HeaderEntry* accept = headers.Accept();
-  if (accept != nullptr &&
-      (Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().getStringView() ||
-       Http::Headers::get().ContentTypeValues.GrpcWebTextProto ==
-           accept->value().getStringView())) {
+  const absl::string_view accept = headers.getInlineValue(accept_handle.handle());
+  if (accept == Http::Headers::get().ContentTypeValues.GrpcWebText ||
+      accept == Http::Headers::get().ContentTypeValues.GrpcWebTextProto) {
     // Checks whether gRPC-Web client is asking for base64 encoded response.
     is_text_response_ = true;
   }
 
   // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
-  // Adds grpc-accept-encoding:identity,deflate,gzip. It's required for gRPC.
-  headers.setReferenceGrpcAcceptEncoding(Http::Headers::get().GrpcAcceptEncodingValues.Default);
+  if (headers.get(Http::CustomHeaders::get().GrpcAcceptEncoding).empty()) {
+    // Adds grpc-accept-encoding:identity
+    headers.setReferenceInline(grpc_accept_encoding_handle.handle(),
+                               Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -136,7 +143,7 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
 }
 
 // Implements StreamEncoderFilter.
-Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (!is_grpc_web_request_) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -186,7 +193,7 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (!is_grpc_web_request_) {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -196,18 +203,18 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   }
 
   // Trailers are expected to come all in once, and will be encoded into one single trailers frame.
-  // Trailers in the trailers frame are separated by CRLFs.
+  // Trailers in the trailers frame are separated by `CRLFs`.
   Buffer::OwnedImpl temp;
-  trailers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        Buffer::Instance* temp = static_cast<Buffer::Instance*>(context);
-        temp->add(header.key().getStringView().data(), header.key().size());
-        temp->add(":");
-        temp->add(header.value().getStringView().data(), header.value().size());
-        temp->add("\r\n");
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &temp);
+  trailers.iterate([&temp](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    temp.add(header.key().getStringView().data(), header.key().size());
+    temp.add(":");
+    temp.add(header.value().getStringView().data(), header.value().size());
+    temp.add("\r\n");
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  // Clears out the trailers so they don't get added since it is now in the body.
+  trailers.clear();
   Buffer::OwnedImpl buffer;
   // Adds the trailers frame head.
   buffer.add(&GRPC_WEB_TRAILER, 1);
@@ -224,16 +231,16 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   return Http::FilterTrailersStatus::Continue;
 }
 
-void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
+void GrpcWebFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
   cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;
   }
-  request_names_ = context_.resolveServiceAndMethod(headers.Path());
+  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
-void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_names_,
+void GrpcWebFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_stat_names_,
                       headers.GrpcStatus());
 }
 

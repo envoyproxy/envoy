@@ -1,6 +1,8 @@
 #include "extensions/filters/http/tap/tap_config_impl.h"
 
-#include "envoy/data/tap/v2alpha/http.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/http.pb.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
@@ -13,17 +15,18 @@ namespace TapFilter {
 namespace TapCommon = Extensions::Common::Tap;
 
 namespace {
-Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* context) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& header_list =
-      *reinterpret_cast<Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>*>(context);
-  auto& new_header = *header_list.Add();
-  new_header.set_key(std::string(header.key().getStringView()));
-  new_header.set_value(std::string(header.value().getStringView()));
-  return Http::HeaderMap::Iterate::Continue;
+Http::HeaderMap::ConstIterateCb
+fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>* output) {
+  return [output](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    auto& new_header = *output->Add();
+    new_header.set_key(std::string(header.key().getStringView()));
+    new_header.set_value(std::string(header.value().getStringView()));
+    return Http::HeaderMap::Iterate::Continue;
+  };
 }
 } // namespace
 
-HttpTapConfigImpl::HttpTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+HttpTapConfigImpl::HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer)
     : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer) {}
 
@@ -33,13 +36,12 @@ HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t strea
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {
   TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-  request_headers_->iterate(
-      fillHeaderList,
-      trace->mutable_http_streamed_trace_segment()->mutable_request_headers()->mutable_headers());
+  request_headers_->iterate(fillHeaderList(
+      trace->mutable_http_streamed_trace_segment()->mutable_request_headers()->mutable_headers()));
   sink_handle_->submitTrace(std::move(trace));
 }
 
-void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) {
+void HttpPerRequestTapperImpl::onRequestHeaders(const Http::RequestHeaderMap& headers) {
   request_headers_ = &headers;
   config_->rootMatcher().onHttpRequestHeaders(headers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
@@ -58,21 +60,21 @@ void HttpPerRequestTapperImpl::streamBufferedRequestBody() {
 
 void HttpPerRequestTapperImpl::onRequestBody(const Buffer::Instance& data) {
   onBody(data, buffered_streamed_request_body_, config_->maxBufferedRxBytes(),
-         &envoy::data::tap::v2alpha::HttpStreamedTraceSegment::mutable_request_body_chunk,
-         &envoy::data::tap::v2alpha::HttpBufferedTrace::mutable_request);
+         &envoy::data::tap::v3::HttpStreamedTraceSegment::mutable_request_body_chunk,
+         &envoy::data::tap::v3::HttpBufferedTrace::mutable_request, true);
 }
 
 void HttpPerRequestTapperImpl::streamRequestTrailers() {
   if (request_trailers_ != nullptr) {
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-    request_trailers_->iterate(fillHeaderList, trace->mutable_http_streamed_trace_segment()
-                                                   ->mutable_request_trailers()
-                                                   ->mutable_headers());
+    request_trailers_->iterate(fillHeaderList(trace->mutable_http_streamed_trace_segment()
+                                                  ->mutable_request_trailers()
+                                                  ->mutable_headers()));
     sink_handle_->submitTrace(std::move(trace));
   }
 }
 
-void HttpPerRequestTapperImpl::onRequestTrailers(const Http::HeaderMap& trailers) {
+void HttpPerRequestTapperImpl::onRequestTrailers(const Http::RequestTrailerMap& trailers) {
   request_trailers_ = &trailers;
   config_->rootMatcher().onHttpRequestTrailers(trailers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
@@ -89,13 +91,12 @@ void HttpPerRequestTapperImpl::onRequestTrailers(const Http::HeaderMap& trailers
 
 void HttpPerRequestTapperImpl::streamResponseHeaders() {
   TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-  response_headers_->iterate(
-      fillHeaderList,
-      trace->mutable_http_streamed_trace_segment()->mutable_response_headers()->mutable_headers());
+  response_headers_->iterate(fillHeaderList(
+      trace->mutable_http_streamed_trace_segment()->mutable_response_headers()->mutable_headers()));
   sink_handle_->submitTrace(std::move(trace));
 }
 
-void HttpPerRequestTapperImpl::onResponseHeaders(const Http::HeaderMap& headers) {
+void HttpPerRequestTapperImpl::onResponseHeaders(const Http::ResponseHeaderMap& headers) {
   response_headers_ = &headers;
   config_->rootMatcher().onHttpResponseHeaders(headers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
@@ -120,11 +121,11 @@ void HttpPerRequestTapperImpl::streamBufferedResponseBody() {
 
 void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
   onBody(data, buffered_streamed_response_body_, config_->maxBufferedTxBytes(),
-         &envoy::data::tap::v2alpha::HttpStreamedTraceSegment::mutable_response_body_chunk,
-         &envoy::data::tap::v2alpha::HttpBufferedTrace::mutable_response);
+         &envoy::data::tap::v3::HttpStreamedTraceSegment::mutable_response_body_chunk,
+         &envoy::data::tap::v3::HttpBufferedTrace::mutable_response, false);
 }
 
-void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailers) {
+void HttpPerRequestTapperImpl::onResponseTrailers(const Http::ResponseTrailerMap& trailers) {
   response_trailers_ = &trailers;
   config_->rootMatcher().onHttpResponseTrailers(trailers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
@@ -139,9 +140,9 @@ void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailer
     }
 
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-    trailers.iterate(fillHeaderList, trace->mutable_http_streamed_trace_segment()
-                                         ->mutable_response_trailers()
-                                         ->mutable_headers());
+    trailers.iterate(fillHeaderList(trace->mutable_http_streamed_trace_segment()
+                                        ->mutable_response_trailers()
+                                        ->mutable_headers()));
     sink_handle_->submitTrace(std::move(trace));
   }
 }
@@ -154,16 +155,16 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
   makeBufferedFullTraceIfNeeded();
   auto& http_trace = *buffered_full_trace_->mutable_http_buffered_trace();
   if (request_headers_ != nullptr) {
-    request_headers_->iterate(fillHeaderList, http_trace.mutable_request()->mutable_headers());
+    request_headers_->iterate(fillHeaderList(http_trace.mutable_request()->mutable_headers()));
   }
   if (request_trailers_ != nullptr) {
-    request_trailers_->iterate(fillHeaderList, http_trace.mutable_request()->mutable_trailers());
+    request_trailers_->iterate(fillHeaderList(http_trace.mutable_request()->mutable_trailers()));
   }
   if (response_headers_ != nullptr) {
-    response_headers_->iterate(fillHeaderList, http_trace.mutable_response()->mutable_headers());
+    response_headers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_headers()));
   }
   if (response_trailers_ != nullptr) {
-    response_trailers_->iterate(fillHeaderList, http_trace.mutable_response()->mutable_trailers());
+    response_trailers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_trailers()));
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");
@@ -175,10 +176,12 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
 void HttpPerRequestTapperImpl::onBody(
     const Buffer::Instance& data, Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
     uint32_t max_buffered_bytes, MutableBodyChunk mutable_body_chunk,
-    MutableMessage mutable_message) {
-  // TODO(mattklein123): Body matching.
+    MutableMessage mutable_message, bool request) {
+  // Invoke body matcher.
+  request ? config_->rootMatcher().onRequestBody(data, statuses_)
+          : config_->rootMatcher().onResponseBody(data, statuses_);
   if (config_->streaming()) {
-    const auto match_status = config_->rootMatcher().matchStatus(statuses_);
+    const auto& match_status = config_->rootMatcher().matchStatus(statuses_);
     // Without body matching, we must have already started tracing or have not yet matched.
     ASSERT(started_streaming_trace_ || !match_status.matches_);
 

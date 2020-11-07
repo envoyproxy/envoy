@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package tools.protodoc;
+
+import "google/protobuf/struct.proto";
+
+// Additional structure information consumed by protodoc when generating
+// documentation for a field.
+message Description {
+  message EdgeConfiguration {
+    // Example secure edge default for the field.
+    google.protobuf.Value example = 1;
+
+    // Additional note to include in the configuration warning.
+    string note = 2;
+  }
+
+  // Additional information for when this field is used in edge deployments.
+  EdgeConfiguration edge_config = 1;
+
+  // TODO: add additional information here to reflect things like Envoy
+  // implementation status.
+}
+
+message Manifest {
+  // Map from fully qualified field name to additional information to be used in
+  // protodoc generation.
+  map<string, Description> fields = 1;
+}

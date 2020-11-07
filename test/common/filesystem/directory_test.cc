@@ -1,23 +1,20 @@
+#include <filesystem>
 #include <fstream>
 #include <stack>
 #include <string>
-#include <unordered_set>
 
 #include "common/filesystem/directory.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Filesystem {
 
-// we are using this class to clean up all the files we create,
-// as it looks like some versions of libstdc++ have a bug in
-// std::experimental::filesystem::remove_all where it fails with nested directories:
-// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71313
 class DirectoryTest : public testing::Test {
 public:
   DirectoryTest() : dir_path_(TestEnvironment::temporaryPath("envoy_test")) {
@@ -25,7 +22,7 @@ public:
   }
 
 protected:
-  void SetUp() override { TestUtility::createDirectory(dir_path_); }
+  void SetUp() override { TestEnvironment::createPath(dir_path_); }
 
   void TearDown() override {
     while (!files_to_remove_.empty()) {
@@ -38,7 +35,7 @@ protected:
   void addSubDirs(std::list<std::string> sub_dirs) {
     for (const std::string& dir_name : sub_dirs) {
       const std::string full_path = dir_path_ + "/" + dir_name;
-      TestUtility::createDirectory(full_path);
+      TestEnvironment::createPath(full_path);
       files_to_remove_.push(full_path);
     }
   }
@@ -55,7 +52,7 @@ protected:
     for (const auto& link : symlinks) {
       const std::string target_path = dir_path_ + "/" + link.first;
       const std::string link_path = dir_path_ + "/" + link.second;
-      TestUtility::createSymlink(target_path, link_path);
+      TestEnvironment::createSymlink(target_path, link_path);
       files_to_remove_.push(link_path);
     }
   }
@@ -70,7 +67,7 @@ struct EntryHash {
   }
 };
 
-using EntrySet = std::unordered_set<DirectoryEntry, EntryHash>;
+using EntrySet = absl::node_hash_set<DirectoryEntry, EntryHash>;
 
 EntrySet getDirectoryContents(const std::string& dir_path, bool recursive) {
   Directory directory(dir_path);
@@ -185,6 +182,26 @@ TEST_F(DirectoryTest, DirectoryWithSymlinkToDirectory) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
+// Test that a broken symlink can be listed
+TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
+  addSubDirs({"sub_dir"});
+  addSymlinks({{"sub_dir", "link_dir"}});
+  TestEnvironment::removePath(dir_path_ + "/sub_dir");
+
+  const EntrySet expected = {
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+#ifndef WIN32
+      // On Linux, a broken directory link is simply a symlink to be rm'ed
+      {"link_dir", FileType::Regular},
+#else
+      // On Windows, a broken directory link remains a directory link to be rmdir'ed
+      {"link_dir", FileType::Directory},
+#endif
+  };
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
+}
+
 // Test that we can list an empty directory
 TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
   const EntrySet expected = {
@@ -209,6 +226,27 @@ TEST(DirectoryIteratorImpl, NonExistingDir) {
 #endif
 }
 
+#ifndef WIN32
+TEST_F(DirectoryTest, Fifo) {
+  std::string fifo_path = fmt::format("{}/fifo", dir_path_);
+  ASSERT_EQ(0, mkfifo(fifo_path.c_str(), 0644));
+
+  const EntrySet expected = {
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"fifo", FileType::Other},
+  };
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
+  remove(fifo_path.c_str());
+}
+
+TEST_F(DirectoryTest, FileTypeTest) {
+  auto sys_calls = Api::OsSysCallsSingleton::get();
+  EXPECT_THROW_WITH_REGEX(DirectoryIteratorImpl::fileType("foo", sys_calls), EnvoyException,
+                          "unable to stat file: 'foo' .*");
+}
+#endif
+
 // Test that we correctly handle trailing path separators
 TEST(Directory, DirectoryHasTrailingPathSeparator) {
 #ifdef WIN32
@@ -216,7 +254,7 @@ TEST(Directory, DirectoryHasTrailingPathSeparator) {
 #else
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "/");
 #endif
-  TestUtility::createDirectory(dir_path);
+  TestEnvironment::createPath(dir_path);
 
   const EntrySet expected = {
       {".", FileType::Directory},

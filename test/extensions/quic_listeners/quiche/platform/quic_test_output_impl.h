@@ -6,10 +6,14 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 
 namespace quic {
 
-void QuicRecordTestOutputImpl(QuicStringPiece identifier, QuicStringPiece data);
+void QuicSaveTestOutputImpl(quiche::QuicheStringPiece filename, quiche::QuicheStringPiece data);
+
+bool QuicLoadTestOutputImpl(quiche::QuicheStringPiece filename, std::string* data);
+
+void QuicRecordTraceImpl(quiche::QuicheStringPiece identifier, quiche::QuicheStringPiece data);
 
 } // namespace quic

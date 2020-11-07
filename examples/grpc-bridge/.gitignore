@@ -1,2 +1,3 @@
-bin/service
 .idea
+server/kv/kv.pb.go
+client/kv/kv_pb2.py

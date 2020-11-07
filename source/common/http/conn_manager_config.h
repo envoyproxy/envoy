@@ -1,13 +1,18 @@
 #pragma once
 
 #include "envoy/config/config_provider.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tracing/http_tracer.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/date_provider.h"
+#include "common/local_reply/local_reply.h"
 #include "common/network/utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -56,6 +61,7 @@ namespace Http {
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_tx_reset)                                                                  \
+  COUNTER(downstream_rq_max_duration_reached)                                                      \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
   COUNTER(rs_too_large)                                                                            \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
@@ -78,8 +84,16 @@ struct ConnectionManagerNamedStats {
 };
 
 struct ConnectionManagerStats {
+  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, const std::string& prefix,
+                         Stats::Scope& scope)
+      : named_(std::move(named_stats)), prefix_(prefix),
+        prefix_stat_name_storage_(prefix, scope.symbolTable()), scope_(scope) {}
+
+  Stats::StatName prefixStatName() const { return prefix_stat_name_storage_.statName(); }
+
   ConnectionManagerNamedStats named_;
   std::string prefix_;
+  Stats::StatNameManagedStorage prefix_stat_name_storage_;
   Stats::Scope& scope_;
 };
 
@@ -107,10 +121,10 @@ struct ConnectionManagerTracingStats {
  */
 struct TracingConnectionManagerConfig {
   Tracing::OperationName operation_name_;
-  std::vector<Http::LowerCaseString> request_headers_for_tags_;
-  envoy::type::FractionalPercent client_sampling_;
-  envoy::type::FractionalPercent random_sampling_;
-  envoy::type::FractionalPercent overall_sampling_;
+  Tracing::CustomTagMap custom_tags_;
+  envoy::type::v3::FractionalPercent client_sampling_;
+  envoy::type::v3::FractionalPercent random_sampling_;
+  envoy::type::v3::FractionalPercent overall_sampling_;
   bool verbose_;
   uint32_t max_path_tag_length_;
 };
@@ -177,9 +191,14 @@ public:
 class ConnectionManagerConfig {
 public:
   using HttpConnectionManagerProto =
-      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager;
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 
   virtual ~ConnectionManagerConfig() = default;
+
+  /**
+   * @return RequestIDExtensionSharedPtr The request id utilities instance to use
+   */
+  virtual RequestIDExtensionSharedPtr requestIDExtension() PURE;
 
   /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.
@@ -208,7 +227,7 @@ public:
    * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
    *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
    */
-  virtual std::chrono::milliseconds drainTimeout() PURE;
+  virtual std::chrono::milliseconds drainTimeout() const PURE;
 
   /**
    * @return FilterChainFactory& the HTTP level filter factory to build the connection's filter
@@ -220,12 +239,17 @@ public:
    * @return whether the connection manager will generate a fresh x-request-id if the request does
    *         not have one.
    */
-  virtual bool generateRequestId() PURE;
+  virtual bool generateRequestId() const PURE;
 
   /**
    * @return whether the x-request-id should not be reset on edge entry inside mesh
    */
   virtual bool preserveExternalRequestId() const PURE;
+
+  /**
+   * @return whether the x-request-id should always be set in the response.
+   */
+  virtual bool alwaysSetRequestIdInResponse() const PURE;
 
   /**
    * @return optional idle timeout for incoming connection manager connections.
@@ -272,6 +296,11 @@ public:
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 
   /**
+   * @return maximum duration time to keep alive stream
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+
+  /**
    * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
    *         config for each request flow. Pointer ownership is _not_ transferred to the caller of
    *         this function. This will return nullptr when scoped routing is enabled.
@@ -288,12 +317,13 @@ public:
   /**
    * @return const std::string& the server name to write into responses.
    */
-  virtual const std::string& serverName() PURE;
+  virtual const std::string& serverName() const PURE;
 
   /**
    * @return ServerHeaderTransformation the transformation to apply to Server response headers.
    */
-  virtual HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() PURE;
+  virtual HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const PURE;
 
   /**
    * @return ConnectionManagerStats& the stats to write to.
@@ -309,7 +339,7 @@ public:
    * @return bool whether to use the remote address for populating XFF, determining internal request
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
-  virtual bool useRemoteAddress() PURE;
+  virtual bool useRemoteAddress() const PURE;
 
   /**
    * @return InternalAddressConfig configuration for user defined internal addresses.
@@ -338,7 +368,7 @@ public:
   /**
    * @return ForwardClientCertType the configuration of how to forward the client cert information.
    */
-  virtual ForwardClientCertType forwardClientCert() PURE;
+  virtual ForwardClientCertType forwardClientCert() const PURE;
 
   /**
    * @return vector of ClientCertDetailsType the configuration of the current client cert's details
@@ -360,6 +390,11 @@ public:
   virtual const absl::optional<std::string>& userAgent() PURE;
 
   /**
+   *  @return HttpTracerSharedPtr HttpTracer to use.
+   */
+  virtual Tracing::HttpTracerSharedPtr tracer() PURE;
+
+  /**
    * @return tracing config.
    */
   virtual const TracingConnectionManagerConfig* tracingConfig() PURE;
@@ -373,6 +408,12 @@ public:
    * @return bool supplies if the HttpConnectionManager should proxy the Expect: 100-Continue
    */
   virtual bool proxy100Continue() const PURE;
+
+  /**
+   * @return bool supplies if the HttpConnectionManager should handle invalid HTTP with a stream
+   * error or connection error.
+   */
+  virtual bool streamErrorOnInvalidHttpMessaging() const PURE;
 
   /**
    * @return supplies the http1 settings.
@@ -389,6 +430,23 @@ public:
    * one.
    */
   virtual bool shouldMergeSlashes() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should remove the port from host/authority header
+   */
+  virtual bool shouldStripMatchingPort() const PURE;
+
+  /**
+   * @return the action HttpConnectionManager should take when receiving client request
+   * headers containing underscore characters.
+   */
+  virtual envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const PURE;
+
+  /**
+   * @return LocalReply configuration which supplies mapping for local reply generated by Envoy.
+   */
+  virtual const LocalReply::LocalReply& localReply() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

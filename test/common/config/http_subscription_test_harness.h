@@ -2,8 +2,11 @@
 
 #include <memory>
 
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/http/async_client.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/utility.h"
 #include "common/config/http_subscription_impl.h"
@@ -18,7 +21,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -47,8 +50,9 @@ public:
     }));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, callbacks_, stats_,
-        init_fetch_timeout, validation_visitor_);
+        std::chrono::milliseconds(1000), *method_descriptor_,
+        Config::TypeUrl::get().ClusterLoadAssignment, envoy::config::core::v3::ApiVersion::AUTO,
+        callbacks_, resource_decoder_, stats_, init_fetch_timeout, validation_visitor_);
   }
 
   ~HttpSubscriptionTestHarness() override {
@@ -63,16 +67,15 @@ public:
     UNREFERENCED_PARAMETER(expect_node);
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
+        .WillOnce(Invoke([this, cluster_names, version](Http::RequestMessagePtr& request,
                                                         Http::AsyncClient::Callbacks& callbacks,
                                                         const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
-          EXPECT_EQ("POST", std::string(request->headers().Method()->value().getStringView()));
+          EXPECT_EQ("POST", request->headers().getMethodValue());
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
-                    std::string(request->headers().ContentType()->value().getStringView()));
-          EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().getStringView()));
-          EXPECT_EQ("/v2/discovery:endpoints",
-                    std::string(request->headers().Path()->value().getStringView()));
+                    request->headers().getContentTypeValue());
+          EXPECT_EQ("eds_cluster", request->headers().getHostValue());
+          EXPECT_EQ("/v2/discovery:endpoints", request->headers().getPathValue());
           std::string expected_request = "{";
           if (!version_.empty()) {
             expected_request += "\"version_info\":\"" + version + "\",";
@@ -90,10 +93,12 @@ public:
             }
             expected_request += "\"resource_names\":[\"" + joined_cluster_names + "\"]";
           }
+          expected_request +=
+              ",\"type_url\":\"type.googleapis.com/envoy.api.v2.ClusterLoadAssignment\"";
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
           EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
-                    std::string(request->headers().ContentLength()->value().getStringView()));
+                    request->headers().getContentLengthValue());
           request_in_progress_ = true;
           return &http_request_;
         }));
@@ -129,14 +134,19 @@ public:
     }
     response_json.pop_back();
     response_json += "]}";
-    envoy::api::v2::DiscoveryResponse response_pb;
+    envoy::service::discovery::v3::DiscoveryResponse response_pb;
     TestUtility::loadFromJson(response_json, response_pb);
-    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", response_code}}};
-    Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
-    message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
+    Http::ResponseHeaderMapPtr response_headers{
+        new Http::TestResponseHeaderMapImpl{{":status", response_code}}};
+    Http::ResponseMessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
+    message->body().add(response_json);
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            response_pb, "cluster_name");
 
     if (modify) {
-      EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
+      EXPECT_CALL(callbacks_,
+                  onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
           .WillOnce(ThrowOnRejectedConfig(accept));
     }
     if (!accept) {
@@ -145,7 +155,7 @@ public:
     }
     EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
     EXPECT_CALL(*timer_, enableTimer(_, _));
-    http_callbacks_->onSuccess(std::move(message));
+    http_callbacks_->onSuccess(http_request_, std::move(message));
     if (accept) {
       version_ = version;
     }
@@ -181,11 +191,13 @@ public:
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
-  envoy::api::v2::core::Node node_;
-  Runtime::MockRandomGenerator random_gen_;
+  envoy::config::core::v3::Node node_;
+  Random::MockRandomGenerator random_gen_;
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
-  Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
+  Config::MockSubscriptionCallbacks callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
   std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;

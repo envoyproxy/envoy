@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
@@ -18,32 +19,48 @@
 namespace Envoy {
 namespace {
 
-Http::TestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
-                                              uint32_t content_length = 0) {
-  return Http::TestHeaderMapImpl{{":authority", "host"},
-                                 {"content-length", fmt::format("{}", content_length)},
-                                 {":path", "/websocket/test"},
-                                 {":method", "GET"},
-                                 {":scheme", "http"},
-                                 {"upgrade", upgrade_type},
-                                 {"connection", "keep-alive, upgrade"}};
+Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
+                                                     uint32_t content_length = 0) {
+  return Http::TestRequestHeaderMapImpl{{":authority", "host"},
+                                        {"content-length", fmt::format("{}", content_length)},
+                                        {":path", "/websocket/test"},
+                                        {":method", "GET"},
+                                        {":scheme", "http"},
+                                        {"upgrade", upgrade_type},
+                                        {"connection", "keep-alive, upgrade"}};
 }
 
-Http::TestHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
-  return Http::TestHeaderMapImpl{{":status", "101"},
-                                 {"connection", "upgrade"},
-                                 {"upgrade", upgrade_type},
-                                 {"content-length", "0"}};
+Http::TestResponseHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
+  return Http::TestResponseHeaderMapImpl{
+      {":status", "101"}, {"connection", "upgrade"}, {"upgrade", upgrade_type}};
+}
+
+template <class ProxiedHeaders, class OriginalHeaders>
+void commonValidate(ProxiedHeaders& proxied_headers, const OriginalHeaders& original_headers) {
+  // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
+  if (original_headers.ContentLength() == nullptr &&
+      proxied_headers.TransferEncoding() != nullptr) {
+    ASSERT_EQ(proxied_headers.getTransferEncodingValue(), "chunked");
+    proxied_headers.removeTransferEncoding();
+  }
+  if (proxied_headers.Connection() != nullptr &&
+      proxied_headers.Connection()->value() == "upgrade" &&
+      original_headers.Connection() != nullptr &&
+      original_headers.Connection()->value() == "keep-alive, upgrade") {
+    // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
+    // header when converting from HTTP/1.1 to H2
+    proxied_headers.setConnection("keep-alive, upgrade");
+  }
 }
 
 } // namespace
 
 void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
-    const Http::HeaderMap& original_proxied_request_headers,
-    const Http::HeaderMap& original_request_headers) {
-  Http::TestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
+    const Http::RequestHeaderMap& original_proxied_request_headers,
+    const Http::RequestHeaderMap& original_request_headers) {
+  Http::TestRequestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
   if (proxied_request_headers.ForwardedProto()) {
-    ASSERT_EQ(proxied_request_headers.ForwardedProto()->value().getStringView(), "http");
+    ASSERT_EQ(proxied_request_headers.getForwardedProtoValue(), "http");
     proxied_request_headers.removeForwardedProto();
   }
 
@@ -53,9 +70,16 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
   proxied_request_headers.removeEnvoyExpectedRequestTimeoutMs();
 
   if (proxied_request_headers.Scheme()) {
-    ASSERT_EQ(proxied_request_headers.Scheme()->value().getStringView(), "http");
+    ASSERT_EQ(proxied_request_headers.getSchemeValue(), "http");
   } else {
     proxied_request_headers.setScheme("http");
+  }
+
+  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
+  // it back to the proxied headers.
+  if (original_request_headers.ContentLength() &&
+      proxied_request_headers.ContentLength() == nullptr) {
+    proxied_request_headers.setContentLength(size_t(0));
   }
 
   commonValidate(proxied_request_headers, original_request_headers);
@@ -65,43 +89,22 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
 }
 
 void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
-    const Http::HeaderMap& original_proxied_response_headers,
-    const Http::HeaderMap& original_response_headers) {
-  Http::TestHeaderMapImpl proxied_response_headers(original_proxied_response_headers);
+    const Http::ResponseHeaderMap& original_proxied_response_headers,
+    const Http::ResponseHeaderMap& original_response_headers) {
+  Http::TestResponseHeaderMapImpl proxied_response_headers(original_proxied_response_headers);
 
   // Check for and remove headers added by default for HTTP responses.
   ASSERT_TRUE(proxied_response_headers.Date() != nullptr);
   ASSERT_TRUE(proxied_response_headers.Server() != nullptr);
-  ASSERT_EQ(proxied_response_headers.Server()->value().getStringView(), "envoy");
+  ASSERT_EQ(proxied_response_headers.getServerValue(), "envoy");
   proxied_response_headers.removeDate();
   proxied_response_headers.removeServer();
+
+  ASSERT_TRUE(proxied_response_headers.TransferEncoding() == nullptr);
 
   commonValidate(proxied_response_headers, original_response_headers);
 
   EXPECT_THAT(&proxied_response_headers, HeaderMapEqualIgnoreOrder(&original_response_headers));
-}
-
-void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
-                                              const Http::HeaderMap& original_headers) {
-  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
-  // it back to the proxied headers.
-  if (original_headers.ContentLength() && proxied_headers.ContentLength() == nullptr) {
-    proxied_headers.setContentLength(size_t(0));
-  }
-  // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
-  if (original_headers.ContentLength() == nullptr &&
-      proxied_headers.TransferEncoding() != nullptr) {
-    ASSERT_EQ(proxied_headers.TransferEncoding()->value().getStringView(), "chunked");
-    proxied_headers.removeTransferEncoding();
-  }
-  if (proxied_headers.Connection() != nullptr &&
-      proxied_headers.Connection()->value() == "upgrade" &&
-      original_headers.Connection() != nullptr &&
-      original_headers.Connection()->value() == "keep-alive, upgrade") {
-    // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
-    // header when converting from HTTP/1.1 to H2
-    proxied_headers.Connection()->value().setCopy("keep-alive, upgrade", 19);
-  }
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,
@@ -109,31 +112,29 @@ INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
-  return
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-        hcm.add_upgrade_configs()->set_upgrade_type("websocket");
-      };
+  return [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); };
 }
 
 void WebsocketIntegrationTest::initialize() {
   if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
     config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
           cluster->mutable_http2_protocol_options()->set_allow_connect(true);
         });
   }
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-            -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   }
   HttpProtocolIntegrationTest::initialize();
 }
 
 void WebsocketIntegrationTest::performUpgrade(
-    const Http::TestHeaderMapImpl& upgrade_request_headers,
-    const Http::TestHeaderMapImpl& upgrade_response_headers) {
+    const Http::TestRequestHeaderMapImpl& upgrade_request_headers,
+    const Http::TestResponseHeaderMapImpl& upgrade_response_headers) {
   // Establish the initial connection.
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -207,7 +208,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   // Verify both the data and the disconnect went through.
   response_->waitForBodyData(5);
   EXPECT_EQ("world", response_->body());
-  waitForClientDisconnectOrReset();
+  waitForClientDisconnectOrReset(Http::StreamResetReason::ConnectError);
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
@@ -260,8 +261,8 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0)->mutable_route();
@@ -283,8 +284,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
       });
@@ -311,8 +312,8 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 
 TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         foo_upgrade->mutable_enabled()->set_value(false);
@@ -344,18 +345,16 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 
   // Add a small buffer filter to the standard HTTP filter chain. Websocket
   // upgrades will use the HTTP filter chain so will also have small buffers.
-  config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
 
   // Add a second upgrade type which goes directly to the router filter.
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         auto* filter_list_back = foo_upgrade->add_filters();
-        const std::string json =
-            Json::Factory::loadFromYamlString("name: envoy.router")->asJsonString();
-        TestUtility::loadFromJson(json, *filter_list_back);
+        TestUtility::loadFromYaml("name: envoy.filters.http.router", *filter_list_back);
       });
   initialize();
 
@@ -367,24 +366,24 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     response_->waitForEndStream();
-    EXPECT_EQ("413", response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("413", response_->headers().getStatusValue());
     waitForClientDisconnectOrReset();
     codec_client_->close();
   }
 
   // HTTP requests are configured to disallow large bodies.
   {
-    Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                            {":path", "/"},
-                                            {"content-length", "2048"},
-                                            {":authority", "host"},
-                                            {":scheme", "https"}};
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {"content-length", "2048"},
+                                                   {":authority", "host"},
+                                                   {":scheme", "https"}};
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     response_->waitForEndStream();
-    EXPECT_EQ("413", response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("413", response_->headers().getStatusValue());
     waitForClientDisconnectOrReset();
     codec_client_->close();
   }
@@ -421,9 +420,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
   // transfer-encoding: chunked.
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
-  }
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response_->headers().TransferEncoding() != nullptr);
   }
 
   // Send both a chunked request body and "websocket" payload.

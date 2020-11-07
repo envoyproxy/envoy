@@ -1,3 +1,5 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/server.h"
 
@@ -10,19 +12,22 @@ namespace Envoy {
 // bootstrap proto it's too late to set it.
 //
 // Instead, set the value early and regression test the bootstrap proto's validation of prefix
-// injection.
+// injection. We also register a custom header to make sure that registered headers interact well
+// with the prefix override.
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    cache_control_handle(Http::CustomHeaders::get().CacheControl);
 
 static const char* custom_prefix_ = "x-custom";
 
 class HeaderPrefixIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  static void SetUpTestSuite() {
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(custom_prefix_);
   }
 };
 
 TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.set_header_prefix("x-custom");
   });
   initialize();
@@ -30,13 +35,15 @@ TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
-  EXPECT_TRUE(response->headers().get(
-                  Envoy::Http::LowerCaseString{"x-custom-upstream-service-time"}) != nullptr);
+  EXPECT_FALSE(response->headers()
+                   .get(Envoy::Http::LowerCaseString{"x-custom-upstream-service-time"})
+                   .empty());
   EXPECT_EQ("x-custom-upstream-service-time",
             response->headers().EnvoyUpstreamServiceTime()->key().getStringView());
 
-  EXPECT_TRUE(upstream_request_->headers().get(
-                  Envoy::Http::LowerCaseString{"x-custom-expected-rq-timeout-ms"}) != nullptr);
+  EXPECT_FALSE(upstream_request_->headers()
+                   .get(Envoy::Http::LowerCaseString{"x-custom-expected-rq-timeout-ms"})
+                   .empty());
   EXPECT_EQ("x-custom-expected-rq-timeout-ms",
             upstream_request_->headers().EnvoyExpectedRequestTimeoutMs()->key().getStringView());
 }
@@ -45,7 +52,7 @@ TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
 // singleton header prefix in SetUpTestSuite, and Envoy will RELEASE_ASSERT on
 // start-up.
 TEST_P(HeaderPrefixIntegrationTest, FailedCustomHeaderPrefix) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.set_header_prefix("x-custom-but-not-set");
   });
   EXPECT_DEATH(initialize(), "Attempting to change the header prefix after it has been used!");

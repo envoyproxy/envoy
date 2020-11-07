@@ -17,59 +17,42 @@ namespace Envoy {
 template <class BaseClass> class MockBufferBase : public BaseClass {
 public:
   MockBufferBase();
-  MockBufferBase(std::function<void()> below_low, std::function<void()> above_high);
+  MockBufferBase(std::function<void()> below_low, std::function<void()> above_high,
+                 std::function<void()> above_overflow);
 
-  MOCK_METHOD1(write, Api::IoCallUint64Result(Network::IoHandle& io_handle));
-  MOCK_METHOD1(move, void(Buffer::Instance& rhs));
-  MOCK_METHOD2(move, void(Buffer::Instance& rhs, uint64_t length));
-  MOCK_METHOD1(drain, void(uint64_t size));
+  MOCK_METHOD(void, move, (Buffer::Instance & rhs));
+  MOCK_METHOD(void, move, (Buffer::Instance & rhs, uint64_t length));
+  MOCK_METHOD(void, drain, (uint64_t size));
 
   void baseMove(Buffer::Instance& rhs) { BaseClass::move(rhs); }
   void baseDrain(uint64_t size) { BaseClass::drain(size); }
-
-  Api::IoCallUint64Result trackWrites(Network::IoHandle& io_handle) {
-    Api::IoCallUint64Result result = BaseClass::write(io_handle);
-    if (result.ok() && result.rc_ > 0) {
-      bytes_written_ += result.rc_;
-    }
-    return result;
-  }
 
   void trackDrains(uint64_t size) {
     bytes_drained_ += size;
     BaseClass::drain(size);
   }
 
-  // A convenience function to invoke on write() which fails the write with EAGAIN.
-  Api::IoCallUint64Result failWrite(Network::IoHandle&) {
-    return Api::IoCallUint64Result(
-        /*rc=*/0,
-        Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(), [](Api::IoError*) {}));
-  }
-
-  int bytes_written() const { return bytes_written_; }
-  uint64_t bytes_drained() const { return bytes_drained_; }
+  uint64_t bytesDrained() const { return bytes_drained_; }
 
 private:
-  int bytes_written_{0};
   uint64_t bytes_drained_{0};
 };
 
 template <>
 MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase(std::function<void()> below_low,
-                                                        std::function<void()> above_high);
+                                                        std::function<void()> above_high,
+                                                        std::function<void()> above_overflow);
 template <> MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase();
 
 template <>
 MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()> below_low,
-                                                  std::function<void()> above_high);
+                                                  std::function<void()> above_high,
+                                                  std::function<void()> above_overflow);
 template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase();
 
 class MockBuffer : public MockBufferBase<Buffer::OwnedImpl> {
 public:
   MockBuffer() {
-    ON_CALL(*this, write(testing::_))
-        .WillByDefault(testing::Invoke(this, &MockBuffer::trackWrites));
     ON_CALL(*this, move(testing::_)).WillByDefault(testing::Invoke(this, &MockBuffer::baseMove));
   }
 };
@@ -78,10 +61,9 @@ class MockWatermarkBuffer : public MockBufferBase<Buffer::WatermarkBuffer> {
 public:
   using BaseClass = MockBufferBase<Buffer::WatermarkBuffer>;
 
-  MockWatermarkBuffer(std::function<void()> below_low, std::function<void()> above_high)
-      : BaseClass(below_low, above_high) {
-    ON_CALL(*this, write(testing::_))
-        .WillByDefault(testing::Invoke(this, &MockWatermarkBuffer::trackWrites));
+  MockWatermarkBuffer(std::function<void()> below_low, std::function<void()> above_high,
+                      std::function<void()> above_overflow)
+      : BaseClass(below_low, above_high, above_overflow) {
     ON_CALL(*this, move(testing::_))
         .WillByDefault(testing::Invoke(this, &MockWatermarkBuffer::baseMove));
   }
@@ -92,13 +74,14 @@ public:
   MockBufferFactory();
   ~MockBufferFactory() override;
 
-  Buffer::InstancePtr create(std::function<void()> below_low,
-                             std::function<void()> above_high) override {
-    return Buffer::InstancePtr{create_(below_low, above_high)};
+  Buffer::InstancePtr create(std::function<void()> below_low, std::function<void()> above_high,
+                             std::function<void()> above_overflow) override {
+    return Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
   }
 
-  MOCK_METHOD2(create_, Buffer::Instance*(std::function<void()> below_low,
-                                          std::function<void()> above_high));
+  MOCK_METHOD(Buffer::Instance*, create_,
+              (std::function<void()> below_low, std::function<void()> above_high,
+               std::function<void()> above_overflow));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
@@ -126,6 +109,10 @@ ACTION_P(AddBufferToString, target_string) {
 
 ACTION_P(AddBufferToStringWithoutDraining, target_string) {
   target_string->append(arg0.toString());
+}
+
+MATCHER_P(RawSliceVectorEqual, rhs, testing::PrintToString(rhs)) {
+  return TestUtility::rawSlicesEqual(arg, rhs.data(), rhs.size());
 }
 
 } // namespace Envoy

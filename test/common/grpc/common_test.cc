@@ -5,7 +5,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"
@@ -16,68 +16,90 @@ namespace Envoy {
 namespace Grpc {
 
 TEST(GrpcContextTest, GetGrpcStatus) {
-  Http::TestHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
+  Http::TestResponseHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers).value());
 
-  Http::TestHeaderMapImpl no_status_trailers{{"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl no_status_trailers{{"foo", "bar"}};
   EXPECT_FALSE(Common::getGrpcStatus(no_status_trailers));
 
-  Http::TestHeaderMapImpl aborted_trailers{{"grpc-status", "10"}};
+  Http::TestResponseHeaderMapImpl aborted_trailers{{"grpc-status", "10"}};
   EXPECT_EQ(Status::Aborted, Common::getGrpcStatus(aborted_trailers).value());
 
-  Http::TestHeaderMapImpl unauth_trailers{{"grpc-status", "16"}};
+  Http::TestResponseHeaderMapImpl unauth_trailers{{"grpc-status", "16"}};
   EXPECT_EQ(Status::Unauthenticated, Common::getGrpcStatus(unauth_trailers).value());
 
-  Http::TestHeaderMapImpl invalid_trailers{{"grpc-status", "-1"}};
+  Http::TestResponseHeaderMapImpl invalid_trailers{{"grpc-status", "-1"}};
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
 
-  Http::TestHeaderMapImpl user_defined_invalid_trailers{{"grpc-status", "1024"}};
+  Http::TestResponseHeaderMapImpl user_defined_invalid_trailers{{"grpc-status", "1024"}};
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
 
-  Http::TestHeaderMapImpl user_defined_trailers{{"grpc-status", "1024"}};
+  Http::TestResponseHeaderMapImpl user_defined_trailers{{"grpc-status", "1024"}};
   EXPECT_EQ(1024, Common::getGrpcStatus(user_defined_trailers, true).value());
 }
 
+TEST(GrpcContextTest, GetGrpcStatusWithFallbacks) {
+  Http::TestResponseHeaderMapImpl ok_status_headers{{"grpc-status", "0"}};
+  Http::TestResponseHeaderMapImpl no_status_headers{{"foo", "bar"}};
+  Http::TestResponseTrailerMapImpl ok_status_trailers{{"grpc-status", "0"}};
+  Http::TestResponseTrailerMapImpl no_status_trailers{{"foo", "bar"}};
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  EXPECT_CALL(info, responseCode()).WillRepeatedly(testing::Return(404));
+
+  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_status_trailers, no_status_headers, info).value());
+
+  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(no_status_trailers, ok_status_headers, info).value());
+
+  EXPECT_EQ(Status::Unimplemented,
+            Common::getGrpcStatus(no_status_trailers, no_status_headers, info).value());
+
+  NiceMock<StreamInfo::MockStreamInfo> info_without_code;
+  EXPECT_FALSE(Common::getGrpcStatus(no_status_trailers, no_status_headers, info_without_code));
+}
+
 TEST(GrpcContextTest, GetGrpcMessage) {
-  Http::TestHeaderMapImpl empty_trailers;
+  Http::TestResponseTrailerMapImpl empty_trailers;
   EXPECT_EQ("", Common::getGrpcMessage(empty_trailers));
 
-  Http::TestHeaderMapImpl error_trailers{{"grpc-message", "Some error"}};
+  Http::TestResponseTrailerMapImpl error_trailers{{"grpc-message", "Some error"}};
   EXPECT_EQ("Some error", Common::getGrpcMessage(error_trailers));
 
-  Http::TestHeaderMapImpl empty_error_trailers{{"grpc-message", ""}};
+  Http::TestResponseTrailerMapImpl empty_error_trailers{{"grpc-message", ""}};
   EXPECT_EQ("", Common::getGrpcMessage(empty_error_trailers));
 }
 
 TEST(GrpcContextTest, GetGrpcTimeout) {
-  Http::TestHeaderMapImpl empty_headers;
-  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(empty_headers));
+  Http::TestRequestHeaderMapImpl empty_headers;
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(empty_headers));
 
-  Http::TestHeaderMapImpl empty_grpc_timeout{{"grpc-timeout", ""}};
-  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(empty_grpc_timeout));
+  Http::TestRequestHeaderMapImpl empty_grpc_timeout{{"grpc-timeout", ""}};
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(empty_grpc_timeout));
 
-  Http::TestHeaderMapImpl missing_unit{{"grpc-timeout", "123"}};
-  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(missing_unit));
+  Http::TestRequestHeaderMapImpl missing_unit{{"grpc-timeout", "123"}};
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(missing_unit));
 
-  Http::TestHeaderMapImpl illegal_unit{{"grpc-timeout", "123F"}};
-  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(illegal_unit));
+  Http::TestRequestHeaderMapImpl illegal_unit{{"grpc-timeout", "123F"}};
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(illegal_unit));
 
-  Http::TestHeaderMapImpl unit_hours{{"grpc-timeout", "1H"}};
-  EXPECT_EQ(std::chrono::milliseconds(60 * 60 * 1000), Common::getGrpcTimeout(unit_hours));
+  Http::TestRequestHeaderMapImpl unit_hours{{"grpc-timeout", "0H"}};
+  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(unit_hours));
 
-  Http::TestHeaderMapImpl unit_minutes{{"grpc-timeout", "1M"}};
+  Http::TestRequestHeaderMapImpl zero_hours{{"grpc-timeout", "1H"}};
+  EXPECT_EQ(std::chrono::milliseconds(60 * 60 * 1000), Common::getGrpcTimeout(zero_hours));
+
+  Http::TestRequestHeaderMapImpl unit_minutes{{"grpc-timeout", "1M"}};
   EXPECT_EQ(std::chrono::milliseconds(60 * 1000), Common::getGrpcTimeout(unit_minutes));
 
-  Http::TestHeaderMapImpl unit_seconds{{"grpc-timeout", "1S"}};
+  Http::TestRequestHeaderMapImpl unit_seconds{{"grpc-timeout", "1S"}};
   EXPECT_EQ(std::chrono::milliseconds(1000), Common::getGrpcTimeout(unit_seconds));
 
-  Http::TestHeaderMapImpl unit_milliseconds{{"grpc-timeout", "12345678m"}};
+  Http::TestRequestHeaderMapImpl unit_milliseconds{{"grpc-timeout", "12345678m"}};
   EXPECT_EQ(std::chrono::milliseconds(12345678), Common::getGrpcTimeout(unit_milliseconds));
 
-  Http::TestHeaderMapImpl unit_microseconds{{"grpc-timeout", "1000001u"}};
+  Http::TestRequestHeaderMapImpl unit_microseconds{{"grpc-timeout", "1000001u"}};
   EXPECT_EQ(std::chrono::milliseconds(1001), Common::getGrpcTimeout(unit_microseconds));
 
-  Http::TestHeaderMapImpl unit_nanoseconds{{"grpc-timeout", "12345678n"}};
+  Http::TestRequestHeaderMapImpl unit_nanoseconds{{"grpc-timeout", "12345678n"}};
   EXPECT_EQ(std::chrono::milliseconds(13), Common::getGrpcTimeout(unit_nanoseconds));
 
   // Max 8 digits and no leading whitespace or +- signs are not enforced on decode,
@@ -85,20 +107,20 @@ TEST(GrpcContextTest, GetGrpcTimeout) {
 }
 
 TEST(GrpcCommonTest, GrpcStatusDetailsBin) {
-  Http::TestHeaderMapImpl empty_trailers;
+  Http::TestResponseTrailerMapImpl empty_trailers;
   EXPECT_FALSE(Common::getGrpcStatusDetailsBin(empty_trailers));
 
-  Http::TestHeaderMapImpl invalid_value{{"grpc-status-details-bin", "invalid"}};
+  Http::TestResponseTrailerMapImpl invalid_value{{"grpc-status-details-bin", "invalid"}};
   EXPECT_FALSE(Common::getGrpcStatusDetailsBin(invalid_value));
 
-  Http::TestHeaderMapImpl unpadded_value{
+  Http::TestResponseTrailerMapImpl unpadded_value{
       {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA"}};
   auto status = Common::getGrpcStatusDetailsBin(unpadded_value);
   ASSERT_TRUE(status);
   EXPECT_EQ(Status::WellKnownGrpcStatus::NotFound, status->code());
   EXPECT_EQ("Resource not found", status->message());
 
-  Http::TestHeaderMapImpl padded_value{
+  Http::TestResponseTrailerMapImpl padded_value{
       {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA=="}};
   status = Common::getGrpcStatusDetailsBin(padded_value);
   ASSERT_TRUE(status);
@@ -107,100 +129,100 @@ TEST(GrpcCommonTest, GrpcStatusDetailsBin) {
 }
 
 TEST(GrpcContextTest, ToGrpcTimeout) {
-  Http::HeaderString value;
+  Http::TestRequestHeaderMapImpl headers;
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(0UL), value);
-  EXPECT_EQ("0m", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(0UL), headers);
+  EXPECT_EQ("0m", headers.getGrpcTimeoutValue());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(1UL), value);
-  EXPECT_EQ("1m", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(1UL), headers);
+  EXPECT_EQ("1m", headers.getGrpcTimeoutValue());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(100000000UL), value);
-  EXPECT_EQ("100000S", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(100000000UL), headers);
+  EXPECT_EQ("100000S", headers.getGrpcTimeoutValue());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(100000000000UL), value);
-  EXPECT_EQ("1666666M", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(100000000000UL), headers);
+  EXPECT_EQ("1666666M", headers.getGrpcTimeoutValue());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(9000000000000UL), value);
-  EXPECT_EQ("2500000H", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(9000000000000UL), headers);
+  EXPECT_EQ("2500000H", headers.getGrpcTimeoutValue());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(360000000000000UL), value);
-  EXPECT_EQ("99999999H", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(360000000000000UL), headers);
+  EXPECT_EQ("99999999H", headers.getGrpcTimeoutValue());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(UINT64_MAX), value);
-  EXPECT_EQ("99999999H", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(UINT64_MAX), headers);
+  EXPECT_EQ("99999999H", headers.getGrpcTimeoutValue());
 }
 
 TEST(GrpcContextTest, PrepareHeaders) {
   {
-    Http::MessagePtr message =
+    Http::RequestMessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name", absl::nullopt);
 
-    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
-    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
-    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
-    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
+    EXPECT_EQ("POST", message->headers().getMethodValue());
+    EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
+    EXPECT_EQ("cluster", message->headers().getHostValue());
+    EXPECT_EQ("application/grpc", message->headers().getContentTypeValue());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::milliseconds>(1));
+    Http::RequestMessagePtr message = Common::prepareHeaders(
+        "cluster", "service_name", "method_name", absl::optional<std::chrono::milliseconds>(1));
 
-    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
-    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
-    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
-    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
-    EXPECT_EQ("1m", message->headers().GrpcTimeout()->value().getStringView());
+    EXPECT_EQ("POST", message->headers().getMethodValue());
+    EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
+    EXPECT_EQ("cluster", message->headers().getHostValue());
+    EXPECT_EQ("application/grpc", message->headers().getContentTypeValue());
+    EXPECT_EQ("1m", message->headers().getGrpcTimeoutValue());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::seconds>(1));
+    Http::RequestMessagePtr message = Common::prepareHeaders(
+        "cluster", "service_name", "method_name", absl::optional<std::chrono::seconds>(1));
 
-    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
-    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
-    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
-    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
-    EXPECT_EQ("1000m", message->headers().GrpcTimeout()->value().getStringView());
+    EXPECT_EQ("POST", message->headers().getMethodValue());
+    EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
+    EXPECT_EQ("cluster", message->headers().getHostValue());
+    EXPECT_EQ("application/grpc", message->headers().getContentTypeValue());
+    EXPECT_EQ("1000m", message->headers().getGrpcTimeoutValue());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::minutes>(1));
+    Http::RequestMessagePtr message = Common::prepareHeaders(
+        "cluster", "service_name", "method_name", absl::optional<std::chrono::minutes>(1));
 
-    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
-    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
-    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
-    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
-    EXPECT_EQ("60000m", message->headers().GrpcTimeout()->value().getStringView());
+    EXPECT_EQ("POST", message->headers().getMethodValue());
+    EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
+    EXPECT_EQ("cluster", message->headers().getHostValue());
+    EXPECT_EQ("application/grpc", message->headers().getContentTypeValue());
+    EXPECT_EQ("60000m", message->headers().getGrpcTimeoutValue());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::hours>(1));
+    Http::RequestMessagePtr message = Common::prepareHeaders(
+        "cluster", "service_name", "method_name", absl::optional<std::chrono::hours>(1));
 
-    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
-    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
-    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
-    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
-    EXPECT_EQ("3600000m", message->headers().GrpcTimeout()->value().getStringView());
+    EXPECT_EQ("POST", message->headers().getMethodValue());
+    EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
+    EXPECT_EQ("cluster", message->headers().getHostValue());
+    EXPECT_EQ("application/grpc", message->headers().getContentTypeValue());
+    EXPECT_EQ("3600000m", message->headers().getGrpcTimeoutValue());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders(
+    Http::RequestMessagePtr message = Common::prepareHeaders(
         "cluster", "service_name", "method_name", absl::optional<std::chrono::hours>(100000000));
 
-    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
-    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
-    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
-    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
-    EXPECT_EQ("99999999H", message->headers().GrpcTimeout()->value().getStringView());
+    EXPECT_EQ("POST", message->headers().getMethodValue());
+    EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
+    EXPECT_EQ("cluster", message->headers().getHostValue());
+    EXPECT_EQ("application/grpc", message->headers().getContentTypeValue());
+    EXPECT_EQ("99999999H", message->headers().getGrpcTimeoutValue());
   }
   {
-    Http::MessagePtr message =
+    Http::RequestMessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name",
                                absl::optional<std::chrono::milliseconds>(100000000000));
 
-    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
-    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
-    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
-    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
-    EXPECT_EQ("1666666M", message->headers().GrpcTimeout()->value().getStringView());
+    EXPECT_EQ("POST", message->headers().getMethodValue());
+    EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
+    EXPECT_EQ("cluster", message->headers().getHostValue());
+    EXPECT_EQ("application/grpc", message->headers().getContentTypeValue());
+    EXPECT_EQ("1666666M", message->headers().getGrpcTimeoutValue());
   }
 }
 
@@ -249,11 +271,11 @@ TEST(GrpcContextTest, HttpToGrpcStatus) {
 
 TEST(GrpcContextTest, HasGrpcContentType) {
   {
-    Http::TestHeaderMapImpl headers{};
+    Http::TestRequestHeaderMapImpl headers{};
     EXPECT_FALSE(Common::hasGrpcContentType(headers));
   }
   auto isGrpcContentType = [](const std::string& s) {
-    Http::TestHeaderMapImpl headers{{"content-type", s}};
+    Http::TestRequestHeaderMapImpl headers{{"content-type", s}};
     return Common::hasGrpcContentType(headers);
   };
   EXPECT_FALSE(isGrpcContentType(""));
@@ -266,69 +288,82 @@ TEST(GrpcContextTest, HasGrpcContentType) {
   EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
 }
 
+TEST(GrpcContextTest, IsGrpcRequestHeader) {
+  Http::TestRequestHeaderMapImpl is{
+      {":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
+  EXPECT_TRUE(Common::isGrpcRequestHeaders(is));
+  Http::TestRequestHeaderMapImpl is_not{{":method", "CONNECT"},
+                                        {"content-type", "application/grpc"}};
+  EXPECT_FALSE(Common::isGrpcRequestHeaders(is_not));
+}
+
 TEST(GrpcContextTest, IsGrpcResponseHeader) {
-  Http::TestHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
-  EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));
-  EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_status_only, false));
+  Http::TestResponseHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
+  EXPECT_TRUE(Common::isGrpcResponseHeaders(grpc_status_only, true));
+  EXPECT_FALSE(Common::isGrpcResponseHeaders(grpc_status_only, false));
 
-  Http::TestHeaderMapImpl grpc_response_header{{":status", "200"},
-                                               {"content-type", "application/grpc"}};
-  EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_response_header, true));
-  EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_response_header, false));
+  Http::TestResponseHeaderMapImpl grpc_response_header{{":status", "200"},
+                                                       {"content-type", "application/grpc"}};
+  EXPECT_FALSE(Common::isGrpcResponseHeaders(grpc_response_header, true));
+  EXPECT_TRUE(Common::isGrpcResponseHeaders(grpc_response_header, false));
 
-  Http::TestHeaderMapImpl json_response_header{{":status", "200"},
-                                               {"content-type", "application/json"}};
-  EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, true));
-  EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
+  Http::TestResponseHeaderMapImpl json_response_header{{":status", "200"},
+                                                       {"content-type", "application/json"}};
+  EXPECT_FALSE(Common::isGrpcResponseHeaders(json_response_header, true));
+  EXPECT_FALSE(Common::isGrpcResponseHeaders(json_response_header, false));
 }
 
 TEST(GrpcContextTest, ValidateResponse) {
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
+    response.trailers(
+        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}}});
     EXPECT_NO_THROW(Common::validateResponse(response));
   }
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
                               "non-200 response code");
   }
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "100"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
+    response.trailers(
+        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "100"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
                               "bad grpc-status trailer");
   }
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "4"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
+    response.trailers(
+        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "4"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "");
   }
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::HeaderMapPtr{
-        new Http::TestHeaderMapImpl{{"grpc-status", "4"}, {"grpc-message", "custom error"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
+    response.trailers(Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{
+        {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
   }
   {
-    Http::ResponseMessageImpl response(Http::HeaderMapPtr{
-        new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "100"}}});
+    Http::ResponseMessageImpl response(Http::ResponseHeaderMapPtr{
+        new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "100"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
                               "bad grpc-status header");
   }
   {
-    Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "4"}}});
+    Http::ResponseMessageImpl response(Http::ResponseHeaderMapPtr{
+        new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "4"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "");
   }
   {
-    Http::ResponseMessageImpl response(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{
-        {":status", "200"}, {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
+    Http::ResponseMessageImpl response(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{
+            {":status", "200"}, {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
   }
 }

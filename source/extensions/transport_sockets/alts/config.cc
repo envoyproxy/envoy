@@ -1,7 +1,7 @@
 #include "extensions/transport_sockets/alts/config.h"
 
-#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
-#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.validate.h"
+#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
+#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
@@ -13,6 +13,7 @@
 #include "extensions/transport_sockets/alts/grpc_tsi.h"
 #include "extensions/transport_sockets/alts/tsi_socket.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -26,9 +27,18 @@ using GrpcAltsCredentialsOptionsPtr =
 
 namespace {
 
+// TODO: gRPC v1.30.0-pre1 defines the equivalent function grpc_alts_set_rpc_protocol_versions
+// that should be called directly when available.
+void grpcAltsSetRpcProtocolVersions(grpc_gcp_rpc_protocol_versions* rpc_versions) {
+  grpc_gcp_rpc_protocol_versions_set_max(rpc_versions, GRPC_PROTOCOL_VERSION_MAX_MAJOR,
+                                         GRPC_PROTOCOL_VERSION_MAX_MINOR);
+  grpc_gcp_rpc_protocol_versions_set_min(rpc_versions, GRPC_PROTOCOL_VERSION_MIN_MAJOR,
+                                         GRPC_PROTOCOL_VERSION_MIN_MINOR);
+}
+
 // Returns true if the peer's service account is found in peers, otherwise
 // returns false and fills out err with an error message.
-bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& peers,
+bool doValidate(const tsi_peer& peer, const absl::node_hash_set<std::string>& peers,
                 std::string& err) {
   for (size_t i = 0; i < peer.property_count; ++i) {
     const std::string name = std::string(peer.properties[i].name);
@@ -46,10 +56,10 @@ bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& pee
 }
 
 HandshakeValidator
-createHandshakeValidator(const envoy::config::transport_socket::alts::v2alpha::Alts& config) {
+createHandshakeValidator(const envoy::extensions::transport_sockets::alts::v3::Alts& config) {
   const auto& peer_service_accounts = config.peer_service_accounts();
-  const std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
-                                              peer_service_accounts.cend());
+  const absl::node_hash_set<std::string> peers(peer_service_accounts.cbegin(),
+                                               peer_service_accounts.cend());
   HandshakeValidator validator;
   // Skip validation if peers is empty.
   if (!peers.empty()) {
@@ -90,7 +100,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
       SINGLETON_MANAGER_REGISTERED_NAME(alts_shared_state),
       [] { return std::make_shared<AltsSharedState>(); });
   auto config =
-      MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
+      MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::alts::v3::Alts&>(
           message, factory_ctxt.messageValidationVisitor());
   HandshakeValidator validator = createHandshakeValidator(config);
 
@@ -108,6 +118,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     } else {
       options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_server_options_create());
     }
+    grpcAltsSetRpcProtocolVersions(&options->rpc_versions);
     const char* target_name = is_upstream ? "" : nullptr;
     tsi_handshaker* handshaker = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
@@ -132,7 +143,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
 } // namespace
 
 ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::transport_socket::alts::v2alpha::Alts>();
+  return std::make_unique<envoy::extensions::transport_sockets::alts::v3::Alts>();
 }
 
 Network::TransportSocketFactoryPtr

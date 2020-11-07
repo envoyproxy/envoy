@@ -1,3 +1,7 @@
+#include <memory>
+
+#include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -15,27 +19,37 @@ namespace ProxyProtocol {
 class ProxyProtocolConfigFactory : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Network::ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::ListenerFactoryContext& context) override {
-    ConfigSharedPtr config(new Config(context.scope()));
-    return [config](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(std::make_unique<Filter>(config));
-    };
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& message,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext& context) override {
+
+    // downcast it to the proxy protocol config
+    const auto& proto_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol&>(
+        message, context.messageValidationVisitor());
+
+    ConfigSharedPtr config = std::make_shared<Config>(context.scope(), proto_config);
+    return
+        [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
+          filter_manager.addAcceptFilter(listener_filter_matcher, std::make_unique<Filter>(config));
+        };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    return std::make_unique<
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol>();
   }
 
-  std::string name() override { return ListenerFilterNames::get().ProxyProtocol; }
+  std::string name() const override { return ListenerFilterNames::get().ProxyProtocol; }
 };
 
 /**
  * Static registration for the proxy protocol filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(ProxyProtocolConfigFactory,
-                 Server::Configuration::NamedListenerFilterConfigFactory);
+                 Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.proxy_protocol"};
 
 } // namespace ProxyProtocol
 } // namespace ListenerFilters

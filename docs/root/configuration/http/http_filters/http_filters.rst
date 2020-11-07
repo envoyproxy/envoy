@@ -7,9 +7,15 @@ HTTP filters
   :maxdepth: 2
 
   adaptive_concurrency_filter
+  admission_control_filter
+  aws_lambda_filter
+  aws_request_signing_filter
   buffer_filter
+  cdn_loop_filter
+  compressor_filter
   cors_filter
   csrf_filter
+  decompressor_filter
   dynamic_forward_proxy_filter
   dynamodb_filter
   ext_authz_filter
@@ -24,10 +30,23 @@ HTTP filters
   header_to_metadata_filter
   ip_tagging_filter
   jwt_authn_filter
+  local_rate_limit_filter
   lua_filter
+  oauth2_filter
+  on_demand_updates_filter
   original_src_filter
   rate_limit_filter
   rbac_filter
   router_filter
   squash_filter
   tap_filter
+  wasm_filter
+
+.. TODO(toddmgreer): Remove this hack and add user-visible CacheFilter docs when CacheFilter is production-ready.
+.. toctree::
+  :hidden:
+
+  ../../../api-v3/extensions/filters/http/admission_control/v3alpha/admission_control.proto
+  ../../../api-v3/extensions/filters/http/oauth2/v3alpha/oauth.proto
+  ../../../api-v3/extensions/filters/http/cache/v3alpha/cache.proto
+  ../../../api-v3/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.proto

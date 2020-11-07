@@ -1,5 +1,8 @@
 #include "uds_integration_test.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
+#include "common/api/os_sys_calls_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
 
@@ -45,16 +48,22 @@ TEST_P(UdsUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseCompl
 INSTANTIATE_TEST_SUITE_P(
     TestParameters, UdsListenerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(false, true)));
+                     testing::Values(false, true), testing::Values(0)));
 #else
 INSTANTIATE_TEST_SUITE_P(
     TestParameters, UdsListenerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(false)));
+                     testing::Values(false), testing::Values(0)));
 #endif
 
+// Test the mode parameter, excluding abstract namespace enabled
+INSTANTIATE_TEST_SUITE_P(
+    TestModeParameter, UdsListenerIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false), testing::Values(0662)));
+
 void UdsListenerIntegrationTest::initialize() {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* admin_addr = bootstrap.mutable_admin()->mutable_address();
     admin_addr->clear_socket_address();
     admin_addr->mutable_pipe()->set_path(getAdminSocketName());
@@ -66,6 +75,7 @@ void UdsListenerIntegrationTest::initialize() {
     auto* listener = listeners->Add();
     listener->set_name("listener_0");
     listener->mutable_address()->mutable_pipe()->set_path(getListenerSocketName());
+    listener->mutable_address()->mutable_pipe()->set_mode(getMode());
     *(listener->mutable_filter_chains()) = filter_chains;
   });
   HttpIntegrationTest::initialize();
@@ -82,12 +92,34 @@ HttpIntegrationTest::ConnectionCreationFunction UdsListenerIntegrationTest::crea
   };
 }
 
+// Excluding Windows; chmod(2) against Windows AF_UNIX socket files succeeds,
+// but stat(2) against those returns ENOENT.
+#ifndef WIN32
+TEST_P(UdsListenerIntegrationTest, TestSocketMode) {
+  if (abstract_namespace_) {
+    // stat(2) against sockets in abstract namespace is not possible
+    GTEST_SKIP();
+  }
+
+  initialize();
+
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  struct stat listener_stat;
+  EXPECT_EQ(os_sys_calls.stat(getListenerSocketName().c_str(), &listener_stat).rc_, 0);
+  if (mode_ == 0) {
+    EXPECT_NE(listener_stat.st_mode & 0777, 0);
+  } else {
+    EXPECT_EQ(listener_stat.st_mode & mode_, mode_);
+  }
+}
+#endif
+
 TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
   fake_upstreams_count_ = 1;
   initialize();
   auto client_connection = createConnectionFn()();
   codec_client_ = makeHttpConnection(std::move(client_connection));
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -102,14 +134,14 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
   EXPECT_EQ(credentials->gid, getgid());
 #endif
 
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = createConnectionFn();
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterHeaderOnlyRequestAndResponse) {

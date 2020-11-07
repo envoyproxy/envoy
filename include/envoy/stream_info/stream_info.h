@@ -4,11 +4,12 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
@@ -24,6 +25,11 @@ namespace Envoy {
 namespace Router {
 class RouteEntry;
 } // namespace Router
+
+namespace Upstream {
+class ClusterInfo;
+using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
+} // namespace Upstream
 
 namespace StreamInfo {
 
@@ -66,8 +72,16 @@ enum ResponseFlag {
   InvalidEnvoyRequestHeaders = 0x20000,
   // Downstream request had an HTTP protocol error
   DownstreamProtocolError = 0x40000,
+  // Upstream request reached to user defined max stream duration.
+  UpstreamMaxStreamDurationReached = 0x80000,
+  // True if the response was served from an Envoy cache filter.
+  ResponseFromCacheFilter = 0x100000,
+  // Filter config was not received within the permitted warming deadline.
+  NoFilterConfigFound = 0x200000,
+  // Request or connection exceeded the downstream connection duration.
+  DurationTimeout = 0x400000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamProtocolError
+  LastFlag = DurationTimeout
 };
 
 /**
@@ -87,22 +101,29 @@ struct ResponseCodeDetailValues {
   const std::string RequestPayloadTooLarge = "request_payload_too_large";
   // Envoy is doing non-streaming proxying, and the response payload exceeded
   // configured limits.
+  const std::string ResponsePayloadTooLarge = "response_payload_too_large";
+  // Envoy is doing streaming proxying, but too much data arrived while waiting
+  // to attempt a retry.
+  const std::string RequestPayloadExceededRetryBufferLimit =
+      "request_payload_exceeded_retry_buffer_limit";
+  // Envoy is doing non-streaming proxying, and the response payload exceeded
+  // configured limits.
   const std::string ResponsePayloadTooLArge = "response_payload_too_large";
   // The per-stream keepalive timeout was exceeded.
   const std::string StreamIdleTimeout = "stream_idle_timeout";
-  // The per-stream total request timeout was exceeded
+  // The per-stream max duration timeout was exceeded.
+  const std::string MaxDurationTimeout = "max_duration_timeout";
+  // The per-stream total request timeout was exceeded.
   const std::string RequestOverallTimeout = "request_overall_timeout";
   // The request was rejected due to the Overload Manager reaching configured resource limits.
   const std::string Overload = "overload";
   // The HTTP/1.0 or HTTP/0.9 request was rejected due to HTTP/1.0 support not being configured.
   const std::string LowVersion = "low_version";
-  // The request was rejected due to the Host: or :authority field missing
+  // The request was rejected due to a missing Host: or :authority field.
   const std::string MissingHost = "missing_host_header";
-  // The request was rejected due to the request headers being larger than the configured limit.
-  const std::string RequestHeadersTooLarge = "request_headers_too_large";
   // The request was rejected due to x-envoy-* headers failing strict header validation.
   const std::string InvalidEnvoyRequestHeaders = "request_headers_failed_strict_check";
-  // The request was rejected due to the Path or :path header field missing.
+  // The request was rejected due to a missing Path or :path header field.
   const std::string MissingPath = "missing_path_rejected";
   // The request was rejected due to using an absolute path on a route not supporting them.
   const std::string AbsolutePath = "absolute_path_rejected";
@@ -125,10 +146,12 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
-  // The upstream response timed out
+  // The upstream response timed out.
   const std::string UpstreamTimeout = "upstream_response_timeout";
-  // The final upstream try timed out
+  // The final upstream try timed out.
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
+  // The request was destroyed because of user defined max stream duration.
+  const std::string UpstreamMaxStreamDurationReached = "upstream_max_stream_duration_reached";
   // The upstream connection was reset before a response was started. This
   // will generally be accompanied by details about why the reset occurred.
   const std::string EarlyUpstreamReset = "upstream_reset_before_response_started";
@@ -137,6 +160,22 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
+  // The request was rejected due to no matching filter chain.
+  const std::string FilterChainNotFound = "filter_chain_not_found";
+  // The client disconnected unexpectedly.
+  const std::string DownstreamRemoteDisconnect = "downstream_remote_disconnect";
+  // The client connection was locally closed for an unspecified reason.
+  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect";
+  // The max connection duration was exceeded.
+  const std::string DurationTimeout = "duration_timeout";
+  // The response was generated by the admin filter.
+  const std::string AdminFilterResponse = "admin_filter_response";
+  // The original stream was replaced with an internal redirect.
+  const std::string InternalRedirect = "internal_redirect";
+  // The request was rejected because configured filters erroneously removed required headers.
+  const std::string FilterRemovedRequiredHeaders = "filter_removed_required_headers";
+  // Changes or additions to details should be reflected in
+  // docs/root/configuration/http/http_conn_man/response_code_details_details.rst
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
@@ -200,6 +239,13 @@ public:
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
   /**
+   * @param connection_termination_details the termination details string to set for this
+   * connection.
+   */
+  virtual void
+  setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
+
+  /**
    * @param response_flags the response_flags to intersect with.
    * @return true if the intersection of the response_flags argument and the currently set response
    * flags is non-empty.
@@ -249,6 +295,11 @@ public:
    * @return the response code details.
    */
   virtual const absl::optional<std::string>& responseCodeDetails() const PURE;
+
+  /**
+   * @return the termination details of the connection.
+   */
+  virtual const absl::optional<std::string>& connectionTerminationDetails() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.
@@ -460,10 +511,11 @@ public:
   virtual const Router::RouteEntry* routeEntry() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this request
+   * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
+   * request
    */
-  virtual envoy::api::v2::core::Metadata& dynamicMetadata() PURE;
-  virtual const envoy::api::v2::core::Metadata& dynamicMetadata() const PURE;
+  virtual envoy::config::core::v3::Metadata& dynamicMetadata() PURE;
+  virtual const envoy::config::core::v3::Metadata& dynamicMetadata() const PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
@@ -479,8 +531,16 @@ public:
    * filters (append only). Both object types can be consumed by multiple filters.
    * @return the filter state associated with this request.
    */
-  virtual FilterState& filterState() PURE;
+  virtual const FilterStateSharedPtr& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
+
+  /**
+   * Filter State object to be shared between upstream and downstream filters.
+   * @param pointer to upstream connections filter state.
+   * @return pointer to filter state to be used by upstream connections.
+   */
+  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
+  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
 
   /**
    * @param SNI value requested.
@@ -506,12 +566,45 @@ public:
   /**
    * @param headers request headers.
    */
-  virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
+  virtual void setRequestHeaders(const Http::RequestHeaderMap& headers) PURE;
 
   /**
    * @return request headers.
    */
-  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
+  virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
+
+  /**
+   * @param Upstream Connection's ClusterInfo.
+   */
+  virtual void
+  setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
+
+  /**
+   * @return Upstream Connection's ClusterInfo.
+   * This returns an optional to differentiate between unset(absl::nullopt),
+   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
+   */
+  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
+
+  /**
+   * @param utils The requestID utils implementation this stream uses
+   */
+  virtual void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) PURE;
+
+  /**
+   * @return A shared pointer to the request ID utils for this stream
+   */
+  virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
+
+  /**
+   * @return Connection ID of the downstream connection, or unset if not available.
+   **/
+  virtual absl::optional<uint64_t> connectionID() const PURE;
+
+  /**
+   * @param id Connection ID of the downstream connection.
+   **/
+  virtual void setConnectionID(uint64_t id) PURE;
 };
 
 } // namespace StreamInfo

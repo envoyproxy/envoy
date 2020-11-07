@@ -4,9 +4,9 @@
 
 #include "common/network/connection_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -25,9 +25,9 @@ public:
     // Roughly every 5th encode (5 being arbitrary) swap the watermark state.
     if (random % 5 == 0) {
       if (connection()->aboveHighWatermark()) {
-        connection()->onLowWatermark();
+        connection()->onWriteBufferLowWatermark();
       } else {
-        connection()->onHighWatermark();
+        connection()->onWriteBufferHighWatermark();
       }
     }
     return Http::PassThroughFilter::encodeData(buf, end_stream);

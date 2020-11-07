@@ -495,12 +495,12 @@ public:
     EXPECT_NE(absl::nullopt, findHistogram(histogram_name));
   }
 
-  Stats::OptionalHistogram findHistogram(const std::string& name) {
+  Stats::HistogramOptConstRef findHistogram(const std::string& name) {
     Stats::StatNameManagedStorage storage(name, scope_.symbolTable());
     return scope_.findHistogram(storage.statName());
   }
 
-  Stats::IsolatedStoreImpl scope_;
+  Stats::TestUtil::TestStore scope_;
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<ZooKeeperFilter> filter_;
   std::string stat_prefix_{"test.zookeeper"};
@@ -951,6 +951,18 @@ TEST_F(ZooKeeperFilterTest, WatchEvent) {
   EXPECT_EQ(1UL, config_->stats().watch_event_.value());
   EXPECT_EQ(36UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, MissingXid) {
+  initialize();
+
+  const auto& stat = config_->stats().getdata_resp_;
+  Buffer::OwnedImpl data = encodeResponseHeader(1000, 2000, 0);
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(0UL, stat.value());
+  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 
 } // namespace ZooKeeperProxy

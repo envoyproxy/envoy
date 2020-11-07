@@ -5,25 +5,13 @@
 #include "test/test_common/utility.h"
 #include "test/test_runner.h"
 
-#include "absl/debugging/symbolize.h"
-
-#ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
-#endif
-
 #include "tools/cpp/runfiles/runfiles.h"
 
 using bazel::tools::cpp::runfiles::Runfiles;
 // The main entry point (and the rest of this file) should have no logic in it,
 // this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
-#ifndef __APPLE__
-  absl::InitializeSymbolizer(argv[0]);
-#endif
-#ifdef ENVOY_HANDLE_SIGNALS
-  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
-  Envoy::SignalAction handle_sigs;
-#endif
+  Envoy::TestEnvironment::initializeTestMain(argv[0]);
 
   // Create a Runfiles object for runfiles lookup.
   // https://github.com/bazelbuild/bazel/blob/master/tools/cpp/runfiles/runfiles_src.h#L32

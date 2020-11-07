@@ -6,18 +6,22 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/common/time.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/cluster/v3/outlier_detection.pb.h"
+#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -38,7 +42,7 @@ public:
   double successRate(SuccessRateMonitorType) const override { return -1; }
 
 private:
-  const absl::optional<MonotonicTime> time_;
+  const absl::optional<MonotonicTime> time_{};
 };
 
 /**
@@ -46,10 +50,10 @@ private:
  */
 class DetectorImplFactory {
 public:
-  static DetectorSharedPtr createForCluster(Cluster& cluster,
-                                            const envoy::api::v2::Cluster& cluster_config,
-                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                            EventLoggerSharedPtr event_logger);
+  static DetectorSharedPtr
+  createForCluster(Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
+                   Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                   EventLoggerSharedPtr event_logger);
 };
 
 /**
@@ -243,7 +247,7 @@ struct DetectionStats {
  */
 class DetectorConfig {
 public:
-  DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config);
+  DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config);
 
   uint64_t intervalMs() const { return interval_ms_; }
   uint64_t baseEjectionTimeMs() const { return base_ejection_time_ms_; }
@@ -323,7 +327,7 @@ private:
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
   static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
+  create(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger);
   ~DetectorImpl() override;
@@ -364,7 +368,7 @@ public:
                                double success_rate_stdev_factor);
 
 private:
-  DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
+  DetectorImpl(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
                EventLoggerSharedPtr event_logger);
 
@@ -385,14 +389,32 @@ private:
   void updateDetectedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
   void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
 
+  // The helper to double write value and gauge. The gauge could be null value since because any
+  // stat might be deactivated.
+  class EjectionsActiveHelper {
+  public:
+    EjectionsActiveHelper(Envoy::Stats::Gauge& gauge) : ejections_active_ref_(gauge) {}
+    void inc() {
+      ejections_active_ref_.inc();
+      ++ejections_active_value_;
+    }
+    void dec() {
+      ejections_active_ref_.dec();
+      --ejections_active_value_;
+    }
+    uint64_t value() { return ejections_active_value_.load(); }
+    Envoy::Stats::Gauge& ejections_active_ref_;
+    std::atomic<uint64_t> ejections_active_value_{0};
+  };
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
   DetectionStats stats_;
+  EjectionsActiveHelper ejections_active_helper_{stats_.ejections_active_};
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
-  std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
+  absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
 
   // EjectionPair for external and local origin events.

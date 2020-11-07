@@ -1,0 +1,21 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+    }
+  }
+}

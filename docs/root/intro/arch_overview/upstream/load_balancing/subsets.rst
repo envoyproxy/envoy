@@ -13,7 +13,7 @@ not be used with subsets because the upstream hosts are not known in advance. Su
 with zone aware routing, but be aware that the use of subsets may easily violate the minimum hosts
 condition described above.
 
-If subsets are :ref:`configured <envoy_api_field_Cluster.lb_subset_config>` and a route
+If subsets are :ref:`configured <envoy_v3_api_field_config.cluster.v3.Cluster.lb_subset_config>` and a route
 specifies no metadata or no subset matching the metadata exists, the subset load balancer initiates
 its fallback policy. The default policy is ``NO_FALLBACK``, in which case the request fails as if
 the cluster had no hosts. Conversely, the ``ANY_ENDPOINT`` fallback policy load balances across all
@@ -34,10 +34,16 @@ balancing. Otherwise, the fallback policy is used. The cluster's subset configur
 therefore, contain a definition that has the same keys as a given route in order for subset load
 balancing to occur.
 
-This feature can only be enabled using the V2 configuration API. Furthermore, host metadata is only
-supported when hosts are defined using
-:ref:`ClusterLoadAssignments <envoy_api_msg_ClusterLoadAssignment>`. ClusterLoadAssignments are
-available via EDS or the Cluster :ref:`load_assignment <envoy_api_field_Cluster.load_assignment>`
+Subsets can be configured with only a single host in each subset, which can be used in use cases
+similar to :ref:`Maglev <arch_overview_load_balancing_types_maglev>` or
+:ref:`ring hash <arch_overview_load_balancing_types_ring_hash>`, such as load balancing based on a cookie,
+but when it is important to select the same host even after new hosts are added to the cluster. Endpoint
+configuration changes may use less CPU if :ref:`single_host_per_subset <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`
+is enabled.
+
+Host metadata is only supported when hosts are defined using
+:ref:`ClusterLoadAssignments <envoy_v3_api_msg_config.endpoint.v3.ClusterLoadAssignment>`. ClusterLoadAssignments are
+available via EDS or the Cluster :ref:`load_assignment <envoy_v3_api_field_config.cluster.v3.Cluster.load_assignment>`
 field. Host metadata for subset load balancing must be placed under the filter name ``"envoy.lb"``.
 Similarly, route metadata match criteria use ``"envoy.lb"`` filter name. Host metadata may be
 hierarchical (e.g., the value for a top-level key may be a structured value or list), but the
@@ -46,8 +52,7 @@ values, a route's match criteria will only match if an identical structured valu
 host's metadata.
 
 Finally, note that subset load balancing is not available for the
-:ref:`ORIGINAL_DST_LB <envoy_api_enum_value_Cluster.LbPolicy.ORIGINAL_DST_LB>` or
-:ref:`CLUSTER_PROVIDED <envoy_api_enum_value_Cluster.LbPolicy.CLUSTER_PROVIDED>` load balancer
+:ref:`CLUSTER_PROVIDED <envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.CLUSTER_PROVIDED>` load balancer
 policies.
 
 Examples
@@ -102,7 +107,7 @@ v: 1.2-pre, stage: dev  host4          Subset of hosts selected
 v: 1.0                  host1, host2   Fallback: No subset selector for "v" alone
 other: x                host1, host2   Fallback: No subset selector for "other"
 (none)                  host1, host2   Fallback: No subset requested
-stage: test             empty cluster  As fallback policy is overriden per selector with "NO_FALLBACK" value
+stage: test             empty cluster  As fallback policy is overridden per selector with "NO_FALLBACK" value
 ======================  =============  ======================================================================
 
 Metadata match criteria may also be specified on a route's weighted clusters. Metadata match

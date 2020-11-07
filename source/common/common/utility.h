@@ -5,7 +5,6 @@
 #include <set>
 #include <sstream>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/interval_set.h"
@@ -18,6 +17,14 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+/**
+ * Retrieve string description of error code
+ * @param int error code
+ * @return const std::string error detail description
+ */
+const std::string errorDetails(int error_code);
+
 /**
  * Utility class for formatting dates given an absl::FormatTime style format string.
  */
@@ -137,6 +144,12 @@ public:
    * @return whether a time_point contains a valid, not default constructed time.
    */
   static bool timePointValid(MonotonicTime time_point);
+
+  /**
+   * @param time_source time keeping source.
+   * @return uint64_t the number of milliseconds since the epoch.
+   */
+  static uint64_t nowToMilliseconds(TimeSource& time_source);
 };
 
 /**
@@ -268,20 +281,6 @@ public:
                             absl::string_view key_token, bool trim_whitespace = true);
 
   /**
-   * Compare one string view with another string view ignoring case sensitivity.
-   * @param lhs supplies the first string view.
-   * @param rhs supplies the second string view.
-   * @return true if strings are semantically the same and false otherwise.
-   *
-   * E.g.,
-   *
-   * caseCompare("hello", "hello")   . true
-   * caseCompare("hello", "HELLO")   . true
-   * caseCompare("hello", "HellO")   . true
-   */
-  static bool caseCompare(absl::string_view lhs, absl::string_view rhs);
-
-  /**
    * Crop characters from a string view starting at the first character of the matched
    * delimiter string view until the end of the source string view.
    * @param source supplies the string view to be processed.
@@ -313,11 +312,14 @@ public:
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param keep_empty_string result contains empty strings if the string starts or ends with
    * 'split', or if instances of 'split' are adjacent; default = false.
+   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
+   * string views; default = false.
    * @return vector containing views of the split strings
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
                                                    absl::string_view delimiters,
-                                                   bool keep_empty_string = false);
+                                                   bool keep_empty_string = false,
+                                                   bool trim_whitespace = false);
 
   /**
    * Remove tokens from a delimiter-separated string view. The tokens are trimmed before
@@ -368,13 +370,6 @@ public:
    * @return std::string s converted to upper case.
    */
   static std::string toUpper(absl::string_view s);
-
-  /**
-   * Convert a string to lower case.
-   * @param s string.
-   * @return std::string s converted to lower case.
-   */
-  static std::string toLower(absl::string_view s);
 
   /**
    * Removes all the character indices from str contained in the interval-set.
@@ -624,6 +619,15 @@ template <class Value> struct TrieLookupTable {
   TrieEntry<Value> root_;
 };
 
+/**
+ * A global utility class to take care of all the exception throwing behaviors in header files.
+ * Its functions simply forward the throwing into .cc file.
+ */
+class ExceptionUtil {
+public:
+  [[noreturn]] static void throwEnvoyException(const std::string& message);
+};
+
 // Mix-in class for allocating classes with variable-sized inlined storage.
 //
 // Use this class by inheriting from it, ensuring that:
@@ -711,16 +715,6 @@ public:
    * @return a string_view into the InlineString.
    */
   absl::string_view toStringView() const { return {data_, size_}; }
-
-  /**
-   * @return the number of bytes in the string
-   */
-  size_t size() const { return size_; }
-
-  /**
-   * @return a pointer to the first byte of the string.
-   */
-  const char* data() const { return data_; }
 
 private:
   // Constructor is declared private so that no one constructs one without the

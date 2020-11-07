@@ -4,24 +4,49 @@
 #include <cstdint>
 
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/stream_info/filter_state_impl.h"
+
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace StreamInfo {
 
-struct StreamInfoImpl : public StreamInfo {
-  explicit StreamInfoImpl(TimeSource& time_source)
-      : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()) {}
+namespace {
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source) : StreamInfoImpl(time_source) {
-    protocol_ = protocol;
-  }
+using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
+
+const ReplacementMap& emptySpaceReplacement() {
+  CONSTRUCT_ON_FIRST_USE(
+      ReplacementMap,
+      ReplacementMap{{" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}});
+}
+
+} // namespace
+
+struct StreamInfoImpl : public StreamInfo {
+  StreamInfoImpl(TimeSource& time_source,
+                 FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
+      : StreamInfoImpl(absl::nullopt, time_source, std::make_shared<FilterStateImpl>(life_span)) {}
+
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
+      : StreamInfoImpl(protocol, time_source,
+                       std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
+
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
+                 FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
+      : StreamInfoImpl(
+            protocol, time_source,
+            std::make_shared<FilterStateImpl>(
+                FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
+                FilterState::LifeSpan::FilterChain)) {}
 
   SystemTime startTime() const override { return start_time_; }
 
@@ -107,7 +132,15 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
-    response_code_details_.emplace(rc_details);
+    response_code_details_.emplace(absl::StrReplaceAll(rc_details, emptySpaceReplacement()));
+  }
+
+  const absl::optional<std::string>& connectionTerminationDetails() const override {
+    return connection_termination_details_;
+  }
+
+  void setConnectionTerminationDetails(absl::string_view connection_termination_details) override {
+    connection_termination_details_.emplace(connection_termination_details);
   }
 
   void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }
@@ -197,15 +230,22 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  envoy::api::v2::core::Metadata& dynamicMetadata() override { return metadata_; };
-  const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
+  envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
+  const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  FilterState& filterState() override { return filter_state_; }
-  const FilterState& filterState() const override { return filter_state_; }
+  const FilterStateSharedPtr& filterState() override { return filter_state_; }
+  const FilterState& filterState() const override { return *filter_state_; }
+
+  const FilterStateSharedPtr& upstreamFilterState() const override {
+    return upstream_filter_state_;
+  }
+  void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) override {
+    upstream_filter_state_ = filter_state;
+  }
 
   void setRequestedServerName(absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
@@ -221,9 +261,18 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_transport_failure_reason_;
   }
 
-  void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
+  void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
+    request_headers_ = &headers;
+  }
 
-  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
+  const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
+
+  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) override {
+    request_id_extension_ = utils;
+  }
+  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
+    return request_id_extension_;
+  }
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
@@ -231,6 +280,19 @@ struct StreamInfoImpl : public StreamInfo {
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
+
+  void setUpstreamClusterInfo(
+      const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) override {
+    upstream_cluster_info_ = upstream_cluster_info;
+  }
+
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+    return upstream_cluster_info_;
+  }
+
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
+
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
 
   TimeSource& time_source_;
   const SystemTime start_time_;
@@ -244,15 +306,24 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
-  envoy::api::v2::core::Metadata metadata_{};
-  FilterStateImpl filter_state_{};
+  envoy::config::core::v3::Metadata metadata_{};
+  FilterStateSharedPtr filter_state_;
+  FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
 
 private:
+  StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+                 FilterStateSharedPtr filter_state)
+      : time_source_(time_source), start_time_(time_source.systemTime()),
+        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
+        filter_state_(std::move(filter_state)),
+        request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
+
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
@@ -262,9 +333,12 @@ private:
   Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
-  const Http::HeaderMap* request_headers_{};
+  const Http::RequestHeaderMap* request_headers_{};
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
+  absl::optional<uint64_t> connection_id_;
 };
 
 } // namespace StreamInfo

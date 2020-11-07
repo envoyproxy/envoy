@@ -1,0 +1,129 @@
+1.8.0 (Oct 4, 2018)
+===================
+
+Changes
+-------
+
+* access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
+  to filter based on the presence of Envoy response flags.
+* access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
+* access log: added REQUESTED_SERVER_NAME for SNI to tcp_proxy and http
+* admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
+  through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
+* cli: added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
+* cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
+  health check/weight/metadata updates within the given duration.
+* config: regex validation added to limit to a maximum of 1024 characters.
+* config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
+* config: v1 disabled by default. v1 support remains available until October via deprecated flag --allow-deprecated-v1-api.
+* config: fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`
+  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented
+  in case of schema/validation error.
+* config: added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with
+  management server.
+* ext_authz: added support for configuring additional :ref:`authorization headers <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationRequest.headers_to_add>`
+  to be sent from Envoy to the authorization service.
+* fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
+  and in :ref:`FaultAbort <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>`.
+* grpc-json: added support for building HTTP response from
+  `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* health check: added support for :ref:`specifying jitter as a percentage <envoy_api_field_core.HealthCheck.interval_jitter_percent>`.
+* health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
+* health_check: added :ref:`timestamp <envoy_api_field_data.core.v2alpha.HealthCheckEvent.timestamp>`
+  to the :ref:`health check event <envoy_api_msg_data.core.v2alpha.HealthCheckEvent>` definition.
+* health_check: added support for specifying :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`
+  to HTTP health checker requests.
+* http: added support for a :ref:`per-stream idle timeout
+  <envoy_api_field_route.RouteAction.idle_timeout>`. This applies at both :ref:`connection manager
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  and :ref:`per-route granularity <envoy_api_field_route.RouteAction.idle_timeout>`. The timeout
+  defaults to 5 minutes; if you have other timeouts (e.g. connection idle timeout, upstream
+  response per-retry) that are longer than this in duration, you may want to consider setting a
+  non-default per-stream idle timeout.
+* http: added upstream_rq_completed counter for :ref:`total requests completed <config_cluster_manager_cluster_stats_dynamic_http>` to dynamic HTTP counters.
+* http: added downstream_rq_completed counter for :ref:`total requests completed <config_http_conn_man_stats>`, including on a :ref:`per-listener basis <config_http_conn_man_stats_per_listener>`.
+* http: added generic :ref:`Upgrade support
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
+* http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
+* http: fixed missing support for appending to predefined inline headers, e.g.
+  *authorization*, in features that interact with request and response headers,
+  e.g. :ref:`request_headers_to_add
+  <envoy_api_field_route.Route.request_headers_to_add>`. For example, a
+  request header *authorization: token1* will appear as *authorization:
+  token1,token2*, after having :ref:`request_headers_to_add
+  <envoy_api_field_route.Route.request_headers_to_add>` with *authorization:
+  token2* applied.
+* http: response filters not applied to early error paths such as http_parser generated 400s.
+* http: restrictions added to reject *:*-prefixed pseudo-headers in :ref:`custom
+  request headers <config_http_conn_man_headers_custom_request_headers>`.
+* http: :ref:`hpack_table_size <envoy_api_field_core.Http2ProtocolOptions.hpack_table_size>` now controls
+  dynamic table size of both: encoder and decoder.
+* http: added support for removing request headers using :ref:`request_headers_to_remove
+  <envoy_api_field_route.Route.request_headers_to_remove>`.
+* http: added support for a :ref:`delayed close timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` to mitigate race conditions when closing connections to downstream HTTP clients. The timeout defaults to 1 second.
+* jwt-authn filter: add support for per route JWT requirements.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
+  :ref:`destination_port <envoy_api_field_listener.FilterChainMatch.destination_port>` and
+  :ref:`prefix_ranges <envoy_api_field_listener.FilterChainMatch.prefix_ranges>`.
+* lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
+* lua: added :ref:`streamInfo() <config_http_filters_lua_stream_info_wrapper>` wrapper and *protocol()* API.
+* lua: added :ref:`streamInfo():dynamicMetadata() <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>` API.
+* network: introduced :ref:`sni_cluster <config_network_filters_sni_cluster>` network filter that forwards connections to the
+  upstream cluster specified by the SNI value presented by the client during a TLS handshake.
+* proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
+* ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
+  Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
+  Envoy can use either proto to send client requests to a ratelimit server with the use of the
+  `use_data_plane_proto` boolean flag in the ratelimit configuration.
+  Support for the legacy proto `source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in
+  case of rate limit service error.
+* rbac config: added a :ref:`principal_name <envoy_api_field_config.rbac.v2.Principal.Authenticated.principal_name>` field and
+  removed the old `name` field to give more flexibility for matching certificate identity.
+* rbac network filter: a :ref:`role-based access control network filter <config_network_filters_rbac>` has been added.
+* rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
+* route checker: added v2 config support and removed support for v1 configs.
+* router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
+* stats: added :ref:`option to configure the DogStatsD metric name prefix<envoy_api_field_config.metrics.v2.DogStatsdSink.prefix>` to DogStatsdSink.
+* tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
+* thrift_proxy: introduced thrift routing, moved configuration to correct location
+* thrift_proxy: introduced thrift configurable decoder filters
+* tls: implemented :ref:`Secret Discovery Service <config_secret_discovery_service>`.
+* tracing: added support for configuration of :ref:`tracing sampling
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
+* upstream: added configuration option to the subset load balancer to take locality weights into account when
+  selecting a host from a subset.
+* upstream: require opt-in to use the :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
+  for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
+  load balancing policy.
+
+Deprecated
+----------
+
+* Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.
+  See envoy-announce `email <https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U>`_.
+* Use of the legacy
+  `ratelimit.proto <https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto>`_
+  is deprecated, in favor of the proto defined in
+  `date-plane-api <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/ratelimit/v2/rls.proto>`_
+  Prior to 1.8.0, Envoy can use either proto to send client requests to a ratelimit server with the use of the
+  `use_data_plane_proto` boolean flag in the `ratelimit configuration <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto>`_.
+  However, when using the deprecated client a warning is logged.
+* Use of the --v2-config-only flag.
+* Use of both `use_websocket` and `websocket_config` in
+  `route.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto>`_
+  is deprecated. Please use the new `upgrade_configs` in the
+  `HttpConnectionManager <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto>`_
+  instead.
+* Use of the integer `percent` field in `FaultDelay <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto>`_
+  and in `FaultAbort <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/http/fault/v2/fault.proto>`_ is deprecated in favor
+  of the new `FractionalPercent` based `percentage` field.
+* Setting hosts via `hosts` field in `Cluster` is deprecated. Use `load_assignment` instead.
+* Use of `response_headers_to_*` and `request_headers_to_add` are deprecated at the `RouteAction`
+  level. Please use the configuration options at the `Route` level.
+* Use of `runtime` in `RouteMatch`, found in
+  `route.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto>`_.
+  Set the `runtime_fraction` field instead.
+* Use of the string `user` field in `Authenticated` in `rbac.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto>`_
+  is deprecated in favor of the new `StringMatcher` based `principal_name` field.

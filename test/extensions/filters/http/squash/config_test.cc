@@ -1,8 +1,9 @@
-#include "envoy/config/filter/http/squash/v2/squash.pb.validate.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 
 #include "extensions/filters/http/squash/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,7 +27,7 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectYaml) {
   attachment_timeout: 3.003s
   )EOF";
 
-  envoy::config::filter::http::squash::v2::Squash proto_config;
+  envoy::extensions::filters::http::squash::v3::Squash proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SquashFilterConfigFactory factory;
@@ -34,6 +35,16 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectYaml) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(SquashFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.squash";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

@@ -9,7 +9,7 @@ Adaptive Concurrency
 
 This filter should be configured with the name `envoy.filters.http.adaptive_concurrency`.
 
-See the :ref:`v2 API reference <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency>` for details on each configuration parameter.
+See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` for details on each configuration parameter.
 
 Overview
 --------
@@ -28,15 +28,17 @@ Gradient Controller
 The gradient controller makes forwarding decisions based on a periodically measured ideal round-trip
 time (minRTT) for an upstream.
 
-:ref:`v2 API reference <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig>`
+:ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig>`
 
 Calculating the minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
 
 The minRTT is periodically measured by only allowing a very low outstanding request count to an
-upstream cluster and measuring the latency under these ideal conditions. The length of this minRTT
-calculation window is variable depending on the number of requests the filter is configured to
-aggregate to represent the expected latency of an upstream.
+upstream cluster and measuring the latency under these ideal conditions. The calculation is also
+triggered in scenarios where the concurrency limit is determined to be the minimum possible value
+for 5 consecutive sampling windows. The length of this minRTT calculation window is variable
+depending on the number of requests the filter is configured to aggregate to represent the expected
+latency of an upstream.
 
 A configurable *jitter* value is used to randomly delay the start of the minRTT calculation window
 by some amount of time. This is not necessary and can be disabled; however, it is recommended to
@@ -64,9 +66,19 @@ The gradient is calculated using summarized sampled request latencies (sampleRTT
 
 .. math::
 
-    gradient = \frac{minRTT}{sampleRTT}
+    gradient = \frac{minRTT + B}{sampleRTT}
 
 This gradient value has a useful property, such that it decreases as the sampled latencies increase.
+Notice that *B*, the buffer value added to the minRTT, allows for normal variance in the sampled
+latencies by requiring the sampled latencies the exceed the minRTT by some configurable threshold
+before decreasing the gradient value.
+
+The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
+
+.. math::
+
+    B = minRTT * buffer_{pct}
+
 The gradient value is then used to update the concurrency limit via:
 
 .. math::
@@ -105,7 +117,8 @@ fields can be overridden via runtime settings.
 .. code-block:: yaml
 
   name: envoy.filters.http.adaptive_concurrency
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency
     gradient_controller_config:
       sample_aggregate_percentile:
         value: 90
@@ -163,8 +176,8 @@ adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms
 adaptive_concurrency.gradient_controller.max_concurrency_limit
     Overrides the maximum allowed concurrency limit.
 
-adaptive_concurrency.gradient_controller.max_gradient
-    Overrides the maximum allowed gradient value.
+adaptive_concurrency.gradient_controller.min_rtt_buffer
+    Overrides the padding added to the minRTT when calculating the concurrency limit.
 
 adaptive_concurrency.gradient_controller.sample_aggregate_percentile
     Overrides the percentile value used to represent the collection of latency samples in
@@ -178,7 +191,7 @@ Statistics
 ----------
 The adaptive concurrency filter outputs statistics in the
 *http.<stat_prefix>.adaptive_concurrency.* namespace. The :ref:`stat prefix
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>`
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager. Statistics are specific to the concurrency
 controllers.
 

@@ -1,14 +1,14 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP filter that implements gRPC telemetry
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
@@ -23,9 +23,10 @@ envoy_cc_extension(
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/grpc:context_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/config/filter/http/grpc_stats/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/grpc_stats/v3:pkg_cc_proto",
     ],
 )

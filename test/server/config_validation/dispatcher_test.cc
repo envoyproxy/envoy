@@ -9,6 +9,7 @@
 
 #include "server/config_validation/api.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_time.h"
@@ -22,15 +23,16 @@ namespace Envoy {
 class ConfigValidation : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   ConfigValidation() {
-    validation_ = std::make_unique<Api::ValidationImpl>(Thread::threadFactoryForTest(),
-                                                        stats_store_, test_time_.timeSystem(),
-                                                        Filesystem::fileSystemForTest());
-    dispatcher_ = validation_->allocateDispatcher();
+    validation_ = std::make_unique<Api::ValidationImpl>(
+        Thread::threadFactoryForTest(), stats_store_, test_time_.timeSystem(),
+        Filesystem::fileSystemForTest(), random_generator_);
+    dispatcher_ = validation_->allocateDispatcher("test_thread");
   }
 
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
+  testing::NiceMock<Random::MockRandomGenerator> random_generator_;
 
 private:
   // Using config validation API.
@@ -39,7 +41,7 @@ private:
 
 // Simple test which creates a connection to fake upstream client. This is to test if
 // ValidationDispatcher can call createClientConnection without crashing.
-TEST_P(ConfigValidation, createConnection) {
+TEST_P(ConfigValidation, CreateConnection) {
   Network::Address::InstanceConstSharedPtr address(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
   dispatcher_->createClientConnection(address, address, Network::Test::createRawBufferSocket(),
@@ -52,9 +54,9 @@ TEST_P(ConfigValidation, createConnection) {
 TEST_F(ConfigValidation, SharedDnsResolver) {
   std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
 
-  Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(resolvers);
+  Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(resolvers, false);
   long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(resolvers);
+  Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(resolvers, false);
 
   EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
   EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.

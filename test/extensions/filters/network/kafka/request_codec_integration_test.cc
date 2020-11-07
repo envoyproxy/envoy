@@ -2,7 +2,6 @@
 
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
-#include "test/mocks/server/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -19,7 +18,7 @@ using RequestCapturingCallback =
     CapturingCallback<RequestCallback, AbstractRequestSharedPtr, RequestParseFailureSharedPtr>;
 
 // Other request types are tested in (generated) 'request_codec_request_test.cc'.
-TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
+TEST_F(RequestCodecIntegrationTest, ShouldProduceAbortedMessageOnUnknownData) {
   // given
   // As real api keys have values below 100, the messages generated in this loop should not be
   // recognized by the codec.

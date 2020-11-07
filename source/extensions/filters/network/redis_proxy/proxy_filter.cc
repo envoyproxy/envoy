@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -16,11 +17,14 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 ProxyFilterConfig::ProxyFilterConfig(
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config, Stats::Scope& scope,
-    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime, Api::Api& api)
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
+    Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
+    Api::Api& api)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
+      downstream_auth_username_(
+          Config::DataSource::read(config.downstream_auth_username(), true, api)),
       downstream_auth_password_(
           Config::DataSource::read(config.downstream_auth_password(), true, api)) {}
 
@@ -36,7 +40,8 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
       config_(config) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
-  connection_allowed_ = config_->downstream_auth_password_.empty();
+  connection_allowed_ =
+      config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty();
 }
 
 ProxyFilter::~ProxyFilter() {
@@ -57,7 +62,8 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
-  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(std::move(value), request);
+  CommandSplitter::SplitRequestPtr split =
+      splitter_.makeRequest(std::move(value), request, callbacks_->connection().dispatcher());
   if (split) {
     // The splitter can immediately respond and destroy the pending request. Only store the handle
     // if the request is still alive.
@@ -89,6 +95,31 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
   } else {
     response->type(Common::Redis::RespType::Error);
     response->asString() = "ERR invalid password";
+    connection_allowed_ = false;
+  }
+  request.onResponse(std::move(response));
+}
+
+void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
+                         const std::string& password) {
+  Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+  if (config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty()) {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "ERR Client sent AUTH, but no username-password pair is set";
+  } else if (config_->downstream_auth_username_.empty() && username == "default" &&
+             password == config_->downstream_auth_password_) {
+    // empty username and "default" are synonymous in Redis 6 ACLs
+    response->type(Common::Redis::RespType::SimpleString);
+    response->asString() = "OK";
+    connection_allowed_ = true;
+  } else if (username == config_->downstream_auth_username_ &&
+             password == config_->downstream_auth_password_) {
+    response->type(Common::Redis::RespType::SimpleString);
+    response->asString() = "OK";
+    connection_allowed_ = true;
+  } else {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "WRONGPASS invalid username-password pair";
     connection_allowed_ = false;
   }
   request.onResponse(std::move(response));

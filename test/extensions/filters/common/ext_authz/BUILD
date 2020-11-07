@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -16,11 +16,13 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/common/ext_authz:check_request_utils_lib",
+        "//source/extensions/filters/common/ext_authz:ext_authz_interface",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -30,9 +32,11 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,7 +46,11 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -52,6 +60,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -65,7 +74,9 @@ envoy_cc_mock(
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

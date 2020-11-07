@@ -13,7 +13,7 @@ OriginalSrcFilter::OriginalSrcFilter(const Config& config) : config_(config) {}
 
 void OriginalSrcFilter::onDestroy() {}
 
-Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::HeaderMap&, bool) {
+Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   const auto downstream_address = callbacks_->streamInfo().downstreamRemoteAddress();
   ASSERT(downstream_address);
 
@@ -36,7 +36,7 @@ Http::FilterDataStatus OriginalSrcFilter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus OriginalSrcFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus OriginalSrcFilter::decodeTrailers(Http::RequestTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 

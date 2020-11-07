@@ -203,7 +203,7 @@ public:
     EXPECT_EQ(1UL, result.size());
     EXPECT_EQ(statement_type, result.getStatement(0)->type());
     hsql::TableAccessMap table_access_map;
-    if (expected_table_access_map.empty()) {
+    if (expected_table_access_map.empty() && (statement_type == hsql::StatementType::kStmtShow)) {
       return;
     }
     result.getStatement(0)->tablesAccessed(table_access_map);
@@ -454,7 +454,8 @@ TEST_F(MySQLCommandTest, MySQLTest20) {
   std::string command = buildAlter(TestResource::TABLE, table, "add column Id varchar (20)");
   hsql::SQLParserResult result;
   EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
-  expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtAlter, {});
+  expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtAlter,
+                                       {{table, {"alter"}}});
 }
 
 /*
@@ -673,6 +674,7 @@ TEST_F(MySQLCommandTest, MySQLTest37) {
  * Test correlated queries: INSERT, SELECT
  */
 TEST_F(MySQLCommandTest, MySQLTest38) {
+  // SPELLCHECKER(off)
   std::string table1 = "table1";
   std::string table2 = "table2";
   std::string ins_command = buildInsert("", true, table1, "");
@@ -682,6 +684,7 @@ TEST_F(MySQLCommandTest, MySQLTest38) {
   EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(ins_command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtInsert,
                                        {{table1, {"insert"}}, {table2, {"select"}}});
+  // SPELLCHECKER(on)
 }
 
 /*

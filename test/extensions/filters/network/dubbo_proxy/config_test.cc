@@ -1,11 +1,11 @@
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
 #include "extensions/filters/network/dubbo_proxy/config.h"
 #include "extensions/filters/network/dubbo_proxy/filters/filter_config.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
@@ -18,13 +18,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-using DubboProxyProto = envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy;
+using DubboProxyProto = envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy;
 
 namespace {
 
-DubboProxyProto parseDubboProxyFromV2Yaml(const std::string& yaml) {
+DubboProxyProto parseDubboProxyFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
   DubboProxyProto dubbo_proxy;
-  TestUtility::loadFromYaml(yaml, dubbo_proxy);
+  TestUtility::loadFromYaml(yaml, dubbo_proxy, false, avoid_boosting);
   return dubbo_proxy;
 }
 
@@ -50,12 +50,12 @@ class DubboFilterConfigTest : public DubboFilterConfigTestBase, public testing::
 TEST_F(DubboFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(DubboProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy(), context),
+                   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy(), context),
                ProtoValidationException);
 }
 
 TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy config{};
+  envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config{};
 
   config.set_stat_prefix("my_stat_prefix");
 
@@ -71,8 +71,8 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
 TEST_F(DubboFilterConfigTest, DubboProxyWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy config =
-      *dynamic_cast<envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy*>(
+  envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("my_stat_prefix");
 
@@ -92,7 +92,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithExplicitRouterConfig) {
       - name: envoy.filters.dubbo.router
     )EOF";
 
-  DubboProxyProto config = parseDubboProxyFromV2Yaml(yaml);
+  DubboProxyProto config = parseDubboProxyFromV3Yaml(yaml);
   testConfig(config);
 }
 
@@ -107,7 +107,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithUnknownFilter) {
       - name: envoy.filters.dubbo.router
     )EOF";
 
-  DubboProxyProto config = parseDubboProxyFromV2Yaml(yaml);
+  DubboProxyProto config = parseDubboProxyFromV3Yaml(yaml);
 
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "no_such_filter");
@@ -131,7 +131,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithMultipleFilters) {
   DubboFilters::MockFilterConfigFactory factory;
   Registry::InjectFactory<DubboFilters::NamedDubboFilterConfigFactory> registry(factory);
 
-  DubboProxyProto config = parseDubboProxyFromV2Yaml(yaml);
+  DubboProxyProto config = parseDubboProxyFromV3Yaml(yaml);
   testConfig(config);
 
   EXPECT_EQ(1, factory.config_struct_.fields_size());
@@ -156,7 +156,7 @@ TEST_F(DubboFilterConfigTest, CreateFilterChain) {
   DubboFilters::MockFilterConfigFactory factory;
   Registry::InjectFactory<DubboFilters::NamedDubboFilterConfigFactory> registry(factory);
 
-  DubboProxyProto dubbo_config = parseDubboProxyFromV2Yaml(yaml);
+  DubboProxyProto dubbo_config = parseDubboProxyFromV3Yaml(yaml);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboFilters::MockFilterChainFactoryCallbacks callbacks;

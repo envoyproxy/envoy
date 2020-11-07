@@ -1,0 +1,23 @@
+// Bad speelinga.
+//
+// SPELLCHECKER(skip-block)
+// Ignored bad speeling.
+
+// Bad speelingb.
+//
+// SPELLCHECKER(skip-block)
+// Ignored bad speeling.
+//
+// Also ignored bad speeling.
+Code with bad speeling
+// Bad speelingc.
+
+/*
+ * Bad speelingd.
+ *
+ * SPELLCHECKER(skip-block)
+ *
+ * Ignored bad speeling.
+ */
+
+/* Bad speelinge. */

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 
-#include "envoy/config/trace/v2/trace.pb.validate.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
 
 #include "common/common/base64.h"
 
@@ -46,7 +46,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
-using envoy::config::trace::v2::OpenCensusConfig;
+using envoy::config::trace::v3::OpenCensusConfig;
 using ::opencensus::trace::exporter::SpanData;
 using ::opencensus::trace::exporter::SpanExporter;
 
@@ -76,7 +76,7 @@ public:
 
 private:
   mutable absl::Mutex mu_;
-  std::vector<SpanData> spans_ GUARDED_BY(mu_);
+  std::vector<SpanData> spans_ ABSL_GUARDED_BY(mu_);
 };
 
 // Use a Singleton SpanCatcher.
@@ -103,10 +103,11 @@ TEST(OpenCensusTracerTest, Span) {
   registerSpanCatcher();
   OpenCensusConfig oc_config;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
+  std::unique_ptr<Tracing::Driver> driver(
+      new OpenCensus::Driver(oc_config, local_info, *Api::createApiForTest()));
 
   NiceMock<Tracing::MockConfig> config;
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const std::string operation_name{"my_operation_1"};
   SystemTime start_time;
@@ -122,6 +123,10 @@ TEST(OpenCensusTracerTest, Span) {
     child->finishSpan();
     span->setSampled(false); // Abandon tracer.
     span->finishSpan();
+
+    // Baggage methods are a noop in opencensus and won't affect events.
+    span->setBaggage("baggage_key", "baggage_value");
+    ASSERT_EQ("", span->getBaggage("baggage_key"));
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
@@ -169,10 +174,10 @@ MATCHER_P2(ContainHeader, header, expected_value,
            "contains the header " + PrintToString(header) + " with value " +
                PrintToString(expected_value)) {
   const auto found_value = arg.get(Http::LowerCaseString(header));
-  if (found_value == nullptr) {
+  if (found_value.empty()) {
     return false;
   }
-  return found_value->value().getStringView() == expected_value;
+  return found_value[0]->value().getStringView() == expected_value;
 }
 
 // Given incoming headers, test that trace context propagation works and generates all the expected
@@ -192,9 +197,10 @@ void testIncomingHeaders(
   oc_config.add_outgoing_trace_context(OpenCensusConfig::TRACE_CONTEXT);
   oc_config.add_outgoing_trace_context(OpenCensusConfig::GRPC_TRACE_BIN);
   oc_config.add_outgoing_trace_context(OpenCensusConfig::CLOUD_TRACE_CONTEXT);
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
+  std::unique_ptr<Tracing::Driver> driver(
+      new OpenCensus::Driver(oc_config, local_info, *Api::createApiForTest()));
   NiceMock<Tracing::MockConfig> config;
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"},
       {":method", "GET"},
       {"x-request-id", "foo"},
@@ -205,7 +211,7 @@ void testIncomingHeaders(
 
   const std::string operation_name{"my_operation_2"};
   SystemTime start_time;
-  Http::TestHeaderMapImpl injected_headers;
+  Http::TestRequestHeaderMapImpl injected_headers;
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, false});
@@ -279,7 +285,8 @@ namespace {
 int SamplerTestHelper(const OpenCensusConfig& oc_config) {
   registerSpanCatcher();
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
+  std::unique_ptr<Tracing::Driver> driver(
+      new OpenCensus::Driver(oc_config, local_info, *Api::createApiForTest()));
   auto span = ::opencensus::trace::Span::StartSpan("test_span");
   span.End();
   // Retrieve SpanData from the OpenCensus trace exporter.

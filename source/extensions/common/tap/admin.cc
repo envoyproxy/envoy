@@ -1,7 +1,9 @@
 #include "extensions/common/tap/admin.h"
 
-#include "envoy/admin/v2alpha/tap.pb.h"
-#include "envoy/admin/v2alpha/tap.pb.validate.h"
+#include "envoy/admin/v3/tap.pb.h"
+#include "envoy/admin/v3/tap.pb.validate.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/wrapper.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -29,6 +31,10 @@ AdminHandler::AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_
   const bool rc =
       admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true);
   RELEASE_ASSERT(rc, "/tap admin endpoint is taken");
+  if (admin_.socket().addressType() == Network::Address::Type::Pipe) {
+    ENVOY_LOG(warn, "Admin tapping (via /tap) is unreliable when the admin endpoint is a pipe and "
+                    "the connection is HTTP/1. Either use an IP address or connect using HTTP/2.");
+  }
 }
 
 AdminHandler::~AdminHandler() {
@@ -48,7 +54,7 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
     return badRequest(response, "/tap requires a JSON/YAML body");
   }
 
-  envoy::admin::v2alpha::TapRequest tap_request;
+  envoy::admin::v3::TapRequest tap_request;
   try {
     MessageUtil::loadFromYamlAndValidate(admin_stream.getRequestBody()->toString(), tap_request,
                                          ProtobufMessage::getStrictValidationVisitor());
@@ -63,7 +69,7 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
                               tap_request.config_id()));
   }
   for (auto config : config_id_map_[tap_request.config_id()]) {
-    config->newTapConfig(std::move(*tap_request.mutable_tap_config()), this);
+    config->newTapConfig(tap_request.tap_config(), this);
   }
 
   admin_stream.setEndStreamOnComplete(false);
@@ -72,10 +78,10 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
       ENVOY_LOG(debug, "detach tap admin request for config_id={}",
                 attached_request_.value().config_id_);
       config->clearTapConfig();
-      attached_request_ = absl::nullopt;
     }
+    attached_request_ = absl::nullopt;
   });
-  attached_request_.emplace(tap_request.config_id(), &admin_stream);
+  attached_request_.emplace(tap_request.config_id(), tap_request.tap_config(), &admin_stream);
   return Http::Code::OK;
 }
 
@@ -89,6 +95,9 @@ void AdminHandler::registerConfig(ExtensionConfig& config, const std::string& co
   ASSERT(!config_id.empty());
   ASSERT(config_id_map_[config_id].count(&config) == 0);
   config_id_map_[config_id].insert(&config);
+  if (attached_request_.has_value() && attached_request_.value().config_id_ == config_id) {
+    config.newTapConfig(attached_request_.value().config_, this);
+  }
 }
 
 void AdminHandler::unregisterConfig(ExtensionConfig& config) {
@@ -102,21 +111,21 @@ void AdminHandler::unregisterConfig(ExtensionConfig& config) {
 }
 
 void AdminHandler::AdminPerTapSinkHandle::submitTrace(
-    TraceWrapperPtr&& trace, envoy::service::tap::v2alpha::OutputSink::Format format) {
+    TraceWrapperPtr&& trace, envoy::config::tap::v3::OutputSink::Format format) {
   ENVOY_LOG(debug, "admin submitting buffered trace to main thread");
   // Convert to a shared_ptr, so we can send it to the main thread.
-  std::shared_ptr<envoy::data::tap::v2alpha::TraceWrapper> shared_trace{std::move(trace)};
+  std::shared_ptr<envoy::data::tap::v3::TraceWrapper> shared_trace{std::move(trace)};
   // The handle can be destroyed before the cross thread post is complete. Thus, we capture a
   // reference to our parent.
-  parent_.main_thread_dispatcher_.post([& parent = parent_, trace = shared_trace, format]() {
+  parent_.main_thread_dispatcher_.post([&parent = parent_, trace = shared_trace, format]() {
     if (!parent.attached_request_.has_value()) {
       return;
     }
 
     std::string output_string;
     switch (format) {
-    case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING:
-    case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_BYTES:
+    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
+    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
       output_string = MessageUtil::getJsonStringFromMessage(*trace, true, true);
       break;
     default:

@@ -26,7 +26,7 @@ public:
   MockBuffer() = default;
   ~MockBuffer() override = default;
 
-  MOCK_CONST_METHOD0(length, uint64_t());
+  MOCK_METHOD(uint64_t, length, (), (const));
 };
 
 MessageMetadataSharedPtr mkMessageMetadata(uint32_t num_headers) {
@@ -311,7 +311,7 @@ TEST(HeaderTransportTest, TransformErrors) {
     EXPECT_THAT(metadata, HasFrameSize(86U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Binary));
     EXPECT_THAT(metadata, HasAppException(AppExceptionType::MissingResult,
-                                          fmt::format("Unknown transform {}", xform_id)));
+                                          absl::StrCat("Unknown transform ", xform_id)));
   }
 
   // Only the first of multiple errors is reported
@@ -458,7 +458,7 @@ TEST(HeaderTransportTest, InfoBlock) {
   buffer.writeByte(0); // empty value
   buffer.writeByte(0); // padding
 
-  Http::HeaderMapImpl expected_headers;
+  Http::TestRequestHeaderMapImpl expected_headers;
   expected_headers.addCopy(Http::LowerCaseString("not"), "empty");
   expected_headers.addCopy(Http::LowerCaseString("key"), "value");
   expected_headers.addCopy(Http::LowerCaseString("key2"), std::string(128, 'x'));
@@ -467,8 +467,7 @@ TEST(HeaderTransportTest, InfoBlock) {
   EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
   EXPECT_THAT(metadata, HasFrameSize(38U));
 
-  Http::HeaderMapImpl& actual_headers = dynamic_cast<Http::HeaderMapImpl&>(metadata.headers());
-  EXPECT_EQ(expected_headers, actual_headers);
+  EXPECT_EQ(expected_headers, metadata.headers());
   EXPECT_EQ(buffer.length(), 0);
 }
 

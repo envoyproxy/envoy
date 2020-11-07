@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
@@ -7,12 +5,16 @@ load(
     "envoy_proto_library",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_test_library(
     name = "custom_static_cluster",
     srcs = [
         "custom_static_cluster.cc",
+    ],
+    hdrs = [
         "custom_static_cluster.h",
     ],
     deps = [
@@ -32,6 +34,9 @@ envoy_cc_test_library(
         "//test/common/upstream:utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )
 

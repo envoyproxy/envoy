@@ -6,7 +6,6 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
-#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -29,8 +28,9 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
 } // namespace
 
 /* static */
-bool PathUtil::canonicalPath(HeaderEntry& path_header) {
-  const auto original_path = path_header.value().getStringView();
+bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
+  ASSERT(headers.Path());
+  const auto original_path = headers.getPathValue();
   // canonicalPath is supposed to apply on path component in URL instead of :path header
   const auto query_pos = original_path.find('?');
   auto normalized_path_opt = canonicalizePath(
@@ -50,12 +50,13 @@ bool PathUtil::canonicalPath(HeaderEntry& path_header) {
   if (!query_suffix.empty()) {
     normalized_path.insert(normalized_path.end(), query_suffix.begin(), query_suffix.end());
   }
-  path_header.value(normalized_path);
+  headers.setPath(normalized_path);
   return true;
 }
 
-void PathUtil::mergeSlashes(HeaderEntry& path_header) {
-  const auto original_path = path_header.value().getStringView();
+void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
+  ASSERT(headers.Path());
+  const auto original_path = headers.getPathValue();
   // Only operate on path component in URL.
   const absl::string_view::size_type query_start = original_path.find('?');
   const absl::string_view path = original_path.substr(0, query_start);
@@ -63,10 +64,21 @@ void PathUtil::mergeSlashes(HeaderEntry& path_header) {
   if (path.find("//") == absl::string_view::npos) {
     return;
   }
-  const absl::string_view prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
-  const absl::string_view suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
-  path_header.value(absl::StrCat(
-      prefix, absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"), query, suffix));
+  const absl::string_view path_prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
+  const absl::string_view path_suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
+  headers.setPath(absl::StrCat(path_prefix,
+                               absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"),
+                               path_suffix, query));
+}
+
+absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
+  absl::string_view ret = path;
+  // Trim query parameters and/or fragment if present.
+  size_t offset = ret.find_first_of("?#");
+  if (offset != absl::string_view::npos) {
+    ret.remove_suffix(ret.length() - offset);
+  }
+  return ret;
 }
 
 } // namespace Http

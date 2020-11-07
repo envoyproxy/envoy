@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["manager.h"],
     deps = [
         ":instance_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/registry",
     ],
 )

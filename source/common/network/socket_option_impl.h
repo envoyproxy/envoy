@@ -2,6 +2,7 @@
 
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/assert.h"
@@ -44,6 +45,24 @@ namespace Network {
 #define ENVOY_SOCKET_SO_MARK ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_MARK)
 #else
 #define ENVOY_SOCKET_SO_MARK Network::SocketOptionName()
+#endif
+
+#ifdef SO_NOSIGPIPE
+#define ENVOY_SOCKET_SO_NOSIGPIPE ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_NOSIGPIPE)
+#else
+#define ENVOY_SOCKET_SO_NOSIGPIPE Network::SocketOptionName()
+#endif
+
+#ifdef SO_REUSEPORT
+#define ENVOY_SOCKET_SO_REUSEPORT ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT)
+#else
+#define ENVOY_SOCKET_SO_REUSEPORT Network::SocketOptionName()
+#endif
+
+#ifdef UDP_GRO
+#define ENVOY_SOCKET_UDP_GRO ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_UDP, UDP_GRO)
+#else
+#define ENVOY_SOCKET_UDP_GRO Network::SocketOptionName()
 #endif
 
 #ifdef TCP_KEEPCNT
@@ -91,15 +110,22 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 // receiving destination address.
 #define ENVOY_SELF_IPV6_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_RECVPKTINFO)
 
+#ifdef SO_ATTACH_REUSEPORT_CBPF
+#define ENVOY_ATTACH_REUSEPORT_CBPF                                                                \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_ATTACH_REUSEPORT_CBPF)
+#else
+#define ENVOY_ATTACH_REUSEPORT_CBPF Network::SocketOptionName()
+#endif
+
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
-  SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+  SocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname,
                    int value) // Yup, int. See setsockopt(2).
       : SocketOptionImpl(in_state, optname,
                          absl::string_view(reinterpret_cast<char*>(&value), sizeof(value))) {}
 
-  SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+  SocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname, absl::string_view value)
       : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()) {
     ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(void*) == 0);
@@ -107,14 +133,14 @@ public:
 
   // Socket::Option
   bool setOption(Socket& socket,
-                 envoy::api::v2::core::SocketOption::SocketState state) const override;
+                 envoy::config::core::v3::SocketOption::SocketState state) const override;
 
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
-                   envoy::api::v2::core::SocketOption::SocketState state) const override;
+                   envoy::config::core::v3::SocketOption::SocketState state) const override;
 
   bool isSupported() const;
 
@@ -132,12 +158,14 @@ public:
                                                const void* value, size_t size);
 
 private:
-  const envoy::api::v2::core::SocketOption::SocketState in_state_;
+  const envoy::config::core::v3::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
   // This has to be a std::vector<uint8_t> but not std::string because std::string might inline
   // the buffer so its data() is not aligned in to alignof(void*).
   const std::vector<uint8_t> value_;
 };
+
+using SocketOptionImplOptRef = absl::optional<std::reference_wrapper<SocketOptionImpl>>;
 
 } // namespace Network
 } // namespace Envoy

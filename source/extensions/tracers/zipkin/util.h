@@ -6,6 +6,7 @@
 #include "envoy/common/time.h"
 
 #include "common/common/byte_order.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,35 +18,6 @@ namespace Zipkin {
  */
 class Util {
 public:
-  // ====
-  // Stringified-JSON manipulation
-  // ====
-
-  /**
-   * Merges the stringified JSONs given in target and source.
-   *
-   * @param target It will contain the resulting stringified JSON.
-   * @param source The stringified JSON that will be added to target.
-   * @param field_name The key name (added to target's JSON) whose value will be the JSON in source.
-   */
-  static void mergeJsons(std::string& target, const std::string& source,
-                         const std::string& field_name);
-
-  /**
-   * Merges a stringified JSON and a vector of stringified JSONs.
-   *
-   * @param target It will contain the resulting stringified JSON.
-   * @param json_array Vector of strings, where each element is a stringified JSON.
-   * @param field_name The key name (added to target's JSON) whose value will be a stringified.
-   * JSON array derived from json_array.
-   */
-  static void addArrayToJson(std::string& target, const std::vector<std::string>& json_array,
-                             const std::string& field_name);
-
-  // ====
-  // Miscellaneous
-  // ====
-
   /**
    * Returns a randomly-generated 64-bit integer number.
    */
@@ -72,6 +44,21 @@ public:
     auto bytes = toEndianness<ByteOrder::BigEndian>(value);
     return std::string(reinterpret_cast<const char*>(&bytes), sizeof(Type));
   }
+
+  using Replacements = std::vector<std::pair<const std::string, const std::string>>;
+
+  /**
+   * Returns a wrapped uint64_t value as a string. In addition to that, it also pushes back a
+   * replacement to the given replacements vector. The replacement includes the supplied name
+   * as a key, for identification in a JSON stream.
+   *
+   * @param value unt64_t number that will be represented in string.
+   * @param name std::string that is the key for the value being replaced.
+   * @param replacements a container to hold the required replacements when serializing this value.
+   * @return ProtobufWkt::Value wrapped uint64_t as a string.
+   */
+  static ProtobufWkt::Value uint64Value(uint64_t value, absl::string_view name,
+                                        Replacements& replacements);
 };
 
 } // namespace Zipkin

@@ -6,10 +6,11 @@
 #include "common/common/logger_delegates.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
-#include "common/http/http2/codec_impl.h"
 #include "common/runtime/runtime_features.h"
 
 #include "exe/process_wide.h"
+
+#include "server/backtrace.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -43,12 +44,15 @@ std::string findAndRemove(const std::regex& pattern, int& argc, char**& argv) {
 // This class is created iff a test is run with the special runtime override flag.
 class RuntimeManagingListener : public ::testing::EmptyTestEventListener {
 public:
-  RuntimeManagingListener(std::string& runtime_override) : runtime_override_(runtime_override) {}
+  RuntimeManagingListener(std::string& runtime_override, bool disable = false)
+      : runtime_override_(runtime_override), disable_(disable) {}
 
   // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
   void OnTestStart(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      if (!Runtime::RuntimeFeaturesPeer::addFeature(runtime_override_)) {
+      bool reset = disable_ ? Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_)
+                            : Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_);
+      if (!reset) {
         // If the entry was already in the hash map, don't remove it OnTestEnd.
         runtime_override_.clear();
       }
@@ -58,10 +62,14 @@ public:
   // As each test ends, clean up the RuntimeFeaturesDefaults state.
   void OnTestEnd(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      Runtime::RuntimeFeaturesPeer::removeFeature(runtime_override_);
+      disable_ ? Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_)
+               : Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_);
     }
   }
   std::string runtime_override_;
+  // This marks whether the runtime feature was enabled by default and needs to be overridden to
+  // false.
+  bool disable_;
 };
 
 } // namespace
@@ -93,21 +101,47 @@ int TestRunner::RunTests(int argc, char** argv) {
   // Before letting TestEnvironment latch argv and argc, remove any runtime override flag.
   // This allows doing test overrides of Envoy runtime features without adding
   // test flags to the Envoy production command line.
-  const std::regex PATTERN{"--runtime-feature-override-for-tests=(.*)", std::regex::optimize};
-  std::string runtime_override = findAndRemove(PATTERN, argc, argv);
-  if (!runtime_override.empty()) {
+  const std::regex ENABLE_PATTERN{"--runtime-feature-override-for-tests=(.*)",
+                                  std::regex::optimize};
+  std::string runtime_override_enable = findAndRemove(ENABLE_PATTERN, argc, argv);
+  if (!runtime_override_enable.empty()) {
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
-                        "Running with runtime feature override {}", runtime_override);
+                        "Running with runtime feature override enable {}", runtime_override_enable);
     // Set up a listener which will create a global runtime and set the feature
     // to true for the duration of each test instance.
     ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
-    listeners.Append(new RuntimeManagingListener(runtime_override));
+    listeners.Append(new RuntimeManagingListener(runtime_override_enable));
   }
+  const std::regex DISABLE_PATTERN{"--runtime-feature-disable-for-tests=(.*)",
+                                   std::regex::optimize};
+  std::string runtime_override_disable = findAndRemove(DISABLE_PATTERN, argc, argv);
+  if (!runtime_override_disable.empty()) {
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
+                        "Running with runtime feature override disable {}",
+                        runtime_override_disable);
+    // Set up a listener which will create a global runtime and set the feature
+    // to false for the duration of each test instance.
+    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+    listeners.Append(new RuntimeManagingListener(runtime_override_disable, true));
+  }
+
+#ifdef ENVOY_CONFIG_COVERAGE
+  // Coverage tests are run with -l trace --log-path /dev/null, in order to
+  // ensure that all of the code-paths from the maximum level of tracing are
+  // covered in tests, but we don't wind up filling up CI with useless detailed
+  // artifacts.
+  //
+  // The downside of this is that if there's a crash, the backtrace is lost, as
+  // the backtracing mechanism uses logging, so force the backtraces to stderr.
+  BackwardsTrace::setLogToStderr(true);
+#endif
 
   TestEnvironment::initializeOptions(argc, argv);
   Thread::MutexBasicLockable lock;
-  Logger::Context logging_state(TestEnvironment::getOptions().logLevel(),
-                                TestEnvironment::getOptions().logFormat(), lock, false);
+
+  Server::Options& options = TestEnvironment::getOptions();
+  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false,
+                                options.enableFineGrainLogging());
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;

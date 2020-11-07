@@ -3,22 +3,24 @@
 #include <chrono>
 
 #include "common/common/assert.h"
+#include "common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
 namespace Envoy {
 namespace Event {
 
-void TimerUtils::millisecondsToTimeval(const std::chrono::milliseconds& d, timeval& tv) {
-  std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(d);
-  std::chrono::microseconds usecs = std::chrono::duration_cast<std::chrono::microseconds>(d - secs);
-
-  tv.tv_sec = secs.count();
-  tv.tv_usec = usecs.count();
-}
-
 TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispatcher)
-    : cb_(cb), dispatcher_(dispatcher) {
+    : cb_(cb), dispatcher_(dispatcher),
+      activate_timers_next_event_loop_(
+          // Only read the runtime feature if the runtime loader singleton has already been created.
+          // Accessing runtime features too early in the initialization sequence triggers logging
+          // and the logging code itself depends on the use of timers. Attempts to log while
+          // initializing the logging subsystem will result in a crash.
+          Runtime::LoaderSingleton::getExisting()
+              ? Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.activate_timers_next_event_loop")
+              : true) {
   ASSERT(cb_);
   evtimer_assign(
       &raw_event_, libevent.get(),
@@ -37,13 +39,25 @@ TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispat
 
 void TimerImpl::disableTimer() { event_del(&raw_event_); }
 
-void TimerImpl::enableTimer(const std::chrono::milliseconds& d, const ScopeTrackedObject* object) {
+void TimerImpl::enableTimer(const std::chrono::milliseconds d, const ScopeTrackedObject* object) {
+  timeval tv;
+  TimerUtils::durationToTimeval(d, tv);
+  internalEnableTimer(tv, object);
+}
+
+void TimerImpl::enableHRTimer(const std::chrono::microseconds d,
+                              const ScopeTrackedObject* object = nullptr) {
+  timeval tv;
+  TimerUtils::durationToTimeval(d, tv);
+  internalEnableTimer(tv, object);
+}
+
+void TimerImpl::internalEnableTimer(const timeval& tv, const ScopeTrackedObject* object) {
   object_ = object;
-  if (d.count() == 0) {
+
+  if (!activate_timers_next_event_loop_ && tv.tv_sec == 0 && tv.tv_usec == 0) {
     event_active(&raw_event_, EV_TIMEOUT, 0);
   } else {
-    timeval tv;
-    TimerUtils::millisecondsToTimeval(d, tv);
     event_add(&raw_event_, &tv);
   }
 }
