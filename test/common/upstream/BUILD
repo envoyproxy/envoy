@@ -793,6 +793,5 @@ envoy_cc_fuzz_test(
         ":least_request_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",
-        "//test/fuzz:utility_lib",
     ],
 )
