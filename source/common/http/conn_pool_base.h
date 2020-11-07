@@ -43,7 +43,8 @@ public:
                        Event::Dispatcher& dispatcher,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                       Http::Protocol protocol);
+                       Random::RandomGenerator& random_generator,
+                       std::vector<Http::Protocol> protocol);
 
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
@@ -55,6 +56,7 @@ public:
     return Envoy::ConnectionPool::ConnPoolImplBase::maybePrefetch(ratio);
   }
   bool hasActiveConnections() const override;
+  Http::Protocol protocol() const override { return protocol_; }
 
   // Creates a new PendingStream and enqueues it into the queue.
   ConnectionPool::Cancellable*
@@ -69,6 +71,10 @@ public:
                    Envoy::ConnectionPool::AttachContext& context) override;
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
+
+protected:
+  Random::RandomGenerator& random_generator_;
+  Http::Protocol protocol_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
@@ -78,8 +84,15 @@ public:
                uint64_t concurrent_stream_limit)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             concurrent_stream_limit) {
-    Upstream::Host::CreateConnectionData data = parent_.host()->createConnection(
-        parent_.dispatcher(), parent_.socketOptions(), parent_.transportSocketOptions());
+    // The static cast makes sure we call the base class host() and not
+    // HttpConnPoolImplBase::host which is of a different type.
+    Upstream::Host::CreateConnectionData data =
+        static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)->host()->createConnection(
+            parent.dispatcher(), parent.socketOptions(), parent.transportSocketOptions());
+    initialize(data, parent);
+  }
+
+  void initialize(Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase& parent) {
     real_host_description_ = data.host_description_;
     codec_client_ = parent.createCodecClient(data);
     codec_client_->addConnectionCallbacks(*this);
@@ -90,6 +103,7 @@ public:
          parent_.host()->cluster().stats().upstream_cx_tx_bytes_buffered_,
          &parent_.host()->cluster().stats().bind_errors_, nullptr});
   }
+
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   void onEvent(Network::ConnectionEvent event) override {

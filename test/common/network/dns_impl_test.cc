@@ -705,7 +705,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   // However, the fresh channel initialized by production code does not point to the TestDnsServer.
-  // This means that resolution will return ARES_ENOTFOUND. This should not dirty the channel.
+  // This means that resolution will return `ARES_ENOTFOUND`. This should not dirty the channel.
   EXPECT_FALSE(peer_->isChannelDirty());
 
   // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
