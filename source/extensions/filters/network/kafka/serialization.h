@@ -69,7 +69,7 @@ template <typename T> class IntDeserializer : public Deserializer<T> {
 public:
   uint32_t feed(absl::string_view& data) override {
     const uint32_t available = std::min<uint32_t>(sizeof(buf_) - written_, data.size());
-    memcpy(buf_ + written_, data.data(), available);
+    memcpy(buf_ + written_, data.data(), available); // NOLINT(safe-memcpy)
     written_ += available;
 
     if (written_ == sizeof(buf_)) {
@@ -96,7 +96,7 @@ class Int8Deserializer : public IntDeserializer<int8_t> {
 public:
   int8_t get() const override {
     int8_t result;
-    memcpy(&result, buf_, sizeof(result));
+    SAFE_MEMCPY(&result, buf_);
     return result;
   }
 };
@@ -108,7 +108,7 @@ class Int16Deserializer : public IntDeserializer<int16_t> {
 public:
   int16_t get() const override {
     int16_t result;
-    memcpy(&result, buf_, sizeof(result));
+    SAFE_MEMCPY(&result, buf_);
     return be16toh(result);
   }
 };
@@ -120,7 +120,7 @@ class Int32Deserializer : public IntDeserializer<int32_t> {
 public:
   int32_t get() const override {
     int32_t result;
-    memcpy(&result, buf_, sizeof(result));
+    SAFE_MEMCPY(&result, buf_);
     return be32toh(result);
   }
 };
@@ -132,7 +132,7 @@ class UInt32Deserializer : public IntDeserializer<uint32_t> {
 public:
   uint32_t get() const override {
     uint32_t result;
-    memcpy(&result, buf_, sizeof(result));
+    SAFE_MEMCPY(&result, buf_);
     return be32toh(result);
   }
 };
@@ -144,7 +144,7 @@ class Int64Deserializer : public IntDeserializer<int64_t> {
 public:
   int64_t get() const override {
     int64_t result;
-    memcpy(&result, buf_, sizeof(result));
+    SAFE_MEMCPY(&result, buf_);
     return be64toh(result);
   }
 };
@@ -189,7 +189,7 @@ public:
 
       // Read next byte from input.
       uint8_t el;
-      memcpy(&el, data.data(), sizeof(uint8_t));
+      SAFE_MEMCPY(&el, data.data());
       data = {data.data() + 1, data.size() - 1};
       processed++;
 

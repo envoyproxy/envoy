@@ -116,14 +116,15 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       sockaddr_in sin;
       sin.sin_port = 0;
       sin.sin_family = AF_INET;
-      memcpy(&sin.sin_addr, general_name->d.ip->data, sizeof(sin.sin_addr));
+      memcpy(&sin.sin_addr, general_name->d.ip->data, sizeof(sin.sin_addr)); // NOLINT(safe-memcpy)
       Network::Address::Ipv4Instance addr(&sin);
       san = addr.ip()->addressAsString();
     } else if (general_name->d.ip->length == 16) {
       sockaddr_in6 sin6;
       sin6.sin6_port = 0;
       sin6.sin6_family = AF_INET6;
-      memcpy(&sin6.sin6_addr, general_name->d.ip->data, sizeof(sin6.sin6_addr));
+      memcpy(&sin6.sin6_addr, general_name->d.ip->data, // NOLINT(safe-memcpy)
+             sizeof(sin6.sin6_addr));
       Network::Address::Ipv6Instance addr(sin6);
       san = addr.ip()->addressAsString();
     }

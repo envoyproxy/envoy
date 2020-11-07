@@ -175,7 +175,8 @@ std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
   static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
-  memcpy(static_cast<void*>(&result), static_cast<const void*>(&address_.sin6_addr.s6_addr),
+  memcpy(static_cast<void*>(&result),\ // NOLINT(safe-memcpy)
+         static_cast<const void*>(&address_.sin6_addr.s6_addr),
          sizeof(absl::uint128));
   return result;
 }
@@ -281,7 +282,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
     }
     pipe_.abstract_namespace_ = true;
     pipe_.address_length_ = pipe_path.size();
-    memcpy(&pipe_.address_.sun_path[0], pipe_path.data(), pipe_path.size());
+    memcpy(&pipe_.address_.sun_path[0], pipe_path.data(), pipe_path.size()); // NOLINT(safe-memcpy)
     pipe_.address_.sun_path[0] = '\0';
     pipe_.address_.sun_path[pipe_path.size()] = '\0';
     friendly_name_ = friendlyNameFromAbstractPath(

@@ -183,7 +183,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
 
     absl::uint128 ip6_htonl = Utility::Ip6htonl(ip6);
     static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
-    memcpy(&sa6.sin6_addr.s6_addr, &ip6_htonl, sizeof(absl::uint128));
+    memcpy(&sa6.sin6_addr.s6_addr, &ip6_htonl, sizeof(absl::uint128)); // NOLINT(safe-memcpy)
     return std::make_shared<Ipv6Instance>(sa6);
   }
   }

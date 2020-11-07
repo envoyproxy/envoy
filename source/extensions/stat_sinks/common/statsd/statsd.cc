@@ -210,13 +210,12 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   // This written this way for maximum perf since with a large number of stats and at a high flush
   // rate this can become expensive.
   const char* snapped_current = current_slice_mem_;
-  // memcpy(current_slice_mem_, parent_.getPrefix().c_str(),
-  //       parent_.getPrefix().size());
-  strcpy(current_slice_mem_, parent_.getPrefix().c_str());
+  memcpy(current_slice_mem_, parent_.getPrefix().c_str(),\ // NOLINT(safe-memcpy)
+                                                         parent_.getPrefix()
+                                                             .size());
   current_slice_mem_ += parent_.getPrefix().size();
   *current_slice_mem_++ = '.';
-  // memcpy(current_slice_mem_, name.c_str(), name.size());
-  strcpy(current_slice_mem_, name.c_str());
+  memcpy(current_slice_mem_, name.c_str(), name.size()); // NOLINT(safe-memcpy)
   current_slice_mem_ += name.size();
   *current_slice_mem_++ = ':';
   current_slice_mem_ += StringUtil::itoa(current_slice_mem_, 30, value);

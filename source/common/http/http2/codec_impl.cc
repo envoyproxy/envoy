@@ -751,7 +751,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // to match the ping and ack.
     uint64_t data;
     static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
-    memcpy(&data, frame->ping.opaque_data, sizeof(data));
+    SAFE_MEMCPY(&data, frame->ping.opaque_data);
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
 
     onKeepaliveResponse();

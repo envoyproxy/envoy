@@ -154,7 +154,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
     buffer->reserve(bytes_read, &slice, 1);
     ASSERT(slice.len_ >= bytes_read);
     slice.len_ = bytes_read;
-    memcpy(slice.mem_, iov.iov_base, iov.iov_len);
+    memcpy(slice.mem_, iov.iov_base, iov.iov_len); // NOLINT(safe-memcpy)
     buffer->commit(&slice, 1);
     MarkConsumed(bytes_read);
   }
