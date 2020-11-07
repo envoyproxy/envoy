@@ -4,6 +4,15 @@ virtual_hosts:
   - www.lyft.com
   routes:
     - match:
+        prefix: /disabled
+        runtime_fraction:
+          runtime_key: runtime.key
+          default_value:
+            numerator: 0
+            denominator: HUNDRED
+      route:
+        cluster: www4
+    - match:
         prefix: /
         runtime_fraction:
           runtime_key: runtime.key

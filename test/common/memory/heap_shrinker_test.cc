@@ -2,8 +2,9 @@
 #include "common/memory/heap_shrinker.h"
 #include "common/memory/stats.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -20,14 +21,15 @@ namespace {
 class HeapShrinkerTest : public testing::Test {
 protected:
   HeapShrinkerTest()
-      : api_(Api::createApiForTest(stats_, time_system_)), dispatcher_(*api_, time_system_) {}
+      : api_(Api::createApiForTest(stats_, time_system_)),
+        dispatcher_("test_thread", *api_, time_system_) {}
 
   void step() {
-    time_system_.sleep(std::chrono::milliseconds(10000));
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(10000), dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
   }
 
-  Envoy::Stats::IsolatedStoreImpl stats_;
+  Envoy::Stats::TestUtil::TestStore stats_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
@@ -59,13 +61,13 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
 
   Envoy::Stats::Counter& shrink_count =
       stats_.counter("overload.envoy.overload_actions.shrink_heap.shrink_count");
-  action_cb(Server::OverloadActionState::Active);
+  action_cb(Server::OverloadActionState::saturated());
   step();
   EXPECT_EQ(1, shrink_count.value());
 
   const uint64_t physical_mem_after_shrink =
       Stats::totalCurrentlyReserved() - Stats::totalPageHeapUnmapped();
-#ifdef TCMALLOC
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
   EXPECT_GE(physical_mem_before_shrink, physical_mem_after_shrink);
 #else
   EXPECT_EQ(physical_mem_before_shrink, physical_mem_after_shrink);
@@ -75,7 +77,7 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
   step();
   EXPECT_EQ(2, shrink_count.value());
 
-  action_cb(Server::OverloadActionState::Inactive);
+  action_cb(Server::OverloadActionState::inactive());
   step();
   step();
   EXPECT_EQ(2, shrink_count.value());

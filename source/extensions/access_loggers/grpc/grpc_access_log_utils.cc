@@ -1,5 +1,7 @@
 #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/network/utility.h"
@@ -11,31 +13,31 @@ namespace GrpcCommon {
 
 namespace {
 
-using namespace envoy::data::accesslog::v2;
+using namespace envoy::data::accesslog::v3;
 
 // Helper function to convert from a BoringSSL textual representation of the
 // TLS version to the corresponding enum value used in gRPC access logs.
 TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) {
   if (tls_version == "TLSv1") {
-    return TLSProperties_TLSVersion_TLSv1;
+    return TLSProperties::TLSv1;
   } else if (tls_version == "TLSv1.1") {
-    return TLSProperties_TLSVersion_TLSv1_1;
+    return TLSProperties::TLSv1_1;
   } else if (tls_version == "TLSv1.2") {
-    return TLSProperties_TLSVersion_TLSv1_2;
+    return TLSProperties::TLSv1_2;
   } else if (tls_version == "TLSv1.3") {
-    return TLSProperties_TLSVersion_TLSv1_3;
+    return TLSProperties::TLSv1_3;
   }
 
-  return TLSProperties_TLSVersion_VERSION_UNSPECIFIED;
+  return TLSProperties::VERSION_UNSPECIFIED;
 }
 
 } // namespace
 
 void Utility::responseFlagsToAccessLogResponseFlags(
-    envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
+    envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x40000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x400000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -88,8 +90,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService)) {
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-        envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
-            ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
+        envoy::data::accesslog::v3::ResponseFlags::Unauthorized::EXTERNAL_SERVICE);
   }
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError)) {
@@ -115,12 +116,24 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError)) {
     common_access_log.mutable_response_flags()->set_downstream_protocol_error(true);
   }
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached)) {
+    common_access_log.mutable_response_flags()->set_upstream_max_stream_duration_reached(true);
+  }
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter)) {
+    common_access_log.mutable_response_flags()->set_response_from_cache_filter(true);
+  }
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound)) {
+    common_access_log.mutable_response_flags()->set_no_filter_config_found(true);
+  }
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DurationTimeout)) {
+    common_access_log.mutable_response_flags()->set_duration_timeout(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(
-    envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
+    envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info,
-    const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(

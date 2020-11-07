@@ -1,6 +1,7 @@
 #include "extensions/filters/http/fault/config.h"
 
-#include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/fault/fault_filter.h"
@@ -11,7 +12,7 @@ namespace HttpFilters {
 namespace Fault {
 
 Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::fault::v2::HTTPFault& config,
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   FaultFilterConfigSharedPtr filter_config(new FaultFilterConfig(
       config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));
@@ -22,7 +23,7 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 FaultFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::config::filter::http::fault::v2::HTTPFault& config,
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const Fault::FaultSettings>(config);
 }
@@ -30,7 +31,8 @@ FaultFilterFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the fault filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(FaultFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(FaultFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.fault"};
 
 } // namespace Fault
 } // namespace HttpFilters

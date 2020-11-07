@@ -4,8 +4,8 @@
 #include <list>
 #include <string>
 
-#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 
@@ -64,14 +64,15 @@ static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
  */
 class Utility {
 public:
-  static const std::string TCP_SCHEME;
-  static const std::string UDP_SCHEME;
-  static const std::string UNIX_SCHEME;
+  static constexpr absl::string_view TCP_SCHEME{"tcp://"};
+  static constexpr absl::string_view UDP_SCHEME{"udp://"};
+  static constexpr absl::string_view UNIX_SCHEME{"unix://"};
 
   /**
    * Resolve a URL.
    * @param url supplies the url to resolve.
    * @return Address::InstanceConstSharedPtr the resolved address.
+   * @throw EnvoyException if url is invalid.
    */
   static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
 
@@ -80,21 +81,21 @@ public:
    * @param url supplies the URL to match.
    * @return bool true if the URL matches the TCP scheme, false otherwise.
    */
-  static bool urlIsTcpScheme(const std::string& url);
+  static bool urlIsTcpScheme(absl::string_view url);
 
   /**
    * Match a URL to the UDP scheme
    * @param url supplies the URL to match.
    * @return bool true if the URL matches the UDP scheme, false otherwise.
    */
-  static bool urlIsUdpScheme(const std::string& url);
+  static bool urlIsUdpScheme(absl::string_view url);
 
   /**
    * Match a URL to the Unix scheme
    * @param url supplies the Unix to match.
    * @return bool true if the URL matches the Unix scheme, false otherwise.
    */
-  static bool urlIsUnixScheme(const std::string& url);
+  static bool urlIsUnixScheme(absl::string_view url);
 
   /**
    * Parses the host from a TCP URL
@@ -168,7 +169,7 @@ public:
    * Determine whether this is a local connection.
    * @return bool the address is a local connection.
    */
-  static bool isLocalConnection(const ConnectionSocket& socket);
+  static bool isSameIpOrLoopback(const ConnectionSocket& socket);
 
   /**
    * Determine whether this is an internal (RFC1918) address.
@@ -229,13 +230,13 @@ public:
                                                             uint32_t port);
 
   /**
-   * Retrieve the original destination address from an accepted fd.
+   * Retrieve the original destination address from an accepted socket.
    * The address (IP and port) may be not local and the port may differ from
    * the listener port if the packets were redirected using iptables
-   * @param fd is the descriptor returned by accept()
+   * @param sock is accepted socket
    * @return the original destination or nullptr if not available.
    */
-  static Address::InstanceConstSharedPtr getOriginalDst(int fd);
+  static Address::InstanceConstSharedPtr getOriginalDst(Socket& sock);
 
   /**
    * Parses a string containing a comma-separated list of port numbers and/or
@@ -270,7 +271,7 @@ public:
   static absl::uint128 Ip6htonl(const absl::uint128& address);
 
   static Address::InstanceConstSharedPtr
-  protobufAddressToAddress(const envoy::api::v2::core::Address& proto_address);
+  protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address);
 
   /**
    * Copies the address instance into the protobuf representation of an address.
@@ -278,7 +279,7 @@ public:
    * @param proto_address is the protobuf address to which the address instance is copied into.
    */
   static void addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::api::v2::core::Address& proto_address);
+                                       envoy::config::core::v3::Address& proto_address);
 
   /**
    * Returns socket type corresponding to SocketAddress.protocol value of the
@@ -286,8 +287,8 @@ public:
    * @param proto_address the address protobuf
    * @return socket type
    */
-  static Address::SocketType
-  protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address);
+  static Socket::Type
+  protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address);
 
   /**
    * Send a packet via given UDP socket with specific source address.
@@ -342,7 +343,7 @@ public:
                                                TimeSource& time_source, uint32_t& packets_dropped);
 
 private:
-  static void throwWithMalformedIp(const std::string& ip_address);
+  static void throwWithMalformedIp(absl::string_view ip_address);
 
   /**
    * Takes a number and flips the order in byte chunks. The last byte of the input will be the

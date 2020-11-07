@@ -1,36 +1,12 @@
+#include <memory>
+
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "test/integration/integration.h"
+#include "test/test_common/network_utility.h"
 
 namespace Envoy {
 namespace {
-
-/**
- * A synchronous UDP client used for testing.
- */
-class UdpSyncClient {
-public:
-  UdpSyncClient(Network::Address::IpVersion version)
-      : socket_(std::make_unique<Network::UdpListenSocket>(
-            Network::Test::getCanonicalLoopbackAddress(version), nullptr, true)) {
-    // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
-    // modification black to the abstraction layer so it will work for multiple platforms.
-    RELEASE_ASSERT(fcntl(socket_->ioHandle().fd(), F_SETFL, 0) != -1, "");
-  }
-
-  void write(const std::string& buffer, const Network::Address::Instance& peer) {
-    const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
-                                                    nullptr, peer);
-    ASSERT_EQ(rc.rc_, buffer.length());
-  }
-
-  void recv(Network::UdpRecvData& datagram) {
-    const auto rc =
-        Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(), datagram);
-    ASSERT_TRUE(rc.ok());
-  }
-
-private:
-  const Network::SocketPtr socket_;
-};
 
 class UdpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
@@ -38,13 +14,14 @@ public:
   UdpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), configToUse()) {}
 
   static std::string configToUse() {
-    return ConfigHelper::BASE_UDP_LISTENER_CONFIG + R"EOF(
+    return absl::StrCat(ConfigHelper::baseUdpListenerConfig(), R"EOF(
     listener_filters:
-      name: envoy.filters.udp_listener.udp_proxy
+      name: udp_proxy
       typed_config:
-        '@type': type.googleapis.com/envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+        stat_prefix: foo
         cluster: cluster_0
-      )EOF";
+      )EOF");
   }
 
   void setup(uint32_t upstream_count) {
@@ -52,28 +29,26 @@ public:
     if (upstream_count > 1) {
       setDeterministic();
       setUpstreamCount(upstream_count);
-      config_helper_.addConfigModifier([upstream_count](
-                                           envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-        for (uint32_t i = 1; i < upstream_count; i++) {
-          auto* new_host = bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
-          new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
-        }
-      });
+      config_helper_.addConfigModifier(
+          [upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+            for (uint32_t i = 1; i < upstream_count; i++) {
+              bootstrap.mutable_static_resources()
+                  ->mutable_clusters(0)
+                  ->mutable_load_assignment()
+                  ->mutable_endpoints(0)
+                  ->add_lb_endpoints()
+                  ->mutable_endpoint()
+                  ->MergeFrom(ConfigHelper::buildEndpoint(
+                      Network::Test::getLoopbackAddressString(GetParam())));
+            }
+          });
     }
     BaseIntegrationTest::initialize();
   }
 
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address) {
     // Send datagram to be proxied.
-    UdpSyncClient client(version_);
+    Network::Test::UdpSyncPeer client(version_);
     client.write("hello", listener_address);
 
     // Wait for the upstream datagram.
@@ -82,17 +57,42 @@ public:
     EXPECT_EQ("hello", request_datagram.buffer_->toString());
 
     // Respond from the upstream.
-    fake_upstreams_[0]->sendUdpDatagram("world", *request_datagram.addresses_.peer_);
+    fake_upstreams_[0]->sendUdpDatagram("world1", request_datagram.addresses_.peer_);
     Network::UdpRecvData response_datagram;
     client.recv(response_datagram);
-    EXPECT_EQ("world", response_datagram.buffer_->toString());
+    EXPECT_EQ("world1", response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
+
+    EXPECT_EQ(5, test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
+    EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
+    EXPECT_EQ(5, test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
+
+    EXPECT_EQ(6, test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
+    // The stat is incremented after the send so there is a race condition and we must wait for
+    // the counter to be incremented.
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", 6);
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
+
+    EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_total")->value());
+    EXPECT_EQ(1, test_server_->gauge("udp.foo.downstream_sess_active")->value());
   }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+// Make sure that we gracefully fail if the user does not configure reuse port and concurrency is
+// > 1.
+TEST_P(UdpProxyIntegrationTest, NoReusePort) {
+  concurrency_ = 2;
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+  setup(1);
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
 
 // Basic loopback test.
 TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
@@ -111,20 +111,20 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
   Network::Address::InstanceConstSharedPtr listener_address;
   if (version_ == Network::Address::IpVersion::v4) {
     // Kernel regards any 127.x.x.x as local address.
-    listener_address.reset(new Network::Address::Ipv4Instance(
-#ifndef __APPLE__
-        "127.0.0.3",
-#else
+    listener_address = std::make_shared<Network::Address::Ipv4Instance>(
+#if defined(__APPLE__) || defined(WIN32)
         "127.0.0.1",
+#else
+        "127.0.0.3",
 #endif
-        port));
+        port);
   } else {
     // IPv6 doesn't allow any non-local source address for sendmsg. And the only
     // local address guaranteed in tests in loopback. Unfortunately, even if it's not
     // specified, kernel will pick this address as source address. So this test
     // only checks if IoSocketHandle::sendmsg() sets up CMSG_DATA correctly,
     // i.e. cmsg_len is big enough when that code path is executed.
-    listener_address.reset(new Network::Address::Ipv6Instance("::1", port));
+    listener_address = std::make_shared<Network::Address::Ipv6Instance>("::1", port);
   }
 
   requestResponseWithListenerAddress(*listener_address);
@@ -137,10 +137,10 @@ TEST_P(UdpProxyIntegrationTest, MultipleClients) {
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
-  UdpSyncClient client1(version_);
+  Network::Test::UdpSyncPeer client1(version_);
   client1.write("client1_hello", *listener_address);
 
-  UdpSyncClient client2(version_);
+  Network::Test::UdpSyncPeer client2(version_);
   client2.write("client2_hello", *listener_address);
   client2.write("client2_hello_2", *listener_address);
 
@@ -158,9 +158,8 @@ TEST_P(UdpProxyIntegrationTest, MultipleClients) {
   EXPECT_NE(*client1_request_datagram.addresses_.peer_, *client2_request_datagram.addresses_.peer_);
 
   // Send two datagrams back to client 2.
-  fake_upstreams_[0]->sendUdpDatagram("client2_world", *client2_request_datagram.addresses_.peer_);
-  fake_upstreams_[0]->sendUdpDatagram("client2_world_2",
-                                      *client2_request_datagram.addresses_.peer_);
+  fake_upstreams_[0]->sendUdpDatagram("client2_world", client2_request_datagram.addresses_.peer_);
+  fake_upstreams_[0]->sendUdpDatagram("client2_world_2", client2_request_datagram.addresses_.peer_);
   Network::UdpRecvData response_datagram;
   client2.recv(response_datagram);
   EXPECT_EQ("client2_world", response_datagram.buffer_->toString());
@@ -168,7 +167,7 @@ TEST_P(UdpProxyIntegrationTest, MultipleClients) {
   EXPECT_EQ("client2_world_2", response_datagram.buffer_->toString());
 
   // Send 1 datagram back to client 1.
-  fake_upstreams_[0]->sendUdpDatagram("client1_world", *client1_request_datagram.addresses_.peer_);
+  fake_upstreams_[0]->sendUdpDatagram("client1_world", client1_request_datagram.addresses_.peer_);
   client1.recv(response_datagram);
   EXPECT_EQ("client1_world", response_datagram.buffer_->toString());
 }
@@ -181,7 +180,7 @@ TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
-  UdpSyncClient client(version_);
+  Network::Test::UdpSyncPeer client(version_);
   client.write("hello1", *listener_address);
   client.write("hello2", *listener_address);
   Network::UdpRecvData request_datagram;
@@ -190,8 +189,8 @@ TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("hello2", request_datagram.buffer_->toString());
 
-  fake_upstreams_[0]->sendUdpDatagram("world1", *request_datagram.addresses_.peer_);
-  fake_upstreams_[0]->sendUdpDatagram("world2", *request_datagram.addresses_.peer_);
+  fake_upstreams_[0]->sendUdpDatagram("world1", request_datagram.addresses_.peer_);
+  fake_upstreams_[0]->sendUdpDatagram("world2", request_datagram.addresses_.peer_);
   Network::UdpRecvData response_datagram;
   client.recv(response_datagram);
   EXPECT_EQ("world1", response_datagram.buffer_->toString());

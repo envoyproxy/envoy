@@ -1,12 +1,12 @@
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
 #include "extensions/filters/network/well_known_names.h"
-
-#include "include/sqlparser/SQLParser.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +14,7 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 MySQLFilterConfig::MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
-    : scope_(scope), stat_prefix_(stat_prefix), stats_(generateStats(stat_prefix, scope)) {}
+    : scope_(scope), stats_(generateStats(stat_prefix, scope)) {}
 
 MySQLFilter::MySQLFilter(MySQLFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
@@ -44,7 +44,7 @@ Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool) {
 
 void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   // Clear dynamic metadata.
-  envoy::api::v2::core::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   auto& metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
@@ -103,38 +103,22 @@ void MySQLFilter::onCommand(Command& command) {
   }
 
   // Parse a given query
-  hsql::SQLParserResult result;
-  hsql::SQLParser::parse(command.getData(), &result);
+  envoy::config::core::v3::Metadata& dynamic_metadata =
+      read_callbacks_->connection().streamInfo().dynamicMetadata();
+  ProtobufWkt::Struct metadata(
+      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
+
+  auto result = Common::SQLUtils::SQLUtils::setMetadata(command.getData(),
+                                                        decoder_->getAttributes(), metadata);
 
   ENVOY_CONN_LOG(trace, "mysql_proxy: query processed {}", read_callbacks_->connection(),
                  command.getData());
 
-  if (!result.isValid()) {
+  if (!result) {
     config_->stats_.queries_parse_error_.inc();
     return;
   }
   config_->stats_.queries_parsed_.inc();
-
-  // Set dynamic metadata
-  envoy::api::v2::core::Metadata& dynamic_metadata =
-      read_callbacks_->connection().streamInfo().dynamicMetadata();
-  ProtobufWkt::Struct metadata(
-      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
-  auto& fields = *metadata.mutable_fields();
-
-  for (auto i = 0u; i < result.size(); ++i) {
-    if (result.getStatement(i)->type() == hsql::StatementType::kStmtShow) {
-      continue;
-    }
-    hsql::TableAccessMap table_access_map;
-    result.getStatement(i)->tablesAccessed(table_access_map);
-    for (auto& it : table_access_map) {
-      auto& operations = *fields[it.first].mutable_list_value();
-      for (const auto& ot : it.second) {
-        operations.add_values()->set_string_value(ot);
-      }
-    }
-  }
 
   read_callbacks_->connection().streamInfo().setDynamicMetadata(
       NetworkFilterNames::get().MySQLProxy, metadata);

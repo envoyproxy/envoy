@@ -1,0 +1,6 @@
+config {
+  name: "envoy.router"
+  typed_config {
+    type_url: "envoy.extensions.filters.http.router.v3.Router"
+  }
+}

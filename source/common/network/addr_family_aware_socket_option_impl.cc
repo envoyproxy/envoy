@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -12,36 +13,10 @@ namespace Envoy {
 namespace Network {
 
 namespace {
-Address::IpVersion getVersionFromAddress(Address::InstanceConstSharedPtr addr) {
-  if (addr->ip() != nullptr) {
-    return addr->ip()->version();
-  }
-  throw EnvoyException("Unable to set socket option on non-IP sockets");
-}
 
-absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
-  try {
-    // We have local address when the socket is used in a listener but have to
-    // infer the IP from the socket FD when initiating connections.
-    // TODO(htuch): Figure out a way to obtain a consistent interface for IP
-    // version from socket.
-    if (socket.localAddress()) {
-      return {getVersionFromAddress(socket.localAddress())};
-    } else {
-      return {getVersionFromAddress(Address::addressFromFd(socket.ioHandle().fd()))};
-    }
-  } catch (const EnvoyException&) {
-    // Ignore, we get here because we failed in getsockname().
-    // TODO(htuch): We should probably clean up this logic to avoid relying on exceptions.
-  }
-
-  return absl::nullopt;
-}
-
-absl::optional<std::reference_wrapper<SocketOptionImpl>>
-getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
-                   SocketOptionImpl& ipv6_option) {
-  auto version = getVersionFromSocket(socket);
+SocketOptionImplOptRef getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
+                                          SocketOptionImpl& ipv6_option) {
+  auto version = socket.ipVersion();
   if (!version.has_value()) {
     return absl::nullopt;
   }
@@ -62,12 +37,12 @@ getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
 } // namespace
 
 bool AddrFamilyAwareSocketOptionImpl::setOption(
-    Socket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
+    Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
   return setIpSocketOption(socket, state, ipv4_option_, ipv6_option_);
 }
 
 absl::optional<Socket::Option::Details> AddrFamilyAwareSocketOptionImpl::getOptionDetails(
-    const Socket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
+    const Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
   auto option = getOptionForSocket(socket, *ipv4_option_, *ipv6_option_);
 
   if (!option.has_value()) {
@@ -78,7 +53,7 @@ absl::optional<Socket::Option::Details> AddrFamilyAwareSocketOptionImpl::getOpti
 }
 
 bool AddrFamilyAwareSocketOptionImpl::setIpSocketOption(
-    Socket& socket, envoy::api::v2::core::SocketOption::SocketState state,
+    Socket& socket, envoy::config::core::v3::SocketOption::SocketState state,
     const std::unique_ptr<SocketOptionImpl>& ipv4_option,
     const std::unique_ptr<SocketOptionImpl>& ipv6_option) {
   auto option = getOptionForSocket(socket, *ipv4_option, *ipv6_option);

@@ -6,4 +6,4 @@ Observability
 
   statistics
   application_logging
-  access_log
+  access_log/access_log.rst

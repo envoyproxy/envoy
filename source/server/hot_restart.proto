@@ -33,6 +33,13 @@ message HotRestartMessage {
     message ShutdownAdmin {
       uint64 original_start_time_unix_seconds = 1;
     }
+    message Span {
+      uint32 first = 1;
+      uint32 last = 2; // inclusive
+    }
+    message RepeatedSpan {
+      repeated Span spans = 1;
+    }
     message Stats {
       // Values for server_stats, which don't fit with the "combination logic" approach.
       uint64 memory_allocated = 1;
@@ -46,6 +53,13 @@ message HotRestartMessage {
       map<string, uint64> counter_deltas = 3;
       // The parent's current values for various gauges in its stats store.
       map<string, uint64> gauges = 4;
+      // Maps the string representation of a StatName into an array of Spans,
+      // which indicate which of the StatName tokens are dynamic. For example,
+      // if we are recording a counter or gauge named "a.b.c.d.e.f", where "a",
+      // and "d.e" were created from a StatNameDynamicPool, then we'd map
+      // "a.b.c.d.e.f" to the span array [[0,0], [3,4]], where the [0,0] span
+      // covers the "a", and the [3,4] span covers "d.e".
+      map<string, RepeatedSpan> dynamics = 5;
     }
     oneof reply {
       // When this oneof is of the PassListenSocketReply type, there is a special

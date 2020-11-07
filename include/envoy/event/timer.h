@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/event/schedulable_cb.h"
 
 namespace Envoy {
 
@@ -39,9 +40,18 @@ public:
    * @param ms supplies the duration of the alarm in milliseconds.
    * @param object supplies an optional scope for the duration of the alarm.
    */
-  virtual void enableTimer(const std::chrono::milliseconds& ms,
+  virtual void enableTimer(std::chrono::milliseconds ms,
                            const ScopeTrackedObject* object = nullptr) PURE;
 
+  /**
+   * Enable a pending high resolution timeout. If a timeout is already pending, it will be reset to
+   * the new timeout.
+   *
+   * @param us supplies the duration of the alarm in microseconds.
+   * @param object supplies an optional scope for the duration of the alarm.
+   */
+  virtual void enableHRTimer(std::chrono::microseconds us,
+                             const ScopeTrackedObject* object = nullptr) PURE;
   /**
    * Return whether the timer is currently armed.
    */
@@ -71,12 +81,17 @@ public:
   ~TimeSystem() override = default;
 
   using Duration = MonotonicTime::duration;
+  using Nanoseconds = std::chrono::nanoseconds;
+  using Microseconds = std::chrono::microseconds;
+  using Milliseconds = std::chrono::milliseconds;
+  using Seconds = std::chrono::seconds;
 
   /**
    * Creates a timer factory. This indirection enables thread-local timer-queue management,
    * so servers can have a separate timer-factory in each thread.
    */
-  virtual SchedulerPtr createScheduler(Scheduler& base_scheduler) PURE;
+  virtual SchedulerPtr createScheduler(Scheduler& base_scheduler,
+                                       CallbackScheduler& cb_scheduler) PURE;
 };
 
 } // namespace Event

@@ -11,8 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
@@ -56,15 +55,14 @@ public:
                             ThreadLocal::SlotAllocator& tls,
                             Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                            AccessLog::AccessLogManager& log_manager,
+                            Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
                             const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                             Singleton::Manager& singleton_manager,
                             Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
       : cluster_manager_(cluster_manager), stats_(stats), tls_(tls),
         dns_resolver_(std::move(dns_resolver)), ssl_context_manager_(ssl_context_manager),
-        runtime_(runtime), random_(random), dispatcher_(dispatcher), log_manager_(log_manager),
+        runtime_(runtime), dispatcher_(dispatcher), log_manager_(log_manager),
         local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager),
         outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api),
         validation_visitor_(validation_visitor), api_(api) {}
@@ -75,7 +73,6 @@ public:
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
   Runtime::Loader& runtime() override { return runtime_; }
-  Runtime::RandomGenerator& random() override { return random_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   AccessLog::AccessLogManager& logManager() override { return log_manager_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
@@ -95,7 +92,6 @@ private:
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   AccessLog::AccessLogManager& log_manager_;
   const LocalInfo::LocalInfo& local_info_;
@@ -118,10 +114,10 @@ public:
    * Static method to get the registered cluster factory and create an instance of cluster.
    */
   static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(const envoy::api::v2::Cluster& cluster, ClusterManager& cluster_manager,
+  create(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
          Stats::Store& stats, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
-         Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
          Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
@@ -130,13 +126,15 @@ public:
   /**
    * Create a dns resolver to be used by the cluster.
    */
-  Network::DnsResolverSharedPtr selectDnsResolver(const envoy::api::v2::Cluster& cluster,
-                                                  ClusterFactoryContext& context);
+  Network::DnsResolverSharedPtr
+  selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context);
 
   // Upstream::ClusterFactory
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context) override;
-  std::string name() override { return name_; }
+  create(const envoy::config::cluster::v3::Cluster& cluster,
+         ClusterFactoryContext& context) override;
+  std::string name() const override { return name_; }
 
 protected:
   ClusterFactoryImplBase(const std::string& name) : name_(name) {}
@@ -145,10 +143,10 @@ private:
   /**
    * Create an instance of ClusterImplBase.
    */
-  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) PURE;
+  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) PURE;
   const std::string name_;
 };
 
@@ -169,10 +167,10 @@ protected:
   ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override {
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     Config::Utility::translateOpaqueConfig(
         cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(),
@@ -184,9 +182,9 @@ private:
   }
 
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterWithConfig(
-      const envoy::api::v2::Cluster& cluster, const ConfigProto& proto_config,
+      const envoy::config::cluster::v3::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) PURE;
 };
 

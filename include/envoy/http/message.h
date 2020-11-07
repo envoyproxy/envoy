@@ -12,31 +12,30 @@ namespace Http {
 /**
  * Wraps an HTTP message including its headers, body, and any trailers.
  */
-class Message {
+template <class HeaderType, class TrailerType> class Message {
 public:
   virtual ~Message() = default;
 
   /**
-   * @return HeaderMap& the message headers.
+   * @return HeaderType& the message headers.
    */
-  virtual HeaderMap& headers() PURE;
+  virtual HeaderType& headers() PURE;
 
   /**
-   * @return Buffer::InstancePtr& the message body, if any. Callers are free to reallocate, remove,
-   *         etc. the body.
+   * @return Buffer::Instance the message body, if any. Callers are free to modify the body.
    */
-  virtual Buffer::InstancePtr& body() PURE;
+  virtual Buffer::Instance& body() PURE;
 
   /**
-   * @return HeaderMap* the message trailers, if any.
+   * @return TrailerType* the message trailers, if any.
    */
-  virtual HeaderMap* trailers() PURE;
+  virtual TrailerType* trailers() PURE;
 
   /**
    * Set the trailers.
    * @param trailers supplies the new trailers.
    */
-  virtual void trailers(HeaderMapPtr&& trailers) PURE;
+  virtual void trailers(std::unique_ptr<TrailerType>&& trailers) PURE;
 
   /**
    * @return std::string the message body as a std::string.
@@ -44,7 +43,10 @@ public:
   virtual std::string bodyAsString() const PURE;
 };
 
-using MessagePtr = std::unique_ptr<Message>;
+using RequestMessage = Message<RequestHeaderMap, RequestTrailerMap>;
+using RequestMessagePtr = std::unique_ptr<RequestMessage>;
+using ResponseMessage = Message<ResponseHeaderMap, ResponseTrailerMap>;
+using ResponseMessagePtr = std::unique_ptr<ResponseMessage>;
 
 } // namespace Http
 } // namespace Envoy

@@ -1,3 +1,5 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
@@ -7,6 +9,7 @@
 #include "gtest/gtest.h"
 
 using testing::Combine;
+using testing::HasSubstr;
 using ::testing::TestParamInfo;
 using testing::Values;
 
@@ -19,11 +22,11 @@ class ThriftConnManagerIntegrationTest
     : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool>>,
       public BaseThriftIntegrationTest {
 public:
-  static void SetUpTestSuite() {
-    thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    thrift_config_ = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
-        - name: envoy.filters.network.thrift_proxy
+        - name: thrift
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
             stat_prefix: thrift_stats
@@ -61,7 +64,7 @@ public:
                     method_name: "poke"
                   route:
                     cluster: "cluster_3"
-      )EOF";
+      )EOF");
   }
 
   void initializeCall(DriverMode mode) {
@@ -108,20 +111,15 @@ public:
   void initializeCommon() {
     setUpstreamCount(4);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       for (int i = 1; i < 4; i++) {
         auto* c = bootstrap.mutable_static_resources()->add_clusters();
         c->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        c->set_name(fmt::format("cluster_{}", i));
+        c->set_name(absl::StrCat("cluster_", i));
       }
     });
 
     BaseThriftIntegrationTest::initialize();
-  }
-
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
 protected:
@@ -177,7 +175,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
   initializeCall(DriverMode::Success);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeRawConnectionPtr fake_upstream_connection;
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
@@ -204,7 +202,7 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
   initializeCall(DriverMode::IDLException);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -231,7 +229,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
   initializeCall(DriverMode::Exception);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -261,10 +259,9 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
-  expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(partial_request);
+  ASSERT_TRUE(tcp_client->write(partial_request));
   tcp_client->close();
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -286,7 +283,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(partial_request);
+  ASSERT_TRUE(tcp_client->write(partial_request));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -301,11 +298,42 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
   EXPECT_EQ(1U, counter->value());
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/9037.
+TEST_P(ThriftConnManagerIntegrationTest, EarlyUpstreamClose) {
+  initializeCall(DriverMode::Success);
+
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
+
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
+  EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  tcp_client->waitForDisconnect();
+
+  EXPECT_THAT(tcp_client->data(), HasSubstr("connection failure"));
+
+  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("thrift.thrift_stats.response_exception");
+  EXPECT_EQ(1U, counter->value());
+}
+
 TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   initializeOneway();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(true);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -326,7 +354,7 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClose) {
   initializeOneway();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
   tcp_client->close();
 
   FakeUpstream* expected_upstream = getExpectedUpstream(true);
@@ -348,10 +376,9 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 1);
 
   FakeUpstream* expected_upstream = getExpectedUpstream(true);
-  expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(partial_request);
+  ASSERT_TRUE(tcp_client->write(partial_request));
   tcp_client->close();
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -386,13 +413,13 @@ TEST_P(ThriftTwitterConnManagerIntegrationTest, Success) {
 
   // Upgrade request/response happens without an upstream.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(upgrade_request_bytes.toString());
+  ASSERT_TRUE(tcp_client->write(upgrade_request_bytes.toString()));
   tcp_client->waitForData(upgrade_response_bytes.toString());
   EXPECT_TRUE(
       TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), upgrade_response_bytes));
 
   // First real request triggers upstream connection.
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
   FakeRawConnectionPtr fake_upstream_connection;
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));

@@ -5,7 +5,6 @@
 #include "server/config_validation/async_client.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
@@ -13,7 +12,7 @@ namespace Http {
 namespace {
 
 TEST(ValidationAsyncClientTest, MockedMethods) {
-  MessagePtr message{new RequestMessageImpl()};
+  RequestMessagePtr message{new RequestMessageImpl()};
   MockAsyncClientCallbacks callbacks;
   MockAsyncClientStreamCallbacks stream_callbacks;
 

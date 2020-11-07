@@ -44,7 +44,7 @@ public:
    * @return const Http::HeaderMap* the incoming headers or nullptr to use during load
    * balancing.
    */
-  virtual const Http::HeaderMap* downstreamHeaders() const PURE;
+  virtual const Http::RequestHeaderMap* downstreamHeaders() const PURE;
 
   /**
    * Called to retrieve a reference to the priority load data that should be used when selecting a
@@ -53,12 +53,13 @@ public:
    *
    * @param priority_state current priority state of the cluster being being load balanced.
    * @param original_priority_load the cached priority load for the cluster being load balanced.
+   * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return a reference to the priority load data that should be used to select a priority.
    *
    */
-  virtual const HealthyAndDegradedLoad&
-  determinePriorityLoad(const PrioritySet& priority_set,
-                        const HealthyAndDegradedLoad& original_priority_load) PURE;
+  virtual const HealthyAndDegradedLoad& determinePriorityLoad(
+      const PrioritySet& priority_set, const HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
 
   /**
    * Called to determine whether we should reperform host selection. The load balancer
@@ -98,6 +99,14 @@ public:
    *        is missing and use sensible defaults.
    */
   virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
+
+  /**
+   * Returns a best effort prediction of the next host to be picked, or nullptr if not predictable.
+   * Advances with subsequent calls, so while the first call will return the next host to be picked,
+   * a subsequent call will return the second host to be picked.
+   * @param context supplies the context which is used in host selection.
+   */
+  virtual HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) PURE;
 };
 
 using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;

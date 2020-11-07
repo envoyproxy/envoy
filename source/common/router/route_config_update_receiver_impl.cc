@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/api/v2/route/route.pb.validate.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -12,69 +13,87 @@
 namespace Envoy {
 namespace Router {
 
-bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const envoy::api::v2::RouteConfiguration& rc,
-                                                const std::string& version_info) {
+bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
+    const envoy::config::route::v3::RouteConfiguration& rc, const std::string& version_info) {
   const uint64_t new_hash = MessageUtil::hash(rc);
   if (new_hash == last_config_hash_) {
     return false;
   }
-
   route_config_proto_ = rc;
   last_config_hash_ = new_hash;
-  last_config_version_ = version_info;
-  last_updated_ = time_source_.systemTime();
-  initializeVhosts(route_config_proto_);
-  config_info_.emplace(RouteConfigProvider::ConfigInfo{route_config_proto_, last_config_version_});
+  const uint64_t new_vhds_config_hash = rc.has_vhds() ? MessageUtil::hash(rc.vhds()) : 0ul;
+  vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
+  last_vhds_config_hash_ = new_vhds_config_hash;
+  initializeRdsVhosts(route_config_proto_);
+  onUpdateCommon(route_config_proto_, version_info);
   return true;
 }
 
+void RouteConfigUpdateReceiverImpl::onUpdateCommon(
+    const envoy::config::route::v3::RouteConfiguration& rc, const std::string& version_info) {
+  last_config_version_ = version_info;
+  last_updated_ = time_source_.systemTime();
+  rebuildRouteConfig(rds_virtual_hosts_, vhds_virtual_hosts_, route_config_proto_);
+  config_info_.emplace(RouteConfigProvider::ConfigInfo{rc, last_config_version_});
+}
+
 bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const VirtualHostRefVector& added_vhosts, const std::set<std::string>& added_resource_ids,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-  removeVhosts(virtual_hosts_, removed_resources);
-  updateVhosts(virtual_hosts_, added_resources);
-  rebuildRouteConfig(virtual_hosts_, route_config_proto_);
-
-  return onRdsUpdate(route_config_proto_, version_info);
+  resource_ids_in_last_update_ = added_resource_ids;
+  const bool removed = removeVhosts(vhds_virtual_hosts_, removed_resources);
+  const bool updated = updateVhosts(vhds_virtual_hosts_, added_vhosts);
+  onUpdateCommon(route_config_proto_, version_info);
+  return removed || updated || !resource_ids_in_last_update_.empty();
 }
 
-void RouteConfigUpdateReceiverImpl::initializeVhosts(
-    const envoy::api::v2::RouteConfiguration& route_configuration) {
-  virtual_hosts_.clear();
+void RouteConfigUpdateReceiverImpl::initializeRdsVhosts(
+    const envoy::config::route::v3::RouteConfiguration& route_configuration) {
+  rds_virtual_hosts_.clear();
   for (const auto& vhost : route_configuration.virtual_hosts()) {
-    virtual_hosts_.emplace(vhost.name(), vhost);
+    rds_virtual_hosts_.emplace(vhost.name(), vhost);
   }
 }
 
-void RouteConfigUpdateReceiverImpl::removeVhosts(
-    std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+bool RouteConfigUpdateReceiverImpl::removeVhosts(
+    std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
+  bool vhosts_removed = false;
   for (const auto& vhost_name : removed_vhost_names) {
-    vhosts.erase(vhost_name);
+    auto found = vhosts.find(vhost_name);
+    if (found != vhosts.end()) {
+      vhosts_removed = true;
+      vhosts.erase(vhost_name);
+    }
   }
+  return vhosts_removed;
 }
 
-void RouteConfigUpdateReceiverImpl::updateVhosts(
-    std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
-  for (const auto& resource : added_resources) {
-    envoy::api::v2::route::VirtualHost vhost =
-        MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource.resource());
-    MessageUtil::validate(vhost, validation_visitor_);
-    auto found = vhosts.find(vhost.name());
+bool RouteConfigUpdateReceiverImpl::updateVhosts(
+    std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
+    const VirtualHostRefVector& added_vhosts) {
+  bool vhosts_added = false;
+  for (const auto& vhost : added_vhosts) {
+    auto found = vhosts.find(vhost.get().name());
     if (found != vhosts.end()) {
       vhosts.erase(found);
     }
-    vhosts.emplace(vhost.name(), vhost);
+    vhosts.emplace(vhost.get().name(), vhost.get());
+    vhosts_added = true;
   }
+  return vhosts_added;
 }
 
 void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
-    const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
-    envoy::api::v2::RouteConfiguration& route_config) {
+    const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
+    const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
+    envoy::config::route::v3::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
-  for (const auto& vhost : vhosts) {
+  for (const auto& vhost : rds_vhosts) {
+    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+  }
+  for (const auto& vhost : vhds_vhosts) {
     route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
   }
 }

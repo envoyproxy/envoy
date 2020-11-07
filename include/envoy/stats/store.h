@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
@@ -37,6 +38,11 @@ public:
    * @return a list of all known gauges.
    */
   virtual std::vector<GaugeSharedPtr> gauges() const PURE;
+
+  /**
+   * @return a list of all known text readouts.
+   */
+  virtual std::vector<TextReadoutSharedPtr> textReadouts() const PURE;
 
   /**
    * @return a list of all known histograms.
@@ -72,6 +78,12 @@ public:
    * @param stats_matcher a StatsMatcher to attach to this StoreRoot.
    */
   virtual void setStatsMatcher(StatsMatcherPtr&& stats_matcher) PURE;
+
+  /**
+   * Attach a HistogramSettings to this StoreRoot to generate histogram configurations
+   * according to some ruleset.
+   */
+  virtual void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have

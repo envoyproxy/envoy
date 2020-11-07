@@ -5,16 +5,24 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::_;
+using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Network {
@@ -29,63 +37,62 @@ bool addressesEqual(const InstanceConstSharedPtr& a, const Instance& b) {
   }
 }
 
-void makeFdBlocking(int fd) {
-  const int flags = ::fcntl(fd, F_GETFL, 0);
-  ASSERT_GE(flags, 0);
-  ASSERT_EQ(::fcntl(fd, F_SETFL, flags & (~O_NONBLOCK)), 0);
-}
-
 void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6only) {
   auto addr_port = Network::Utility::parseInternetAddressAndPort(
       fmt::format("{}:0", Network::Test::getAnyAddressUrlString(ip_version)), v6only);
   ASSERT_NE(addr_port, nullptr);
 
   if (addr_port->ip()->port() == 0) {
-    addr_port = Network::Test::findOrCheckFreePort(addr_port, SocketType::Stream);
+    addr_port = Network::Test::findOrCheckFreePort(addr_port, Socket::Type::Stream);
   }
   ASSERT_NE(addr_port, nullptr);
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  IoHandlePtr io_handle = addr_port->socket(SocketType::Stream);
-  ASSERT_GE(io_handle->fd(), 0) << addr_port->asString();
+  SocketImpl sock(Socket::Type::Stream, addr_port);
+  EXPECT_TRUE(sock.ioHandle().isOpen()) << addr_port->asString();
 
   // Check that IPv6 sockets accept IPv6 connections only.
   if (addr_port->ip()->version() == IpVersion::v6) {
     int socket_v6only = 0;
     socklen_t size_int = sizeof(socket_v6only);
-    ASSERT_GE(::getsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int),
-              0);
-    EXPECT_EQ(v6only, socket_v6only);
+    ASSERT_GE(sock.getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int).rc_, 0);
+    EXPECT_EQ(v6only, socket_v6only != 0);
   }
 
   // Bind the socket to the desired address and port.
-  const Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
-  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+  const Api::SysCallIntResult result = sock.bind(addr_port);
+  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
                            << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
-  ASSERT_EQ(::listen(io_handle->fd(), 128), 0);
+  ASSERT_EQ(sock.listen(128).rc_, 0);
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    IoHandlePtr client_handle = addr_port->socket(SocketType::Stream);
-    ASSERT_GE(client_handle->fd(), 0) << addr_port->asString();
+    SocketImpl client_sock(Socket::Type::Stream, addr_port);
+
+    EXPECT_TRUE(client_sock.ioHandle().isOpen()) << addr_port->asString();
 
     // Instance::socket creates a non-blocking socket, which that extends all the way to the
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
     // handshake can complete. For testing convenience, re-enable blocking on the socket
     // so that connect will wait for the handshake to complete.
-    makeFdBlocking(client_handle->fd());
+    ASSERT_EQ(client_sock.setBlockingForTest(true).rc_, 0);
 
     // Connect to the server.
-    const Api::SysCallIntResult result = addr_port->connect(client_handle->fd());
-    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+    const Api::SysCallIntResult result = client_sock.connect(addr_port);
+    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
 
-  client_connect(addr_port);
+  auto client_addr_port = Network::Utility::parseInternetAddressAndPort(
+      fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version),
+                  addr_port->ip()->port()),
+      v6only);
+  ASSERT_NE(client_addr_port, nullptr);
+  client_connect(client_addr_port);
 
   if (!v6only) {
     ASSERT_EQ(IpVersion::v6, addr_port->ip()->version());
@@ -147,6 +154,8 @@ TEST(Ipv4InstanceTest, SocketAddress) {
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1.2.3.4"), address));
   EXPECT_EQ(nullptr, address.ip()->ipv6());
   EXPECT_TRUE(address.ip()->isUnicastAddress());
+  EXPECT_EQ(nullptr, address.pipe());
+  EXPECT_EQ(nullptr, address.envoyInternalAddress());
 }
 
 TEST(Ipv4InstanceTest, AddressOnly) {
@@ -234,6 +243,8 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1:0023::0Ef"), address));
   EXPECT_EQ(nullptr, address.ip()->ipv4());
   EXPECT_TRUE(address.ip()->isUnicastAddress());
+  EXPECT_EQ(nullptr, address.pipe());
+  EXPECT_EQ(nullptr, address.envoyInternalAddress());
 }
 
 TEST(Ipv6InstanceTest, AddressOnly) {
@@ -310,6 +321,81 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ("/foo", address.asString());
   EXPECT_EQ(Type::Pipe, address.type());
   EXPECT_EQ(nullptr, address.ip());
+  EXPECT_EQ(nullptr, address.envoyInternalAddress());
+}
+
+TEST(InteralInstanceTest, Basic) {
+  EnvoyInternalInstance address("listener_foo");
+  EXPECT_EQ("envoy://listener_foo", address.asString());
+  EXPECT_EQ(Type::EnvoyInternal, address.type());
+  EXPECT_EQ(nullptr, address.ip());
+  EXPECT_EQ(nullptr, address.pipe());
+  EXPECT_NE(nullptr, address.envoyInternalAddress());
+  EXPECT_EQ(nullptr, address.sockAddr());
+  EXPECT_EQ(static_cast<decltype(address.sockAddrLen())>(0), address.sockAddrLen());
+}
+
+// Excluding Windows; chmod(2) against Windows AF_UNIX socket files succeeds,
+// but stat(2) against those returns ENOENT.
+#ifndef WIN32
+TEST(PipeInstanceTest, BasicPermission) {
+  std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
+
+  const mode_t mode = 0777;
+  PipeInstance pipe(path, mode);
+  InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
+  SocketImpl sock(Socket::Type::Stream, address);
+
+  EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
+
+  Api::SysCallIntResult result = sock.bind(address);
+  ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
+                           << "\terrno: " << result.errno_;
+
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  struct stat stat_buf;
+  result = os_sys_calls.stat(path.c_str(), &stat_buf);
+  EXPECT_EQ(result.rc_, 0);
+  // Get file permissions bits
+  ASSERT_EQ(stat_buf.st_mode & 07777, mode)
+      << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
+      << (stat_buf.st_mode) << errorDetails(result.errno_);
+}
+#endif
+
+TEST(PipeInstanceTest, PermissionFail) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
+
+  const mode_t mode = 0777;
+  PipeInstance pipe(path, mode);
+  InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
+  SocketImpl sock(Socket::Type::Stream, address);
+
+  EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
+
+  EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_sys_calls, chmod(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_THROW_WITH_REGEX(sock.bind(address), EnvoyException, "Failed to create socket with mode");
+}
+
+TEST(PipeInstanceTest, AbstractNamespacePermission) {
+#if defined(__linux__)
+  std::string path = "@/foo";
+  const mode_t mode = 0777;
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(path, mode), EnvoyException,
+                          "Cannot set mode for Abstract AF_UNIX sockets");
+
+  sockaddr_un sun;
+  sun.sun_family = AF_UNIX;
+  StringUtil::strlcpy(&sun.sun_path[1], path.data(), path.size());
+  sun.sun_path[0] = '\0';
+  socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
+
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(&sun, ss_len, mode), EnvoyException,
+                          "Cannot set mode for Abstract AF_UNIX sockets");
+#endif
 }
 
 TEST(PipeInstanceTest, AbstractNamespace) {
@@ -355,12 +441,15 @@ TEST(PipeInstanceTest, EmbeddedNullPathError) {
 
 TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
-    PipeInstance address(path);
-    IoHandlePtr io_handle = address.socket(SocketType::Stream);
-    ASSERT_GE(io_handle->fd(), 0) << address.asString();
+    PipeInstance pipe(path);
+    InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
+    SocketImpl sock(Socket::Type::Stream, address);
 
-    const Api::SysCallIntResult result = address.bind(io_handle->fd());
-    ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
+    EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
+
+    const Api::SysCallIntResult result = sock.bind(address);
+
+    ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
 
@@ -377,9 +466,9 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &sin.sin_addr));
   sin.sin_port = htons(6502);
 
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, sizeof(sockaddr_in) - 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, sizeof(sockaddr_in) + 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in) - 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in) + 1), "ss_len");
 
   EXPECT_EQ("1.2.3.4:6502", addressFromSockAddr(ss, sizeof(sockaddr_in))->asString());
 
@@ -396,9 +485,9 @@ TEST(AddressFromSockAddrDeathTest, IPv6) {
   EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &sin6.sin6_addr));
   sin6.sin6_port = htons(32000);
 
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, sizeof(sockaddr_in6) - 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, sizeof(sockaddr_in6) + 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in6) - 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in6) + 1), "ss_len");
 
   EXPECT_EQ("[1:23::ef]:32000", addressFromSockAddr(ss, sizeof(sockaddr_in6))->asString());
 
@@ -419,9 +508,8 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 
   StringUtil::strlcpy(sun.sun_path, "/some/path", sizeof sun.sun_path);
 
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path)),
-                             "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path)), "ss_len");
 
   socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
   EXPECT_EQ("/some/path", addressFromSockAddr(ss, ss_len)->asString());
@@ -439,7 +527,7 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 
 // Test comparisons between all the different (known) test classes.
 struct TestCase {
-  enum InstanceType { Ipv4, Ipv6, Pipe };
+  enum InstanceType { Ipv4, Ipv6, Pipe, Internal };
 
   TestCase() = default;
   TestCase(enum InstanceType type, const std::string& address, uint32_t port)
@@ -473,6 +561,9 @@ protected:
     case TestCase::Pipe:
       return std::make_shared<PipeInstance>(test_case.address_);
       break;
+    case TestCase::Internal:
+      return std::make_shared<EnvoyInternalInstance>(test_case.address_);
+      break;
     }
     return nullptr;
   }
@@ -491,15 +582,15 @@ TEST_P(MixedAddressTest, Equality) {
 }
 
 struct TestCase test_cases[] = {
-    {TestCase::Ipv4, "1.2.3.4", 1},         {TestCase::Ipv4, "1.2.3.4", 2},
-    {TestCase::Ipv4, "1.2.3.5", 1},         {TestCase::Ipv6, "01:023::00ef", 1},
-    {TestCase::Ipv6, "01:023::00ef", 2},    {TestCase::Ipv6, "01:023::00ed", 1},
-    {TestCase::Pipe, "/path/to/pipe/1", 0}, {TestCase::Pipe, "/path/to/pipe/2", 0}};
+    {TestCase::Ipv4, "1.2.3.4", 1},          {TestCase::Ipv4, "1.2.3.4", 2},
+    {TestCase::Ipv4, "1.2.3.5", 1},          {TestCase::Ipv6, "01:023::00ef", 1},
+    {TestCase::Ipv6, "01:023::00ef", 2},     {TestCase::Ipv6, "01:023::00ed", 1},
+    {TestCase::Pipe, "/path/to/pipe/1", 0},  {TestCase::Pipe, "/path/to/pipe/2", 0},
+    {TestCase::Internal, "listener_foo", 0}, {TestCase::Internal, "listener_bar", 0}};
 
 INSTANTIATE_TEST_SUITE_P(AddressCrossProduct, MixedAddressTest,
                          ::testing::Combine(::testing::ValuesIn(test_cases),
                                             ::testing::ValuesIn(test_cases)));
-
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

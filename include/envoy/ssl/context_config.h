@@ -1,13 +1,17 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
+#include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -70,6 +74,16 @@ public:
    * @param callback callback that is executed by context config.
    */
   virtual void setSecretUpdateCallback(std::function<void()> callback) PURE;
+
+  /**
+   * @return a callback which can be used to create Handshaker instances.
+   */
+  virtual HandshakerFactoryCb createHandshaker() const PURE;
+
+  /**
+   * @return the set of capabilities for handshaker instances created by this context.
+   */
+  virtual HandshakerCapabilities capabilities() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
@@ -109,10 +123,22 @@ public:
     std::array<uint8_t, 256 / 8> aes_key_; // AES256 key size, in bytes
   };
 
+  enum class OcspStaplePolicy {
+    LenientStapling,
+    StrictStapling,
+    MustStaple,
+  };
+
   /**
    * @return True if client certificate is required, false otherwise.
    */
   virtual bool requireClientCertificate() const PURE;
+
+  /**
+   * @return OcspStaplePolicy The rule for determining whether to staple OCSP
+   * responses on new connections.
+   */
+  virtual OcspStaplePolicy ocspStaplePolicy() const PURE;
 
   /**
    * @return The keys to use for encrypting and decrypting session tickets.
@@ -120,6 +146,17 @@ public:
    * are candidates for decrypting received tickets.
    */
   virtual const std::vector<SessionTicketKey>& sessionTicketKeys() const PURE;
+
+  /**
+   * @return timeout in seconds for the session.
+   * Session timeout is used to specify lifetime hint of tls tickets.
+   */
+  virtual absl::optional<std::chrono::seconds> sessionTimeout() const PURE;
+
+  /**
+   * @return True if stateless TLS session resumption is disabled, false otherwise.
+   */
+  virtual bool disableStatelessSessionResumption() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

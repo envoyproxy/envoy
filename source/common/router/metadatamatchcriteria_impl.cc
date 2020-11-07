@@ -9,7 +9,7 @@ MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCrite
 
   // Track locations of each name (from the parent) in v to make it
   // easier to replace them when the same name exists in matches.
-  std::unordered_map<std::string, std::size_t> existing;
+  absl::node_hash_map<std::string, std::size_t> existing;
 
   if (parent) {
     for (const auto& it : parent->metadata_match_criteria_) {
@@ -38,5 +38,23 @@ MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCrite
 
   return v;
 }
+
+MetadataMatchCriteriaConstPtr
+MetadataMatchCriteriaImpl::filterMatchCriteria(const std::set<std::string>& names) const {
+
+  std::vector<MetadataMatchCriterionConstSharedPtr> v;
+
+  // iterating over metadata_match_criteria_ ensures correct order without sorting
+  for (const auto& it : metadata_match_criteria_) {
+    if (names.count(it->name()) == 1) {
+      v.emplace_back(it);
+    }
+  }
+  if (v.empty()) {
+    return nullptr;
+  }
+  return MetadataMatchCriteriaImplConstPtr(new MetadataMatchCriteriaImpl(v));
+};
+
 } // namespace Router
 } // namespace Envoy

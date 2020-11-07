@@ -1,18 +1,19 @@
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include <chrono>
-#include <unordered_map>
 
 #include "envoy/common/time.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/container/node_hash_map.h"
 #include "jwt_verify_lib/check_audience.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using ::google::jwt_verify::Jwks;
 using ::google::jwt_verify::Status;
 
@@ -114,7 +115,7 @@ public:
     return it->second;
   }
 
-  JwksData* findByProvider(const std::string& provider) override {
+  JwksData* findByProvider(const std::string& provider) final {
     const auto it = jwks_data_map_.find(provider);
     if (it == jwks_data_map_.end()) {
       return nullptr;
@@ -124,16 +125,16 @@ public:
 
 private:
   // The Jwks data map indexed by provider.
-  std::unordered_map<std::string, JwksDataImpl> jwks_data_map_;
+  absl::node_hash_map<std::string, JwksDataImpl> jwks_data_map_;
   // The Jwks data pointer map indexed by issuer.
-  std::unordered_map<std::string, JwksData*> issuer_ptr_map_;
+  absl::node_hash_map<std::string, JwksData*> issuer_ptr_map_;
 };
 
 } // namespace
 
-JwksCachePtr JwksCache::create(
-    const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
-    TimeSource& time_source, Api::Api& api) {
+JwksCachePtr
+JwksCache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
+                  TimeSource& time_source, Api::Api& api) {
   return JwksCachePtr(new JwksCacheImpl(config, time_source, api));
 }
 

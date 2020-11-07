@@ -5,10 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
+
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -17,7 +19,7 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
+    const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
         proto_config,
     Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
     : stats_prefix_(std::move(stats_prefix)), time_source_(time_source),
@@ -27,7 +29,7 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
     : config_(std::move(config)), controller_(std::move(controller)) {}
 
-Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
+Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // In addition to not sampling if the filter is disabled, health checks should also not be sampled
   // by the concurrency controller since they may potentially bias the sample aggregate to lower
   // latency measurements.
@@ -35,22 +37,17 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderM
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (controller_->forwardingDecision() == ConcurrencyController::RequestForwardingAction::Block) {
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
-                                       "reached concurrency limit");
+  if (controller_->forwardingDecision() == Controller::RequestForwardingAction::Block) {
+    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "reached concurrency limit",
+                                       nullptr, absl::nullopt, "reached_concurrency_limit");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // When the deferred_sample_task_ object is destroyed, the time difference between its destruction
-  // and the request start time is measured as the request latency. This value is sampled by the
-  // concurrency controller either when encoding is complete or during destruction of this filter
-  // object.
+  // When the deferred_sample_task_ object is destroyed, the request start time is sampled. This
+  // occurs either when encoding is complete or during destruction of this filter object.
+  const auto now = config_->timeSource().monotonicTime();
   deferred_sample_task_ =
-      std::make_unique<Cleanup>([this, rq_start_time = config_->timeSource().monotonicTime()]() {
-        const auto now = config_->timeSource().monotonicTime();
-        const std::chrono::nanoseconds rq_latency = now - rq_start_time;
-        controller_->recordLatencySample(rq_latency);
-      });
+      std::make_unique<Cleanup>([this, now]() { controller_->recordLatencySample(now); });
 
   return Http::FilterHeadersStatus::Continue;
 }

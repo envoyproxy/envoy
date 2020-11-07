@@ -1,7 +1,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 
 #include "common/config/well_known_names.h"
 #include "common/stats/tag_extractor_impl.h"
@@ -19,7 +19,7 @@ TEST(TagExtractorTest, TwoSubexpressions) {
   TagExtractorStdRegexImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
   EXPECT_EQ("cluster_name", tag_extractor.name());
   std::string name = "cluster.test_cluster.upstream_cx_total";
-  std::vector<Tag> tags;
+  TagVector tags;
   IntervalSetImpl<size_t> remove_characters;
   ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
   std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
@@ -58,7 +58,7 @@ TEST(TagExtractorTest, RE2Variants) {
 TEST(TagExtractorTest, SingleSubexpression) {
   TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)");
   std::string name = "listener.80.downstream_cx_total";
-  std::vector<Tag> tags;
+  TagVector tags;
   IntervalSetImpl<size_t> remove_characters;
   ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
   std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
@@ -94,13 +94,13 @@ TEST(TagExtractorTest, BadRegex) {
 
 class DefaultTagRegexTester {
 public:
-  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v2::StatsConfig()) {}
+  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v3::StatsConfig()) {}
 
   void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
-                 const std::vector<Tag>& expected_tags) {
+                 const TagVector& expected_tags) {
 
     // Test forward iteration through the regexes
-    std::vector<Tag> tags;
+    TagVector tags;
     const std::string tag_extracted_name = tag_extractors_.produceTags(stat_name, tags);
 
     auto cmp = [](const Tag& lhs, const Tag& rhs) {
@@ -114,7 +114,7 @@ public:
         << fmt::format("Stat name '{}' did not produce the expected tags", stat_name);
 
     // Reverse iteration through regexes to ensure ordering invariance
-    std::vector<Tag> rev_tags;
+    TagVector rev_tags;
     const std::string rev_tag_extracted_name = produceTagsReverse(stat_name, rev_tags);
 
     EXPECT_EQ(expected_tag_extracted_name, rev_tag_extracted_name);
@@ -135,10 +135,12 @@ public:
    * assuming we don't care about tag-order. This is in large part correct by design because
    * stat_name is not mutated until all the extraction is done.
    * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
-   * @param tags std::vector<Tag>& a set of Stats::Tag.
+   * @param tags TagVector& a set of Stats::Tag.
    * @return std::string the metric_name with tags removed.
    */
-  std::string produceTagsReverse(const std::string& metric_name, std::vector<Tag>& tags) const {
+  std::string produceTagsReverse(const std::string& metric_name, TagVector& tags) const {
+    // TODO(jmarantz): Skip the creation of string-based tags, creating a StatNameTagVector instead.
+
     // Note: one discrepancy between this and TagProducerImpl::produceTags is that this
     // version does not add in tag_extractors_.default_tags_ into tags. That doesn't matter
     // for this test, however.
@@ -333,8 +335,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   client_ssl.name_ = tag_names.CLIENTSSL_PREFIX;
   client_ssl.value_ = "clientssl_prefix";
 
-  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_white_list",
-                         "auth.clientssl.auth_ip_white_list", {client_ssl});
+  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_allowlist",
+                         "auth.clientssl.auth_ip_allowlist", {client_ssl});
 
   // TCP Prefix
   Tag tcp_prefix;
@@ -343,6 +345,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   regex_tester.testRegex("tcp.tcp_prefix.downstream_flow_control_resumed_reading_total",
                          "tcp.downstream_flow_control_resumed_reading_total", {tcp_prefix});
+
+  // UDP Prefix
+  Tag udp_prefix;
+  udp_prefix.name_ = tag_names.UDP_PREFIX;
+  udp_prefix.value_ = "udp_prefix";
+
+  regex_tester.testRegex("udp.udp_prefix.downstream_flow_control_resumed_reading_total",
+                         "udp.downstream_flow_control_resumed_reading_total", {udp_prefix});
 
   // Fault Downstream Cluster
   Tag fault_connection_manager;

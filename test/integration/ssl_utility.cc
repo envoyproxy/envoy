@@ -1,5 +1,8 @@
 #include "test/integration/ssl_utility.h"
 
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+
+#include "common/http/utility.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
@@ -9,7 +12,7 @@
 
 #include "test/config/utility.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
@@ -47,20 +50,23 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 )EOF";
   }
 
-  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {
-    common_context->add_alpn_protocols("h2");
-    common_context->add_alpn_protocols("http/1.1");
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
   }
   if (options.san_) {
-    common_context->mutable_validation_context()->add_verify_subject_alt_name(
-        "spiffe://lyft.com/backend-team");
+    common_context->mutable_validation_context()
+        ->add_hidden_envoy_deprecated_verify_subject_alt_name("spiffe://lyft.com/backend-team");
   }
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
+  }
+  if (!options.sni_.empty()) {
+    tls_context.set_sni(options.sni_);
   }
 
   common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
@@ -78,7 +84,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
                                                             Api::Api& api) {
-  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
@@ -91,6 +97,24 @@ Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& cont
       std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
 }
 
+Network::TransportSocketFactoryPtr createFakeUpstreamSslContext(
+    const std::string& upstream_cert_name, ContextManager& context_manager,
+    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto* common_tls_context = tls_context.mutable_common_tls_context();
+  auto* tls_cert = common_tls_context->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
+      fmt::format("test/config/integration/certs/{}cert.pem", upstream_cert_name)));
+  tls_cert->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
+      fmt::format("test/config/integration/certs/{}key.pem", upstream_cert_name)));
+
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, factory_context);
+
+  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+      std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
+}
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port) {
   std::string url =

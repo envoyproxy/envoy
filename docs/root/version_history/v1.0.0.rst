@@ -1,0 +1,7 @@
+1.0.0 (September 12, 2016)
+==========================
+
+Changes
+-------
+
+Initial open source release.

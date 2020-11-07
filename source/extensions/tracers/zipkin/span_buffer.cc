@@ -1,11 +1,15 @@
 #include "extensions/tracers/zipkin/span_buffer.h"
 
-#include "common/protobuf/protobuf.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
+
+#include "common/protobuf/utility.h"
 
 #include "extensions/tracers/zipkin/util.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,12 +17,12 @@ namespace Tracers {
 namespace Zipkin {
 
 SpanBuffer::SpanBuffer(
-    const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
+    const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context)
     : serializer_{makeSerializer(version, shared_span_context)} {}
 
 SpanBuffer::SpanBuffer(
-    const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
+    const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context, uint64_t size)
     : serializer_{makeSerializer(version, shared_span_context)} {
   allocateBuffer(size);
@@ -29,8 +33,7 @@ bool SpanBuffer::addSpan(Span&& span) {
   if (span_buffer_.size() == span_buffer_.capacity() || annotations.empty() ||
       annotations.end() ==
           std::find_if(annotations.begin(), annotations.end(), [](const auto& annotation) {
-            return annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND ||
-                   annotation.value() == ZipkinCoreConstants::get().SERVER_RECV;
+            return annotation.value() == CLIENT_SEND || annotation.value() == SERVER_RECV;
           })) {
 
     // Buffer full or invalid span.
@@ -43,14 +46,14 @@ bool SpanBuffer::addSpan(Span&& span) {
 }
 
 SerializerPtr SpanBuffer::makeSerializer(
-    const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
+    const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context) {
   switch (version) {
-  case envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1:
+  case envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1:
     return std::make_unique<JsonV1Serializer>();
-  case envoy::config::trace::v2::ZipkinConfig::HTTP_JSON:
+  case envoy::config::trace::v3::ZipkinConfig::HTTP_JSON:
     return std::make_unique<JsonV2Serializer>(shared_span_context);
-  case envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO:
+  case envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO:
     return std::make_unique<ProtobufSerializer>(shared_span_context);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -59,7 +62,7 @@ SerializerPtr SpanBuffer::makeSerializer(
 
 std::string JsonV1Serializer::serialize(const std::vector<Span>& zipkin_spans) {
   const std::string serialized_elements =
-      absl::StrJoin(zipkin_spans, ",", [](std::string* element, Span zipkin_span) {
+      absl::StrJoin(zipkin_spans, ",", [](std::string* element, const Span& zipkin_span) {
         absl::StrAppend(element, zipkin_span.toJson());
       });
   return absl::StrCat("[", serialized_elements, "]");
@@ -69,55 +72,104 @@ JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
     : shared_span_context_{shared_span_context} {}
 
 std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
-  const std::string serialized_elements =
-      absl::StrJoin(zipkin_spans, ",", [this](std::string* out, const Span& zipkin_span) {
-        absl::StrAppend(out,
-                        absl::StrJoin(toListOfSpans(zipkin_span), ",",
-                                      [](std::string* element, const zipkin::jsonv2::Span& span) {
-                                        std::string entry;
-                                        Protobuf::util::MessageToJsonString(span, &entry);
-                                        absl::StrAppend(element, entry);
-                                      }));
+  Util::Replacements replacements;
+  const std::string serialized_elements = absl::StrJoin(
+      zipkin_spans, ",", [this, &replacements](std::string* out, const Span& zipkin_span) {
+        const auto& replacement_values = replacements;
+        absl::StrAppend(
+            out, absl::StrJoin(
+                     toListOfSpans(zipkin_span, replacements), ",",
+                     [&replacement_values](std::string* element, const ProtobufWkt::Struct& span) {
+                       const std::string json = MessageUtil::getJsonStringFromMessage(
+                           span, /* pretty_print */ false,
+                           /* always_print_primitive_fields */ true);
+
+                       // The Zipkin API V2 specification mandates to store timestamp value as int64
+                       // https://github.com/openzipkin/zipkin-api/blob/228fabe660f1b5d1e28eac9df41f7d1deed4a1c2/zipkin2-api.yaml#L447-L463
+                       // (often translated as uint64 in some of the official implementations:
+                       // https://github.com/openzipkin/zipkin-go/blob/62dc8b26c05e0e8b88eb7536eff92498e65bbfc3/model/span.go#L114,
+                       // and see the discussion here:
+                       // https://github.com/openzipkin/zipkin-go/pull/161#issuecomment-598558072).
+                       // However, when the timestamp is stored as number value in a protobuf
+                       // struct, it is stored as a double. Because of how protobuf serializes
+                       // doubles, there is a possibility that the value will be rendered as a
+                       // number with scientific notation as reported in:
+                       // https://github.com/envoyproxy/envoy/issues/9341#issuecomment-566912973. To
+                       // deal with that issue, here we do a workaround by storing the timestamp as
+                       // string and keeping track of that with the corresponding integer
+                       // replacements, and do the replacement here so we can meet the Zipkin API V2
+                       // requirements.
+                       //
+                       // TODO(dio): The right fix for this is to introduce additional knob when
+                       // serializing double in protobuf DoubleToBuffer function, and make it
+                       // available to be controlled at caller site.
+                       // https://github.com/envoyproxy/envoy/issues/10411).
+                       absl::StrAppend(element, absl::StrReplaceAll(json, replacement_values));
+                     }));
       });
   return absl::StrCat("[", serialized_elements, "]");
 }
 
-const std::vector<zipkin::jsonv2::Span>
-JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
-  std::vector<zipkin::jsonv2::Span> spans;
+const std::vector<ProtobufWkt::Struct>
+JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& replacements) const {
+  std::vector<ProtobufWkt::Struct> spans;
   spans.reserve(zipkin_span.annotations().size());
   for (const auto& annotation : zipkin_span.annotations()) {
-    zipkin::jsonv2::Span span;
+    ProtobufWkt::Struct span;
+    auto* fields = span.mutable_fields();
 
-    if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
-      span.set_kind(ZipkinCoreConstants::get().KIND_CLIENT);
-    } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
-      span.set_shared(shared_span_context_ && zipkin_span.annotations().size() > 1);
-      span.set_kind(ZipkinCoreConstants::get().KIND_SERVER);
+    if (annotation.value() == CLIENT_SEND) {
+      (*fields)[SPAN_KIND] = ValueUtil::stringValue(KIND_CLIENT);
+    } else if (annotation.value() == SERVER_RECV) {
+      if (shared_span_context_ && zipkin_span.annotations().size() > 1) {
+        (*fields)[SPAN_SHARED] = ValueUtil::boolValue(true);
+      }
+      (*fields)[SPAN_KIND] = ValueUtil::stringValue(KIND_SERVER);
     } else {
       continue;
     }
 
     if (annotation.isSetEndpoint()) {
-      span.set_timestamp(annotation.timestamp());
-      span.mutable_local_endpoint()->MergeFrom(toProtoEndpoint(annotation.endpoint()));
+      // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
+      // However, due to the possibility of rendering that to a number with scientific notation, we
+      // chose to store it as a string and keeping track the corresponding replacement. For example,
+      // we have 1584324295476870 if we stored it as a double value, MessageToJsonString gives
+      // us 1.58432429547687e+15. Instead we store it as the string of 1584324295476870 (when it is
+      // serialized: "1584324295476870"), and replace it post MessageToJsonString serialization with
+      // integer (1584324295476870 without `"`), see: JsonV2Serializer::serialize.
+      (*fields)[SPAN_TIMESTAMP] =
+          Util::uint64Value(annotation.timestamp(), SPAN_TIMESTAMP, replacements);
+      (*fields)[SPAN_LOCAL_ENDPOINT] =
+          ValueUtil::structValue(toProtoEndpoint(annotation.endpoint()));
     }
 
-    span.set_trace_id(zipkin_span.traceIdAsHexString());
+    (*fields)[SPAN_TRACE_ID] = ValueUtil::stringValue(zipkin_span.traceIdAsHexString());
     if (zipkin_span.isSetParentId()) {
-      span.set_parent_id(zipkin_span.parentIdAsHexString());
+      (*fields)[SPAN_PARENT_ID] = ValueUtil::stringValue(zipkin_span.parentIdAsHexString());
     }
 
-    span.set_id(zipkin_span.idAsHexString());
-    span.set_name(zipkin_span.name());
+    (*fields)[SPAN_ID] = ValueUtil::stringValue(zipkin_span.idAsHexString());
+
+    const auto& span_name = zipkin_span.name();
+    if (!span_name.empty()) {
+      (*fields)[SPAN_NAME] = ValueUtil::stringValue(span_name);
+    }
 
     if (zipkin_span.isSetDuration()) {
-      span.set_duration(zipkin_span.duration());
+      // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
+      // store it.
+      (*fields)[SPAN_DURATION] =
+          Util::uint64Value(zipkin_span.duration(), SPAN_DURATION, replacements);
     }
 
-    auto& tags = *span.mutable_tags();
-    for (const auto& binary_annotation : zipkin_span.binaryAnnotations()) {
-      tags[binary_annotation.key()] = binary_annotation.value();
+    const auto& binary_annotations = zipkin_span.binaryAnnotations();
+    if (!binary_annotations.empty()) {
+      ProtobufWkt::Struct tags;
+      auto* tag_fields = tags.mutable_fields();
+      for (const auto& binary_annotation : binary_annotations) {
+        (*tag_fields)[binary_annotation.key()] = ValueUtil::stringValue(binary_annotation.value());
+      }
+      (*fields)[SPAN_TAGS] = ValueUtil::structValue(tags);
     }
 
     spans.push_back(std::move(span));
@@ -125,22 +177,23 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
   return spans;
 }
 
-const zipkin::jsonv2::Endpoint
-JsonV2Serializer::toProtoEndpoint(const Endpoint& zipkin_endpoint) const {
-  zipkin::jsonv2::Endpoint endpoint;
+const ProtobufWkt::Struct JsonV2Serializer::toProtoEndpoint(const Endpoint& zipkin_endpoint) const {
+  ProtobufWkt::Struct endpoint;
+  auto* fields = endpoint.mutable_fields();
+
   Network::Address::InstanceConstSharedPtr address = zipkin_endpoint.address();
   if (address) {
     if (address->ip()->version() == Network::Address::IpVersion::v4) {
-      endpoint.set_ipv4(address->ip()->addressAsString());
+      (*fields)[ENDPOINT_IPV4] = ValueUtil::stringValue(address->ip()->addressAsString());
     } else {
-      endpoint.set_ipv6(address->ip()->addressAsString());
+      (*fields)[ENDPOINT_IPV6] = ValueUtil::stringValue(address->ip()->addressAsString());
     }
-    endpoint.set_port(address->ip()->port());
+    (*fields)[ENDPOINT_PORT] = ValueUtil::numberValue(address->ip()->port());
   }
 
   const std::string& service_name = zipkin_endpoint.serviceName();
   if (!service_name.empty()) {
-    endpoint.set_service_name(service_name);
+    (*fields)[ENDPOINT_SERVICE_NAME] = ValueUtil::stringValue(service_name);
   }
 
   return endpoint;
@@ -163,9 +216,9 @@ const zipkin::proto3::ListOfSpans ProtobufSerializer::toListOfSpans(const Span& 
   zipkin::proto3::ListOfSpans spans;
   for (const auto& annotation : zipkin_span.annotations()) {
     zipkin::proto3::Span span;
-    if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
+    if (annotation.value() == CLIENT_SEND) {
       span.set_kind(zipkin::proto3::Span::CLIENT);
-    } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
+    } else if (annotation.value() == SERVER_RECV) {
       span.set_shared(shared_span_context_ && zipkin_span.annotations().size() > 1);
       span.set_kind(zipkin::proto3::Span::SERVER);
     } else {

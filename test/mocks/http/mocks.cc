@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/header_map.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,6 +20,16 @@ MockConnectionCallbacks::~MockConnectionCallbacks() = default;
 
 MockServerConnectionCallbacks::MockServerConnectionCallbacks() = default;
 MockServerConnectionCallbacks::~MockServerConnectionCallbacks() = default;
+
+MockFilterManagerCallbacks::MockFilterManagerCallbacks() {
+  ON_CALL(*this, responseHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
+    if (response_headers_) {
+      return absl::make_optional(std::ref(*response_headers_));
+    }
+    return absl::nullopt;
+  }));
+}
+MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
 
 MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
@@ -63,29 +74,35 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, sendLocalReply(_, _, _, _, _))
       .WillByDefault(Invoke([this](Code code, absl::string_view body,
-                                   std::function<void(HeaderMap & headers)> modify_headers,
+                                   std::function<void(ResponseHeaderMap & headers)> modify_headers,
                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                    absl::string_view details) {
         sendLocalReply_(code, body, modify_headers, grpc_status, details);
       }));
+  ON_CALL(*this, routeConfig())
+      .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
 
 void MockStreamDecoderFilterCallbacks::sendLocalReply_(
-    Code code, absl::string_view body, std::function<void(HeaderMap& headers)> modify_headers,
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  details_ = std::string(details);
   Utility::sendLocalReply(
-      is_grpc_request_,
-      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        encodeHeaders(std::move(headers), end_stream);
-      },
-      [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-      stream_destroyed_, code, body, grpc_status, is_head_request_);
+      stream_destroyed_,
+      Utility::EncodeFunctions{
+          nullptr, nullptr,
+          [this, modify_headers, details](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+            if (modify_headers != nullptr) {
+              modify_headers(*headers);
+            }
+            encodeHeaders(std::move(headers), end_stream, details);
+          },
+          [this](Buffer::Instance& data, bool end_stream) -> void {
+            encodeData(data, end_stream);
+          }},
+      Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
 }
 
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {

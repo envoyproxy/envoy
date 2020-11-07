@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/stats_matcher.h"
 
 #include "common/common/matchers.h"
@@ -18,7 +18,7 @@ namespace Stats {
  */
 class StatsMatcherImpl : public StatsMatcher {
 public:
-  explicit StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config);
+  explicit StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config);
 
   // Default constructor simply allows everything.
   StatsMatcherImpl() = default;

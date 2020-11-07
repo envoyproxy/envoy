@@ -3,10 +3,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"
@@ -46,13 +48,13 @@ public:
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext();
   Network::TransportSocketFactoryPtr createClientSslContext(bool mtls);
-  Network::ClientConnectionPtr makeClientConnection();
+  Network::ClientConnectionPtr makeTcpClientConnection();
   Network::ClientConnectionPtr makeTlsClientConnection();
   Network::ClientConnectionPtr makeMtlsClientConnection();
   void testRequestAndResponseWithXfccHeader(std::string privous_xfcc, std::string expected_xfcc);
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ForwardClientCertDetails fcc_;
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       SetCurrentClientCertDetails sccd_;
   bool tls_ = true;
 

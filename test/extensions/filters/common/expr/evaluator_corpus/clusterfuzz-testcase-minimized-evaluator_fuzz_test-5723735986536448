@@ -1,0 +1,1 @@
+expression { } stream_info {   address {     pipe {       path: "            \0     "     }   } } 

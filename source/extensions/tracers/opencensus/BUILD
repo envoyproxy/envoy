@@ -1,15 +1,16 @@
-licenses(["notice"])  # Apache 2
-
-# Trace driver for OpenCensus: https://opencensus.io/
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
+    "envoy_select_google_grpc",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+# Trace driver for OpenCensus: https://opencensus.io/
+
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
@@ -18,9 +19,8 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":opencensus_tracer_impl",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -43,6 +43,6 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
-    ],
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+    ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )

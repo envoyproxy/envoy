@@ -8,13 +8,13 @@ an upstream cluster. However, if the percentage of available hosts in the cluste
 Envoy will disregard health status and balance either amongst all hosts or no hosts. This is known
 as the *panic threshold*. The default panic threshold is 50%. This is
 :ref:`configurable <config_cluster_manager_cluster_runtime>` via runtime as well as in the
-:ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.healthy_panic_threshold>`.
+:ref:`cluster configuration <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.healthy_panic_threshold>`.
 The panic threshold is used to avoid a situation in which host failures cascade throughout the
 cluster as load increases.
 
 There are two modes Envoy can choose from when in a panic state: traffic will either be sent to all
 hosts, or will be sent to no hosts (and therefore will always fail). This is configured in the
-:ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>`.
+:ref:`cluster configuration <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>`.
 Choosing to fail traffic during panic scenarios can help avoid overwhelming potentially failing
 upstream services, as it will reduce the load on the upstream service before all hosts have been
 determined to be unhealthy. However, it eliminates the possibility of _some_ requests succeeding
@@ -79,8 +79,15 @@ priority.
 
 Panic mode can be disabled by setting the panic threshold to 0%.
 
-If all hosts become unhealthy normalized total health is 0%, and if the panic threshold is above 0%
-all traffic will be redirected to P=0.
+Load distribution is calculated as described above as long as there are priority levels not in panic mode.
+When all priority levels enter the panic mode, load calculation algorithm changes.
+In this case each priority level receives traffic relative to the number of hosts in that priority level
+in relation to the number of hosts in all priority levels.
+For example, if there are 2 priorities P=0 and P=1 and each of them consists of 5 hosts, each level will 
+receive 50% of the traffic.
+If there are 2 hosts in priority P=0 and 8 hosts in priority P=1, priority P=0 will receive 20% of the 
+traffic and priority P=1 will receive 80% of the traffic.
+
 However, if the panic threshold is 0% for any priority, that priority will never enter panic mode.
 In this case if all hosts are unhealthy, Envoy will fail to select a host and will instead immediately
 return error responses with "503 - no healthy upstream".

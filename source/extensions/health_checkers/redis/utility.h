@@ -1,8 +1,10 @@
 #pragma once
 
-#include "envoy/api/v2/core/health_check.pb.validate.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 
+#include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -14,12 +16,14 @@ namespace RedisHealthChecker {
 namespace {
 
 static const envoy::config::health_checker::redis::v2::Redis
-getRedisHealthCheckConfig(const envoy::api::v2::core::HealthCheck& health_check_config,
+getRedisHealthCheckConfig(const envoy::config::core::v3::HealthCheck& health_check_config,
                           ProtobufMessage::ValidationVisitor& validation_visitor) {
   ProtobufTypes::MessagePtr config =
       ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};
-  MessageUtil::jsonConvert(health_check_config.custom_health_check().config(), validation_visitor,
-                           *config);
+  Envoy::Config::Utility::translateOpaqueConfig(
+      health_check_config.custom_health_check().typed_config(),
+      health_check_config.custom_health_check().hidden_envoy_deprecated_config(),
+      validation_visitor, *config);
   return MessageUtil::downcastAndValidate<const envoy::config::health_checker::redis::v2::Redis&>(
       *config, validation_visitor);
 }

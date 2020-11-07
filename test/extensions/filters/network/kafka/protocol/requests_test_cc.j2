@@ -7,7 +7,6 @@
 #include "extensions/filters/network/kafka/request_codec.h"
 
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
-#include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,8 +24,8 @@ protected:
 
 class MockMessageListener : public RequestCallback {
 public:
-  MOCK_METHOD1(onMessage, void(AbstractRequestSharedPtr));
-  MOCK_METHOD1(onFailedParse, void(RequestParseFailureSharedPtr));
+  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr));
 };
 
 /**
@@ -55,7 +54,7 @@ template <typename T> std::shared_ptr<T> RequestTest::serializeAndDeserialize(T 
   (put "string" as std::string, 32 as uint32_t, etc.).
 #}
 {% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
-TEST_F(RequestTest, shouldParse{{ message_type.name }}V{{ field_list.version }}) {
+TEST_F(RequestTest, ShouldParse{{ message_type.name }}V{{ field_list.version }}) {
   // given
   {{ message_type.name }} data = { {{ field_list.example_value() }} };
   Request<{{ message_type.name }}> message = { {

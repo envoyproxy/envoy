@@ -1,10 +1,13 @@
 #pragma once
 
-#include "envoy/api/v2/listener/quic_config.pb.h"
+#include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
+#include "envoy/runtime/runtime.h"
 
+#include "common/network/socket_option_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "server/connection_handler_impl.h"
 
@@ -15,84 +18,85 @@ namespace Quic {
 
 // QUIC specific UdpListenerCallbacks implementation which delegates incoming
 // packets, write signals and listener errors to QuicDispatcher.
-class ActiveQuicListener : public Network::UdpListenerCallbacks,
-                           public Server::ConnectionHandlerImpl::ActiveListenerImplBase,
+class ActiveQuicListener : public Envoy::Server::ActiveUdpListenerBase,
                            Logger::Loggable<Logger::Id::quic> {
 public:
-  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
+  // TODO(bencebeky): Tune this value.
+  static const size_t kNumSessionsToCreatePerLoop = 16;
 
-  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::SocketSharedPtr listen_socket,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
+  ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
+                     Network::ConnectionHandler& parent, Network::ListenerConfig& listener_config,
+                     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
+                     bool kernel_worker_routing,
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
 
-  // TODO(#7465): Make this a callback.
+  ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
+                     Network::ConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
+                     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
+
+  ~ActiveQuicListener() override;
+
   void onListenerShutdown();
-
-  // Network::UdpListenerCallbacks
-  void onData(Network::UdpRecvData& data) override;
-  void onWriteReady(const Network::Socket& socket) override;
-  void onReceiveError(const Network::UdpListenerCallbacks::ErrorCode& /*error_code*/,
-                      Api::IoError::IoErrorCode /*err*/) override {
-    // No-op. Quic can't do anything upon listener error.
+  uint64_t eventLoopsWithBufferedChlosForTest() const {
+    return event_loops_with_buffered_chlo_for_test_;
   }
 
+  // Network::UdpListenerCallbacks
+  void onReadReady() override;
+  void onWriteReady(const Network::Socket& socket) override;
+  void onReceiveError(Api::IoError::IoErrorCode /*error_code*/) override {
+    // No-op. Quic can't do anything upon listener error.
+  }
+  Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
+  void onDataWorker(Network::UdpRecvData&& data) override;
+  uint32_t destination(const Network::UdpRecvData& data) const override;
+
   // ActiveListenerImplBase
-  Network::Listener* listener() override { return udp_listener_.get(); }
-  void destroy() override { udp_listener_.reset(); }
+  void pauseListening() override;
+  void resumeListening() override;
+  void shutdownListener() override;
 
 private:
   friend class ActiveQuicListenerPeer;
 
-  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::Socket& listen_socket, std::unique_ptr<quic::QuicPacketWriter> writer,
-                     Network::UdpListenerPtr&& listener, Network::ListenerConfig& listener_config,
-                     const quic::QuicConfig& quic_config);
-
-  Network::UdpListenerPtr udp_listener_;
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;
   Event::Dispatcher& dispatcher_;
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
-  Network::Socket& listen_socket_;
+  const bool kernel_worker_routing_;
+  Runtime::FeatureFlag enabled_;
+  Network::UdpPacketWriter* udp_packet_writer_;
+
+  // The number of runs of the event loop in which at least one CHLO was buffered.
+  // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
+  uint64_t event_loops_with_buffered_chlo_for_test_{0};
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 
 // A factory to create ActiveQuicListener based on given config.
-class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory {
+class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
+                                  Logger::Loggable<Logger::Id::quic> {
 public:
-  ActiveQuicListenerFactory(const envoy::api::v2::listener::QuicProtocolOptions& config) {
-    uint64_t idle_network_timeout_ms =
-        config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
-                                  : 300000;
-    quic_config_.SetIdleNetworkTimeout(
-        quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms),
-        quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
-    int32_t max_time_before_crypto_handshake_ms =
-        config.has_crypto_handshake_timeout()
-            ? DurationUtil::durationToMilliseconds(config.crypto_handshake_timeout())
-            : 20000;
-    quic_config_.set_max_time_before_crypto_handshake(
-        quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
-    int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
-    quic_config_.SetMaxIncomingBidirectionalStreamsToSend(max_streams);
-    quic_config_.SetMaxIncomingUnidirectionalStreamsToSend(max_streams);
-  }
+  ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
+                            uint32_t concurrency);
 
   // Network::ActiveUdpListenerFactory.
-  Network::ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          Network::ListenerConfig& config) const override {
-    return std::make_unique<ActiveQuicListener>(disptacher, parent, config, quic_config_);
-  }
+  Network::ConnectionHandler::ActiveUdpListenerPtr
+  createActiveUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
+                          Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
 
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
   quic::QuicConfig quic_config_;
+  const uint32_t concurrency_;
+  absl::once_flag install_bpf_once_;
+  envoy::config::core::v3::RuntimeFeatureFlag enabled_;
 };
 
 } // namespace Quic

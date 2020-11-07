@@ -34,10 +34,6 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
       vcluster_(stat_name_pool_.add("vcluster")), vhost_(stat_name_pool_.add("vhost")),
       zone_(stat_name_pool_.add("zone")) {
 
-  for (auto& rc_stat_name : rc_stat_names_) {
-    rc_stat_name = nullptr;
-  }
-
   // Pre-allocate response codes 200, 404, and 503, as those seem quite likely.
   // We don't pre-allocate all the HTTP codes because the first 127 allocations
   // are likely to be encoded in one byte, and we would rather spend those on
@@ -158,13 +154,6 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   }
 }
 
-absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
-  if (absl::EndsWith(str, ".")) {
-    str.remove_suffix(1);
-  }
-  return str;
-}
-
 Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
   switch (enumToInt(response_code) / 100) {
   case 1:
@@ -187,18 +176,10 @@ Stats::StatName CodeStatsImpl::upstreamRqStatName(Code response_code) const {
   if (rc_index >= NumHttpCodes) {
     return upstream_rq_unknown_;
   }
-  std::atomic<uint8_t*>& atomic_ref = rc_stat_names_[rc_index];
-  if (atomic_ref.load() == nullptr) {
-    absl::MutexLock lock(&mutex_);
-
-    // Check again under lock as two threads might have raced to add a StatName
-    // for the same code.
-    if (atomic_ref.load() == nullptr) {
-      atomic_ref = stat_name_pool_.addReturningStorage(
-          absl::StrCat("upstream_rq_", enumToInt(response_code)));
-    }
-  }
-  return Stats::StatName(atomic_ref.load());
+  return Stats::StatName(rc_stat_names_.get(rc_index, [this, response_code]() -> const uint8_t* {
+    return stat_name_pool_.addReturningStorage(
+        absl::StrCat("upstream_rq_", enumToInt(response_code)));
+  }));
 }
 
 std::string CodeUtility::groupStringForResponseCode(Code response_code) {

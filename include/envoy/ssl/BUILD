@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["connection.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":ssl_socket_state",
         "//include/envoy/common:time_interface",
     ],
 )
@@ -20,9 +21,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
-    deps = [
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-    ],
+    deps = ["@envoy_api//envoy/admin/v3:pkg_cc_proto"],
 )
 
 envoy_cc_library(
@@ -30,6 +29,7 @@ envoy_cc_library(
     hdrs = ["context_config.h"],
     deps = [
         ":certificate_validation_context_config_interface",
+        ":handshaker_interface",
         ":tls_certificate_config_interface",
     ],
 )
@@ -41,6 +41,7 @@ envoy_cc_library(
         ":context_config_interface",
         ":context_interface",
         "//include/envoy/common:time_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/stats:stats_interface",
     ],
 )
@@ -56,4 +57,35 @@ envoy_cc_library(
 envoy_cc_library(
     name = "certificate_validation_context_config_interface",
     hdrs = ["certificate_validation_context_config.h"],
+    deps = [
+        "//source/common/common:matchers_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_socket_extended_info_interface",
+    hdrs = ["ssl_socket_extended_info.h"],
+    deps = [
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_socket_state",
+    hdrs = ["ssl_socket_state.h"],
+    deps = [],
+)
+
+envoy_cc_library(
+    name = "handshaker_interface",
+    hdrs = ["handshaker.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//include/envoy/api:api_interface",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:post_io_action_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+    ],
 )

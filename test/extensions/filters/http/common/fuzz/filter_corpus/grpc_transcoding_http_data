@@ -1,0 +1,24 @@
+config {
+  name: "envoy.filters.http.grpc_json_transcoder"
+  typed_config: {}
+}
+
+data {
+  headers {
+    headers {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod"
+    }
+  }
+  http_body {
+    data: "{\"theme\": \"Children\"}"
+  }
+}

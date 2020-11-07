@@ -2,12 +2,15 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -15,20 +18,22 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
 
-const std::string Utility::TCP_SCHEME = "tcp://";
-const std::string Utility::UDP_SCHEME = "udp://";
-const std::string Utility::UNIX_SCHEME = "unix://";
+// TODO(lambdai): Remove below re-declare in C++17.
+constexpr absl::string_view Utility::TCP_SCHEME;
+constexpr absl::string_view Utility::UDP_SCHEME;
+constexpr absl::string_view Utility::UNIX_SCHEME;
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (urlIsTcpScheme(url)) {
@@ -39,48 +44,48 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
   } else {
-    throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
+    throw EnvoyException(absl::StrCat("unknown protocol scheme: ", url));
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) { return absl::StartsWith(url, TCP_SCHEME); }
+bool Utility::urlIsTcpScheme(absl::string_view url) { return absl::StartsWith(url, TCP_SCHEME); }
 
-bool Utility::urlIsUdpScheme(const std::string& url) { return absl::StartsWith(url, UDP_SCHEME); }
+bool Utility::urlIsUdpScheme(absl::string_view url) { return absl::StartsWith(url, UDP_SCHEME); }
 
-bool Utility::urlIsUnixScheme(const std::string& url) { return absl::StartsWith(url, UNIX_SCHEME); }
+bool Utility::urlIsUnixScheme(absl::string_view url) { return absl::StartsWith(url, UNIX_SCHEME); }
 
 namespace {
 
-std::string hostFromUrl(const std::string& url, const std::string& scheme,
-                        const std::string& scheme_name) {
+std::string hostFromUrl(const std::string& url, absl::string_view scheme,
+                        absl::string_view scheme_name) {
   if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', scheme.size());
+  const size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
   return url.substr(scheme.size(), colon_index - scheme.size());
 }
 
-uint32_t portFromUrl(const std::string& url, const std::string& scheme,
-                     const std::string& scheme_name) {
+uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
+                     absl::string_view scheme_name) {
   if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', scheme.size());
+  const size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
-  size_t rcolon_index = url.rfind(':');
+  const size_t rcolon_index = url.rfind(':');
   if (colon_index != rcolon_index) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
   try {
@@ -90,6 +95,28 @@ uint32_t portFromUrl(const std::string& url, const std::string& scheme,
   } catch (const std::out_of_range& e) {
     throw EnvoyException(e.what());
   }
+}
+
+Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::InstancePtr& buffer,
+                                       IoHandle::RecvMsgOutput& output, IoHandle& handle,
+                                       const Address::Instance& local_address) {
+
+  Buffer::RawSlice slice;
+  const uint64_t num_slices = buffer->reserve(max_packet_size, &slice, 1);
+  ASSERT(num_slices == 1u);
+
+  Api::IoCallUint64Result result =
+      handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
+
+  if (!result.ok()) {
+    return result;
+  }
+
+  // Adjust memory length and commit slice to buffer
+  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
+  buffer->commit(&slice, 1);
+
+  return result;
 }
 
 } // namespace
@@ -167,6 +194,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     throwWithMalformedIp(ip_address);
   }
   sockaddr_in sa4;
+  memset(&sa4, 0, sizeof(sa4));
   if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
     throwWithMalformedIp(ip_address);
   }
@@ -182,8 +210,8 @@ Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Addres
   return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
 }
 
-void Utility::throwWithMalformedIp(const std::string& ip_address) {
-  throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
+void Utility::throwWithMalformedIp(absl::string_view ip_address) {
+  throw EnvoyException(absl::StrCat("malformed IP address: ", ip_address));
 }
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between
@@ -191,11 +219,12 @@ void Utility::throwWithMalformedIp(const std::string& ip_address) {
 // the default is to return a loopback address of type version. This function may
 // need to be updated in the future. Discussion can be found at Github issue #939.
 Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
+  Address::InstanceConstSharedPtr ret;
+#ifdef SUPPORTS_GETIFADDRS
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
-  Address::InstanceConstSharedPtr ret;
 
-  int rc = getifaddrs(&ifaddr);
+  const int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc, "");
 
   // man getifaddrs(3)
@@ -219,19 +248,20 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   if (ifaddr) {
     freeifaddrs(ifaddr);
   }
+#endif
 
   // If the local address is not found above, then return the loopback address by default.
   if (ret == nullptr) {
     if (version == Address::IpVersion::v4) {
-      ret.reset(new Address::Ipv4Instance("127.0.0.1"));
+      ret = std::make_shared<Address::Ipv4Instance>("127.0.0.1");
     } else if (version == Address::IpVersion::v6) {
-      ret.reset(new Address::Ipv6Instance("::1"));
+      ret = std::make_shared<Address::Ipv6Instance>("::1");
     }
   }
   return ret;
 }
 
-bool Utility::isLocalConnection(const ConnectionSocket& socket) {
+bool Utility::isSameIpOrLoopback(const ConnectionSocket& socket) {
   // These are local:
   // - Pipes
   // - Sockets to a loopback address
@@ -296,16 +326,17 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     absl::uint128 addr = address.ip()->ipv6()->address();
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
   CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
-                         new Address::Ipv4Instance("127.0.0.1", 0));
+                         new Address::Ipv4Instance("127.0.0.1", 0, nullptr));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv6Instance("::1", 0));
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
+                         new Address::Ipv6Instance("::1", 0, nullptr));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
@@ -337,47 +368,38 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
+Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
 #ifdef SOL_IP
+
+  if (sock.addressType() != Address::Type::Ip) {
+    return nullptr;
+  }
+
+  auto ipVersion = sock.ipVersion();
+  if (!ipVersion.has_value()) {
+    return nullptr;
+  }
+
   sockaddr_storage orig_addr;
+  memset(&orig_addr, 0, sizeof(orig_addr));
   socklen_t addr_len = sizeof(sockaddr_storage);
-  int socket_domain;
-  socklen_t domain_len = sizeof(socket_domain);
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallIntResult result =
-      os_syscalls.getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
-  int status = result.rc_;
+  int status;
 
-  if (status != 0) {
-    return nullptr;
-  }
-
-  if (socket_domain == AF_INET) {
-    status = os_syscalls.getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
-  } else if (socket_domain == AF_INET6) {
-    status = os_syscalls.getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+  if (*ipVersion == Address::IpVersion::v4) {
+    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   } else {
-    return nullptr;
+    status = sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   }
 
   if (status != 0) {
     return nullptr;
   }
 
-  switch (orig_addr.ss_family) {
-  case AF_INET:
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-  case AF_INET6:
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv6Instance(reinterpret_cast<sockaddr_in6&>(orig_addr))};
-  default:
-    return nullptr;
-  }
+  return Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
-  UNREFERENCED_PARAMETER(fd);
+  UNREFERENCED_PARAMETER(sock);
   return nullptr;
 #endif
 }
@@ -422,17 +444,19 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
 }
 
 absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) {
-  // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  static_assert(ABSL_IS_LITTLE_ENDIAN,
-                "Machines using big-endian byte order is not supported for IPv6.");
+#ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
+#else
+  return address;
+#endif
 }
 
 absl::uint128 Utility::Ip6htonl(const absl::uint128& address) {
-  // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  static_assert(ABSL_IS_LITTLE_ENDIAN,
-                "Machines using big-endian byte order is not supported for IPv6.");
+#ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
+#else
+  return address;
+#endif
 }
 
 absl::uint128 Utility::flipOrder(const absl::uint128& input) {
@@ -447,21 +471,22 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
 }
 
 Address::InstanceConstSharedPtr
-Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_address) {
+Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
-  case envoy::api::v2::core::Address::kSocketAddress:
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return Utility::parseInternetAddress(proto_address.socket_address().address(),
                                          proto_address.socket_address().port_value(),
                                          !proto_address.socket_address().ipv4_compat());
-  case envoy::api::v2::core::Address::kPipe:
-    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path());
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
+    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
+                                                   proto_address.pipe().mode());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
 void Utility::addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::api::v2::core::Address& proto_address) {
+                                       envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
   } else {
@@ -472,22 +497,22 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
   }
 }
 
-Address::SocketType
-Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address) {
+Socket::Type
+Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
-  case envoy::api::v2::core::Address::kSocketAddress: {
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress: {
     const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
-    case envoy::api::v2::core::SocketAddress::TCP:
-      return Address::SocketType::Stream;
-    case envoy::api::v2::core::SocketAddress::UDP:
-      return Address::SocketType::Datagram;
+    case envoy::config::core::v3::SocketAddress::TCP:
+      return Socket::Type::Stream;
+    case envoy::config::core::v3::SocketAddress::UDP:
+      return Socket::Type::Datagram;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
-  case envoy::api::v2::core::Address::kPipe:
-    return Address::SocketType::Stream;
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
+    return Socket::Type::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -496,10 +521,8 @@ Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_ad
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
-  const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  buffer.getRawSlices(slices.begin(), num_slices);
-  return writeToSocket(handle, slices.begin(), num_slices, local_ip, peer_address);
+  Buffer::RawSliceVector slices = buffer.getRawSlices();
+  return writeToSocket(handle, slices.data(), slices.size(), local_ip, peer_address);
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,
@@ -514,7 +537,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "sendmsg sent:{} bytes", send_result.rc_);
+    ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.rc_);
   } else {
     ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
                    static_cast<int>(send_result.err_->getErrorCode()),
@@ -523,43 +546,120 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
   return send_result;
 }
 
+void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
+                            Address::InstanceConstSharedPtr peer_addess,
+                            Address::InstanceConstSharedPtr local_address,
+                            UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
+  RELEASE_ASSERT(
+      peer_addess != nullptr,
+      fmt::format("Unable to get remote address on the socket bount to local address: {} ",
+                  local_address->asString()));
+
+  // Unix domain sockets are not supported
+  RELEASE_ASSERT(peer_addess->type() == Address::Type::Ip,
+                 fmt::format("Unsupported remote address: {} local address: {}, receive size: "
+                             "{}",
+                             peer_addess->asString(), local_address->asString(), bytes_read));
+  udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
+                                     std::move(buffer), receive_time);
+}
+
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped) {
-  Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
-  Buffer::RawSlice slice;
-  const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
-  ASSERT(num_slices == 1);
 
-  IoHandle::RecvMsgOutput output(packets_dropped);
+  if (handle.supportsUdpGro()) {
+    Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
+    IoHandle::RecvMsgOutput output(1, packets_dropped);
+
+    // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
+    const uint64_t max_packet_size_with_gro = 16 * udp_packet_processor.maxPacketSize();
+
+    Api::IoCallUint64Result result =
+        receiveMessage(max_packet_size_with_gro, buffer, output, handle, local_address);
+
+    if (!result.ok()) {
+      return result;
+    }
+
+    const uint64_t gso_size = output.msg_[0].gso_size_;
+    ENVOY_LOG_MISC(trace, "recvmsg bytes {} with gso_size as {}", result.rc_, gso_size);
+
+    // Skip gso segmentation and proceed as a single payload.
+    if (gso_size == 0u) {
+      passPayloadToProcessor(result.rc_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+                             std::move(output.msg_[0].local_address_), udp_packet_processor,
+                             receive_time);
+      return result;
+    }
+
+    // Segment the buffer read by the recvmsg syscall into gso_sized sub buffers.
+    while (buffer->length() > 0) {
+      const uint64_t bytes_to_copy = std::min(buffer->length(), gso_size);
+      Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
+      sub_buffer->move(*buffer, bytes_to_copy);
+      passPayloadToProcessor(bytes_to_copy, std::move(sub_buffer), output.msg_[0].peer_address_,
+                             output.msg_[0].local_address_, udp_packet_processor, receive_time);
+    }
+
+    return result;
+  }
+
+  if (handle.supportsMmsg()) {
+    const uint32_t num_packets_per_mmsg_call = 16u;
+    const uint32_t num_slices_per_packet = 1u;
+    absl::FixedArray<Buffer::InstancePtr> buffers(num_packets_per_mmsg_call);
+    RawSliceArrays slices(num_packets_per_mmsg_call,
+                          absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
+    for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
+      buffers[i] = std::make_unique<Buffer::OwnedImpl>();
+      const uint64_t num_slices = buffers[i]->reserve(udp_packet_processor.maxPacketSize(),
+                                                      slices[i].data(), num_slices_per_packet);
+      ASSERT(num_slices == num_slices_per_packet);
+    }
+
+    IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);
+    Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
+    if (!result.ok()) {
+      return result;
+    }
+
+    uint64_t packets_read = result.rc_;
+    ENVOY_LOG_MISC(trace, "recvmmsg read {} packets", packets_read);
+    for (uint64_t i = 0; i < packets_read; ++i) {
+      Buffer::RawSlice* slice = slices[i].data();
+      const uint64_t msg_len = output.msg_[i].msg_len_;
+      ASSERT(msg_len <= slice->len_);
+      ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
+                     output.msg_[i].peer_address_->asString());
+
+      // Adjust used memory length and commit slice to buffer
+      slice->len_ = std::min(slice->len_, static_cast<size_t>(msg_len));
+      buffers[i]->commit(slice, 1);
+
+      passPayloadToProcessor(msg_len, std::move(buffers[i]), output.msg_[i].peer_address_,
+                             output.msg_[i].local_address_, udp_packet_processor, receive_time);
+    }
+    return result;
+  }
+
+  Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
+  IoHandle::RecvMsgOutput output(1, packets_dropped);
+
   Api::IoCallUint64Result result =
-      handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
+      receiveMessage(udp_packet_processor.maxPacketSize(), buffer, output, handle, local_address);
 
   if (!result.ok()) {
     return result;
   }
 
-  // Adjust used memory length.
-  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
-  buffer->commit(&slice, 1);
-
   ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
 
-  RELEASE_ASSERT(output.peer_address_ != nullptr,
-                 fmt::format("Unable to get remote address for fd: {}, local address: {} ",
-                             handle.fd(), local_address.asString()));
-
-  // Unix domain sockets are not supported
-  RELEASE_ASSERT(output.peer_address_->type() == Address::Type::Ip,
-                 fmt::format("Unsupported remote address: {} local address: {}, receive size: "
-                             "{}",
-                             output.peer_address_->asString(), local_address.asString(),
-                             result.rc_));
-  udp_packet_processor.processPacket(std::move(output.local_address_),
-                                     std::move(output.peer_address_), std::move(buffer),
-                                     receive_time);
+  passPayloadToProcessor(result.rc_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+                         std::move(output.msg_[0].local_address_), udp_packet_processor,
+                         receive_time);
   return result;
 }
 

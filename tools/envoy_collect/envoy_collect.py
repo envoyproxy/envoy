@@ -4,7 +4,7 @@
 Example use:
 
   ./tools/envoy_collect.py --output-path=./envoy.tar -c
-  ./configs/google_com_proxy.v2.yaml --service-node foo
+  ./configs/envoyproxy_io_proxy.yaml --service-node foo
   <Ctrl-C>
   tar -tvf ./envoy.tar
   -rw------- htuch/eng         0 2017-08-13 21:13 access_0.log

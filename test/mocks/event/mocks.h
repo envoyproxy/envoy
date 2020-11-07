@@ -9,6 +9,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/signal.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
@@ -30,17 +31,20 @@ namespace Event {
 class MockDispatcher : public Dispatcher {
 public:
   MockDispatcher();
+  MockDispatcher(const std::string& name);
   ~MockDispatcher() override;
 
   // Dispatcher
+  const std::string& name() override { return name_; }
   TimeSource& timeSource() override { return time_system_; }
-  Network::ConnectionPtr
+  Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket) override {
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo&) override {
     // The caller expects both the socket and the transport socket to be moved.
     socket.reset();
     transport_socket.reset();
-    return Network::ConnectionPtr{createServerConnection_()};
+    return Network::ServerConnectionPtr{createServerConnection_()};
   }
 
   Network::ClientConnectionPtr
@@ -52,7 +56,7 @@ public:
         createClientConnection_(address, source_address, transport_socket, options)};
   }
 
-  FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+  FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override {
     return FileEventPtr{createFileEvent_(fd, cb, trigger, events)};
   }
@@ -62,17 +66,28 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::ListenerCallbacks& cb, bool bind_to_port) override {
-    return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port)};
+                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
+                                      uint32_t backlog_size) override {
+    return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port, backlog_size)};
   }
 
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
+  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                             Network::UdpListenerCallbacks& cb) override {
-    return Network::UdpListenerPtr{createUdpListener_(std::move(socket), cb)};
+    return Network::UdpListenerPtr{createUdpListener_(socket, cb)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
-    return Event::TimerPtr{createTimer_(cb)};
+    auto timer = Event::TimerPtr{createTimer_(cb)};
+    // Assert that the timer is not null to avoid confusing test failures down the line.
+    ASSERT(timer != nullptr);
+    return timer;
+  }
+
+  Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override {
+    auto schedulable_cb = Event::SchedulableCallbackPtr{createSchedulableCallback_(cb)};
+    // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
+    ASSERT(schedulable_cb != nullptr);
+    return schedulable_cb;
   }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
@@ -87,42 +102,47 @@ public:
   }
 
   // Event::Dispatcher
-  MOCK_METHOD2(initializeStats, void(Stats::Scope&, const std::string&));
-  MOCK_METHOD0(clearDeferredDeleteList, void());
-  MOCK_METHOD0(createServerConnection_, Network::Connection*());
-  MOCK_METHOD4(
-      createClientConnection_,
-      Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address,
-                                 Network::Address::InstanceConstSharedPtr source_address,
-                                 Network::TransportSocketPtr& transport_socket,
-                                 const Network::ConnectionSocket::OptionsSharedPtr& options));
-  MOCK_METHOD1(createDnsResolver,
-               Network::DnsResolverSharedPtr(
-                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));
-  MOCK_METHOD4(createFileEvent_,
-               FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
-  MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
-  MOCK_METHOD3(createListener_,
-               Network::Listener*(Network::SocketSharedPtr&& socket, Network::ListenerCallbacks& cb,
-                                  bool bind_to_port));
-  MOCK_METHOD2(createUdpListener_, Network::UdpListener*(Network::SocketSharedPtr&& socket,
-                                                         Network::UdpListenerCallbacks& cb));
-  MOCK_METHOD1(createTimer_, Timer*(Event::TimerCb cb));
-  MOCK_METHOD1(deferredDelete_, void(DeferredDeletable* to_delete));
-  MOCK_METHOD0(exit, void());
-  MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
-  MOCK_METHOD1(post, void(std::function<void()> callback));
-  MOCK_METHOD1(run, void(RunType type));
-  MOCK_METHOD1(setTrackedObject, const ScopeTrackedObject*(const ScopeTrackedObject* object));
-  MOCK_CONST_METHOD0(isThreadSafe, bool());
+  MOCK_METHOD(void, registerWatchdog,
+              (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
+  MOCK_METHOD(void, clearDeferredDeleteList, ());
+  MOCK_METHOD(Network::ServerConnection*, createServerConnection_, ());
+  MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
+              (Network::Address::InstanceConstSharedPtr address,
+               Network::Address::InstanceConstSharedPtr source_address,
+               Network::TransportSocketPtr& transport_socket,
+               const Network::ConnectionSocket::OptionsSharedPtr& options));
+  MOCK_METHOD(Network::DnsResolverSharedPtr, createDnsResolver,
+              (const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+               const bool use_tcp_for_dns_lookups));
+  MOCK_METHOD(FileEvent*, createFileEvent_,
+              (os_fd_t fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
+  MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
+  MOCK_METHOD(Network::Listener*, createListener_,
+              (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
+               bool bind_to_port, uint32_t backlog_size));
+  MOCK_METHOD(Network::UdpListener*, createUdpListener_,
+              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
+  MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
+  MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
+  MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
+  MOCK_METHOD(void, exit, ());
+  MOCK_METHOD(SignalEvent*, listenForSignal_, (int signal_num, SignalCb cb));
+  MOCK_METHOD(void, post, (std::function<void()> callback));
+  MOCK_METHOD(void, run, (RunType type));
+  MOCK_METHOD(const ScopeTrackedObject*, setTrackedObject, (const ScopeTrackedObject* object));
+  MOCK_METHOD(bool, isThreadSafe, (), (const));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
-  MOCK_METHOD0(getCurrentThreadId, Thread::ThreadId());
-  MOCK_CONST_METHOD0(approximateMonotonicTime, MonotonicTime());
-  MOCK_METHOD0(updateApproximateMonotonicTime, void());
+  MOCK_METHOD(Thread::ThreadId, getCurrentThreadId, ());
+  MOCK_METHOD(MonotonicTime, approximateMonotonicTime, (), (const));
+  MOCK_METHOD(void, updateApproximateMonotonicTime, ());
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
+
+private:
+  const std::string name_;
 };
 
 class MockTimer : public Timer {
@@ -144,17 +164,52 @@ public:
   }
 
   // Timer
-  MOCK_METHOD0(disableTimer, void());
-  MOCK_METHOD2(enableTimer,
-               void(const std::chrono::milliseconds&, const ScopeTrackedObject* scope));
-  MOCK_METHOD0(enabled, bool());
+  MOCK_METHOD(void, disableTimer, ());
+  MOCK_METHOD(void, enableTimer, (std::chrono::milliseconds, const ScopeTrackedObject* scope));
+  MOCK_METHOD(void, enableHRTimer, (std::chrono::microseconds, const ScopeTrackedObject* scope));
+  MOCK_METHOD(bool, enabled, ());
 
   MockDispatcher* dispatcher_{};
   const ScopeTrackedObject* scope_{};
   bool enabled_{};
 
-private:
   Event::TimerCb callback_;
+
+  // If not nullptr, will be set on dtor. This can help to verify that the timer was destroyed.
+  bool* timer_destroyed_{};
+};
+
+class MockScaledRangeTimerManager : public ScaledRangeTimerManager {
+public:
+  TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
+    return TimerPtr{createTimer_(minimum, std::move(callback))};
+  }
+  MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
+  MOCK_METHOD(void, setScaleFactor, (double), (override));
+};
+
+class MockSchedulableCallback : public SchedulableCallback {
+public:
+  MockSchedulableCallback(MockDispatcher* dispatcher);
+  ~MockSchedulableCallback() override;
+
+  void invokeCallback() {
+    EXPECT_TRUE(enabled_);
+    enabled_ = false;
+    callback_();
+  }
+
+  // SchedulableCallback
+  MOCK_METHOD(void, scheduleCallbackCurrentIteration, ());
+  MOCK_METHOD(void, scheduleCallbackNextIteration, ());
+  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(bool, enabled, ());
+
+  MockDispatcher* dispatcher_{};
+  bool enabled_{};
+
+private:
+  std::function<void()> callback_;
 };
 
 class MockSignalEvent : public SignalEvent {
@@ -170,8 +225,8 @@ public:
   MockFileEvent();
   ~MockFileEvent() override;
 
-  MOCK_METHOD1(activate, void(uint32_t events));
-  MOCK_METHOD1(setEnabled, void(uint32_t events));
+  MOCK_METHOD(void, activate, (uint32_t events));
+  MOCK_METHOD(void, setEnabled, (uint32_t events));
 };
 
 } // namespace Event

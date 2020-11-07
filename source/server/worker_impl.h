@@ -23,7 +23,7 @@ public:
       : tls_(tls), api_(api), hooks_(hooks) {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager& overload_manager,
+  WorkerPtr createWorker(uint32_t index, OverloadManager& overload_manager,
                          const std::string& worker_name) override;
 
 private:
@@ -39,20 +39,26 @@ class WorkerImpl : public Worker, Logger::Loggable<Logger::Id::main> {
 public:
   WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks, Event::DispatcherPtr&& dispatcher,
              Network::ConnectionHandlerPtr handler, OverloadManager& overload_manager,
-             Api::Api& api, const std::string& worker_name);
+             Api::Api& api);
 
   // Server::Worker
-  void addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) override;
-  uint64_t numConnections() override;
+  void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+                   AddListenerCompletion completion) override;
+  uint64_t numConnections() const override;
+
   void removeListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
+  void removeFilterChains(uint64_t listener_tag,
+                          const std::list<const Network::FilterChain*>& filter_chains,
+                          std::function<void()> completion) override;
   void start(GuardDog& guard_dog) override;
-  void initializeStats(Stats::Scope& scope, const std::string& prefix) override;
+  void initializeStats(Stats::Scope& scope) override;
   void stop() override;
   void stopListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
 
 private:
   void threadRoutine(GuardDog& guard_dog);
   void stopAcceptingConnectionsCb(OverloadActionState state);
+  void rejectIncomingConnectionsCb(OverloadActionState state);
 
   ThreadLocal::Instance& tls_;
   ListenerHooks& hooks_;
@@ -60,7 +66,6 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Api::Api& api_;
   Thread::ThreadPtr thread_;
-  const std::string worker_name_;
   WatchDogSharedPtr watch_dog_;
 };
 

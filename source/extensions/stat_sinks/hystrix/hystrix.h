@@ -19,12 +19,12 @@ namespace Hystrix {
 using RollingWindow = std::vector<uint64_t>;
 using RollingStatsMap = std::map<const std::string, RollingWindow>;
 
-using QuantileLatencyMap = std::unordered_map<double, double>;
+using QuantileLatencyMap = absl::node_hash_map<double, double>;
 static const std::vector<double> hystrix_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
                                                       0.95, 0.99, 0.995, 1};
 
-struct {
-  const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
+static const struct {
+  absl::string_view AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
 } AccessControlAllowHeadersValue;
 
 struct ClusterStatsCache {
@@ -47,8 +47,8 @@ using ClusterStatsCachePtr = std::unique_ptr<ClusterStatsCache>;
 
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
-  HystrixSink(Server::Instance& server, uint64_t num_buckets);
-  Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
+  HystrixSink(Server::Configuration::ServerFactoryContext& server, uint64_t num_buckets);
+  Http::Code handlerHystrixEventStream(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
@@ -149,15 +149,17 @@ private:
                             std::stringstream& ss);
 
   std::vector<Http::StreamDecoderFilterCallbacks*> callbacks_list_;
-  Server::Instance& server_;
+  Server::Configuration::ServerFactoryContext& server_;
   uint64_t current_index_;
   const uint64_t window_size_;
   static const uint64_t DEFAULT_NUM_BUCKETS = 10;
 
   // Map from cluster names to a struct of all of that cluster's stat windows.
-  std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
+  absl::node_hash_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
 
   // Saved StatNames for fast comparisons in loop.
+  // TODO(mattklein123): Many/all of these stats should just be pulled directly from the cluster
+  // stats directly. This needs some cleanup.
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName cluster_name_;
   const Stats::StatName cluster_upstream_rq_time_;

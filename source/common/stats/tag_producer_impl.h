@@ -4,11 +4,9 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/tag_extractor.h"
 #include "envoy/stats/tag_producer.h"
 
@@ -18,6 +16,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -29,7 +28,7 @@ namespace Stats {
  */
 class TagProducerImpl : public TagProducer {
 public:
-  TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config);
+  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config);
   TagProducerImpl() = default;
 
   /**
@@ -38,7 +37,7 @@ public:
    * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
    * @param tags std::vector a set of Stats::Tag.
    */
-  std::string produceTags(absl::string_view metric_name, std::vector<Tag>& tags) const override;
+  std::string produceTags(absl::string_view metric_name, TagVector& tags) const override;
 
 private:
   friend class DefaultTagRegexTester;
@@ -63,7 +62,7 @@ private:
    * Roughly estimate the size of the vectors.
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
    */
-  void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
+  void reserveResources(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
    * Adds all default extractors from well_known_names.cc into the
@@ -71,10 +70,10 @@ private:
    * into a string-set for dup-detection against new stat names
    * specified in the configuration.
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
-   * @return names std::unordered_set<std::string> the set of names to populate
+   * @return names absl::node_hash_set<std::string> the set of names to populate
    */
-  std::unordered_set<std::string>
-  addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config);
+  absl::node_hash_set<std::string>
+  addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
    * Iterates over every tag extractor that might possibly match stat_name, calling
@@ -99,7 +98,7 @@ private:
   // the storage for the prefix string is owned by the TagExtractor, which, depending on
   // implementation, may need make a copy of the prefix.
   absl::flat_hash_map<absl::string_view, std::vector<TagExtractorPtr>> tag_extractor_prefix_map_;
-  std::vector<Tag> default_tags_;
+  TagVector default_tags_;
 };
 
 } // namespace Stats

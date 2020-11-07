@@ -20,8 +20,8 @@ request, before the request arrive to the application code, without any changes 
 Configuration
 -------------
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.squash.v2.Squash>`
-* This filter should be configured with the name *envoy.squash*.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.squash.v3.Squash>`
+* This filter should be configured with the name *envoy.filters.http.squash*.
 
 How it works
 ------------

@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.h"
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.validate.h"
+#include "envoy/config/filter/thrift/router/v2alpha1/router.pb.h"
+#include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -13,8 +13,8 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 
@@ -43,7 +43,7 @@ public:
   TestNamedTransportConfigFactory(std::function<MockTransport*()> f) : f_(f) {}
 
   TransportPtr createTransport() override { return TransportPtr{f_()}; }
-  std::string name() override { return TransportNames::get().FRAMED; }
+  std::string name() const override { return TransportNames::get().FRAMED; }
 
   std::function<MockTransport*()> f_;
 };
@@ -53,7 +53,7 @@ public:
   TestNamedProtocolConfigFactory(std::function<MockProtocol*()> f) : f_(f) {}
 
   ProtocolPtr createProtocol() override { return ProtocolPtr{f_()}; }
-  std::string name() override { return ProtocolNames::get().BINARY; }
+  std::string name() const override { return ProtocolNames::get().BINARY; }
 
   std::function<MockProtocol*()> f_;
 };
@@ -85,7 +85,7 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager());
+    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -95,7 +95,7 @@ public:
   void initializeMetadata(MessageType msg_type, std::string method = "method") {
     msg_type_ = msg_type;
 
-    metadata_.reset(new MessageMetadata());
+    metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName(method);
     metadata_->setMessageType(msg_type_);
     metadata_->setSequenceId(1);
@@ -368,7 +368,7 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
         EXPECT_TRUE(end_stream);
       }));
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
@@ -377,7 +377,7 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
   startRequest(MessageType::Call);
 
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+      ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
 
 TEST_F(ThriftRouterTest, PoolTimeout) {
@@ -392,8 +392,7 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::Timeout);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Timeout);
 }
 
 TEST_F(ThriftRouterTest, PoolOverflowFailure) {
@@ -408,8 +407,8 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*too many connections.*"));
         EXPECT_TRUE(end_stream);
       }));
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::Overflow);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Overflow,
+                                                       true);
 }
 
 TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
@@ -419,7 +418,7 @@ TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
   EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   destroyRouter();
 }
@@ -437,6 +436,7 @@ TEST_F(ThriftRouterTest, NoRoute) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
 }
 
 TEST_F(ThriftRouterTest, NoCluster) {
@@ -455,6 +455,7 @@ TEST_F(ThriftRouterTest, NoCluster) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
 }
 
 TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
@@ -475,6 +476,7 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
 }
 
 TEST_F(ThriftRouterTest, NoHealthyHosts) {
@@ -496,6 +498,7 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
 }
 
 TEST_F(ThriftRouterTest, TruncatedResponse) {
@@ -603,6 +606,27 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/9037.
+TEST_F(ThriftRouterTest, DontCloseConnectionTwice) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::String);
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
+      }));
+  router_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  // Connection close shouldn't happen in onDestroy(), since it's been handled.
+  EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush)).Times(0);
+  destroyRouter();
+}
+
 TEST_F(ThriftRouterTest, UnexpectedRouterDestroyBeforeUpstreamConnect) {
   initializeRouter();
   startRequest(MessageType::Call);
@@ -653,6 +677,75 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
       }));
 
   context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+  EXPECT_NE(nullptr, upstream_callbacks_);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(*upgrade_response, onData(Ref(buffer))).WillOnce(Return(false));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  EXPECT_CALL(*upgrade_response, onData(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(*protocol_, completeUpgrade(_, Ref(*upgrade_response)));
+  EXPECT_CALL(callbacks_, continueDecoding());
+  EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+        EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+        EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+        EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+      }));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  // Then the actual request...
+  sendTrivialStruct(FieldType::String);
+  completeRequest();
+  returnResponse();
+  destroyRouter();
+}
+
+// Test the case where an upgrade will occur, but the conn pool
+// returns immediately with a valid, but never, used connection.
+TEST_F(ThriftRouterTest, ProtocolUpgradeOnExistingUnusedConnection) {
+  initializeRouter();
+
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
+
+  conn_state_.reset();
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+      .WillRepeatedly(
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, setConnectionState_(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
+
+  MockThriftObject* upgrade_response = new NiceMock<MockThriftObject>();
+
+  EXPECT_CALL(upstream_connection_, write(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_EQ("upgrade request", buffer.toString());
+      }));
+
+  // Simulate an existing connection that's never been used.
+  EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            context_.cluster_manager_.tcp_conn_pool_.newConnectionImpl(cb);
+
+            EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
+
+            EXPECT_CALL(*protocol_, attemptUpgrade(_, _, _))
+                .WillOnce(Invoke([&](Transport&, ThriftConnectionState&,
+                                     Buffer::Instance& buffer) -> ThriftObjectPtr {
+                  buffer.add("upgrade request");
+                  return ThriftObjectPtr{upgrade_response};
+                }));
+
+            context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+            return nullptr;
+          }));
+
+  startRequest(MessageType::Call);
+
   EXPECT_NE(nullptr, upstream_callbacks_);
 
   Buffer::OwnedImpl buffer;

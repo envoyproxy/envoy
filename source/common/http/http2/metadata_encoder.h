@@ -18,7 +18,9 @@ namespace Http2 {
 
 /**
  * A class that creates and sends METADATA payload. The METADATA payload is a group of string key
- * value pairs encoded in HTTP/2 header blocks.
+ * value pairs encoded in HTTP/2 header blocks. METADATA frames are constructed in two steps: first,
+ * the stream submits the frames' headers to nghttp2, and later, when nghttp2 prepares to send the
+ * frames, it calls back into this class in order to construct their payloads.
  */
 class MetadataEncoder : Logger::Loggable<Logger::Id::http2> {
 public:
@@ -32,7 +34,7 @@ public:
   bool createPayload(const MetadataMapVector& metadata_map_vector);
 
   /**
-   * @return true if there is payload to be submitted.
+   * @return true if there is payload left to be packed.
    */
   bool hasNextFrame();
 
@@ -40,21 +42,18 @@ public:
    * Creates the metadata frame payload for the next metadata frame.
    * @param buf is the pointer to the destination memory where the payload should be copied to. len
    * is the largest length the memory can hold.
-   * @return the size of frame payload.
+   * @return the size of frame payload, or -1 for failure.
    */
-  uint64_t packNextFramePayload(uint8_t* buf, const size_t len);
+  ssize_t packNextFramePayload(uint8_t* buf, const size_t len);
 
   /**
-   * Returns end_metadata value for the next metadata frame.
-   * @return end_metadata value.
+   * Returns a vector denoting the sequence of METADATA frames that this encoder expects to pack,
+   * and the flags to be set in each frame. This counts only frames that the encoder has not already
+   * packed; to get the full sequence of frames corresponding to the metadata map vector, call this
+   * before submitting any frames to nghttp2.
+   * @return A vector indicating the header byte in each METADATA frame, in sequence.
    */
-  uint8_t nextEndMetadata();
-
-  /**
-   * Estimates upper bound of the number of frames the payload_ can generate.
-   * @return frame count upper bound.
-   */
-  uint64_t frameCountUpperBound();
+  std::vector<uint8_t> payloadFrameFlagBytes();
 
 private:
   /**
@@ -86,9 +85,9 @@ private:
   Deflater deflater_;
 
   // Stores the remaining payload size of each metadata_map to be packed. The payload size is needed
-  // so that we know when END_METADATA should be set. The payload size gets updated when the payload
-  // is packed into metadata frames.
-  std::queue<uint64_t> payload_size_queue_;
+  // so that we know where to delineate between different metadata_maps in the payload_ buffer. The
+  // payload size gets updated when the payload is packed into metadata frames.
+  std::deque<uint64_t> payload_size_queue_;
 };
 
 } // namespace Http2

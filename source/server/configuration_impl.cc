@@ -6,7 +6,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
@@ -19,8 +22,6 @@
 #include "common/config/utility.h"
 #include "common/network/socket_option_factory.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -53,9 +54,18 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
-void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
+  // In order to support dynamic configuration of tracing providers,
+  // a former server-wide HttpTracer singleton has been replaced by
+  // an HttpTracer instance per "envoy.filters.network.http_connection_manager" filter.
+  // Tracing configuration as part of bootstrap config is still supported,
+  // however, it's become mandatory to process it prior to static Listeners.
+  // Otherwise, static Listeners will be configured in assumption that
+  // tracing configuration is missing from the bootstrap config.
+  initializeTracers(bootstrap.tracing(), server);
+
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
@@ -76,55 +86,95 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   stats_flush_interval_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
 
-  const auto& watchdog = bootstrap.watchdog();
-  watchdog_miss_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, miss_timeout, 200));
-  watchdog_megamiss_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, megamiss_timeout, 1000));
-  watchdog_kill_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, kill_timeout, 0));
-  watchdog_multikill_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
-
-  initializeTracers(bootstrap.tracing(), server);
+  initializeWatchdogs(bootstrap, server);
   initializeStatsSinks(bootstrap, server);
 }
 
-void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& configuration,
+void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& configuration,
                                  Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
+  // Default tracing configuration must be set prior to processing of static Listeners begins.
+  server.setDefaultTracingConfig(configuration);
+
   if (!configuration.has_http()) {
-    http_tracer_ = std::make_unique<Tracing::HttpNullTracer>();
     return;
   }
 
-  // Initialize tracing driver.
-  std::string type = configuration.http().name();
-  ENVOY_LOG(info, "  loading tracing driver: {}", type);
+  // Validating tracing configuration (minimally).
+  ENVOY_LOG(info, "  validating default server-wide tracing driver: {}",
+            configuration.http().name());
 
   // Now see if there is a factory that will accept the config.
-  auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
+  auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(configuration.http());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
-  http_tracer_ = factory.createHttpTracer(*message, server);
+
+  // Notice that the actual HttpTracer instance will be created on demand
+  // in the context of "envoy.filters.network.http_connection_manager" filter.
+  // The side effect of this is that provider-specific configuration
+  // is no longer validated in this step.
 }
 
-void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                     Instance& server) {
   ENVOY_LOG(info, "loading stats sink configuration");
 
-  for (const envoy::config::metrics::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
+  for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
-    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
+    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
-    stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
+    stats_sinks_.emplace_back(factory.createStatsSink(*message, server.serverFactoryContext()));
   }
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                   Instance& server) {
+  if (bootstrap.has_watchdog() && bootstrap.has_watchdogs()) {
+    throw EnvoyException("Only one of watchdog or watchdogs should be set!");
+  }
+
+  if (bootstrap.has_watchdog()) {
+    main_thread_watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+    worker_watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+  } else {
+    main_thread_watchdog_ =
+        std::make_unique<WatchdogImpl>(bootstrap.watchdogs().main_thread_watchdog(), server);
+    worker_watchdog_ =
+        std::make_unique<WatchdogImpl>(bootstrap.watchdogs().worker_watchdog(), server);
+  }
+}
+
+WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdog,
+                           Instance& server) {
+  miss_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, miss_timeout, 200));
+  megamiss_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, megamiss_timeout, 1000));
+
+  uint64_t kill_timeout = PROTOBUF_GET_MS_OR_DEFAULT(watchdog, kill_timeout, 0);
+  const uint64_t max_kill_timeout_jitter =
+      PROTOBUF_GET_MS_OR_DEFAULT(watchdog, max_kill_timeout_jitter, 0);
+
+  // Adjust kill timeout if we have skew enabled.
+  if (kill_timeout > 0 && max_kill_timeout_jitter > 0) {
+    // Increments the kill timeout with a random value in (0, max_skew].
+    // We shouldn't have overflow issues due to the range of Duration.
+    // This won't be entirely uniform, depending on how large max_skew
+    // is relation to uint64.
+    kill_timeout += (server.api().randomGenerator().random() % max_kill_timeout_jitter) + 1;
+  }
+
+  kill_timeout_ = std::chrono::milliseconds(kill_timeout);
+  multikill_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
+  multikill_threshold_ = PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(watchdog, multikill_threshold, 0.0);
+  actions_ = watchdog.actions();
+}
+
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   const auto& admin = bootstrap.admin();
   admin_.access_log_path_ = admin.access_log_path();
   admin_.profile_path_ =
@@ -149,7 +199,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
       layered_runtime_.add_layers()->mutable_admin_layer();
     }
   } else {
-    Config::translateRuntime(bootstrap.runtime(), layered_runtime_);
+    Config::translateRuntime(bootstrap.hidden_envoy_deprecated_runtime(), layered_runtime_);
   }
 }
 

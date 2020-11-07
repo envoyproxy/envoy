@@ -6,6 +6,7 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/config/protobuf_link_hacks.h"
 #include "common/event/libevent.h"
 
 #include "test/config_test/config_test.h"

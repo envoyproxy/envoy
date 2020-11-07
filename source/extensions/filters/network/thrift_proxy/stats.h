@@ -32,7 +32,7 @@ namespace ThriftProxy {
   HISTOGRAM(request_time_ms, Milliseconds)
 
 /**
- * Struct definition for all mongo proxy stats. @see stats_macros.h
+ * Struct definition for all thrift proxy stats. @see stats_macros.h
  */
 struct ThriftFilterStats {
   ALL_THRIFT_FILTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)

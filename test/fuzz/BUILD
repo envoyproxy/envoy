@@ -1,23 +1,29 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
 envoy_proto_library(
     name = "common_proto",
     srcs = ["common.proto"],
-    deps = ["@envoy_api//envoy/api/v2/core:pkg"],
+    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
 )
+
+exports_files(["headers.dict"])
 
 envoy_cc_test_library(
     name = "main",
     srcs = ["main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
     deps = [
         ":fuzz_runner_lib",
         "//source/common/common:assert_lib",
@@ -25,7 +31,10 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["//source/common/signal:sigaction_lib"],
+    }),
 )
 
 envoy_cc_test_library(
@@ -51,10 +60,30 @@ envoy_cc_test_library(
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "random_lib",
+    hdrs = ["random.h"],
+    deps = [
+        "//include/envoy/common:random_generator_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "random_test",
+    srcs = ["random_test.cc"],
+    deps = [
+        "//test/fuzz:random_lib",
     ],
 )

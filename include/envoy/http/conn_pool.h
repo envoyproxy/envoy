@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/common/conn_pool.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
@@ -12,28 +13,8 @@ namespace Envoy {
 namespace Http {
 namespace ConnectionPool {
 
-/**
- * Handle that allows a pending request to be cancelled before it is bound to a connection.
- */
-class Cancellable {
-public:
-  virtual ~Cancellable() = default;
-
-  /**
-   * Cancel the pending request.
-   */
-  virtual void cancel() PURE;
-};
-
-/**
- * Reason that a pool stream could not be obtained.
- */
-enum class PoolFailureReason {
-  // A resource overflowed and policy prevented a new stream from being created.
-  Overflow,
-  // A connection failure took place and the stream could not be bound.
-  ConnectionFailure
-};
+using PoolFailureReason = ::Envoy::ConnectionPool::PoolFailureReason;
+using Cancellable = ::Envoy::ConnectionPool::Cancellable;
 
 /**
  * Pool callbacks invoked in the context of a newStream() call, either synchronously or
@@ -60,15 +41,14 @@ public:
    *             connection pools the description may be different each time this is called.
    * @param info supplies the stream info object associated with the upstream connection.
    */
-  virtual void onPoolReady(Http::StreamEncoder& encoder,
-                           Upstream::HostDescriptionConstSharedPtr host,
+  virtual void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
                            const StreamInfo::StreamInfo& info) PURE;
 };
 
 /**
  * An instance of a generic connection pool.
  */
-class Instance : public Event::DeferredDeletable {
+class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
 public:
   ~Instance() override = default;
 
@@ -76,27 +56,6 @@ public:
    * @return Http::Protocol Reports the protocol in use by this connection pool.
    */
   virtual Http::Protocol protocol() const PURE;
-
-  /**
-   * Called when a connection pool has been drained of pending requests, busy connections, and
-   * ready connections.
-   */
-  using DrainedCb = std::function<void()>;
-
-  /**
-   * Register a callback that gets called when the connection pool is fully drained. No actual
-   * draining is done. The owner of the connection pool is responsible for not creating any
-   * new streams.
-   */
-  virtual void addDrainedCallback(DrainedCb cb) PURE;
-
-  /**
-   * Actively drain all existing connection pool connections. This method can be used in cases
-   * where the connection pool is not being destroyed, but the caller wishes to make sure that
-   * all new streams take place on a new connection. For example, when a health check failure
-   * occurs.
-   */
-  virtual void drainConnections() PURE;
 
   /**
    * Determines whether the connection pool is actively processing any requests.
@@ -119,12 +78,8 @@ public:
    * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
    *          the callbacks are called.
    */
-  virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks) PURE;
-
-  /**
-   * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.
-   */
-  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
+  virtual Cancellable* newStream(Http::ResponseDecoder& response_decoder,
+                                 Callbacks& callbacks) PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;

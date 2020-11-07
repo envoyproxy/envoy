@@ -1,15 +1,15 @@
-licenses(["notice"])  # Apache 2
-
-# tap wrapper around a transport socket.
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+# tap wrapper around a transport socket.
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "tap_config_interface",
@@ -28,6 +28,8 @@ envoy_cc_library(
         ":tap_config_interface",
         "//source/common/network:utility_lib",
         "//source/extensions/common/tap:tap_config_base",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -40,8 +42,8 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/tap:extension_config_base",
-        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/data/tap/v2alpha:pkg_cc_proto",
+        "//source/extensions/transport_sockets/common:passthrough_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -49,6 +51,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # TODO(#9953) clean up.
+    extra_visibility = [
+        "//test/common/access_log:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "alpha",
     deps = [
@@ -60,6 +67,7 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
     ],
 )

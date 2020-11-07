@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -16,12 +16,12 @@ namespace AdaptiveConcurrency {
  */
 class AdaptiveConcurrencyFilterFactory
     : public Common::FactoryBase<
-          envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency> {
+          envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency> {
 public:
   AdaptiveConcurrencyFilterFactory() : FactoryBase(HttpFilterNames::get().AdaptiveConcurrency) {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
+      const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
           proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

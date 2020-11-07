@@ -10,7 +10,7 @@ service1 makes an API call to service2 before returning a response.
 The three containers will be deployed inside a virtual network called ``envoymesh``.
 
 All incoming requests are routed via the front Envoy, which is acting as a reverse proxy
-sitting on the edge of the ``envoymesh`` network. Port ``80`` is mapped to  port ``8000``
+sitting on the edge of the ``envoymesh`` network. Port ``8000`` is exposed
 by docker compose (see :repo:`/examples/zipkin-tracing/docker-compose.yaml`). Notice that
 all Envoys are configured to collect request traces (e.g., http_connection_manager/config/tracing setup in
 :repo:`/examples/zipkin-tracing/front-envoy-zipkin.yaml`) and setup to propagate the spans generated
@@ -29,16 +29,14 @@ calls to other services. In the sandbox we have provided, the simple flask app
 (see trace function in :repo:`/examples/front-proxy/service.py`) acting as service1 propagates
 the trace headers while making an outbound call to service2.
 
+.. include:: _include/docker-env-setup.rst
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
+Step 3: Build the sandbox
+*************************
 
-The following documentation runs through the setup of an Envoy cluster organized
-as is described in the image above.
+To build this sandbox example, and start the example apps run the following commands:
 
-**Step 1: Build the sandbox**
-
-To build this sandbox example, and start the example apps run the following commands::
+.. code-block:: console
 
     $ pwd
     envoy/examples/zipkin-tracing
@@ -46,16 +44,19 @@ To build this sandbox example, and start the example apps run the following comm
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                Name                          Command             State                            Ports
-    -----------------------------------------------------------------------------------------------------------------------------
-    zipkin-tracing_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-    zipkin-tracing_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
-    zipkin-tracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
+                Name                          Command             State            Ports
+    -------------------------------------------------------------------------------------------------------
+    zipkin-tracing_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
+    zipkin-tracing_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
+    zipkin-tracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
     zipkin-tracing_zipkin_1        /busybox/sh run.sh             Up      9410/tcp, 0.0.0.0:9411->9411/tcp
 
-**Step 2: Generate some load**
+Step 4: Generate some load
+**************************
 
-You can now send a request to service1 via the front-envoy as follows::
+You can now send a request to service1 via the front-envoy as follows:
+
+.. code-block:: console
 
     $ curl -v localhost:8000/trace/1
     *   Trying 192.168.99.100...
@@ -75,7 +76,8 @@ You can now send a request to service1 via the front-envoy as follows::
     Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
     * Connection #0 to host 192.168.99.100 left intact
 
-**Step 3: View the traces in Zipkin UI**
+Step 5: View the traces in Zipkin UI
+************************************
 
 Point your browser to http://localhost:9411 . You should see the Zipkin dashboard.
 Set the service to "front-proxy" and set the start time to a few minutes before

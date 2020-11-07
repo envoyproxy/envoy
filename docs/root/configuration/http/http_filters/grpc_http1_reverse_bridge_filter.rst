@@ -4,7 +4,7 @@ gRPC HTTP/1.1 reverse bridge
 ============================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig>`
 * This filter should be configured with the name *envoy.filters.http.grpc_http1_reverse_bridge*.
 
 This is a filter that enables converting an incoming gRPC request into a HTTP/1.1 request to allow
@@ -42,80 +42,5 @@ with the gRPC frame header and respond with gRPC formatted responses.
 How to disable HTTP/1.1 reverse bridge filter per route
 -------------------------------------------------------
 
-.. code-block:: yaml
-
-  admin:
-    access_log_path: /dev/stdout
-    address:
-      socket_address:
-        address: 0.0.0.0
-        port_value: 9901
-  static_resources:
-    listeners:
-    - name: listener_0
-      address:
-        socket_address:
-          address: 0.0.0.0
-          port_value: 80
-      filter_chains:
-      - filters:
-        - name: envoy.http_connection_manager
-          config:
-            access_log:
-            - name: envoy.file_access_log
-              config:
-                path: /dev/stdout
-            stat_prefix: ingress_http
-            route_config:
-              name: local_route
-              virtual_hosts:
-              - name: local_service
-                domains: ["*"]
-                routes:
-                - match:
-                    prefix: "/route-with-filter-disabled"
-                  route:
-                    host_rewrite: localhost
-                    cluster: grpc
-                    timeout: 5.00s
-                  # per_filter_config disables the filter for this route
-                  per_filter_config:
-                    envoy.filters.http.grpc_http1_reverse_bridge:
-                      disabled: true
-                - match:
-                    prefix: "/route-with-filter-enabled"
-                  route:
-                    host_rewrite: localhost
-                    cluster: other
-                    timeout: 5.00s
-            http_filters:
-            - name: envoy.filters.http.grpc_http1_reverse_bridge
-              config:
-                content_type: application/grpc+proto
-                withhold_grpc_frames: true
-            - name: envoy.router
-              config: {}
-    clusters:
-    - name: other
-      connect_timeout: 5.00s
-      type: LOGICAL_DNS
-      dns_lookup_family: V4_ONLY
-      lb_policy: ROUND_ROBIN
-      hosts:
-        - socket_address:
-            address: localhost
-            port_value: 4630
-    - name: grpc
-      connect_timeout: 5.00s
-      type: strict_dns
-      lb_policy: round_robin
-      http2_protocol_options: {}
-      load_assignment:
-        cluster_name: grpc
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: localhost
-                      port_value: 10005
+.. literalinclude:: _include/grpc-reverse-bridge-filter.yaml
+    :language: yaml

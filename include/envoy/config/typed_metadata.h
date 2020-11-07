@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -50,18 +51,9 @@ protected:
  * Typed metadata should implement this factory and register via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class TypedMetadataFactory {
+class TypedMetadataFactory : public UntypedFactory {
 public:
-  virtual ~TypedMetadataFactory() = default;
-
-  /**
-   * Name of the factory, a reversed DNS name is encouraged to avoid cross-org conflict.
-   * It's used as key in the metadata map, as well as key in the factory registry.
-   * When building a TypedMetadata from envoy::api::v2::core::Metadata, if the key is not found, the
-   * parse will not be called and the corresponding typedMetadata entry will be set to nullptr.
-   * @return the name of the factory.
-   */
-  virtual const std::string name() const PURE;
+  ~TypedMetadataFactory() override = default;
 
   /**
    * Convert the google.protobuf.Struct into an instance of TypedMetadata::Object.
@@ -72,6 +64,8 @@ public:
    */
   virtual std::unique_ptr<const TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& data) const PURE;
+
+  std::string category() const override { return "envoy.typed_metadata"; }
 };
 
 } // namespace Config

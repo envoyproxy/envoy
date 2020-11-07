@@ -1,9 +1,13 @@
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
+#include "test/integration/ssl_utility.h"
 
 namespace Envoy {
 namespace {
@@ -14,34 +18,25 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  static std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
-    switch (version) {
-    case Network::Address::IpVersion::v4:
-      return "V4_ONLY";
-    case Network::Address::IpVersion::v6:
-      return "V6_ONLY";
-    }
-
-    // This seems to be needed on the coverage build for some reason.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
-  void setup(uint64_t max_hosts = 1024) {
+  void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
 
     const std::string filter = fmt::format(R"EOF(
-name: envoy.filters.http.dynamic_forward_proxy
+name: dynamic_forward_proxy
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
     max_hosts: {}
+    dns_cache_circuit_breaker:
+      max_pending_requests: {}
 )EOF",
-                                           ipVersionToDnsFamily(GetParam()), max_hosts);
+                                           Network::Test::ipVersionToDnsFamily(GetParam()),
+                                           max_hosts, max_pending_requests);
     config_helper_.addFilter(filter);
 
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
@@ -49,17 +44,17 @@ typed_config:
 
     // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
-        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
 
     // Setup the initial CDS cluster.
     cluster_.mutable_connect_timeout()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     cluster_.set_name("cluster_0");
-    cluster_.set_lb_policy(envoy::api::v2::Cluster::CLUSTER_PROVIDED);
+    cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
 
     if (upstream_tls_) {
-      envoy::api::v2::auth::UpstreamTlsContext tls_context;
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       auto* validation_context =
           tls_context.mutable_common_tls_context()->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
@@ -68,19 +63,25 @@ typed_config:
       cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
     }
 
-    const std::string cluster_type_config =
-        fmt::format(R"EOF(
+    const std::string cluster_type_config = fmt::format(
+        R"EOF(
 name: envoy.clusters.dynamic_forward_proxy
 typed_config:
-  "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+  "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
     max_hosts: {}
+    dns_cache_circuit_breaker:
+      max_pending_requests: {}
 )EOF",
-                    ipVersionToDnsFamily(GetParam()), max_hosts);
+        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests);
 
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
+    cluster_.mutable_circuit_breakers()
+        ->add_thresholds()
+        ->mutable_max_pending_requests()
+        ->set_value(max_pending_requests);
 
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({cluster_});
@@ -91,35 +92,23 @@ typed_config:
 
   void createUpstreams() override {
     if (upstream_tls_) {
-      fake_upstreams_.emplace_back(new FakeUpstream(
-          createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+      addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
+                                                        factory_context_),
+                      FakeHttpConnection::Type::HTTP1);
     } else {
       HttpIntegrationTest::createUpstreams();
     }
   }
 
-  // TODO(mattklein123): This logic is duplicated in various places. Cleanup in a follow up.
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::api::v2::auth::DownstreamTlsContext tls_context;
-    auto* common_tls_context = tls_context.mutable_common_tls_context();
-    auto* tls_cert = common_tls_context->add_tls_certificates();
-    tls_cert->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
-        fmt::format("test/config/integration/certs/{}cert.pem", upstream_cert_name_)));
-    tls_cert->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
-        fmt::format("test/config/integration/certs/{}key.pem", upstream_cert_name_)));
-
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
-
-    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+  void disableDnsCacheCircuitBreakers() {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_dns_cache_circuit_breakers",
+                                      "false");
   }
 
   bool upstream_tls_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
-  envoy::api::v2::Cluster cluster_;
+  envoy::config::cluster::v3::Cluster cluster_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
@@ -131,7 +120,31 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+
+  // Now send another request. This should hit the DNS cache.
+  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
+  checkSimpleRequestSuccess(512, 512, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+}
+
+TEST_P(ProxyFilterIntegrationTest, RequestWithBodyWithClusterCircuitBreaker) {
+  disableDnsCacheCircuitBreakers();
+  setup();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -156,7 +169,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
 TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -192,7 +205,7 @@ TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
 TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -208,7 +221,7 @@ TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
   cleanupUpstreamAndDownstream();
 
   // > 5m
-  simTime().sleep(std::chrono::milliseconds(300001));
+  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
   test_server_->waitForGaugeEq("dns_cache.foo.num_hosts", 0);
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_removed")->value());
 }
@@ -218,7 +231,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
   setup(1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -230,14 +243,14 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
   checkSimpleRequestSuccess(1024, 1024, response.get());
 
   // Send another request, this should lead to a response directly from the filter.
-  const Http::TestHeaderMapImpl request_headers2{
+  const Http::TestRequestHeaderMapImpl request_headers2{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
       {":authority", fmt::format("localhost2", fake_upstreams_[0]->localAddress()->ip()->port())}};
   response = codec_client_->makeHeaderOnlyRequest(request_headers2);
   response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_overflow")->value());
 }
 
@@ -246,7 +259,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   upstream_tls_ = true;
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -256,11 +269,10 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ("localhost",
-               SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+  EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -271,21 +283,20 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   upstream_tls_ = true;
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
-      {":authority", fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()),
-                                 fake_upstreams_[0]->localAddress()->ip()->port())}};
+      {":authority", fake_upstreams_[0]->localAddress()->asString()}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
   // No SNI for IP hosts.
-  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -297,13 +308,10 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
   upstream_tls_ = true;
   upstream_cert_name_ = "upstream";
   setup();
-  // The upstream connection is going to fail handshake so make sure it can read and we expect
-  // it to disconnect.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   fake_upstreams_[0]->setReadDisableOnNewConnection(false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -312,9 +320,48 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ssl.fail_verify_san")->value());
+}
+
+TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
+  setup(1024, 0);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+  response->waitForEndStream();
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_rq_pending_overflow")->value());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(ProxyFilterIntegrationTest, ClusterCircuitBreakersInvoked) {
+  disableDnsCacheCircuitBreakers();
+  setup(1024, 0);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+  response->waitForEndStream();
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
 } // namespace

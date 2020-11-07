@@ -54,7 +54,7 @@ private:
     void encodeData(Buffer::Instance& data);
 
     // Tcp::ConnectionPool::Callbacks
-    void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+    void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
@@ -63,7 +63,7 @@ private:
     void onRequestComplete();
     void onResponseComplete();
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
-    void onResetStream(Tcp::ConnectionPool::PoolFailureReason reason);
+    void onResetStream(ConnectionPool::PoolFailureReason reason);
 
     Router& parent_;
     Tcp::ConnectionPool::Instance& conn_pool_;

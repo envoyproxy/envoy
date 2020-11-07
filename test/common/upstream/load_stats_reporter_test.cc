@@ -1,14 +1,15 @@
 #include <memory>
 
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/endpoint/load_report.pb.h"
+#include "envoy/config/endpoint/v3/load_report.pb.h"
+#include "envoy/service/load_stats/v3/lrs.pb.h"
 
 #include "common/upstream/load_stats_reporter.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -44,21 +45,25 @@ public:
       return response_timer_;
     }));
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
+        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_),
+        envoy::config::core::v3::ApiVersion::AUTO, dispatcher_);
   }
 
   void expectSendMessage(
-      const std::vector<envoy::api::v2::endpoint::ClusterStats>& expected_cluster_stats) {
-    envoy::service::load_stats::v2::LoadStatsRequest expected_request;
+      const std::vector<envoy::config::endpoint::v3::ClusterStats>& expected_cluster_stats) {
+    envoy::service::load_stats::v3::LoadStatsRequest expected_request;
     expected_request.mutable_node()->MergeFrom(local_info_.node());
+    expected_request.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),
               Protobuf::RepeatedPtrFieldBackInserter(expected_request.mutable_cluster_stats()));
-    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
+    EXPECT_CALL(
+        async_stream_,
+        sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_request), false));
   }
 
   void deliverLoadStatsResponse(const std::vector<std::string>& cluster_names) {
-    std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse> response(
-        new envoy::service::load_stats::v2::LoadStatsResponse());
+    std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse> response(
+        new envoy::service::load_stats::v3::LoadStatsResponse());
     response->mutable_load_reporting_interval()->set_seconds(42);
     std::copy(cluster_names.begin(), cluster_names.end(),
               Protobuf::RepeatedPtrFieldBackInserter(response->mutable_clusters()));
@@ -127,7 +132,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   time_system_.setMonotonicTime(std::chrono::microseconds(4));
   {
-    envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
+    envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
     foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(5);
@@ -150,13 +155,13 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   time_system_.setMonotonicTime(std::chrono::microseconds(28));
   {
-    envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
+    envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
     foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(2);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
-    envoy::api::v2::endpoint::ClusterStats bar_cluster_stats;
+    envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
     bar_cluster_stats.set_total_dropped_requests(1);
     bar_cluster_stats.mutable_load_report_interval()->MergeFrom(
@@ -177,7 +182,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   time_system_.setMonotonicTime(std::chrono::microseconds(33));
   {
-    envoy::api::v2::endpoint::ClusterStats bar_cluster_stats;
+    envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
     bar_cluster_stats.set_total_dropped_requests(6);
     bar_cluster_stats.mutable_load_report_interval()->MergeFrom(
@@ -199,13 +204,13 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   time_system_.setMonotonicTime(std::chrono::microseconds(47));
   {
-    envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
+    envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
     foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(1);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(4));
-    envoy::api::v2::endpoint::ClusterStats bar_cluster_stats;
+    envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
     bar_cluster_stats.set_total_dropped_requests(2);
     bar_cluster_stats.mutable_load_report_interval()->MergeFrom(

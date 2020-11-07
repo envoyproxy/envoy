@@ -9,17 +9,18 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
-class TcpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+
+struct TcpProxyIntegrationTestParams {
+  Network::Address::IpVersion version;
+  bool test_original_version;
+};
+
+class TcpProxyIntegrationTest : public testing::TestWithParam<TcpProxyIntegrationTestParams>,
                                 public BaseIntegrationTest {
 public:
-  TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {
+  TcpProxyIntegrationTest()
+      : BaseIntegrationTest(GetParam().version, ConfigHelper::tcpProxyConfig()) {
     enable_half_close_ = true;
-  }
-
-  ~TcpProxyIntegrationTest() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void initialize() override;
@@ -42,5 +43,4 @@ public:
   FakeRawConnectionPtr fake_upstream_connection_;
 };
 
-} // namespace
 } // namespace Envoy

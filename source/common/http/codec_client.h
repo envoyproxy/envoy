@@ -4,6 +4,7 @@
 #include <list>
 #include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
@@ -76,7 +77,7 @@ public:
   /**
    * @return the underlying connection ID.
    */
-  uint64_t id() { return connection_->id(); }
+  uint64_t id() const { return connection_->id(); }
 
   /**
    * @return the underlying codec protocol.
@@ -100,7 +101,7 @@ public:
    * @param response_decoder supplies the decoder to use for response callbacks.
    * @return StreamEncoder& the encoder to use for encoding the request.
    */
-  StreamEncoder& newStream(StreamDecoder& response_decoder);
+  RequestEncoder& newStream(ResponseDecoder& response_decoder);
 
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {
     connection_->setConnectionStats(stats);
@@ -131,9 +132,9 @@ protected:
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 
   // Http::ConnectionCallbacks
-  void onGoAway() override {
+  void onGoAway(GoAwayErrorCode error_code) override {
     if (codec_callbacks_) {
-      codec_callbacks_->onGoAway();
+      codec_callbacks_->onGoAway(error_code);
     }
   }
 
@@ -155,9 +156,11 @@ protected:
   }
 
   const Type type_;
-  ClientConnectionPtr codec_;
-  Network::ClientConnectionPtr connection_;
+  // The order of host_, connection_, and codec_ matter as during destruction each can refer to
+  // the previous, at least in tests.
   Upstream::HostDescriptionConstSharedPtr host_;
+  Network::ClientConnectionPtr connection_;
+  ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
 
@@ -186,9 +189,9 @@ private:
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
                          public StreamCallbacks,
-                         public StreamDecoderWrapper {
-    ActiveRequest(CodecClient& parent, StreamDecoder& inner)
-        : StreamDecoderWrapper(inner), parent_(parent) {}
+                         public ResponseDecoderWrapper {
+    ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
+        : ResponseDecoderWrapper(inner), parent_(parent) {}
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -201,7 +204,7 @@ private:
     void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
-    StreamEncoder* encoder_{};
+    RequestEncoder* encoder_{};
     CodecClient& parent_;
   };
 
@@ -243,7 +246,8 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+                  Random::RandomGenerator& random_generator);
 };
 
 } // namespace Http

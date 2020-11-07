@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <string>
 
 #include "envoy/network/address.h"
@@ -24,7 +25,7 @@ namespace Test {
  *          listening, else nullptr if the address and port are not free.
  */
 Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
-                                                    Address::SocketType type);
+                                                    Socket::Type type);
 
 /**
  * As above, but addr_port is specified as a string. For example:
@@ -34,14 +35,14 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
  *    - [::]:45678       Check whether a specific port on all local IPv6 addresses is free.
  */
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
-                                                    Address::SocketType type);
+                                                    Socket::Type type);
 
 /**
  * Get a URL ready IP loopback address as a string.
  * @param version IP address version of loopback address.
  * @return std::string URL ready loopback address as a string.
  */
-const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
+std::string getLoopbackAddressUrlString(const Address::IpVersion version);
 
 /**
  * Get a IP loopback address as a string. There are no square brackets around IPv6 addresses, this
@@ -49,28 +50,28 @@ const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
  * @param version IP address version of loopback address.
  * @return std::string loopback address as a string.
  */
-const std::string getLoopbackAddressString(const Address::IpVersion version);
+std::string getLoopbackAddressString(const Address::IpVersion version);
 
 /**
  * Get a URL ready IP any address as a string.
  * @param version IP address version of any address.
  * @return std::string URL ready any address as a string.
  */
-const std::string getAnyAddressUrlString(const Address::IpVersion version);
+std::string getAnyAddressUrlString(const Address::IpVersion version);
 
 /**
  * Get an IP any address as a string.
  * @param version IP address version of any address.
  * @return std::string any address as a string.
  */
-const std::string getAnyAddressString(const Address::IpVersion version);
+std::string getAnyAddressString(const Address::IpVersion version);
 
 /**
  * Return a string version of enum IpVersion version.
  * @param version IP address version.
  * @return std::string string version of IpVersion.
  */
-const std::string addressVersionAsString(const Address::IpVersion version);
+std::string addressVersionAsString(const Address::IpVersion version);
 
 /**
  * Returns a loopback address for the specified IP version (127.0.0.1 for IPv4 and ::1 for IPv6).
@@ -100,15 +101,21 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version,
 bool supportsIpVersion(const Address::IpVersion version);
 
 /**
+ * Returns the DNS family for the specified IP version.
+ * @param version the IP version of the DNS lookup family.
+ */
+std::string ipVersionToDnsFamily(Network::Address::IpVersion version);
+
+/**
  * Bind a socket to a free port on a loopback address, and return the socket's fd and bound address.
- * Enables a test server to reliably "select" a port to listen on. Note that the socket option
- * SO_REUSEADDR has NOT been set on the socket.
+ * Enables a test server to reliably "select" a port to listen on.
  * @param version the IP version of the loopback address.
  * @param type the type of socket to be bound.
+ * @param reuse_port specifies whether the socket option SO_REUSEADDR has been set on the socket.
  * @returns the address and the fd of the socket bound to that address.
  */
-std::pair<Address::InstanceConstSharedPtr, IoHandlePtr>
-bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type);
+std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_port = false);
 
 /**
  * Create a transport socket for testing purposes.
@@ -137,6 +144,10 @@ public:
     return *transport_socket_factory_;
   }
 
+  std::chrono::milliseconds transportSocketConnectTimeout() const override {
+    return std::chrono::milliseconds::zero();
+  }
+
   const std::vector<FilterFactoryCb>& networkFilterFactories() const override {
     return empty_network_filter_factory_;
   }
@@ -162,10 +173,32 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
 
 /**
  * Wrapper for Utility::readFromSocket() which reads a single datagram into the supplied
- * UdpRecvData without worrying about the packet processor interface.
+ * UdpRecvData without worrying about the packet processor interface. The function will
+ * instantiate the buffer returned in data.
  */
 Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
                                        UdpRecvData& data);
+
+/**
+ * A synchronous UDP peer that can be used for testing.
+ */
+class UdpSyncPeer {
+public:
+  UdpSyncPeer(Network::Address::IpVersion version);
+
+  // Writer a datagram to a remote peer.
+  void write(const std::string& buffer, const Network::Address::Instance& peer);
+
+  // Receive a datagram.
+  void recv(Network::UdpRecvData& datagram);
+
+  // Return the local peer's socket address.
+  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+
+private:
+  const Network::SocketPtr socket_;
+  std::list<Network::UdpRecvData> received_datagrams_;
+};
 
 } // namespace Test
 } // namespace Network

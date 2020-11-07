@@ -3,10 +3,12 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
+#include "common/common/matchers.h"
 #include "common/common/non_copyable.h"
 #include "common/stats/metric_impl.h"
 
@@ -15,32 +17,53 @@
 namespace Envoy {
 namespace Stats {
 
+class HistogramSettingsImpl : public HistogramSettings {
+public:
+  HistogramSettingsImpl() = default;
+  HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config);
+
+  // HistogramSettings
+  const ConstSupportedBuckets& buckets(absl::string_view stat_name) const override;
+
+  static ConstSupportedBuckets& defaultBuckets();
+
+private:
+  using Config = std::pair<Matchers::StringMatcherImpl, ConstSupportedBuckets>;
+  const std::vector<Config> configs_{};
+};
+
 /**
  * Implementation of HistogramStatistics for circllhist.
  */
 class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
 public:
-  HistogramStatisticsImpl() : computed_quantiles_(supportedQuantiles().size(), 0.0) {}
+  HistogramStatisticsImpl();
+
   /**
    * HistogramStatisticsImpl object is constructed using the passed in histogram.
    * @param histogram_ptr pointer to the histogram for which stats will be calculated. This pointer
    * will not be retained.
    */
-  HistogramStatisticsImpl(const histogram_t* histogram_ptr);
+  HistogramStatisticsImpl(
+      const histogram_t* histogram_ptr,
+      ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
+
+  static ConstSupportedBuckets& defaultSupportedBuckets();
 
   void refresh(const histogram_t* new_histogram_ptr);
 
   // HistogramStatistics
   std::string quantileSummary() const override;
   std::string bucketSummary() const override;
-  const std::vector<double>& supportedQuantiles() const override;
+  const std::vector<double>& supportedQuantiles() const final;
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
-  const std::vector<double>& supportedBuckets() const override;
+  ConstSupportedBuckets& supportedBuckets() const override { return supported_buckets_; }
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
   uint64_t sampleCount() const override { return sample_count_; }
   double sampleSum() const override { return sample_sum_; }
 
 private:
+  ConstSupportedBuckets& supported_buckets_;
   std::vector<double> computed_quantiles_;
   std::vector<uint64_t> computed_buckets_;
   uint64_t sample_count_;
@@ -49,9 +72,9 @@ private:
 
 class HistogramImplHelper : public MetricImpl<Histogram> {
 public:
-  HistogramImplHelper(StatName name, const std::string& tag_extracted_name,
-                      const std::vector<Tag>& tags, SymbolTable& symbol_table)
-      : MetricImpl<Histogram>(name, tag_extracted_name, tags, symbol_table) {}
+  HistogramImplHelper(StatName name, StatName tag_extracted_name,
+                      const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table)
+      : MetricImpl<Histogram>(name, tag_extracted_name, stat_name_tags, symbol_table) {}
   HistogramImplHelper(SymbolTable& symbol_table) : MetricImpl<Histogram>(symbol_table) {}
 
   // RefcountInterface
@@ -68,10 +91,10 @@ private:
  */
 class HistogramImpl : public HistogramImplHelper {
 public:
-  HistogramImpl(StatName name, Unit unit, Store& parent, const std::string& tag_extracted_name,
-                const std::vector<Tag>& tags)
-      : HistogramImplHelper(name, tag_extracted_name, tags, parent.symbolTable()), unit_(unit),
-        parent_(parent) {}
+  HistogramImpl(StatName name, Unit unit, Store& parent, StatName tag_extracted_name,
+                const StatNameTagVector& stat_name_tags)
+      : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, parent.symbolTable()),
+        unit_(unit), parent_(parent) {}
   ~HistogramImpl() override {
     // We must explicitly free the StatName here in order to supply the
     // SymbolTable reference. An RAII alternative would be to store a
@@ -85,7 +108,7 @@ public:
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
-  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+  SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
 private:
   Unit unit_;

@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
@@ -8,6 +6,8 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -25,6 +25,7 @@ envoy_cc_test_library(
     hdrs = ["environment.h"],
     external_deps = [
         "abseil_optional",
+        "abseil_symbolize",
         "bazel_runfiles",
     ],
     deps = [
@@ -34,11 +35,15 @@ envoy_cc_test_library(
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
         "//test/common/runtime:utility_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["//source/common/signal:sigaction_lib"],
+    }),
 )
 
 envoy_cc_test_library(
@@ -50,9 +55,20 @@ envoy_cc_test_library(
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "network_utility_test",
+    srcs = ["network_utility_test.cc"],
+    deps = [
+        ":environment_lib",
+        ":network_utility_lib",
     ],
 )
 
@@ -87,6 +103,12 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "resources_lib",
+    hdrs = ["resources.h"],
+    deps = ["//source/common/singleton:const_singleton"],
+)
+
+envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -95,6 +117,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":file_system_for_test_lib",
+        ":resources_lib",
         ":test_time_lib",
         ":thread_factory_for_test_lib",
         "//include/envoy/buffer:buffer_interface",
@@ -104,7 +127,9 @@ envoy_cc_test_library(
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:resources_lib",
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:opaque_resource_decoder_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",
@@ -112,13 +137,15 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -134,6 +161,7 @@ envoy_cc_test_library(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -162,7 +190,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     deps = [
         ":utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -215,7 +243,6 @@ envoy_cc_test_library(
     hdrs = ["test_time.h"],
     deps = [
         ":global_lib",
-        ":only_one_thread_lib",
         ":test_time_system_interface",
         "//source/common/event:real_time_system_lib",
     ],
@@ -227,6 +254,8 @@ envoy_cc_test_library(
     hdrs = ["test_time_system.h"],
     deps = [
         ":global_lib",
+        ":only_one_thread_lib",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_lib",
     ],
@@ -237,12 +266,17 @@ envoy_cc_test_library(
     srcs = ["simulated_time_system.cc"],
     hdrs = ["simulated_time_system.h"],
     deps = [
-        ":only_one_thread_lib",
         ":test_time_system_interface",
+        ":utility_lib",
         "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
         "//source/common/event:timer_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "status_utility_lib",
+    hdrs = ["status_utility.h"],
 )
 
 envoy_cc_test(
@@ -253,6 +287,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/event:libevent_scheduler_lib",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -264,4 +299,31 @@ envoy_cc_test(
         ":test_time_lib",
         ":utility_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "wasm_lib",
+    hdrs = ["wasm_base.h"],
+    deps = [
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/common/wasm:wasm_interoperation_lib",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_basic_cc_library(
+    name = "test_version_linkstamp",
+    srcs = ["test_version_linkstamp.cc"],
+    alwayslink = 1,
 )

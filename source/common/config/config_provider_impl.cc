@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Config {
 
 ImmutableConfigProviderBase::ImmutableConfigProviderBase(
-    Server::Configuration::FactoryContext& factory_context,
+    Server::Configuration::ServerFactoryContext& factory_context,
     ConfigProviderManagerImplBase& config_provider_manager,
     ConfigProviderInstanceType instance_type, ApiType api_type)
     : last_updated_(factory_context.timeSource().systemTime()),
@@ -20,16 +20,13 @@ ImmutableConfigProviderBase::~ImmutableConfigProviderBase() {
 }
 
 ConfigSubscriptionCommonBase::~ConfigSubscriptionCommonBase() {
-  init_target_.ready();
+  local_init_target_.ready();
   config_provider_manager_.unbindSubscription(manager_identifier_);
 }
 
 void ConfigSubscriptionCommonBase::applyConfigUpdate(const ConfigUpdateCb& update_fn) {
-  tls_->runOnAllThreads([update_fn](ThreadLocal::ThreadLocalObjectSharedPtr previous)
-                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    auto prev_thread_local_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
-    prev_thread_local_config->config_ = update_fn(prev_thread_local_config->config_);
-    return previous;
+  tls_.runOnAllThreads([update_fn](OptRef<ThreadLocalConfig> thread_local_config) {
+    thread_local_config->config_ = update_fn(thread_local_config->config_);
   });
 }
 

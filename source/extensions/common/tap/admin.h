@@ -5,6 +5,8 @@
 
 #include "extensions/common/tap/tap.h"
 
+#include "absl/container/node_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -60,16 +62,18 @@ private:
 
     // Extensions::Common::Tap::PerTapSinkHandle
     void submitTrace(TraceWrapperPtr&& trace,
-                     envoy::service::tap::v2alpha::OutputSink::Format format) override;
+                     envoy::config::tap::v3::OutputSink::Format format) override;
 
     AdminHandler& parent_;
   };
 
   struct AttachedRequest {
-    AttachedRequest(std::string config_id, Server::AdminStream* admin_stream)
-        : config_id_(std::move(config_id)), admin_stream_(admin_stream) {}
+    AttachedRequest(std::string config_id, const envoy::config::tap::v3::TapConfig& config,
+                    Server::AdminStream* admin_stream)
+        : config_id_(std::move(config_id)), config_(config), admin_stream_(admin_stream) {}
 
     const std::string config_id_;
+    const envoy::config::tap::v3::TapConfig config_;
     const Server::AdminStream* admin_stream_;
   };
 
@@ -79,7 +83,7 @@ private:
 
   Server::Admin& admin_;
   Event::Dispatcher& main_thread_dispatcher_;
-  std::unordered_map<std::string, std::unordered_set<ExtensionConfig*>> config_id_map_;
+  absl::node_hash_map<std::string, absl::node_hash_set<ExtensionConfig*>> config_id_map_;
   absl::optional<const AttachedRequest> attached_request_;
 };
 

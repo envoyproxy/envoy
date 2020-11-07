@@ -2,8 +2,8 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/filesystem/file_shared_impl.h"
-#include "common/stats/isolated_store_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -51,7 +51,7 @@ protected:
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Filesystem::MockFile>* file_;
   const std::chrono::milliseconds timeout_40ms_{40};
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   Thread::ThreadFactory& thread_factory_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Thread::MutexBasicLockable lock_;
@@ -79,7 +79,7 @@ TEST_F(AccessLogManagerImplTest, OpenFileWithRightFlags) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
+TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -148,7 +148,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
+TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -220,7 +220,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, flushCountsIOErrors) {
+TEST_F(AccessLogManagerImplTest, FlushCountsIOErrors) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -250,7 +250,7 @@ TEST_F(AccessLogManagerImplTest, flushCountsIOErrors) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, reopenFile) {
+TEST_F(AccessLogManagerImplTest, ReopenFile) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
@@ -307,7 +307,7 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
 }
 
 // Test that the flush timer will trigger file reopen even if no data is waiting.
-TEST_F(AccessLogManagerImplTest, reopenFileOnTimerOnly) {
+TEST_F(AccessLogManagerImplTest, ReopenFileOnTimerOnly) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
@@ -355,7 +355,7 @@ TEST_F(AccessLogManagerImplTest, reopenFileOnTimerOnly) {
   }
 }
 
-TEST_F(AccessLogManagerImplTest, reopenThrows) {
+TEST_F(AccessLogManagerImplTest, ReopenThrows) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, write_(_))
@@ -403,7 +403,7 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
   waitForCounterEq("filesystem.reopen_failed", 1);
 }
 
-TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
+TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
@@ -443,7 +443,7 @@ TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
+TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillRepeatedly(ReturnNew<NiceMock<Event::MockTimer>>());
 
   Sequence sq;

@@ -1,16 +1,20 @@
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/router/string_accessor_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::network::http_connection_manager::v2::HttpFilter;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
+using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 
 namespace Envoy {
 namespace Extensions {
@@ -27,12 +31,13 @@ public:
   HeaderToFilterStateFilter(const std::string& header, const std::string& state)
       : header_(header), state_(state) {}
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
-    const Http::HeaderEntry* entry = headers.get(header_);
-    if (entry) {
-      decoder_callbacks_->streamInfo().filterState().setData(
-          state_, std::make_unique<Router::StringAccessorImpl>(entry->value().getStringView()),
-          StreamInfo::FilterState::StateType::ReadOnly);
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
+    const auto entry = headers.get(header_);
+    if (!entry.empty()) {
+      decoder_callbacks_->streamInfo().filterState()->setData(
+          state_, std::make_unique<Router::StringAccessorImpl>(entry[0]->value().getStringView()),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
     return Http::FilterHeadersStatus::Continue;
   }
@@ -56,10 +61,6 @@ public:
   }
 };
 
-// perform static registration
-REGISTER_FACTORY(HeaderToFilterStateFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
-
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config_str, proto_config);
@@ -81,7 +82,13 @@ std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-using LocalJwksIntegrationTest = HttpProtocolIntegrationTest;
+class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  LocalJwksIntegrationTest() : registration_(factory_) {}
+
+  HeaderToFilterStateFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
+};
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
@@ -94,7 +101,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -103,16 +110,16 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   });
 
   waitForNextUpstreamRequest();
-  const auto* payload_entry =
+  const auto payload_entry =
       upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo"));
-  EXPECT_TRUE(payload_entry != nullptr);
-  EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
+  EXPECT_FALSE(payload_entry.empty());
+  EXPECT_EQ(payload_entry[0]->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_FALSE(upstream_request_->headers().Authorization());
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // With local Jwks, this test verifies a request is rejected with an expired Jwt token.
@@ -122,7 +129,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -132,7 +139,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
 }
 
 TEST_P(LocalJwksIntegrationTest, MissingToken) {
@@ -141,7 +148,7 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -150,7 +157,7 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
 }
 
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
@@ -159,7 +166,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "HEAD"},
       {":path", "/"},
       {":scheme", "http"},
@@ -169,8 +176,8 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
-  EXPECT_NE("0", response->headers().ContentLength()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_NE("0", response->headers().getContentLengthValue());
   EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
 
@@ -181,7 +188,7 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/foo"},
       {":scheme", "http"},
@@ -189,11 +196,34 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   });
 
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// This test verifies a CORS preflight request without JWT token is allowed.
+TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "OPTIONS"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"access-control-request-method", "GET"},
+      {"origin", "test-origin"},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // This test verifies JwtRequirement specified from filer state rules
@@ -252,7 +282,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   };
 
   for (const auto& test : test_cases) {
-    Http::TestHeaderMapImpl headers{
+    Http::TestRequestHeaderMapImpl headers{
         {":method", "GET"},
         {":path", "/foo"},
         {":scheme", "http"},
@@ -265,12 +295,12 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 
     if (test.expected_status == "200") {
       waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     }
 
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
-    EXPECT_EQ(test.expected_status, response->headers().Status()->value().getStringView());
+    EXPECT_EQ(test.expected_status, response->headers().getStatusValue());
   }
 }
 
@@ -280,15 +310,14 @@ public:
   void createUpstreams() override {
     HttpProtocolIntegrationTest::createUpstreams();
     // for Jwks upstream.
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, GetParam().upstream_protocol, version_, timeSystem()));
+    addFakeUpstream(GetParam().upstream_protocol);
   }
 
   void initializeFilter(bool add_cluster) {
     config_helper_.addFilter(getFilterConfig(false));
 
     if (add_cluster) {
-      config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
         auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
         jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
         jwks_cluster->set_name("pubkey_cluster");
@@ -309,7 +338,7 @@ public:
     result = jwks_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    Http::TestHeaderMapImpl response_headers{{":status", status}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", status}};
     jwks_request_->encodeHeaders(response_headers, false);
     Buffer::OwnedImpl response_data1(jwks_body);
     jwks_request_->encodeData(response_data1, true);
@@ -346,7 +375,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -358,18 +387,18 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
 
   waitForNextUpstreamRequest();
 
-  const auto* payload_entry =
+  const auto payload_entry =
       upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo"));
-  EXPECT_TRUE(payload_entry != nullptr);
-  EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
+  EXPECT_FALSE(payload_entry.empty());
+  EXPECT_EQ(payload_entry[0]->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_FALSE(upstream_request_->headers().Authorization());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanup();
 }
@@ -381,7 +410,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -394,7 +423,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
 
   cleanup();
 }
@@ -404,7 +433,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -414,9 +443,144 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
 
   cleanup();
+}
+
+class PerRouteIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  void setup(const std::string& filter_config, const PerRouteConfig& per_route) {
+    config_helper_.addFilter(getAuthFilterConfig(filter_config, true));
+
+    config_helper_.addConfigModifier(
+        [per_route](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          auto& per_route_any =
+              (*virtual_host->mutable_routes(0)
+                    ->mutable_typed_per_filter_config())[HttpFilterNames::get().JwtAuthn];
+          per_route_any.PackFrom(per_route);
+        });
+
+    initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, PerRouteIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// This test verifies per-route config disabled.
+TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabled) {
+  // per-route config has disabled flag.
+  PerRouteConfig per_route;
+  per_route.set_disabled(true);
+  // Use a normal filter config that requires jwt_auth.
+  setup(ExampleConfig, per_route);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // So the request without a JWT token is OK.
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// This test verifies per-route config with wrong requirement_name
+TEST_P(PerRouteIntegrationTest, PerRouteConfigWrongRequireName) {
+  // A config with a requirement_map
+  const std::string filter_conf = R"(
+  providers:
+    example_provider:
+      issuer: https://example.com
+      audiences:
+      - example_service
+  requirement_map:
+    abc:
+      provider_name: "example_provider"
+)";
+
+  // Per-route config has a wrong requirement_name.
+  PerRouteConfig per_route;
+  per_route.set_requirement_name("wrong-requirement-name");
+  setup(filter_conf, per_route);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // So the request with a good Jwt token is rejected.
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+  });
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+}
+
+// This test verifies per-route config with correct requirement_name
+TEST_P(PerRouteIntegrationTest, PerRouteConfigOK) {
+  // A config with a requirement_map
+  const std::string filter_conf = R"(
+  providers:
+    example_provider:
+      issuer: https://example.com
+      audiences:
+      - example_service
+  requirement_map:
+    abc:
+      provider_name: "example_provider"
+)";
+
+  // Per-route config with correct requirement_name
+  PerRouteConfig per_route;
+  per_route.set_requirement_name("abc");
+  setup(filter_conf, per_route);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // So the request with a JWT token is OK.
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // A request with missing token is rejected.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  response1->waitForEndStream();
+  ASSERT_TRUE(response1->complete());
+  EXPECT_EQ("401", response1->headers().getStatusValue());
 }
 
 } // namespace

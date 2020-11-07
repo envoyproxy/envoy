@@ -1,4 +1,5 @@
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -23,16 +24,14 @@ public:
   void initialize() override {
     setUpstreamCount(1);
     // change the configuration of the cluster_0 to a custom static cluster
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
-      cluster_0->clear_hosts();
-
       if (cluster_provided_lb_) {
-        cluster_0->set_lb_policy(envoy::api::v2::Cluster::CLUSTER_PROVIDED);
+        cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
       }
 
-      envoy::api::v2::Cluster_CustomClusterType cluster_type;
+      envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
       cluster_type.set_name(cluster_provided_lb_ ? "envoy.clusters.custom_static_with_lb"
                                                  : "envoy.clusters.custom_static");
       test::integration::clusters::CustomStaticConfig config;

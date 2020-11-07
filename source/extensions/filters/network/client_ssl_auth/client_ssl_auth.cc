@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
@@ -13,6 +14,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -21,14 +23,14 @@ namespace NetworkFilters {
 namespace ClientSslAuth {
 
 ClientSslAuthConfig::ClientSslAuthConfig(
-    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+    const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-    Stats::Scope& scope, Runtime::RandomGenerator& random)
+    Stats::Scope& scope, Random::RandomGenerator& random)
     : RestApiFetcher(
           cm, config.auth_api_cluster(), dispatcher, random,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000)),
           std::chrono::milliseconds(1000)),
-      tls_(tls.allocateSlot()), ip_white_list_(config.ip_white_list()),
+      tls_(tls.allocateSlot()), ip_allowlist_(config.ip_white_list()),
       stats_(generateStats(scope, config.stat_prefix())) {
 
   if (!cm.get(remote_cluster_name_)) {
@@ -42,9 +44,9 @@ ClientSslAuthConfig::ClientSslAuthConfig(
 }
 
 ClientSslAuthConfigSharedPtr ClientSslAuthConfig::create(
-    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+    const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-    Stats::Scope& scope, Runtime::RandomGenerator& random) {
+    Stats::Scope& scope, Random::RandomGenerator& random) {
   ClientSslAuthConfigSharedPtr new_config(
       new ClientSslAuthConfig(config, tls, cm, dispatcher, scope, random));
   new_config->initialize();
@@ -62,7 +64,7 @@ GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::s
   return stats;
 }
 
-void ClientSslAuthConfig::parseResponse(const Http::Message& message) {
+void ClientSslAuthConfig::parseResponse(const Http::ResponseMessage& message) {
   AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(message.bodyAsString());
   for (const Json::ObjectSharedPtr& certificate : loader->getObjectArray("certificates")) {
@@ -83,7 +85,7 @@ void ClientSslAuthConfig::onFetchFailure(Config::ConfigUpdateFailureReason, cons
 
 static const std::string Path = "/v1/certs/list/approved";
 
-void ClientSslAuthConfig::createRequest(Http::Message& request) {
+void ClientSslAuthConfig::createRequest(Http::RequestMessage& request) {
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   request.headers().setPath(Path);
 }
@@ -110,8 +112,8 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
   }
 
   ASSERT(read_callbacks_->connection().ssl());
-  if (config_->ipWhiteList().contains(*read_callbacks_->connection().remoteAddress())) {
-    config_->stats().auth_ip_white_list_.inc();
+  if (config_->ipAllowlist().contains(*read_callbacks_->connection().remoteAddress())) {
+    config_->stats().auth_ip_allowlist_.inc();
     read_callbacks_->continueReading();
     return;
   }

@@ -1,3 +1,5 @@
+#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
+
 #include "extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
 #include "absl/types/optional.h"
@@ -14,8 +16,8 @@ class MockMemoryStatsReader : public MemoryStatsReader {
 public:
   MockMemoryStatsReader() = default;
 
-  MOCK_METHOD0(reservedHeapBytes, uint64_t());
-  MOCK_METHOD0(unmappedHeapBytes, uint64_t());
+  MOCK_METHOD(uint64_t, reservedHeapBytes, ());
+  MOCK_METHOD(uint64_t, unmappedHeapBytes, ());
 };
 
 class ResourcePressure : public Server::ResourceMonitor::Callbacks {
@@ -49,6 +51,21 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
   EXPECT_TRUE(resource.hasPressure());
   EXPECT_FALSE(resource.hasError());
   EXPECT_EQ(resource.pressure(), 0.7);
+}
+
+TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
+  envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig config;
+  uint64_t max_heap = 1024 * 1024 * 1024;
+  config.set_max_heap_size_bytes(max_heap);
+  auto stats_reader = std::make_unique<MemoryStatsReader>();
+  const double expected_usage =
+      (stats_reader->reservedHeapBytes() - stats_reader->unmappedHeapBytes()) /
+      static_cast<double>(max_heap);
+  std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  EXPECT_NEAR(resource.pressure(), expected_usage, 0.0005);
 }
 
 } // namespace

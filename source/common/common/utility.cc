@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
@@ -34,8 +35,34 @@ public:
 };
 
 using SpecifierConstants = ConstSingleton<SpecifierConstantValues>;
+using UnsignedMilliseconds = std::chrono::duration<uint64_t, std::milli>;
 
 } // namespace
+
+const std::string errorDetails(int error_code) {
+#ifndef WIN32
+  // clang-format off
+  return strerror(error_code);
+  // clang-format on
+#else
+  // Windows error codes do not correspond to POSIX errno values
+  // Use FormatMessage, strip trailing newline, and return "Unknown error" on failure (as on POSIX).
+  // Failures will usually be due to the error message not being found.
+  char* buffer = NULL;
+  DWORD msg_size = FormatMessage(
+      FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+      NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buffer, 0, NULL);
+  if (msg_size == 0) {
+    return "Unknown error";
+  }
+  if (msg_size > 1 && buffer[msg_size - 2] == '\r' && buffer[msg_size - 1] == '\n') {
+    msg_size -= 2;
+  }
+  std::string error_details(buffer, msg_size);
+  ASSERT(LocalFree(buffer) == NULL);
+  return error_details;
+#endif
+}
 
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   struct CachedTime {
@@ -59,7 +86,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
       SpecifierOffsets specifier_offsets;
     };
     // A map is used to keep different formatted format strings at a given second.
-    std::unordered_map<std::string, const Formatted> formatted;
+    absl::node_hash_map<std::string, const Formatted> formatted;
   };
   static thread_local CachedTime cached_time;
 
@@ -75,9 +102,11 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // Remove all the expired cached items.
     for (auto it = cached_time.formatted.cbegin(); it != cached_time.formatted.cend();) {
       if (it->second.epoch_time_seconds != epoch_time_seconds) {
-        it = cached_time.formatted.erase(it);
+        auto next_it = std::next(it);
+        cached_time.formatted.erase(it);
+        it = next_it;
       } else {
-        it++;
+        ++it;
       }
     }
 
@@ -126,10 +155,13 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 }
 
 void DateFormatter::parse(const std::string& format_string) {
-  std::string new_format_string = format_string;
+  std::string suffix = format_string;
   std::smatch matched;
+  // "step" is the last specifier's position + the last specifier's width. It's not the current
+  // position in "format_string" because the length has changed. It is actually the index which
+  // points to the end of the last specifier in formatted string (generated in the future).
   size_t step = 0;
-  while (regex_search(new_format_string, matched, SpecifierConstants::get().PATTERN)) {
+  while (regex_search(suffix, matched, SpecifierConstants::get().PATTERN)) {
     // The std::smatch matched for (%([1-9])?f)|(%s): [all, subsecond-specifier, subsecond-specifier
     // width, second-specifier].
     const std::string& width_specifier = matched[2];
@@ -138,27 +170,22 @@ void DateFormatter::parse(const std::string& format_string) {
     // In the template string to be used in runtime substitution, the width is the number of
     // characters to be replaced.
     const size_t width = width_specifier.empty() ? 9 : width_specifier.at(0) - '0';
-    new_format_string.replace(matched.position(), matched.length(),
-                              std::string(second_specifier.empty() ? width : 2, '?'));
 
-    ASSERT(step < new_format_string.size());
-
+    ASSERT(!suffix.empty());
     // This records matched position, the width of current subsecond pattern, and also the string
     // segment before the matched position. These values will be used later at data path.
     specifiers_.emplace_back(
         second_specifier.empty()
-            ? Specifier(matched.position(), width,
-                        new_format_string.substr(step, matched.position() - step))
-            : Specifier(matched.position(),
-                        new_format_string.substr(step, matched.position() - step)));
-
+            ? Specifier(step + matched.position(), width, suffix.substr(0, matched.position()))
+            : Specifier(step + matched.position(), suffix.substr(0, matched.position())));
     step = specifiers_.back().position_ + specifiers_.back().width_;
+    suffix = matched.suffix();
   }
 
   // To capture the segment after the last specifier pattern of a format string by creating a zero
   // width specifier. E.g. %3f-this-is-the-last-%s-segment-%Y-until-this.
-  if (step < new_format_string.size()) {
-    Specifier specifier(step, 0, new_format_string.substr(step));
+  if (!suffix.empty()) {
+    Specifier specifier(step, 0, suffix);
     specifiers_.emplace_back(specifier);
   }
 }
@@ -213,6 +240,11 @@ bool DateUtil::timePointValid(SystemTime time_point) {
 bool DateUtil::timePointValid(MonotonicTime time_point) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
              .count() != 0;
+}
+
+uint64_t DateUtil::nowToMilliseconds(TimeSource& time_source) {
+  const SystemTime& now = time_source.systemTime();
+  return std::chrono::time_point_cast<UnsignedMilliseconds>(now).time_since_epoch().count();
 }
 
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
@@ -277,7 +309,7 @@ bool StringUtil::findToken(absl::string_view source, absl::string_view delimiter
                            absl::string_view key_token, bool trim_whitespace) {
   const auto tokens = splitToken(source, delimiters, trim_whitespace);
   if (trim_whitespace) {
-    for (const auto token : tokens) {
+    for (const auto& token : tokens) {
       if (key_token == trim(token)) {
         return true;
       }
@@ -294,19 +326,14 @@ bool StringUtil::caseFindToken(absl::string_view source, absl::string_view delim
   std::function<bool(absl::string_view)> predicate;
 
   if (trim_whitespace) {
-    predicate = [&](absl::string_view token) { return caseCompare(key_token, trim(token)); };
+    predicate = [&](absl::string_view token) {
+      return absl::EqualsIgnoreCase(key_token, trim(token));
+    };
   } else {
-    predicate = [&](absl::string_view token) { return caseCompare(key_token, token); };
+    predicate = [&](absl::string_view token) { return absl::EqualsIgnoreCase(key_token, token); };
   }
 
   return std::find_if(tokens.begin(), tokens.end(), predicate) != tokens.end();
-}
-
-bool StringUtil::caseCompare(absl::string_view lhs, absl::string_view rhs) {
-  if (rhs.size() != lhs.size()) {
-    return false;
-  }
-  return absl::StartsWithIgnoreCase(rhs, lhs);
 }
 
 absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter) {
@@ -327,18 +354,29 @@ absl::string_view StringUtil::cropLeft(absl::string_view source, absl::string_vi
 
 std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
                                                       absl::string_view delimiters,
-                                                      bool keep_empty_string) {
+                                                      bool keep_empty_string,
+                                                      bool trim_whitespace) {
+  std::vector<absl::string_view> result;
   if (keep_empty_string) {
-    return absl::StrSplit(source, absl::ByAnyChar(delimiters));
+    result = absl::StrSplit(source, absl::ByAnyChar(delimiters));
+  } else {
+    if (trim_whitespace) {
+      result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipWhitespace());
+    } else {
+      result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
+    }
   }
-  return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
+
+  if (trim_whitespace) {
+    for_each(result.begin(), result.end(), [](auto& v) { v = trim(v); });
+  }
+  return result;
 }
 
 std::string StringUtil::removeTokens(absl::string_view source, absl::string_view delimiters,
                                      const CaseUnorderedSet& tokens_to_remove,
                                      absl::string_view joiner) {
-  auto values = Envoy::StringUtil::splitToken(source, delimiters);
-  std::for_each(values.begin(), values.end(), [](auto& v) { v = StringUtil::trim(v); });
+  auto values = Envoy::StringUtil::splitToken(source, delimiters, false, true);
   auto end = std::remove_if(values.begin(), values.end(),
                             [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
   return absl::StrJoin(values.begin(), end, joiner);
@@ -404,9 +442,11 @@ std::string StringUtil::escape(const std::string& source) {
   return ret;
 }
 
-std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
-  static const std::string DefaultDateFormat = "%Y-%m-%dT%H:%M:%E3SZ";
+const std::string& getDefaultDateFormat() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3SZ");
+}
 
+std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
     std::string formatted_time;
@@ -420,8 +460,8 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) 
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
   if (cached_time.formatted_time.empty() || cached_time.epoch_time_seconds != epoch_time_seconds) {
-    cached_time.formatted_time =
-        absl::FormatTime(DefaultDateFormat, absl::FromChrono(system_time), absl::UTCTimeZone());
+    cached_time.formatted_time = absl::FormatTime(
+        getDefaultDateFormat(), absl::FromChrono(system_time), absl::UTCTimeZone());
     cached_time.epoch_time_seconds = epoch_time_seconds;
   } else {
     // Overwrite the digits in the ".000Z" at the end of the string with the
@@ -451,16 +491,9 @@ std::string StringUtil::toUpper(absl::string_view s) {
   return upper_s;
 }
 
-std::string StringUtil::toLower(absl::string_view s) {
-  std::string lower_s;
-  lower_s.reserve(s.size());
-  std::transform(s.cbegin(), s.cend(), std::back_inserter(lower_s), absl::ascii_tolower);
-  return lower_s;
-}
-
 bool StringUtil::CaseInsensitiveCompare::operator()(absl::string_view lhs,
                                                     absl::string_view rhs) const {
-  return StringUtil::caseCompare(lhs, rhs);
+  return absl::EqualsIgnoreCase(lhs, rhs);
 }
 
 uint64_t StringUtil::CaseInsensitiveHash::operator()(absl::string_view key) const {
@@ -474,12 +507,12 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
   const auto intervals = remove_characters.toVector();
   std::vector<absl::string_view> pieces;
   pieces.reserve(intervals.size());
-  for (const auto& interval : intervals) {
-    if (interval.first != pos) {
-      ASSERT(interval.second <= str.size());
-      pieces.push_back(str.substr(pos, interval.first - pos));
+  for (const auto& [left_bound, right_bound] : intervals) {
+    if (left_bound != pos) {
+      ASSERT(right_bound <= str.size());
+      pieces.push_back(str.substr(pos, left_bound - pos));
     }
-    pos = interval.second;
+    pos = right_bound;
   }
   if (pos != str.size()) {
     pieces.push_back(str.substr(pos));
@@ -537,6 +570,10 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
 InlineString::InlineString(const char* str, size_t size) : size_(size) {
   RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
   memcpy(data_, str, size);
+}
+
+void ExceptionUtil::throwEnvoyException(const std::string& message) {
+  throw EnvoyException(message);
 }
 
 } // namespace Envoy

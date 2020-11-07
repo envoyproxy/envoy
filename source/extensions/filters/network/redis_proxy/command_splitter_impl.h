@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/stats/scope.h"
@@ -10,15 +9,14 @@
 #include "envoy/stats/timespan.h"
 
 #include "common/common/logger.h"
-#include "common/common/to_lower_table.h"
 #include "common/common/utility.h"
-#include "common/singleton/const_singleton.h"
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
+#include "extensions/filters/network/common/redis/fault_impl.h"
 #include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "extensions/filters/network/redis_proxy/router.h"
 
 namespace Envoy {
@@ -38,20 +36,15 @@ struct ResponseValues {
 
 using Response = ConstSingleton<ResponseValues>;
 
-class Utility {
-public:
-  static Common::Redis::RespValuePtr makeError(const std::string& error);
-};
-
 /**
  * All command level stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_COMMAND_STATS(COUNTER)                                                                 \
   COUNTER(total)                                                                                   \
   COUNTER(success)                                                                                 \
-  COUNTER(error)
-// clang-format on
+  COUNTER(error)                                                                                   \
+  COUNTER(error_fault)                                                                             \
+  COUNTER(delay_fault)
 
 /**
  * Struct definition for all command stats. @see stats_macros.h
@@ -67,7 +60,7 @@ public:
 
   virtual SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request,
                                        SplitCallbacks& callbacks, CommandStats& command_stats,
-                                       TimeSource& time_source) PURE;
+                                       TimeSource& time_source, bool delay_command_latency) PURE;
 };
 
 class CommandHandlerBase {
@@ -83,10 +76,14 @@ protected:
                                        const Common::Redis::RespValue& request);
   void updateStats(const bool success);
 
-  SplitRequestBase(CommandStats& command_stats, TimeSource& time_source)
+  SplitRequestBase(CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
       : command_stats_(command_stats) {
-    command_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-        command_stats_.latency_, time_source);
+    if (!delay_command_latency) {
+      command_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+          command_stats_.latency_, time_source);
+    } else {
+      command_latency_ = nullptr;
+    }
   }
   CommandStats& command_stats_;
   Stats::TimespanPtr command_latency_;
@@ -95,27 +92,79 @@ protected:
 /**
  * SingleServerRequest is a base class for commands that hash to a single backend.
  */
-class SingleServerRequest : public SplitRequestBase, public Common::Redis::Client::PoolCallbacks {
+class SingleServerRequest : public SplitRequestBase, public ConnPool::PoolCallbacks {
 public:
   ~SingleServerRequest() override;
 
-  // Common::Redis::Client::PoolCallbacks
+  // ConnPool::PoolCallbacks
   void onResponse(Common::Redis::RespValuePtr&& response) override;
   void onFailure() override;
-  bool onRedirection(const Common::Redis::RespValue& value) override;
+  void onFailure(std::string error_msg);
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
 
 protected:
   SingleServerRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
-                      TimeSource& time_source)
-      : SplitRequestBase(command_stats, time_source), callbacks_(callbacks) {}
+                      TimeSource& time_source, bool delay_command_latency)
+      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {
+  }
 
   SplitCallbacks& callbacks_;
   ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
   Common::Redis::RespValuePtr incoming_request_;
+};
+
+/**
+ * ErrorFaultRequest returns an error.
+ */
+class ErrorFaultRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool has_delaydelay_command_latency_fault);
+
+private:
+  ErrorFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                    bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
+ * DelayFaultRequest wraps a request- either a normal request or a fault- and delays it.
+ */
+class DelayFaultRequest : public SplitRequestBase, public SplitCallbacks {
+public:
+  static std::unique_ptr<DelayFaultRequest>
+  create(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+         Event::Dispatcher& dispatcher, std::chrono::milliseconds delay);
+
+  DelayFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                    Event::Dispatcher& dispatcher, std::chrono::milliseconds delay)
+      : SplitRequestBase(command_stats, time_source, false), callbacks_(callbacks), delay_(delay) {
+    delay_timer_ = dispatcher.createTimer([this]() -> void { onDelayResponse(); });
+  }
+
+  // SplitCallbacks
+  bool connectionAllowed() override { return callbacks_.connectionAllowed(); }
+  void onAuth(const std::string& password) override { callbacks_.onAuth(password); }
+  void onAuth(const std::string& username, const std::string& password) override {
+    callbacks_.onAuth(username, password);
+  }
+  void onResponse(Common::Redis::RespValuePtr&& response) override;
+
+  // RedisProxy::CommandSplitter::SplitRequest
+  void cancel() override;
+
+  SplitRequestPtr wrapped_request_ptr_;
+
+private:
+  void onDelayResponse();
+
+  SplitCallbacks& callbacks_;
+  std::chrono::milliseconds delay_;
+  Event::TimerPtr delay_timer_;
+  Common::Redis::RespValuePtr response_;
 };
 
 /**
@@ -125,11 +174,12 @@ class SimpleRequest : public SingleServerRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source);
+                                TimeSource& time_source, bool delay_command_latency);
 
 private:
-  SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
-      : SingleServerRequest(callbacks, command_stats, time_source) {}
+  SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 };
 
 /**
@@ -139,11 +189,12 @@ class EvalRequest : public SingleServerRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source);
+                                TimeSource& time_source, bool delay_command_latency);
 
 private:
-  EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
-      : SingleServerRequest(callbacks, command_stats, time_source) {}
+  EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 };
 
 /**
@@ -159,37 +210,30 @@ public:
   void cancel() override;
 
 protected:
-  FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
-      : SplitRequestBase(command_stats, time_source), callbacks_(callbacks) {}
+  FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                    bool delay_command_latency)
+      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {
+  }
 
-  struct PendingRequest : public Common::Redis::Client::PoolCallbacks {
+  struct PendingRequest : public ConnPool::PoolCallbacks {
     PendingRequest(FragmentedRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
 
-    // Common::Redis::Client::PoolCallbacks
+    // ConnPool::PoolCallbacks
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onChildResponse(std::move(value), index_);
     }
     void onFailure() override { parent_.onChildFailure(index_); }
 
-    bool onRedirection(const Common::Redis::RespValue& value) override {
-      return parent_.onChildRedirection(value, index_, conn_pool_);
-    }
-
     FragmentedRequest& parent_;
     const uint32_t index_;
     Common::Redis::Client::PoolRequest* handle_{};
-    ConnPool::InstanceSharedPtr conn_pool_;
   };
 
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
-  bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                          const ConnPool::InstanceSharedPtr& conn_pool);
-  virtual void recreate(Common::Redis::RespValue& request, uint32_t index) PURE;
 
   SplitCallbacks& callbacks_;
 
-  Common::Redis::RespValueSharedPtr incoming_request_;
   Common::Redis::RespValuePtr pending_response_;
   std::vector<PendingRequest> pending_requests_;
   uint32_t num_pending_responses_;
@@ -204,15 +248,15 @@ class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source);
+                                TimeSource& time_source, bool delay_command_latency);
 
 private:
-  MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
-      : FragmentedRequest(callbacks, command_stats, time_source) {}
+  MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 };
 
 /**
@@ -225,16 +269,15 @@ class SplitKeysSumResultRequest : public FragmentedRequest, Logger::Loggable<Log
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source);
+                                TimeSource& time_source, bool delay_command_latency);
 
 private:
   SplitKeysSumResultRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
-                            TimeSource& time_source)
-      : FragmentedRequest(callbacks, command_stats, time_source) {}
+                            TimeSource& time_source, bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 
   int64_t total_{0};
 };
@@ -248,15 +291,15 @@ class MSETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source);
+                                TimeSource& time_source, bool delay_command_latency);
 
 private:
-  MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
-      : FragmentedRequest(callbacks, command_stats, time_source) {}
+  MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 };
 
 /**
@@ -268,19 +311,19 @@ class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
   CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
-                               CommandStats& command_stats, TimeSource& time_source) override {
-    return RequestClass::create(router_, std::move(request), callbacks, command_stats, time_source);
+                               CommandStats& command_stats, TimeSource& time_source,
+                               bool delay_command_latency) override {
+    return RequestClass::create(router_, std::move(request), callbacks, command_stats, time_source,
+                                delay_command_latency);
   }
 };
 
 /**
  * All splitter stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_COMMAND_SPLITTER_STATS(COUNTER)                                                        \
   COUNTER(invalid_request)                                                                         \
   COUNTER(unsupported_command)
-// clang-format on
 
 /**
  * Struct definition for all splitter stats. @see stats_macros.h
@@ -292,13 +335,16 @@ struct InstanceStats {
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
-               TimeSource& time_source, bool latency_in_micros);
+               TimeSource& time_source, bool latency_in_micros,
+               Common::Redis::FaultManagerPtr&& fault_manager);
 
   // RedisProxy::CommandSplitter::Instance
-  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
-                              SplitCallbacks& callbacks) override;
+  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
+                              Event::Dispatcher& dispatcher) override;
 
 private:
+  friend class RedisCommandSplitterImplTest;
+
   struct HandlerData {
     CommandStats command_stats_;
     std::reference_wrapper<CommandHandler> handler_;
@@ -318,8 +364,8 @@ private:
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
-  const ToLowerTable to_lower_table_;
   TimeSource& time_source_;
+  Common::Redis::FaultManagerPtr fault_manager_;
 };
 
 } // namespace CommandSplitter

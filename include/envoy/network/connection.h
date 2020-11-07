@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -101,6 +102,11 @@ public:
   virtual void addConnectionCallbacks(ConnectionCallbacks& cb) PURE;
 
   /**
+   * Unregister callbacks which previously fired when connection events occur.
+   */
+  virtual void removeConnectionCallbacks(ConnectionCallbacks& cb) PURE;
+
+  /**
    * Register for callback every time bytes are written to the underlying TransportSocket.
    */
   virtual void addBytesSentCallback(BytesSentCb cb) PURE;
@@ -126,6 +132,12 @@ public:
    * @return uint64_t the unique local ID of this connection.
    */
   virtual uint64_t id() const PURE;
+
+  /**
+   * @param vector of bytes to which the connection should append hash key data. Any data already in
+   * the key vector must not be modified.
+   */
+  virtual void hashKey(std::vector<uint8_t>& hash) const PURE;
 
   /**
    * @return std::string the next protocol to use as selected by network level negotiation. (E.g.,
@@ -171,6 +183,13 @@ public:
    * @return The address of the remote client. Note that this method will never return nullptr.
    */
   virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+
+  /**
+   * @return The address of the remote directly connected peer. Note that this method
+   * will never return nullptr. This address is not affected or modified by PROXY protocol
+   * or any other listener filter.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
 
   /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.
@@ -226,6 +245,12 @@ public:
    * @return State the current state of the connection.
    */
   virtual State state() const PURE;
+
+  /**
+   * @return true if the connection has not completed connecting, false if the connection is
+   * established.
+   */
+  virtual bool connecting() const PURE;
 
   /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
@@ -294,9 +319,31 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  time of the connection. If the platform does not support this, then an empty optional is
+   *  returned.
+   */
+  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;
+
+/**
+ * Connections servicing inbound connects.
+ */
+class ServerConnection : public virtual Connection {
+public:
+  /**
+   * Set the amount of time allowed for the transport socket to report that a connection is
+   * established. The provided timeout is relative to the current time. If this method is called
+   * after a connection has already been established, it is a no-op.
+   */
+  virtual void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) PURE;
+};
+
+using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
  * Connections capable of outbound connects.

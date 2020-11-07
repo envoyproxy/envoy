@@ -1,22 +1,26 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
     deps = [
         ":health_checker_interface",
         ":load_balancer_interface",
         ":thread_local_cluster_interface",
         ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/grpc:async_client_manager_interface",
@@ -29,8 +33,9 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/thread_local:thread_local_interface",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -39,7 +44,7 @@ envoy_cc_library(
     hdrs = ["health_checker.h"],
     deps = [
         ":upstream_interface",
-        "@envoy_api//envoy/data/core/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -58,7 +63,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/stats:primitive_stats_macros",
         "//include/envoy/stats:stats_macros",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -77,7 +82,7 @@ envoy_cc_library(
     hdrs = ["load_balancer_type.h"],
     deps = [
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
@@ -86,7 +91,7 @@ envoy_cc_library(
     hdrs = ["locality.h"],
     deps = [
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -104,6 +109,7 @@ envoy_cc_library(
     name = "retry_interface",
     hdrs = ["retry.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/upstream:types_interface",
         "//include/envoy/upstream:upstream_interface",
     ],
@@ -112,6 +118,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resource_manager_interface",
     hdrs = ["resource_manager.h"],
+    deps = ["//include/envoy/common:resource_interface"],
 )
 
 envoy_cc_library(
@@ -141,6 +148,7 @@ envoy_cc_library(
         ":locality_lib",
         ":resource_manager_interface",
         "//include/envoy/common:callback",
+        "//include/envoy/config:subscription_interface",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",
@@ -149,7 +157,8 @@ envoy_cc_library(
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/upstream:types_interface",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -164,6 +173,7 @@ envoy_cc_library(
         ":resource_manager_interface",
         ":upstream_interface",
         "//include/envoy/common:callback",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",
@@ -171,6 +181,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

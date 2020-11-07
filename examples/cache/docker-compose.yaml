@@ -1,0 +1,36 @@
+version: "3.7"
+services:
+
+  front-envoy:
+    build:
+      context: .
+      dockerfile: Dockerfile-frontenvoy
+    networks:
+      - envoymesh
+    ports:
+      - "8000:8000"
+
+  service1:
+    build:
+      context: .
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./responses.yaml:/etc/responses.yaml
+    networks:
+      - envoymesh
+    environment:
+      - SERVICE_NAME=1
+
+  service2:
+    build:
+      context: .
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./responses.yaml:/etc/responses.yaml
+    networks:
+      - envoymesh
+    environment:
+      - SERVICE_NAME=2
+
+networks:
+  envoymesh: {}

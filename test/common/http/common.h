@@ -28,7 +28,7 @@ public:
       destroy_cb_(this);
     }
   }
-  void raiseGoAway() { onGoAway(); }
+  void raiseGoAway(Http::GoAwayErrorCode error_code) { onGoAway(error_code); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
 
   DestroyCb destroy_cb_;
@@ -38,22 +38,24 @@ public:
  * Mock callbacks used for conn pool testing.
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
-  void onPoolReady(Http::StreamEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
+  void onPoolReady(Http::RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
                    const StreamInfo::StreamInfo&) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();
   }
 
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason, absl::string_view,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
+    reason_ = reason;
     pool_failure_.ready();
   }
 
+  ConnectionPool::PoolFailureReason reason_;
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
-  Http::StreamEncoder* outer_encoder_{};
+  Http::RequestEncoder* outer_encoder_{};
   Upstream::HostDescriptionConstSharedPtr host_;
 };
 
@@ -62,6 +64,7 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
  */
 class HttpTestUtility {
 public:
-  static void addDefaultHeaders(Http::HeaderMap& headers, const std::string default_method = "GET");
+  static void addDefaultHeaders(Http::RequestHeaderMap& headers,
+                                const std::string default_method = "GET");
 };
 } // namespace Envoy

@@ -5,17 +5,20 @@
 
 #include <memory>
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
 #include "extensions/quic_listeners/quiche/platform/quic_mem_slice_span_impl.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
@@ -49,12 +52,12 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
-void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
+void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);
 }
 
-void EnvoyQuicServerStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
+void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   // QUICHE guarantees to take all the headers. This could cause infinite data to
   // be buffered on headers stream in Google QUIC implementation because
@@ -64,8 +67,18 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::HeaderMap& headers, bool e
   // Same vulnerability exists in crypto stream which can infinitely buffer data
   // if handshake implementation goes wrong.
   // TODO(#8826) Modify QUICHE to have an upper bound for header stream send buffer.
+  // This is counting not serialized bytes in the send buffer.
+  quic::QuicStream* writing_stream =
+      quic::VersionUsesHttp3(transport_version())
+          ? static_cast<quic::QuicStream*>(this)
+          : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
+  const uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
+
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
   local_end_stream_ = end_stream;
+  const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
+  ASSERT(bytes_to_send_old <= bytes_to_send_new);
+  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -73,7 +86,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
                    data.length());
   local_end_stream_ = end_stream;
   // This is counting not serialized bytes in the send buffer.
-  uint64_t bytes_to_send_old = BufferedDataBytes();
+  const uint64_t bytes_to_send_old = BufferedDataBytes();
   // QUIC stream must take all.
   WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
   if (data.length() > 0) {
@@ -82,21 +95,29 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     return;
   }
 
-  uint64_t bytes_to_send_new = BufferedDataBytes();
+  const uint64_t bytes_to_send_new = BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
-void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& trailers) {
+void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
+  quic::QuicStream* writing_stream =
+      quic::VersionUsesHttp3(transport_version())
+          ? static_cast<quic::QuicStream*>(this)
+          : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
+  const uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
+  ASSERT(bytes_to_send_old <= bytes_to_send_new);
+  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUIC.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  // TODO(danzh): add stats for metadata not supported error.
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
@@ -126,9 +147,9 @@ void EnvoyQuicServerStream::switchStreamBlockState(bool should_block) {
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
-  ASSERT(decoder() != nullptr);
   ASSERT(headers_decompressed());
-  decoder()->decodeHeaders(quicHeadersToEnvoyHeaders(header_list), /*end_stream=*/fin);
+  request_decoder_->decodeHeaders(
+      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list), /*end_stream=*/fin);
   if (fin) {
     end_stream_decoded_ = true;
   }
@@ -145,7 +166,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // TODO(danzh): check Envoy per stream buffer limit.
   // Currently read out all the data.
   while (HasBytesToRead()) {
-    struct iovec iov;
+    iovec iov;
     int num_regions = GetReadableRegions(&iov, 1);
     ASSERT(num_regions > 0);
     size_t bytes_read = iov.iov_len;
@@ -167,8 +188,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // already delivered it or decodeTrailers will be called.
   bool skip_decoding = empty_payload_with_fin && (end_stream_decoded_ || !finished_reading);
   if (!skip_decoding) {
-    ASSERT(decoder() != nullptr);
-    decoder()->decodeData(*buffer, finished_reading);
+    request_decoder_->decodeData(*buffer, finished_reading);
     if (finished_reading) {
       end_stream_decoded_ = true;
     }
@@ -184,11 +204,12 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
     return;
   }
 
-  if (!quic::VersionUsesQpack(transport_version()) && !FinishedReadingTrailers()) {
+  if (!quic::VersionUsesHttp3(transport_version()) && !FinishedReadingTrailers()) {
     // For Google QUIC implementation, trailers may arrived earlier and wait to
     // be consumed after reading all the body. Consume it here.
     // IETF QUIC shouldn't reach here because trailers are sent on same stream.
-    decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
+    request_decoder_->decodeTrailers(
+        spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
   }
   OnFinRead();
@@ -199,12 +220,12 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
                                                       const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   if (session()->connection()->connected() &&
-      (quic::VersionUsesQpack(transport_version()) || sequencer()->IsClosed()) &&
+      (quic::VersionUsesHttp3(transport_version()) || sequencer()->IsClosed()) &&
       !FinishedReadingTrailers()) {
     // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
-    ASSERT(decoder() != nullptr);
-    decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
+    request_decoder_->decodeTrailers(
+        spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
   }
 }
@@ -230,9 +251,9 @@ void EnvoyQuicServerStream::OnClose() {
 }
 
 void EnvoyQuicServerStream::OnCanWrite() {
-  uint64_t buffered_data_old = BufferedDataBytes();
+  const uint64_t buffered_data_old = BufferedDataBytes();
   quic::QuicSpdyServerStreamBase::OnCanWrite();
-  uint64_t buffered_data_new = BufferedDataBytes();
+  const uint64_t buffered_data_new = BufferedDataBytes();
   // As long as OnCanWriteNewData() is no-op, data to sent in buffer shouldn't
   // increase.
   ASSERT(buffered_data_new <= buffered_data_old);

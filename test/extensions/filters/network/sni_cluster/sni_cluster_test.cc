@@ -4,7 +4,7 @@
 #include "extensions/filters/network/sni_cluster/sni_cluster.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 
 #include "gmock/gmock.h"
@@ -49,7 +49,7 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return(EMPTY_STRING));
     filter.onNewConnection();
 
-    EXPECT_FALSE(stream_info.filterState().hasData<TcpProxy::PerConnectionCluster>(
+    EXPECT_FALSE(stream_info.filterState()->hasData<TcpProxy::PerConnectionCluster>(
         TcpProxy::PerConnectionCluster::key()));
   }
 
@@ -59,11 +59,11 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return("filter_state_cluster"));
     filter.onNewConnection();
 
-    EXPECT_TRUE(stream_info.filterState().hasData<TcpProxy::PerConnectionCluster>(
+    EXPECT_TRUE(stream_info.filterState()->hasData<TcpProxy::PerConnectionCluster>(
         TcpProxy::PerConnectionCluster::key()));
 
     auto per_connection_cluster =
-        stream_info.filterState().getDataReadOnly<TcpProxy::PerConnectionCluster>(
+        stream_info.filterState()->getDataReadOnly<TcpProxy::PerConnectionCluster>(
             TcpProxy::PerConnectionCluster::key());
     EXPECT_EQ(per_connection_cluster.value(), "filter_state_cluster");
   }

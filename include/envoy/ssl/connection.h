@@ -1,10 +1,12 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
 
@@ -24,8 +26,13 @@ public:
   virtual bool peerCertificatePresented() const PURE;
 
   /**
-   * @return std::string the URIs in the SAN field of the local certificate. Returns {} if there is
-   *         no local certificate, or no SAN field, or no URI.
+   * @return bool whether the peer certificate was validated.
+   **/
+  virtual bool peerCertificateValidated() const PURE;
+
+  /**
+   * @return absl::Span<const std::string>the URIs in the SAN field of the local certificate.
+   *         Returns {} if there is no local certificate, or no SAN field, or no URI.
    **/
   virtual absl::Span<const std::string> uriSanLocalCertificate() const PURE;
 
@@ -40,6 +47,12 @@ public:
    *         certificate which can happen in TLS (non mTLS) connections.
    */
   virtual const std::string& sha256PeerCertificateDigest() const PURE;
+
+  /**
+   * @return std::string the SHA1 digest of the peer certificate. Returns "" if there is no peer
+   *         certificate which can happen in TLS (non mTLS) connections.
+   */
+  virtual const std::string& sha1PeerCertificateDigest() const PURE;
 
   /**
    * @return std::string the serial number field of the peer certificate. Returns "" if
@@ -60,8 +73,8 @@ public:
   virtual const std::string& subjectPeerCertificate() const PURE;
 
   /**
-   * @return std::string the URIs in the SAN field of the peer certificate. Returns {} if there is
-   *no peer certificate, or no SAN field, or no URI.
+   * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate.
+   *         Returns {} if there is no peer certificate, or no SAN field, or no URI.
    **/
   virtual absl::Span<const std::string> uriSanPeerCertificate() const PURE;
 

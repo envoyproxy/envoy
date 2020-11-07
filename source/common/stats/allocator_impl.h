@@ -6,6 +6,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
+#include "common/common/thread_synchronizer.h"
 #include "common/stats/metric_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -16,17 +17,19 @@ namespace Stats {
 
 class AllocatorImpl : public Allocator {
 public:
+  static const char DecrementToZeroSyncPoint[];
+
   AllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~AllocatorImpl() override;
 
-  void removeCounterFromSet(Counter* counter);
-  void removeGaugeFromSet(Gauge* gauge);
-
   // Allocator
-  CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
-                               const std::vector<Tag>& tags) override;
-  GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
-                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override;
+  CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
+                               const StatNameTagVector& stat_name_tags) override;
+  GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
+                           const StatNameTagVector& stat_name_tags,
+                           Gauge::ImportMode import_mode) override;
+  TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
+                                       const StatNameTagVector& stat_name_tags) override;
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
@@ -34,28 +37,34 @@ public:
   void debugPrint();
 #endif
 
+  /**
+   * @return a thread synchronizer object used for reproducing a race-condition in tests.
+   */
+  Thread::ThreadSynchronizer& sync() { return sync_; }
+
+  /**
+   * @return whether the allocator's mutex is locked, exposed for testing purposes.
+   */
+  bool isMutexLockedForTest();
+
+protected:
+  virtual Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
+                                       const StatNameTagVector& stat_name_tags);
+
 private:
-  struct HeapStatHash {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-    size_t operator()(const Metric* a) const { return a->statName().hash(); }
-    size_t operator()(StatName a) const { return a.hash(); }
-  };
+  template <class BaseClass> friend class StatsSharedImpl;
+  friend class CounterImpl;
+  friend class GaugeImpl;
+  friend class TextReadoutImpl;
+  friend class NotifyingAllocatorImpl;
 
-  struct HeapStatCompare {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-    bool operator()(const Metric* a, const Metric* b) const {
-      return a->statName() == b->statName();
-    }
-    bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
-  };
+  void removeCounterFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeGaugeFromSetLockHeld(Gauge* gauge) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeTextReadoutFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  // An unordered set of HeapStatData pointers which keys off the key()
-  // field in each object. This necessitates a custom comparator and hasher, which key off of the
-  // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  template <class StatType>
-  using StatSet = absl::flat_hash_set<StatType*, HeapStatHash, HeapStatCompare>;
-  StatSet<Counter> counters_ GUARDED_BY(mutex_);
-  StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
+  StatSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
+  StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
+  StatSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);
 
   SymbolTable& symbol_table_;
 
@@ -64,6 +73,8 @@ private:
   // free() operations are made from the destructors of the individual stat objects, which are not
   // protected by locks.
   Thread::MutexBasicLockable mutex_;
+
+  Thread::ThreadSynchronizer sync_;
 };
 
 } // namespace Stats

@@ -8,3 +8,4 @@ Other protocols
   mongo
   dynamo
   redis
+  postgres

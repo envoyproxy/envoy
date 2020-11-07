@@ -16,3 +16,4 @@ The Envoy documentation is composed of a few major sections:
 * :ref:`Extending Envoy <extending>`: Information on how to write custom filters for Envoy.
 * :ref:`API reference <envoy_api_reference>`: Envoy API detailed reference.
 * :ref:`Envoy FAQ <faq_overview>`: Have questions? We have answers. Hopefully.
+* :ref:`Version history <version_history>`: Per-version release notes.

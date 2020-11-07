@@ -1,0 +1,38 @@
+static_resources:
+  clusters:
+  - name: dummy_cluster
+    connect_timeout: 1s
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: {{ ntop_ip_loopback_address }}
+                port_value: 0
+  - name: ads_cluster
+    connect_timeout: 1s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: "dummy_cluster"
+dynamic_resources:
+  ads_config:
+    api_type: GRPC
+    grpc_services:
+      envoy_grpc:
+        cluster_name: ads_cluster
+    set_node_on_first_message_only: true
+layered_runtime:
+  layers:
+    - name: foobar
+      rtds_layer:
+        name: foobar
+        rtds_config:
+          ads: {}
+                

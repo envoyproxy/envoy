@@ -1,11 +1,9 @@
-#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.validate.h"
-
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/manager_impl.h"
 
 #include "extensions/transport_sockets/alts/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

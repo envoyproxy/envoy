@@ -1,12 +1,12 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "private_key_manager_lib",
@@ -21,6 +21,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/ssl/private_key:private_key_config_interface",
         "//include/envoy/ssl/private_key:private_key_interface",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

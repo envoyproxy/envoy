@@ -13,7 +13,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix)
+MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix,
+                       const std::vector<std::string>& commands)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Mongo")),
       prefix_(stat_name_set_->add(prefix)), callsite_(stat_name_set_->add("callsite")),
       cmd_(stat_name_set_->add("cmd")), collection_(stat_name_set_->add("collection")),
@@ -25,29 +26,26 @@ MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix)
       scatter_get_(stat_name_set_->add("scatter_get")), total_(stat_name_set_->add("total")),
       unknown_command_(stat_name_set_->add("unknown_command")) {
 
-  // TODO(jmarantz): is this the right set of mongo commands to use as builtins?
-  // Should we also have builtins for callsites or collections, or do those need
-  // to be dynamic?
-  stat_name_set_->rememberBuiltins({"insert", "query", "update", "delete"});
+  for (const auto& cmd : commands) {
+    stat_name_set_->rememberBuiltin(cmd);
+  }
 }
 
-Stats::SymbolTable::StoragePtr MongoStats::addPrefix(const std::vector<Stats::StatName>& names) {
-  std::vector<Stats::StatName> names_with_prefix;
+Stats::ElementVec MongoStats::addPrefix(const Stats::ElementVec& names) {
+  Stats::ElementVec names_with_prefix;
   names_with_prefix.reserve(1 + names.size());
   names_with_prefix.push_back(prefix_);
   names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
-  return scope_.symbolTable().join(names_with_prefix);
+  return names_with_prefix;
 }
 
-void MongoStats::incCounter(const std::vector<Stats::StatName>& names) {
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+void MongoStats::incCounter(const Stats::ElementVec& names) {
+  Stats::Utility::counterFromElements(scope_, addPrefix(names)).inc();
 }
 
-void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names,
-                                 Stats::Histogram::Unit unit, uint64_t sample) {
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit).recordValue(sample);
+void MongoStats::recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit,
+                                 uint64_t sample) {
+  Stats::Utility::histogramFromElements(scope_, addPrefix(names), unit).recordValue(sample);
 }
 
 } // namespace MongoProxy

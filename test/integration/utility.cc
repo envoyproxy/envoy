@@ -18,8 +18,9 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -27,7 +28,22 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
-void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+namespace {
+
+RawConnectionDriver::DoWriteCallback writeBufferCallback(Buffer::Instance& data) {
+  auto shared_data = std::make_shared<Buffer::OwnedImpl>();
+  shared_data->move(data);
+  return [shared_data](Network::ClientConnection& client) {
+    if (shared_data->length() > 0) {
+      client.write(*shared_data, false);
+      shared_data->drain(shared_data->length());
+    }
+  };
+}
+
+} // namespace
+
+void BufferingStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
   headers_ = std::move(headers);
@@ -45,7 +61,7 @@ void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream)
   }
 }
 
-void BufferingStreamDecoder::decodeTrailers(Http::HeaderMapPtr&&) {
+void BufferingStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
@@ -65,10 +81,12 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& host, const std::string& content_type) {
 
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
+  NiceMock<Random::MockRandomGenerator> random;
   Event::GlobalTimeSystem time_system;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
-                Filesystem::fileSystemForTest());
-  Event::DispatcherPtr dispatcher(api.allocateDispatcher());
+                Filesystem::fileSystemForTest(), random_generator);
+  Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
       Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
@@ -76,15 +94,15 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
                                          Network::Test::createRawBufferSocket(), nullptr),
-      host_description, *dispatcher);
+      host_description, *dispatcher, random);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();
   }));
-  Http::StreamEncoder& encoder = client.newStream(*response);
+  Http::RequestEncoder& encoder = client.newStream(*response);
   encoder.getStream().addCallbacks(*response);
 
-  Http::HeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   headers.setMethod(method);
   headers.setPath(url);
   headers.setHost(host);
@@ -92,7 +110,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   if (!content_type.empty()) {
     headers.setContentType(content_type);
   }
-  encoder.encodeHeaders(headers, body.empty());
+  const auto status = encoder.encodeHeaders(headers, body.empty());
+  ASSERT(status.ok());
   if (!body.empty()) {
     Buffer::OwnedImpl body_buffer(body);
     encoder.encodeData(body_buffer, true);
@@ -112,26 +131,55 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
 
-RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
-                                         ReadCallback data_callback,
-                                         Network::Address::IpVersion version) {
+RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& request_data,
+                                         ReadCallback response_data_callback,
+                                         Network::Address::IpVersion version,
+                                         Event::Dispatcher& dispatcher,
+                                         Network::TransportSocketPtr transport_socket)
+    : RawConnectionDriver(port, writeBufferCallback(request_data), response_data_callback, version,
+                          dispatcher, std::move(transport_socket)) {}
+
+RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_request_callback,
+                                         ReadCallback response_data_callback,
+                                         Network::Address::IpVersion version,
+                                         Event::Dispatcher& dispatcher,
+                                         Network::TransportSocketPtr transport_socket)
+    : dispatcher_(dispatcher) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
-  dispatcher_ = api_->allocateDispatcher();
-  callbacks_ = std::make_unique<ConnectionCallbacks>();
-  client_ = dispatcher_->createClientConnection(
+  callbacks_ = std::make_unique<ConnectionCallbacks>(
+      [this, write_request_callback]() { write_request_callback(*client_); });
+
+  if (transport_socket == nullptr) {
+    transport_socket = Network::Test::createRawBufferSocket();
+  }
+
+  client_ = dispatcher_.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+  // ConnectionCallbacks will call write_request_callback from the connect and low-watermark
+  // callbacks. Set a small buffer limit so high-watermark is triggered after every write and
+  // low-watermark is triggered every time the buffer is drained.
+  client_->setBufferLimits(1);
   client_->addConnectionCallbacks(*callbacks_);
-  client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
-  client_->write(initial_data, false);
+  client_->addReadFilter(
+      Network::ReadFilterSharedPtr{new ForwardingFilter(*this, response_data_callback)});
   client_->connect();
 }
 
 RawConnectionDriver::~RawConnectionDriver() = default;
 
-void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
+void RawConnectionDriver::waitForConnection() {
+  // TODO(mattklein123): Add a timeout and switch to events and waitFor().
+  while (!callbacks_->connected() && !callbacks_->closed()) {
+    Event::GlobalTimeSystem().timeSystem().realSleepDoNotUseWithoutScrutiny(
+        std::chrono::milliseconds(10));
+    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_.run(run_type); }
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
 

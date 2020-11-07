@@ -7,6 +7,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
 #include "test/test_common/printers.h"
@@ -25,7 +26,8 @@ namespace Envoy {
 namespace Network {
 
 MockListenerConfig::MockListenerConfig()
-    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()) {
+    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()),
+      udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(1)) {
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
   ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
   ON_CALL(socket_factory_, localAddress()).WillByDefault(ReturnRef(socket_->localAddress()));
@@ -34,6 +36,9 @@ MockListenerConfig::MockListenerConfig()
       .WillByDefault(Return(std::reference_wrapper<Socket>(*socket_)));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, udpListenerWorkerRouter()).WillByDefault(Invoke([this]() {
+    return UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_);
+  }));
 }
 MockListenerConfig::~MockListenerConfig() = default;
 
@@ -93,8 +98,8 @@ MockFilter::MockFilter() {
 
 MockFilter::~MockFilter() = default;
 
-MockListenerCallbacks::MockListenerCallbacks() = default;
-MockListenerCallbacks::~MockListenerCallbacks() = default;
+MockTcpListenerCallbacks::MockTcpListenerCallbacks() = default;
+MockTcpListenerCallbacks::~MockTcpListenerCallbacks() = default;
 
 MockUdpListenerCallbacks::MockUdpListenerCallbacks() = default;
 MockUdpListenerCallbacks::~MockUdpListenerCallbacks() = default;
@@ -135,6 +140,7 @@ MockListenSocket::MockListenSocket()
   ON_CALL(testing::Const(*this), isOpen()).WillByDefault(Invoke([this]() {
     return socket_is_open_;
   }));
+  ON_CALL(*this, ipVersion()).WillByDefault(Return(local_address_->ip()->version()));
 }
 
 MockSocketOption::MockSocketOption() {
@@ -149,13 +155,15 @@ MockConnectionSocket::MockConnectionSocket()
       remote_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
+  ON_CALL(*this, directRemoteAddress()).WillByDefault(ReturnRef(remote_address_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
+  ON_CALL(*this, ipVersion()).WillByDefault(Return(local_address_->ip()->version()));
 }
 
 MockConnectionSocket::~MockConnectionSocket() = default;
 
-MockListener::MockListener() {}
+MockListener::MockListener() = default;
 
 MockListener::~MockListener() { onDestroy(); }
 
@@ -165,6 +173,8 @@ MockConnectionHandler::~MockConnectionHandler() = default;
 MockIp::MockIp() = default;
 MockIp::~MockIp() = default;
 
+MockResolvedAddress::MockResolvedAddress(const std::string& logical, const std::string& physical)
+    : logical_(logical), physical_(physical) {}
 MockResolvedAddress::~MockResolvedAddress() = default;
 
 MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
@@ -172,7 +182,13 @@ MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
 }
 MockTransportSocketCallbacks::~MockTransportSocketCallbacks() = default;
 
-MockUdpListener::MockUdpListener() = default;
+MockUdpPacketWriter::MockUdpPacketWriter() = default;
+MockUdpPacketWriter::~MockUdpPacketWriter() = default;
+
+MockUdpListener::MockUdpListener() {
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+}
+
 MockUdpListener::~MockUdpListener() { onDestroy(); }
 
 MockUdpReadFilterCallbacks::MockUdpReadFilterCallbacks() {
@@ -190,6 +206,9 @@ MockUdpListenerFilterManager::~MockUdpListenerFilterManager() = default;
 
 MockConnectionBalancer::MockConnectionBalancer() = default;
 MockConnectionBalancer::~MockConnectionBalancer() = default;
+
+MockListenerFilterMatcher::MockListenerFilterMatcher() = default;
+MockListenerFilterMatcher::~MockListenerFilterMatcher() = default;
 
 } // namespace Network
 } // namespace Envoy

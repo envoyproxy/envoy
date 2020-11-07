@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
@@ -11,10 +12,13 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/network/socket_interface.h"
+#include "common/network/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_join.h"
@@ -25,49 +29,83 @@ namespace StatSinks {
 namespace Common {
 namespace Statsd {
 
-Writer::Writer(Network::Address::InstanceConstSharedPtr address)
-    : io_handle_(address->socket(Network::Address::SocketType::Datagram)) {
-  ASSERT(io_handle_->fd() != -1);
+UdpStatsdSink::WriterImpl::WriterImpl(UdpStatsdSink& parent)
+    : parent_(parent), io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram,
+                                                           parent_.server_address_)) {}
 
-  const Api::SysCallIntResult result = address->connect(io_handle_->fd());
-  ASSERT(result.rc_ != -1);
+void UdpStatsdSink::WriterImpl::write(const std::string& message) {
+  // TODO(mattklein123): We can avoid this const_cast pattern by having a constant variant of
+  // RawSlice. This can be fixed elsewhere as well.
+  Buffer::RawSlice slice{const_cast<char*>(message.c_str()), message.size()};
+  Network::Utility::writeToSocket(*io_handle_, &slice, 1, nullptr, *parent_.server_address_);
 }
 
-Writer::~Writer() {
-  if (io_handle_->isOpen()) {
-    RELEASE_ASSERT(io_handle_->close().err_ == nullptr, "");
-  }
-}
-
-void Writer::write(const std::string& message) {
-  ::send(io_handle_->fd(), message.c_str(), message.size(), MSG_DONTWAIT);
+void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance& data) {
+  Network::Utility::writeToSocket(*io_handle_, data, nullptr, *parent_.server_address_);
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
-                             const std::string& prefix)
+                             const std::string& prefix, absl::optional<uint64_t> buffer_size)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
-      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix) {
+      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
+      buffer_size_(buffer_size.value_or(0)) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<Writer>(this->server_address_);
+    return std::make_shared<WriterImpl>(*this);
   });
 }
 
 void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   Writer& writer = tls_->getTyped<Writer>();
+  Buffer::OwnedImpl buffer;
+
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      writer.write(fmt::format("{}.{}:{}|c{}", prefix_, getName(counter.counter_.get()),
-                               counter.delta_, buildTagStr(counter.counter_.get().tags())));
+      const std::string counter_str =
+          absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_, "|c",
+                       buildTagStr(counter.counter_.get().tags()));
+      writeBuffer(buffer, writer, counter_str);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(gauge.get()), gauge.get().value(),
-                               buildTagStr(gauge.get().tags())));
+      const std::string gauge_str =
+          absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(), "|g",
+                       buildTagStr(gauge.get().tags()));
+      writeBuffer(buffer, writer, gauge_str);
     }
   }
+
+  flushBuffer(buffer, writer);
+  // TODO(efimki): Add support of text readouts stats.
+}
+
+void UdpStatsdSink::writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer,
+                                const std::string& statsd_metric) const {
+  if (statsd_metric.length() >= buffer_size_) {
+    // Our statsd_metric is too large to fit into the buffer, skip buffering and write directly
+    writer.write(statsd_metric);
+  } else {
+    if ((buffer.length() + statsd_metric.length() + 1) > buffer_size_) {
+      // If we add the new statsd_metric, we'll overflow our buffer. Flush the buffer to make
+      // room for the new statsd_metric.
+      flushBuffer(buffer, writer);
+    } else if (buffer.length() > 0) {
+      // We have room and have metrics already in the buffer, add a newline to separate
+      // metric entries.
+      buffer.add("\n");
+    }
+    buffer.add(statsd_metric);
+  }
+}
+
+void UdpStatsdSink::flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const {
+  if (buffer.length() == 0) {
+    return;
+  }
+  writer.writeBuffer(buffer);
+  buffer.drain(buffer.length());
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
@@ -77,13 +115,13 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   // are timers but record in units other than milliseconds, it may make sense to scale the value to
   // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
   // backwards compatibility).
-  const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, getName(histogram),
-                                        std::chrono::milliseconds(value).count(),
-                                        buildTagStr(histogram.tags())));
+  const std::string message(absl::StrCat(prefix_, ".", getName(histogram), ":",
+                                         std::chrono::milliseconds(value).count(), "|ms",
+                                         buildTagStr(histogram.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
-const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
+const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {
   if (use_tag_) {
     return metric.tagExtractedName();
   } else {
@@ -91,7 +129,7 @@ const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
   }
 }
 
-const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) {
+const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) const {
   if (!use_tag_ || tags.empty()) {
     return "";
   }
@@ -134,6 +172,7 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
       tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
     }
   }
+  // TODO(efimki): Add support of text readouts stats.
   tls_sink.endFlush(true);
 }
 
@@ -264,7 +303,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   connection_->write(buffer, false);
 }
 
-uint64_t TcpStatsdSink::TlsSink::usedBuffer() {
+uint64_t TcpStatsdSink::TlsSink::usedBuffer() const {
   ASSERT(current_slice_mem_ != nullptr);
   return current_slice_mem_ - reinterpret_cast<char*>(current_buffer_slice_.mem_);
 }

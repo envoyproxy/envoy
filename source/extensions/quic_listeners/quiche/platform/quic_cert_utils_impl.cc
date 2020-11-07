@@ -11,8 +11,8 @@
 namespace quic {
 
 // static
-bool QuicCertUtilsImpl::ExtractSubjectNameFromDERCert(QuicStringPiece cert,
-                                                      QuicStringPiece* subject_out) {
+bool QuicCertUtilsImpl::ExtractSubjectNameFromDERCert(quiche::QuicheStringPiece cert,
+                                                      quiche::QuicheStringPiece* subject_out) {
   CBS tbs_certificate;
   if (!SeekToSubject(cert, &tbs_certificate)) {
     return false;
@@ -28,7 +28,7 @@ bool QuicCertUtilsImpl::ExtractSubjectNameFromDERCert(QuicStringPiece cert,
 }
 
 // static
-bool QuicCertUtilsImpl::SeekToSubject(QuicStringPiece cert, CBS* tbs_certificate) {
+bool QuicCertUtilsImpl::SeekToSubject(quiche::QuicheStringPiece cert, CBS* tbs_certificate) {
   CBS der;
   CBS_init(&der, reinterpret_cast<const uint8_t*>(cert.data()), cert.size());
   CBS certificate;

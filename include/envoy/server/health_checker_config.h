@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -20,11 +23,6 @@ public:
    * @return Runtime::Loader& the singleton runtime loader for the server.
    */
   virtual Envoy::Runtime::Loader& runtime() PURE;
-
-  /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Envoy::Runtime::RandomGenerator& random() PURE;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
@@ -54,35 +52,24 @@ public:
  * Implemented by each custom health checker and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class CustomHealthCheckerFactory {
+class CustomHealthCheckerFactory : public Config::TypedFactory {
 public:
-  virtual ~CustomHealthCheckerFactory() = default;
+  ~CustomHealthCheckerFactory() override = default;
 
   /**
    * Creates a particular custom health checker factory implementation.
    *
-   * @param config supplies the configuration as a full envoy::api::v2::core::HealthCheck config.
-   *        The implementation of this method can get the specific configuration for a custom health
-   *        check from custom_health_check().config().
+   * @param config supplies the configuration as a full envoy::config::core::v3::HealthCheck
+   * config. The implementation of this method can get the specific configuration for a custom
+   * health check from custom_health_check().config().
    * @param context supplies the custom health checker's context.
    * @return HealthCheckerSharedPtr the pointer of a health checker instance.
    */
   virtual Upstream::HealthCheckerSharedPtr
-  createCustomHealthChecker(const envoy::api::v2::core::HealthCheck& config,
+  createCustomHealthChecker(const envoy::config::core::v3::HealthCheck& config,
                             HealthCheckerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of a custom health
-   * checker produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "health_checkers"; }
+  std::string category() const override { return "envoy.health_checkers"; }
 };
 
 } // namespace Configuration

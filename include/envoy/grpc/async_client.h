@@ -58,6 +58,12 @@ public:
    * stream object and no further callbacks will be invoked.
    */
   virtual void resetStream() PURE;
+
+  /***
+   * @returns if the stream has enough buffered outbound data to be over the configured buffer
+   * limits
+   */
+  virtual bool isAboveWriteBufferHighWatermark() const PURE;
 };
 
 class RawAsyncRequestCallbacks {
@@ -68,7 +74,7 @@ public:
    * Called when populating the headers to send with initial metadata.
    * @param metadata initial metadata reference.
    */
-  virtual void onCreateInitialMetadata(Http::HeaderMap& metadata) PURE;
+  virtual void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) PURE;
 
   /**
    * Called when the async gRPC request succeeds. No further callbacks will be invoked.
@@ -102,14 +108,14 @@ public:
    * Called when populating the headers to send with initial metadata.
    * @param metadata initial metadata reference.
    */
-  virtual void onCreateInitialMetadata(Http::HeaderMap& metadata) PURE;
+  virtual void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) PURE;
 
   /**
    * Called when initial metadata is received. This will be called with empty metadata on a
    * trailers-only response, followed by onReceiveTrailingMetadata() with the trailing metadata.
    * @param metadata initial metadata reference.
    */
-  virtual void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) PURE;
+  virtual void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) PURE;
 
   /**
    * Called when an async gRPC message is received.
@@ -124,7 +130,7 @@ public:
    * stream termination.
    * @param metadata trailing metadata reference.
    */
-  virtual void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) PURE;
+  virtual void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) PURE;
 
   /**
    * Called when the remote closes or an error occurs on the gRPC stream. The stream is
@@ -181,6 +187,7 @@ public:
 };
 
 using RawAsyncClientPtr = std::unique_ptr<RawAsyncClient>;
+using RawAsyncClientSharedPtr = std::shared_ptr<RawAsyncClient>;
 
 } // namespace Grpc
 } // namespace Envoy

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
 
@@ -21,10 +22,11 @@ public:
   ~MockClient() override;
 
   // RateLimit::Client
-  MOCK_METHOD0(cancel, void());
-  MOCK_METHOD4(limit, void(RequestCallbacks& callbacks, const std::string& domain,
-                           const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           Tracing::Span& parent_span));
+  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, limit,
+              (RequestCallbacks & callbacks, const std::string& domain,
+               const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+               Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info));
 };
 
 } // namespace RateLimit

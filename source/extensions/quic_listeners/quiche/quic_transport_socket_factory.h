@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/network/transport_socket.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
@@ -22,6 +24,7 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   bool implementsSecureTransport() const override { return true; }
+  bool usesProxyProtocolOptions() const override { return false; }
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
@@ -71,6 +74,9 @@ public:
 
   // Server::Configuration::TransportSocketConfigFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
+  // Prevent double registration for the config proto
+  std::string configType() override { return ""; }
 };
 
 DECLARE_FACTORY(QuicServerTransportSocketConfigFactory);
@@ -86,6 +92,9 @@ public:
 
   // Server::Configuration::TransportSocketConfigFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
+  // Prevent double registration for the config proto
+  std::string configType() override { return ""; }
 };
 
 DECLARE_FACTORY(QuicClientTransportSocketConfigFactory);

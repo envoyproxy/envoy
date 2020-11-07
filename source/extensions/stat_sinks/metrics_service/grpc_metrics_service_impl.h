@@ -1,10 +1,11 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
-#include "envoy/service/metrics/v2/metrics_service.pb.h"
-#include "envoy/service/metrics/v2/metrics_service.pb.validate.h"
+#include "envoy/service/metrics/v3/metrics_service.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
@@ -23,7 +24,7 @@ namespace MetricsService {
  * Interface for metrics streamer.
  */
 class GrpcMetricsStreamer
-    : public Grpc::AsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
+    : public Grpc::AsyncStreamCallbacks<envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
   ~GrpcMetricsStreamer() override = default;
 
@@ -31,15 +32,15 @@ public:
    * Send Metrics Message.
    * @param message supplies the metrics to send.
    */
-  virtual void send(envoy::service::metrics::v2::StreamMetricsMessage& message) PURE;
+  virtual void send(envoy::service::metrics::v3::StreamMetricsMessage& message) PURE;
 
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void
-  onReceiveMessage(std::unique_ptr<envoy::service::metrics::v2::StreamMetricsResponse>&&) override {
+  onReceiveMessage(std::unique_ptr<envoy::service::metrics::v3::StreamMetricsResponse>&&) override {
   }
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override{};
 };
 
@@ -51,21 +52,26 @@ using GrpcMetricsStreamerSharedPtr = std::shared_ptr<GrpcMetricsStreamer>;
 class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
 public:
   GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                          const LocalInfo::LocalInfo& local_info);
+                          const LocalInfo::LocalInfo& local_info,
+                          envoy::config::core::v3::ApiVersion transport_api_version);
 
   // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override;
+  void send(envoy::service::metrics::v3::StreamMetricsMessage& message) override;
 
   // Grpc::AsyncStreamCallbacks
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; }
 
 private:
-  Grpc::AsyncStream<envoy::service::metrics::v2::StreamMetricsMessage> stream_{};
-  Grpc::AsyncClient<envoy::service::metrics::v2::StreamMetricsMessage,
-                    envoy::service::metrics::v2::StreamMetricsResponse>
+  Grpc::AsyncStream<envoy::service::metrics::v3::StreamMetricsMessage> stream_{};
+  Grpc::AsyncClient<envoy::service::metrics::v3::StreamMetricsMessage,
+                    envoy::service::metrics::v3::StreamMetricsResponse>
       client_;
   const LocalInfo::LocalInfo& local_info_;
+  const Protobuf::MethodDescriptor& service_method_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
+
+using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 
 /**
  * Stat Sink implementation of Metrics Service.
@@ -74,18 +80,19 @@ class MetricsServiceSink : public Stats::Sink {
 public:
   // MetricsService::Sink
   MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
-                     TimeSource& time_system);
+                     const bool report_counters_as_deltas);
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
-  void flushCounter(const Stats::Counter& counter);
-  void flushGauge(const Stats::Gauge& gauge);
-  void flushHistogram(const Stats::ParentHistogram& envoy_histogram);
+  void flushCounter(const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
+                    int64_t snapshot_time_ms);
+  void flushGauge(const Stats::Gauge& gauge, int64_t snapshot_time_ms);
+  void flushHistogram(const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time_ms);
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
-  envoy::service::metrics::v2::StreamMetricsMessage message_;
-  TimeSource& time_source_;
+  envoy::service::metrics::v3::StreamMetricsMessage message_;
+  const bool report_counters_as_deltas_;
 };
 
 } // namespace MetricsService

@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -23,6 +23,9 @@ envoy_cc_library(
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
     tcmalloc_dep = 1,
+    deps = [
+        ":stats_lib",
+    ],
 )
 
 envoy_cc_library(

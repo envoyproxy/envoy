@@ -19,7 +19,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() override { return NetworkFilterNames::get().SniCluster; }
+  std::string name() const override { return NetworkFilterNames::get().SniCluster; }
 };
 
 } // namespace SniCluster

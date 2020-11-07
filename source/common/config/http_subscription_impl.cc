@@ -2,10 +2,15 @@
 
 #include <memory>
 
+#include "envoy/service/discovery/v3/discovery.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/macros.h"
+#include "common/common/utility.h"
+#include "common/config/decoded_resource_impl.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/http/headers.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -18,16 +23,19 @@ namespace Config {
 HttpSubscriptionImpl::HttpSubscriptionImpl(
     const LocalInfo::LocalInfo& local_info, Upstream::ClusterManager& cm,
     const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-    Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
+    Random::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
     std::chrono::milliseconds request_timeout, const Protobuf::MethodDescriptor& service_method,
-    SubscriptionCallbacks& callbacks, SubscriptionStats stats,
-    std::chrono::milliseconds init_fetch_timeout,
+    absl::string_view type_url, envoy::config::core::v3::ApiVersion transport_api_version,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
                            request_timeout),
-      callbacks_(callbacks), stats_(stats), dispatcher_(dispatcher),
-      init_fetch_timeout_(init_fetch_timeout), validation_visitor_(validation_visitor) {
+      callbacks_(callbacks), resource_decoder_(resource_decoder), stats_(stats),
+      dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout),
+      validation_visitor_(validation_visitor), transport_api_version_(transport_api_version) {
   request_.mutable_node()->CopyFrom(local_info.node());
+  request_.set_type_url(std::string(type_url));
   ASSERT(service_method.options().HasExtension(google::api::http));
   const auto& http_rule = service_method.options().GetExtension(google::api::http);
   path_ = http_rule.post();
@@ -35,7 +43,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
 }
 
 // Config::Subscription
-void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
+void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names, const bool) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       handleFailure(Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
@@ -57,20 +65,19 @@ void HttpSubscriptionImpl::updateResourceInterest(
 }
 
 // Http::RestApiFetcher
-void HttpSubscriptionImpl::createRequest(Http::Message& request) {
+void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
   ENVOY_LOG(debug, "Sending REST request for {}", path_);
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request.headers().setPath(path_);
-  request.body() =
-      std::make_unique<Buffer::OwnedImpl>(MessageUtil::getJsonStringFromMessage(request_));
+  request.body().add(VersionConverter::getJsonStringFromMessage(request_, transport_api_version_));
   request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  request.headers().setContentLength(request.body()->length());
+  request.headers().setContentLength(request.body().length());
 }
 
-void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
+void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {
   disableInitFetchTimeoutTimer();
-  envoy::api::v2::DiscoveryResponse message;
+  envoy::service::discovery::v3::DiscoveryResponse message;
   try {
     MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
   } catch (const EnvoyException& e) {
@@ -78,9 +85,13 @@ void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
     return;
   }
   try {
-    callbacks_.onConfigUpdate(message.resources(), message.version_info());
+    const auto decoded_resources =
+        DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());
+    callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
     request_.set_version_info(message.version_info());
+    stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
+    stats_.version_text_.set(request_.version_info());
     stats_.update_success_.inc();
   } catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);

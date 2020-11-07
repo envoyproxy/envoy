@@ -9,6 +9,8 @@
 
 #include "test/test_common/environment.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Fuzz {
 
@@ -45,12 +47,26 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   static auto* logging_context =
       new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock, false);
   UNREFERENCED_PARAMETER(logging_context);
+
+  // Suppress all libprotobuf non-fatal logging as long as this object exists.
+  // For fuzzing, this prevents logging when parsing text-format protos fails,
+  // deprecated fields are used, etc.
+  // https://github.com/protocolbuffers/protobuf/blob/204f99488ce1ef74565239cf3963111ae4c774b7/src/google/protobuf/stubs/logging.h#L223
+  if (log_level_ > spdlog::level::debug) {
+    ABSL_ATTRIBUTE_UNUSED static auto* log_silencer = new Protobuf::LogSilencer();
+  }
 }
 
 } // namespace Fuzz
 } // namespace Envoy
 
-extern "C" int LLVMFuzzerInitialize(int* /*argc*/, char*** argv) {
+// LLVMFuzzerInitialize() is called by LibFuzzer once before fuzzing starts.
+// NOLINTNEXTLINE(readability-identifier-naming)
+extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv) {
+  // Before parsing gmock flags, set the default value of flag --gmock_verbose to "error".
+  // This suppresses logs from NiceMock objects, which can be noisy and provide little value.
+  testing::GMOCK_FLAG(verbose) = "error";
+  testing::InitGoogleMock(argc, *argv);
   Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::critical);
   return 0;
 }

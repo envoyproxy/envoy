@@ -1,7 +1,12 @@
+#include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.validate.h"
+
 #include "extensions/filters/common/rbac/engine.h"
 #include "extensions/filters/http/rbac/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,10 +21,10 @@ namespace RBACFilter {
 namespace {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
-  envoy::config::rbac::v2::Policy policy;
+  envoy::config::rbac::v3::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
-  envoy::config::filter::http::rbac::v2::RBAC config;
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
   (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -32,16 +37,14 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBAC*>(
-      factory.createEmptyConfigProto().get());
-  EXPECT_NE(nullptr, config);
+  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBAC*>(
+                         factory.createEmptyConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBACPerRoute*>(
-      factory.createEmptyRouteConfigProto().get());
-  EXPECT_NE(nullptr, config);
+  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBACPerRoute*>(
+                         factory.createEmptyRouteConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {

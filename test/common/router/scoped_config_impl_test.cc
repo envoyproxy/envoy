@@ -1,5 +1,9 @@
 #include <memory>
 
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/scoped_route.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "common/router/scoped_config_impl.h"
 
 #include "test/mocks/router/mocks.h"
@@ -11,7 +15,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-using ::Envoy::Http::TestHeaderMapImpl;
+using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::testing::NiceMock;
 
 class FooFragment : public ScopeKeyFragmentBase {
@@ -112,30 +116,30 @@ TEST(HeaderValueExtractorImplTest, HeaderExtractionByIndex) {
 
   TestUtility::loadFromYaml(yaml_plain, config);
   HeaderValueExtractorImpl extractor(std::move(config));
-  std::unique_ptr<ScopeKeyFragmentBase> fragment =
-      extractor.computeFragment(TestHeaderMapImpl{{"foo_header", "part-0,part-1:value_bluh"}});
+  std::unique_ptr<ScopeKeyFragmentBase> fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{{"foo_header", "part-0,part-1:value_bluh"}});
 
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"part-1:value_bluh"});
 
   // No such header.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{{"bar_header", "part-0"}});
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{{"bar_header", "part-0"}});
   EXPECT_EQ(fragment, nullptr);
 
   // Empty header value.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", ""},
   });
   EXPECT_EQ(fragment, nullptr);
 
   // Index out of bound.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", "part-0"},
   });
   EXPECT_EQ(fragment, nullptr);
 
   // Element is empty.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", "part-0,,,bluh"},
   });
   EXPECT_NE(fragment, nullptr);
@@ -155,47 +159,48 @@ TEST(HeaderValueExtractorImplTest, HeaderExtractionByKey) {
 
   TestUtility::loadFromYaml(yaml_plain, config);
   HeaderValueExtractorImpl extractor(std::move(config));
-  std::unique_ptr<ScopeKeyFragmentBase> fragment = extractor.computeFragment(TestHeaderMapImpl{
-      {"foo_header", "part-0;bar=>bluh;foo=>foo_value"},
-  });
+  std::unique_ptr<ScopeKeyFragmentBase> fragment =
+      extractor.computeFragment(TestRequestHeaderMapImpl{
+          {"foo_header", "part-0;bar=>bluh;foo=>foo_value"},
+      });
 
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"bluh"});
 
   // No such header.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"bluh", "part-0;"},
   });
   EXPECT_EQ(fragment, nullptr);
 
   // Empty header value.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", ""},
   });
   EXPECT_EQ(fragment, nullptr);
 
   // No such key.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", "part-0"},
   });
   EXPECT_EQ(fragment, nullptr);
 
   // Empty value.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", "bluh;;bar=>;foo=>last_value"},
   });
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{""});
 
   // Duplicate values, the first value returned.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", "bluh;;bar=>value1;bar=>value2;bluh;;bar=>last_value"},
   });
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"value1"});
 
   // No separator in the element, value is set to empty string.
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", "bluh;;bar;bar=>value2;bluh;;bar=>last_value"},
   });
   EXPECT_NE(fragment, nullptr);
@@ -215,13 +220,14 @@ TEST(HeaderValueExtractorImplTest, ElementSeparatorEmpty) {
 
   TestUtility::loadFromYaml(yaml_plain, config);
   HeaderValueExtractorImpl extractor(std::move(config));
-  std::unique_ptr<ScopeKeyFragmentBase> fragment = extractor.computeFragment(TestHeaderMapImpl{
-      {"foo_header", "bar=b;c=d;e=f"},
-  });
+  std::unique_ptr<ScopeKeyFragmentBase> fragment =
+      extractor.computeFragment(TestRequestHeaderMapImpl{
+          {"foo_header", "bar=b;c=d;e=f"},
+      });
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"b;c=d;e=f"});
 
-  fragment = extractor.computeFragment(TestHeaderMapImpl{
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
       {"foo_header", "a=b;bar=d;e=f"},
   });
   EXPECT_EQ(fragment, nullptr);
@@ -293,7 +299,7 @@ TEST(ScopeKeyBuilderImplTest, Parse) {
   TestUtility::loadFromYaml(yaml_plain, config);
   ScopeKeyBuilderImpl key_builder(std::move(config));
 
-  std::unique_ptr<ScopeKey> key = key_builder.computeScopeKey(TestHeaderMapImpl{
+  ScopeKeyPtr key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
       {"foo_header", "a=b,bar=bar_value,e=f"},
       {"bar_header", "a=b;bar=bar_value;index2"},
   });
@@ -301,7 +307,7 @@ TEST(ScopeKeyBuilderImplTest, Parse) {
   EXPECT_EQ(*key, makeKey({"bar_value", "index2"}));
 
   // Empty string fragment is fine.
-  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
       {"foo_header", "a=b,bar,e=f"},
       {"bar_header", "a=b;bar=bar_value;"},
   });
@@ -309,35 +315,35 @@ TEST(ScopeKeyBuilderImplTest, Parse) {
   EXPECT_EQ(*key, makeKey({"", ""}));
 
   // Key not found.
-  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
       {"foo_header", "a=b,meh,e=f"},
       {"bar_header", "a=b;bar=bar_value;"},
   });
   EXPECT_EQ(key, nullptr);
 
   // Index out of bound.
-  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
       {"foo_header", "a=b,bar=bar_value,e=f"},
       {"bar_header", "a=b;bar=bar_value"},
   });
   EXPECT_EQ(key, nullptr);
 
   // Header missing.
-  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
       {"foo_header", "a=b,bar=bar_value,e=f"},
       {"foobar_header", "a=b;bar=bar_value;index2"},
   });
   EXPECT_EQ(key, nullptr);
 
   // Header value empty.
-  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
       {"foo_header", ""},
       {"bar_header", "a=b;bar=bar_value;index2"},
   });
   EXPECT_EQ(key, nullptr);
 
   // Case sensitive.
-  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
       {"foo_header", "a=b,Bar=bar_value,e=f"},
       {"bar_header", "a=b;bar=bar_value;index2"},
   });
@@ -361,14 +367,14 @@ public:
     route_config_->name_ = "foo_route";
   }
 
-  envoy::api::v2::RouteConfiguration route_configuration_;
-  envoy::api::v2::ScopedRouteConfiguration scoped_route_config_;
+  envoy::config::route::v3::RouteConfiguration route_configuration_;
+  envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config_;
   std::shared_ptr<MockConfig> route_config_;
   std::unique_ptr<ScopedRouteInfo> info_;
 };
 
 TEST_F(ScopedRouteInfoTest, Creation) {
-  envoy::api::v2::ScopedRouteConfiguration config_copy = scoped_route_config_;
+  envoy::config::route::v3::ScopedRouteConfiguration config_copy = scoped_route_config_;
   info_ = std::make_unique<ScopedRouteInfo>(std::move(scoped_route_config_), route_config_);
   EXPECT_EQ(info_->routeConfig().get(), route_config_.get());
   EXPECT_TRUE(TestUtility::protoEqual(info_->configProto(), config_copy));
@@ -420,7 +426,7 @@ public:
 )EOF");
   }
   std::shared_ptr<ScopedRouteInfo> makeScopedRouteInfo(const std::string& route_config_yaml) {
-    envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
+    envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config;
     TestUtility::loadFromYaml(route_config_yaml, scoped_route_config);
 
     std::shared_ptr<MockConfig> route_config = std::make_shared<NiceMock<MockConfig>>();
@@ -439,25 +445,25 @@ public:
 // Test a ScopedConfigImpl returns the correct route Config.
 TEST_F(ScopedConfigImplTest, PickRoute) {
   scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_b_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
 
   // Key (foo, bar) maps to scope_info_a_.
-  ConfigConstSharedPtr route_config = scoped_config_impl_->getRouteConfig(TestHeaderMapImpl{
+  ConfigConstSharedPtr route_config = scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
       {"foo_header", ",,key=value,bar=foo,"},
       {"bar_header", ";val1;bar;val3"},
   });
   EXPECT_EQ(route_config, scope_info_a_->routeConfig());
 
   // Key (bar, baz) maps to scope_info_b_.
-  route_config = scoped_config_impl_->getRouteConfig(TestHeaderMapImpl{
+  route_config = scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
       {"foo_header", ",,key=value,bar=bar,"},
       {"bar_header", ";val1;baz;val3"},
   });
   EXPECT_EQ(route_config, scope_info_b_->routeConfig());
 
   // No such key (bar, NOT_BAZ).
-  route_config = scoped_config_impl_->getRouteConfig(TestHeaderMapImpl{
+  route_config = scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
       {"foo_header", ",key=value,bar=bar,"},
       {"bar_header", ";val1;NOT_BAZ;val3"},
   });
@@ -468,7 +474,7 @@ TEST_F(ScopedConfigImplTest, PickRoute) {
 TEST_F(ScopedConfigImplTest, Update) {
   scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
 
-  TestHeaderMapImpl headers{
+  TestRequestHeaderMapImpl headers{
       {"foo_header", ",,key=value,bar=foo,"},
       {"bar_header", ";val1;bar;val3"},
   };
@@ -476,36 +482,36 @@ TEST_F(ScopedConfigImplTest, Update) {
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
 
   // Add scope_key (bar, baz).
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_b_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
+  // scope_info_a_ not found
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
-  EXPECT_EQ(scoped_config_impl_->getRouteConfig(
-                TestHeaderMapImpl{{"foo_header", ",,key=v,bar=bar,"}, {"bar_header", ";val1;baz"}}),
+  // scope_info_b_ found
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
+                {"foo_header", ",,key=v,bar=bar,"}, {"bar_header", ";val1;baz"}}),
             scope_info_b_->routeConfig());
 
   // Add scope_key (foo, bar).
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
   // Found scope_info_a_.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), scope_info_a_->routeConfig());
 
   // Update scope foo_scope.
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_v2_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_v2_});
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
 
   // foo_scope now is keyed by (xyz, xyz).
-  EXPECT_EQ(scoped_config_impl_->getRouteConfig(
-                TestHeaderMapImpl{{"foo_header", ",bar=xyz,foo=bar"}, {"bar_header", ";;xyz"}}),
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
+                {"foo_header", ",bar=xyz,foo=bar"}, {"bar_header", ";;xyz"}}),
             scope_info_a_v2_->routeConfig());
 
   // Remove scope "foo_scope".
-  scoped_config_impl_->removeRoutingScope("foo_scope");
+  scoped_config_impl_->removeRoutingScopes({"foo_scope"});
   // scope_info_a_ is gone.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
 
   // Now delete some non-existent scopes.
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("foo_scope1"));
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("base_scope"));
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("bluh_scope"));
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("xyz_scope"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScopes(
+      {"foo_scope1", "base_scope", "bluh_scope", "xyz_scope"}));
 }
 
 } // namespace

@@ -1,5 +1,6 @@
 #include "extensions/filters/http/csrf/csrf_filter.h"
 
+#include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
@@ -14,44 +15,60 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Csrf {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    origin_handle(Http::CustomHeaders::get().Origin);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer_handle(Http::CustomHeaders::get().Referer);
+
 struct RcDetailsValues {
   const std::string OriginMismatch = "csrf_origin_mismatch";
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
-bool isModifyMethod(const Http::HeaderMap& headers) {
-  const Envoy::Http::HeaderEntry* method = headers.Method();
-  if (method == nullptr) {
+bool isModifyMethod(const Http::RequestHeaderMap& headers) {
+  const absl::string_view method_type = headers.getMethodValue();
+  if (method_type.empty()) {
     return false;
   }
-  const absl::string_view method_type = method->value().getStringView();
   const auto& method_values = Http::Headers::get().MethodValues;
   return (method_type == method_values.Post || method_type == method_values.Put ||
           method_type == method_values.Delete || method_type == method_values.Patch);
 }
 
-absl::string_view hostAndPort(const Http::HeaderEntry* header) {
-  Http::Utility::Url absolute_url;
-  if (header != nullptr && !header->value().empty()) {
-    if (absolute_url.initialize(header->value().getStringView())) {
-      return absolute_url.host_and_port();
+std::string hostAndPort(const absl::string_view absolute_url) {
+  Http::Utility::Url url;
+  if (!absolute_url.empty()) {
+    if (url.initialize(absolute_url, /*is_connect=*/false)) {
+      return std::string(url.hostAndPort());
     }
-    return header->value().getStringView();
+    return std::string(absolute_url);
   }
   return EMPTY_STRING;
 }
 
-absl::string_view sourceOriginValue(const Http::HeaderMap& headers) {
-  const absl::string_view origin = hostAndPort(headers.Origin());
-  if (origin != EMPTY_STRING) {
+// Note: per https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin,
+//       the Origin header must include the scheme (and hostAndPort expects
+//       an absolute URL).
+std::string sourceOriginValue(const Http::RequestHeaderMap& headers) {
+  const auto origin = hostAndPort(headers.getInlineValue(origin_handle.handle()));
+  if (!origin.empty()) {
     return origin;
   }
-  return hostAndPort(headers.Referer());
+  return hostAndPort(headers.getInlineValue(referer_handle.handle()));
 }
 
-absl::string_view targetOriginValue(const Http::HeaderMap& headers) {
-  return hostAndPort(headers.Host());
+std::string targetOriginValue(const Http::RequestHeaderMap& headers) {
+  const auto host_value = headers.getHostValue();
+
+  // Don't even bother if there's not Host header.
+  if (host_value.empty()) {
+    return EMPTY_STRING;
+  }
+
+  const auto absolute_url = fmt::format(
+      "{}://{}", headers.Scheme() != nullptr ? headers.getSchemeValue() : "http", host_value);
+  return hostAndPort(absolute_url);
 }
 
 static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -59,20 +76,21 @@ static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-static CsrfPolicyPtr generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-                                    Runtime::Loader& runtime) {
+static CsrfPolicyPtr
+generatePolicy(const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
+               Runtime::Loader& runtime) {
   return std::make_unique<CsrfPolicy>(policy, runtime);
 }
 } // namespace
 
-CsrfFilterConfig::CsrfFilterConfig(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-                                   const std::string& stats_prefix, Stats::Scope& scope,
-                                   Runtime::Loader& runtime)
+CsrfFilterConfig::CsrfFilterConfig(
+    const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, runtime)) {}
 
 CsrfFilter::CsrfFilter(const CsrfFilterConfigSharedPtr config) : config_(config) {}
 
-Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   determinePolicy();
 
   if (!policy_->enabled() && !policy_->shadowEnabled()) {
@@ -84,8 +102,8 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bo
   }
 
   bool is_valid = true;
-  const absl::string_view source_origin = sourceOriginValue(headers);
-  if (source_origin == EMPTY_STRING) {
+  const auto source_origin = sourceOriginValue(headers);
+  if (source_origin.empty()) {
     is_valid = false;
     config_->stats().missing_source_origin_.inc();
   }
@@ -120,8 +138,8 @@ void CsrfFilter::determinePolicy() {
   }
 }
 
-bool CsrfFilter::isValid(const absl::string_view source_origin, Http::HeaderMap& headers) {
-  const absl::string_view target_origin = targetOriginValue(headers);
+bool CsrfFilter::isValid(const absl::string_view source_origin, Http::RequestHeaderMap& headers) {
+  const auto target_origin = targetOriginValue(headers);
   if (source_origin == target_origin) {
     return true;
   }

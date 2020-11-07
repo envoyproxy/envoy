@@ -1,9 +1,13 @@
 #include "extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/grpc/typed_async_client.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stream_info/utility.h"
 
 namespace Envoy {
@@ -21,33 +25,61 @@ void GrpcAccessLoggerImpl::LocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
   }
 }
 
-GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
-                                           std::chrono::milliseconds buffer_flush_interval_msec,
-                                           uint64_t buffer_size_bytes,
-                                           Event::Dispatcher& dispatcher,
-                                           const LocalInfo::LocalInfo& local_info)
-    : client_(std::move(client)), log_name_(log_name),
+GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
+    Grpc::RawAsyncClientPtr&& client, std::string log_name,
+    std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+    envoy::config::core::v3::ApiVersion transport_api_version)
+    : stats_({ALL_GRPC_ACCESS_LOGGER_STATS(
+          POOL_COUNTER_PREFIX(scope, "access_logs.grpc_access_log."))}),
+      client_(std::move(client)), log_name_(log_name),
       buffer_flush_interval_msec_(buffer_flush_interval_msec),
       flush_timer_(dispatcher.createTimer([this]() {
         flush();
         flush_timer_->enableTimer(buffer_flush_interval_msec_);
       })),
-      buffer_size_bytes_(buffer_size_bytes), local_info_(local_info) {
+      max_buffer_size_bytes_(max_buffer_size_bytes), local_info_(local_info),
+      service_method_(
+          Grpc::VersionedMethods("envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs",
+                                 "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
+              .getMethodDescriptorForVersion(transport_api_version)),
+      transport_api_version_(transport_api_version) {
   flush_timer_->enableTimer(buffer_flush_interval_msec_);
 }
 
-void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
+bool GrpcAccessLoggerImpl::canLogMore() {
+  if (max_buffer_size_bytes_ == 0 || approximate_message_size_bytes_ < max_buffer_size_bytes_) {
+    stats_.logs_written_.inc();
+    return true;
+  }
+  flush();
+  if (approximate_message_size_bytes_ < max_buffer_size_bytes_) {
+    stats_.logs_written_.inc();
+    return true;
+  }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disallow_unbounded_access_logs")) {
+    stats_.logs_dropped_.inc();
+    return false;
+  }
+  stats_.logs_written_.inc();
+  return true;
+}
+
+void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+  if (!canLogMore()) {
+    return;
+  }
   approximate_message_size_bytes_ += entry.ByteSizeLong();
   message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
-  if (approximate_message_size_bytes_ >= buffer_size_bytes_) {
+  if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
     flush();
   }
 }
 
-void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry) {
+void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
   approximate_message_size_bytes_ += entry.ByteSizeLong();
   message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
-  if (approximate_message_size_bytes_ >= buffer_size_bytes_) {
+  if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
     flush();
   }
 }
@@ -64,9 +96,7 @@ void GrpcAccessLoggerImpl::flush() {
 
   if (stream_->stream_ == nullptr) {
     stream_->stream_ =
-        client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"),
-                       *stream_, Http::AsyncClient::StreamOptions());
+        client_->start(service_method_, *stream_, Http::AsyncClient::StreamOptions());
 
     auto* identifier = message_.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
@@ -74,7 +104,10 @@ void GrpcAccessLoggerImpl::flush() {
   }
 
   if (stream_->stream_ != nullptr) {
-    stream_->stream_->sendMessage(message_, false);
+    if (stream_->stream_->isAboveWriteBufferHighWatermark()) {
+      return;
+    }
+    stream_->stream_->sendMessage(message_, transport_api_version_, false);
   } else {
     // Clear out the stream data due to stream creation failure.
     stream_.reset();
@@ -96,8 +129,8 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 }
 
 GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
-    const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
-    GrpcAccessLoggerType logger_type) {
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+    GrpcAccessLoggerType logger_type, Stats::Scope& scope) {
   // TODO(euroelessar): Consider cleaning up loggers.
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
   const auto cache_key = std::make_pair(MessageUtil::hash(config), logger_type);
@@ -111,7 +144,7 @@ GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
       factory->create(), config.log_name(),
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
-      local_info_);
+      local_info_, scope, config.transport_api_version());
   cache.access_loggers_.emplace(cache_key, logger);
   return logger;
 }

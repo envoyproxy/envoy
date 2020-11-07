@@ -7,7 +7,6 @@
 #include "extensions/filters/network/kafka/response_codec.h"
 
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
-#include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,8 +24,8 @@ protected:
 
 class MockMessageListener : public ResponseCallback {
 public:
-  MOCK_METHOD1(onMessage, void(AbstractResponseSharedPtr));
-  MOCK_METHOD1(onFailedParse, void(ResponseMetadataSharedPtr));
+  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
 };
 
 /**
@@ -40,7 +39,7 @@ template <typename T> std::shared_ptr<T> ResponseTest::serializeAndDeserialize(T
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
   ResponseDecoder testee{ {mock_listener} };
   const ResponseMetadata& metadata = message.metadata_;
-  testee.expectResponse(metadata.api_key_, metadata.api_version_);
+  testee.expectResponse(metadata.correlation_id_, metadata.api_key_, metadata.api_version_);
 
   AbstractResponseSharedPtr received_message;
   EXPECT_CALL(*mock_listener, onMessage(testing::_))
@@ -57,7 +56,7 @@ template <typename T> std::shared_ptr<T> ResponseTest::serializeAndDeserialize(T
   (put "string" as std::string, 32 as uint32_t, etc.).
 #}
 {% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
-TEST_F(ResponseTest, shouldParse{{ message_type.name }}V{{ field_list.version }}) {
+TEST_F(ResponseTest, ShouldParse{{ message_type.name }}V{{ field_list.version }}) {
   // given
   {{ message_type.name }} data = { {{ field_list.example_value() }} };
   Response<{{ message_type.name }}> message = { {

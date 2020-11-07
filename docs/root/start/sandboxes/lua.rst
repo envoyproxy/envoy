@@ -9,23 +9,10 @@ filter that contains two functions namely
 ``envoy_on_request(request_handle)`` and
 ``envoy_on_response(response_handle)`` as documented :ref:`here <config_http_filters_lua>`.
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
+.. include:: _include/docker-env-setup.rst
 
-The following documentation runs through the setup of both services.
-
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo and start all of our containers**
-
-If you have not cloned the Envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
-or ``git clone https://github.com/envoyproxy/envoy.git``
-
-Terminal 1
+Step 3: Build the sandbox
+*************************
 
 .. code-block:: console
 
@@ -35,12 +22,13 @@ Terminal 1
   $ docker-compose up --build -d
   $ docker-compose ps
 
-      Name                     Command               State                            Ports
-  --------------------------------------------------------------------------------------------------------------------
-  lua_proxy_1         /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-  lua_web_service_1   node ./index.js                  Up      0.0.0.0:8080->80/tcp
+      Name                     Command               State             Ports
+  --------------------------------------------------------------------------------------------
+  lua_proxy_1         /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
+  lua_web_service_1   node ./index.js                Up      0.0.0.0:8080->80/tcp
 
-**Step 3: Send a request to the service**
+Step 4: Send a request to the service
+*************************************
 
 The output from the ``curl`` command below should include the headers ``foo``.
 

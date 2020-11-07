@@ -10,7 +10,7 @@
 #
 #  python tools/deprecate_version/deprecate_version.py
 #
-# A GitHub access token must be set in GH_ACCESS_TOKEN. To create one, go to
+# A GitHub access token must be set in GITHUB_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create
 # a token with public_repo scope. Keep this safe, it's broader than it needs to
 # be thanks to GH permission model
@@ -22,6 +22,8 @@
 
 from __future__ import print_function
 
+import datetime
+from datetime import date
 from collections import defaultdict
 import os
 import re
@@ -45,26 +47,6 @@ class DeprecateVersionError(Exception):
   pass
 
 
-# Figure out map from version to set of commits.
-def GetHistory():
-  """Obtain mapping from release version to docs/root/intro/deprecated.rst PRs.
-
-  Returns:
-    A dictionary mapping from release version to a set of git commit objects.
-  """
-  repo = Repo(os.getcwd())
-  version = None
-  history = defaultdict(set)
-  for commit, lines in repo.blame('HEAD', 'docs/root/intro/deprecated.rst'):
-    for line in lines:
-      sr = re.match('## Version (.*) \(.*\)', line)
-      if sr:
-        version = sr.group(1)
-        continue
-      history[version].add(commit)
-  return history
-
-
 def GetConfirmation():
   """Obtain stdin confirmation to create issues in GH."""
   return input('Creates issues? [yN] ').strip().lower() in ('y', 'yes')
@@ -75,9 +57,10 @@ def CreateIssues(access_token, runtime_and_pr):
 
   Args:
     access_token: GitHub access token (see comment at top of file).
-    runtime_and_pr: a list of runtime guards and the PRs they were added.
+    runtime_and_pr: a list of runtime guards and the PRs and commits they were added.
   """
-  repo = github.Github(access_token).get_repo('envoyproxy/envoy')
+  git = github.Github(access_token)
+  repo = git.get_repo('envoyproxy/envoy')
 
   # Find GitHub label objects for LABELS.
   labels = []
@@ -88,24 +71,44 @@ def CreateIssues(access_token, runtime_and_pr):
     raise DeprecateVersionError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
 
   issues = []
-  for runtime_guard, pr in runtime_and_pr:
+  for runtime_guard, pr, commit in runtime_and_pr:
     # Who is the author?
-    pr_info = repo.get_pull(pr)
+    if pr:
+      # Extract PR title, number, and author.
+      pr_info = repo.get_pull(pr)
+      change_title = pr_info.title
+      number = ('#%d') % pr
+      login = pr_info.user.login
+    else:
+      # Extract commit message, sha, and author.
+      # Only keep commit message title (remove description), and truncate to 50 characters.
+      change_title = commit.message.split('\n')[0][:50]
+      number = ('commit %s') % commit.hexsha
+      email = commit.author.email
+      # Use the commit author's email to search through users for their login.
+      search_user = git.search_users(email.split('@')[0] + " in:email")
+      login = search_user[0].login if search_user else None
 
     title = '%s deprecation' % (runtime_guard)
-    body = ('#%d (%s) introduced a runtime guarded feature. This issue '
-            'tracks source code cleanup.') % (pr, pr_info.title)
+    body = ('Your change %s (%s) introduced a runtime guarded feature. It has been 6 months since '
+            'the new code has been exercised by default, so it\'s time to remove the old code '
+            'path. This issue tracks source code cleanup so we don\'t forget.') % (number,
+                                                                                   change_title)
+
     print(title)
     print(body)
-    print('  >> Assigning to %s' % pr_info.user.login)
+    print('  >> Assigning to %s' % (login or email))
+    search_title = '%s in:title' % title
 
     # TODO(htuch): Figure out how to do this without legacy and faster.
-    exists = repo.legacy_search_issues('open', '"%s"' % title) or repo.legacy_search_issues(
-        'closed', '"%s"' % title)
+    exists = repo.legacy_search_issues('open', search_title) or repo.legacy_search_issues(
+        'closed', search_title)
     if exists:
+      print("Issue with %s already exists" % search_title)
+      print(exists)
       print('  >> Issue already exists, not posting!')
     else:
-      issues.append((title, body, pr_info.user))
+      issues.append((title, body, login))
 
   if not issues:
     print('No features to deprecate in this release')
@@ -113,80 +116,76 @@ def CreateIssues(access_token, runtime_and_pr):
 
   if GetConfirmation():
     print('Creating issues...')
-    for title, body, user in issues:
+    for title, body, login in issues:
       try:
-        repo.create_issue(title, body=body, assignees=[user.login], labels=labels)
+        repo.create_issue(title, body=body, assignees=[login], labels=labels)
       except github.GithubException as e:
         try:
-          body += '\ncc @' + user.login
+          if login:
+            body += '\ncc @' + login
           repo.create_issue(title, body=body, labels=labels)
           print(('unable to assign issue %s to %s. Add them to the Envoy proxy org'
-                 'and assign it their way.') % (title, user.login))
+                 'and assign it their way.') % (title, login))
         except github.GithubException as e:
           print('GithubException while creating issue.')
           raise
 
 
-def GetRuntimeAlreadyTrue():
-  """Returns a list of runtime flags already defaulted to true
-  """
-  runtime_already_true = []
-  runtime_features = re.compile(r'.*"(envoy.reloadable_features..*)",.*')
-  with open('source/common/runtime/runtime_features.cc', 'r') as features:
-    for line in features.readlines():
-      match = runtime_features.match(line)
-      if match and 'test_feature_true' not in match.group(1):
-        print("Found existing flag " + match.group(1))
-        runtime_already_true.append(match.group(1))
-
-  return runtime_already_true
-
-
 def GetRuntimeAndPr():
-  """Returns a list of tuples of [runtime features to deprecate, PR the feature was added]
+  """Returns a list of tuples of [runtime features to deprecate, PR, commit the feature was added]
   """
   repo = Repo(os.getcwd())
 
-  runtime_already_true = GetRuntimeAlreadyTrue()
-
   # grep source code looking for reloadable features which are true to find the
   # PR they were added.
-  grep_output = subprocess.check_output('grep -r "envoy.reloadable_features\." source/', shell=True)
   features_to_flip = []
-  runtime_feature_regex = re.compile(r'.*(source.*cc).*"(envoy.reloadable_features\.[^"]+)".*')
-  for line in grep_output.splitlines():
-    match = runtime_feature_regex.match(str(line))
-    if match:
-      filename = (match.group(1))
-      runtime_guard = match.group(2)
-      # If this runtime guard isn't true, ignore it for this release.
-      if not runtime_guard in runtime_already_true:
-        continue
 
-      # For true runtime guards, walk the blame of the file they were added to,
-      # to find the pr the feature was added.
-      for commit, lines in repo.blame('HEAD', filename):
-        for line in lines:
-          if runtime_guard in line:
-            pr = (int(re.search('\(#(\d+)\)', commit.message).group(1)))
-            # Add the runtime guard and PR to the list to file issues about.
-            features_to_flip.append((runtime_guard, pr))
-            # Make sure if grep finds multiple spots we only do the work one time.
-            runtime_already_true.remove(runtime_guard)
+  runtime_features = re.compile(r'.*"(envoy.reloadable_features..*)",.*')
 
-    else:
-      print('no match in ' + str(line) + ' please address manually!')
+  removal_date = date.today() - datetime.timedelta(days=183)
+  found_test_feature_true = False
 
-  return features_to_flip
+  # Walk the blame of runtime_features and look for true runtime features older than 6 months.
+  for commit, lines in repo.blame('HEAD', 'source/common/runtime/runtime_features.cc'):
+    for line in lines:
+      match = runtime_features.match(line)
+      if match:
+        runtime_guard = match.group(1)
+        if runtime_guard == 'envoy.reloadable_features.test_feature_false':
+          print("Found end sentinel\n")
+          if not found_test_feature_true:
+            # The script depends on the cc file having the true runtime block
+            # before the false runtime block.  Fail if one isn't found.
+            print('Failed to find test_feature_true.  Script needs fixing')
+            sys.exit(1)
+          return features_to_flip
+        if runtime_guard == 'envoy.reloadable_features.test_feature_true':
+          found_test_feature_true = True
+          continue
+        pr_num = re.search('\(#(\d+)\)', commit.message)
+        # Some commits may not come from a PR (if they are part of a security point release).
+        pr = (int(pr_num.group(1))) if pr_num else None
+        pr_date = date.fromtimestamp(commit.committed_date)
+        removable = (pr_date < removal_date)
+        # Add the runtime guard and PR to the list to file issues about.
+        print('Flag ' + runtime_guard + ' added at ' + str(pr_date) + ' ' +
+              (removable and 'and is safe to remove' or 'is not ready to remove'))
+        if removable:
+          features_to_flip.append((runtime_guard, pr, commit))
+  print('Failed to find test_feature_false.  Script needs fixing')
+  sys.exit(1)
 
 
 if __name__ == '__main__':
   runtime_and_pr = GetRuntimeAndPr()
 
-  access_token = os.getenv('GH_ACCESS_TOKEN')
+  if not runtime_and_pr:
+    print('No code is deprecated.')
+    sys.exit(0)
+
+  access_token = os.getenv('GITHUB_TOKEN')
   if not access_token:
-    print(
-        'Missing GH_ACCESS_TOKEN: see instructions in tools/deprecate_version/deprecate_version.py')
+    print('Missing GITHUB_TOKEN: see instructions in tools/deprecate_version/deprecate_version.py')
     sys.exit(1)
 
   CreateIssues(access_token, runtime_and_pr)

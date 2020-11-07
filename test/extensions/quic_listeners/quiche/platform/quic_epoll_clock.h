@@ -7,8 +7,8 @@
 // porting layer for QUICHE.
 
 #include "quiche/epoll_server/simple_epoll_server.h"
+#include "quiche/quic/core/quic_clock.h"
 #include "quiche/quic/core/quic_time.h"
-#include "quiche/quic/platform/api/quic_clock.h"
 
 namespace quic {
 

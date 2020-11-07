@@ -3,15 +3,20 @@
 #include <fstream>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/service/tap/v2alpha/common.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/wrapper.pb.h"
 
+#include "extensions/common/matcher/matcher.h"
 #include "extensions/common/tap/tap.h"
-#include "extensions/common/tap/tap_matcher.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
+
+using Matcher = Envoy::Extensions::Common::Matcher::Matcher;
+using MatcherPtr = Envoy::Extensions::Common::Matcher::MatcherPtr;
 
 /**
  * Common utilities for tapping.
@@ -28,15 +33,15 @@ public:
    * @param buffer_length_to_copy supplies the length of the data to buffer.
    * @return whether the buffered data was truncated or not.
    */
-  static bool addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_body,
+  static bool addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
                                     uint32_t max_buffered_bytes, const Buffer::Instance& data,
                                     uint32_t buffer_start_offset, uint32_t buffer_length_to_copy);
 
   /**
    * Swap body as bytes to body as string if necessary in a trace wrapper.
    */
-  static void bodyBytesToString(envoy::data::tap::v2alpha::TraceWrapper& trace,
-                                envoy::service::tap::v2alpha::OutputSink::Format sink_format);
+  static void bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
+                                envoy::config::tap::v3::OutputSink::Format sink_format);
 
   /**
    * Trim a container that contains buffer raw slices so that the slices start at an offset and
@@ -51,7 +56,9 @@ public:
       const uint32_t start_offset_trim = std::min<uint32_t>(start_offset, slice.len_);
       slice.len_ -= start_offset_trim;
       start_offset -= start_offset_trim;
-      slice.mem_ = static_cast<char*>(slice.mem_) + start_offset_trim;
+      if (slice.mem_ != nullptr) {
+        slice.mem_ = static_cast<char*>(slice.mem_) + start_offset_trim;
+      }
 
       const uint32_t final_length = std::min<uint32_t>(length, slice.len_);
       slice.len_ = final_length;
@@ -94,7 +101,7 @@ public:
   bool streaming() const override { return streaming_; }
 
 protected:
-  TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+  TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                     Common::Tap::Sink* admin_streamer);
 
 private:
@@ -107,7 +114,7 @@ private:
   const bool streaming_;
   Sink* sink_to_use_;
   SinkPtr sink_;
-  envoy::service::tap::v2alpha::OutputSink::Format sink_format_;
+  envoy::config::tap::v3::OutputSink::Format sink_format_;
   std::vector<MatcherPtr> matchers_;
 };
 
@@ -116,7 +123,7 @@ private:
  */
 class FilePerTapSink : public Sink {
 public:
-  FilePerTapSink(const envoy::service::tap::v2alpha::FilePerTapSink& config) : config_(config) {}
+  FilePerTapSink(const envoy::config::tap::v3::FilePerTapSink& config) : config_(config) {}
 
   // Sink
   PerTapSinkHandlePtr createPerTapSinkHandle(uint64_t trace_id) override {
@@ -130,14 +137,14 @@ private:
 
     // PerTapSinkHandle
     void submitTrace(TraceWrapperPtr&& trace,
-                     envoy::service::tap::v2alpha::OutputSink::Format format) override;
+                     envoy::config::tap::v3::OutputSink::Format format) override;
 
     FilePerTapSink& parent_;
     const uint64_t trace_id_;
     std::ofstream output_file_;
   };
 
-  const envoy::service::tap::v2alpha::FilePerTapSink config_;
+  const envoy::config::tap::v3::FilePerTapSink config_;
 };
 
 } // namespace Tap

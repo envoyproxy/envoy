@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_manager.h"
@@ -35,9 +36,14 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
-  ClientSslTransportOptions&
-  setTlsVersion(envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version) {
+  ClientSslTransportOptions& setTlsVersion(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version) {
     tls_version_ = tls_version;
+    return *this;
+  }
+
+  ClientSslTransportOptions& setSni(absl::string_view sni) {
+    sni_ = std::string(sni);
     return *this;
   }
 
@@ -46,15 +52,21 @@ struct ClientSslTransportOptions {
   bool client_ecdsa_cert_{};
   std::vector<std::string> cipher_suites_{};
   std::string sigalgs_;
-  envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version_{
-      envoy::api::v2::auth::TlsParameters::TLS_AUTO};
+  std::string sni_;
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
 };
 
 Network::TransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api);
+
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
                                                             Api::Api& api);
+
+Network::TransportSocketFactoryPtr
+createFakeUpstreamSslContext(const std::string& upstream_cert_name, ContextManager& context_manager,
+                             Server::Configuration::TransportSocketFactoryContext& factory_context);
 
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port);

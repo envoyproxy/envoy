@@ -8,8 +8,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
+
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
 namespace Envoy {
 
@@ -19,7 +20,7 @@ class ProcessContextFilter : public Http::PassThroughFilter {
 public:
   ProcessContextFilter(ProcessContext& process_context)
       : process_object_(dynamic_cast<ProcessObjectForFilter&>(process_context.get())) {}
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     if (!process_object_.isHealthy()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
                                          "ProcessObjectForFilter is unhealthy", nullptr,

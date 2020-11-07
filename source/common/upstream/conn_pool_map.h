@@ -21,7 +21,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> class ConnPoolMap {
 public:
   using PoolFactory = std::function<std::unique_ptr<POOL_TYPE>()>;
   using DrainedCb = std::function<void()>;
-  using OptPoolRef = absl::optional<std::reference_wrapper<POOL_TYPE>>;
+  using PoolOptRef = absl::optional<std::reference_wrapper<POOL_TYPE>>;
 
   ConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host,
               ResourcePriority priority);
@@ -31,7 +31,7 @@ public:
    * possible for this to fail if a limit on the number of pools allowed is reached.
    * @return The pool corresponding to `key`, or `absl::nullopt`.
    */
-  OptPoolRef getPool(KEY_TYPE key, const PoolFactory& factory);
+  PoolOptRef getPool(KEY_TYPE key, const PoolFactory& factory);
 
   /**
    * @return the number of pools.

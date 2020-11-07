@@ -25,7 +25,7 @@ ThriftProxy::FilterStatus Filter::messageBegin(ThriftProxy::MessageMetadataShare
 }
 
 void Filter::initiateCall(const ThriftProxy::MessageMetadata& metadata) {
-  ThriftProxy::Router::RouteConstSharedPtr route = callbacks_->route();
+  ThriftProxy::Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (!route || !route->routeEntry()) {
     return;
   }
@@ -45,7 +45,8 @@ void Filter::initiateCall(const ThriftProxy::MessageMetadata& metadata) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors, Tracing::NullSpan::instance());
+    client_->limit(*this, config_->domain(), descriptors, Tracing::NullSpan::instance(),
+                   decoder_callbacks_->streamInfo());
     initiating_call_ = false;
   }
 }
@@ -58,11 +59,13 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Http::HeaderMapPtr&& response_headers_to_add,
-                      Http::HeaderMapPtr&& request_headers_to_add) {
+                      Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
+                      Http::ResponseHeaderMapPtr&& response_headers_to_add,
+                      Http::RequestHeaderMapPtr&& request_headers_to_add) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
+  UNREFERENCED_PARAMETER(descriptor_statuses);
   UNREFERENCED_PARAMETER(response_headers_to_add);
   UNREFERENCED_PARAMETER(request_headers_to_add);
 
@@ -77,10 +80,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     if (!config_->failureModeAllow()) {
       state_ = State::Responded;
-      callbacks_->sendLocalReply(
+      decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "limiter error"),
           false);
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
+      decoder_callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::RateLimitServiceError);
       return;
     }
     cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
@@ -89,17 +93,17 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
     if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
       state_ = State::Responded;
-      callbacks_->sendLocalReply(
+      decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),
           false);
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
       return;
     }
     break;
   }
 
   if (!initiating_call_) {
-    callbacks_->continueDecoding();
+    decoder_callbacks_->continueDecoding();
   }
 }
 
@@ -117,7 +121,8 @@ void Filter::populateRateLimitDescriptors(
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   metadata, *callbacks_->streamInfo().downstreamRemoteAddress());
+                                   metadata,
+                                   *decoder_callbacks_->streamInfo().downstreamRemoteAddress());
   }
 }
 

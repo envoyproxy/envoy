@@ -4,8 +4,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
+
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
 namespace Envoy {
 
@@ -26,7 +27,7 @@ public:
     encode_delay_timer_->enableTimer(std::chrono::seconds(0));
   }
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool end_stream) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override {
     if (end_stream) {
       setEndStreamAndDecodeTimer();
       return Http::FilterHeadersStatus::StopIteration;
@@ -42,7 +43,7 @@ public:
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool end_stream) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool end_stream) override {
     if (end_stream) {
       setEndStreamAndEncodeTimer();
       return Http::FilterHeadersStatus::StopIteration;

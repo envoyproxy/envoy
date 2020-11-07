@@ -10,3 +10,19 @@ index d7c731bf6..315cdeca0 100644
      ],
      "//conditions:default": ["-DOPENSSL_NO_ASM"],
  })
+@@ -141,6 +142,7 @@ cc_library(
+         ":windows_x86_64": ["-defaultlib:advapi32.lib"],
+         "//conditions:default": ["-lpthread"],
+     }),
++    linkstatic = True,
+     visibility = ["//visibility:public"],
+ )
+ 
+@@ -150,6 +152,7 @@ cc_library(
+     hdrs = ssl_headers,
+     copts = boringssl_copts_cxx,
+     includes = ["src/include"],
++    linkstatic = True,
+     visibility = ["//visibility:public"],
+     deps = [
+         ":crypto",

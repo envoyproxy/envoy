@@ -2,12 +2,14 @@
 
 #include <string>
 
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/transport_socket.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
@@ -40,7 +42,7 @@ public:
   /**
    * @return Stats::Scope& the transport socket's stats scope.
    */
-  virtual Stats::Scope& statsScope() const PURE;
+  virtual Stats::Scope& scope() PURE;
 
   /**
    * Return the instance of secret manager.
@@ -55,7 +57,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher.
@@ -63,26 +65,14 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Envoy::Runtime::RandomGenerator& random() PURE;
-
-  /**
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;
 
   /**
-   * Pass an init manager to register dynamic secret provider.
-   * @param init_manager instance of init manager.
+   * @return a reference to the instance of an init manager.
    */
-  virtual void setInitManager(Init::Manager& init_manager) PURE;
-
-  /**
-   * @return a pointer pointing to the instance of an init manager, or nullptr
-   * if not set.
-   */
-  virtual Init::Manager* initManager() PURE;
+  virtual Init::Manager& initManager() PURE;
 
   /**
    * @return the server's singleton manager.
@@ -106,22 +96,9 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-class TransportSocketConfigFactory {
+class TransportSocketConfigFactory : public Config::TypedFactory {
 public:
-  virtual ~TransportSocketConfigFactory() = default;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message. The transport socket
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted
-   *         to JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular TransportSocketFactoryPtr
-   *         implementation produced by the factory.
-   */
-  virtual std::string name() const PURE;
+  ~TransportSocketConfigFactory() override = default;
 };
 
 /**
@@ -145,12 +122,7 @@ public:
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "transport_sockets.upstream"; }
+  std::string category() const override { return "envoy.transport_sockets.upstream"; }
 };
 
 /**
@@ -177,12 +149,7 @@ public:
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "transport_sockets.downstream"; }
+  std::string category() const override { return "envoy.transport_sockets.downstream"; }
 };
 
 } // namespace Configuration

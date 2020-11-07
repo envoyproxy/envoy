@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/retry/previous_priorities/previous_priorities_config.pb.validate.h"
+#include "envoy/config/retry/previous_priorities/previous_priorities_config.pb.h"
 #include "envoy/upstream/retry.h"
 
 #include "common/protobuf/protobuf.h"

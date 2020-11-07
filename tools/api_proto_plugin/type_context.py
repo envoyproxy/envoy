@@ -152,8 +152,9 @@ class TypeContext(object):
     # Map from a message's oneof index to the "required" bool property.
     self.oneof_required = {}
     self.type_name = 'file'
+    self.deprecated = False
 
-  def _Extend(self, path, type_name, name):
+  def _Extend(self, path, type_name, name, deprecated=False):
     if not self.name:
       extended_name = name
     else:
@@ -165,25 +166,28 @@ class TypeContext(object):
     extended.oneof_fields = self.oneof_fields.copy()
     extended.oneof_names = self.oneof_names.copy()
     extended.oneof_required = self.oneof_required.copy()
+    extended.deprecated = self.deprecated or deprecated
     return extended
 
-  def ExtendMessage(self, index, name):
+  def ExtendMessage(self, index, name, deprecated):
     """Extend type context with a message.
 
     Args:
       index: message index in file.
       name: message name.
+      deprecated: is the message depreacted?
     """
-    return self._Extend([4, index], 'message', name)
+    return self._Extend([4, index], 'message', name, deprecated)
 
-  def ExtendNestedMessage(self, index, name):
+  def ExtendNestedMessage(self, index, name, deprecated):
     """Extend type context with a nested message.
 
     Args:
       index: nested message index in message.
       name: message name.
+      deprecated: is the message depreacted?
     """
-    return self._Extend([3, index], 'message', name)
+    return self._Extend([3, index], 'message', name, deprecated)
 
   def ExtendField(self, index, name):
     """Extend type context with a field.
@@ -194,14 +198,15 @@ class TypeContext(object):
     """
     return self._Extend([2, index], 'field', name)
 
-  def ExtendEnum(self, index, name):
+  def ExtendEnum(self, index, name, deprecated):
     """Extend type context with an enum.
 
     Args:
       index: enum index in file.
       name: enum name.
+      deprecated: is the message depreacted?
     """
-    return self._Extend([5, index], 'enum', name)
+    return self._Extend([5, index], 'enum', name, deprecated)
 
   def ExtendService(self, index, name):
     """Extend type context with a service.
@@ -212,14 +217,15 @@ class TypeContext(object):
     """
     return self._Extend([6, index], 'service', name)
 
-  def ExtendNestedEnum(self, index, name):
+  def ExtendNestedEnum(self, index, name, deprecated):
     """Extend type context with a nested enum.
 
     Args:
       index: enum index in message.
       name: enum name.
+      deprecated: is the message depreacted?
     """
-    return self._Extend([4, index], 'enum', name)
+    return self._Extend([4, index], 'enum', name, deprecated)
 
   def ExtendEnumValue(self, index, name):
     """Extend type context with an enum enum.

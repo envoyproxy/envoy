@@ -1,0 +1,38 @@
+config {
+  stat_prefix: "envoy.extensions.filters.network.e"
+  failure_mode_allow: true
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+    data: "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+    end_stream: true
+    result {
+      check_status_denied {
+      }
+    }
+  }
+}
+actions {
+  on_data {
+    data: "CCCCCCCCCCCC"
+    end_stream: true
+    result {
+      check_status_denied {
+      }
+    }
+  }
+}
+actions {
+  on_data {
+    data: "\000\000\000\000"
+    end_stream: true
+    result {
+      check_status_error {
+      }
+    }
+  }
+}

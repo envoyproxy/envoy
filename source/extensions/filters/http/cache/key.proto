@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package Envoy.Extensions.HttpFilters.Cache;
+
+// Cache key for lookups and inserts.
+message Key {
+  string cluster_name = 1;
+  string host = 2;
+  string path = 3;
+  string query = 4;
+  // True for http://, false for https://.
+  bool clear_http = 5;
+  // Cache implementations can store arbitrary content in these fields; never set by cache filter.
+  repeated bytes custom_fields = 6;
+  repeated int64 custom_ints = 7;
+};

@@ -1,10 +1,11 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -21,11 +22,11 @@
 #include "server/filter_chain_manager_impl.h"
 #include "server/listener_manager_impl.h"
 
-#include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/drain_manager.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
@@ -45,12 +46,15 @@ namespace Envoy {
 namespace Server {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-
-  std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
-    // Won't dereference but requires not nullptr.
-    return std::make_unique<Network::MockFilterChain>();
+public:
+  MockFilterChainFactoryBuilder() {
+    ON_CALL(*this, buildFilterChain(_, _))
+        .WillByDefault(Return(std::make_shared<Network::MockFilterChain>()));
   }
+
+  MOCK_METHOD(Network::DrainableFilterChainSharedPtr, buildFilterChain,
+              (const envoy::config::listener::v3::FilterChain&, FilterChainFactoryContextCreator&),
+              (const));
 };
 
 class FilterChainManagerImplTest : public testing::Test {
@@ -95,10 +99,12 @@ public:
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 
-  void addSingleFilterChainHelper(const envoy::api::v2::listener::FilterChain& filter_chain) {
-    filter_chain_manager_.addFilterChain(
-        std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain},
-        filter_chain_factory_builder_);
+  void addSingleFilterChainHelper(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      const envoy::config::listener::v3::FilterChain* fallback_filter_chain = nullptr) {
+    filter_chain_manager_.addFilterChains(
+        std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
+        fallback_filter_chain, filter_chain_factory_builder_, filter_chain_manager_);
   }
 
   // Intermediate states.
@@ -111,7 +117,7 @@ public:
       filter_chain_match:
         destination_port: 10000
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:
@@ -122,12 +128,20 @@ public:
             keys:
             - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
-  envoy::api::v2::listener::FilterChain filter_chain_template_;
-  MockFilterChainFactoryBuilder filter_chain_factory_builder_;
+  Init::ManagerImpl init_manager_{"for_filter_chain_manager_test"};
+  envoy::config::listener::v3::FilterChain filter_chain_template_;
+  std::shared_ptr<Network::MockFilterChain> build_out_filter_chain_{
+      std::make_shared<Network::MockFilterChain>()};
+  envoy::config::listener::v3::FilterChain fallback_filter_chain_;
+  std::shared_ptr<Network::MockFilterChain> build_out_fallback_filter_chain_{
+      std::make_shared<Network::MockFilterChain>()};
 
+  NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
+  NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_,
+      init_manager_};
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
@@ -139,6 +153,98 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   addSingleFilterChainHelper(filter_chain_template_);
   auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, FilterChainUseFallbackIfNoFilterChainMatches) {
+  // The build helper will build matchable filter chain and then build the default filter chain.
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _))
+      .WillOnce(Return(build_out_fallback_filter_chain_));
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _))
+      .WillOnce(Return(std::make_shared<Network::MockFilterChain>()))
+      .RetiresOnSaturation();
+  addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
+
+  auto filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain, nullptr);
+  auto fallback_filter_chain =
+      findFilterChainHelper(9999, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(fallback_filter_chain, build_out_fallback_filter_chain_.get());
+}
+
+TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+
+  for (int i = 0; i < 2; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    // For sanity check.
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
+  filter_chain_manager_.addFilterChains(
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0],
+                                                                   &filter_chain_messages[1]},
+      nullptr, filter_chain_factory_builder_, filter_chain_manager_);
+}
+
+TEST_F(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+
+  for (int i = 0; i < 3; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    // For sanity check
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(1);
+  filter_chain_manager_.addFilterChains(
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0]},
+      nullptr, filter_chain_factory_builder_, filter_chain_manager_);
+
+  FilterChainManagerImpl new_filter_chain_manager{
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_,
+      init_manager_, filter_chain_manager_};
+  // The new filter chain manager maintains 3 filter chains, but only 2 filter chain context is
+  // built because it reuse the filter chain context in the previous filter chain manager
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
+  new_filter_chain_manager.addFilterChains(
+      std::vector<const envoy::config::listener::v3::FilterChain*>{
+          &filter_chain_messages[0], &filter_chain_messages[1], &filter_chain_messages[2]},
+      nullptr, filter_chain_factory_builder_, new_filter_chain_manager);
+}
+
+TEST_F(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependentDrainClose) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+  for (int i = 0; i < 3; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    // For sanity check
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+  auto context0 = filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_messages[0]);
+  auto context1 = filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_messages[1]);
+
+  // Server as whole is not draining.
+  MockDrainManager not_a_draining_manager;
+  EXPECT_CALL(not_a_draining_manager, drainClose).WillRepeatedly(Return(false));
+  Configuration::MockServerFactoryContext mock_server_context;
+  EXPECT_CALL(mock_server_context, drainManager).WillRepeatedly(ReturnRef(not_a_draining_manager));
+  EXPECT_CALL(parent_context_, getServerFactoryContext)
+      .WillRepeatedly(ReturnRef(mock_server_context));
+
+  EXPECT_FALSE(context0->drainDecision().drainClose());
+  EXPECT_FALSE(context1->drainDecision().drainClose());
+
+  // Drain filter chain 0
+  auto* context_impl_0 = dynamic_cast<PerFilterChainFactoryContextImpl*>(context0.get());
+  context_impl_0->startDraining();
+
+  EXPECT_TRUE(context0->drainDecision().drainClose());
+  EXPECT_FALSE(context1->drainDecision().drainClose());
 }
 } // namespace Server
 } // namespace Envoy

@@ -1,6 +1,5 @@
 #include <list>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "test/integration/integration.h"
@@ -47,7 +46,7 @@ private:
     Request(TestFilter& parent, Buffer::Instance& data) : parent_(parent) { data_.move(data); }
 
     // Tcp::ConnectionPool::Callbacks
-    void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason,
+    void onPoolFailure(ConnectionPool::PoolFailureReason,
                        Upstream::HostDescriptionConstSharedPtr) override {
       ASSERT(false);
     }
@@ -95,10 +94,12 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
   bool isTerminalFilter() override { return true; }
 };
 
@@ -111,23 +112,17 @@ public:
       : BaseIntegrationTest(GetParam(), tcp_conn_pool_config), filter_resolver_(config_factory_) {}
 
   // Called once by the gtest framework before any tests are run.
-  static void SetUpTestSuite() {
-    tcp_conn_pool_config = ConfigHelper::BASE_CONFIG + R"EOF(
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    tcp_conn_pool_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       - filters:
         - name: envoy.test.router
           config:
-      )EOF";
+      )EOF");
   }
 
   // Initializer for individual tests.
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  // Destructor for individual tests.
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 
 private:
   TestFilterConfigFactory config_factory_;
@@ -143,7 +138,7 @@ TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
   std::string response("response");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request);
+  ASSERT_TRUE(tcp_client->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -163,7 +158,7 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
 
   // send request 1
-  tcp_client->write(request1);
+  ASSERT_TRUE(tcp_client->write(request1));
   FakeRawConnectionPtr fake_upstream_connection1;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
   std::string data;
@@ -171,7 +166,7 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
   EXPECT_EQ(request1, data);
 
   // send request 2
-  tcp_client->write(request2);
+  ASSERT_TRUE(tcp_client->write(request2));
   FakeRawConnectionPtr fake_upstream_connection2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->waitForData(request2.size(), &data));

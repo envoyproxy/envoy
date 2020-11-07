@@ -1,5 +1,8 @@
 #include <string>
 
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/type/v3/percent.pb.h"
+
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "extensions/filters/network/redis_proxy/router_impl.h"
 
@@ -18,8 +21,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes createPrefixRoutes() {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes prefix_routes;
+envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes
+createPrefixRoutes() {
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes;
   auto* routes = prefix_routes.mutable_routes();
 
   {
@@ -190,7 +194,7 @@ TEST(PrefixRoutesTest, DuplicatePrefix) {
 }
 
 TEST(MirrorPolicyImplTest, ShouldMirrorDefault) {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route::
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route::
       RequestMirrorPolicy config;
   auto upstream = std::make_shared<ConnPool::MockInstance>();
   NiceMock<Runtime::MockLoader> runtime;
@@ -204,7 +208,7 @@ TEST(MirrorPolicyImplTest, ShouldMirrorDefault) {
 }
 
 TEST(MirrorPolicyImplTest, MissingUpstream) {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route::
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route::
       RequestMirrorPolicy config;
   NiceMock<Runtime::MockLoader> runtime;
 
@@ -217,7 +221,7 @@ TEST(MirrorPolicyImplTest, MissingUpstream) {
 }
 
 TEST(MirrorPolicyImplTest, ExcludeReadCommands) {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route::
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route::
       RequestMirrorPolicy config;
   config.set_exclude_read_commands(true);
   auto upstream = std::make_shared<ConnPool::MockInstance>();
@@ -232,12 +236,12 @@ TEST(MirrorPolicyImplTest, ExcludeReadCommands) {
 }
 
 TEST(MirrorPolicyImplTest, DefaultValueZero) {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route::
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route::
       RequestMirrorPolicy config;
   auto* runtime_fraction = config.mutable_runtime_fraction();
   auto* percentage = runtime_fraction->mutable_default_value();
   percentage->set_numerator(0);
-  percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  percentage->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   auto upstream = std::make_shared<ConnPool::MockInstance>();
   NiceMock<Runtime::MockLoader> runtime;
 
@@ -248,21 +252,21 @@ TEST(MirrorPolicyImplTest, DefaultValueZero) {
 }
 
 TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route::
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route::
       RequestMirrorPolicy config;
   auto* runtime_fraction = config.mutable_runtime_fraction();
   runtime_fraction->set_runtime_key("runtime_key");
   auto* percentage = runtime_fraction->mutable_default_value();
   percentage->set_numerator(50);
-  percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  percentage->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   auto upstream = std::make_shared<ConnPool::MockInstance>();
 
   NiceMock<Runtime::MockLoader> runtime;
   MirrorPolicyImpl policy(config, upstream, runtime);
 
-  EXPECT_CALL(
-      runtime.snapshot_,
-      featureEnabled("runtime_key", Matcher<const envoy::type::FractionalPercent&>(Percent(50))))
+  EXPECT_CALL(runtime.snapshot_,
+              featureEnabled("runtime_key",
+                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
       .Times(4)
       .WillRepeatedly(Return(true));
   EXPECT_EQ(true, policy.shouldMirror("get"));
@@ -270,9 +274,9 @@ TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
   EXPECT_EQ(true, policy.shouldMirror("GET"));
   EXPECT_EQ(true, policy.shouldMirror("SET"));
 
-  EXPECT_CALL(
-      runtime.snapshot_,
-      featureEnabled("runtime_key", Matcher<const envoy::type::FractionalPercent&>(Percent(50))))
+  EXPECT_CALL(runtime.snapshot_,
+              featureEnabled("runtime_key",
+                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
       .Times(4)
       .WillRepeatedly(Return(false));
   EXPECT_EQ(false, policy.shouldMirror("get"));

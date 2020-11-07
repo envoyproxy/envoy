@@ -1,5 +1,5 @@
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -10,10 +10,11 @@
 #include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -30,7 +31,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-using ConfigDubboProxy = envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy;
+using ConfigDubboProxy = envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy;
 
 class ConnectionManagerTest;
 class TestConfigImpl : public ConfigImpl {
@@ -308,7 +309,7 @@ public:
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   DubboFilterStats stats_;
   ConfigDubboProxy proto_config_;
 
@@ -317,7 +318,7 @@ public:
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<ConnectionManager> conn_manager_;
   MockSerializer* custom_serializer_{};
   MockProtocol* custom_protocol_{};
@@ -365,13 +366,13 @@ TEST_F(ConnectionManagerTest, OnDataHandlesHeartbeatEvent) {
         auto result = protocol->decodeHeader(buffer, metadata);
         EXPECT_TRUE(result.second);
         const DubboProxy::ContextImpl& ctx = *static_cast<const ContextImpl*>(result.first.get());
-        EXPECT_TRUE(ctx.is_heartbeat());
+        EXPECT_TRUE(ctx.isHeartbeat());
         EXPECT_TRUE(metadata->hasResponseStatus());
-        EXPECT_FALSE(metadata->is_two_way());
-        EXPECT_EQ(ProtocolType::Dubbo, metadata->protocol_type());
-        EXPECT_EQ(metadata->response_status(), ResponseStatus::Ok);
-        EXPECT_EQ(metadata->message_type(), MessageType::HeartbeatResponse);
-        buffer.drain(ctx.header_size());
+        EXPECT_FALSE(metadata->isTwoWay());
+        EXPECT_EQ(ProtocolType::Dubbo, metadata->protocolType());
+        EXPECT_EQ(metadata->responseStatus(), ResponseStatus::Ok);
+        EXPECT_EQ(metadata->messageType(), MessageType::HeartbeatResponse);
+        buffer.drain(ctx.headerSize());
       }));
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -1186,7 +1187,7 @@ route_config:
       .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
-        auto invo = static_cast<const RpcInvocationBase*>(&metadata->invocation_info());
+        auto invo = static_cast<const RpcInvocationBase*>(&metadata->invocationInfo());
         auto data = const_cast<RpcInvocationBase*>(invo);
         data->setServiceName("org.apache.dubbo.demo.DemoService");
         data->setMethodName("test");
@@ -1247,7 +1248,7 @@ TEST_F(ConnectionManagerTest, MessageDecodedReturnStopIteration) {
   size_t buf_size = buffer_.length();
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr ctx) -> FilterStatus {
-        EXPECT_EQ(ctx->message_size(), buf_size);
+        EXPECT_EQ(ctx->messageSize(), buf_size);
         return FilterStatus::StopIteration;
       }));
 
@@ -1335,8 +1336,8 @@ TEST_F(ConnectionManagerTest, HandleResponseWithEncoderFilter) {
   EXPECT_CALL(*encoder_filter, onMessageEncoded(_, _))
       .WillOnce(
           Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) -> FilterStatus {
-            EXPECT_EQ(metadata->request_id(), request_id);
-            EXPECT_EQ(ctx->message_size(), expect_response_length);
+            EXPECT_EQ(metadata->requestId(), request_id);
+            EXPECT_EQ(ctx->messageSize(), expect_response_length);
             return FilterStatus::Continue;
           }));
 
@@ -1363,7 +1364,7 @@ TEST_F(ConnectionManagerTest, HandleResponseWithCodecFilter) {
       .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
   EXPECT_CALL(*mock_codec_filter, onMessageDecoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
-        EXPECT_EQ(metadata->request_id(), request_id);
+        EXPECT_EQ(metadata->requestId(), request_id);
         return FilterStatus::Continue;
       }));
 
@@ -1385,8 +1386,8 @@ TEST_F(ConnectionManagerTest, HandleResponseWithCodecFilter) {
   EXPECT_CALL(*mock_codec_filter, onMessageEncoded(_, _))
       .WillOnce(
           Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) -> FilterStatus {
-            EXPECT_EQ(metadata->request_id(), request_id);
-            EXPECT_EQ(ctx->message_size(), expect_response_length);
+            EXPECT_EQ(metadata->requestId(), request_id);
+            EXPECT_EQ(ctx->messageSize(), expect_response_length);
             return FilterStatus::Continue;
           }));
 
@@ -1409,7 +1410,7 @@ TEST_F(ConnectionManagerTest, AddDataWithStopAndContinue) {
 
   EXPECT_CALL(*config_->decoder_filters_[0], onMessageDecoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
-        EXPECT_EQ(metadata->request_id(), request_id);
+        EXPECT_EQ(metadata->requestId(), request_id);
         return FilterStatus::Continue;
       }));
   EXPECT_CALL(*config_->decoder_filters_[1], onMessageDecoded(_, _))
@@ -1424,7 +1425,7 @@ TEST_F(ConnectionManagerTest, AddDataWithStopAndContinue) {
   // For encode direction
   EXPECT_CALL(*config_->encoder_filters_[0], onMessageEncoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
-        EXPECT_EQ(metadata->request_id(), request_id);
+        EXPECT_EQ(metadata->requestId(), request_id);
         return FilterStatus::Continue;
       }));
   EXPECT_CALL(*config_->encoder_filters_[1], onMessageEncoded(_, _))

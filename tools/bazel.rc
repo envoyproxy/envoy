@@ -1,4 +1,0 @@
-# This is intended to fail build process when this tools/bazel.rc is processed.
-# Bazel will print what is processed and raise an error since --dummy_unknown_option is not recognized.
-
-common --dummy_unknown_option="ERROR: tools/bazel.rc is being processed, either due to old version of bazel or wrongly symlinked from .bazelrc. Update your bazel and symlink to top level .bazelrc instead."

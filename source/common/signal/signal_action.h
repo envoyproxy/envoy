@@ -45,7 +45,7 @@ namespace Envoy {
  * re-raising the fatal signal with default handler.
  *
  * It is recommended that this object be instantiated at the highest possible
- * scope, eg, in main(). This enables fatal signal handling for almost all code
+ * scope, e.g., in main(). This enables fatal signal handling for almost all code
  * executed. Because of the save-and-restore behavior it is possible for
  * SignalAction to be used at both wider and tighter scopes without issue.
  */
@@ -72,18 +72,6 @@ public:
    * Public so that we can exercise it directly from a test.
    */
   static void sigHandler(int sig, siginfo_t* info, void* context);
-
-  /**
-   * Add this handler to the list of functions which will be called if Envoy
-   * receives a fatal signal.
-   */
-  static void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler);
-
-  /**
-   * Removes this handler from the list of functions which will be called if Envoy
-   * receives a fatal signal.
-   */
-  static void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler);
 
 private:
   /**
@@ -142,7 +130,6 @@ private:
   char* altstack_{};
   std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
   stack_t previous_altstack_;
-  std::list<const FatalErrorHandlerInterface*> fatal_error_handlers_;
 };
 
 } // namespace Envoy

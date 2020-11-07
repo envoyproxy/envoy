@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
@@ -8,6 +6,8 @@ load(
     "envoy_package",
     "envoy_select_google_grpc",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -18,9 +18,10 @@ envoy_cc_test(
         "//source/common/grpc:async_client_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -32,8 +33,10 @@ envoy_cc_test(
         "//source/common/grpc:async_client_manager_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -66,7 +69,7 @@ envoy_cc_test(
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:utility_lib",
     ],
@@ -77,9 +80,9 @@ envoy_cc_test(
     srcs = ["context_impl_test.cc"],
     deps = [
         "//source/common/grpc:common_lib",
+        "//source/common/grpc:context_lib",
         "//source/common/http:headers_lib",
-        "//source/common/stats:fake_symbol_table_lib",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:global_lib",
     ],
 )
@@ -90,7 +93,6 @@ envoy_cc_test(
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_grpc_utils_lib"]),
@@ -131,6 +133,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -142,14 +145,22 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/grpc:context_lib",
+        "//source/common/http:context_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:global_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -170,6 +181,6 @@ envoy_cc_test_library(
     data = ["//test/config/integration/certs"],
     deps = [
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

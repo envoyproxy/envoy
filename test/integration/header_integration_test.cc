@@ -1,13 +1,19 @@
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/config/filter/http/router/v2/router.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/config/metadata.h"
-#include "common/config/resources.h"
+#include "common/http/exception.h"
 #include "common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -25,7 +31,7 @@ std::string ipSuppressEnvoyHeadersTestParamsToString(
 }
 
 void disableHeaderValueOptionAppend(
-    Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& header_value_options) {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
     i.mutable_append()->set_value(false);
   }
@@ -33,7 +39,7 @@ void disableHeaderValueOptionAppend(
 
 const std::string http_connection_mgr_config = R"EOF(
 http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
 codec_type: HTTP1
 use_remote_address: false
 xff_num_trusted_hops: 1
@@ -132,7 +138,7 @@ route_config:
             key: "x-foo"
             value: "value1"
         - header:
-            key: "authorization"
+            key: "user-agent"
             value: "token1"
       routes:
         - match: { prefix: "/test" }
@@ -143,7 +149,7 @@ route_config:
                 key: "x-foo"
                 value: "value2"
             - header:
-                key: "authorization"
+                key: "user-agent"
                 value: "token2"
     - name: path-sanitization
       domains: ["path-sanitization.com"]
@@ -182,22 +188,17 @@ public:
 
   void TearDown() override {
     if (eds_connection_ != nullptr) {
-      // Don't ASSERT fail if an EDS reconnect ends up unparented.
-      fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
       AssertionResult result = eds_connection_->close();
       RELEASE_ASSERT(result, result.message());
       result = eds_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
       eds_connection_.reset();
     }
-    cleanupUpstreamAndDownstream();
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
-  void addHeader(Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>* field,
+  void addHeader(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>* field,
                  const std::string& key, const std::string& value, bool append) {
-    envoy::api::v2::core::HeaderValueOption* header_value_option = field->Add();
+    envoy::config::core::v3::HeaderValueOption* header_value_option = field->Add();
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(key);
     mutable_header->set_value(value);
@@ -205,12 +206,12 @@ public:
   }
 
   void prepareEDS() {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
 
       static_resources->mutable_clusters(0)->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
               R"EOF(
                   name: cluster_0
                   type: EDS
@@ -229,30 +230,40 @@ public:
       // host must come before the eds-cluster's host to keep the upstreams and ports in the same
       // order.
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(
               R"EOF(
                       name: unused-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
-                      hosts:
-                        - socket_address:
-                            address: {}
-                            port_value: 0
+                      load_assignment:
+                        cluster_name: unused-cluster
+                        endpoints:
+                        - lb_endpoints:
+                          - endpoint:
+                              address:
+                                socket_address:
+                                  address: {}
+                                  port_value: 0
                   )EOF",
               Network::Test::getLoopbackAddressString(version_))));
 
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(
               R"EOF(
                       name: eds-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
                       http2_protocol_options: {{}}
                       connect_timeout: 5s
-                      hosts:
-                        - socket_address:
-                            address: {}
-                            port_value: 0
+                      load_assignment:
+                        cluster_name: eds-cluster
+                        endpoints:
+                        - lb_endpoints:
+                          - endpoint:
+                              address:
+                                socket_address:
+                                  address: {}
+                                  port_value: 0
                   )EOF",
               Network::Test::getLoopbackAddressString(version_))));
     });
@@ -262,11 +273,11 @@ public:
 
   void initializeFilter(HeaderMode mode, bool inject_route_config_headers) {
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           // Overwrite default config with our own.
           TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
-          envoy::config::filter::http::router::v2::Router router_config;
+          envoy::extensions::filters::http::router::v3::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
           hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
 
@@ -348,8 +359,7 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+      addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     }
   }
 
@@ -363,16 +373,16 @@ public:
         RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 
-        envoy::api::v2::DiscoveryRequest discovery_request;
+        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
         result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
         RELEASE_ASSERT(result, result.message());
 
-        envoy::api::v2::DiscoveryResponse discovery_response;
+        API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-        envoy::api::v2::ClusterLoadAssignment cluster_load_assignment =
-            TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
+        auto cluster_load_assignment =
+            TestUtility::parseYaml<API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment)>(fmt::format(
                 R"EOF(
                 cluster_name: cluster_0
                 endpoints:
@@ -403,20 +413,21 @@ public:
   }
 
 protected:
-  void performRequest(Http::TestHeaderMapImpl&& request_headers,
-                      Http::TestHeaderMapImpl&& expected_request_headers,
-                      Http::TestHeaderMapImpl&& response_headers,
-                      Http::TestHeaderMapImpl&& expected_response_headers) {
+  void performRequest(Http::TestRequestHeaderMapImpl&& request_headers,
+                      Http::TestRequestHeaderMapImpl&& expected_request_headers,
+                      Http::TestResponseHeaderMapImpl&& response_headers,
+                      Http::TestResponseHeaderMapImpl&& expected_response_headers) {
     registerTestServerPorts({"http"});
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
     auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
 
-    compareHeaders(upstream_request_->headers(), expected_request_headers);
-    compareHeaders(response->headers(), expected_response_headers);
+    compareHeaders(Http::TestRequestHeaderMapImpl(upstream_request_->headers()),
+                   expected_request_headers);
+    compareHeaders(Http::TestResponseHeaderMapImpl(response->headers()), expected_response_headers);
   }
 
-  void compareHeaders(Http::TestHeaderMapImpl&& headers,
-                      Http::TestHeaderMapImpl& expected_headers) {
+  template <class Headers, class ExpectedHeaders>
+  void compareHeaders(Headers&& headers, ExpectedHeaders& expected_headers) {
     headers.remove(Envoy::Http::LowerCaseString{"content-length"});
     headers.remove(Envoy::Http::LowerCaseString{"date"});
     if (!routerSuppressEnvoyHeaders()) {
@@ -446,26 +457,26 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
   initializeFilter(HeaderMode::Append, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
           {":authority", "no-headers.com"},
           {"x-request-foo", "downstram"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "no-headers.com"},
           {"x-request-foo", "downstram"},
           {":path", "/"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
           {"x-return-foo", "upstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-return-foo", "upstream"},
           {":status", "200"},
@@ -477,7 +488,7 @@ TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
 TEST_P(HeaderIntegrationTest, TestVirtualHostAppendHeaderManipulation) {
   initializeFilter(HeaderMode::Append, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-only"},
           {":scheme", "http"},
@@ -485,21 +496,21 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAppendHeaderManipulation) {
           {"x-vhost-request", "downstream"},
           {"x-vhost-request-remove", "downstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-vhost-request", "downstream"},
           {"x-vhost-request", "vhost"},
           {":path", "/vhost-only"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
           {"x-vhost-response", "upstream"},
           {"x-vhost-response-remove", "upstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-vhost-response", "upstream"},
           {"x-vhost-response", "vhost"},
@@ -511,7 +522,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAppendHeaderManipulation) {
 TEST_P(HeaderIntegrationTest, TestVirtualHostReplaceHeaderManipulation) {
   initializeFilter(HeaderMode::Replace, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-only"},
           {":scheme", "http"},
@@ -519,21 +530,21 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostReplaceHeaderManipulation) {
           {"x-vhost-request", "downstream"},
           {"x-unmodified", "downstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-unmodified", "downstream"},
           {"x-vhost-request", "vhost"},
           {":path", "/vhost-only"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
           {"x-vhost-response", "upstream"},
           {"x-unmodified", "upstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "upstream"},
           {"x-vhost-response", "vhost"},
@@ -545,7 +556,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostReplaceHeaderManipulation) {
 TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
   initializeFilter(HeaderMode::Append, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/route-only"},
           {":scheme", "http"},
@@ -553,21 +564,21 @@ TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
           {"x-route-request", "downstream"},
           {"x-route-request-remove", "downstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "route-headers.com"},
           {"x-route-request", "downstream"},
           {"x-route-request", "route"},
           {":path", "/route-only"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
           {"x-route-response", "upstream"},
           {"x-route-response-remove", "upstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-route-response", "upstream"},
           {"x-route-response", "route"},
@@ -579,7 +590,7 @@ TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
 TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
   initializeFilter(HeaderMode::Replace, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/route-only"},
           {":scheme", "http"},
@@ -588,14 +599,14 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
           {"x-route-request-remove", "downstream"},
           {"x-unmodified", "downstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "route-headers.com"},
           {"x-unmodified", "downstream"},
           {"x-route-request", "route"},
           {":path", "/route-only"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -603,7 +614,7 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
           {"x-route-response-remove", "upstream"},
           {"x-unmodified", "upstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "upstream"},
           {"x-route-response", "route"},
@@ -615,7 +626,7 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
 TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
   initializeFilter(HeaderMode::Append, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-and-route"},
           {":scheme", "http"},
@@ -625,7 +636,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
           {"x-route-request", "downstream"},
           {"x-route-request-remove", "downstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-vhost-request", "downstream"},
           {"x-route-request", "downstream"},
@@ -634,7 +645,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
           {":path", "/vhost-and-route"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -643,7 +654,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
           {"x-route-response", "upstream"},
           {"x-route-response-remove", "upstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-vhost-response", "upstream"},
           {"x-route-response", "upstream"},
@@ -657,7 +668,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
 TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) {
   initializeFilter(HeaderMode::Replace, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-and-route"},
           {":scheme", "http"},
@@ -666,7 +677,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) 
           {"x-route-request", "downstream"},
           {"x-unmodified", "request"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-unmodified", "request"},
           {"x-route-request", "route"},
@@ -674,7 +685,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) 
           {":path", "/vhost-and-route"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -682,7 +693,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) 
           {"x-route-response", "upstream"},
           {"x-unmodified", "response"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {"x-route-response", "route"},
@@ -696,7 +707,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) 
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderManipulation) {
   initializeFilter(HeaderMode::Append, true);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-and-route"},
           {":scheme", "http"},
@@ -708,7 +719,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderMani
           {"x-route-request", "downstream"},
           {"x-route-request-remove", "downstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-routeconfig-request", "downstream"},
           {"x-vhost-request", "downstream"},
@@ -719,7 +730,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderMani
           {":path", "/vhost-and-route"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -730,7 +741,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderMani
           {"x-route-response", "upstream"},
           {"x-route-response-remove", "upstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-routeconfig-response", "upstream"},
           {"x-vhost-response", "upstream"},
@@ -747,7 +758,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderMani
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderManipulation) {
   initializeFilter(HeaderMode::Replace, true);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-and-route"},
           {":scheme", "http"},
@@ -757,7 +768,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderMan
           {"x-route-request", "downstream"},
           {"x-unmodified", "request"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-unmodified", "request"},
           {"x-route-request", "route"},
@@ -766,7 +777,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderMan
           {":path", "/vhost-and-route"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -775,7 +786,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderMan
           {"x-route-response", "upstream"},
           {"x-unmodified", "response"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {"x-route-response", "route"},
@@ -790,7 +801,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderMan
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHeaderManipulation) {
   initializeFilter(HeaderMode::Append, true);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-route-and-weighted-clusters"},
           {":scheme", "http"},
@@ -804,7 +815,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHea
           {"x-weighted-cluster-request", "downstream"},
           {"x-weighted-cluster-request-remove", "downstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-routeconfig-request", "downstream"},
           {"x-vhost-request", "downstream"},
@@ -817,7 +828,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHea
           {":path", "/vhost-route-and-weighted-clusters"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -830,7 +841,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHea
           {"x-weighted-cluster-response", "upstream"},
           {"x-weighted-cluster-response-remove", "upstream"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-routeconfig-response", "upstream"},
           {"x-vhost-response", "upstream"},
@@ -849,7 +860,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHea
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterReplaceHeaderManipulation) {
   initializeFilter(HeaderMode::Replace, true);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-route-and-weighted-clusters"},
           {":scheme", "http"},
@@ -860,7 +871,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterReplaceHe
           {"x-weighted-cluster-request", "downstream"},
           {"x-unmodified", "request"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-unmodified", "request"},
           {"x-weighted-cluster-request", "weighted-cluster-1"},
@@ -870,7 +881,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterReplaceHe
           {":path", "/vhost-route-and-weighted-clusters"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -880,7 +891,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterReplaceHe
           {"x-weighted-cluster-response", "upstream"},
           {"x-unmodified", "response"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {"x-weighted-cluster-response", "weighted-cluster-1"},
@@ -896,7 +907,7 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
   prepareEDS();
   initializeFilter(HeaderMode::Replace, true);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/vhost-route-and-weighted-clusters"},
           {":scheme", "http"},
@@ -907,7 +918,7 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
           {"x-weighted-cluster-request", "downstream"},
           {"x-unmodified", "request"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-unmodified", "request"},
           {"x-weighted-cluster-request", "weighted-cluster-1"},
@@ -917,7 +928,7 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
           {":path", "/vhost-route-and-weighted-clusters"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -927,7 +938,7 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
           {"x-weighted-cluster-response", "upstream"},
           {"x-unmodified", "response"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {"x-weighted-cluster-response", "weighted-cluster-1"},
@@ -946,27 +957,27 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
 TEST_P(HeaderIntegrationTest, TestXFFParsing) {
   initializeFilter(HeaderMode::Replace, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/test"},
           {":scheme", "http"},
           {":authority", "xff-headers.com"},
           {"x-forwarded-for", "1.2.3.4, 5.6.7.8 ,9.10.11.12"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "xff-headers.com"},
           {"x-forwarded-for", "1.2.3.4, 5.6.7.8 ,9.10.11.12"},
           {"x-real-ip", "5.6.7.8"},
           {":path", "/test"},
           {":method", "GET"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
           {"x-unmodified", "response"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {":status", "200"},
@@ -978,30 +989,30 @@ TEST_P(HeaderIntegrationTest, TestXFFParsing) {
 TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
   initializeFilter(HeaderMode::Append, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/test"},
           {":scheme", "http"},
           {":authority", "append-same-headers.com"},
-          {"authorization", "token3"},
+          {"user-agent", "token3"},
           {"x-foo", "value3"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":authority", "append-same-headers.com"},
           {":path", "/test"},
           {":method", "GET"},
-          {"authorization", "token3,token2,token1"},
+          {"user-agent", "token3,token2,token1"},
           {"x-foo", "value3"},
           {"x-foo", "value2"},
           {"x-foo", "value1"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
           {"x-unmodified", "response"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {":status", "200"},
@@ -1015,23 +1026,23 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
   normalize_path_ = false;
   initializeFilter(HeaderMode::Append, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/private/../public"},
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       },
-      Http::TestHeaderMapImpl{{":authority", "path-sanitization.com"},
-                              {":path", "/private/../public"},
-                              {":method", "GET"},
-                              {"x-site", "private"}},
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/private/../public"},
+                                     {":method", "GET"},
+                                     {"x-site", "private"}},
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
           {"x-unmodified", "response"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {":status", "200"},
@@ -1045,26 +1056,96 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
   normalize_path_ = true;
   initializeFilter(HeaderMode::Append, false);
   performRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/private/../public"},
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       },
-      Http::TestHeaderMapImpl{{":authority", "path-sanitization.com"},
-                              {":path", "/public"},
-                              {":method", "GET"},
-                              {"x-site", "public"}},
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/public"},
+                                     {":method", "GET"},
+                                     {"x-site", "public"}},
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
           {"x-unmodified", "response"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {":status", "200"},
+      });
+}
+
+// Validates TE header is forwarded if it contains a supported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, close"},
+          {"te", "trailers"},
+      },
+      Http::TestRequestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+          {"connection", "close"},
+      });
+}
+
+// Validates TE header is stripped if it contains an unsupported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, mike, sam, will, close"},
+          {"te", "gzip"},
+          {"mike", "foo"},
+          {"sam", "bar"},
+          {"will", "baz"},
+      },
+      Http::TestRequestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+          {"connection", "close"},
       });
 }
 } // namespace Envoy

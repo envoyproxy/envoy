@@ -7,16 +7,17 @@
 // porting layer for QUICHE.
 
 #include "openssl/base.h"
-#include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 
 namespace quic {
 
 class QuicCertUtilsImpl {
 public:
-  static bool ExtractSubjectNameFromDERCert(QuicStringPiece cert, QuicStringPiece* subject_out);
+  static bool ExtractSubjectNameFromDERCert(quiche::QuicheStringPiece cert,
+                                            quiche::QuicheStringPiece* subject_out);
 
 private:
-  static bool SeekToSubject(QuicStringPiece cert, CBS* tbs_certificate);
+  static bool SeekToSubject(quiche::QuicheStringPiece cert, CBS* tbs_certificate);
 };
 
 } // namespace quic

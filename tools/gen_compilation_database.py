@@ -3,33 +3,25 @@
 import argparse
 import glob
 import json
+import logging
 import os
 import shlex
 import subprocess
 from pathlib import Path
 
 
-def runBazelBuildForCompilationDatabase(bazel_options, bazel_targets):
-  query = 'attr(include_prefix, ".+", kind(cc_library, deps({})))'.format(
-      ' union '.join(bazel_targets))
-  build_targets = subprocess.check_output(["bazel", "query", query]).decode().splitlines()
-  subprocess.check_call(["bazel", "build"] + bazel_options + build_targets)
-
-
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.sh
 def generateCompilationDatabase(args):
-  # We need to download all remote outputs for generated source code, we don't care about built
-  # binaries so just always strip and use dynamic link to minimize download size.
+  # We need to download all remote outputs for generated source code. This option lives here to override those
+  # specified in bazelrc.
   bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
-      "-c", "fastbuild", "--build_tag_filters=-manual",
-      "--experimental_remote_download_outputs=all", "--strip=always"
+      "--config=compdb",
+      "--remote_download_outputs=all",
   ]
-  if args.run_bazel_build:
-    runBazelBuildForCompilationDatabase(bazel_options, args.bazel_targets)
 
   subprocess.check_call(["bazel", "build"] + bazel_options + [
       "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
-      "--output_groups=compdb_files"
+      "--output_groups=compdb_files,header_files"
   ] + args.bazel_targets)
 
   execroot = subprocess.check_output(["bazel", "info", "execution_root"] +
@@ -81,6 +73,9 @@ def modifyCompileCommand(target, args):
   if isHeader(target["file"]):
     options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
     options += " -Wno-unused-function"
+    if not target["file"].startswith("external/"):
+      # *.h file is treated as C header by default while our headers files are all C++17.
+      options = "-x c++ -std=c++17 -fexceptions " + options
 
   target["command"] = " ".join([cc, options])
   return target
@@ -95,7 +90,6 @@ def fixCompilationDatabase(args, db):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Generate JSON compilation database')
-  parser.add_argument('--run_bazel_build', action='store_true')
   parser.add_argument('--include_external', action='store_true')
   parser.add_argument('--include_genfiles', action='store_true')
   parser.add_argument('--include_headers', action='store_true')

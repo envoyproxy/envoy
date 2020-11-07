@@ -2,17 +2,20 @@
 
 #include <memory>
 
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
-#include "common/common/stack_array.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,7 +32,7 @@ const std::string SquashFilter::ATTACHED_STATE = "attached";
 const std::string SquashFilter::ERROR_STATE = "error";
 
 SquashFilterConfig::SquashFilterConfig(
-    const envoy::config::filter::http::squash::v2::Squash& proto_config,
+    const envoy::extensions::filters::http::squash::v3::Squash& proto_config,
     Upstream::ClusterManager& cluster_manager)
     : cluster_name_(proto_config.cluster()),
       attachment_json_(getAttachment(proto_config.attachment_template())),
@@ -133,20 +136,20 @@ SquashFilter::~SquashFilter() = default;
 
 void SquashFilter::onDestroy() { cleanup(); }
 
-Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Check for squash header
-  if (!headers.get(Http::Headers::get().XSquashDebug)) {
+  if (headers.get(Http::Headers::get().XSquashDebug).empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   ENVOY_LOG(debug, "Squash: Holding request and requesting debug attachment");
 
-  Http::MessagePtr request(new Http::RequestMessageImpl());
+  Http::RequestMessagePtr request(new Http::RequestMessageImpl());
   request->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   request->headers().setReferencePath(POST_ATTACHMENT_PATH);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
   request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  request->body() = std::make_unique<Buffer::OwnedImpl>(config_->attachmentJson());
+  request->body().add(config_->attachmentJson());
 
   is_squashing_ = true;
   in_flight_request_ =
@@ -179,7 +182,7 @@ Http::FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus SquashFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus SquashFilter::decodeTrailers(Http::RequestTrailerMap&) {
   if (is_squashing_) {
     return Http::FilterTrailersStatus::StopIteration;
   }
@@ -190,13 +193,13 @@ void SquashFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&
   decoder_callbacks_ = &callbacks;
 }
 
-void SquashFilter::onCreateAttachmentSuccess(Http::MessagePtr&& m) {
+void SquashFilter::onCreateAttachmentSuccess(Http::ResponseMessagePtr&& m) {
   in_flight_request_ = nullptr;
 
   // Get the config object that was created
   if (Http::Utility::getResponseStatus(m->headers()) != enumToInt(Http::Code::Created)) {
     ENVOY_LOG(debug, "Squash: can't create attachment object. status {} - not squashing",
-              m->headers().Status()->value().getStringView());
+              m->headers().getStatusValue());
     doneSquashing();
   } else {
     std::string debug_attachment_id;
@@ -231,7 +234,7 @@ void SquashFilter::onCreateAttachmentFailure(Http::AsyncClient::FailureReason) {
   }
 }
 
-void SquashFilter::onGetAttachmentSuccess(Http::MessagePtr&& m) {
+void SquashFilter::onGetAttachmentSuccess(Http::ResponseMessagePtr&& m) {
   in_flight_request_ = nullptr;
 
   std::string attachmentstate;
@@ -266,7 +269,7 @@ void SquashFilter::scheduleRetry() {
 }
 
 void SquashFilter::pollForAttachment() {
-  Http::MessagePtr request(new Http::RequestMessageImpl());
+  Http::RequestMessagePtr request(new Http::RequestMessageImpl());
   request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   request->headers().setReferencePath(debug_attachment_path_);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
@@ -305,17 +308,8 @@ void SquashFilter::cleanup() {
   debug_attachment_path_ = EMPTY_STRING;
 }
 
-Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::MessagePtr&& m) {
-  Buffer::InstancePtr& data = m->body();
-  uint64_t num_slices = data->getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data->getRawSlices(slices.begin(), num_slices);
-  std::string jsonbody;
-  for (const Buffer::RawSlice& slice : slices) {
-    jsonbody += std::string(static_cast<const char*>(slice.mem_), slice.len_);
-  }
-
-  return Json::Factory::loadFromString(jsonbody);
+Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::ResponseMessagePtr&& m) {
+  return Json::Factory::loadFromString(m->bodyAsString());
 }
 
 } // namespace Squash

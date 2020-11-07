@@ -18,8 +18,7 @@ static void deathTestWorker() {
 }
 
 TEST(SingletonManagerImplDeathTest, NotRegistered) {
-  EXPECT_DEATH_LOG_TO_STDERR(deathTestWorker(),
-                             "invalid singleton name 'foo'. Make sure it is registered.");
+  EXPECT_DEATH(deathTestWorker(), "invalid singleton name 'foo'. Make sure it is registered.");
 }
 
 SINGLETON_MANAGER_REGISTRATION(test);
@@ -28,7 +27,7 @@ class TestSingleton : public Instance {
 public:
   ~TestSingleton() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 TEST(SingletonManagerImplTest, Basic) {

@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/extensions/resource_monitors/fixed_heap:fixed_heap_monitor",
+        "@envoy_api//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg_cc_proto",
     ],
 )
 

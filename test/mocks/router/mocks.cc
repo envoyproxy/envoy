@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::DoAll;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -17,6 +18,14 @@ namespace Router {
 
 MockDirectResponseEntry::MockDirectResponseEntry() = default;
 MockDirectResponseEntry::~MockDirectResponseEntry() = default;
+
+TestRetryPolicy::TestRetryPolicy() { num_retries_ = 1; }
+
+TestRetryPolicy::~TestRetryPolicy() = default;
+
+MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
+  ON_CALL(*this, enabled()).WillByDefault(Return(false));
+}
 
 MockRetryState::MockRetryState() = default;
 
@@ -81,9 +90,10 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
+  ON_CALL(*this, internalRedirectPolicy()).WillByDefault(ReturnRef(internal_redirect_policy_));
   ON_CALL(*this, retryShadowBufferLimit())
       .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
-  ON_CALL(*this, shadowPolicy()).WillByDefault(ReturnRef(shadow_policy_));
+  ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
   ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
@@ -93,12 +103,14 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
+  ON_CALL(*this, connectConfig()).WillByDefault(ReturnRef(connect_config_));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
 
 MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
   ON_CALL(*this, route(_, _, _)).WillByDefault(Return(route_));
+  ON_CALL(*this, route(_, _, _, _)).WillByDefault(Return(route_));
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
@@ -108,6 +120,7 @@ MockConfig::~MockConfig() = default;
 
 MockDecorator::MockDecorator() {
   ON_CALL(*this, getOperation()).WillByDefault(ReturnRef(operation_));
+  ON_CALL(*this, propagate()).WillByDefault(Return(true));
 }
 MockDecorator::~MockDecorator() = default;
 
@@ -141,5 +154,8 @@ MockScopedRouteConfigProvider::MockScopedRouteConfigProvider()
 }
 MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 
+MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
+  ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));
+}
 } // namespace Router
 } // namespace Envoy

@@ -14,9 +14,11 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -28,13 +30,26 @@ FileImplPosix::~FileImplPosix() {
   }
 }
 
-void FileImplPosix::openFile(FlagSet in) {
+Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
+  if (isOpen()) {
+    return resultSuccess(true);
+  }
+
   const auto flags_and_mode = translateFlag(in);
   fd_ = ::open(path_.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
+  return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
 }
 
-ssize_t FileImplPosix::writeFile(absl::string_view buffer) {
-  return ::write(fd_, buffer.data(), buffer.size());
+Api::IoCallSizeResult FileImplPosix::write(absl::string_view buffer) {
+  const ssize_t rc = ::write(fd_, buffer.data(), buffer.size());
+  return rc != -1 ? resultSuccess(rc) : resultFailure(rc, errno);
+};
+
+Api::IoCallBoolResult FileImplPosix::close() {
+  ASSERT(isOpen());
+  int rc = ::close(fd_);
+  fd_ = -1;
+  return (rc != -1) ? resultSuccess(true) : resultFailure(false, errno);
 }
 
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
@@ -59,8 +74,6 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
 
   return {out, mode};
 }
-
-bool FileImplPosix::closeFile() { return ::close(fd_) != -1; }
 
 FilePtr InstanceImplPosix::createFile(const std::string& path) {
   return std::make_unique<FileImplPosix>(path);
@@ -91,14 +104,12 @@ ssize_t InstanceImplPosix::fileSize(const std::string& path) {
 
 std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    throw EnvoyException(fmt::format("Invalid path: {}", path));
+    throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
-
-  std::ios::sync_with_stdio(false);
 
   std::ifstream file(path);
   if (file.fail()) {
-    throw EnvoyException(fmt::format("unable to read file: {}", path));
+    throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
 
   std::stringstream file_string;
@@ -107,13 +118,26 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
+PathSplitResult InstanceImplPosix::splitPathFromFilename(absl::string_view path) {
+  size_t last_slash = path.rfind('/');
+  if (last_slash == std::string::npos) {
+    throw EnvoyException(fmt::format("invalid file path {}", path));
+  }
+  absl::string_view name = path.substr(last_slash + 1);
+  // truncate all trailing slashes, except root slash
+  if (last_slash == 0) {
+    ++last_slash;
+  }
+  return {path.substr(0, last_slash), name};
+}
+
 bool InstanceImplPosix::illegalPath(const std::string& path) {
   // Special case, allow /dev/fd/* access here so that config can be passed in a
   // file descriptor from a bootstrap script via exec. The reason we do this
   // _before_ canonicalizing the path is that different unix flavors implement
   // /dev/fd/* differently, for example on linux they are symlinks to /dev/pts/*
   // which are symlinks to /proc/self/fds/. On BSD (and darwin) they are not
-  // symlinks at all. To avoid lots of platform, specifics, we whitelist
+  // symlinks at all. To avoid lots of platform, specifics, we allowlist
   // /dev/fd/* _before_ resolving the canonical path.
   if (absl::StartsWith(path, "/dev/fd/")) {
     return false;
@@ -122,7 +146,7 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   const Api::SysCallStringResult canonical_path = canonicalPath(path);
   if (canonical_path.rc_.empty()) {
     ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,
-                   ::strerror(canonical_path.errno_));
+                   errorDetails(canonical_path.errno_));
     return true;
   }
 
@@ -140,7 +164,6 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
 }
 
 Api::SysCallStringResult InstanceImplPosix::canonicalPath(const std::string& path) {
-  // TODO(htuch): When we are using C++17, switch to std::filesystem::canonical.
   char* resolved_path = ::realpath(path.c_str(), nullptr);
   if (resolved_path == nullptr) {
     return {std::string(), errno};

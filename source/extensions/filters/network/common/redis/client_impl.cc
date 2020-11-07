@@ -1,5 +1,7 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -7,11 +9,14 @@ namespace Common {
 namespace Redis {
 namespace Client {
 namespace {
+// null_pool_callbacks is used for requests that must be filtered and not redirected such as
+// "asking".
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 } // namespace
 
 ConfigImpl::ConfigImpl(
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
+        config)
     : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
       enable_hashtagging_(config.enable_hashtagging()),
       enable_redirection_(config.enable_redirection()),
@@ -25,23 +30,21 @@ ConfigImpl::ConfigImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
       enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
-  case envoy::config::filter::network::redis_proxy::v2::
-      RedisProxy_ConnPoolSettings_ReadPolicy_MASTER:
-    read_policy_ = ReadPolicy::Master;
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
+    read_policy_ = ReadPolicy::Primary;
     break;
-  case envoy::config::filter::network::redis_proxy::v2::
-      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER:
-    read_policy_ = ReadPolicy::PreferMaster;
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
+      PREFER_MASTER:
+    read_policy_ = ReadPolicy::PreferPrimary;
     break;
-  case envoy::config::filter::network::redis_proxy::v2::
-      RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA:
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::REPLICA:
     read_policy_ = ReadPolicy::Replica;
     break;
-  case envoy::config::filter::network::redis_proxy::v2::
-      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA:
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
+      PREFER_REPLICA:
     read_policy_ = ReadPolicy::PreferReplica;
     break;
-  case envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY:
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ANY:
     read_policy_ = ReadPolicy::Any;
     break;
   default:
@@ -97,7 +100,7 @@ void ClientImpl::flushBufferAndResetTimer() {
   connection_->write(encoder_buffer_, false);
 }
 
-PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
+PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
   const bool empty_buffer = encoder_buffer_.length() == 0;
@@ -212,7 +215,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   }
   request.aggregate_request_timer_->complete();
 
-  PoolCallbacks& callbacks = request.callbacks_;
+  ClientCallbacks& callbacks = request.callbacks_;
 
   // We need to ensure the request is popped before calling the callback, since the callback might
   // result in closing the connection.
@@ -223,9 +226,13 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
     bool redirected = false;
     if (err.size() == 3) {
+      // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash
+      // key slot (err[1]), and IP address and TCP port separated by a colon (err[2])
       if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
-        redirected = callbacks.onRedirection(*value);
-        if (redirected) {
+        redirected = true;
+        bool redirect_succeeded = callbacks.onRedirection(std::move(value), std::string(err[2]),
+                                                          err[0] == RedirectionResponse::get().ASK);
+        if (redirect_succeeded) {
           host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
         } else {
           host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
@@ -233,7 +240,11 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
       }
     }
     if (!redirected) {
-      callbacks.onResponse(std::move(value));
+      if (err[0] == RedirectionResponse::get().CLUSTER_DOWN) {
+        callbacks.onFailure();
+      } else {
+        callbacks.onResponse(std::move(value));
+      }
     }
   } else {
     callbacks.onResponse(std::move(value));
@@ -251,7 +262,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
 }
 
-ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks,
+ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks,
                                            Stats::StatName command)
     : parent_(parent), callbacks_(callbacks), command_{command},
       aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
@@ -278,16 +289,20 @@ void ClientImpl::PendingRequest::cancel() {
   canceled_ = true;
 }
 
-void ClientImpl::initialize(const std::string& auth_password) {
-  if (!auth_password.empty()) {
+void ClientImpl::initialize(const std::string& auth_username, const std::string& auth_password) {
+  if (!auth_username.empty()) {
+    // Send an AUTH command to the upstream server with username and password.
+    Utility::AuthRequest auth_request(auth_username, auth_password);
+    makeRequest(auth_request, null_pool_callbacks);
+  } else if (!auth_password.empty()) {
     // Send an AUTH command to the upstream server.
     Utility::AuthRequest auth_request(auth_password);
     makeRequest(auth_request, null_pool_callbacks);
   }
   // Any connection to replica requires the READONLY command in order to perform read.
-  // Also the READONLY command is a no-opt for the master.
+  // Also the READONLY command is a no-opt for the primary.
   // We only need to send the READONLY command iff it's possible that the host is a replica.
-  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Master) {
+  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
     makeRequest(Utility::ReadOnlyRequest::instance(), null_pool_callbacks);
   }
 }
@@ -297,10 +312,11 @@ ClientFactoryImpl ClientFactoryImpl::instance_;
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
-                                    Stats::Scope& scope, const std::string& auth_password) {
+                                    Stats::Scope& scope, const std::string& auth_username,
+                                    const std::string& auth_password) {
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
                                         decoder_factory_, config, redis_command_stats, scope);
-  client->initialize(auth_password);
+  client->initialize(auth_username, auth_password);
   return client;
 }
 

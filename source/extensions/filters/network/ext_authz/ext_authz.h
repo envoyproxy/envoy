@@ -5,13 +5,16 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "common/common/matchers.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -28,9 +31,11 @@ namespace ExtAuthz {
   COUNTER(cx_closed)                                                                               \
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
+  COUNTER(timeout)                                                                                 \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(ok)                                                                                      \
   COUNTER(total)                                                                                   \
+  COUNTER(disabled)                                                                                \
   GAUGE(active, Accumulate)
 
 /**
@@ -45,21 +50,30 @@ struct InstanceStats {
  */
 class Config {
 public:
-  Config(const envoy::config::filter::network::ext_authz::v2::ExtAuthz& config, Stats::Scope& scope)
+  Config(const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& config,
+         Stats::Scope& scope)
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
-        include_peer_certificate_(config.include_peer_certificate()) {}
+        include_peer_certificate_(config.include_peer_certificate()),
+        filter_enabled_metadata_(
+            config.has_filter_enabled_metadata()
+                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                : absl::nullopt) {}
 
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
+    return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
+  }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   const InstanceStats stats_;
   bool failure_mode_allow_;
   const bool include_peer_certificate_;
+  const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -105,6 +119,10 @@ private:
   enum class FilterReturn { Stop, Continue };
   void callCheck();
 
+  bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
+    return config_->filterEnabledMetadata(metadata);
+  }
+
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
@@ -112,7 +130,7 @@ private:
   FilterReturn filter_return_{FilterReturn::Stop};
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
-  envoy::service::auth::v2::CheckRequest check_request_{};
+  envoy::service::auth::v3::CheckRequest check_request_{};
 };
 } // namespace ExtAuthz
 } // namespace NetworkFilters

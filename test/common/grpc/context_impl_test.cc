@@ -5,9 +5,9 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"
 
@@ -22,7 +22,7 @@ TEST(GrpcContextTest, ChargeStats) {
   Stats::StatNamePool pool(*symbol_table_);
   const Stats::StatName service = pool.add("service");
   const Stats::StatName method = pool.add("method");
-  Context::RequestNames request_names{service, method};
+  Context::RequestStatNames request_names{service, method};
   ContextImpl context(*symbol_table_);
   context.chargeStat(cluster, request_names, true);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
@@ -39,7 +39,12 @@ TEST(GrpcContextTest, ChargeStats) {
   EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.request_message_count").value());
   EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.response_message_count").value());
 
-  Http::TestHeaderMapImpl trailers;
+  context.chargeRequestMessageStat(cluster, {}, 3);
+  context.chargeResponseMessageStat(cluster, {}, 4);
+  EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.request_message_count").value());
+  EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.response_message_count").value());
+
+  Http::TestResponseTrailerMapImpl trailers;
   trailers.setGrpcStatus("0");
   const Http::HeaderEntry* status = trailers.GrpcStatus();
   context.chargeStat(cluster, Context::Protocol::Grpc, request_names, status);
@@ -60,25 +65,26 @@ TEST(GrpcContextTest, ChargeStats) {
 TEST(GrpcContextTest, ResolveServiceAndMethod) {
   std::string service;
   std::string method;
-  Http::HeaderMapImpl headers;
-  headers.setPath("/service_name/method_name");
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/service_name/method_name?a=b");
   const Http::HeaderEntry* path = headers.Path();
   Stats::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
-  absl::optional<Context::RequestNames> request_names = context.resolveServiceAndMethod(path);
+  absl::optional<Context::RequestStatNames> request_names =
+      context.resolveDynamicServiceAndMethod(path);
   EXPECT_TRUE(request_names);
-  EXPECT_EQ("service_name", symbol_table->toString(request_names->service_));
-  EXPECT_EQ("method_name", symbol_table->toString(request_names->method_));
+  EXPECT_EQ("service_name", absl::get<Stats::DynamicName>(request_names->service_));
+  EXPECT_EQ("method_name", absl::get<Stats::DynamicName>(request_names->method_));
   headers.setPath("");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("/");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("//");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("/service_name");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("/service_name/");
-  EXPECT_FALSE(context.resolveServiceAndMethod(path));
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
 }
 
 } // namespace Grpc

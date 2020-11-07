@@ -9,11 +9,14 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/io_handle.h"
 
 #include "common/common/byte_order.h"
+#include "common/common/utility.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -27,6 +30,8 @@ struct RawSlice {
 
   bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
 };
+
+using RawSliceVector = absl::InlinedVector<RawSlice, 16>;
 
 /**
  * A wrapper class to facilitate passing in externally owned data to a buffer via addBufferFragment.
@@ -52,11 +57,35 @@ public:
 };
 
 /**
+ * A class to facilitate extracting buffer slices from a buffer instance.
+ */
+class SliceData {
+public:
+  virtual ~SliceData() = default;
+
+  /**
+   * @return a mutable view of the slice data.
+   */
+  virtual absl::Span<uint8_t> getMutableData() PURE;
+};
+
+using SliceDataPtr = std::unique_ptr<SliceData>;
+
+/**
  * A basic buffer abstraction.
  */
 class Instance {
 public:
   virtual ~Instance() = default;
+
+  /**
+   * Register function to call when the last byte in the last slice of this
+   * buffer has fully drained. Note that slices may be transferred to
+   * downstream buffers, drain trackers are transferred along with the bytes
+   * they track so the function is called only after the last byte is drained
+   * from all buffers.
+   */
+  virtual void addDrainTracker(std::function<void()> drain_tracker) PURE;
 
   /**
    * Copy data into the buffer (deprecated, use absl::string_view variant
@@ -102,8 +131,8 @@ public:
   /**
    * Commit a set of slices originally obtained from reserve(). The number of slices should match
    * the number obtained from reserve(). The size of each slice can also be altered. Commit must
-   * occur following a reserve() without any mutating operations in between other than to the iovecs
-   * len_ fields.
+   * occur once following a reserve() without any mutating operations in between other than to the
+   * iovecs len_ fields.
    * @param iovecs supplies the array of slices to commit.
    * @param num_iovecs supplies the size of the slices array.
    */
@@ -124,21 +153,21 @@ public:
   virtual void drain(uint64_t size) PURE;
 
   /**
-   * Fetch the raw buffer slices. This routine is optimized for performance.
-   * @param out supplies an array of RawSlice objects to fill.
-   * @param out_size supplies the size of out.
-   * @return the actual number of slices needed, which may be greater than out_size. Passing
-   *         nullptr for out and 0 for out_size will just return the size of the array needed
-   *         to capture all of the slice data.
-   * TODO(mattklein123): WARNING: The underlying implementation of this function currently uses
-   * libevent's evbuffer. It has the infuriating property where calling getRawSlices(nullptr, 0)
-   * will return the slices that include all of the buffer data, but not any empty slices at the
-   * end. However, calling getRawSlices(iovec, SOME_CONST), WILL return potentially empty slices
-   * beyond the end of the buffer. Code that is trying to avoid stack overflow by limiting the
-   * number of returned slices needs to deal with this. When we get rid of evbuffer we can rework
-   * all of this.
+   * Fetch the raw buffer slices.
+   * @param max_slices supplies an optional limit on the number of slices to fetch, for performance.
+   * @return RawSliceVector with non-empty slices in the buffer.
    */
-  virtual uint64_t getRawSlices(RawSlice* out, uint64_t out_size) const PURE;
+  virtual RawSliceVector
+  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
+
+  /**
+   * Transfer ownership of the front slice to the caller. Must only be called if the
+   * buffer is not empty otherwise the implementation will have undefined behavior.
+   * If the underlying slice is immutable then the implementation must create and return
+   * a mutable slice that has a copy of the immutable data.
+   * @return pointer to SliceData object that wraps the front slice
+   */
+  virtual SliceDataPtr extractMutableFrontSlice() PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).
@@ -164,15 +193,6 @@ public:
   virtual void move(Instance& rhs, uint64_t length) PURE;
 
   /**
-   * Read from a file descriptor directly into the buffer.
-   * @param io_handle supplies the io handle to read from.
-   * @param max_length supplies the maximum length to read.
-   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
-   * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
-   */
-  virtual Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) PURE;
-
-  /**
    * Reserve space in the buffer.
    * @param length supplies the amount of space to reserve.
    * @param iovecs supplies the slices to fill with reserved memory.
@@ -186,9 +206,22 @@ public:
    * @param data supplies the data to search for.
    * @param size supplies the length of the data to search for.
    * @param start supplies the starting index to search from.
+   * @param length limits the search to specified number of bytes starting from start index.
+   * When length value is zero, entire length of data from starting index to the end is searched.
    * @return the index where the match starts or -1 if there is no match.
    */
-  virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
+  virtual ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const PURE;
+
+  /**
+   * Search for an occurrence of data within entire buffer.
+   * @param data supplies the data to search for.
+   * @param size supplies the length of the data to search for.
+   * @param start supplies the starting index to search from.
+   * @return the index where the match starts or -1 if there is no match.
+   */
+  ssize_t search(const void* data, uint64_t size, size_t start) const {
+    return search(data, size, start, 0);
+  }
 
   /**
    * Search for an occurrence of data at the start of a buffer.
@@ -202,15 +235,6 @@ public:
    * @return the flattened string.
    */
   virtual std::string toString() const PURE;
-
-  /**
-   * Write the buffer out to a file descriptor.
-   * @param io_handle supplies the io_handle to write to.
-   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
-   * written if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be
-   * used.
-   */
-  virtual Api::IoCallUint64Result write(Network::IoHandle& io_handle) PURE;
 
   /**
    * Copy an integer out of the buffer.
@@ -240,11 +264,11 @@ public:
    * deduced from the size of the type T
    */
   template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
-  T peekInt(uint64_t start = 0) {
+  T peekInt(uint64_t start = 0) const {
     static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
 
     if (length() < start + Size) {
-      throw EnvoyException("buffer underflow");
+      ExceptionUtil::throwEnvoyException("buffer underflow");
     }
 
     constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
@@ -276,7 +300,7 @@ public:
    * @param start supplies the buffer index to start copying from.
    * @param Size how many bytes to read out of the buffer.
    */
-  template <typename T, size_t Size = sizeof(T)> T peekLEInt(uint64_t start = 0) {
+  template <typename T, size_t Size = sizeof(T)> T peekLEInt(uint64_t start = 0) const {
     return peekInt<T, ByteOrder::LittleEndian, Size>(start);
   }
 
@@ -285,7 +309,7 @@ public:
    * @param start supplies the buffer index to start copying from.
    * @param Size how many bytes to read out of the buffer.
    */
-  template <typename T, size_t Size = sizeof(T)> T peekBEInt(uint64_t start = 0) {
+  template <typename T, size_t Size = sizeof(T)> T peekBEInt(uint64_t start = 0) const {
     return peekInt<T, ByteOrder::BigEndian, Size>(start);
   }
 
@@ -381,7 +405,8 @@ public:
    * @return a newly created InstancePtr.
    */
   virtual InstancePtr create(std::function<void()> below_low_watermark,
-                             std::function<void()> above_high_watermark) PURE;
+                             std::function<void()> above_high_watermark,
+                             std::function<void()> above_overflow_watermark) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

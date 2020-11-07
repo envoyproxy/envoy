@@ -1,10 +1,11 @@
 #include <string>
 
-#include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.validate.h"
 
 #include "extensions/filters/http/lua/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -21,7 +22,7 @@ namespace {
 TEST(LuaFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(LuaFilterConfig().createFilterFactoryFromProto(
-                   envoy::config::filter::http::lua::v2::Lua(), "stats", context),
+                   envoy::extensions::filters::http::lua::v3::Lua(), "stats", context),
                ProtoValidationException);
 }
 
@@ -30,7 +31,7 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   inline_code : "print(5)"
   )EOF";
 
-  envoy::config::filter::http::lua::v2::Lua proto_config;
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
@@ -38,6 +39,16 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(LuaFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.lua";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

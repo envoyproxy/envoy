@@ -122,9 +122,6 @@ public:
     return FilterStatus::Continue;
   }
 
-protected:
-  ProtocolType protocolType() const { return proto_->type(); }
-
 private:
   Protocol* proto_;
   Buffer::Instance* buffer_{};
