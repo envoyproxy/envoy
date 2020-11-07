@@ -201,7 +201,7 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
     b += sizeof(uint32_t);
   };
   for (auto& e : response) {
-    memcpy(b, e.address_->asStringView().data(),\ // NOLINT(safe-memcpy)
+    memcpy(b, e.address_->asStringView().data(), // NOLINT(safe-memcpy)
                                                 e.address_->asStringView()
                                                     .size());
     b += e.address_->asStringView().size();

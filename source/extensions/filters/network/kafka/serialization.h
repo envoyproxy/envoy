@@ -132,7 +132,7 @@ class UInt32Deserializer : public IntDeserializer<uint32_t> {
 public:
   uint32_t get() const override {
     uint32_t result;
-    memcpy(&result, buf_, sizeof(uint32_t));  // NOLINT(safe-memcpy)
+    memcpy(&result, buf_, sizeof(uint32_t)); // NOLINT(safe-memcpy)
     return be32toh(result);
   }
 };

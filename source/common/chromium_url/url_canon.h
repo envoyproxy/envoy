@@ -147,7 +147,7 @@ public:
   void Resize(int sz) override {
     T* new_buf = new T[sz];
     memcpy(new_buf, this->buffer_, // NOLINT(safe-memcpy)
-          sizeof(T) * (this->cur_len_ < sz ? this->cur_len_ : sz));
+           sizeof(T) * (this->cur_len_ < sz ? this->cur_len_ : sz));
     if (this->buffer_ != fixed_buffer_)
       delete[] this->buffer_;
     this->buffer_ = new_buf;
