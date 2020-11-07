@@ -228,7 +228,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     : subscription_(std::move(subscription)),
       config_update_info_(subscription_->routeConfigUpdate()), factory_context_(factory_context),
       validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
-      tls_(factory_context.threadLocal().allocateSlot()) {
+      tls_(factory_context.threadLocal()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
     initial_config = std::make_shared<ConfigImpl>(config_update_info_->routeConfiguration(),
@@ -236,7 +236,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
   }
-  tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  tls_.set([initial_config](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalConfig>(initial_config);
   });
   // It should be 1:1 mapping due to shared rds config.
@@ -250,19 +250,12 @@ RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
   ASSERT(subscription_->routeConfigProviders().empty());
 }
 
-Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
-  return tls_->getTyped<ThreadLocalConfig>().config_;
-}
+Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() { return tls_->config_; }
 
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(new ConfigImpl(config_update_info_->routeConfiguration(),
                                                  factory_context_, validator_, false));
-  tls_->runOnAllThreads([new_config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
-                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
-    prev_config->config_ = new_config;
-    return previous;
-  });
+  tls_.runOnAllThreads([new_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = new_config; });
 
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.

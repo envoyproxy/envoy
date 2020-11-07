@@ -46,7 +46,8 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
-void EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) {
+Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
+                                                  bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   quic::QuicStream* writing_stream =
       quic::VersionUsesHttp3(transport_version())
@@ -60,6 +61,7 @@ void EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
   // IETF QUIC sends HEADER frame on current stream. After writing headers, the
   // buffer may increase.
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
+  return Http::okStatus();
 }
 
 void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
