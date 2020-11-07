@@ -1,6 +1,5 @@
-#include "common/event/signal_impl.h"
-
 #include "common/event/dispatcher_impl.h"
+#include "common/event/signal_impl.h"
 
 #include "event2/event.h"
 
@@ -16,7 +15,8 @@ SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signat_t signal_num
   }
 
   os_fd_t socks[2];
-  Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
+  Api::SysCallIntResult result =
+      Api::OsSysCallsSingleton::get().socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
   ASSERT(result.rc_ == 0);
 
   read_handle_ = std::make_unique<Network::IoSocketHandleImpl>(socks[0], false, AF_INET);
