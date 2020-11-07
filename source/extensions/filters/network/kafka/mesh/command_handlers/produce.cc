@@ -30,12 +30,14 @@ RecordExtractorImpl::computeFootmarksForTopic(const std::string& topic, const in
   // Reference implementation:
   // org.apache.kafka.common.record.DefaultRecordBatch.writeHeader(ByteBuffer, long, int, int, byte,
   // CompressionType, TimestampType, long, long, long, short, int, boolean, boolean, int, int)
-  absl::string_view data = { reinterpret_cast<const char*>(bytes.data()) , bytes.size()};
+  absl::string_view data = {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
 
   // Fields common to any records payload. Magic will follow.
-  const unsigned int common_fields_size = /* BaseOffset */ 8 + /* Length */ 4 + /* PartitionLeaderEpoch */ 4;
+  const unsigned int common_fields_size =
+      /* BaseOffset */ 8 + /* Length */ 4 + /* PartitionLeaderEpoch */ 4;
   if (data.length() < common_fields_size) {
-    throw EnvoyException(fmt::format("record batch for [{}-{}] is too short (no common fields): {}", topic, partition, data.length()));
+    throw EnvoyException(fmt::format("record batch for [{}-{}] is too short (no common fields): {}",
+                                     topic, partition, data.length()));
   }
   // Let's skip these common fields, because we are not using them.
   data = {data.data() + common_fields_size, data.length() - common_fields_size};
@@ -52,24 +54,28 @@ RecordExtractorImpl::computeFootmarksForTopic(const std::string& topic, const in
       return extractRecordsOutOfBatchWithMagicEqualTo2(topic, partition, data);
     } else {
       // Old client sending old magic, or Apache Kafka introducing new magic.
-      throw EnvoyException(fmt::format("unknown magic value in record batch for [{}-{}]: {}", topic, partition, magic));
+      throw EnvoyException(fmt::format("unknown magic value in record batch for [{}-{}]: {}", topic,
+                                       partition, magic));
     }
   } else {
-    throw EnvoyException(fmt::format("magic byte is not present in record batch for [{}-{}]", topic, partition));
+    throw EnvoyException(
+        fmt::format("magic byte is not present in record batch for [{}-{}]", topic, partition));
   }
 }
 
-std::vector<RecordFootmark> RecordExtractorImpl::extractRecordsOutOfBatchWithMagicEqualTo2(const std::string& topic,
-                                                               const int32_t partition,
-                                                               absl::string_view data) const {
+std::vector<RecordFootmark> RecordExtractorImpl::extractRecordsOutOfBatchWithMagicEqualTo2(
+    const std::string& topic, const int32_t partition, absl::string_view data) const {
 
   // Not going to reuse the information in these fields, because we are going to republish.
-  unsigned int ignored_fields_size = /* CRC */ 4 + /* Attributes */ 2 + /* LastOffsetDelta */ 4 +
-                       /* FirstTimestamp */ 8 + /* MaxTimestamp */ 8 + /* ProducerId */ 8 +
-                       /* ProducerEpoch */ 2 + /* BaseSequence */ 4 + /* RecordCount */ 4;
+  unsigned int ignored_fields_size =
+      /* CRC */ 4 + /* Attributes */ 2 + /* LastOffsetDelta */ 4 +
+      /* FirstTimestamp */ 8 + /* MaxTimestamp */ 8 + /* ProducerId */ 8 +
+      /* ProducerEpoch */ 2 + /* BaseSequence */ 4 + /* RecordCount */ 4;
 
   if (data.length() < ignored_fields_size) {
-    throw EnvoyException(fmt::format("record batch for [{}-{}] is too short (no attribute fields): {}", topic, partition, data.length()));
+    throw EnvoyException(
+        fmt::format("record batch for [{}-{}] is too short (no attribute fields): {}", topic,
+                    partition, data.length()));
   }
   data = {data.data() + ignored_fields_size, data.length() - ignored_fields_size};
 
@@ -98,9 +104,11 @@ static absl::string_view comsumeBytes(absl::string_view& input) {
 
   if (length >= 0) {
     if (length > input.size()) {
-      throw EnvoyException(fmt::format("byte array length larger than data provided: {} vs {}", length, input.size()));
+      throw EnvoyException(fmt::format("byte array length larger than data provided: {} vs {}",
+                                       length, input.size()));
     }
-    const absl::string_view result = {input.data(), static_cast<absl::string_view::size_type>(length)};
+    const absl::string_view result = {input.data(),
+                                      static_cast<absl::string_view::size_type>(length)};
     input = {input.data() + length, input.length() - length};
     return result;
   } else {
@@ -108,14 +116,17 @@ static absl::string_view comsumeBytes(absl::string_view& input) {
   }
 }
 
-RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, const int32_t partition, absl::string_view& data) const {
+RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, const int32_t partition,
+                                                  absl::string_view& data) const {
   // The reference implementation is:
-  // org.apache.kafka.common.record.DefaultRecord.writeTo(DataOutputStream, int, long, ByteBuffer, ByteBuffer, Header[])
+  // org.apache.kafka.common.record.DefaultRecord.writeTo(DataOutputStream, int, long, ByteBuffer,
+  // ByteBuffer, Header[])
 
   VarInt32Deserializer length;
   length.feed(data);
   if (!length.ready()) {
-    throw EnvoyException(fmt::format("record for [{}-{}] is too short (no length)", topic, partition));
+    throw EnvoyException(
+        fmt::format("record for [{}-{}] is too short (no length)", topic, partition));
   }
   const int32_t len = length.get();
 
@@ -128,7 +139,8 @@ RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, cons
   VarUInt32Deserializer offsetDelta;
   offsetDelta.feed(data);
   if (!attributes.ready() || !tsDelta.ready() || !offsetDelta.ready()) {
-    throw EnvoyException(fmt::format("attributes not present in record for [{}-{}]", topic, partition));
+    throw EnvoyException(
+        fmt::format("attributes not present in record for [{}-{}]", topic, partition));
   }
 
   absl::string_view key = comsumeBytes(data);
@@ -137,11 +149,13 @@ RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, cons
   VarInt32Deserializer headers_count_deserializer;
   headers_count_deserializer.feed(data);
   if (!headers_count_deserializer.ready()) {
-    throw EnvoyException(fmt::format("header count not present in record for [{}-{}]", topic, partition));
+    throw EnvoyException(
+        fmt::format("header count not present in record for [{}-{}]", topic, partition));
   }
   const int32_t headers_count = headers_count_deserializer.get();
   if (headers_count < 0) {
-    throw EnvoyException(fmt::format("invalid header count in record for [{}-{}]: {}", topic, partition, headers_count));
+    throw EnvoyException(fmt::format("invalid header count in record for [{}-{}]: {}", topic,
+                                     partition, headers_count));
   }
   for (int32_t i = 0; i < headers_count; ++i) {
     comsumeBytes(data); // header key
@@ -150,10 +164,11 @@ RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, cons
 
   if (data == expected_end_of_record) {
     // We have consumed everything nicely.
-    return RecordFootmark{ topic, partition, key, value };
+    return RecordFootmark{topic, partition, key, value};
   } else {
     // Bad data - there are bytes left.
-    throw EnvoyException(fmt::format("data left after consuming record for [{}-{}]: {}", topic, partition, data.length()));
+    throw EnvoyException(fmt::format("data left after consuming record for [{}-{}]: {}", topic,
+                                     partition, data.length()));
   }
 }
 
