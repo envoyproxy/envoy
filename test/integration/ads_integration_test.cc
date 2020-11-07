@@ -1189,14 +1189,24 @@ TEST_P(AdsClusterV3Test, TestPrimaryClusterWarmClusterInitialization) {
   auto port = fake_upstreams_.back()->localAddress()->ip()->port();
 
   // This cluster will be blocked since endpoint name cannot be resolved.
-  auto warming_cluster =
-      ConfigHelper::buildStaticCluster("fake_cluster", 12345, "notexist.foo.com");
-  warming_cluster.set_type(envoy::config::cluster::v3::Cluster::STRICT_DNS);
-  warming_cluster.set_use_tcp_for_dns_lookups(true);
-  auto dns_resolver = warming_cluster.mutable_dns_resolvers()->Add();
-  dns_resolver->mutable_socket_address()->set_address(loopback);
-  dns_resolver->mutable_socket_address()->set_port_value(port);
-  auto active_cluster = ConfigHelper::buildStaticCluster("fake_cluster", 12346, loopback);
+  auto warming_cluster = ConfigHelper::buildStaticCluster("fake_cluster", port, loopback);
+  // Below endpoint accepts request but never return. The health check hangs 1 hour which covers the
+  // test running.
+  auto blocking_health_check = TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(R"EOF(
+      timeout: 3600s
+      interval: 3600s
+      unhealthy_threshold: 2
+      healthy_threshold: 2
+      tcp_health_check:
+        send:
+          text: '01'
+        receive:
+          - text: '02'
+          )EOF");
+  *warming_cluster.add_health_checks() = blocking_health_check;
+
+  // Active cluster has the same name with warming cluster but has no blocking health check.
+  auto active_cluster = ConfigHelper::buildStaticCluster("fake_cluster", port, loopback);
 
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {warming_cluster},
