@@ -133,8 +133,13 @@ message ProcessingResponse {
     // the "response_trailers" field set.
     TrailersResponse response_trailers = 6;
 
-    // If specified, return the specified response downstream to the client
-    // and end further filter processing on the request path.
+    // If specified, attempt to create a locally generated response, send it
+    // downstream, and stop processing additional filters and ignore any
+    // additional messages received from the remote server for this request or
+    // response. If a response has already started -- for example, if this
+    // message is sent response to a "response_body" message -- then
+    // this will either ship the reply directly to the downstream codec,
+    // or reset the stream.
     ImmediateResponse immediate_response = 7;
   }
 
@@ -182,78 +187,74 @@ message HttpTrailers {
 
 // The following are messages that may be sent back by the server.
 
-// This message must be sent in response to a request_headers or response_headers
-// message.
-// [#next-free-field: 6]
+// This message must be sent in response to an HttpHeaders message.
 message HeadersResponse {
-  // Instructions on how to manipulate the headers
-  HeaderMutation header_mutation = 1;
-
-  // If set, add a body to the message if none was present
-  // before.
-  BodyMutation body_mutation = 2;
-
-  // If set, add trailers to the message. If and only if this
-  // field is combined with the end_stream flag, then
-  // the trailers will be sent along with the request or
-  // response -- otherwise, this field is ignored.
-  config.core.v3.HeaderMap trailers = 3;
-
-  // If true, then replace the request and response with the contents
-  // of this message. If header_mutation is set, apply it to the
-  // headers. If body_mutation is set and contains a body, then add that
-  // body to the request or response, even if one does not already exist --
-  // otherwise, clear the body. Any additional body and trailers
-  // received from downstream will be ignored, and any additional messages
-  // from the remote server on either the request or response path will
-  // also be ignored for the duration of this request or response.
-  bool end_of_stream = 4;
-
-  // Clear the route cache for the current request.
-  // This is necessary if the remote server
-  // modified headers that are used to calculate the route.
-  bool clear_route_cache = 5;
+  CommonResponse response = 1;
 }
 
-// This message must be sent in response to a request_trailers
-// or response_trailers message.
+// This message must be sent in response to an HttpTrailers message.
 message TrailersResponse {
   // Instructions on how to manipulate the trailers
   HeaderMutation header_mutation = 1;
 }
 
-// TODO this is now the same as HeaderResponse. However, do we think
-// that will always be the case? Keeping it as a separate message
-// for now.
-// [#next-free-field: 6]
+// This message must be sent in response to an HttpBody message.
 message BodyResponse {
-  // If set, manipulate HTTP headers along with the body. Note that
-  // this is only possible if the headers have not been sent down
-  // the filter chain yet. Practically, then, this field will be ignored
-  // unless the request or response BodySendMode is BUFFERED or
-  // BUFFERED_PARTIAL, which means that Envoy is buffering the body
-  // in memory while waiting for this response.
-  HeaderMutation header_mutation = 1;
+  CommonResponse response = 1;
+}
 
-  // Request that the last body chunk delivered be modified.
-  BodyMutation body_mutation = 2;
+// This message contains common fields between header and body responses.
+// [#next-free-field: 6]
+message CommonResponse {
+  enum ResponseStatus {
+    // Apply the mutation instructions in this message to the
+    // request or response, and then continue processing the filter
+    // stream as normal. This is the default.
+    CONTINUE = 0;
 
-  // If set, add trailers to the message. If and only if this
-  // field is combined with the end_stream flag, then
-  // the trailers will be sent along with the request or
-  // response -- otherwise, this field is ignored.
-  config.core.v3.HeaderMap trailers = 3;
+    // Replace the request or response with the contents
+    // of this message. If header_mutation is set, apply it to the
+    // headers. If body_mutation is set and contains a body, then add that
+    // body to the request or response, even if one does not already exist --
+    // otherwise, clear the body. Any additional body and trailers
+    // received from downstream will be ignored, and any additional messages
+    // from the remote server on either the request or response path will
+    // also be ignored for the duration of this request or response.
+    // This can be used to add a body to a request or response that does not
+    // have one already.
+    CONTINUE_AND_DO_NOT_END_STREAM = 1;
 
-  // If true, then replace the request and response with the contents
-  // of this message. If header_mutation is set and headers have not
-  // already been forwarded down the filter chain, apply it to the
-  // headers. If body_mutation is set and contains a body, then add that
-  // body to the request or response, even if one does not already exist --
-  // otherwise, clear the body. Any additional body and trailers
-  // received from downstream will be ignored, and any additional messages
-  // from the remote server on either the request or response path will
-  // also be ignored for the duration of this request or response.
-  bool end_of_stream = 4;
+    // Replace the request or response as with CONTINUE_AND_DO_NOT_END_STREAM,
+    // but do not continue filter processing yet -- the remote server can
+    // send additional ProcessingResponse messages with this value
+    // set that further modify the message or add new data, and
+    // must eventually reply with one of the "CONTINUE" statuses
+    // in order for filter processing to resume.
+    PAUSE_AND_DO_NOT_END_STREAM = 2;
+  }
+
+  // If set, provide additional direction on how the Envoy proxy should
+  // handle the rest of the HTTP filter chain.
+  ResponseStatus status = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Instructions on how to manipulate the headers. When responding to an
+  // HttpBody request, header mutations will only take effect if the
+  // headers were not already sent further on the filter chain, which
+  // happens only if the current processing mode for the body is BUFFERED
+  // or BUFFERED_PARTIAL.
+  HeaderMutation header_mutation = 2;
+
+  // Replace the body of the last message sent to the remote server on this
+  // stream. If responding to an HttpBody request, simply replace or clear
+  // the body chunk that was sent with that request. If responding to an
+  // HttpHeaders request, then a new body may be added to the request if this
+  // message is returned along with the CONTINUE_AND_DO_NOT_END_STREAM status.
+  BodyMutation body_mutation = 3;
+
+  // Add new trailers to the message. This may be used when responding to either a
+  // HttpHeaders or HttpBody message, but only if this message is returned
+  // along with the CONTINUE_AND_DO_NOT_END_STREAM status.
+  config.core.v3.HeaderMap trailers = 4;
 
   // Clear the route cache for the current request.
   // This is necessary if the remote server
@@ -261,20 +262,36 @@ message BodyResponse {
   bool clear_route_cache = 5;
 }
 
-// This message completely replaces the response. If the response headers
-// have not already been sent downstream, then this will cause the filter to
-// immediately return the data specified here to the downstream
-// system, stop further filter processing, and ignore further messages coming
-// from the remote server. However, if the response headers have already been
-// delivered downstream, then this message will be ignored.
+// This message causes the filter to attempt to create a locally
+// generated response, send it  downstream, stop processing
+// additional filters, and ignore any additional messages received
+// from the remote server for this request or response. If a response
+// has already started, then  this will either ship the reply directly
+// to the downstream codec, or reset the stream.
+// [#next-free-field: 6]
 message ImmediateResponse {
+  // The response code to return
   type.v3.HttpStatus status = 1 [(validate.rules).message = {required: true}];
 
-  config.core.v3.HeaderMap headers = 2;
+  // Apply changes to the default headers, which will include content-type.
+  HeaderMutation headers = 2;
 
-  bytes body = 3;
+  // The message body to return with the response which is sent using the
+  // text/plain content type, or encoded in the grpc-message header.
+  string body = 3;
 
-  config.core.v3.HeaderMap trailers = 4;
+  // If set, then include a gRPC status trailer.
+  GrpcStatus grpc_status = 4;
+
+  // A string detailing why this local reply was sent, which may be included
+  // in log and debug output.
+  string details = 5;
+}
+
+// This message specifies a gRPC status for an ImmediateResponse message.
+message GrpcStatus {
+  // The actual gRPC status
+  uint32 status = 1;
 }
 
 // Change HTTP headers or trailers by appending, replacing, or removing
