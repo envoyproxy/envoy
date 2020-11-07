@@ -24,5 +24,13 @@ MockPrivateKeyMethodManager::~MockPrivateKeyMethodManager() = default;
 MockPrivateKeyMethodProvider::MockPrivateKeyMethodProvider() = default;
 MockPrivateKeyMethodProvider::~MockPrivateKeyMethodProvider() = default;
 
+MockTlsCertificateConfigProvidersFactory::MockTlsCertificateConfigProvidersFactory() = default;
+MockTlsCertificateConfigProvidersFactory::~MockTlsCertificateConfigProvidersFactory() = default;
+
+MockCertificateValicationContextConfigProviderFactory::
+    MockCertificateValicationContextConfigProviderFactory() = default;
+MockCertificateValicationContextConfigProviderFactory::
+    ~MockCertificateValicationContextConfigProviderFactory() = default;
+
 } // namespace Ssl
 } // namespace Envoy

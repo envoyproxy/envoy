@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gmock/gmock-function-mocker.h>
+
 #include <functional>
 #include <string>
 
@@ -181,6 +183,26 @@ public:
 #ifdef OPENSSL_IS_BORINGSSL
   MOCK_METHOD(BoringSslPrivateKeyMethodSharedPtr, getBoringSslPrivateKeyMethod, ());
 #endif
+};
+
+class MockTlsCertificateConfigProvidersFactory : public TlsCertificateConfigProvidersFactory {
+public:
+  MockTlsCertificateConfigProvidersFactory();
+  ~MockTlsCertificateConfigProvidersFactory() override;
+
+  MOCK_METHOD(std::vector<Secret::TlsCertificateConfigProviderSharedPtr>, create, ());
+};
+
+class MockCertificateValicationContextConfigProviderFactory
+    : public CertificateValidationContextConfigProviderFactory {
+public:
+  MockCertificateValicationContextConfigProviderFactory();
+  ~MockCertificateValicationContextConfigProviderFactory() override;
+
+  MOCK_METHOD(Secret::CertificateValidationContextConfigProviderSharedPtr, create, ());
+  MOCK_METHOD(
+      std::shared_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>,
+      defaultCvc, (), (const));
 };
 
 } // namespace Ssl
