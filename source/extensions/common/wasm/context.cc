@@ -276,7 +276,7 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
       n = counter.counter_.get().name().size();
       memcpy(b, &n, sizeof(uint32_t)); // NOLINT(safe-memcpy)
       b += sizeof(uint32_t);
-      memcpy(b, counter.counter_.get().name().data(),\ // NOLINT(safe-memcpy)
+      memcpy(b, counter.counter_.get().name().data(), // NOLINT(safe-memcpy)
                                                      counter.counter_.get()
                                                          .name()
                                                          .size());
