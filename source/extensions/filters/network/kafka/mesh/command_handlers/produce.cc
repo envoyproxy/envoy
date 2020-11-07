@@ -103,7 +103,7 @@ static absl::string_view comsumeBytes(absl::string_view& input) {
   }
 
   if (length >= 0) {
-    if (length > input.size()) {
+    if (static_cast<absl::string_view::size_type>(length) > input.size()) {
       throw EnvoyException(fmt::format("byte array length larger than data provided: {} vs {}",
                                        length, input.size()));
     }
