@@ -122,7 +122,7 @@ public:
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
-                   testing::Values(Grpc::SotwOrDelta::Sotw))
+                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta))
 #else
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
