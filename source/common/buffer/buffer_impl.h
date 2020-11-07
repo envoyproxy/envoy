@@ -8,7 +8,6 @@
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/assert.h"
-#include "common/common/mem_block_builder.h"
 #include "common/common/non_copyable.h"
 #include "common/common/utility.h"
 #include "common/event/libevent.h"
@@ -154,9 +153,7 @@ public:
     uint8_t* dest = base_ + reservable_;
     reservable_ += copy_size;
     // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
-    MemBlockBuilder<uint8_t> mem_builder(dest, copy_size);
-    uint8_t* data_non_raw = reinterpret_cast<uint8_t*>(const_cast<void*>(data));
-    mem_builder.appendData(absl::Span<uint8_t>(data_non_raw, size));
+    memcpy(dest, data, copy_size);
     return copy_size;
   }
 
@@ -186,9 +183,7 @@ public:
       copy_size = std::min(size, data_);
       data_ -= copy_size;
     }
-    MemBlockBuilder<uint8_t> mem_builder(base_ + data_, copy_size);
-    mem_builder.appendData(
-        absl::Span<uint8_t>(const_cast<uint8_t*>(src + size - copy_size), copy_size));
+    memcpy(base_ + data_, src + size - copy_size, copy_size);
     return copy_size;
   }
 
@@ -281,9 +276,7 @@ public:
   static SlicePtr create(const void* data, uint64_t size) {
     uint64_t slice_capacity = sliceSize(size);
     std::unique_ptr<OwnedSlice> slice(new (slice_capacity) OwnedSlice(slice_capacity));
-    MemBlockBuilder<uint8_t> mem_builder(slice->base_, size);
-    uint8_t* data_non_raw = reinterpret_cast<uint8_t*>(const_cast<void*>(data));
-    mem_builder.appendData(absl::Span<uint8_t>(data_non_raw, size));
+    memcpy(slice->base_, data, size);
     slice->reservable_ = size;
     return slice;
   }
@@ -660,9 +653,7 @@ private:
   OwnedBufferFragmentImpl(absl::string_view data, const Releasor& releasor)
       : releasor_(releasor), size_(data.size()) {
     ASSERT(releasor != nullptr);
-    MemBlockBuilder<uint8_t> mem_builder(data_, data.size());
-    uint8_t* data_non_raw = reinterpret_cast<uint8_t*>(const_cast<char*>(data.data()));
-    mem_builder.appendData(absl::Span<uint8_t>(data_non_raw, data.size()));
+    memcpy(data_, data.data(), data.size());
   }
 
   const Releasor releasor_;
