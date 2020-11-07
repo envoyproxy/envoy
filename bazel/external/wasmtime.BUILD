@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@io_bazel_rules_rust//rust:rust.bzl", "rust_library")
 
 licenses(["notice"])  # Apache 2
@@ -15,10 +16,6 @@ cc_library(
 rust_library(
     name = "rust_c_api",
     srcs = glob(["crates/c-api/src/**/*.rs"]),
-    crate_features = [
-        "jitdump",
-        "cache",
-    ],
     crate_root = "crates/c-api/src/lib.rs",
     crate_type = "staticlib",
     edition = "2018",
