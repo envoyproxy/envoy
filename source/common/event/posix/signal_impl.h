@@ -5,6 +5,8 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"
 
+
+
 namespace Envoy {
 namespace Event {
 
@@ -13,11 +15,10 @@ namespace Event {
  */
 class SignalEventImpl : public SignalEvent, ImplBase {
 public:
-  SignalEventImpl(DispatcherImpl& dispatcher, int signal_num, SignalCb cb);
+  SignalEventImpl(DispatcherImpl& dispatcher, signat_t signal_num, SignalCb cb);
 
 private:
   SignalCb cb_;
 };
-
 } // namespace Event
 } // namespace Envoy

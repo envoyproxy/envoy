@@ -1,6 +1,9 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_platform_dep",
+    "envoy_cc_posix_library",
+    "envoy_cc_win32_library",
     "envoy_package",
 )
 
@@ -13,10 +16,6 @@ envoy_cc_library(
     srcs = [
         "dispatcher_impl.cc",
         "file_event_impl.cc",
-        "signal_impl.cc",
-    ],
-    hdrs = [
-        "signal_impl.h",
     ],
     deps = [
         ":dispatcher_includes",
@@ -37,7 +36,31 @@ envoy_cc_library(
     ] + select({
         "//bazel:apple": ["//source/common/network:apple_dns_lib"],
         "//conditions:default": [],
-    }),
+    }) + envoy_cc_platform_dep("signal_impl_lib"),
+)
+
+envoy_cc_posix_library(
+    name = "signal_impl_lib",
+    srcs = ["posix/signal_impl.cc"],
+    hdrs = ["posix/signal_impl.h"],
+    strip_include_prefix = "posix",
+    deps = [
+        ":dispatcher_includes",
+        "//include/envoy/event:signal_interface",
+        "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_win32_library(
+    name = "signal_impl_lib",
+    srcs = ["win32/signal_impl.cc"],
+    hdrs = ["win32/signal_impl.h"],
+    strip_include_prefix = "win32",
+    deps = [
+        ":dispatcher_includes",
+        "//include/envoy/event:signal_interface",
+        "//source/common/common:thread_lib",
+    ],
 )
 
 envoy_cc_library(

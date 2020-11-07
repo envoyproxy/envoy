@@ -53,6 +53,9 @@
 #include "server/listener_hooks.h"
 #include "server/ssl_context_manager.h"
 
+namespace {
+constexpr bool platformSupportsSignal(signat_t signal_num) { return signal_num != -1; }
+} // namespace
 namespace Envoy {
 namespace Server {
 
@@ -614,28 +617,29 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       }) {
   // Setup signals.
   if (options.signalHandlingEnabled()) {
-// TODO(Pivotal): Figure out solution to graceful shutdown on Windows. None of these signals exist
-// on Windows.
-#ifndef WIN32
-    sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
-      ENVOY_LOG(warn, "caught SIGTERM");
-      instance.shutdown();
-    });
-
-    sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
-      ENVOY_LOG(warn, "caught SIGINT");
-      instance.shutdown();
-    });
-
-    sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-      ENVOY_LOG(info, "caught SIGUSR1. Reopening access logs.");
-      access_log_manager.reopen();
-    });
-
-    sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
-      ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
-    });
-#endif
+    if constexpr (platformSupportsSignal(ENVOY_SIGTERM)) {
+      sigterm_ = dispatcher.listenForSignal(ENVOY_SIGTERM, [&instance]() {
+        ENVOY_LOG(warn, "caught ENVOY_SIGTERM");
+        instance.shutdown();
+      });
+    }
+    if constexpr (platformSupportsSignal(ENVOY_SIGINIT)) {
+      sigint_ = dispatcher.listenForSignal(ENVOY_SIGINIT, [&instance]() {
+        ENVOY_LOG(warn, "caught SIGINT");
+        instance.shutdown();
+      });
+    }
+    if constexpr (platformSupportsSignal(ENVOY_SIGUSR1)) {
+      sig_usr_1_ = dispatcher.listenForSignal(ENVOY_SIGUSR1, [&access_log_manager]() {
+        ENVOY_LOG(info, "caught SIGUSR1. Reopening access logs.");
+        access_log_manager.reopen();
+      });
+    }
+    if constexpr (platformSupportsSignal(ENVOY_SIGHUP)) {
+      sig_hup_ = dispatcher.listenForSignal(ENVOY_SIGHUP, []() {
+        ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
+      });
+    }
   }
 
   // Start overload manager before workers.

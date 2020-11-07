@@ -65,6 +65,7 @@ typedef uint32_t mode_t;
 
 typedef SOCKET os_fd_t;
 typedef HANDLE filesystem_os_id_t; // NOLINT(modernize-use-using)
+typedef DWORD signat_t; // NOLINT(modernize-use-using)
 
 typedef unsigned int sa_family_t;
 
@@ -151,6 +152,12 @@ struct msghdr {
 #define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
 
+#define ENVOY_SIGINIT CTRL_C_EVENT
+#define ENVOY_SIGTERM CTRL_CLOSE_EVENT
+#define ENVOY_SIGUSR1 -1
+#define ENVOY_SIGHUP -1
+
+
 namespace Platform {
 constexpr absl::string_view null_device_path{"NUL"};
 }
@@ -215,6 +222,8 @@ constexpr absl::string_view null_device_path{"NUL"};
 
 typedef int os_fd_t;
 typedef int filesystem_os_id_t; // NOLINT(modernize-use-using)
+typedef int signat_t; // NOLINT(modernize-use-using)
+
 
 #define INVALID_HANDLE -1
 #define INVALID_SOCKET -1
@@ -244,6 +253,11 @@ typedef int filesystem_os_id_t; // NOLINT(modernize-use-using)
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES
 #define HANDLE_ERROR_INVALID EBADF
+
+#define ENVOY_SIGTERM SIGTERM
+#define ENVOY_SIGINIT SIGINT
+#define ENVOY_SIGUSR1 SIGUSR1
+#define ENVOY_SIGHUP SIGHUP
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"/dev/null"};
