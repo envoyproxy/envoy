@@ -1205,9 +1205,9 @@ virtualize
 vptr
 wakeup
 wakeups
+wasmtime
 websocket
 wepoll
-wasmtime
 whitespace
 whitespaces
 wildcard

@@ -41,6 +41,7 @@ def envoy_select_wasm(xs):
 
 def envoy_select_wasm_v8(xs):
     return select({
+        "@envoy//bazel:wasm_wasmtime": [],
         "@envoy//bazel:wasm_wavm": [],
         "@envoy//bazel:wasm_none": [],
         "//conditions:default": xs,
@@ -53,12 +54,19 @@ def envoy_select_wasm_wavm(xs):
         "//conditions:default": [],
     })
 
-def envoy_select_wasm_all_v8_wavm_none(xs1, xs2, xs3, xs4):
+def envoy_select_wasm_wasmtime(xs):
+    return select({
+        "@envoy//bazel:wasm_wasmtime": xs,
+        "//conditions:default": [],
+    })
+
+def envoy_select_wasm_all_v8_wavm_none(xs1, xs2, xs3, xs4, xs5):
     return select({
         "@envoy//bazel:wasm_all": xs1,
         "@envoy//bazel:wasm_v8": xs2,
         "@envoy//bazel:wasm_wavm": xs3,
-        "@envoy//bazel:wasm_none": xs4,
+        "@envoy//bazel:wasm_wasmtime": xs4,
+        "@envoy//bazel:wasm_none": xs5,
         "//conditions:default": xs2,
     })
 

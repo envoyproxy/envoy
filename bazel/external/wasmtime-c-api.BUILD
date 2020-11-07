@@ -10,7 +10,6 @@ cc_library(
         "include/wasm.h",
     ],
     defines = [
-        "ENVOY_WASM_WAVM",  # TODO: delete
         "ENVOY_WASM_WASMTIME",
     ],
     include_prefix = "wasmtime",

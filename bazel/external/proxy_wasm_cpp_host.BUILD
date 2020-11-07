@@ -3,6 +3,7 @@ load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_select_wasm_all_v8_wavm_none",
     "envoy_select_wasm_v8",
+    "envoy_select_wasm_wasmtime",
     "envoy_select_wasm_wavm",
 )
 
@@ -27,6 +28,12 @@ cc_library(
                 "src/**/*.h",
                 "src/**/*.cc",
             ],
+            exclude = [
+                # TODO: currently we cannot link wasmtime with (v8, WAVM) due to symbol collision:
+                # - V8: wasm-c-api symbols
+                # - WAVM: LLVM's gdb JIT interface related symbols
+                "src/wasmtime/*",
+            ],
         ),
         glob(
             [
@@ -35,6 +42,16 @@ cc_library(
             ],
             exclude = [
                 "src/wavm/*",
+                "src/wasmtime/*",
+            ],
+        ),
+        glob(
+            [
+                "src/**/*.h",
+                "src/**/*.cc",
+            ],
+            exclude = [
+                "src/v8/*",
                 "src/wasmtime/*",
             ],
         ),
@@ -76,9 +93,10 @@ cc_library(
         "@proxy_wasm_cpp_sdk//:api_lib",
         "@proxy_wasm_cpp_sdk//:common_lib",
     ] + envoy_select_wasm_wavm([
-        "@com_github_wasmtime_c_api//:lib",
-        #        "@envoy//bazel/foreign_cc:wavm",
+        "@envoy//bazel/foreign_cc:wavm",
     ]) + envoy_select_wasm_v8([
         "//external:wee8",
+    ]) + envoy_select_wasm_wasmtime([
+        "@com_github_wasmtime_c_api//:lib",
     ]),
 )

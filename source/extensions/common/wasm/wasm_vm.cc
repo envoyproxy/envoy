@@ -82,7 +82,7 @@ WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& s
 #endif
 #if defined(ENVOY_WASM_WAVM)
   } else if (runtime == WasmRuntimeNames::get().Wavm) {
-    auto wasm = proxy_wasm::createWasmtimeVm(); // TODO: revert to WAVM
+    auto wasm = proxy_wasm::createWavmVm();
     wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "wavm");
     return wasm;
 #endif

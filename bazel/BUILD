@@ -331,6 +331,11 @@ config_setting(
 )
 
 config_setting(
+    name = "wasm_wasmtime",
+    values = {"define": "wasm=wasmtime"},
+)
+
+config_setting(
     name = "wasm_none",
     values = {"define": "wasm=disabled"},
 )
