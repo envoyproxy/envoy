@@ -108,7 +108,7 @@ class Int16Deserializer : public IntDeserializer<int16_t> {
 public:
   int16_t get() const override {
     int16_t result;
-    SAFE_MEMCPY(&result, buf_);
+    memcpy(&result, buf_, sizeof(int16_t)); // NOLINT(safe-memcpy)
     return be16toh(result);
   }
 };
