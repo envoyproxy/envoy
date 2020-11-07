@@ -153,7 +153,7 @@ public:
     uint8_t* dest = base_ + reservable_;
     reservable_ += copy_size;
     // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
-    memcpy(dest, data, copy_size);
+    memcpy(dest, data, copy_size); // NOLINT(safe-memcpy)
     return copy_size;
   }
 
@@ -183,7 +183,7 @@ public:
       copy_size = std::min(size, data_);
       data_ -= copy_size;
     }
-    memcpy(base_ + data_, src + size - copy_size, copy_size);
+    memcpy(base_ + data_, src + size - copy_size, copy_size); // NOLINT(safe-memcpy)
     return copy_size;
   }
 
@@ -276,7 +276,7 @@ public:
   static SlicePtr create(const void* data, uint64_t size) {
     uint64_t slice_capacity = sliceSize(size);
     std::unique_ptr<OwnedSlice> slice(new (slice_capacity) OwnedSlice(slice_capacity));
-    memcpy(slice->base_, data, size);
+    memcpy(slice->base_, data, size); // NOLINT(safe-memcpy)
     slice->reservable_ = size;
     return slice;
   }
@@ -653,7 +653,7 @@ private:
   OwnedBufferFragmentImpl(absl::string_view data, const Releasor& releasor)
       : releasor_(releasor), size_(data.size()) {
     ASSERT(releasor != nullptr);
-    memcpy(data_, data.data(), data.size());
+    memcpy(data_, data.data(), data.size()); // NOLINT(safe-memcpy)
   }
 
   const Releasor releasor_;
