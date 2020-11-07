@@ -123,7 +123,9 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
        {Http::Headers::get().Scheme, scheme},
        {Http::Headers::get().Path, "/"},
        {Http::Headers::get().Host, hostname_}});
-  request_encoder_->encodeHeaders(*headers, false);
+  const auto status = request_encoder_->encodeHeaders(*headers, false);
+  // Encoding can only fail on missing required request headers.
+  ASSERT(status.ok());
 }
 
 void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
@@ -168,10 +170,8 @@ TcpConnPool::~TcpConnPool() {
   }
 }
 
-bool TcpConnPool::valid() const { return conn_pool_ != nullptr; }
-
-void TcpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
-  callbacks_ = callbacks;
+void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
+  callbacks_ = &callbacks;
   // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
   // valid connection handle. If newConnection fails inline it may result in attempting to
   // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
@@ -203,9 +203,9 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 
 HttpConnPool::HttpConnPool(const std::string& cluster_name,
                            Upstream::ClusterManager& cluster_manager,
-                           Upstream::LoadBalancerContext* context, std::string hostname,
+                           Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
-    : hostname_(hostname), upstream_callbacks_(upstream_callbacks) {
+    : hostname_(config.hostname()), upstream_callbacks_(upstream_callbacks) {
   conn_pool_ = cluster_manager.httpConnPoolForCluster(
       cluster_name, Upstream::ResourcePriority::Default, absl::nullopt, context);
 }
@@ -218,10 +218,8 @@ HttpConnPool::~HttpConnPool() {
   }
 }
 
-bool HttpConnPool::valid() const { return conn_pool_ != nullptr; }
-
-void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
-  callbacks_ = callbacks;
+void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
+  callbacks_ = &callbacks;
   upstream_ = std::make_unique<HttpUpstream>(upstream_callbacks_, hostname_);
   Tcp::ConnectionPool::Cancellable* handle =
       conn_pool_->newStream(upstream_->responseDecoder(), *this);
