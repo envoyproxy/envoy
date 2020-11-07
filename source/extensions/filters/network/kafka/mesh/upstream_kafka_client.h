@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <deque>
 #include <thread>
 
@@ -151,7 +152,7 @@ private:
   std::unique_ptr<KafkaProducerWrapper> producer_;
 
   // Flag controlling monitoring threads's execution.
-  volatile bool poller_thread_active_;
+  std::atomic<bool> poller_thread_active_;
 
   // Monitoring thread that's responsible for continuously polling for new Kafka producer events.
   Thread::ThreadPtr poller_thread_;
