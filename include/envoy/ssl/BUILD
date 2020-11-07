@@ -31,6 +31,7 @@ envoy_cc_library(
         ":certificate_validation_context_config_interface",
         ":handshaker_interface",
         ":tls_certificate_config_interface",
+        "//include/envoy/secret:secret_manager_interface",
     ],
 )
 

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
@@ -15,6 +16,40 @@
 
 namespace Envoy {
 namespace Ssl {
+
+class TlsCertificateConfigProvidersFactory {
+public:
+  virtual ~TlsCertificateConfigProvidersFactory() = default;
+
+  /**
+   * Create the certificate config providers factory
+   */
+  virtual std::vector<Secret::TlsCertificateConfigProviderSharedPtr> create() PURE;
+};
+
+using TlsCertificateConfigProvidersFactoryPtr =
+    std::unique_ptr<TlsCertificateConfigProvidersFactory>;
+
+class CertificateValidationContextConfigProviderFactory {
+public:
+  virtual ~CertificateValidationContextConfigProviderFactory() = default;
+
+  /**
+   * Create the validation context config provider.
+   */
+  virtual Secret::CertificateValidationContextConfigProviderSharedPtr create() PURE;
+
+  /**
+   * To get default certificate validation context. This value is nullptr by default except for
+   * validation context type is combined validation context.
+   */
+  virtual std::shared_ptr<
+      envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
+  defaultCvc() const PURE;
+};
+
+using CertificateValidationContextConfigProviderFactoryPtr =
+    std::unique_ptr<CertificateValidationContextConfigProviderFactory>;
 
 /**
  * Supplies the configuration for an SSL context.

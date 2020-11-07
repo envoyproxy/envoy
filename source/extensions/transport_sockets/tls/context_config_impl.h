@@ -20,6 +20,47 @@ namespace Tls {
 
 static const std::string INLINE_STRING = "<inline>";
 
+class TlsCertificateConfigProvidersFactoryImpl : public Ssl::TlsCertificateConfigProvidersFactory {
+public:
+  TlsCertificateConfigProvidersFactoryImpl(
+      const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> create() override;
+
+private:
+  const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config_;
+  Server::Configuration::TransportSocketFactoryContext& factory_context_;
+};
+
+class CertificateValidationContextConfigProviderFactoryImpl
+    : public Ssl::CertificateValidationContextConfigProviderFactory {
+public:
+  CertificateValidationContextConfigProviderFactoryImpl(
+      const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+  Secret::CertificateValidationContextConfigProviderSharedPtr create() override;
+
+  std::shared_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
+  defaultCvc() const override {
+    return default_cvc_;
+  }
+
+private:
+  Secret::CertificateValidationContextConfigProviderSharedPtr createFromSds(
+      const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& sds_secret_config)
+      const;
+
+  const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config_;
+  Server::Configuration::TransportSocketFactoryContext& factory_context_;
+  // If certificate validation context type is combined_validation_context. default_cvc_
+  // holds a copy of CombinedCertificateValidationContext::default_validation_context.
+  // Otherwise, default_cvc_ is nullptr.
+  std::shared_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
+      default_cvc_;
+};
+
 class ContextConfigImpl : public virtual Ssl::ContextConfig {
 public:
   ~ContextConfigImpl() override;
@@ -47,10 +88,11 @@ public:
   bool isReady() const override {
     const bool tls_is_ready =
         (tls_certificate_providers_.empty() || !tls_certificate_configs_.empty());
+    const auto default_cvc = cvc_config_provider_factory_->defaultCvc();
     const bool combined_cvc_is_ready =
-        (default_cvc_ == nullptr || validation_context_config_ != nullptr);
+        (default_cvc == nullptr || validation_context_config_ != nullptr);
     const bool cvc_is_ready = (certificate_validation_context_provider_ == nullptr ||
-                               default_cvc_ != nullptr || validation_context_config_ != nullptr);
+                               default_cvc != nullptr || validation_context_config_ != nullptr);
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
 
@@ -63,11 +105,13 @@ public:
           dynamic_cvc);
 
 protected:
-  ContextConfigImpl(const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
-                    const unsigned default_min_protocol_version,
-                    const unsigned default_max_protocol_version,
-                    const std::string& default_cipher_suites, const std::string& default_curves,
-                    Server::Configuration::TransportSocketFactoryContext& factory_context);
+  ContextConfigImpl(
+      const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
+      const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
+      const std::string& default_cipher_suites, const std::string& default_curves,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Ssl::TlsCertificateConfigProvidersFactoryPtr tls_cert_config_providers_factory,
+      Ssl::CertificateValidationContextConfigProviderFactoryPtr cvc_config_provider_factory);
   Api::Api& api_;
 
 private:
@@ -79,13 +123,11 @@ private:
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
 
+  Ssl::TlsCertificateConfigProvidersFactoryPtr tls_cert_config_providers_factory_;
+  Ssl::CertificateValidationContextConfigProviderFactoryPtr cvc_config_provider_factory_;
+
   std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
-  // If certificate validation context type is combined_validation_context. default_cvc_
-  // holds a copy of CombinedCertificateValidationContext::default_validation_context.
-  // Otherwise, default_cvc_ is nullptr.
-  std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
-      default_cvc_;
   std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
   // Handle for TLS certificate dynamic secret callback.
   Envoy::Common::CallbackHandle* tc_update_callback_handle_{};
