@@ -153,19 +153,19 @@ protected:
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
                          testing::Combine(testing::Values(
 #if defined(ENVOY_WASM_V8)
-    "v8"
+                                              "v8"
 #endif
 #if defined(ENVOY_WASM_V8) && (defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME))
-    ,
+                                              ,
 #endif
 #if defined(ENVOY_WASM_WAVM)
-    "wavm"
+                                              "wavm"
 #endif
 #if (defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)) && defined(ENVOY_WASM_WASMTIME)
-    ,
+                                              ,
 #endif
 #if defined(ENVOY_WASM_WASMTIME)
-    "wasmtime"
+                                              "wasmtime"
 #endif
                                               ),
                                           testing::Values("cpp", "rust")));
