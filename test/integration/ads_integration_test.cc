@@ -1178,6 +1178,45 @@ TEST_P(AdsClusterV3Test, ClusterInitializationUpdateTheOnlyWarmingCluster) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 }
 
+// Primary cluster is warming during cluster initialization. Update the cluster with immediate ready
+// config and verify that all the clusters are initialized.
+TEST_P(AdsClusterV3Test, TestPrimaryClusterWarmClusterInitialization) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V3);
+  auto loopback = Network::Test::getLoopbackAddressString(ipVersion());
+  addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+  auto port = fake_upstreams_.back()->localAddress()->ip()->port();
+
+  // This cluster will be blocked since endpoint name cannot be resolved.
+  auto warming_cluster =
+      ConfigHelper::buildStaticCluster("fake_cluster", 12345, "notexist.foo.com");
+  warming_cluster.set_type(envoy::config::cluster::v3::Cluster::STRICT_DNS);
+  warming_cluster.set_use_tcp_for_dns_lookups(true);
+  auto dns_resolver = warming_cluster.mutable_dns_resolvers()->Add();
+  dns_resolver->mutable_socket_address()->set_address(loopback);
+  dns_resolver->mutable_socket_address()->set_port_value(port);
+  auto active_cluster = ConfigHelper::buildStaticCluster("fake_cluster", 12346, loopback);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {warming_cluster},
+                                                             {warming_cluster}, {}, "1", false);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_.back()->waitForRawConnection(fake_upstream_connection));
+
+  // fake_cluster is in warming.
+  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 1);
+
+  // Now replace the warming cluster by the config which will turn ready immediately.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {active_cluster},
+                                                             {active_cluster}, {}, "2", false);
+
+  // All clusters are ready.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+}
+
 // Two cluster warming, update one of them. Verify that the clusters are eventually initialized.
 TEST_P(AdsClusterV3Test, ClusterInitializationUpdateOneOfThe2Warming) {
   initialize();
