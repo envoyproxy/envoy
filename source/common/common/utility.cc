@@ -13,7 +13,6 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
-#include "common/common/mem_block_builder.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/container/node_hash_map.h"
@@ -44,7 +43,7 @@ const std::string errorDetails(int error_code) {
 #ifndef WIN32
   // clang-format off
   return strerror(error_code);
-// clang-format on
+  // clang-format on
 #else
   // Windows error codes do not correspond to POSIX errno values
   // Use FormatMessage, strip trailing newline, and return "Unknown error" on failure (as on POSIX).
@@ -570,8 +569,7 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
 
 InlineString::InlineString(const char* str, size_t size) : size_(size) {
   RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
-  MemBlockBuilder<char> mem_builder(data_, size);
-  mem_builder.appendData(absl::Span<char>(const_cast<char*>(str), size));
+  memcpy(data_, str, size); // NOLINT(safe-memcpy)
 }
 
 void ExceptionUtil::throwEnvoyException(const std::string& message) {

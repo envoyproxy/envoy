@@ -96,7 +96,7 @@ class Int8Deserializer : public IntDeserializer<int8_t> {
 public:
   int8_t get() const override {
     int8_t result;
-    SAFE_MEMCPY(&result, buf_);
+    memcpy(&result, buf_, sizeof(int8_t)); // NOLINT(safe-memcpy)
     return result;
   }
 };
@@ -120,7 +120,7 @@ class Int32Deserializer : public IntDeserializer<int32_t> {
 public:
   int32_t get() const override {
     int32_t result;
-    SAFE_MEMCPY(&result, buf_);
+    memcpy(&result, buf_, sizeof(int32_t)); // NOLINT(safe-memcpy)
     return be32toh(result);
   }
 };
@@ -132,7 +132,7 @@ class UInt32Deserializer : public IntDeserializer<uint32_t> {
 public:
   uint32_t get() const override {
     uint32_t result;
-    SAFE_MEMCPY(&result, buf_);
+    memcpy(&result, buf_, sizeof(uint32_t));  // NOLINT(safe-memcpy)
     return be32toh(result);
   }
 };
@@ -144,7 +144,7 @@ class Int64Deserializer : public IntDeserializer<int64_t> {
 public:
   int64_t get() const override {
     int64_t result;
-    SAFE_MEMCPY(&result, buf_);
+    memcpy(&result, buf_, sizeof(int64_t)); // NOLINT(safe-memcpy)
     return be64toh(result);
   }
 };
