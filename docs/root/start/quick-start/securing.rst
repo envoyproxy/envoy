@@ -8,15 +8,17 @@ between proxies and services within your network.
 
 Transport Layer Security (``TLS``) can be used to secure all types of ``HTTP`` traffic, including ``WebSockets``.
 
-Envoy also has support for transmitting and receiving generic ``TCP`` traffic over ``TLS``.
+Envoy also has support for transmitting and receiving generic ``TCP`` traffic with ``TLS``.
 
 .. warning::
 
    The following guide takes you through individual aspects of securing traffic.
 
-   To secure traffic over a network that is untrusted, you are strongly advised to make
-   use of :ref:`SNI <start_quick_start_securing_sni>` *and* :ref:`mTLS <start_quick_start_securing_mtls>`
-   wherever you control both sides of the connection or where these protocols are available.
+   To secure traffic over a network that is untrusted, you are strongly advised to make use of encryption
+   and mutual authentication wherever you control both sides of the connection or where relevant protocols are available.
+
+   Here we provide a guide to using :ref:`mTLS <start_quick_start_securing_mtls>` which provides both encryption
+   and mutual authentication.
 
    You are also strongly encouraged to :ref:`validate <start_quick_start_securing_validation>` all certificates
    wherever possible.
@@ -98,53 +100,6 @@ certificate is valid for.
    See :ref:`here <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>` to view all
    of the possible configurations for certificate validation.
 
-.. _start_quick_start_securing_sni:
-
-Secure an endpoint with SNI
----------------------------
-
-``SNI`` is an extension to the ``TLS`` protocol through which a client indicates the hostname of the server
-that they are connecting to during the ``TLS`` negotiation.
-
-To enforce ``SNI`` on a listening connection, you should set the
-:ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` of the
-:ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`:
-
-.. literalinclude:: _include/envoy-demo-tls-sni.yaml
-   :language: yaml
-   :linenos:
-   :lineno-start: 27
-   :lines: 27-35
-   :emphasize-lines: 2-4
-   :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
-
-.. _start_quick_start_securing_sni_client:
-
-Connect to an endpoint securely with SNI
-----------------------------------------
-
-When connecting to a ``TLS`` endpoint that is protected by ``SNI`` you can set
-:ref:`sni <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>` in the configuration
-of the :ref:`UpstreamTLSContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
-
-.. literalinclude:: _include/envoy-demo-tls-sni.yaml
-   :language: yaml
-   :linenos:
-   :lineno-start: 56
-   :lines: 56-61
-   :emphasize-lines: 6
-   :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
-
-When connecting to an Envoy endpoint that is protected by ``SNI``, this must match one of the
-:ref:`server_names <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>` set in the endpoint's
-:ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`, as
-:ref:`described above <start_quick_start_securing_sni>`.
-
-.. note::
-
-   When connecting to a ``TLS`` endpoint that is not protected by ``SNI``, this configuration is ignored, so it is
-   generally advisable to always set this to the DNS name of the endpoint you are connecting to.
-
 .. _start_quick_start_securing_mtls:
 
 Use mututal TLS (mTLS) to enforce client certificate authentication
@@ -196,3 +151,49 @@ When connecting to an upstream with client certificates you can set them as foll
    :lines: 45-69
    :emphasize-lines: 21-25
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
+
+.. _start_quick_start_securing_sni:
+
+Provide multiple TLS domains at the same IP address
+---------------------------------------------------
+
+``SNI`` is an extension to the ``TLS`` protocol which allows multiple domains served
+from the same ``IP`` address to be secured with ``TLS``.
+
+To secure specific domains on a listening connection with ``SNI``, you should set the
+:ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` of the
+:ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`:
+
+.. literalinclude:: _include/envoy-demo-tls-sni.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 27
+   :lines: 27-35
+   :emphasize-lines: 2-4
+   :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
+
+See here for :ref:`more info about creating multiple endpoints with SNI <faq_how_to_setup_sni>`
+
+.. _start_quick_start_securing_sni_client:
+
+Connect to an endpoint with SNI
+-------------------------------
+
+When connecting to a ``TLS`` endpoint that uses ``SNI`` you should set
+:ref:`sni <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>` in the configuration
+of the :ref:`UpstreamTLSContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
+
+This will usually be the DNS name of the service you are connecting to.
+
+.. literalinclude:: _include/envoy-demo-tls-sni.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 56
+   :lines: 56-61
+   :emphasize-lines: 6
+   :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
+
+When connecting to an Envoy endpoint that is protected by ``SNI``, this must match one of the
+:ref:`server_names <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>` set in the endpoint's
+:ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`, as
+:ref:`described above <start_quick_start_securing_sni>`.
