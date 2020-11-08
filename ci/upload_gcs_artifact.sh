@@ -18,7 +18,7 @@ if [ ! -d "${SOURCE_DIRECTORY}" ]; then
   exit 1
 fi
 
-if [[ "$BUILD_SOURCEBRANCHNAME" != "master" ]]; then
+if [[ "$BUILD_REASON" == "PullRequest" ]]; then
     # non-master upload to the last commit sha (first 7 chars) in the developers branch
     UPLOAD_PATH="$(git log --pretty=%P -n 1 | cut -d' ' -f2 | head -c7)"
 else
@@ -30,8 +30,8 @@ GCS_LOCATION="${GCS_ARTIFACT_BUCKET}/${UPLOAD_PATH}/${TARGET_SUFFIX}"
 echo "Uploading to gs://${GCS_LOCATION} ..."
 gsutil -mq rsync -dr "${SOURCE_DIRECTORY}" "gs://${GCS_LOCATION}"
 
-# For non-master uploads, add a redirect `PR_NUMBER` -> `COMMIT_SHA`
-if [[ "$BUILD_SOURCEBRANCHNAME" != "master" ]]; then
+# For PR uploads, add a redirect `PR_NUMBER` -> `COMMIT_SHA`
+if [[ "$BUILD_REASON" == "PullRequest" ]]; then
     REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
     TMP_REDIRECT="/tmp/redirect/${REDIRECT_PATH}/${TARGET_SUFFIX}"
     mkdir -p "$TMP_REDIRECT"
