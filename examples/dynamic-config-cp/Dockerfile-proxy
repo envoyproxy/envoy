@@ -1,0 +1,6 @@
+FROM envoyproxy/envoy-dev:latest
+
+RUN apt-get -y update && apt-get install -y -qq --no-install-recommends netcat
+COPY ./envoy.yaml /etc/envoy.yaml
+RUN chmod go+r /etc/envoy.yaml
+CMD ["/usr/local/bin/envoy", "-c /etc/envoy.yaml", "-l", "debug"]

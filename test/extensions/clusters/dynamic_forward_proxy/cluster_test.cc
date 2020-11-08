@@ -43,7 +43,7 @@ public:
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
     if (uses_tls) {
-      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
+      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _, _));
     }
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     // Below we return a nullptr handle which has no effect on the code under test but isn't

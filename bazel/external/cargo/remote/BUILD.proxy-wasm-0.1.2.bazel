@@ -1,0 +1,63 @@
+"""
+@generated
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+# buildifier: disable=load
+load(
+    "@io_bazel_rules_rust//rust:rust.bzl",
+    "rust_binary",
+    "rust_library",
+    "rust_test",
+)
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+package(default_visibility = [
+    # Public for visibility by "@raze__crate__version//" targets.
+    #
+    # Prefer access through "//bazel/external/cargo", which limits external
+    # visibility to explicit Cargo.toml dependencies.
+    "//visibility:public",
+])
+
+licenses([
+    "notice",  # Apache-2.0 from expression "Apache-2.0"
+])
+
+# Generated Targets
+
+# Unsupported target "hello_world" with type "example" omitted
+
+# Unsupported target "http_auth_random" with type "example" omitted
+
+# Unsupported target "http_body" with type "example" omitted
+
+# Unsupported target "http_headers" with type "example" omitted
+
+rust_library(
+    name = "proxy_wasm",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+    ],
+    crate_root = "src/lib.rs",
+    crate_type = "lib",
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+    version = "0.1.2",
+    # buildifier: leave-alone
+    deps = [
+        "@raze__hashbrown__0_7_2//:hashbrown",
+        "@raze__log__0_4_11//:log",
+        "@raze__wee_alloc__0_4_5//:wee_alloc",
+    ],
+)

@@ -25,6 +25,7 @@ public:
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
   void addFilter(Network::FilterSharedPtr filter) override;
   void addReadFilter(Network::ReadFilterSharedPtr filter) override;
+  void removeReadFilter(Network::ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
   // Network::Connection
@@ -62,6 +63,12 @@ public:
       return Network::Connection::State::Open;
     }
     return Network::Connection::State::Closed;
+  }
+  bool connecting() const override {
+    if (quic_connection_ != nullptr && quic_connection_->connected()) {
+      return false;
+    }
+    return true;
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.

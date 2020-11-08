@@ -86,7 +86,9 @@ public:
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
-                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr);
+                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
+                    Network::Address::InstanceConstSharedPtr source_address =
+                        Network::Address::InstanceConstSharedPtr());
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
@@ -287,6 +289,22 @@ public:
     Buffer::OwnedImpl buffer(initial_data);
     return std::make_unique<RawConnectionDriver>(port, buffer, data_callback, version_,
                                                  *dispatcher_);
+  }
+
+  /**
+   * Helper to create ConnectionDriver.
+   *
+   * @param port the port to connect to.
+   * @param write_request_cb callback used to send data.
+   * @param data_callback the callback on the received data.
+   * @param transport_socket transport socket to use for the client connection
+   **/
+  std::unique_ptr<RawConnectionDriver> createConnectionDriver(
+      uint32_t port, RawConnectionDriver::DoWriteCallback write_request_cb,
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback,
+      Network::TransportSocketPtr transport_socket = nullptr) {
+    return std::make_unique<RawConnectionDriver>(port, write_request_cb, data_callback, version_,
+                                                 *dispatcher_, std::move(transport_socket));
   }
 
   // Helper to create FakeUpstream.
