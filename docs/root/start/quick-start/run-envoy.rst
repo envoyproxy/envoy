@@ -226,6 +226,8 @@ Access log paths can be set for the admin interface, and for configured listener
 
 Some filters may have additional logging capabilities.
 
+Envoy can be configured to log to different formats, and to different outputs in addition to files and ``stdout/err``.
+
 Envoy debugging
 ---------------
 
@@ -235,15 +237,17 @@ This can be set using the :option:`-l or --log-level <--log-level>` option.
 
 The available log levels are:
 
-- trace
-- debug
-- info
-- warning/warn
-- error
-- critical
-- off
+- ``trace``
+- ``debug``
+- ``info``
+- ``warning/warn``
+- ``error``
+- ``critical``
+- ``off``
 
 You can also set the log level for specific components using the :option:`--component-log-level` option.
+
+The following example inhibits all logging except for the ``upstream`` and ``connection`` components.
 
 .. tabs::
 
@@ -263,3 +267,7 @@ You can also set the log level for specific components using the :option:`--comp
 	       envoyproxy/|envoy_docker_image| \
 	       -l off \
 	       --component-log-level upstream:debug,connection:trace
+
+.. tip::
+
+   See ``ALL_LOGGER_IDS`` in :repo:`logger.h </source/common/common/logger.h>` for a list of components.
