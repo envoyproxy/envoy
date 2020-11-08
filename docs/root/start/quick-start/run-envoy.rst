@@ -162,9 +162,36 @@ The Envoy admin endpoint should also be available at http://localhost:9901
 Validating your Envoy configuration
 -----------------------------------
 
-You can start Envoy in validation mode, which allows you to check that Envoy is
-able to start with your configuration, without actually starting the service.
+You can start Envoy in :option:`validation mode <--mode>`.
+
+This allows you to check that Envoy is able to start with your configuration, without actually starting
+or restarting the service, or making any network connections.
+
+To test your configuration you can use the following:
+
+.. tabs::
+
+   .. tab:: System
+
+      .. code-block:: console
+
+	 $ envoy --mode validate -c my-envoy-config.yaml
+
+   .. tab:: Docker
+
+      You can start the Envoy Docker image without specifying a configuration file, and
+      it will use the demo config by default.
+
+      .. substitution-code-block:: console
+
+	 $ docker run --rm \
+	       envoyproxy/|envoy_docker_image| \
+	       --mode validate \
+	       -c my-envoy-config.yaml
+
+Envoy logging
+-------------
 
 
-Logging and debugging
----------------------
+Envoy debugging
+---------------
