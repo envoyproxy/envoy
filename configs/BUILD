@@ -31,13 +31,13 @@ filegroup(
             "using_deprecated_config.yaml",
             "**/*.template.yaml",
             "freebind/freebind.yaml",
-            "envoyproxy_io_proxy.yaml",
+            "envoy-default.yaml",
         ],
     ) + select({
-        "//bazel:apple": ["envoyproxy_io_proxy.yaml"],
+        "//bazel:apple": ["envoy-default.yaml"],
         "//bazel:windows_x86_64": [],
         "//conditions:default": [
-            "envoyproxy_io_proxy.yaml",
+            "envoy-default.yaml",
             "freebind/freebind.yaml",
         ],
     }),
