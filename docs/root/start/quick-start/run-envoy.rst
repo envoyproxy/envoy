@@ -218,6 +218,48 @@ For invalid configuration the process will print the errors and exit with ``1``.
 Envoy logging
 -------------
 
+By default Envoy system logs are sent to ``/dev/stderr``.
+
+This can be overridden using ``--log-path``
+
+Access log paths can be set for the admin interface, and for configured listeners.
+
+Some filters may have additional logging capabilities.
 
 Envoy debugging
 ---------------
+
+The default log level for Envoy system logs is ``info``.
+
+This can be set using the :option:`-l or --log-level <--log-level>` option.
+
+The available log levels are:
+
+- trace
+- debug
+- info
+- warning/warn
+- error
+- critical
+- off
+
+You can also set the log level for specific components using the :option:`--component-log-level` option.
+
+.. tabs::
+
+   .. tab:: System
+
+      .. code-block:: console
+
+	 $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
+
+   .. tab:: Docker
+
+      .. substitution-code-block:: console
+
+	 $ docker run --rm -d \
+               -p 9901:9901 \
+	       -p 10000:10000 \
+	       envoyproxy/|envoy_docker_image| \
+	       -l off \
+	       --component-log-level upstream:debug,connection:trace
