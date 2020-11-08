@@ -202,8 +202,7 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   };
   for (auto& e : response) {
     memcpy(b, e.address_->asStringView().data(), // NOLINT(safe-memcpy)
-                                                e.address_->asStringView()
-                                                    .size());
+           e.address_->asStringView().size());
     b += e.address_->asStringView().size();
     *b++ = 0;
   };
@@ -277,9 +276,7 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
       memcpy(b, &n, sizeof(uint32_t)); // NOLINT(safe-memcpy)
       b += sizeof(uint32_t);
       memcpy(b, counter.counter_.get().name().data(), // NOLINT(safe-memcpy)
-                                                     counter.counter_.get()
-                                                         .name()
-                                                         .size());
+             counter.counter_.get().name().size());
       b = align<uint64_t>(b + counter.counter_.get().name().size());
       v = counter.counter_.get().value();
       memcpy(b, &v, sizeof(uint64_t)); // NOLINT(safe-memcpy)

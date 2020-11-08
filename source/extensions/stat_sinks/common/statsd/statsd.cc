@@ -211,8 +211,7 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   // rate this can become expensive.
   const char* snapped_current = current_slice_mem_;
   memcpy(current_slice_mem_, parent_.getPrefix().c_str(), // NOLINT(safe-memcpy)
-                                                         parent_.getPrefix()
-                                                             .size());
+         parent_.getPrefix().size());
   current_slice_mem_ += parent_.getPrefix().size();
   *current_slice_mem_++ = '.';
   memcpy(current_slice_mem_, name.c_str(), name.size()); // NOLINT(safe-memcpy)
