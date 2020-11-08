@@ -20,15 +20,15 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
 
       .. code-block:: console
 
-	 $ envoy --version
+         $ envoy --version
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm \
-	       envoyproxy/|envoy_docker_image| \
-	           --version
+         $ docker run --rm \
+               envoyproxy/|envoy_docker_image| \
+                   --version
 
 .. _start_quick_start_help:
 
@@ -44,15 +44,15 @@ flag:
 
       .. code-block:: console
 
-	 $ envoy --help
+         $ envoy --help
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm \
-	       envoyproxy/|envoy_docker_image| \
-	           --help
+         $ docker run --rm \
+               envoyproxy/|envoy_docker_image| \
+                   --help
 
 .. _start_quick_start_config:
 
@@ -70,7 +70,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. code-block:: console
 
-	 $ envoy -c envoy-demo.yaml
+         $ envoy -c envoy-demo.yaml
 
    .. tab:: Docker
 
@@ -79,10 +79,10 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d \
+         $ docker run --rm -d \
                -p 9901:9901 \
-	       -p 10000:10000 \
-	       envoyproxy/|envoy_docker_image|
+               -p 10000:10000 \
+               envoyproxy/|envoy_docker_image|
 
       To specify a custom configuration you can mount the config into the container, and specify the path with ``-c``.
 
@@ -90,12 +90,12 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d \
-	       -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml \
-	       -p 9901:9901 \
-	       -p 10000:10000 \
-	       envoyproxy/|envoy_docker_image| \
-	           -c /envoy-custom.yaml
+         $ docker run --rm -d \
+               -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml \
+               -p 9901:9901 \
+               -p 10000:10000 \
+               envoyproxy/|envoy_docker_image| \
+                   -c /envoy-custom.yaml
 
 Check Envoy is proxying on http://localhost:10000
 
@@ -119,6 +119,8 @@ configuration.
 
 Save the following snippet to ``envoy-override.yaml``:
 
+THIS DOESNT WORK!
+
 .. code-block:: yaml
 
    listeners:
@@ -135,17 +137,17 @@ Next, start the Envoy server using the override configuration.
 
       .. code-block:: console
 
-	 $ envoy -c envoy-demo.yaml --config-yaml envoy-override.yaml
+         $ envoy -c envoy-demo.yaml --config-yaml envoy-override.yaml
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d \
-	       -v $(pwd)/envoy-override.yaml:/envoy-override.yaml \
-	       -p 20000:20000 \
-	       envoyproxy/|envoy_docker_image| \
-	           --config-yaml /envoy-override.yaml
+         $ docker run --rm -d \
+               -v $(pwd)/envoy-override.yaml:/envoy-override.yaml \
+               -p 20000:20000 \
+               envoyproxy/|envoy_docker_image| \
+                   --config-yaml /envoy-override.yaml
 
 Envoy should now be proxying on http://localhost:20000
 
@@ -177,43 +179,43 @@ For invalid configuration the process will print the errors and exit with ``1``.
 
       .. code-block:: console
 
-	 $ envoy --mode validate -c my-envoy-config.yaml
-	 [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
-	 - name: base
-	   static_layer:
-	     {}
-	 - name: admin
-	   admin_layer:
-	     {}
-	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration
-	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)
-	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)
-	 [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
-	 [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
-	 configuration 'my-envoy-config.yaml' OK
+         $ envoy --mode validate -c my-envoy-config.yaml
+         [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
+         - name: base
+           static_layer:
+             {}
+         - name: admin
+           admin_layer:
+             {}
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)
+         [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
+         [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
+         configuration 'my-envoy-config.yaml' OK
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm \
-	       -v $(pwd)/my-envoy-config.yaml:/my-envoy-config.yaml \
-	       envoyproxy/|envoy_docker_image| \
-	       --mode validate \
-	       -c my-envoy-config.yaml
-	 [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
-	 - name: base
-	   static_layer:
-	     {}
-	 - name: admin
-	   admin_layer:
-	     {}
-	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration
-	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)
-	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)
-	 [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
-	 [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
-	 configuration 'my-envoy-config.yaml' OK
+         $ docker run --rm \
+               -v $(pwd)/my-envoy-config.yaml:/my-envoy-config.yaml \
+               envoyproxy/|envoy_docker_image| \
+               --mode validate \
+               -c my-envoy-config.yaml
+         [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
+         - name: base
+           static_layer:
+             {}
+         - name: admin
+           admin_layer:
+             {}
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)
+         [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
+         [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
+         configuration 'my-envoy-config.yaml' OK
 
 Envoy logging
 -------------
@@ -231,9 +233,9 @@ Envoy can be configured to log to different formats, and to different outputs in
 Envoy debugging
 ---------------
 
-The default log level for Envoy system logs is ``info``.
+The log level for Envoy system logs can be set using the :option:`-l or --log-level <--log-level>` option.
 
-This can be set using the :option:`-l or --log-level <--log-level>` option.
+The default  is ``info``.
 
 The available log levels are:
 
@@ -255,19 +257,20 @@ The following example inhibits all logging except for the ``upstream`` and ``con
 
       .. code-block:: console
 
-	 $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
+         $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d \
+         $ docker run --rm -d \
                -p 9901:9901 \
-	       -p 10000:10000 \
-	       envoyproxy/|envoy_docker_image| \
-	       -l off \
-	       --component-log-level upstream:debug,connection:trace
+               -p 10000:10000 \
+               envoyproxy/|envoy_docker_image| \
+	       -c /etc/envoy/envoy.yaml \
+               -l off \
+               --component-log-level upstream:debug,connection:trace
 
 .. tip::
 
-   See ``ALL_LOGGER_IDS`` in :repo:`logger.h </source/common/common/logger.h>` for a list of components.
+   See ``ALL_LOGGER_IDS`` in :repo:`logger.h </source/common/common/logger.h#L29>` for a list of components.
