@@ -167,7 +167,9 @@ You can start Envoy in :option:`validation mode <--mode>`.
 This allows you to check that Envoy is able to start with your configuration, without actually starting
 or restarting the service, or making any network connections.
 
-To test your configuration you can use the following:
+If the configuration is valid the process will print ``OK`` and exit with a return code of ``0``.
+
+For invalid configuration the process will print the errors and exit with ``1``.
 
 .. tabs::
 
@@ -176,18 +178,42 @@ To test your configuration you can use the following:
       .. code-block:: console
 
 	 $ envoy --mode validate -c my-envoy-config.yaml
+	 [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
+	 - name: base
+	   static_layer:
+	     {}
+	 - name: admin
+	   admin_layer:
+	     {}
+	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration
+	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)
+	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)
+	 [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
+	 [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
+	 configuration 'my-envoy-config.yaml' OK
 
    .. tab:: Docker
-
-      You can start the Envoy Docker image without specifying a configuration file, and
-      it will use the demo config by default.
 
       .. substitution-code-block:: console
 
 	 $ docker run --rm \
+	       -v $(pwd)/my-envoy-config.yaml:/my-envoy-config.yaml \
 	       envoyproxy/|envoy_docker_image| \
 	       --mode validate \
 	       -c my-envoy-config.yaml
+	 [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
+	 - name: base
+	   static_layer:
+	     {}
+	 - name: admin
+	   admin_layer:
+	     {}
+	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration
+	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)
+	 [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)
+	 [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
+	 [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
+	 configuration 'my-envoy-config.yaml' OK
 
 Envoy logging
 -------------
