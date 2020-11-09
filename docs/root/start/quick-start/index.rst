@@ -13,4 +13,5 @@ provides an introduction to the types of configuration Envoy can be used with.
     configuration-static
     configuration-dynamic-filesystem
     configuration-dynamic-control-plane
+    securing
     next-steps
