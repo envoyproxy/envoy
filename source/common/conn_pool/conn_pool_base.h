@@ -156,7 +156,8 @@ public:
 
   virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
 
-  void attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client, AttachContext& context);
+  virtual void attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client,
+                                    AttachContext& context);
 
   virtual void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                              absl::string_view failure_reason,
@@ -173,6 +174,7 @@ public:
   const Network::TransportSocketOptionsSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
+  bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
 protected:
   // Creates up to 3 connections, based on the prefetch ratio.

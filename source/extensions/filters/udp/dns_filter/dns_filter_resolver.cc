@@ -80,7 +80,8 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                        // timer
                        ctx.timeout_timer->disableTimer();
 
-                       ENVOY_LOG(trace, "async query status returned. Entries {}", response.size());
+                       ENVOY_LOG(trace, "async query status returned for query [{}]. Entries {}",
+                                 ctx.query_context->id_, response.size());
                        ASSERT(ctx.resolver_status == DnsFilterResolverStatus::Pending);
 
                        ctx.query_context->in_callback_ = true;

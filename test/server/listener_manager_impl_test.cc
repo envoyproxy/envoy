@@ -1517,7 +1517,7 @@ filter_chains:
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   // On Windows if the socket has not been bound to an address with bind
-  // the call to getsockname fails with WSAEINVAL. To avoid that we make sure
+  // the call to getsockname fails with `WSAEINVAL`. To avoid that we make sure
   // that the bind system actually happens and it does not get mocked.
   ON_CALL(os_sys_calls_, bind(_, _, _))
       .WillByDefault(Invoke(
