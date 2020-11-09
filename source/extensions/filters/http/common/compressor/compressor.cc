@@ -242,7 +242,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   // Find intersection of encodings accepted by the user agent and provided
   // by the allowed compressors and choose the one with the highest q-value.
   EncPair choice{Http::Headers::get().AcceptEncodingValues.Identity, static_cast<float>(0)};
-  for (const auto pair : pairs) {
+  for (const auto& pair : pairs) {
     if ((pair.second > choice.second) &&
         (allowed_compressors.count(std::string(pair.first)) ||
          pair.first == Http::Headers::get().AcceptEncodingValues.Identity ||
