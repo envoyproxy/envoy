@@ -29,22 +29,24 @@ public:
 
   void expectCacheAndClientEqual(const AsyncClientCacheSharedPtr& expected_client_cache,
                                  const RawAsyncClientSharedPtr& expected_client,
-                                 const ::envoy::config::core::v3::GrpcService config) {
+                                 const ::envoy::config::core::v3::GrpcService config,
+				 const std::string& error_message) {
     AsyncClientCacheSharedPtr actual_client_cache =
         client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
                                                              config);
-    EXPECT_EQ(expected_client_cache, actual_client_cache);
-    EXPECT_EQ(expected_client, actual_client_cache->getAsyncClient());
+    EXPECT_EQ(expected_client_cache, actual_client_cache) << error_message;
+    EXPECT_EQ(expected_client, actual_client_cache->getAsyncClient()) << error_message;
   }
 
   void expectCacheAndClientNotEqual(const AsyncClientCacheSharedPtr& expected_client_cache,
                                     const RawAsyncClientSharedPtr& expected_client,
-                                    const ::envoy::config::core::v3::GrpcService config) {
+                                    const ::envoy::config::core::v3::GrpcService config,
+				    const std::string& error_message) {
     AsyncClientCacheSharedPtr actual_client_cache =
         client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
                                                              config);
-    EXPECT_NE(expected_client_cache, actual_client_cache);
-    EXPECT_NE(expected_client, actual_client_cache->getAsyncClient());
+    EXPECT_NE(expected_client_cache, actual_client_cache) << error_message;
+    EXPECT_NE(expected_client, actual_client_cache->getAsyncClient()) << error_message;
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -70,12 +72,14 @@ TEST_F(AsyncClientCacheTest, Deduplication) {
                                                            config);
   RawAsyncClientSharedPtr test_client_01 = test_client_cache_01->getAsyncClient();
   // Fetches the existing client and they should be equal.
-  expectCacheAndClientEqual(test_client_cache_01, test_client_01, config);
+  std::string error_message = "Fetched client should be same as the existing one.";
+  expectCacheAndClientEqual(test_client_cache_01, test_client_01, config, error_message);
 
   config.mutable_google_grpc()->set_credentials_factory_name("test_credential02");
   expectClientCreation();
   // Different credentials use different clients.
-  expectCacheAndClientNotEqual(test_client_cache_01, test_client_01, config);
+  error_message = "different config should use different clients.";
+  expectCacheAndClientNotEqual(test_client_cache_01, test_client_01, config, error_message);
 
   AsyncClientCacheSharedPtr test_client_cache_02 =
       client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
@@ -84,13 +88,15 @@ TEST_F(AsyncClientCacheTest, Deduplication) {
 
   config.mutable_google_grpc()->set_credentials_factory_name("test_credential02");
   // No creation, fetching the existing one.
-  expectCacheAndClientEqual(test_client_cache_02, test_client_02, config);
+  error_message = "Fetched existing client should be the same.";
+  expectCacheAndClientEqual(test_client_cache_02, test_client_02, config, error_message);
 
   // Different targets use different clients.
+  error_message = "different config with different targets should use different clients.";
   config.mutable_google_grpc()->set_target_uri("dns://test02");
   expectClientCreation();
-  expectCacheAndClientNotEqual(test_client_cache_01, test_client_01, config);
-  expectCacheAndClientNotEqual(test_client_cache_02, test_client_02, config);
+  expectCacheAndClientNotEqual(test_client_cache_01, test_client_01, config, error_message);
+  expectCacheAndClientNotEqual(test_client_cache_02, test_client_02, config, error_message);
 }
 
 } // namespace

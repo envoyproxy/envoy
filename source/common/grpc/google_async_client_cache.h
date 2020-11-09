@@ -52,6 +52,8 @@ public:
 private:
   // The tls slots with client cache stored with key as hash of
   // envoy::config::core::v3::GrpcService::GoogleGrpc config.
+  // TODO(fpliu233): When new configuration is pushed, the old client cache will not get cleaned up.
+  // Remove when the cleaner and generic solution for gRPC is live. Tracking in #2598 and #13417.
   absl::flat_hash_map<std::size_t, AsyncClientCacheSharedPtr> async_clients_;
 };
 
