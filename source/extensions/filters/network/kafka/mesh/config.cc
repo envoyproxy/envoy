@@ -6,8 +6,10 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 
+#ifndef WIN32
 #include "extensions/filters/network/kafka/mesh/clustering.h"
 #include "extensions/filters/network/kafka/mesh/filter.h"
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -20,6 +22,9 @@ namespace Mesh {
 Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyped(
     const KafkaMeshProtoConfig& config, Server::Configuration::FactoryContext& context) {
 
+#ifdef WIN32
+  throw "boom";
+#else
   ENVOY_LOG(warn, "Creating ClusteringConfiguration instance");
   const ClusteringConfigurationSharedPtr clustering_configuration =
       std::make_shared<ClusteringConfigurationImpl>(config);
@@ -35,6 +40,7 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
         std::make_shared<KafkaMeshFilter>(*clustering_configuration, *upstream_kafka_facade);
     filter_manager.addReadFilter(filter);
   };
+#endif
 }
 
 /**

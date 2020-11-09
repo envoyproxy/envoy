@@ -15,10 +15,7 @@ envoy_extension_package()
 
 envoy_cc_extension(
     name = "config_lib",
-    srcs = select({
-        "//bazel:windows": ["config_windows.cc"],
-        "//conditions:default": ["config.cc"],
-    }),
+    srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "wip",
