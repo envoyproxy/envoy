@@ -34,6 +34,7 @@
 
 #include "server/active_raw_udp_listener_config.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -457,6 +458,7 @@ private:
   const Type type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
@@ -509,6 +511,12 @@ public:
     return [data_to_wait_for](const std::string& data) -> bool {
       return data.find(data_to_wait_for) != std::string::npos;
     };
+  }
+
+  // Creates a ValidatorFunction which returns true when data_to_wait_for is
+  // contains at least bytes_read bytes.
+  static ValidatorFunction waitForAtLeastBytes(uint32_t bytes) {
+    return [bytes](const std::string& data) -> bool { return data.size() >= bytes; };
   }
 
 private:
@@ -611,6 +619,13 @@ public:
   Http::Http2::CodecStats& http2CodecStats() {
     return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
   }
+
+  // Write into the outbound buffer of the network connection at the specified index.
+  // Note: that this write bypasses any processing by the upstream codec.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  rawWriteConnection(uint32_t index, const std::string& data, bool end_stream = false,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;

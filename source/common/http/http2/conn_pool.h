@@ -18,25 +18,23 @@ namespace Http2 {
  */
 class ConnPoolImpl : public Envoy::Http::HttpConnPoolImplBase {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-               Upstream::ResourcePriority priority,
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+               Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
   ~ConnPoolImpl() override;
 
-  // Http::ConnectionPool::Instance
-  Http::Protocol protocol() const override { return Http::Protocol::Http2; }
-
   // ConnPoolImplBase
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
 
-protected:
   class ActiveClient : public CodecClientCallbacks,
                        public Http::ConnectionCallbacks,
                        public Envoy::Http::ActiveClient {
   public:
-    ActiveClient(ConnPoolImpl& parent);
+    ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent);
+    ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+                 Upstream::Host::CreateConnectionData& data);
     ~ActiveClient() override = default;
 
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
@@ -46,28 +44,14 @@ protected:
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
     // CodecClientCallbacks
-    void onStreamDestroy() override { parent().onStreamDestroy(*this); }
-    void onStreamReset(Http::StreamResetReason reason) override {
-      parent().onStreamReset(*this, reason);
-    }
+    void onStreamDestroy() override;
+    void onStreamReset(Http::StreamResetReason reason) override;
 
     // Http::ConnectionCallbacks
-    void onGoAway(Http::GoAwayErrorCode error_code) override {
-      parent().onGoAway(*this, error_code);
-    }
+    void onGoAway(Http::GoAwayErrorCode error_code) override;
 
     bool closed_with_active_rq_{};
   };
-
-  uint64_t maxStreamsPerConnection();
-  void movePrimaryClientToDraining();
-  void onGoAway(ActiveClient& client, Http::GoAwayErrorCode error_code);
-  void onStreamDestroy(ActiveClient& client);
-  void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
-
-  // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
-  // side we do 2^29.
-  static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 };
 
 /**
@@ -82,8 +66,8 @@ private:
 };
 
 ConnectionPool::InstancePtr
-allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                 Upstream::ResourcePriority priority,
+allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                 Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 

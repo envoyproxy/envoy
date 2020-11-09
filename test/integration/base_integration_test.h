@@ -86,7 +86,9 @@ public:
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
-                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr);
+                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
+                    Network::Address::InstanceConstSharedPtr source_address =
+                        Network::Address::InstanceConstSharedPtr());
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
@@ -287,6 +289,68 @@ public:
     Buffer::OwnedImpl buffer(initial_data);
     return std::make_unique<RawConnectionDriver>(port, buffer, data_callback, version_,
                                                  *dispatcher_);
+  }
+
+  /**
+   * Helper to create ConnectionDriver.
+   *
+   * @param port the port to connect to.
+   * @param write_request_cb callback used to send data.
+   * @param data_callback the callback on the received data.
+   * @param transport_socket transport socket to use for the client connection
+   **/
+  std::unique_ptr<RawConnectionDriver> createConnectionDriver(
+      uint32_t port, RawConnectionDriver::DoWriteCallback write_request_cb,
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback,
+      Network::TransportSocketPtr transport_socket = nullptr) {
+    return std::make_unique<RawConnectionDriver>(port, write_request_cb, data_callback, version_,
+                                                 *dispatcher_, std::move(transport_socket));
+  }
+
+  // Helper to create FakeUpstream.
+  // Creates a fake upstream bound to the specified unix domain socket path.
+  std::unique_ptr<FakeUpstream> createFakeUpstream(const std::string& uds_path,
+                                                   FakeHttpConnection::Type type) {
+    return std::make_unique<FakeUpstream>(uds_path, type, timeSystem());
+  }
+  // Creates a fake upstream bound to the specified |address|.
+  std::unique_ptr<FakeUpstream>
+  createFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                     FakeHttpConnection::Type type, bool enable_half_close = false,
+                     bool udp_fake_upstream = false) {
+    return std::make_unique<FakeUpstream>(address, type, timeSystem(), enable_half_close,
+                                          udp_fake_upstream);
+  }
+  // Creates a fake upstream bound to INADDR_ANY and there is no specified port.
+  std::unique_ptr<FakeUpstream> createFakeUpstream(FakeHttpConnection::Type type,
+                                                   bool enable_half_close = false) {
+    return std::make_unique<FakeUpstream>(0, type, version_, timeSystem(), enable_half_close);
+  }
+  std::unique_ptr<FakeUpstream>
+  createFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                     FakeHttpConnection::Type type) {
+    return std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, type, version_,
+                                          timeSystem());
+  }
+  // Helper to add FakeUpstream.
+  // Add a fake upstream bound to the specified unix domain socket path.
+  void addFakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type) {
+    fake_upstreams_.emplace_back(createFakeUpstream(uds_path, type));
+  }
+  // Add a fake upstream bound to the specified |address|.
+  void addFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                       FakeHttpConnection::Type type, bool enable_half_close = false,
+                       bool udp_fake_upstream = false) {
+    fake_upstreams_.emplace_back(
+        createFakeUpstream(address, type, enable_half_close, udp_fake_upstream));
+  }
+  // Add a fake upstream bound to INADDR_ANY and there is no specified port.
+  void addFakeUpstream(FakeHttpConnection::Type type, bool enable_half_close = false) {
+    fake_upstreams_.emplace_back(createFakeUpstream(type, enable_half_close));
+  }
+  void addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                       FakeHttpConnection::Type type) {
+    fake_upstreams_.emplace_back(createFakeUpstream(std::move(transport_socket_factory), type));
   }
 
 protected:

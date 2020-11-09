@@ -18,7 +18,6 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -265,9 +264,6 @@ void StreamEncoderImpl::endEncode() {
 }
 
 void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) {
-  if (!flood_protection_) {
-    return;
-  }
   // It's messy and complicated to try to tag the final write of an HTTP response for response
   // tracking for flood protection. Instead, write an empty buffer fragment after the response,
   // to allow for tracking.
@@ -282,9 +278,6 @@ void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffe
 
 Status ServerConnectionImpl::doFloodProtectionChecks() const {
   ASSERT(dispatching_);
-  if (!flood_protection_) {
-    return okStatus();
-  }
   // Before processing another request, make sure that we are below the response flood protection
   // threshold.
   if (outbound_responses_ >= max_outbound_responses_) {
@@ -373,19 +366,15 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
-void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+  // Required headers must be present. This can only happen by some erroneous processing after the
+  // downstream codecs decode.
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   const HeaderEntry* host = headers.Host();
   bool is_connect = HeaderUtility::isConnect(headers);
-
-  // TODO(#10878): Include missing host header for CONNECT.
-  // The RELEASE_ASSERT below does not change the existing behavior of `encodeHeaders`.
-  // The `encodeHeaders` used to throw on errors. Callers of `encodeHeaders()` do not catch
-  // exceptions and this would cause abnormal process termination in error cases. This change
-  // replaces abnormal process termination from unhandled exception with the RELEASE_ASSERT. Further
-  // work will replace this RELEASE_ASSERT with proper error handling.
-  RELEASE_ASSERT(method && (path || is_connect), ":method and :path must be specified");
 
   if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
@@ -407,6 +396,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   encodeHeadersBase(headers, absl::nullopt, end_stream);
+  return okStatus();
 }
 
 int ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
@@ -860,8 +850,6 @@ ServerConnectionImpl::ServerConnectionImpl(
       // maintainer team as it will otherwise be removed entirely soon.
       max_outbound_responses_(
           Runtime::getInteger("envoy.do_not_use_going_away_max_http2_outbound_responses", 2)),
-      flood_protection_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")),
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {

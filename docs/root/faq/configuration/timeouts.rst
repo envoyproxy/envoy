@@ -31,6 +31,8 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   :ref:`common_http_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` field
   in the cluster configuration.
 
+See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
+
 Stream timeouts
 ^^^^^^^^^^^^^^^
 
@@ -88,6 +90,10 @@ stream timeouts already introduced above.
   is sent to the downstream, which normally happens after the upstream has sent response headers.
   This timeout can be used with streaming endpoints to retry if the upstream fails to begin a
   response within the timeout.
+* The route :ref:`MaxStreamDuration proto <envoy_v3_api_msg_config.route.v3.RouteAction.MaxStreamDuration>`
+  can be used to override the HttpConnectionManager's
+  :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`
+  for individual routes as well as setting both limits and a fixed time offset on grpc-timeout headers.
 
 TCP
 ---
@@ -98,8 +104,20 @@ TCP
 
   .. attention::
 
-    For TLS connections, the connect timeout includes the TLS handshake.
+    For upstream TLS connections, the connect timeout includes the TLS handshake. For downstream
+    connections, see :ref:`below <faq_configuration_timeouts_transport_socket>` for configuration options.
+
 * The TCP proxy :ref:`idle_timeout
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout>`
   is the amount of time that the TCP proxy will allow a connection to exist with no upstream
   or downstream activity. The default idle timeout if not otherwise specified is *1 hour*.
+
+.. _faq_configuration_timeouts_transport_socket:
+
+Transport Socket
+----------------
+
+* The :ref:`transport_socket_connect_timeout <envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket_connect_timeout>`
+  specifies the amount of time Envoy will wait for a downstream client to complete transport-level
+  negotiations. When configured on a filter chain with a TLS or ALTS transport socket, this limits
+  the amount of time allowed to finish the encrypted handshake after establishing a TCP connection.

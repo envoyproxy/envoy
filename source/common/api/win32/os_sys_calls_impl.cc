@@ -354,6 +354,17 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
+SysCallSocketResult OsSysCallsImpl::duplicate(os_fd_t oldfd) {
+  WSAPROTOCOL_INFO info;
+  auto currentProcess = ::GetCurrentProcessId();
+  auto rc = WSADuplicateSocket(oldfd, currentProcess, &info);
+  if (rc == SOCKET_ERROR) {
+    return {(SOCKET)-1, ::WSAGetLastError()};
+  }
+  auto new_socket = ::WSASocket(info.iAddressFamily, info.iSocketType, info.iProtocol, &info, 0, 0);
+  return {new_socket, SOCKET_VALID(new_socket) ? 0 : ::WSAGetLastError()};
+}
+
 SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
   const os_fd_t rc = ::accept(sockfd, addr, addrlen);
   if (SOCKET_INVALID(rc)) {
@@ -362,6 +373,23 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 
   setsocketblocking(rc, false);
   return {rc, 0};
+}
+
+SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
+                                                [[maybe_unused]] EnvoyTcpInfo* tcp_info) {
+#ifdef SIO_TCP_INFO
+  TCP_INFO_v0 win_tcpinfo;
+  DWORD infoVersion = 0;
+  DWORD bytesReturned = 0;
+  int rc = ::WSAIoctl(sockfd, SIO_TCP_INFO, &infoVersion, sizeof(infoVersion), &win_tcpinfo,
+                      sizeof(win_tcpinfo), &bytesReturned, nullptr, nullptr);
+
+  if (!SOCKET_FAILURE(rc)) {
+    tcp_info->tcpi_rtt = std::chrono::microseconds(win_tcpinfo.RttUs);
+  }
+  return {!SOCKET_FAILURE(rc), !SOCKET_FAILURE(rc) ? 0 : ::WSAGetLastError()};
+#endif
+  return {false, WSAEOPNOTSUPP};
 }
 
 } // namespace Api

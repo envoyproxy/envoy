@@ -59,6 +59,7 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString CdnLoop{"cdn-loop"};
@@ -103,7 +104,7 @@ public:
   } CORSValues;
 
   struct {
-    const std::string Default{"identity,deflate,gzip"};
+    const std::string Default{"identity"};
   } GrpcAcceptEncodingValues;
 
   struct {
@@ -133,7 +134,6 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyAttemptCount{absl::StrCat(prefix(), "-attempt-count")};
-  const LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
   const LowerCaseString EnvoyCluster{absl::StrCat(prefix(), "-cluster")};
   const LowerCaseString EnvoyDegraded{absl::StrCat(prefix(), "-degraded")};
   const LowerCaseString EnvoyDownstreamServiceCluster{

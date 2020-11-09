@@ -125,31 +125,25 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 }
 
 void CodecClient::onData(Buffer::Instance& data) {
-  bool protocol_error = false;
   const Status status = codec_->dispatch(data);
 
-  if (isCodecProtocolError(status)) {
-    ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
-    close();
-    protocol_error = true;
-  } else if (isPrematureResponseError(status)) {
-    ENVOY_CONN_LOG(debug, "premature response", *connection_);
+  if (!status.ok()) {
+    ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
-    if (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout) {
-      protocol_error = true;
+    if (!isPrematureResponseError(status) ||
+        (!active_requests_.empty() ||
+         getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
+      host_->cluster().stats().upstream_cx_protocol_error_.inc();
     }
-  }
-
-  if (protocol_error) {
-    host_->cluster().stats().upstream_cx_protocol_error_.inc();
   }
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
-                                 Event::Dispatcher& dispatcher)
+                                 Event::Dispatcher& dispatcher,
+                                 Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
 
   switch (type) {
@@ -166,17 +160,10 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     break;
   }
   case Type::HTTP2: {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-          *connection_, *this, host->cluster().http2CodecStats(), host->cluster().http2Options(),
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
-          Http2::ProdNghttp2SessionFactory::get());
-    } else {
-      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-          *connection_, *this, host->cluster().http2CodecStats(), host->cluster().http2Options(),
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
-          Http2::ProdNghttp2SessionFactory::get());
-    }
+    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+        *connection_, *this, host->cluster().http2CodecStats(), random_generator,
+        host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+        host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   }
   case Type::HTTP3: {

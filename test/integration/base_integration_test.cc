@@ -190,9 +190,10 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
-                                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                       Network::Address::InstanceConstSharedPtr source_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_, options);
+                                                enable_half_close_, options, source_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -365,8 +366,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     return;
   }
   if (tls_xds_upstream_ == false) {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
@@ -382,8 +382,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(std::move(context), FakeHttpConnection::Type::HTTP2);
   }
   xds_upstream_ = fake_upstreams_[1].get();
 }

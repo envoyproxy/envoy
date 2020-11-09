@@ -6,13 +6,10 @@ MySQL Filter
 In this example, we show how the :ref:`MySQL filter <config_network_filters_mysql_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a MySQL filter that parses queries and collects MySQL-specific
 metrics.
 
-
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
-**Step 3: Build the sandbox**
+Step 3: Build the sandbox
+*************************
 
 Terminal 1
 
@@ -26,11 +23,11 @@ Terminal 1
 
       Name                   Command               State                             Ports
   ------------------------------------------------------------------------------------------------------------------
-  mysql_mysql_1   docker-entrypoint.sh mysqld      Up      0.0.0.0:3306->3306/tcp
+  mysql_mysql_1   docker-entrypoint.sh mysqld      Up      3306/tcp
   mysql_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
 
-
-**Step 4: Issue commands using mysql**
+Step 4: Issue commands using mysql
+**********************************
 
 Use ``mysql`` to issue some commands and verify they are routed via Envoy. Note
 that the current implementation of the protocol filter was tested with MySQL
@@ -74,7 +71,8 @@ Terminal 1
   mysql> exit
   Bye
 
-**Step 5: Check egress stats**
+Step 5: Check egress stats
+**************************
 
 Check egress stats were updated.
 
@@ -93,7 +91,8 @@ Terminal 1
   mysql.egress_mysql.sessions: 1
   mysql.egress_mysql.upgraded_to_ssl: 0
 
-**Step 6: Check TCP stats**
+Step 6: Check TCP stats
+***********************
 
 Check TCP stats were updated.
 

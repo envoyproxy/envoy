@@ -25,6 +25,7 @@ public:
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
   void addFilter(Network::FilterSharedPtr filter) override;
   void addReadFilter(Network::ReadFilterSharedPtr filter) override;
+  void removeReadFilter(Network::ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
   // Network::Connection
@@ -63,6 +64,12 @@ public:
     }
     return Network::Connection::State::Closed;
   }
+  bool connecting() const override {
+    if (quic_connection_ != nullptr && quic_connection_->connected()) {
+      return false;
+    }
+    return true;
+  }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -82,6 +89,7 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
