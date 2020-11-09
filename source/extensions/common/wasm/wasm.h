@@ -137,6 +137,23 @@ private:
   WasmSharedPtr wasm_;
 };
 
+using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
+
+class PluginHandle : public PluginHandleBase, public ThreadLocal::ThreadLocalObject {
+public:
+  explicit PluginHandle(const WasmHandleSharedPtr& wasm_handle, absl::string_view plugin_key)
+      : PluginHandleBase(std::static_pointer_cast<WasmHandleBase>(wasm_handle), plugin_key),
+        wasm_handle_(wasm_handle) {}
+
+  WasmSharedPtr& wasm() { return wasm_handle_->wasm(); }
+  WasmHandleSharedPtr& wasmHandleForTest() { return wasm_handle_; }
+
+private:
+  WasmHandleSharedPtr wasm_handle_;
+};
+
+using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
+
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 
 // Returns false if createWasm failed synchronously. This is necessary because xDS *MUST* report
@@ -151,10 +168,10 @@ bool createWasm(const VmConfig& vm_config, const PluginSharedPtr& plugin,
                 CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
 
-WasmHandleSharedPtr
-getOrCreateThreadLocalWasm(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
-                           Event::Dispatcher& dispatcher,
-                           CreateContextFn create_root_context_for_testing = nullptr);
+PluginHandleSharedPtr
+getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
+                             Event::Dispatcher& dispatcher,
+                             CreateContextFn create_root_context_for_testing = nullptr);
 
 void clearCodeCacheForTesting();
 std::string anyToBytes(const ProtobufWkt::Any& any);

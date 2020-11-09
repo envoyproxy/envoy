@@ -80,12 +80,13 @@ public:
         lifecycle_notifier_, remote_data_provider_,
         [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     if (wasm_) {
-      wasm_ = getOrCreateThreadLocalWasm(
+      plugin_handle_ = getOrCreateThreadLocalPlugin(
           wasm_, plugin_, dispatcher_,
           [this, create_root](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) {
             root_context_ = static_cast<Context*>(create_root(wasm, plugin));
             return root_context_;
           });
+      wasm_ = plugin_handle_->wasmHandleForTest();
     }
   }
 
@@ -101,6 +102,7 @@ public:
   NiceMock<Init::MockManager> init_manager_;
   WasmHandleSharedPtr wasm_;
   PluginSharedPtr plugin_;
+  PluginHandleSharedPtr plugin_handle_;
   NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

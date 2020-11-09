@@ -40,7 +40,7 @@ WasmSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
       return;
     }
     wasm_sink->setSingleton(
-        Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, context.dispatcher()));
+        Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, context.dispatcher()));
   };
 
   if (!Common::Wasm::createWasm(

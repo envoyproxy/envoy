@@ -37,9 +37,10 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
 
   auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    auto tls_slot = ThreadLocal::TypedSlot<WasmHandle>::makeUnique(context.threadLocal());
+    auto tls_slot =
+        ThreadLocal::TypedSlot<Common::Wasm::PluginHandle>::makeUnique(context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher);
+      return Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher);
     });
     access_log->setTlsSlot(std::move(tls_slot));
   };

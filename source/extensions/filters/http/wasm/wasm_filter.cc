@@ -7,7 +7,8 @@ namespace Wasm {
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context)
-    : tls_slot_(ThreadLocal::TypedSlot<WasmHandle>::makeUnique(context.threadLocal())) {
+    : tls_slot_(
+          ThreadLocal::TypedSlot<Common::Wasm::PluginHandle>::makeUnique(context.threadLocal())) {
   plugin_ = std::make_shared<Common::Wasm::Plugin>(
       config.config().name(), config.config().root_id(), config.config().vm_config().vm_id(),
       config.config().vm_config().runtime(),
@@ -18,7 +19,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
   auto callback = [plugin, this](const Common::Wasm::WasmHandleSharedPtr& base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
     tls_slot_->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher);
+      return Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher);
     });
   };
 
@@ -28,17 +29,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
           context.lifecycleNotifier(), remote_data_provider_, std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm HTTP filter {}", plugin->name_));
-  }
-}
-
-FilterConfig::~FilterConfig() {
-  if (tls_slot_->currentThreadRegistered()) {
-    // Start graceful shutdown of Wasm plugin, unless Envoy is already shutting down.
-    tls_slot_->runOnAllThreads([plugin = plugin_](OptRef<WasmHandle> handle) {
-      if (handle.has_value()) {
-        handle->wasm()->startShutdown(plugin);
-      }
-    });
   }
 }
 

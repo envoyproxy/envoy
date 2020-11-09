@@ -46,6 +46,14 @@ EnvoyWasm::createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope,
   return std::make_unique<EnvoyWasmVmIntegration>(scope, runtime, short_runtime);
 }
 
+PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
+  return [](const WasmHandleSharedPtr& base_wasm,
+            absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+    return std::static_pointer_cast<PluginHandleBase>(
+        std::make_shared<PluginHandle>(base_wasm, plugin_key));
+  };
+}
+
 WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
   return [](const VmConfig vm_config, const Stats::ScopeSharedPtr& scope,
             Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,

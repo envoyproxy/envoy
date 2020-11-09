@@ -689,7 +689,7 @@ TEST_P(WasmCommonTest, VmCache) {
   EXPECT_NE(wasm_handle2, nullptr);
   EXPECT_EQ(wasm_handle, wasm_handle2);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -703,12 +703,17 @@ TEST_P(WasmCommonTest, VmCache) {
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
   wasm_handle2.reset();
 
-  auto wasm = wasm_handle_local->wasm();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   wasm->configure(wasm->getContext(1), plugin);
@@ -789,7 +794,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
 
   EXPECT_NE(wasm_handle, nullptr);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -803,11 +808,17 @@ TEST_P(WasmCommonTest, RemoteCode) {
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
 
-  auto wasm = wasm_handle_local->wasm();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
+
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   wasm->configure(wasm->getContext(1), plugin);
   plugin.reset();
@@ -899,7 +910,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_NE(wasm_handle, nullptr);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -913,11 +924,16 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
 
-  auto wasm = wasm_handle_local->wasm();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   wasm->configure(wasm->getContext(1), plugin);

@@ -16,34 +16,21 @@ namespace Extensions {
 namespace Bootstrap {
 namespace Wasm {
 
-using Envoy::Extensions::Common::Wasm::WasmHandle;
+using Envoy::Extensions::Common::Wasm::PluginHandle;
+using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
+using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 
 class WasmService {
 public:
-  WasmService(Common::Wasm::PluginSharedPtr plugin, Common::Wasm::WasmHandleSharedPtr singleton)
+  WasmService(PluginSharedPtr plugin, PluginHandleSharedPtr singleton)
       : plugin_(plugin), singleton_(std::move(singleton)) {}
-  WasmService(Common::Wasm::PluginSharedPtr plugin,
-              ThreadLocal::TypedSlotPtr<WasmHandle>&& tls_slot)
+  WasmService(PluginSharedPtr plugin, ThreadLocal::TypedSlotPtr<PluginHandle>&& tls_slot)
       : plugin_(plugin), tls_slot_(std::move(tls_slot)) {}
 
-  virtual ~WasmService() {
-    if (singleton_) {
-      // Singleton Wasm Service is running only on the main thread.
-      singleton_->wasm()->startShutdown(plugin_);
-    } else if (tls_slot_->currentThreadRegistered()) {
-      // Start graceful shutdown of Wasm plugin, unless Envoy is already shutting down.
-      tls_slot_->runOnAllThreads([plugin = plugin_](OptRef<WasmHandle> handle) {
-        if (handle.has_value()) {
-          handle->wasm()->startShutdown(plugin);
-        }
-      });
-    }
-  }
-
 private:
-  Common::Wasm::PluginSharedPtr plugin_;
-  Common::Wasm::WasmHandleSharedPtr singleton_;
-  ThreadLocal::TypedSlotPtr<WasmHandle> tls_slot_;
+  PluginSharedPtr plugin_;
+  PluginHandleSharedPtr singleton_;
+  ThreadLocal::TypedSlotPtr<PluginHandle> tls_slot_;
 };
 
 using WasmServicePtr = std::unique_ptr<WasmService>;

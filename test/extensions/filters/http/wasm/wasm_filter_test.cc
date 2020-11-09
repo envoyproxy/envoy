@@ -716,6 +716,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallAfterDestroyed) {
   // Destroy the Context, Plugin and VM.
   context_.reset();
   plugin_.reset();
+  plugin_handle_.reset();
   wasm_.reset();
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
@@ -1010,6 +1011,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
   // Destroy the Context, Plugin and VM.
   context_.reset();
   plugin_.reset();
+  plugin_handle_.reset();
   wasm_.reset();
 
   ProtobufWkt::Value value;
@@ -1203,6 +1205,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
   // Destroy the Context, Plugin and VM.
   context_.reset();
   plugin_.reset();
+  plugin_handle_.reset();
   wasm_.reset();
 }
 
@@ -1436,7 +1439,8 @@ TEST_P(WasmHttpFilterTest, RootId2) {
   setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders2 2"))));
   Http::TestRequestHeaderMapImpl request_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, true));
 }
 
 } // namespace Wasm

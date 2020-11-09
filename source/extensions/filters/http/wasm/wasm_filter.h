@@ -16,14 +16,14 @@ namespace HttpFilters {
 namespace Wasm {
 
 using Envoy::Extensions::Common::Wasm::Context;
+using Envoy::Extensions::Common::Wasm::PluginHandle;
+using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 using Envoy::Extensions::Common::Wasm::Wasm;
-using Envoy::Extensions::Common::Wasm::WasmHandle;
 
 class FilterConfig : Logger::Loggable<Logger::Id::wasm> {
 public:
   FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config,
                Server::Configuration::FactoryContext& context);
-  virtual ~FilterConfig();
 
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
@@ -42,8 +42,8 @@ public:
 
 private:
   uint32_t root_context_id_{0};
-  Envoy::Extensions::Common::Wasm::PluginSharedPtr plugin_;
-  ThreadLocal::TypedSlotPtr<WasmHandle> tls_slot_;
+  PluginSharedPtr plugin_;
+  ThreadLocal::TypedSlotPtr<PluginHandle> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 

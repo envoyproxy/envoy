@@ -281,6 +281,14 @@ getCloneFactory(WasmExtension* wasm_extension, Event::Dispatcher& dispatcher,
   };
 }
 
+static proxy_wasm::PluginHandleFactory getPluginFactory(WasmExtension* wasm_extension) {
+  auto wasm_plugin_factory = wasm_extension->pluginFactory();
+  return [wasm_plugin_factory](WasmHandleBaseSharedPtr base_wasm,
+                               absl::string_view plugin_key) -> std::shared_ptr<PluginHandleBase> {
+    return wasm_plugin_factory(std::static_pointer_cast<WasmHandle>(base_wasm), plugin_key);
+  };
+}
+
 WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   if (!wasm) {
     return WasmEvent::UnableToCreateVM;
@@ -474,10 +482,10 @@ bool createWasm(const VmConfig& vm_config, const PluginSharedPtr& plugin,
                             create_root_context_for_testing);
 }
 
-WasmHandleSharedPtr getOrCreateThreadLocalWasm(const WasmHandleSharedPtr& base_wasm,
-                                               const PluginSharedPtr& plugin,
-                                               Event::Dispatcher& dispatcher,
-                                               CreateContextFn create_root_context_for_testing) {
+PluginHandleSharedPtr
+getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
+                             Event::Dispatcher& dispatcher,
+                             CreateContextFn create_root_context_for_testing) {
   if (!base_wasm) {
     if (!plugin->fail_open_) {
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
@@ -485,9 +493,10 @@ WasmHandleSharedPtr getOrCreateThreadLocalWasm(const WasmHandleSharedPtr& base_w
     }
     return nullptr;
   }
-  return std::static_pointer_cast<WasmHandle>(proxy_wasm::getOrCreateThreadLocalWasm(
+  return std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
       std::static_pointer_cast<WasmHandle>(base_wasm), plugin,
-      getCloneFactory(getWasmExtension(), dispatcher, create_root_context_for_testing)));
+      getCloneFactory(getWasmExtension(), dispatcher, create_root_context_for_testing),
+      getPluginFactory(getWasmExtension())));
 }
 
 } // namespace Wasm
