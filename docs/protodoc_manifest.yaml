@@ -42,6 +42,9 @@ fields:
   envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout:
     edge_config:
       example: 300s # 5 mins
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_headers_timeout:
+    edge_config:
+      example: 10s # 10 seconds
   envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_timeout:
     edge_config:
       note: >
