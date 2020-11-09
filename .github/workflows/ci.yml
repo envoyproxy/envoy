@@ -1,8 +1,6 @@
 name: Build envoy docs and deploy with github pages
 
 on:
-        #  push:
-        #    branches: [ zh ]
   pull_request:
     branches: [ zh ]
     types: ["opened","reopened","synchronize"]

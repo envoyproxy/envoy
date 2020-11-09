@@ -1,12 +1,11 @@
-Envoy documentation
+Envoy 文档
 =================================
 
 .. ifconfig:: release_level in ('pre-release')
 
   .. attention::
 
-    This is pre-release documentation. There is risk of it not being consistent with what is
-    currently implemented in Envoy, though we try to make things consistent as quickly as possible.
+    这是预发布文档。这有可能与 Envoy 目前实现的内容不一致，但我们力求尽可能一致。
 
 .. toctree::
   :maxdepth: 2
