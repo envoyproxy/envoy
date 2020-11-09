@@ -509,10 +509,10 @@ public:
    * Note that HttpConnectionManager sanitization will *not* be performed on the
    * recreated stream, as it is assumed that sanitization has already been done.
    *
-   * @param headers Headers used for logging in the access logs and for charging stats. Ignored if
-   * null.
+   * @param original_response_headers Headers used for logging in the access logs and for charging
+   * stats. Ignored if null.
    */
-  virtual bool recreateStream(const ResponseHeaderMap* headers) PURE;
+  virtual bool recreateStream(const ResponseHeaderMap* original_response_headers) PURE;
 
   /**
    * Adds socket options to be applied to any connections used for upstream requests. Note that

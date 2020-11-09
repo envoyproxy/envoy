@@ -184,7 +184,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void setDecoderBufferLimit(uint32_t limit) override;
   uint32_t decoderBufferLimit() override;
-  bool recreateStream(const Http::ResponseHeaderMap* headers) override;
+  bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
