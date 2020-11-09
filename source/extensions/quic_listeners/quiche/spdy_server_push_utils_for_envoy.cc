@@ -28,9 +28,9 @@ bool SpdyServerPushUtils::PromisedUrlIsValid(const SpdyHeaderBlock& /*headers*/)
 }
 
 // static
-std::string SpdyServerPushUtils::GetPushPromiseUrl(quiche::QuicheStringPiece /*scheme*/,
-                                                   quiche::QuicheStringPiece /*authority*/,
-                                                   quiche::QuicheStringPiece /*path*/) {
+std::string SpdyServerPushUtils::GetPushPromiseUrl(absl::string_view /*scheme*/,
+                                                   absl::string_view /*authority*/,
+                                                   absl::string_view /*path*/) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 

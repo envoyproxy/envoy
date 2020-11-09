@@ -44,6 +44,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     Network::ConnectionSocketPtr&& connection_socket)
     : EnvoyQuicConnection(
           server_connection_id,
+          quic::QuicSocketAddress(),
           envoyIpAddressToQuicSocketAddress(connection_socket->remoteAddress()->ip()), helper,
           alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT, supported_versions,
           std::move(connection_socket)),

@@ -101,10 +101,24 @@ template <> bool TypedFlag<int32_t>::SetValueFromString(const std::string& value
 template <> bool TypedFlag<int64_t>::SetValueFromString(const std::string& value_str);
 template <> bool TypedFlag<double>::SetValueFromString(const std::string& value_str);
 template <> bool TypedFlag<std::string>::SetValueFromString(const std::string& value_str);
+template <> bool TypedFlag<unsigned long>::SetValueFromString(const std::string& value_str);
 
 // Flag declarations
-#define QUICHE_FLAG(type, flag, value, help) extern TypedFlag<type>* FLAGS_##flag;
-#include "extensions/quic_listeners/quiche/platform/flags_list.h"
-#undef QUICHE_FLAG
+#define QUIC_FLAG(flag, ...) extern TypedFlag<bool>* flag;
+#include  "quiche/quic/core/quic_flags_list.h"
+QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
+QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
+QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
+QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
+#undef QUIC_FLAG
+
+
+#define QUIC_PROTOCOL_FLAG(type, flag, ...) extern TypedFlag<type>* FLAGS_##flag;
+#include  "quiche/quic/core/quic_protocol_flags_list.h"
+#undef QUIC_PROTOCOL_FLAG
 
 } // namespace quiche

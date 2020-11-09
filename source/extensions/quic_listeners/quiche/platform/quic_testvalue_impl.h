@@ -1,7 +1,7 @@
 #pragma once
 
 // NOLINT(namespace-envoy)
-//
+
 // This file is part of the QUICHE platform implementation, and is not to be
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
@@ -10,10 +10,8 @@
 
 namespace quic {
 
-void QuicSaveTestOutputImpl(absl::string_view filename, absl::string_view data);
+template <class T>
+void AdjustTestValueImpl(absl::string_view /*label*/, T* /*var*/) {
+}
 
-bool QuicLoadTestOutputImpl(absl::string_view filename, std::string* data);
-
-void QuicRecordTraceImpl(absl::string_view identifier, absl::string_view data);
-
-} // namespace quic
+}  // namespace quic

@@ -30,7 +30,6 @@
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
-#include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
@@ -42,7 +41,6 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_macros.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
 #include "quiche/quic/platform/api/quic_mem_slice_span.h"
@@ -91,8 +89,6 @@ protected:
   const QuicLogLevel log_level_;
   const int verbosity_log_threshold_;
 };
-
-TEST_F(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
@@ -468,9 +464,9 @@ TEST_F(QuicPlatformTest, QuicCertUtils) {
   unsigned char* der = nullptr;
   int len = i2d_X509(x509_cert.get(), &der);
   ASSERT_GT(len, 0);
-  quiche::QuicheStringPiece out;
+  absl::string_view out;
   QuicCertUtils::ExtractSubjectNameFromDERCert(
-      quiche::QuicheStringPiece(reinterpret_cast<const char*>(der), len), &out);
+      absl::string_view(reinterpret_cast<const char*>(der), len), &out);
   EXPECT_EQ("0z1\v0\t\x6\x3U\x4\x6\x13\x2US1\x13"
             "0\x11\x6\x3U\x4\b\f\nCalifornia1\x16"
             "0\x14\x6\x3U\x4\a\f\rSan Francisco1\r"
@@ -709,14 +705,6 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // build.
   QuicRunSystemEventLoopIteration();
   QuicSystemEventLoop("dummy");
-}
-
-QUIC_MUST_USE_RESULT bool dummyTestFunction() { return false; }
-
-TEST_F(QuicPlatformTest, TestQuicMacros) {
-  // Just make sure it compiles.
-  EXPECT_FALSE(dummyTestFunction());
-  int a QUIC_UNUSED;
 }
 
 TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {

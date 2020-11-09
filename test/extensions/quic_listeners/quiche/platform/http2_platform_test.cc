@@ -72,12 +72,6 @@ TEST(Http2PlatformTest, Http2Log) {
   HTTP2_DLOG_EVERY_N(ERROR, 2) << "DLOG_EVERY_N(ERROR, 2)";
 }
 
-TEST(Http2PlatformTest, Http2StringPiece) {
-  std::string s = "bar";
-  quiche::QuicheStringPiece sp(s);
-  EXPECT_EQ('b', sp[0]);
-}
-
 TEST(Http2PlatformTest, Http2Macro) {
   EXPECT_DEBUG_DEATH(HTTP2_UNREACHABLE(), "");
   EXPECT_DEATH(HTTP2_DIE_IF_NULL(nullptr), "");

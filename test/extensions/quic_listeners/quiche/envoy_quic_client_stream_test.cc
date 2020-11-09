@@ -50,7 +50,7 @@ public:
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
                                   quic::StreamSendingState state, bool,
-                                  quiche::QuicheOptional<quic::EncryptionLevel>) {
+                                  absl::optional<quic::EncryptionLevel>) {
           return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
         }));
     EXPECT_CALL(writer_, WritePacket(_, _, _, _, _))
@@ -184,7 +184,7 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
     std::unique_ptr<char[]> data_buffer;
     quic::QuicByteCount data_frame_header_length =
         quic::HttpEncoder::SerializeDataFrameHeader(response_body_.length(), &data_buffer);
-    quiche::QuicheStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+    absl::string_view data_frame_header(data_buffer.get(), data_frame_header_length);
     data = absl::StrCat(data_frame_header, response_body_);
   }
   quic::QuicStreamFrame frame(stream_id_, false, 0, data);
@@ -285,7 +285,7 @@ TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(Invoke([](quic::QuicStreamId, size_t /*write_length*/, quic::QuicStreamOffset,
                           quic::StreamSendingState state, bool,
-                          quiche::QuicheOptional<quic::EncryptionLevel>) {
+                          absl::optional<quic::EncryptionLevel>) {
         return quic::QuicConsumedData{0u, state != quic::NO_FIN};
       }));
   quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
@@ -303,7 +303,7 @@ TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
                           quic::StreamSendingState state, bool,
-                          quiche::QuicheOptional<quic::EncryptionLevel>) {
+                          absl::optional<quic::EncryptionLevel>) {
         return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
       }));
   EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark());
@@ -317,7 +317,7 @@ TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
                           quic::StreamSendingState state, bool,
-                          quiche::QuicheOptional<quic::EncryptionLevel>) {
+                          absl::optional<quic::EncryptionLevel>) {
         return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
       }));
   quic_session_.OnCanWrite();
@@ -326,7 +326,7 @@ TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(Invoke([](quic::QuicStreamId, size_t, quic::QuicStreamOffset,
                           quic::StreamSendingState state, bool,
-                          quiche::QuicheOptional<quic::EncryptionLevel>) {
+                          absl::optional<quic::EncryptionLevel>) {
         return quic::QuicConsumedData{0u, state != quic::NO_FIN};
       }));
   // Send more data. If watermark bytes counting were not cleared in previous

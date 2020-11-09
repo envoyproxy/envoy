@@ -6,10 +6,11 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "absl/strings/string_view.h"
+
 #include "envoy/buffer/buffer.h"
 
 #include "absl/container/fixed_array.h"
-#include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
 
@@ -43,7 +44,7 @@ public:
   }
 
   // QuicMemSliceSpan
-  quiche::QuicheStringPiece GetData(size_t index);
+  absl::string_view GetData(size_t index);
   QuicByteCount total_length() { return buffer_->length(); };
   size_t NumSlices() { return buffer_->getRawSlices().size(); }
   template <typename ConsumeFunction> QuicByteCount ConsumeAll(ConsumeFunction consume);

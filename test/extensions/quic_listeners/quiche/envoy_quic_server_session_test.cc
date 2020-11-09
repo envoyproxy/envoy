@@ -61,6 +61,7 @@ public:
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Network::Socket& listen_socket)
       : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
+                                  quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
                                   quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
                                   helper, alarm_factory, &writer, /*owns_writer=*/false,
                                   supported_versions, listen_socket) {}

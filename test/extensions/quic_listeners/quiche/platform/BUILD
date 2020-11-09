@@ -15,7 +15,6 @@ envoy_cc_test(
     external_deps = ["quiche_common_platform"],
     deps = [
         "@com_googlesource_quiche//:quiche_common_platform",
-        "@com_googlesource_quiche//:quiche_common_platform_endian",
     ],
 )
 

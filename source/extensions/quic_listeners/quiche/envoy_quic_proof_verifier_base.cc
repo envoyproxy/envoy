@@ -58,7 +58,7 @@ bool EnvoyQuicProofVerifierBase::verifySignature(const std::string& server_confi
     *error_details = "QuicPacketWriter error.";
     return false;
   }
-  bool valid = cert_view->VerifySignature(quiche::QuicheStringPiece(payload.get(), payload_size),
+  bool valid = cert_view->VerifySignature(absl::string_view(payload.get(), payload_size),
                                           signature, sign_alg);
   if (!valid) {
     *error_details = "Signature is not valid.";
