@@ -24,7 +24,7 @@ bool regexStartsWithDot(absl::string_view regex) {
 } // namespace
 
 TagExtractorImplBase::TagExtractorImplBase(const std::string& name, const std::string& regex,
-                                   const std::string& substr)
+                                           const std::string& substr)
     : name_(name), prefix_(std::string(extractRegexPrefix(regex))), substr_(substr) {}
 
 std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
@@ -59,9 +59,10 @@ TagExtractorPtr TagExtractorImplBase::createTagExtractor(const std::string& name
         "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
   switch (re_type) {
-    case Regex::Type::Re2: return std::make_unique<TagExtractorRe2Impl>(name, regex, substr);
-    case Regex::Type::StdRegex: return std::make_unique<TagExtractorStdRegexImpl>(
-        name, regex, substr);
+  case Regex::Type::Re2:
+    return std::make_unique<TagExtractorRe2Impl>(name, regex, substr);
+  case Regex::Type::StdRegex:
+    return std::make_unique<TagExtractorStdRegexImpl>(name, regex, substr);
   }
 }
 

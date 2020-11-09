@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Regex {
 
-enum class Type {Re2, StdRegex};
+enum class Type { Re2, StdRegex };
 
 /**
  * Utilities for constructing regular expressions.

@@ -30,7 +30,7 @@ public:
                                             Regex::Type re_type = Regex::Type::StdRegex);
 
   TagExtractorImplBase(const std::string& name, const std::string& regex,
-                   const std::string& substr = "");
+                       const std::string& substr = "");
   std::string name() const override { return name_; }
   absl::string_view prefixToken() const override { return prefix_; }
 
