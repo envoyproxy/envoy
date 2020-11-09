@@ -53,8 +53,8 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   }
 
   ConnectionPool::PoolFailureReason reason_;
-  ReadyWatcher pool_failure_;
-  ReadyWatcher pool_ready_;
+  testing::NiceMock<ReadyWatcher> pool_failure_;
+  testing::NiceMock<ReadyWatcher> pool_ready_;
   Http::RequestEncoder* outer_encoder_{};
   Upstream::HostDescriptionConstSharedPtr host_;
 };

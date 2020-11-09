@@ -137,8 +137,8 @@ message Cluster {
   }
 
   enum ClusterProtocolSelection {
-    // If both :ref:`http2_protocol_options <envoy_api_field_config.cluster.v3.Cluster.http2_protocol_options>`
-    // and :ref:`http_protocol_options <envoy_api_field_config.cluster.v3.Cluster.http_protocol_options>` are
+    // If both :ref:`http2_protocol_options <envoy_api_field_config.cluster.v4alpha.Cluster.http2_protocol_options>`
+    // and :ref:`http_protocol_options <envoy_api_field_config.cluster.v4alpha.Cluster.http_protocol_options>` are
     // configured, Envoy will attempt to do ALPN negotiation for TLS connections, failing
     // over to HTTP/1.1 if ALPN negotiation fails.
     // If only one protocol option is present it will be used as the hard-coded

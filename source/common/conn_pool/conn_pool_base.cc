@@ -372,7 +372,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     transitionActiveClientState(client, ActiveClient::State::READY);
 
     // At this point for the mixed ALPN pool client may be deleted. Do not
-    // refer to it after this point.
+    // refer to client after this point.
     onConnected(client);
     onUpstreamReady();
     checkForDrained();
