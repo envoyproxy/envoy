@@ -775,3 +775,23 @@ envoy_cc_fuzz_test(
         "//test/fuzz:utility_lib",
     ],
 )
+
+envoy_proto_library(
+    name = "least_request_load_balancer_fuzz_proto",
+    srcs = ["least_request_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "least_request_load_balancer_fuzz_test",
+    srcs = ["least_request_load_balancer_fuzz_test.cc"],
+    corpus = "//test/common/upstream:least_request_load_balancer_corpus",
+    deps = [
+        ":least_request_load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+        ":zone_aware_load_balancer_fuzz_lib",
+    ],
+)
