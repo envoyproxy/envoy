@@ -30,7 +30,7 @@ public:
   void expectCacheAndClientEqual(const AsyncClientCacheSharedPtr& expected_client_cache,
                                  const RawAsyncClientSharedPtr& expected_client,
                                  const ::envoy::config::core::v3::GrpcService config,
-				 const std::string& error_message) {
+                                 const std::string& error_message) {
     AsyncClientCacheSharedPtr actual_client_cache =
         client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
                                                              config);
@@ -41,7 +41,7 @@ public:
   void expectCacheAndClientNotEqual(const AsyncClientCacheSharedPtr& expected_client_cache,
                                     const RawAsyncClientSharedPtr& expected_client,
                                     const ::envoy::config::core::v3::GrpcService config,
-				    const std::string& error_message) {
+                                    const std::string& error_message) {
     AsyncClientCacheSharedPtr actual_client_cache =
         client_cache_singleton_->getOrCreateAsyncClientCache(async_client_manager_, scope_, tls_,
                                                              config);
