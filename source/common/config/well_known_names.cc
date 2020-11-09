@@ -120,12 +120,12 @@ TagNameValues::TagNameValues() {
 
 void TagNameValues::addRegex(const std::string& name, const std::string& regex,
                              const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, false});
+  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, Regex::Type::StdRegex});
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
                            const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, true});
+  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, Regex::Type::Re2});
 }
 
 } // namespace Config

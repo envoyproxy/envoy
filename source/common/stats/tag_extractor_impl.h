@@ -6,13 +6,15 @@
 
 #include "envoy/stats/tag_extractor.h"
 
+#include "common/common/regex.h"
+
 #include "absl/strings/string_view.h"
 #include "re2/re2.h"
 
 namespace Envoy {
 namespace Stats {
 
-class TagExtractorImpl : public TagExtractor {
+class TagExtractorImplBase : public TagExtractor {
 public:
   /**
    * Creates a tag extractor from the regex provided. name and regex must be non-empty.
@@ -24,9 +26,10 @@ public:
    * @return TagExtractorPtr newly constructed TagExtractor.
    */
   static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex,
-                                            const std::string& substr = "", bool is_re2 = false);
+                                            const std::string& substr = "",
+                                            Regex::Type re_type = Regex::Type::StdRegex);
 
-  TagExtractorImpl(const std::string& name, const std::string& regex,
+  TagExtractorImplBase(const std::string& name, const std::string& regex,
                    const std::string& substr = "");
   std::string name() const override { return name_; }
   absl::string_view prefixToken() const override { return prefix_; }
@@ -51,7 +54,7 @@ protected:
   const std::string substr_;
 };
 
-class TagExtractorStdRegexImpl : public TagExtractorImpl {
+class TagExtractorStdRegexImpl : public TagExtractorImplBase {
 public:
   TagExtractorStdRegexImpl(const std::string& name, const std::string regex,
                            const std::string& substr = "");
@@ -63,7 +66,7 @@ private:
   const std::regex regex_;
 };
 
-class TagExtractorRe2Impl : public TagExtractorImpl {
+class TagExtractorRe2Impl : public TagExtractorImplBase {
 public:
   TagExtractorRe2Impl(const std::string& name, const std::string regex,
                       const std::string& substr = "");

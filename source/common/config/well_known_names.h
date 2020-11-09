@@ -6,6 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/regex.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -65,7 +66,7 @@ public:
     const std::string name_;
     const std::string regex_;
     const std::string substr_;
-    bool use_re2_;
+    Regex::Type re_type_;
   };
 
   // Cluster name tag

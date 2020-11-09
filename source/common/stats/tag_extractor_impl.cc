@@ -23,11 +23,11 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 } // namespace
 
-TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex,
+TagExtractorImplBase::TagExtractorImplBase(const std::string& name, const std::string& regex,
                                    const std::string& substr)
     : name_(name), prefix_(std::string(extractRegexPrefix(regex))), substr_(substr) {}
 
-std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
+std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
   std::string prefix;
   if (absl::StartsWith(regex, "^")) {
     for (absl::string_view::size_type i = 1; i < regex.size(); ++i) {
@@ -46,10 +46,10 @@ std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
   return prefix;
 }
 
-TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
-                                                     const std::string& regex,
-                                                     const std::string& substr, bool use_re2) {
-
+TagExtractorPtr TagExtractorImplBase::createTagExtractor(const std::string& name,
+                                                         const std::string& regex,
+                                                         const std::string& substr,
+                                                         Regex::Type re_type) {
   if (name.empty()) {
     throw EnvoyException("tag_name cannot be empty");
   }
@@ -58,19 +58,20 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
     throw EnvoyException(fmt::format(
         "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
-  if (use_re2) {
-    return std::make_unique<TagExtractorRe2Impl>(name, regex, substr);
+  switch (re_type) {
+    case Regex::Type::Re2: return std::make_unique<TagExtractorRe2Impl>(name, regex, substr);
+    case Regex::Type::StdRegex: return std::make_unique<TagExtractorStdRegexImpl>(
+        name, regex, substr);
   }
-  return std::make_unique<TagExtractorStdRegexImpl>(name, regex, substr);
 }
 
-bool TagExtractorImpl::substrMismatch(absl::string_view stat_name) const {
+bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {
   return !substr_.empty() && stat_name.find(substr_) == absl::string_view::npos;
 }
 
 TagExtractorStdRegexImpl::TagExtractorStdRegexImpl(const std::string& name, const std::string regex,
                                                    const std::string& substr)
-    : TagExtractorImpl(name, regex, substr), regex_(Regex::Utility::parseStdRegex(regex)) {}
+    : TagExtractorImplBase(name, regex, substr), regex_(Regex::Utility::parseStdRegex(regex)) {}
 
 bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
                                           IntervalSet<size_t>& remove_characters) const {
@@ -113,7 +114,7 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
 
 TagExtractorRe2Impl::TagExtractorRe2Impl(const std::string& name, const std::string regex,
                                          const std::string& substr)
-    : TagExtractorImpl(name, regex, substr), regex_(regex) {}
+    : TagExtractorImplBase(name, regex, substr), regex_(regex) {}
 
 bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
