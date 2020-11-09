@@ -34,8 +34,9 @@ AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion
 
 void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
 
-envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "ROUND_ROBIN", api_version_);
+envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name,
+                                                                     const std::string& lb_policy) {
+  return ConfigHelper::buildCluster(name, lb_policy, api_version_);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildTlsCluster(const std::string& name) {
