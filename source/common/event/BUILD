@@ -17,10 +17,23 @@ envoy_cc_library(
         "dispatcher_impl.cc",
         "file_event_impl.cc",
     ],
+    hdrs = select({
+        "//bazel:windows_x86_64": [
+            "win32/signal_impl.h",
+        ],
+        "//conditions:default": [
+            "posix/signal_impl.h",
+        ],
+    }),
+    strip_include_prefix = select({
+        "//bazel:windows_x86_64": "win32",
+        "//conditions:default": "posix",
+    }),
     deps = [
         ":dispatcher_includes",
         ":libevent_scheduler_lib",
         ":real_time_system_lib",
+        ":signal_lib",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:signal_interface",
@@ -36,7 +49,12 @@ envoy_cc_library(
     ] + select({
         "//bazel:apple": ["//source/common/network:apple_dns_lib"],
         "//conditions:default": [],
-    }) + envoy_cc_platform_dep("signal_impl_lib"),
+    }),
+)
+
+envoy_cc_library(
+    name = "signal_lib",
+    deps = envoy_cc_platform_dep("signal_impl_lib"),
 )
 
 envoy_cc_posix_library(
@@ -60,6 +78,8 @@ envoy_cc_win32_library(
         ":dispatcher_includes",
         "//include/envoy/event:signal_interface",
         "//source/common/common:thread_lib",
+       "//source/common/api:os_sys_calls_lib",
+       "//source/common/network:default_socket_interface_lib",
     ],
 )
 

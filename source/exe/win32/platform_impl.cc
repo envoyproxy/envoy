@@ -8,13 +8,15 @@
 
 namespace Envoy {
 
+static volatile bool shutdown_pending = false;
+
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   auto eventBridgeHandlers = Event::eventBridgeHandlersSingleton::get();
   auto handler_it = eventBridgeHandlers.find(fdwCtrlType);
-  if (handler_it == eventBridgeHandlers.end() || !handler_it->second) {
+  if (handler_it == eventBridgeHandlers.end() || !handler_it->second || shutdown_pending) {
     return 0;
   }
-
+  shutdown_pending = true;
   Buffer::OwnedImpl buffer;
   constexpr absl::string_view data{"a"};
   buffer.add(data);

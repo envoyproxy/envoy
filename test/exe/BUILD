@@ -4,7 +4,7 @@ load(
     "envoy_package",
     "envoy_sh_test",
 )
-
+load("@rules_python//python:defs.bzl", "py_test")
 licenses(["notice"])  # Apache 2
 
 envoy_package()
@@ -80,4 +80,16 @@ envoy_cc_test(
         "//source/exe:terminate_handler_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+py_test(
+    name = "outofproc_main_test",
+    srcs = [
+        "outofproc_main_test.py",
+    ],
+    data = [
+        "//source/exe:envoy-static",
+    ],
+    python_version = "PY3",
+    srcs_version = "PY3",
 )

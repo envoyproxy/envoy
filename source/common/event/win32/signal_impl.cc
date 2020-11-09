@@ -10,7 +10,6 @@ SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signat_t signal_num
     : cb_(cb) {
   auto handler_it = eventBridgeHandlersSingleton::get().find(signal_num);
   if (handler_it != eventBridgeHandlersSingleton::get().end()) {
-    ENVOY_BUG(false, fmt::format("Attempting to initialize event {} twice.", signal_num));
     return;
   }
 
