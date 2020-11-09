@@ -32,6 +32,8 @@ message Matcher {
         "envoy.config.common.matcher.v3.Matcher.OnMatch";
 
     oneof on_match {
+      option (validate.required) = true;
+
       // Nested matcher to evaluate.
       // If the nested matcher does not match and does not specify
       // on_no_match, then this matcher is considered not to have
@@ -62,9 +64,11 @@ message Matcher {
             "envoy.config.common.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate";
 
         // Protocol-specific specification of input field to match on.
-        core.v4alpha.TypedExtensionConfig input = 1;
+        core.v4alpha.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
 
         oneof matcher {
+          option (validate.required) = true;
+
           // Use existing infrastructure for actually matching the
           // value.
           type.matcher.v4alpha.ValueMatcher value_match = 2;
@@ -79,10 +83,12 @@ message Matcher {
         option (udpa.annotations.versioning).previous_message_type =
             "envoy.config.common.matcher.v3.Matcher.MatcherList.Predicate.PredicateList";
 
-        repeated Predicate predicate = 1;
+        repeated Predicate predicate = 1 [(validate.rules).repeated = {min_items: 1}];
       }
 
       oneof match_type {
+        option (validate.required) = true;
+
         // A single predicate to evaluate.
         SinglePredicate single_predicate = 1;
 
@@ -99,15 +105,15 @@ message Matcher {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.common.matcher.v3.Matcher.MatcherList.FieldMatcher";
 
-      Predicate predicate = 1;
       // Determines if the match succeeds.
+      Predicate predicate = 1 [(validate.rules).message = {required: true}];
 
-      OnMatch on_match = 2;
       // What to do if the match succeeds.
+      OnMatch on_match = 2 [(validate.rules).message = {required: true}];
     }
 
     // A list of matchers. First match wins.
-    repeated FieldMatcher matchers = 1;
+    repeated FieldMatcher matchers = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
   message MatcherTree {
@@ -119,16 +125,18 @@ message Matcher {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.common.matcher.v3.Matcher.MatcherTree.MatchMap";
 
-      map<string, OnMatch> map = 1;
+      map<string, OnMatch> map = 1 [(validate.rules).map = {min_pairs: 1}];
     }
 
     // Protocol-specific specification of input field to match on.
-    core.v4alpha.TypedExtensionConfig input = 1;
+    core.v4alpha.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
 
     // Exact or prefix match maps in which to look up the input value.
     // If the lookup succeeds, the match is considered successful, and
     // the corresponding OnMatch is used.
     oneof tree_type {
+      option (validate.required) = true;
+
       MatchMap exact_match_map = 2;
 
       // Longest matching prefix wins.
@@ -140,6 +148,8 @@ message Matcher {
   }
 
   oneof matcher_type {
+    option (validate.required) = true;
+
     // A linear list of matchers to evaluate.
     MatcherList matcher_list = 1;
 
@@ -151,7 +161,7 @@ message Matcher {
   // If specified, the OnMatch is used, and the matcher is considered
   // to have matched.
   // If not specified, the matcher is considered not to have matched.
-  OnMatch on_no_match = 3;
+  OnMatch on_no_match = 3 [(validate.rules).message = {required: true}];
 }
 
 // Match configuration. This is a recursive structure which allows complex nested match
