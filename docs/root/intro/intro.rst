@@ -1,6 +1,6 @@
 .. _intro:
 
-Introduction
+介绍
 ============
 
 .. toctree::
