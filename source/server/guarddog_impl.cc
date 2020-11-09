@@ -185,19 +185,22 @@ void GuardDogImpl::step() {
 }
 
 WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id,
-                                               const std::string& thread_name) {
+                                               const std::string& thread_name,
+                                               Event::Dispatcher& dispatcher) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
   // accessed out of the locked section below is const (time_source_ has no
   // state).
   const auto wd_interval = loop_interval_ / 2;
-  auto new_watchdog = std::make_shared<WatchDogImpl>(std::move(thread_id), wd_interval);
+  auto new_watchdog = std::make_shared<WatchDogImpl>(std::move(thread_id));
   WatchedDogPtr watched_dog = std::make_unique<WatchedDog>(stats_scope_, thread_name, new_watchdog);
   new_watchdog->touch();
   {
     Thread::LockGuard guard(wd_lock_);
     watched_dogs_.push_back(std::move(watched_dog));
   }
+  dispatcher.registerWatchdog(new_watchdog, wd_interval);
+  new_watchdog->touch();
   return new_watchdog;
 }
 

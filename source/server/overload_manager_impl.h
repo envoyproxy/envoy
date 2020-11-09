@@ -100,6 +100,8 @@ private:
   std::vector<std::string> names_;
 };
 
+class ThreadLocalOverloadStateImpl;
+
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
@@ -161,7 +163,7 @@ private:
 
   bool started_;
   Event::Dispatcher& dispatcher_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ThreadLocalOverloadStateImpl> tls_;
   NamedOverloadActionSymbolTable action_symbol_table_;
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
