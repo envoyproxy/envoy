@@ -121,12 +121,3 @@ static void BM_RE2_AltPattern(benchmark::State& state) {
   RELEASE_ASSERT(passes > 0, "");
 }
 BENCHMARK(BM_RE2_AltPattern);
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}
