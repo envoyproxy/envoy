@@ -100,7 +100,7 @@ private:
   bool should_succeed_;
   const std::string& server_config_;
   const quic::QuicTransportVersion& version_;
-  absl::string_view  chlo_hash_;
+  absl::string_view chlo_hash_;
   Network::FilterChain& expected_filter_chain_;
   NiceMock<Stats::MockStore> store_;
   Event::GlobalTimeSystem time_system_;
@@ -178,7 +178,7 @@ protected:
   quic::QuicSocketAddress server_address_;
   quic::QuicSocketAddress client_address_;
   quic::QuicTransportVersion version_{quic::QUIC_VERSION_UNSUPPORTED};
-  absl::string_view  chlo_hash_{"aaaaa"};
+  absl::string_view chlo_hash_{"aaaaa"};
   std::string server_config_{"Server Config"};
   std::string expected_certs_{quic::test::kTestCertificateChainPem};
   std::string pkey_{quic::test::kTestCertificatePrivateKeyPem};

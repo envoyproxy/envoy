@@ -10,8 +10,6 @@
 
 namespace quic {
 
-template <class T>
-void AdjustTestValueImpl(absl::string_view /*label*/, T* /*var*/) {
-}
+template <class T> void AdjustTestValueImpl(absl::string_view /*label*/, T* /*var*/) {}
 
-}  // namespace quic
+} // namespace quic

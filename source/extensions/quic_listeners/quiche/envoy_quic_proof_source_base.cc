@@ -21,7 +21,7 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& server_ad
                                         const std::string& hostname,
                                         const std::string& server_config,
                                         quic::QuicTransportVersion /*transport_version*/,
-                                     std::string_view chlo_hash,
+                                        std::string_view chlo_hash,
                                         std::unique_ptr<quic::ProofSource::Callback> callback) {
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
       GetCertChain(server_address, client_address, hostname);
@@ -68,8 +68,7 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& server_ad
   auto signature_callback = std::make_unique<SignatureCallback>(std::move(callback), chain);
 
   signPayload(server_address, client_address, hostname, sign_alg,
-              absl::string_view(payload.get(), payload_size),
-              std::move(signature_callback));
+              absl::string_view(payload.get(), payload_size), std::move(signature_callback));
 }
 
 void EnvoyQuicProofSourceBase::ComputeTlsSignature(

@@ -6,11 +6,10 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "absl/strings/string_view.h"
-
 #include "envoy/buffer/buffer.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/string_view.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
 

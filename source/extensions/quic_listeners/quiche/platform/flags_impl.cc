@@ -20,14 +20,14 @@ absl::flat_hash_map<std::string, Flag*> MakeFlagMap() {
 
 #define QUIC_FLAG(flag, ...) flags.emplace(flag->name(), flag);
 #include "quiche/quic/core/quic_flags_list.h"
-QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
+  QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
+  QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
+  QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
+  QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
+  QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
+  QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
+  QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
+  QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
 
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) flags.emplace(FLAGS_##flag->name(), FLAGS_##flag);
@@ -108,15 +108,14 @@ template <> bool TypedFlag<std::string>::SetValueFromString(const std::string& v
 template <> bool TypedFlag<unsigned long>::SetValueFromString(const std::string& value_str) {
   unsigned long value;
   if (absl::SimpleAtoi(value_str, &value)) {
-  SetValue(value);
-  return true;
+    SetValue(value);
+    return true;
   }
   return false;
 }
 
 // Flag definitions
-#define QUIC_FLAG(flag, value)                                                       \
-  TypedFlag<bool>* flag = new TypedFlag<bool>(#flag, value, "");
+#define QUIC_FLAG(flag, value) TypedFlag<bool>* flag = new TypedFlag<bool>(#flag, value, "");
 #include "quiche/quic/core/quic_flags_list.h"
 QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
 QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
@@ -131,24 +130,22 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 
 #define STRINGIFY(X) #X
 
-#define DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                                     \
+#define DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                    \
   TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(STRINGIFY(FLAGS_##flag), value, help);
 
-#define DEFINE_QUIC_PROTOCOL_FLAG_SINGLE_VALUE(type, flag, value, doc) \
+#define DEFINE_QUIC_PROTOCOL_FLAG_SINGLE_VALUE(type, flag, value, doc)                             \
   DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, value, doc)
 
-#define DEFINE_QUIC_PROTOCOL_FLAG_TWO_VALUES(type, flag, internal_value, \
-                                             external_value, doc)        \
+#define DEFINE_QUIC_PROTOCOL_FLAG_TWO_VALUES(type, flag, internal_value, external_value, doc)      \
   DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, internal_value, doc)
 
 // Preprocessor macros can only have one definition.
 // Select the right macro based on the number of arguments.
 #define GET_6TH_ARG(arg1, arg2, arg3, arg4, arg5, arg6, ...) arg6
-#define QUIC_PROTOCOL_FLAG_MACRO_CHOOSER(...)                    \
-  GET_6TH_ARG(__VA_ARGS__, DEFINE_QUIC_PROTOCOL_FLAG_TWO_VALUES, \
+#define QUIC_PROTOCOL_FLAG_MACRO_CHOOSER(...)                                                      \
+  GET_6TH_ARG(__VA_ARGS__, DEFINE_QUIC_PROTOCOL_FLAG_TWO_VALUES,                                   \
               DEFINE_QUIC_PROTOCOL_FLAG_SINGLE_VALUE)
-#define QUIC_PROTOCOL_FLAG(...) \
-  QUIC_PROTOCOL_FLAG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+#define QUIC_PROTOCOL_FLAG(...) QUIC_PROTOCOL_FLAG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
