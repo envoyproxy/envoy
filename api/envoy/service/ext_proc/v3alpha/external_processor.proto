@@ -217,20 +217,10 @@ message CommonResponse {
     // headers. If body_mutation is set and contains a body, then add that
     // body to the request or response, even if one does not already exist --
     // otherwise, clear the body. Any additional body and trailers
-    // received from downstream will be ignored, and any additional messages
-    // from the remote server on either the request or response path will
-    // also be ignored for the duration of this request or response.
+    // received from downstream or upstream will be ignored.
     // This can be used to add a body to a request or response that does not
     // have one already.
     CONTINUE_AND_DO_NOT_END_STREAM = 1;
-
-    // Replace the request or response as with CONTINUE_AND_DO_NOT_END_STREAM,
-    // but do not continue filter processing yet -- the remote server can
-    // send additional ProcessingResponse messages with this value
-    // set that further modify the message or add new data, and
-    // must eventually reply with one of the "CONTINUE" statuses
-    // in order for filter processing to resume.
-    PAUSE_AND_DO_NOT_END_STREAM = 2;
   }
 
   // If set, provide additional direction on how the Envoy proxy should
