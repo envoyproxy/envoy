@@ -32,7 +32,7 @@ public:
   // Network::TransportSocketFactory
   TransportSocketPtr createTransportSocket(TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  void addReadyCb(std::function<void()> callback) override { callback(); }
+  bool usesProxyProtocolOptions() const override { return false; }
 };
 
 } // namespace Network

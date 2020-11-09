@@ -9,6 +9,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/event/file_event.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -19,6 +20,29 @@
 
 namespace Envoy {
 namespace Network {
+
+void DnsService::dnsServiceRefDeallocate(DNSServiceRef sdRef) { DNSServiceRefDeallocate(sdRef); }
+
+DNSServiceErrorType DnsService::dnsServiceCreateConnection(DNSServiceRef* sdRef) {
+  return DNSServiceCreateConnection(sdRef);
+}
+
+dnssd_sock_t DnsService::dnsServiceRefSockFD(DNSServiceRef sdRef) {
+  return DNSServiceRefSockFD(sdRef);
+}
+
+DNSServiceErrorType DnsService::dnsServiceProcessResult(DNSServiceRef sdRef) {
+  return DNSServiceProcessResult(sdRef);
+}
+
+DNSServiceErrorType DnsService::dnsServiceGetAddrInfo(DNSServiceRef* sdRef, DNSServiceFlags flags,
+                                                      uint32_t interfaceIndex,
+                                                      DNSServiceProtocol protocol,
+                                                      const char* hostname,
+                                                      DNSServiceGetAddrInfoReply callBack,
+                                                      void* context) {
+  return DNSServiceGetAddrInfo(sdRef, flags, interfaceIndex, protocol, hostname, callBack, context);
+}
 
 AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {
@@ -38,7 +62,7 @@ void AppleDnsResolverImpl::deallocateMainSdRef() {
   //   be removed BEFORE DNSServiceRefDeallocate() is called, as this function closes the
   //   reference's socket.
   sd_ref_event_.reset();
-  DNSServiceRefDeallocate(main_sd_ref_);
+  DnsServiceSingleton::get().dnsServiceRefDeallocate(main_sd_ref_);
 }
 
 void AppleDnsResolverImpl::initializeMainSdRef() {
@@ -54,10 +78,11 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   // However, using a shared connection brings some complexities detailed in the inline comments
   // for kDNSServiceFlagsShareConnection in dns_sd.h, and copied (and edited) in this implementation
   // where relevant.
-  auto error = DNSServiceCreateConnection(&main_sd_ref_);
-  RELEASE_ASSERT(!error, "error in DNSServiceCreateConnection");
+  auto error = DnsServiceSingleton::get().dnsServiceCreateConnection(&main_sd_ref_);
+  RELEASE_ASSERT(error == kDNSServiceErr_NoError,
+                 fmt::format("error={} in DNSServiceCreateConnection", error));
 
-  auto fd = DNSServiceRefSockFD(main_sd_ref_);
+  auto fd = DnsServiceSingleton::get().dnsServiceRefSockFD(main_sd_ref_);
   RELEASE_ASSERT(fd != -1, "error in DNSServiceRefSockFD");
   ENVOY_LOG(debug, "DNS resolver has fd={}", fd);
 
@@ -71,31 +96,61 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
 }
 
 void AppleDnsResolverImpl::onEventCallback(uint32_t events) {
-  ENVOY_LOG(debug, "DNS resolver file event");
-  ASSERT(events & Event::FileReadyType::Read);
-  DNSServiceProcessResult(main_sd_ref_);
+  ENVOY_LOG(debug, "DNS resolver file event ({})", events);
+  RELEASE_ASSERT(events & Event::FileReadyType::Read,
+                 fmt::format("invalid FileReadyType event={}", events));
+  DNSServiceErrorType error = DnsServiceSingleton::get().dnsServiceProcessResult(main_sd_ref_);
+  if (error != kDNSServiceErr_NoError) {
+    ENVOY_LOG(warn, "DNS resolver error ({}) in DNSServiceProcessResult", error);
+    // Similar to receiving an error in onDNSServiceGetAddrInfoReply, an error while processing fd
+    // events indicates that the sd_ref state is broken.
+    // Therefore, flush queries with_error == true.
+    flushPendingQueries(true /* with_error */);
+  }
 }
 
 ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
                                               DnsLookupFamily dns_lookup_family,
                                               ResolveCb callback) {
   ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
-  std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
 
-  DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
-  if (error != kDNSServiceErr_NoError) {
-    ENVOY_LOG(warn, "DNS resolver error in dnsServiceGetAddrInfo for {}", dns_name);
-    return nullptr;
+  Address::InstanceConstSharedPtr address{};
+  try {
+    // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
+    // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
+    // resolver implements a similar resolution path to avoid making improper DNS queries for
+    // resolved IPs.
+    address = Utility::parseInternetAddress(dns_name);
+    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
+              dns_name, address->asString());
+  } catch (const EnvoyException& e) {
+    // Resolution via Apple APIs
+    ENVOY_LOG(debug, "DNS resolver local resolution failed with: {}", e.what());
+    std::unique_ptr<PendingResolution> pending_resolution(
+        new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
+
+    DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
+    if (error != kDNSServiceErr_NoError) {
+      ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
+      return nullptr;
+    }
+
+    // If the query was synchronously resolved in the Apple API call, there is no need to return the
+    // query.
+    if (pending_resolution->synchronously_completed_) {
+      return nullptr;
+    }
+
+    pending_resolution->owned_ = true;
+    return pending_resolution.release();
   }
 
-  // If the query was synchronously resolved, there is no need to return the query.
-  if (pending_resolution->synchronously_completed_) {
-    return nullptr;
-  }
-
-  pending_resolution->owned_ = true;
-  return pending_resolution.release();
+  ASSERT(address != nullptr);
+  // Finish local, synchronous resolution. This needs to happen outside of the exception block above
+  // as the callback itself can throw.
+  callback(DnsResolver::ResolutionStatus::Success,
+           {DnsResponse(address, std::chrono::seconds(60))});
+  return nullptr;
 }
 
 void AppleDnsResolverImpl::addPendingQuery(PendingResolution* query) {
@@ -113,16 +168,9 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
   for (std::set<PendingResolution*>::iterator it = queries_with_pending_cb_.begin();
        it != queries_with_pending_cb_.end(); ++it) {
     auto query = *it;
-    try {
-      ASSERT(query->pending_cb_);
-      query->callback_(query->pending_cb_->status_, std::move(query->pending_cb_->responses_));
-    } catch (const std::exception& e) {
-      ENVOY_LOG(warn, "std::exception in DNSService callback: {}", e.what());
-      throw EnvoyException(e.what());
-    } catch (...) {
-      ENVOY_LOG(warn, "Unknown exception in DNSService callback");
-      throw EnvoyException("unknown");
-    }
+
+    ASSERT(query->pending_cb_);
+    query->callback_(query->pending_cb_->status_, std::move(query->pending_cb_->responses_));
 
     if (query->owned_) {
       ENVOY_LOG(debug, "Resolution for {} completed (async)", query->dns_name_);
@@ -150,7 +198,14 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   ENVOY_LOG(debug, "Destroying PendingResolution for {}", dns_name_);
-  DNSServiceRefDeallocate(individual_sd_ref_);
+  // It is possible that DNSServiceGetAddrInfo returns a synchronous error, with a NULLed
+  // DNSServiceRef, in AppleDnsResolverImpl::resolve.
+  // Additionally, it is also possible that the query is cancelled before resolution starts, and
+  // thus the DNSServiceRef is null.
+  // Therefore, only deallocate if the ref is not null.
+  if (individual_sd_ref_) {
+    DnsServiceSingleton::get().dnsServiceRefDeallocate(individual_sd_ref_);
+  }
 }
 
 void AppleDnsResolverImpl::PendingResolution::cancel() {
@@ -190,21 +245,22 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
             "error_code={}, hostname={}",
             dns_name_, flags, flags & kDNSServiceFlagsMoreComing ? "yes" : "no",
             flags & kDNSServiceFlagsAdd ? "yes" : "no", interface_index, error_code, hostname);
-  ASSERT(interface_index == 0);
+  RELEASE_ASSERT(interface_index == 0,
+                 fmt::format("unexpected interface_index={}", interface_index));
+
+  if (!pending_cb_) {
+    pending_cb_ = {ResolutionStatus::Success, {}};
+    parent_.addPendingQuery(this);
+  }
 
   // Generic error handling.
   if (error_code != kDNSServiceErr_NoError) {
     // TODO(junr03): consider creating stats for known error types (timeout, refused connection,
     // etc.). Currently a bit challenging because there is no scope access wired through. Current
     // query gets a failure status
-    if (!pending_cb_) {
-      ENVOY_LOG(warn, "[Error path] Adding to queries pending callback");
-      pending_cb_ = {ResolutionStatus::Failure, {}};
-      parent_.addPendingQuery(this);
-    } else {
-      ENVOY_LOG(warn, "[Error path] Changing status for query already pending flush");
-      pending_cb_->status_ = ResolutionStatus::Failure;
-    }
+
+    pending_cb_->status_ = ResolutionStatus::Failure;
+    pending_cb_->responses_.clear();
 
     ENVOY_LOG(warn, "[Error path] DNS Resolver flushing queries pending callback");
     parent_.flushPendingQueries(true /* with_error */);
@@ -213,21 +269,14 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     return;
   }
 
-  // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are purely
+  // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are only
   // additive.
   if (flags & kDNSServiceFlagsAdd) {
+    ASSERT(address, "invalid to add null address");
     auto dns_response = buildDnsResponse(address, ttl);
     ENVOY_LOG(debug, "Address to add address={}, ttl={}",
               dns_response.address_->ip()->addressAsString(), ttl);
-
-    if (!pending_cb_) {
-      ENVOY_LOG(debug, "Adding to queries pending callback");
-      pending_cb_ = {ResolutionStatus::Success, {dns_response}};
-      parent_.addPendingQuery(this);
-    } else {
-      ENVOY_LOG(debug, "New address for query already pending flush");
-      pending_cb_->responses_.push_back(dns_response);
-    }
+    pending_cb_->responses_.push_back(dns_response);
   }
 
   if (!(flags & kDNSServiceFlagsMoreComing)) {
@@ -272,8 +321,8 @@ AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo(DnsLookupFamily d
 
   // TODO: explore caching: there are caching flags in the dns_sd.h flags, allow expired answers
   // from the cache?
-  // TODO: explore validation via DNSSEC?
-  return DNSServiceGetAddrInfo(
+  // TODO: explore validation via `DNSSEC`?
+  return DnsServiceSingleton::get().dnsServiceGetAddrInfo(
       &individual_sd_ref_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0, protocol,
       dns_name_.c_str(),
       /*

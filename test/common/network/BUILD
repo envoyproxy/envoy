@@ -103,29 +103,24 @@ envoy_cc_test(
         "//bazel:apple": ["apple_dns_impl_test.cc"],
         "//conditions:default": [],
     }),
+    external_deps = ["abseil_synchronization"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:address_interface",
         "//include/envoy/network:dns_interface",
-        "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
+        "//include/envoy/event:file_event_interface",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
-        "//source/common/network:filter_lib",
-        "//source/common/network:listen_socket_lib",
-        "//source/common/stats:stats_lib",
-        "//source/common/stream_info:stream_info_lib",
-        "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/mocks/event:event_mocks",
     ] + select({
-        "//bazel:apple": ["//source/common/network:dns_lib"],
+        "//bazel:apple": [
+            "//source/common/network:dns_lib",
+        ],
         "//conditions:default": [],
     }),
 )
@@ -231,6 +226,15 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "raw_buffer_socket_test",
+    srcs = ["raw_buffer_socket_test.cc"],
+    deps = [
+        "//source/common/network:raw_buffer_socket_lib",
+        "//test/test_common:network_utility_lib",
     ],
 )
 
@@ -419,6 +423,16 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "io_socket_handle_impl_integration_test",
+    srcs = ["io_socket_handle_impl_integration_test.cc"],
+    tags = ["requires-network"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
     ],
 )
 

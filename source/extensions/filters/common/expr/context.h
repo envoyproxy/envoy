@@ -54,6 +54,7 @@ constexpr absl::string_view Connection = "connection";
 constexpr absl::string_view MTLS = "mtls";
 constexpr absl::string_view RequestedServerName = "requested_server_name";
 constexpr absl::string_view TLSVersion = "tls_version";
+constexpr absl::string_view ConnectionTerminationDetails = "termination_details";
 constexpr absl::string_view SubjectLocalCertificate = "subject_local_certificate";
 constexpr absl::string_view SubjectPeerCertificate = "subject_peer_certificate";
 constexpr absl::string_view URISanLocalCertificate = "uri_san_local_certificate";

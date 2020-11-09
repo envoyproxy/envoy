@@ -68,7 +68,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.early_errors_via_hcm",
     "envoy.reloadable_features.enable_deprecated_v2_api_warning",
     "envoy.reloadable_features.enable_dns_cache_circuit_breakers",
-    "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
     "envoy.reloadable_features.fix_upgrade_response",
     "envoy.reloadable_features.fix_wildcard_matching",
     "envoy.reloadable_features.fixed_connection_close",
@@ -88,6 +87,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.stop_faking_paths",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.tls_use_io_handle_bio",
+    "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.unify_grpc_handling",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
 };
@@ -106,8 +106,13 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
+    // TODO(yanavlasov) flip true after all tests for upstream flood checks are implemented
+    "envoy.reloadable_features.upstream_http2_flood_checks",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // gRPC Timeout header is missing (#13580)
+    "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
+
 };
 
 RuntimeFeatures::RuntimeFeatures() {

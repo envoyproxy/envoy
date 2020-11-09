@@ -462,6 +462,36 @@ TEST_F(RouterTest, RouteNotFound) {
   EXPECT_EQ(callbacks_.details(), "route_not_found");
 }
 
+TEST_F(RouterTest, MissingRequiredHeaders) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.removeMethod();
+
+  EXPECT_CALL(encoder, encodeHeaders(_, _))
+      .WillOnce(Invoke([](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        return Http::HeaderUtility::checkRequiredHeaders(headers);
+      }));
+  EXPECT_CALL(callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable,
+                             testing::Eq("missing required header: :method"), _, _,
+                             "filter_removed_required_headers{missing required header: :method}"))
+      .WillOnce(testing::InvokeWithoutArgs([] {}));
+  router_.decodeHeaders(headers, true);
+  router_.onDestroy();
+}
+
 TEST_F(RouterTest, ClusterNotFound) {
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
 
@@ -641,7 +671,7 @@ TEST_F(RouterTest, AddCookie) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -693,7 +723,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -744,7 +774,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -1507,8 +1537,9 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(encoder, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   Http::TestRequestHeaderMapImpl headers;
@@ -5837,8 +5868,9 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   // :authority header in the outgoing request should match the DNS name of
   // the selected upstream host
   EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&outgoing_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
@@ -5874,8 +5906,9 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   // :authority header in the outgoing request should match the :authority header of
   // the incoming request
   EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&incoming_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
