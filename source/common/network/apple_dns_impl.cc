@@ -85,7 +85,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   // where relevant.
   auto error = DnsServiceSingleton::get().dnsServiceCreateConnection(&main_sd_ref_);
   if (error != kDNSServiceErr_NoError) {
-    // FIXME: stat
+    // FIX ME: stat
     initialize_failure_timer_->enableTimer(
         std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
     return;
@@ -93,7 +93,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
 
   auto fd = DnsServiceSingleton::get().dnsServiceRefSockFD(main_sd_ref_);
   if (fd == -1) {
-    // FIXME: stat
+    // FIX ME: stat
     initialize_failure_timer_->enableTimer(
         std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
     return;
@@ -148,7 +148,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     if (initialize_failure_timer_->enabled()) {
       // No queries should be accumulating while the main_sd_ref_ is not alive. Either they were
       // flushed when the error that deallocated occurred, or they have all failed in this branch of
-      // the code synchronously due to continous inability to initialize the main_sd_ref_.
+      // the code synchronously due to continuous inability to initialize the main_sd_ref_.
       ASSERT(queries_with_pending_cb_.empty());
 
       // Short-circuit the pending retry to initialize the main_sd_ref_ and try now.
