@@ -8,14 +8,7 @@ namespace Envoy {
 
 void PerHostHttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   callbacks_ = callbacks;
-  // It's possible for a reset to happen inline within the newStream() call. In this case, we
-  // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
-  // deal with this case.
-  Envoy::Http::ConnectionPool::Cancellable* handle =
-      conn_pool_->newStream(callbacks->upstreamToDownstream(), *this);
-  if (handle) {
-    conn_pool_stream_handle_ = handle;
-  }
+  conn_pool_stream_handle_ = conn_pool_->newStream(callbacks->upstreamToDownstream(), *this);
 }
 
 bool PerHostHttpConnPool::cancelAnyPendingStream() {
@@ -34,6 +27,7 @@ absl::optional<Envoy::Http::Protocol> PerHostHttpConnPool::protocol() const {
 void PerHostHttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                         absl::string_view transport_failure_reason,
                                         Upstream::HostDescriptionConstSharedPtr host) {
+  conn_pool_stream_handle_ = nullptr;
   callbacks_->onPoolFailure(reason, transport_failure_reason, host);
 }
 

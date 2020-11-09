@@ -7,8 +7,6 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-#envoy_package()
-
 envoy_extension_package()
 
 envoy_cc_extension(

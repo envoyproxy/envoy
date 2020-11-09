@@ -9,11 +9,12 @@ Router::GenericConnPoolPtr PerHostGenericConnPoolFactory::createGenericConnPool(
     absl::optional<Envoy::Http::Protocol> downstream_protocol,
     Upstream::LoadBalancerContext* ctx) const {
   if (is_connect) {
+    // This example factory doesn't support terminating CONNECT stream.
     return nullptr;
   }
-  auto ret =
+  auto upstream_http_conn_pool =
       std::make_unique<PerHostHttpConnPool>(cm, is_connect, route_entry, downstream_protocol, ctx);
-  return (ret->valid() ? std::move(ret) : nullptr);
+  return (upstream_http_conn_pool->valid() ? std::move(upstream_http_conn_pool) : nullptr);
 }
 
 } // namespace Envoy

@@ -15,6 +15,23 @@
 
 namespace Envoy {
 
+namespace {
+void addHeader(Envoy::Http::RequestHeaderMap& header_map, absl::string_view header_name,
+               const envoy::config::core::v3::Metadata& metadata, absl::string_view meta_key_0,
+               absl::string_view meta_key_1) {
+  if (auto filter_metadata = metadata.filter_metadata().find(meta_key_0);
+      filter_metadata != metadata.filter_metadata().end()) {
+    const ProtobufWkt::Struct& data_struct = filter_metadata->second;
+    const auto& fields = data_struct.fields();
+    if (auto iter = fields.find(meta_key_1); iter != fields.end()) {
+      if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
+        header_map.setCopy(Envoy::Http::LowerCaseString(std::string(header_name)),
+                           iter->second.string_value());
+      }
+    }
+  }
+}
+} // namespace
 class PerHostHttpConnPool : public Router::GenericConnPool,
                             public Envoy::Http::ConnectionPool::Callbacks {
 public:
@@ -45,6 +62,7 @@ public:
 private:
   // Points to the actual connection pool to create streams from.
   Envoy::Http::ConnectionPool::Instance* conn_pool_{};
+  // The handle to the upstream request. Non-null if there is pending stream to create.
   Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };
@@ -65,31 +83,14 @@ public:
     sub_upstream_.encodeMetadata(metadata_map_vector);
   }
 
+  // Copy, mutate and pass downstream headers to sub upstream.
   void encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override {
     auto dup = Envoy::Http::RequestHeaderMapImpl::create();
     Envoy::Http::HeaderMapImpl::copyFrom(*dup, headers);
     dup->setCopy(Envoy::Http::LowerCaseString("X-foo"), "foo-common");
-    if (auto filter_metadata = host_->cluster().metadata().filter_metadata().find("foo");
-        filter_metadata != host_->cluster().metadata().filter_metadata().end()) {
-      const ProtobufWkt::Struct& data_struct = filter_metadata->second;
-      const auto& fields = data_struct.fields();
-      if (auto iter = fields.find("bar"); iter != fields.end()) {
-        if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
-          dup->setCopy(Envoy::Http::LowerCaseString("X-cluster-foo"), iter->second.string_value());
-        }
-      }
-    }
+    addHeader(*dup, "X-cluster-foo", host_->cluster().metadata(), "foo", "bar");
     if (host_->metadata() != nullptr) {
-      if (auto filter_metadata = host_->metadata()->filter_metadata().find("foo");
-          filter_metadata != host_->metadata()->filter_metadata().end()) {
-        const ProtobufWkt::Struct& data_struct = filter_metadata->second;
-        const auto& fields = data_struct.fields();
-        if (auto iter = fields.find("bar"); iter != fields.end()) {
-          if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
-            dup->setCopy(Envoy::Http::LowerCaseString("X-host-foo"), iter->second.string_value());
-          }
-        }
-      }
+      addHeader(*dup, "X-host-foo", *host_->metadata(), "foo", "bar");
     }
     sub_upstream_.encodeHeaders(*dup, end_stream);
   }
@@ -104,7 +105,7 @@ public:
 
 private:
   Extensions::Upstreams::Http::Http::HttpUpstream sub_upstream_;
-  Upstream::HostDescriptionConstSharedPtr host_{};
+  Upstream::HostDescriptionConstSharedPtr host_;
 };
 
 } // namespace Envoy

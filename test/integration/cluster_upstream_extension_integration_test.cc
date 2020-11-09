@@ -57,6 +57,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterUpstreamExtensionIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// This test verify that cluster upstream extensions can fulfill the requirement that rewrite http
+// headers after cluster and host is selected. See https://github.com/envoyproxy/envoy/issues/12236
+// This test case should be rewritten once upstream http
+// filters(https://github.com/envoyproxy/envoy/issues/10455) is landed.
 TEST_P(ClusterUpstreamExtensionIntegrationTest,
        VerifyRequestHeadersAreRewrittenByClusterAndHostMetadata) {
   initialize();
