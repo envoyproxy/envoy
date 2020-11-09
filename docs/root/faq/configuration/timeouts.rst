@@ -50,6 +50,12 @@ context request/stream is interchangeable.
     This timeout is not enforced by default as it is not compatible with streaming requests
     (requests that never end). See the stream idle timeout that follows. However, if using the
     :ref:`buffer filter <config_http_filters_buffer>`, it is recommended to configure this timeout.
+* The HTTP connection manager :ref:`request_headers_timeout
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_headers_timeout>`
+  determines the amount of time the client has to send *only the headers* on the request stream
+  before the stream is cancelled. This can be used to prevent clients from consuming too much
+  memory by creating large numbers of mostly-idle streams waiting for headers. The request header
+  timeout is disabled by default.
 * The HTTP connection manager :ref:`stream_idle_timeout
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`
   is the amount of time that the connection manager will allow a stream to exist with no upstream

@@ -192,12 +192,12 @@ protected:
     initialize();
 
     // write_request_cb will write each of the items in request_chunks as a separate SSL_write.
-    auto write_request_cb = [&request_chunks](Network::ClientConnection& client) {
+    auto write_request_cb = [&request_chunks](Buffer::Instance& buffer) {
       if (!request_chunks.empty()) {
-        Buffer::OwnedImpl buffer(request_chunks.front());
-        client.write(buffer, false);
+        buffer.add(request_chunks.front());
         request_chunks.pop_front();
       }
+      return false;
     };
 
     auto client_transport_socket_factory_ptr =

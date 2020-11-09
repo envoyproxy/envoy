@@ -58,6 +58,7 @@ namespace Http {
   COUNTER(downstream_rq_response_before_rq_complete)                                               \
   COUNTER(downstream_rq_rx_reset)                                                                  \
   COUNTER(downstream_rq_timeout)                                                                   \
+  COUNTER(downstream_rq_header_timeout)                                                            \
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_tx_reset)                                                                  \
@@ -288,6 +289,12 @@ public:
    *         a disabled request timeout.
    */
   virtual std::chrono::milliseconds requestTimeout() const PURE;
+
+  /**
+   * @return request header timeout for incoming connection manager connections. Zero indicates a
+   *         disabled request header timeout.
+   */
+  virtual std::chrono::milliseconds requestHeadersTimeout() const PURE;
 
   /**
    * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled

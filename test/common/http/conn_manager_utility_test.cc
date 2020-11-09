@@ -109,6 +109,7 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestTimeout, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, requestHeadersTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
   MOCK_METHOD(Router::RouteConfigProvider*, routeConfigProvider, ());
   MOCK_METHOD(Config::ConfigProvider*, scopedRouteConfigProvider, ());
