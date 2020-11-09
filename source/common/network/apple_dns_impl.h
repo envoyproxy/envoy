@@ -8,8 +8,10 @@
 #include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 
+#include "common/common/backoff_strategy.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
@@ -43,7 +45,7 @@ using DnsServiceSingleton = ThreadSafeSingleton<DnsService>;
  */
 class AppleDnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  AppleDnsResolverImpl(Event::Dispatcher& dispatcher);
+  AppleDnsResolverImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random);
   ~AppleDnsResolverImpl() override;
 
   // Network::DnsResolver
@@ -111,6 +113,8 @@ private:
   void flushPendingQueries(const bool with_error);
 
   Event::Dispatcher& dispatcher_;
+  Event::TimerPtr initialize_failure_timer_;
+  BackOffStrategyPtr backoff_strategy_;
   DNSServiceRef main_sd_ref_;
   Event::FileEventPtr sd_ref_event_;
   // When using a shared sd ref via DNSServiceCreateConnection, the DNSServiceGetAddrInfoReply

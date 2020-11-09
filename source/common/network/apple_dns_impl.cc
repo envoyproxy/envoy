@@ -44,16 +44,21 @@ DNSServiceErrorType DnsService::dnsServiceGetAddrInfo(DNSServiceRef* sdRef, DNSS
   return DNSServiceGetAddrInfo(sdRef, flags, interfaceIndex, protocol, hostname, callBack, context);
 }
 
-AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher) {
+// Parameters of the jittered backoff strategy.
+static constexpr uint32_t RetryInitialDelayMilliseconds = 300;
+static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * RetryInitialDelayMilliseconds;
+
+AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher,
+                                           Random::RandomGenerator& random)
+    : dispatcher_(dispatcher), initialize_failure_timer_(dispatcher.createTimer(
+                                   [this]() -> void { initializeMainSdRef(); })),
+      backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
+          RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random)) {
   ENVOY_LOG(debug, "Constructing DNS resolver");
   initializeMainSdRef();
 }
 
-AppleDnsResolverImpl::~AppleDnsResolverImpl() {
-  ENVOY_LOG(debug, "Destructing DNS resolver");
-  deallocateMainSdRef();
-}
+AppleDnsResolverImpl::~AppleDnsResolverImpl() { deallocateMainSdRef(); }
 
 void AppleDnsResolverImpl::deallocateMainSdRef() {
   ENVOY_LOG(debug, "DNSServiceRefDeallocate main sd ref");
@@ -79,12 +84,20 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   // for kDNSServiceFlagsShareConnection in dns_sd.h, and copied (and edited) in this implementation
   // where relevant.
   auto error = DnsServiceSingleton::get().dnsServiceCreateConnection(&main_sd_ref_);
-  RELEASE_ASSERT(error == kDNSServiceErr_NoError,
-                 fmt::format("error={} in DNSServiceCreateConnection", error));
+  if (error != kDNSServiceErr_NoError) {
+    // FIXME: stat
+    initialize_failure_timer_->enableTimer(
+        std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
+    return;
+  }
 
   auto fd = DnsServiceSingleton::get().dnsServiceRefSockFD(main_sd_ref_);
-  RELEASE_ASSERT(fd != -1, "error in DNSServiceRefSockFD");
-  ENVOY_LOG(debug, "DNS resolver has fd={}", fd);
+  if (fd == -1) {
+    // FIXME: stat
+    initialize_failure_timer_->enableTimer(
+        std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
+    return;
+  }
 
   sd_ref_event_ = dispatcher_.createFileEvent(
       fd,
@@ -93,6 +106,9 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
       [this](uint32_t events) { onEventCallback(events); }, Event::FileTriggerType::Level,
       Event::FileReadyType::Read);
   sd_ref_event_->setEnabled(Event::FileReadyType::Read);
+
+  initialize_failure_timer_->disableTimer();
+  backoff_strategy_->reset();
 }
 
 void AppleDnsResolverImpl::onEventCallback(uint32_t events) {
@@ -125,7 +141,28 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
               dns_name, address->asString());
   } catch (const EnvoyException& e) {
     // Resolution via Apple APIs
-    ENVOY_LOG(debug, "DNS resolver local resolution failed with: {}", e.what());
+    ENVOY_LOG(trace, "DNS resolver local resolution failed with: {}", e.what());
+
+    // First check that the main_sd_ref is alive by checking if the resolver is currently trying to
+    // initialize its main_sd_ref.
+    if (initialize_failure_timer_->enabled()) {
+      // No queries should be accumulating while the main_sd_ref_ is not alive. Either they were
+      // flushed when the error that deallocated occurred, or they have all failed in this branch of
+      // the code synchronously due to continous inability to initialize the main_sd_ref_.
+      ASSERT(queries_with_pending_cb_.empty());
+
+      // Short-circuit the pending retry to initialize the main_sd_ref_ and try now.
+      initializeMainSdRef();
+
+      // If the timer is still enabled, that means the initialization failed. Synchronously fail the
+      // resolution, the callback target should retry.
+      if (initialize_failure_timer_->enabled()) {
+        callback(DnsResolver::ResolutionStatus::Failure, {});
+        return nullptr;
+      }
+    }
+
+    // Proceed with resolution after establishing that the resolver has a live main_sd_ref_.
     std::unique_ptr<PendingResolution> pending_resolution(
         new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
 
