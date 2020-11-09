@@ -135,7 +135,7 @@ message Matcher {
   // If specified, the OnMatch is used, and the matcher is considered
   // to have matched.
   // If not specified, the matcher is considered not to have matched.
-  OnMatch on_no_match = 3 [(validate.rules).message = {required: true}];
+  OnMatch on_no_match = 3;
 }
 
 // Match configuration. This is a recursive structure which allows complex nested match
