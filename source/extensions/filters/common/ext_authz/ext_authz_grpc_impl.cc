@@ -142,23 +142,6 @@ void GrpcClientImpl::toAuthzResponseHeader(
   }
 }
 
-const Grpc::RawAsyncClientSharedPtr AsyncClientCache::getOrCreateAsyncClient(
-    const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
-  // The cache stores Google gRPC client, so channel is not created for each request.
-  ASSERT(proto_config.has_grpc_service() && proto_config.grpc_service().has_google_grpc());
-  auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
-  const std::size_t cache_key = MessageUtil::hash(proto_config.grpc_service().google_grpc());
-  const auto it = cache.async_clients_.find(cache_key);
-  if (it != cache.async_clients_.end()) {
-    return it->second;
-  }
-  const Grpc::AsyncClientFactoryPtr factory =
-      async_client_manager_.factoryForGrpcService(proto_config.grpc_service(), scope_, true);
-  const Grpc::RawAsyncClientSharedPtr async_client = factory->create();
-  cache.async_clients_.emplace(cache_key, async_client);
-  return async_client;
-}
-
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

@@ -37,7 +37,11 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
       fmt::format(yaml, TestUtility::getVersionStringFromApiVersion(api_version)), *proto_config);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, singletonManager()).Times(1);
+  testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
+  EXPECT_CALL(context, getServerFactoryContext())
+      .Times(1)
+      .WillOnce(testing::ReturnRef(server_context));
+  EXPECT_CALL(server_context, singletonManager()).Times(1);
   EXPECT_CALL(context, threadLocal()).Times(1);
   EXPECT_CALL(context, messageValidationVisitor()).Times(1);
   EXPECT_CALL(context, clusterManager()).Times(1);
