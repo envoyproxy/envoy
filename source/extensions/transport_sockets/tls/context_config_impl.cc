@@ -373,10 +373,8 @@ bool ClientContextConfigImpl::isSecretReady() const {
       return false;
     }
   }
-  if (certificate_validation_context_provider_ == nullptr) {
-    return true;
-  }
-  return certificate_validation_context_provider_->secret() != nullptr;
+  return certificate_validation_context_provider_ == nullptr ||
+         certificate_validation_context_provider_->secret() != nullptr;
 }
 
 const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
