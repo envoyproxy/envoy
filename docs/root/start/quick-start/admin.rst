@@ -6,13 +6,6 @@ Envoy admin interface
 The optional admin interface provided by Envoy allows you to view configuration and statistics, change the
 behaviour of the server, and tap traffic according to specific filter rules.
 
-The admin interface can be configured for static and dynamic setups.
-
-Enabling the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` interface with
-dynamic configuration can be particularly useful as it allows you to use the
-:ref:`config_dump <start_quick_start_admin_config_dump>` endpoint to see how Envoy is configured at
-a particular point in time.
-
 .. note::
 
    This guide provides configuration information, and some basic examples of using a couple of the admin
@@ -121,6 +114,13 @@ you could:
 
    See the reference section for :ref:`config_dump <operations_admin_interface_config_dump>` for further information
    on available parameters and responses.
+
+.. tip::
+
+   Enabling the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` interface with
+   dynamic configuration can be particularly useful as it allows you to use the
+   :ref:`config_dump <start_quick_start_admin_config_dump>` endpoint to see how Envoy is configured at
+   a particular point in time.
 
 .. _start_quick_start_admin_stats:
 
