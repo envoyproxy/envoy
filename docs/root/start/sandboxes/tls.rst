@@ -23,9 +23,9 @@ It demonstrates a number of commonly used proxying and ``TLS`` termination patte
    For the sake of simplicity, the examples provided here do not authenticate any client certificates,
    or validate any of the provided certificates.
 
-   Please see :ref:`securing envoy <start_quick_start_securing>` for more information about using TLS to secure your network.
+   Please see :ref:`securing envoy <start_quick_start_securing>` for more information about using ``TLS`` to secure your network.
 
-   The double proxy sandbox <INSERT LINK> also provides an example of validation and authentication
+   The :ref:`double proxy sandbox <>` also provides an example of validation and authentication
    with client certificates using ``mTLS``.
 
 .. include:: _include/docker-env-setup.rst
