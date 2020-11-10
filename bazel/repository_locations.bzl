@@ -376,7 +376,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "brotli-{version}",
         urls = ["https://github.com/google/brotli/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.compression.brotli.compressor", "envoy.compression.brotli.decompressor"],
+        extensions = [
+            "envoy.compression.brotli.compressor",
+            "envoy.compression.brotli.decompressor",
+        ],
         release_date = "2020-09-08",
         cpe = "cpe:2.3:a:google:brotli:*",
     ),
