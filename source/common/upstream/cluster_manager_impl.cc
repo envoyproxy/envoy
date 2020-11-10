@@ -392,7 +392,9 @@ ClusterManagerImpl::ClusterManagerImpl(
       continue;
     }
 
-    postThreadLocalClusterUpdate(*cluster.second, ThreadLocalClusterUpdateParams());
+    // Avoid virtual call in the constructor. This only impacts tests. Remove this when fixing
+    // the above TODO.
+    postThreadLocalClusterUpdateNonVirtual(*cluster.second, ThreadLocalClusterUpdateParams());
   }
 
   // We can now potentially create the CDS API once the backing cluster exists.
@@ -937,8 +939,8 @@ void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
   });
 }
 
-void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
-                                                      ThreadLocalClusterUpdateParams&& params) {
+void ClusterManagerImpl::postThreadLocalClusterUpdateNonVirtual(
+    ClusterManagerCluster& cm_cluster, ThreadLocalClusterUpdateParams&& params) {
   const bool is_local_cluster = local_cluster_name_.has_value() &&
                                 local_cluster_name_.value() == cm_cluster.cluster().info()->name();
   bool add_or_update_cluster = false;
