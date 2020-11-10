@@ -623,7 +623,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "7874feb1026bbef06796bd5ab80e73f15b8e83752bde8dc93994f5bc039a4952",
         strip_prefix = "wasmtime-{version}",
         urls = ["https://github.com/bytecodealliance/wasmtime/archive/v{version}.tar.gz"],
-        release_date = "2020-11-04",
+        release_date = "2020-11-05",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -642,7 +642,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "aea8cd095e9937f1e14f2c93e026317b197eb2345e7a817fe3932062eb7b792c",
         strip_prefix = "wasm-c-api-{version}",
         urls = ["https://github.com/WebAssembly/wasm-c-api/archive/{version}.tar.gz"],
-        release_date = "2020-11-04",
+        release_date = "2019-11-14",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
