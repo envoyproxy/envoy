@@ -59,13 +59,13 @@ Envoy 可用于服务网格之外的各种配置。 例如，它还可以充当�
    :width: 90%
    :align: center
 
-Envoy 可以在多层拓扑中进行配置，以实现可伸缩性和可靠性，其中请求首先通过边缘 Envoy，然后再通过第二层 Envoy ：
+Envoy 可以在多层拓扑中进行配置，以实现可伸缩性和可靠性，其中请求首先通过边缘 Envoy，然后再通过第二层 Envoy：
 
 .. image:: /_static/lor-topology-tiered.svg
    :width: 80%
    :align: center
 
-在上述所有情况下，请求将从下游通过 TCP，UDP 或 Unix 域套接字到达特定的 Envoy 。 Envoy 将通过 TCP，UDP 或 Unix 
+在上述所有情况下，请求将从下游通过 TCP，UDP 或 Unix 域套接字到达特定的 Envoy。 Envoy 将通过 TCP，UDP 或 Unix 
 域套接字向上游转发请求。 我们在下面仅关注一个 Envoy 代理。
 
 配置
@@ -84,11 +84,11 @@ Envoy是一个易于扩展的平台。 这导致可能的请求路径组合爆�
 一次专注于一个示例是很有帮助的，因此此示例涵盖以下内容：
 
 * 通过 TCP 连接向下游和上游的 :ref:`TLS <arch_overview_ssl>` 发出的 HTTP/2 请求。
-* :ref:`HTTP连接管理器 <arch_overview_http_conn_man>` 是唯一的 :ref:`网络过滤器 <arch_overview_network_filters>` 。
+* :ref:`HTTP连接管理器 <arch_overview_http_conn_man>` 是唯一的 :ref:`网络过滤器 <arch_overview_network_filters>`。
 * 假设的自定义过滤器和 :ref:`路由器 <arch_overview_http_routing>` 过滤器作为 :ref:`HTTP过滤器 <arch_overview_http_filters>` 链。
-* :ref:`文件系统访问日志记录 <arch_overview_access_logs_sinks>` 。
-* :ref:`统计下沉 <envoy_v3_api_msg_config.metrics.v3.StatsSink>` 。
-* 具有静态端点的单个 :ref:`集群 <arch_overview_cluster_manager>` 。
+* :ref:`文件系统访问日志记录 <arch_overview_access_logs_sinks>`。
+* :ref:`统计下沉 <envoy_v3_api_msg_config.metrics.v3.StatsSink>`。
+* 具有静态端点的单个 :ref:`集群 <arch_overview_cluster_manager>`。
 
 为了简单起见，我们假定使用静态引导程序配置文件：
 
@@ -100,10 +100,8 @@ Envoy是一个易于扩展的平台。 这导致可能的请求路径组合爆�
 
 Envoy 中的请求处理路径包括两个主要部分：
 
-* :ref:`监听器子系统 <arch_overview_listeners>` 对**下游**请求进行处理。 它还负责管理下游请求生命周期
-以及到客户端的响应路径。 下游 HTTP/2 编解码器位于此处。
-* :ref:`集群子系统 <arch_overview_cluster_manager>` 负责选择和配置到端点的**上游**连接。这是了解集群
-和端点运行状况并具有负载平衡和连接池功能。 上游 HTTP/2 编解码器位于此处。
+* :ref:`监听器子系统 <arch_overview_listeners>` 对**下游**请求进行处理。 它还负责管理下游请求生命周期以及到客户端的响应路径。 下游 HTTP/2 编解码器位于此处。
+* :ref:`集群子系统 <arch_overview_cluster_manager>` 负责选择和配置到端点的**上游**连接。这是了解集群和端点运行状况并具有负载平衡和连接池功能。 上游 HTTP/2 编解码器位于此处。
 
 这两个子系统与 HTTP 路由过滤器桥接，该过滤器将 HTTP 请求从下游转发到上游。
 
@@ -116,7 +114,7 @@ Envoy 中的请求处理路径包括两个主要部分：
 类创建的模块和实例类的组。这些管理系统在请求之前和请求的过程中会实例化许多我们在下面讨论的组件，
 例如监听器，过滤器链，编解码器，连接池和负载均衡等数据结构。
 
-Envoy 具有 `基于事件的线程模型 <https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310>`_ 。
+Envoy 具有 `基于事件的线程模型 <https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310>`_。
 主线程负责服务器的生命周期，配置处理，信息统计等。:ref:`工作线程 <arch_overview_threading>` 负责请求处理。
 所有线程都围绕事件循环（`libevent <https://libevent.org/>`_）运行，并且任何给定的下游 TCP 连接
 （包括其上的所有多路复用流）都将由一个工作线程在其生命周期内完全处理。 每个工作线程都维护自己的与上游端点的 TCP 连接池。
@@ -138,8 +136,7 @@ UDP过滤器状态被给定的工作线程共享，使用该过滤器可以根�
    传输套接字（在我们的情况下为TLS传输套接字）与此过滤器链相关联。
 3. 在进行网络读取时， :ref:`TLS <arch_overview_ssl>` 传输套接字将从 TCP 连接读取的数据解密为解密的数据流，以进行进一步处理。
 4. :ref:`网络过滤器 <arch_overview_network_filters>` 链已创建并运行。HTTP 最重要的过滤器是 HTTP 连接管理器，它是链中的最后一个网络过滤器。
-5.  :ref:`HTTP 连接管理器 <arch_overview_http_conn_man>` 中的 HTTP/2 编解码器将解密后的数据流从 TLS 连接解帧并解复用为多个独立的流。 
-   每个流只处理一个请求和响应。
+5.  :ref:`HTTP 连接管理器 <arch_overview_http_conn_man>` 中的 HTTP/2 编解码器将解密后的数据流从 TLS 连接解帧并解复用为多个独立的流。 每个流只处理一个请求和响应。
 6. 对于每个 HTTP 请求流，都会创建并运行 :ref:`HTTP 过滤器 <arch_overview_http_filters>` 链。该请求首先通过可以读取和修改请求的自定义过滤器。
    路由过滤器是最重要的 HTTP 过滤器，它位于 HTTP 过滤器链的末尾。在路由过滤器上调用 `decodeHeaders` 时，将选择路由和集群。数据流上的请求
    头被转发到该集群中的上游端点。 :ref:`路由 <arch_overview_http_routing>` 过滤器通过从集群管理器中匹配到的集群获取HTTP连接池，以执行操作。
@@ -147,8 +144,8 @@ UDP过滤器状态被给定的工作线程共享，使用该过滤器可以根�
    为空或容量不足，则会创建到端点的新连接。
 8. 上游端点连接的 HTTP/2 编解码器将请求流与通过单个 TCP 连接流向上游的任何其他流进行多路复用和帧化。
 9. 上游端点连接的 TLS 传输套接字对这些字节进行加密，并将其写入上游连接的 TCP 套接字。
-10. 由请求头，可选的请求体和尾部组成的请求在上游被代理，而响应在下游被代理。响应以与请求 :ref:`逆序 <arch_overview_http_filters_ordering>` 
-   通过 HTTP 过滤器，从路由器过滤器开始并通过自定义过滤器，然后再发送到下游。
+10. 由请求头，可选的请求体和尾部组成的请求在上游被代理，而响应在下游被代理。响应以与请求 :ref:`逆序 <arch_overview_http_filters_ordering>` 通过 HTTP 过滤器，
+    从路由器过滤器开始并通过自定义过滤器，然后再发送到下游。
 11. 当响应完成后，请求流将被销毁。 请求后处理程序将更新统计信息，写入访问日志并最终确定跟踪范围。
 
 我们将在以下各节中详细介绍每个步骤。
@@ -228,7 +225,7 @@ Envoy 通过 :repo:`TransportSocket <include/envoy/network/transport_socket.h>` 
 4. 网络过滤器链处理
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-与监听滤器链一样，Envoy 将通过 `Network::FilterManagerImpl` 实例化其过滤器工厂中的一系列 :ref:`网络过滤器 <arch_overview_network_filters>` 。
+与监听滤器链一样，Envoy 将通过 `Network::FilterManagerImpl` 实例化其过滤器工厂中的一系列 :ref:`网络过滤器 <arch_overview_network_filters>`。
 该实例对于每个新连接都是新的。网络过滤器（如传输套接字）跟随 TCP 生命周期事件，并作为可以从传输套接字使用的数据被调用。
 
 .. image:: /_static/lor-network-filters.svg
@@ -292,7 +289,7 @@ HTTP 过滤器接口共有三种：
 
 * :repo:`StreamDecoderFilter <include/envoy/http/filter.h>` 带有用于处理请求的回调。
 * :repo:`StreamEncoderFilter <include/envoy/http/filter.h>` 带有用于响应处理的回调。
-* :repo:`StreamFilter <include/envoy/http/filter.h>` 同时实现 `StreamDecoderFilter` 和 `StreamEncoderFilter`.
+* :repo:`StreamFilter <include/envoy/http/filter.h>` 同时实现 `StreamDecoderFilter` 和 `StreamEncoderFilter`。
 
 查看解码器过滤器接口：
 
@@ -305,7 +302,7 @@ HTTP 过滤器接口共有三种：
 HTTP 过滤器遵循 HTTP 请求的生命周期，而不是对连接缓冲区和事件进行操作，例如 ``decodeHeaders()`` 将 HTTP 请求头作为参数而不是字节缓冲区。 
 与网络和监听器过滤器一样，返回的 ``FilterStatus`` 提供了管理过滤器链控制流的功能。
 
-当 HTTP/2 编解码器使 HTTP 请求头可用时，它们首先被传递到自定义过滤器中的 ``decodeHeaders()`` 。 如果返回的 ``FilterHeadersStatus`` 为 ``Continue`` ，
+当 HTTP/2 编解码器使 HTTP 请求头可用时，它们首先被传递到自定义过滤器中的 ``decodeHeaders()``。如果返回的 ``FilterHeadersStatus`` 为 ``Continue``，
 然后 HCM 将请求头（可能由自定义过滤器导致）传递到路由器过滤器。
 
 解码器和编/解码器过滤器在请求路径上执行。 编码器和编/解码器过滤器在响应路径上以 :ref:`相反的方向 <arch_overview_http_filters_ordering>`执行。 
