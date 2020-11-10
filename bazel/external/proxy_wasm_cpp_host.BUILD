@@ -1,7 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
-    "envoy_select_wasm_all_v8_wavm_none",
+    "envoy_select_wasm",
     "envoy_select_wasm_v8",
     "envoy_select_wasm_wasmtime",
     "envoy_select_wasm_wavm",
@@ -22,61 +22,38 @@ cc_library(
 cc_library(
     name = "lib",
     # Note that the select cannot appear in the glob.
-    srcs = envoy_select_wasm_all_v8_wavm_none(
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-            exclude = [
-                # TODO: currently we cannot link wasmtime with (v8, WAVM) due to symbol collision:
-                # - V8: wasm-c-api symbols
-                # - WAVM: LLVM's gdb JIT interface related symbols
-                "src/wasmtime/*",
-            ],
-        ),
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-            exclude = [
-                "src/wavm/*",
-                "src/wasmtime/*",
-            ],
-        ),
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-            exclude = [
-                "src/v8/*",
-                "src/wasmtime/*",
-            ],
-        ),
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-            exclude = [
-                "src/v8/*",
-                "src/wavm/*",
-            ],
-        ),
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-            exclude = [
-                "src/wavm/*",
-                "src/v8/*",
-                "src/wasmtime/*",
-            ],
-        ),
-    ),
+    srcs = envoy_select_wasm([
+        "include/proxy-wasm/context.h",
+        "include/proxy-wasm/context_interface.h",
+        "include/proxy-wasm/exports.h",
+        "include/proxy-wasm/null.h",
+        "include/proxy-wasm/null_plugin.h",
+        "include/proxy-wasm/null_vm.h",
+        "include/proxy-wasm/null_vm_plugin.h",
+        "include/proxy-wasm/wasm.h",
+        "include/proxy-wasm/wasm_api_impl.h",
+        "include/proxy-wasm/wasm_vm.h",
+        "include/proxy-wasm/word.h",
+        "src/context.cc",
+        "src/exports.cc",
+        "src/foreign.cc",
+        "src/wasm.cc",
+        "src/null/null.cc",
+        "src/null/null_plugin.cc",
+        "src/null/null_vm.cc",
+        "src/third_party/base64.cc",
+        "src/third_party/base64.h",
+        "src/third_party/picosha2.h",
+    ]) + envoy_select_wasm_v8([
+        "include/proxy-wasm/v8.h",
+        "src/v8/v8.cc",
+    ]) + envoy_select_wasm_wavm([
+        "include/proxy-wasm/wavm.h",
+        "src/wavm/wavm.cc",
+    ]) + envoy_select_wasm_wasmtime([
+        "include/proxy-wasm/wasmtime.h",
+        "src/wasmtime/wasmtime.cc",
+    ]),
     copts = envoy_select_wasm_wavm([
         '-DWAVM_API=""',
         "-Wno-non-virtual-dtor",
@@ -92,10 +69,10 @@ cc_library(
         "//external:zlib",
         "@proxy_wasm_cpp_sdk//:api_lib",
         "@proxy_wasm_cpp_sdk//:common_lib",
-    ] + envoy_select_wasm_wavm([
-        "@envoy//bazel/foreign_cc:wavm",
-    ]) + envoy_select_wasm_v8([
+    ] + envoy_select_wasm_v8([
         "//external:wee8",
+    ]) + envoy_select_wasm_wavm([
+        "@envoy//bazel/foreign_cc:wavm",
     ]) + envoy_select_wasm_wasmtime([
         "@com_github_wasm_c_api//:wasmtime_lib",
     ]),
