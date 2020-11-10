@@ -274,13 +274,13 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # changes, this build type may need to be broken up.
   # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   COMPILE_TIME_OPTIONS=(
+    "--define" "wasm=wavm"
     "--define" "signal_trace=disabled"
     "--define" "hot_restart=disabled"
     "--define" "google_grpc=disabled"
     "--define" "boringssl=fips"
     "--define" "log_debug_assert_in_release=enabled"
     "--define" "quiche=enabled"
-    "--define" "wasm=wasmtime"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
     "--define" "use_new_codecs_in_integration_tests=false"
@@ -299,6 +299,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Building all the dependencies from scratch to link them against libc++.
   echo "Building and testing ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+
+  echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
+  bazel_with_collection test --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]:2}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
   # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
   # integration tests with asan.
