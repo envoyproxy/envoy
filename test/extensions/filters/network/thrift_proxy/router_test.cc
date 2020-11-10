@@ -1014,7 +1014,7 @@ TEST_P(ThriftRouterPassthroughTest, PassthroughEnable) {
                                         ProtocolNames::get().fromType(upstream_protocol_type)),
                             configuration);
 
-  auto protocol_option = std::make_shared<ProtocolOptionsConfigImpl>(configuration);
+  const auto protocol_option = std::make_shared<ProtocolOptionsConfigImpl>(configuration);
   EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
               extensionProtocolOptions(_))
       .WillRepeatedly(Return(protocol_option));

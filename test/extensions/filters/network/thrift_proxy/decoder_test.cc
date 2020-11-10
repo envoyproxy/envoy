@@ -1277,10 +1277,11 @@ TEST(DecoderTest, OnDataPassthrough) {
       }));
 
   EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
-  EXPECT_CALL(handler, passthroughData(Ref(buffer), 80)).WillOnce(Invoke([&]() -> FilterStatus {
-    buffer.drain(80);
-    return FilterStatus::Continue;
-  }));
+  EXPECT_CALL(handler, passthroughData(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        EXPECT_EQ(80, data.length());
+        return FilterStatus::Continue;
+      }));
 
   EXPECT_CALL(proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
   EXPECT_CALL(handler, messageEnd()).WillOnce(Return(FilterStatus::Continue));
@@ -1319,17 +1320,18 @@ TEST(DecoderTest, OnDataPassthroughResumes) {
         return true;
       }));
   EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
-  EXPECT_CALL(handler, passthroughData(_, _)).Times(0);
+  EXPECT_CALL(handler, passthroughData(_)).Times(0);
 
   bool underflow = false;
   EXPECT_EQ(FilterStatus::Continue, decoder.onData(buffer, underflow));
   EXPECT_TRUE(underflow);
 
   buffer.add(std::string(100, 'a'));
-  EXPECT_CALL(handler, passthroughData(Ref(buffer), 100)).WillOnce(Invoke([&]() -> FilterStatus {
-    buffer.drain(100);
-    return FilterStatus::Continue;
-  }));
+  EXPECT_CALL(handler, passthroughData(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        EXPECT_EQ(100, data.length());
+        return FilterStatus::Continue;
+      }));
   EXPECT_CALL(proto, readMessageEnd(_)).WillOnce(Return(true));
   EXPECT_CALL(transport, decodeFrameEnd(_)).WillOnce(Return(true));
 
@@ -1371,10 +1373,11 @@ TEST(DecoderTest, OnDataPassthroughResumesTransportFrameStart) {
         return true;
       }));
   EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
-  EXPECT_CALL(handler, passthroughData(Ref(buffer), 100)).WillOnce(Invoke([&]() -> FilterStatus {
-    buffer.drain(100);
-    return FilterStatus::Continue;
-  }));
+  EXPECT_CALL(handler, passthroughData(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        EXPECT_EQ(100, data.length());
+        return FilterStatus::Continue;
+      }));
 
   EXPECT_CALL(proto, readMessageEnd(_)).WillOnce(Return(true));
   EXPECT_CALL(transport, decodeFrameEnd(_)).WillOnce(Return(true));
@@ -1413,10 +1416,11 @@ TEST(DecoderTest, OnDataPassthroughResumesTransportFrameEnd) {
         return true;
       }));
   EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
-  EXPECT_CALL(handler, passthroughData(Ref(buffer), 100)).WillOnce(Invoke([&]() -> FilterStatus {
-    buffer.drain(100);
-    return FilterStatus::Continue;
-  }));
+  EXPECT_CALL(handler, passthroughData(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        EXPECT_EQ(100, data.length());
+        return FilterStatus::Continue;
+      }));
 
   EXPECT_CALL(proto, readMessageEnd(_)).WillOnce(Return(true));
   EXPECT_CALL(transport, decodeFrameEnd(_)).WillOnce(Return(false));
@@ -1479,16 +1483,17 @@ TEST(DecoderTest, OnDataPassthroughHandlesStopIterationAndResumes) {
         return FilterStatus::StopIteration;
       }));
   EXPECT_CALL(handler, passthroughEnabled()).WillOnce(Return(true));
-  EXPECT_CALL(handler, passthroughData(_, _)).Times(0);
+  EXPECT_CALL(handler, passthroughData(_)).Times(0);
 
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow);
 
   buffer.add(std::string(100, 'a'));
-  EXPECT_CALL(handler, passthroughData(Ref(buffer), 100)).WillOnce(Invoke([&]() -> FilterStatus {
-    buffer.drain(100);
-    return FilterStatus::StopIteration;
-  }));
+  EXPECT_CALL(handler, passthroughData(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        EXPECT_EQ(100, data.length());
+        return FilterStatus::StopIteration;
+      }));
 
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow); // buffer.length() == 0

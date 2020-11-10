@@ -39,7 +39,7 @@ public:
   virtual TransportPtr createTransport() PURE;
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
-  virtual bool payloadPassthrough() PURE;
+  virtual bool payloadPassthrough() const PURE;
 };
 
 /**
@@ -182,8 +182,8 @@ private:
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportEnd() override;
-    bool passthroughEnabled() override;
-    FilterStatus passthroughData(Buffer::Instance& data, uint64_t bytes_to_passthrough) override;
+    bool passthroughEnabled() const override;
+    FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus messageEnd() override;
     FilterStatus structBegin(absl::string_view name) override;

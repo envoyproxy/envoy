@@ -398,7 +398,7 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   }
 }
 
-bool ConnectionManager::ActiveRpc::passthroughEnabled() {
+bool ConnectionManager::ActiveRpc::passthroughEnabled() const {
   if (!parent_.config_.payloadPassthrough()) {
     return false;
   }
@@ -411,12 +411,11 @@ bool ConnectionManager::ActiveRpc::passthroughEnabled() {
   return true;
 }
 
-FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data,
-                                                           uint64_t bytes_to_passthrough) {
+FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
   filter_context_ = &data;
-  filter_action_ = [this, bytes_to_passthrough](DecoderEventHandler* filter) -> FilterStatus {
+  filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
     Buffer::Instance* data = absl::any_cast<Buffer::Instance*>(filter_context_);
-    return filter->passthroughData(*data, bytes_to_passthrough);
+    return filter->passthroughData(*data);
   };
 
   return applyDecoderFilters(nullptr);

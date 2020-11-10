@@ -27,13 +27,10 @@ public:
   void enablePassthrough(bool enable) { enable_passthrough_ = enable; }
 
   // DecoderEventHandler
-  bool passthroughEnabled() override { return enable_passthrough_; }
+  bool passthroughEnabled() const override { return enable_passthrough_; }
 
-  FilterStatus passthroughData(Buffer::Instance& data, uint64_t bytes_to_passthrough) override {
-    // Current implementation will buffer all data after metadata and send it once.
-    ASSERT(bytes_to_passthrough <= data.length());
-
-    buffer_->move(data, bytes_to_passthrough);
+  FilterStatus passthroughData(Buffer::Instance& data) override {
+    buffer_->move(data);
     return FilterStatus::Continue;
   }
 

@@ -81,7 +81,7 @@ public:
   TransportPtr createTransport() override;
   ProtocolPtr createProtocol() override;
   Router::Config& routerConfig() override { return *this; }
-  bool payloadPassthrough() override { return payload_passthrough_; }
+  bool payloadPassthrough() const override { return payload_passthrough_; }
 
 private:
   void processFilter(

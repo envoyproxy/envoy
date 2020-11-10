@@ -21,10 +21,8 @@ public:
   ~ThriftBase() override = default;
 
   // DecoderEventHandler
-  bool passthroughEnabled() override { return false; }
-  FilterStatus passthroughData(Buffer::Instance&, uint64_t) override {
-    return FilterStatus::Continue;
-  }
+  bool passthroughEnabled() const override { return false; }
+  FilterStatus passthroughData(Buffer::Instance&) override { return FilterStatus::Continue; }
   FilterStatus transportBegin(MessageMetadataSharedPtr) override { return FilterStatus::Continue; }
   FilterStatus transportEnd() override { return FilterStatus::Continue; }
   FilterStatus messageBegin(MessageMetadataSharedPtr) override { return FilterStatus::Continue; }

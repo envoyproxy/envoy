@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 
@@ -12,17 +13,22 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
+// PassthroughData -> PassthroughData
+// PassthroughData -> MessageEnd (all body bytes received)
 DecoderStateMachine::DecoderStatus DecoderStateMachine::passthroughData(Buffer::Instance& buffer) {
   if (body_bytes_ > buffer.length()) {
     return {ProtocolState::WaitForData};
   }
 
-  return {ProtocolState::MessageEnd, handler_.passthroughData(buffer, body_bytes_)};
+  Buffer::OwnedImpl body;
+  body.move(buffer, body_bytes_);
+
+  return {ProtocolState::MessageEnd, handler_.passthroughData(body)};
 }
 
 // MessageBegin -> StructBegin
 DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Instance& buffer) {
-  auto total = buffer.length();
+  const auto total = buffer.length();
   if (!proto_.readMessageBegin(buffer, *metadata_)) {
     return {ProtocolState::WaitForData};
   }
@@ -30,7 +36,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Ins
   stack_.clear();
   stack_.emplace_back(Frame(ProtocolState::MessageEnd));
 
-  auto status = handler_.messageBegin(metadata_);
+  const auto status = handler_.messageBegin(metadata_);
 
   if (handler_.passthroughEnabled()) {
     body_bytes_ = metadata_->frameSize() - (total - buffer.length());
