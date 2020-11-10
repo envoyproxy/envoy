@@ -15,7 +15,7 @@ namespace Wasm {
  */
 class WasmRuntimeValues {
 public:
-  // wasmtime (https://github.com/bytecodealliance/wasmtime).
+  // Wasmtime (https://github.com/bytecodealliance/wasmtime).
   const std::string Wasmtime = "envoy.wasm.runtime.wasmtime";
   // WAVM (https://github.com/WAVM/WAVM) Wasm VM.
   const std::string Wavm = "envoy.wasm.runtime.wavm";
