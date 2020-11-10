@@ -28,7 +28,7 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
   // an OOM condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(fd), "");
 #ifdef WIN32
-  RELEASE_ASSERT(isEventTypeLevelLike(trigger_),
+  RELEASE_ASSERT(trigger_ != FileTriggerType::Edge,
                  "libevent does not support edge triggers on Windows");
 #endif
   assignEvents(events, &dispatcher.base());
@@ -46,6 +46,16 @@ void FileEventImpl::activate(uint32_t events) {
   ASSERT(events != 0);
   // Only supported event types are set.
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
+
+  if (enabled_events_ & FileReadyType::Closed && events & FileReadyType::Read) {
+    // We never ask for both early close and read at the same time. If close is requested
+    // keep that instead.
+    events = events & ~FileReadyType::Read;
+  }
+
+  if (events == 0) {
+    return;
+  }
 
   if (!activate_fd_events_next_event_loop_) {
     // Legacy implementation
@@ -84,7 +94,7 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
   enabled_events_ = events;
   event_assign(
       &raw_event_, base, fd_,
-      EV_PERSIST | (isEventTypeLevelLike(trigger_) ? 0 : EV_ET) |
+      EV_PERSIST | (trigger_ == FileTriggerType::Edge ? EV_ET : 0) |
           (events & FileReadyType::Read ? EV_READ : 0) |
           (events & FileReadyType::Write ? EV_WRITE : 0) |
           (events & FileReadyType::Closed ? EV_CLOSED : 0),
@@ -110,6 +120,9 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
 }
 
 void FileEventImpl::updateEvents(uint32_t events) {
+  if (events == enabled_events_) {
+    return;
+  }
   auto* base = event_get_base(&raw_event_);
   event_del(&raw_event_);
   assignEvents(events, base);
@@ -129,23 +142,31 @@ void FileEventImpl::setEnabled(uint32_t events) {
 }
 
 void FileEventImpl::unregisterEventIfEmulatedEdge(uint32_t event) {
-  ASSERT(event == FileReadyType::Write || event == FileReadyType::Read,
-         fmt::format("not allowed to unregister {}", event));
-  if (trigger_ == FileTriggerType::EmulatedEdge) {
-    auto new_event_mask = enabled_events_ & ~event;
-    updateEvents(new_event_mask);
+  // This constexpr if allows the compiler to optimize away the function on POSIX
+  if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+    ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
+    if (trigger_ == FileTriggerType::EmulatedEdge) {
+      auto new_event_mask = enabled_events_ & ~event;
+      updateEvents(new_event_mask);
+    }
   }
 }
 
 void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
-  ASSERT(event == Event::FileReadyType::Write || event == Event::FileReadyType::Read);
-  if (trigger_ == FileTriggerType::EmulatedEdge) {
-    auto new_event_mask = enabled_events_ | event;
-    if (event == FileReadyType::Read && (enabled_events_ & FileReadyType::Closed)) {
-      // We never ask for both early close and read at the same time.
-      return;
+  // This constexpr if allows the compiler to optimize away the function on POSIX
+  if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+    ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
+    if (trigger_ == FileTriggerType::EmulatedEdge) {
+      auto new_event_mask = enabled_events_ | event;
+      if (event & FileReadyType::Read && (enabled_events_ & FileReadyType::Closed)) {
+        // We never ask for both early close and read at the same time.
+        new_event_mask = new_event_mask & ~FileReadyType::Read;
+      }
+      if (event == 0) {
+        return;
+      }
+      updateEvents(new_event_mask);
     }
-    updateEvents(new_event_mask);
   }
 }
 
@@ -159,11 +180,9 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
   // TODO(davinci26): This can be optimized further in (w)epoll backends using the `EPOLLONESHOT`
   // flag. With this flag `EPOLLIN`/`EPOLLOUT` are automatically disabled when the event is
   // activated.
-  std::array<uint32_t, 2> event_types{Event::FileReadyType::Write, Event::FileReadyType::Read};
-  for (const auto& event_type : event_types) {
-    if ((event_type & events) && trigger_ == FileTriggerType::EmulatedEdge) {
-      unregisterEventIfEmulatedEdge(event_type);
-    }
+  if (trigger_ == FileTriggerType::EmulatedEdge) {
+    unregisterEventIfEmulatedEdge(events &
+                                  (Event::FileReadyType::Write | Event::FileReadyType::Read));
   }
 
   cb_(events);

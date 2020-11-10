@@ -18,7 +18,7 @@ struct FileReadyType {
   static const uint32_t Closed = 0x4;
 };
 
-#define FORCE_LEVEL_EVENTS 0
+#define FORCE_LEVEL_EVENTS
 enum class FileTriggerType { Level, Edge, EmulatedEdge };
 
 static constexpr bool optimizeLevelEvents = true;
@@ -36,10 +36,6 @@ constexpr FileTriggerType determinePlatformPreferredEventType() {
 }
 
 static constexpr FileTriggerType PlatformDefaultTriggerType = determinePlatformPreferredEventType();
-
-static constexpr bool isEventTypeLevelLike(FileTriggerType event) {
-  return (event == FileTriggerType::EmulatedEdge) || (event == FileTriggerType::Level);
-}
 
 /**
  * Callback invoked when a FileEvent is ready for reading or writing.

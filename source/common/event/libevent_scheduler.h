@@ -103,11 +103,6 @@ public:
    */
   void initializeStats(DispatcherStats* stats);
 
-  /**
-   * Return true if the scheduler will run the loop at most once.
-   */
-  static constexpr bool supportsMultipleLoops() { return !(flagsBasedOnEventType() & EVLOOP_ONCE); }
-
 private:
   static void onPrepareForCallback(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
   static void onPrepareForStats(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
