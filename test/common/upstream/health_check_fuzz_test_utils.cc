@@ -1,4 +1,4 @@
-#include "test/common/upstream/health_checker_impl_test_utils.h"
+#include "test/common/upstream/health_check_fuzz_test_utils.h"
 
 #include "test/common/upstream/utility.h"
 
@@ -14,8 +14,8 @@ void HttpHealthCheckerImplTestBase::expectSessionCreate(
   TestSessionPtr new_test_session(new TestSession());
   test_sessions_.emplace_back(std::move(new_test_session));
   TestSession& test_session = *test_sessions_.back();
-  test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
-  test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
+  test_session.timeout_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  test_session.interval_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   expectClientCreate(test_sessions_.size() - 1, health_check_map);
 }
 
