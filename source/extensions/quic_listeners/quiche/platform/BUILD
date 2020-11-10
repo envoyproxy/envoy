@@ -274,7 +274,6 @@ envoy_cc_library(
     hdrs = [
         "spdy_bug_tracker_impl.h",
         "spdy_containers_impl.h",
-        "spdy_endianness_util_impl.h",
         "spdy_estimate_memory_usage_impl.h",
         "spdy_flags_impl.h",
         "spdy_logging_impl.h",
