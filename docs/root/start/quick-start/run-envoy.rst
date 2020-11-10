@@ -121,7 +121,7 @@ Override the default configuration
 You can provide an override configuration using :option:`--config-yaml` which will merge with the main
 configuration.
 
-This can only be specified once.
+This option can only be specified once.
 
 Save the following snippet to ``envoy-override.yaml``:
 
@@ -268,7 +268,7 @@ Envoy can be configured to log to :ref:`different formats <config_access_log>`, 
 
    If you are running Envoy on a Windows system Envoy will output to `CON` by default.
 
-Envoy debugging
+Debugging Envoy
 ---------------
 
 The log level for Envoy system logs can be set using the :option:`-l or --log-level <--log-level>` option.
@@ -287,7 +287,8 @@ The available log levels are:
 
 You can also set the log level for specific components using the :option:`--component-log-level` option.
 
-The following example inhibits all logging except for the ``upstream`` and ``connection`` components.
+The following example inhibits all logging except for the ``upstream`` and ``connection`` components,
+which are set to ``debug`` and ``trace`` respectively.
 
 .. tabs::
 
