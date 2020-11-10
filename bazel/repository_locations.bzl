@@ -861,7 +861,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        release_date = "2020-10-22",
+        release_date = "2020-11-10",
         cpe = "N/A",
     ),
     proxy_wasm_cpp_host = dict(
