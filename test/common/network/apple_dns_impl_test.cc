@@ -11,10 +11,10 @@
 #include "envoy/network/dns.h"
 
 #include "common/common/random_generator.h"
-#include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/apple_dns_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
@@ -32,6 +32,8 @@ using testing::Return;
 using testing::SaveArg;
 using testing::StrEq;
 using testing::WithArgs;
+
+struct _DNSServiceRef_t {};
 
 namespace Envoy {
 namespace Network {
@@ -214,18 +216,21 @@ public:
 
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(initialize_failure_timer_));
     EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_))
-        .WillOnce(Return(kDNSServiceErr_NoError));
+        .WillOnce(DoAll(
+            WithArgs<0>(Invoke([](DNSServiceRef* ref) -> void { *ref = new _DNSServiceRef_t{}; })),
+            Return(kDNSServiceErr_NoError)));
     EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
     EXPECT_CALL(*initialize_failure_timer_, disableTimer());
 
-    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_);
+    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
   }
 
 protected:
   MockDnsService dns_service_;
   TestThreadsafeSingletonInjector<Network::DnsService> dns_service_injector_{&dns_service_};
+  Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::AppleDnsResolverImpl> resolver_{};
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* initialize_failure_timer_;
@@ -239,7 +244,9 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInConnectionCreation) {
   EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_Unknown));
   EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
 
-  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_);
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
+
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.connection_failure")->value());
 }
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
@@ -248,7 +255,9 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(-1));
   EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
 
-  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_);
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
+
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.socket_failure")->value());
 }
 
 TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
@@ -272,6 +281,8 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
   EXPECT_CALL(*initialize_failure_timer_, disableTimer());
 
   file_ready_cb_(Event::FileReadyType::Read);
+
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.processing_failure")->value());
 }
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResultWithPendingQueries) {
@@ -437,7 +448,10 @@ TEST_F(AppleDnsImplFakeApiTest, QueryCompletedWithError) {
   EXPECT_CALL(dns_service_, dnsServiceRefDeallocate(_)).Times(2);
   // A new main ref is created on error.
   EXPECT_CALL(*initialize_failure_timer_, disableTimer());
-  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_NoError));
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_))
+      .WillOnce(DoAll(
+          WithArgs<0>(Invoke([](DNSServiceRef* ref) -> void { *ref = new _DNSServiceRef_t{}; })),
+          Return(kDNSServiceErr_NoError)));
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
@@ -784,7 +798,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInConnectionCreationImmediateCallback) {
   EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_Unknown));
   EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
 
-  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_);
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
 
   EXPECT_CALL(*initialize_failure_timer_, enabled()).Times(2).WillRepeatedly(Return(true));
   EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_NoError));
@@ -808,14 +822,17 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInConnectionCreationQueryDispatched) {
   EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_Unknown));
   EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
 
-  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_);
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
 
   file_event_ = new NiceMock<Event::MockFileEvent>;
   EXPECT_CALL(*initialize_failure_timer_, enabled())
       .Times(2)
       .WillOnce(Return(true))
       .WillOnce(Return(false));
-  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_NoError));
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_))
+      .WillOnce(DoAll(
+          WithArgs<0>(Invoke([](DNSServiceRef* ref) -> void { *ref = new _DNSServiceRef_t{}; })),
+          Return(kDNSServiceErr_NoError)));
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));

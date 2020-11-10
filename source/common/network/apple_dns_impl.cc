@@ -49,16 +49,22 @@ static constexpr uint32_t RetryInitialDelayMilliseconds = 300;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * RetryInitialDelayMilliseconds;
 
 AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher,
-                                           Random::RandomGenerator& random)
+                                           Random::RandomGenerator& random,
+                                           Stats::Scope& root_scope)
     : dispatcher_(dispatcher), initialize_failure_timer_(dispatcher.createTimer(
                                    [this]() -> void { initializeMainSdRef(); })),
       backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
-          RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random)) {
+          RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random)),
+      scope_(root_scope.createScope("dns.apple.")), stats_(generateAppleDnsResolverStats(*scope_)) {
   ENVOY_LOG(debug, "Constructing DNS resolver");
   initializeMainSdRef();
 }
 
 AppleDnsResolverImpl::~AppleDnsResolverImpl() { deallocateMainSdRef(); }
+
+AppleDnsResolverStats AppleDnsResolverImpl::generateAppleDnsResolverStats(Stats::Scope& scope) {
+  return {ALL_APPLE_DNS_RESOLVER_STATS(POOL_COUNTER(scope))};
+}
 
 void AppleDnsResolverImpl::deallocateMainSdRef() {
   ENVOY_LOG(debug, "DNSServiceRefDeallocate main sd ref");
@@ -85,7 +91,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   // where relevant.
   auto error = DnsServiceSingleton::get().dnsServiceCreateConnection(&main_sd_ref_);
   if (error != kDNSServiceErr_NoError) {
-    // FIX ME: stat
+    stats_.connection_failure_.inc();
     initialize_failure_timer_->enableTimer(
         std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
     return;
@@ -93,7 +99,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
 
   auto fd = DnsServiceSingleton::get().dnsServiceRefSockFD(main_sd_ref_);
   if (fd == -1) {
-    // FIX ME: stat
+    stats_.socket_failure_.inc();
     initialize_failure_timer_->enableTimer(
         std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
     return;
@@ -118,6 +124,7 @@ void AppleDnsResolverImpl::onEventCallback(uint32_t events) {
   DNSServiceErrorType error = DnsServiceSingleton::get().dnsServiceProcessResult(main_sd_ref_);
   if (error != kDNSServiceErr_NoError) {
     ENVOY_LOG(warn, "DNS resolver error ({}) in DNSServiceProcessResult", error);
+    stats_.processing_failure_.inc();
     // Similar to receiving an error in onDNSServiceGetAddrInfoReply, an error while processing fd
     // events indicates that the sd_ref state is broken.
     // Therefore, flush queries with_error == true.
@@ -241,6 +248,7 @@ AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   // thus the DNSServiceRef is null.
   // Therefore, only deallocate if the ref is not null.
   if (individual_sd_ref_) {
+    ENVOY_LOG(debug, "DNSServiceRefDeallocate individual sd ref");
     DnsServiceSingleton::get().dnsServiceRefDeallocate(individual_sd_ref_);
   }
 }

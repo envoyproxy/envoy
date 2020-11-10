@@ -109,6 +109,7 @@ envoy_cc_test(
         "//include/envoy/network:dns_interface",
         "//source/common/event:dispatcher_includes",
         "//include/envoy/event:file_event_interface",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
         "//source/common/common:random_generator_lib",

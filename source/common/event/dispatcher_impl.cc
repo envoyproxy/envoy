@@ -148,7 +148,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
                    "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
                    "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
     return Network::DnsResolverSharedPtr{
-        new Network::AppleDnsResolverImpl(*this, api_.randomGenerator())};
+        new Network::AppleDnsResolverImpl(*this, api_.randomGenerator(), api_.rootScope())};
   }
 #endif
   return Network::DnsResolverSharedPtr{
