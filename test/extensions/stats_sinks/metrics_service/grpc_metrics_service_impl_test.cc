@@ -62,8 +62,9 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream1, sendMessageRaw_(_, false));
-  Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily> metrics1;
-  streamer_->send(metrics1);
+  auto metrics =
+      std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
+  streamer_->send(std::move(metrics));
   // Verify that sending an empty response message doesn't do anything bad.
   callbacks1->onReceiveMessage(
       std::make_unique<envoy::service::metrics::v3::StreamMetricsResponse>());
@@ -81,16 +82,22 @@ TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
             return nullptr;
           }));
   EXPECT_CALL(local_info_, node());
-  Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily> metrics1;
-  streamer_->send(metrics1);
+  auto metrics =
+      std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
+  streamer_->send(std::move(metrics));
 }
 
 class MockGrpcMetricsStreamer
-    : public GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsResponse> {
+    : public GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
+                                 envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
+  MockGrpcMetricsStreamer(Grpc::AsyncClientFactoryPtr&& factory)
+      : GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
+                            envoy::service::metrics::v3::StreamMetricsResponse>(
+            std::move(factory)) {}
+
   // GrpcMetricsStreamer
-  MOCK_METHOD(void, send,
-              (Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily> & metrics));
+  MOCK_METHOD(void, send, (MetricsPtr && metrics));
 };
 
 class MetricsServiceSinkTest : public testing::Test {
@@ -98,11 +105,14 @@ public:
   MetricsServiceSinkTest() = default;
 
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
-  std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
+  std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer(
+      Grpc::AsyncClientFactoryPtr{new NiceMock<Grpc::MockAsyncClientFactory>()})};
 };
 
 TEST_F(MetricsServiceSinkTest, CheckSendCall) {
-  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsResponse> sink(streamer_, false);
+  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                     envoy::service::metrics::v3::StreamMetricsResponse>
+      sink(streamer_, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -126,7 +136,9 @@ TEST_F(MetricsServiceSinkTest, CheckSendCall) {
 }
 
 TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
-  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsResponse> sink(streamer_, false);
+  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                     envoy::service::metrics::v3::StreamMetricsResponse>
+      sink(streamer_, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -140,26 +152,24 @@ TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
   gauge->used_ = true;
   snapshot_.gauges_.push_back(*gauge);
 
-  EXPECT_CALL(*streamer_, send(_))
-      .WillOnce(Invoke(
-          [](Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics) {
-            EXPECT_EQ(2, metrics.size());
-          }));
+  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    EXPECT_EQ(2, metrics->size());
+  }));
   sink.flush(snapshot_);
 
   // Verify only newly added metrics come after endFlush call.
   gauge->used_ = false;
-  EXPECT_CALL(*streamer_, send(_))
-      .WillOnce(Invoke(
-          [](Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics) {
-            EXPECT_EQ(1, metrics.size());
-          }));
+  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    EXPECT_EQ(1, metrics->size());
+  }));
   sink.flush(snapshot_);
 }
 
 // Test that verifies counters are correctly reported as current value when configured to do so.
 TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
-  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsResponse> sink(streamer_, false);
+  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                     envoy::service::metrics::v3::StreamMetricsResponse>
+      sink(streamer_, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -167,18 +177,18 @@ TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
   counter->used_ = true;
   snapshot_.counters_.push_back({1, *counter});
 
-  EXPECT_CALL(*streamer_, send(_))
-      .WillOnce(Invoke(
-          [](Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics) {
-            EXPECT_EQ(1, metrics.size());
-            EXPECT_EQ(100, metrics[0].metric(0).counter().value());
-          }));
+  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    EXPECT_EQ(1, metrics->size());
+    EXPECT_EQ(100, (*metrics)[0].metric(0).counter().value());
+  }));
   sink.flush(snapshot_);
 }
 
 // Test that verifies counters are reported as the delta between flushes when configured to do so.
 TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
-  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsResponse> sink(streamer_, true);
+  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                     envoy::service::metrics::v3::StreamMetricsResponse>
+      sink(streamer_, true);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -186,12 +196,10 @@ TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
   counter->used_ = true;
   snapshot_.counters_.push_back({1, *counter});
 
-  EXPECT_CALL(*streamer_, send(_))
-      .WillOnce(Invoke(
-          [](Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics) {
-            EXPECT_EQ(1, metrics.size());
-            EXPECT_EQ(1, metrics[0].metric(0).counter().value());
-          }));
+  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    EXPECT_EQ(1, metrics->size());
+    EXPECT_EQ(1, (*metrics)[0].metric(0).counter().value());
+  }));
   sink.flush(snapshot_);
 }
 
