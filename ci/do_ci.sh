@@ -314,7 +314,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   bazel build "${BAZEL_BUILD_OPTIONS[@]}"  --define wasm=wavm  "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
 
-  echo "Building binary with wasm=wavm..."
+  echo "Building binary with wasm=wasmtime..."
   bazel build "${BAZEL_BUILD_OPTIONS[@]}"  --define wasm=wasmtime  "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
   exit 0
