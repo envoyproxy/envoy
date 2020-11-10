@@ -45,8 +45,9 @@ DNSServiceErrorType DnsService::dnsServiceGetAddrInfo(DNSServiceRef* sdRef, DNSS
 }
 
 // Parameters of the jittered backoff strategy.
-static constexpr uint32_t RetryInitialDelayMilliseconds = 300;
-static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * RetryInitialDelayMilliseconds;
+static constexpr std::chrono::milliseconds RetryInitialDelayMilliseconds(300);
+static constexpr std::chrono::milliseconds RetryMaxDelayMilliseconds(10 *
+                                                                     RetryInitialDelayMilliseconds);
 
 AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher,
                                            Random::RandomGenerator& random,
@@ -54,7 +55,7 @@ AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher,
     : dispatcher_(dispatcher), initialize_failure_timer_(dispatcher.createTimer(
                                    [this]() -> void { initializeMainSdRef(); })),
       backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
-          RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random)),
+          RetryInitialDelayMilliseconds.count(), RetryMaxDelayMilliseconds.count(), random)),
       scope_(root_scope.createScope("dns.apple.")), stats_(generateAppleDnsResolverStats(*scope_)) {
   ENVOY_LOG(debug, "Constructing DNS resolver");
   initializeMainSdRef();
