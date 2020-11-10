@@ -104,7 +104,7 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
       .WillByDefault(testing::Return(input.http_verify_cluster()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  if (input.upstream_cx_total_inc()) {
+  if (input.upstream_cx_success()) {
     cluster_->info_->stats().upstream_cx_total_.inc();
   }
   expectSessionCreate();
@@ -215,6 +215,9 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   allocTcpHealthCheckerFromProto(input.health_check_config());
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  if (input.upstream_cx_success()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
   expectClientCreate();
   health_checker_->start();
@@ -320,7 +323,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   allocGrpcHealthCheckerFromProto(input.health_check_config());
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  if (input.upstream_cx_total_inc()) {
+  if (input.upstream_cx_success()) {
     cluster_->info_->stats().upstream_cx_total_.inc();
   }
   expectSessionCreate();
