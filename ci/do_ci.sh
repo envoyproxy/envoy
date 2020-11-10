@@ -150,7 +150,7 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests" "@org_unicode_icuuc//:common_test")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests" "@org_unicode_icuuc//:common_test" "//third_party/icu/...")
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -170,7 +170,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   bazel_binary_build release
 
   # Validate skipping system ICU linking.
-  ./ci/check_no_system_icu.sh
+  ./ci/check_skip_system_icu_linking.sh
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
