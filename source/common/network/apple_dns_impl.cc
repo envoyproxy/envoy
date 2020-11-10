@@ -45,9 +45,8 @@ DNSServiceErrorType DnsService::dnsServiceGetAddrInfo(DNSServiceRef* sdRef, DNSS
 }
 
 // Parameters of the jittered backoff strategy.
-static constexpr std::chrono::milliseconds RetryInitialDelayMilliseconds(300);
-static constexpr std::chrono::milliseconds RetryMaxDelayMilliseconds(10 *
-                                                                     RetryInitialDelayMilliseconds);
+static constexpr std::chrono::milliseconds RetryInitialDelayMilliseconds(30);
+static constexpr std::chrono::milliseconds RetryMaxDelayMilliseconds(30000);
 
 AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher,
                                            Random::RandomGenerator& random,
