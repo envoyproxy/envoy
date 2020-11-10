@@ -23,6 +23,9 @@ static_resources:
           - name: envoy.access_loggers.file
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              # For the demo/default config in the Docker container we use:
+              #   - system logs -> `/dev/stderr`
+              #   - (listener) access_logs -> `/dev/stdout`
               path: /dev/stdout
           route_config:
             name: local_route
