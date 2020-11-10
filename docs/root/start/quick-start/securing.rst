@@ -10,6 +10,10 @@ Transport Layer Security (``TLS``) can be used to secure all types of ``HTTP`` t
 
 Envoy also has support for transmitting and receiving generic ``TCP`` traffic with ``TLS``.
 
+Envoy also offers a number of other ``HTTP``-based protocols for authentication and authorization
+such as :ref:`JWT <arch_overview_jwt_authn>`, :ref:`RBAC <arch_overview_rbac>`
+and :ref:`OAuth <envoy_v3_api_file_envoy/extensions/filters/http/oauth2/v3alpha/oauth.proto>`.
+
 .. warning::
 
    The following guide takes you through individual aspects of securing traffic.
@@ -20,20 +24,22 @@ Envoy also has support for transmitting and receiving generic ``TCP`` traffic wi
    Here we provide a guide to using :ref:`mTLS <start_quick_start_securing_mtls>` which provides both encryption
    and mutual authentication.
 
-   You are also strongly encouraged to :ref:`validate <start_quick_start_securing_validation>` all certificates
-   wherever possible.
+   When using ``TLS``, you are strongly encouraged to :ref:`validate <start_quick_start_securing_validation>`
+   all certificates wherever possible.
 
    It is your responsibility to ensure the integrity of your certificate chain, and outside the scope of this guide.
 
 .. _start_quick_start_securing_contexts:
 
-Upstream and downstream TLS contexts
-------------------------------------
+Upstream and downstream ``TLS`` contexts
+----------------------------------------
 
 Machines connecting to Envoy to proxy traffic are "downstream" in relation to Envoy.
 
 Specifying a ``TLS`` context that clients can connect to is achieved by setting the
 :ref:`DownstreamTLSContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`
+in the :ref:`transport_socket <extension_envoy.transport_sockets.tls>` of a
+:ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`.
 
 You will also need to provide valid certificates.
 
@@ -46,7 +52,8 @@ You will also need to provide valid certificates.
 
 Connecting to an "upstream" ``TLS`` service is conversely done by adding an
 :ref:`UpstreamTLSContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`
-to the :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
+to the :ref:`transport_socket <extension_envoy.transport_sockets.tls>` of a
+:ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
 .. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
@@ -102,10 +109,10 @@ certificate is valid for.
 
 .. _start_quick_start_securing_mtls:
 
-Use mututal TLS (mTLS) to enforce client certificate authentication
--------------------------------------------------------------------
+Use mututal ``TLS`` (``mTLS``) to enforce client certificate authentication
+---------------------------------------------------------------------------
 
-With mutual TLS (mTLS), Envoy also provides a way to authenticate connecting clients.
+With mutual ``TLS`` (``mTLS``), Envoy also provides a way to authenticate connecting clients.
 
 At a minimum you will need to set
 :ref:`require_client_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
@@ -139,8 +146,8 @@ similar to validating upstream certificates :ref:`described above <start_quick_s
 
 .. _start_quick_start_securing_mtls_client:
 
-Use mututal TLS (mTLS) to connect with client certificates
-----------------------------------------------------------
+Use mututal ``TLS`` (``mTLS``) to connect with client certificates
+------------------------------------------------------------------
 
 When connecting to an upstream with client certificates you can set them as follows:
 
@@ -154,8 +161,8 @@ When connecting to an upstream with client certificates you can set them as foll
 
 .. _start_quick_start_securing_sni:
 
-Provide multiple TLS domains at the same IP address
----------------------------------------------------
+Provide multiple ``TLS`` domains at the same ``IP`` address with ``SNI``
+------------------------------------------------------------------------
 
 ``SNI`` is an extension to the ``TLS`` protocol which allows multiple domains served
 from the same ``IP`` address to be secured with ``TLS``.
@@ -176,8 +183,8 @@ See here for :ref:`more info about creating multiple endpoints with SNI <faq_how
 
 .. _start_quick_start_securing_sni_client:
 
-Connect to an endpoint with SNI
--------------------------------
+Connect to an endpoint with ``SNI``
+-----------------------------------
 
 When connecting to a ``TLS`` endpoint that uses ``SNI`` you should set
 :ref:`sni <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>` in the configuration

@@ -46,8 +46,8 @@ In this example, the logs are simply discarded.
 
 .. warning::
 
-   The Envoy admin endpoint can expose private information about the running service, and
-   can also be used to shut it down.
+   The Envoy admin endpoint can expose private information about the running service, allows modification
+   of runtime settings and can also be used to shut the server down.
 
    As the endpoint is not authenticated it is essential that you limit access to it.
 
@@ -102,7 +102,7 @@ you could:
 
 .. code-block:: console
 
-   $ curl -s http://localhost:19000/config_dump?resource=dynamic_listeners | jq '.configs[0].active_state.listener.address'
+   $ curl -s http://localhost:9901/config_dump?resource=dynamic_listeners | jq '.configs[0].active_state.listener.address'
    {
      "socket_address": {
        "address": "0.0.0.0",
@@ -155,7 +155,7 @@ is evaluated as a regular expression:
 
 .. code-block:: console
 
-   $ curl -s http://localhost:19000/stats?filter='^http\.ingress_http'
+   $ curl -s http://localhost:9901/stats?filter='^http\.ingress_http'
    http.ingress_http.downstream_cx_active: 0
    http.ingress_http.downstream_cx_delayed_close_timeout: 0
    http.ingress_http.downstream_cx_destroy: 3
@@ -232,7 +232,7 @@ You can also pass a :ref:`format <operations_admin_interface_stats>` argument, f
 
 .. code-block:: console
 
-   $ curl -s "http://localhost:19000/stats?filter=http.ingress_http.rq&format=json" | jq '.stats'
+   $ curl -s "http://localhost:9901/stats?filter=http.ingress_http.rq&format=json" | jq '.stats'
 
 .. code-block:: json
 
@@ -254,3 +254,14 @@ You can also pass a :ref:`format <operations_admin_interface_stats>` argument, f
        "name": "http.ingress_http.rq_total"
      }
    ]
+
+
+Envoy admin web UI
+------------------
+
+Envoy also has a web user interface that allows you to view and modify settings and
+statistics.
+
+Point your browser to http://localhost:9901.
+
+.. image:: /_static/envoy-admin.png
