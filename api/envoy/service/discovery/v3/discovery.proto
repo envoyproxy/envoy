@@ -253,7 +253,7 @@ message DeltaDiscoveryResponse {
   string nonce = 5;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Resource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Resource";
 
@@ -288,4 +288,10 @@ message Resource {
   // testing where the fault injection should be terminated in the event that Envoy loses contact
   // with the management server.
   google.protobuf.Duration ttl = 6;
+
+  // If true, xDS proxies may not cache this resource.
+  // Note that this does not apply to non-proxy xDS clients, which must cache resources for their
+  // own use, regardless of the value of this field.
+  // [#not-implemented-hide:]
+  bool do_not_cache = 7;
 }
