@@ -88,6 +88,7 @@ py_test(
         "outofproc_main_test.py",
     ],
     data = [
+        "//test/config/integration:google_com_proxy_port_0",
         "//source/exe:envoy-static",
     ],
     python_version = "PY3",
