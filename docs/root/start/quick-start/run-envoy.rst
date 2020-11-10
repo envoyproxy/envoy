@@ -119,15 +119,12 @@ configuration.
 
 Save the following snippet to ``envoy-override.yaml``:
 
-THIS DOESNT WORK!
-
 .. code-block:: yaml
 
-   listeners:
-     - name: listener_0
-       address:
-         socket_address:
-           port_value: 20000
+   admin:
+     address:
+       socket_address:
+         port_value: 9902
 
 Next, start the Envoy server using the override configuration.
 
@@ -137,29 +134,34 @@ Next, start the Envoy server using the override configuration.
 
       .. code-block:: console
 
-         $ envoy -c envoy-demo.yaml --config-yaml envoy-override.yaml
+         $ envoy -c envoy-demo.yaml --config-yaml "$(cat envoy-override.yaml)"
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
          $ docker run --rm -d \
-               -v $(pwd)/envoy-override.yaml:/envoy-override.yaml \
-               -p 20000:20000 \
+               -p 9902:9902 \
+               -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
-                   --config-yaml /envoy-override.yaml
+                   -c /etc/envoy/envoy.yaml \
+                   --config-yaml "$(cat envoy-override.yaml)"
 
-Envoy should now be proxying on http://localhost:20000
-
-.. code-block:: console
-
-   $ curl -v localhost:20000
-
-The Envoy admin endpoint should also be available at http://localhost:9901
+The Envoy admin interface should now be available on http://localhost:9902
 
 .. code-block:: console
 
-   $ curl -v localhost:9901
+   $ curl -v localhost:9902
+
+.. note::
+
+   When merging ``yaml`` lists (e.g. :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`
+   or :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`) the merged configurations
+   are appended.
+
+   You cannot therefore use an override file to change the configurations of previously specified
+   :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>` or
+   :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
 
 Validating your Envoy configuration
 -----------------------------------
@@ -230,21 +232,21 @@ This can be overridden using ``--log-path``
 
       .. code-block:: console
 
-	 $ mkdir logs
+         $ mkdir logs
          $ envoy -c envoy-demo.yaml --log-path logs/custom.log
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ mkdir logs
-	 $ chmod go+rwx logs/
+         $ mkdir logs
+         $ chmod go+rwx logs/
          $ docker run --rm -d \
                -p 10000:10000 \
-	       -v $(pwd)/logs:/logs \
+               -v $(pwd)/logs:/logs \
                envoyproxy/|envoy_docker_image| \
-	       -c /etc/envoy/envoy.yaml \
-	       --log-path logs/custom.log
+               -c /etc/envoy/envoy.yaml \
+               --log-path logs/custom.log
 
 Access log paths can be set for the admin interface, and for configured listeners.
 
@@ -293,7 +295,7 @@ The following example inhibits all logging except for the ``upstream`` and ``con
                -p 9901:9901 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
-	       -c /etc/envoy/envoy.yaml \
+               -c /etc/envoy/envoy.yaml \
                -l off \
                --component-log-level upstream:debug,connection:trace
 
