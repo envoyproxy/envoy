@@ -80,17 +80,27 @@ struct ClusterConnectivityState {
     ASSERT(active_streams_ == 0);
     ASSERT(connecting_capacity_ == 0);
   }
-  void checkAndDecrement(uint32_t& value, uint32_t& delta) {
-    ASSERT(value - delta <= value);
+
+  template <class T> void checkAndDecrement(T& value, uint32_t delta) {
+    ASSERT(delta <= value);
     value -= delta;
   }
 
-  void incrPendingStreams(uint32_t delta) { pending_streams_ += delta; }
-  void decrPendingStreams(uint32_t delta) { checkAndDecrement(pending_streams_, delta); }
-  void incrConnectingCapacity(uint32_t delta) { connecting_capacity_ += delta; }
-  void decrConnectingCapacity(uint32_t delta) { checkAndDecrement(connecting_capacity_, delta); }
-  void incrActiveStreams(uint32_t delta) { active_streams_ += delta; }
-  void decrActiveStreams(uint32_t delta) { checkAndDecrement(active_streams_, delta); }
+  template <class T> void checkAndIncrement(T& value, uint32_t delta) {
+    ASSERT(std::numeric_limits<T>::max() - value > delta);
+    value += delta;
+  }
+
+  void incrPendingStreams(uint32_t delta) { checkAndIncrement<uint32_t>(pending_streams_, delta); }
+  void decrPendingStreams(uint32_t delta) { checkAndDecrement<uint32_t>(pending_streams_, delta); }
+  void incrConnectingCapacity(uint32_t delta) {
+    checkAndIncrement<uint64_t>(connecting_capacity_, delta);
+  }
+  void decrConnectingCapacity(uint32_t delta) {
+    checkAndDecrement<uint64_t>(connecting_capacity_, delta);
+  }
+  void incrActiveStreams(uint32_t delta) { checkAndIncrement<uint32_t>(active_streams_, delta); }
+  void decrActiveStreams(uint32_t delta) { checkAndDecrement<uint32_t>(active_streams_, delta); }
 
   // Tracks the number of pending streams for this ClusterManager.
   uint32_t pending_streams_{};
@@ -98,7 +108,7 @@ struct ClusterConnectivityState {
   uint32_t active_streams_{};
   // Tracks the stream capacity if all connecting connections were connected but
   // excluding streams which are in use.
-  uint32_t connecting_capacity_{};
+  uint64_t connecting_capacity_{};
 };
 
 /**

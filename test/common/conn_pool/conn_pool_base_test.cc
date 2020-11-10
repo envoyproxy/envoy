@@ -22,9 +22,9 @@ public:
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
-  size_t numActiveStreams() const override { return active_streams_; }
+  uint32_t numActiveStreams() const override { return active_streams_; }
 
-  size_t active_streams_{};
+  uint32_t active_streams_{};
 };
 
 class TestPendingStream : public PendingStream {

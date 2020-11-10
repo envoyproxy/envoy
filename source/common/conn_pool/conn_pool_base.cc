@@ -468,13 +468,13 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
 namespace {
 // Translate zero to UINT64_MAX so that the zero/unlimited case doesn't
 // have to be handled specially.
-uint64_t translateZeroToUnlimited(uint64_t limit) {
-  return (limit != 0) ? limit : std::numeric_limits<uint64_t>::max();
+uint32_t translateZeroToUnlimited(uint32_t limit) {
+  return (limit != 0) ? limit : std::numeric_limits<uint32_t>::max();
 }
 } // namespace
 
-ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-                           uint64_t concurrent_stream_limit)
+ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+                           uint32_t concurrent_stream_limit)
     : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit)),
       concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
       connect_timer_(parent_.dispatcher().createTimer([this]() -> void { onConnectTimeout(); })) {

@@ -22,8 +22,7 @@ namespace {
 class ConnPoolImplForTest : public HttpConnPoolImplBase {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterConnectivityState& state,
-                      Random::RandomGenerator& random,
-                      Upstream::ClusterInfoConstSharedPtr cluster)
+                      Random::RandomGenerator& random, Upstream::ClusterInfoConstSharedPtr cluster)
       : HttpConnPoolImplBase(Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                              Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
                              random, state, {Http::Protocol::Http2, Http::Protocol::Http11}) {}

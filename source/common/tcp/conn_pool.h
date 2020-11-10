@@ -95,7 +95,7 @@ public:
   void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
 
   void close() override { connection_->close(Network::ConnectionCloseType::NoFlush); }
-  size_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
+  uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
   bool closingWithIncompleteStream() const override { return false; }
   uint64_t id() const override { return connection_->id(); }
 

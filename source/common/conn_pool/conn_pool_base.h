@@ -29,8 +29,8 @@ class ActiveClient : public LinkedObject<ActiveClient>,
                      public Event::DeferredDeletable,
                      protected Logger::Loggable<Logger::Id::pool> {
 public:
-  ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-               uint64_t concurrent_stream_limit);
+  ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+               uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
   void releaseResources();
@@ -45,11 +45,11 @@ public:
 
   // Returns the concurrent stream limit, accounting for if the total stream limit
   // is less than the concurrent stream limit.
-  uint64_t effectiveConcurrentStreamLimit() const {
+  uint32_t effectiveConcurrentStreamLimit() const {
     return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
-  uint64_t currentUnusedCapacity() const {
+  uint32_t currentUnusedCapacity() const {
     return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
   }
 
@@ -60,7 +60,7 @@ public:
   // Returns true if this closed with an incomplete stream, for stats tracking/ purposes.
   virtual bool closingWithIncompleteStream() const PURE;
   // Returns the number of active streams on this connection.
-  virtual size_t numActiveStreams() const PURE;
+  virtual uint32_t numActiveStreams() const PURE;
 
   enum class State {
     CONNECTING, // Connection is not yet established.
@@ -72,8 +72,8 @@ public:
   };
 
   ConnPoolImplBase& parent_;
-  uint64_t remaining_streams_;
-  const uint64_t concurrent_stream_limit_;
+  uint32_t remaining_streams_;
+  const uint32_t concurrent_stream_limit_;
   State state_{State::CONNECTING};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
@@ -245,11 +245,11 @@ private:
   std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.
-  uint64_t num_active_streams_{0};
+  uint32_t num_active_streams_{0};
 
   // The number of streams that can be immediately dispatched
   // if all CONNECTING connections become connected.
-  uint64_t connecting_stream_capacity_{0};
+  uint32_t connecting_stream_capacity_{0};
 };
 
 } // namespace ConnectionPool

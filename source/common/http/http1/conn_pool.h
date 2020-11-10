@@ -75,7 +75,7 @@ protected:
     bool closingWithIncompleteStream() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
-    size_t numActiveStreams() const override {
+    uint32_t numActiveStreams() const override {
       // Override the parent class using the codec for numActiveStreams.
       // Unfortunately for the HTTP/1 codec, the stream is destroyed before decode
       // is complete, and we must make sure the connection pool does not observe available
