@@ -33,7 +33,6 @@ envoy_sh_test(
     coverage = False,
     data = ["//bazel/external/icu/googleurl:googleurl_test"],
     tags = [
-        "nofips",
         "skip_on_windows",
     ],
 )
