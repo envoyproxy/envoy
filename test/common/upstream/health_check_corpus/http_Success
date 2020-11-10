@@ -45,3 +45,4 @@ actions {
         }
     }
 }
+upstream_cx_success: true
