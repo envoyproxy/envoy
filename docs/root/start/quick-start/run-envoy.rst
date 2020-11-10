@@ -79,7 +79,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. substitution-code-block:: console
 
-         $ docker run --rm -d \
+         $ docker run --rm -it \
                -p 9901:9901 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image|
@@ -90,32 +90,38 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. substitution-code-block:: console
 
-         $ docker run --rm -d \
+         $ docker run --rm -it \
                -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml \
                -p 9901:9901 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
                    -c /envoy-custom.yaml
 
-Check Envoy is proxying on http://localhost:10000
+Check Envoy is proxying on http://localhost:10000.
 
 .. code-block:: console
 
    $ curl -v localhost:10000
 
-The Envoy admin endpoint should also be available at http://localhost:9901
+The Envoy admin endpoint should also be available at http://localhost:9901.
 
 .. code-block:: console
 
    $ curl -v localhost:9901
 
+You can exit the server with `Ctrl-c`.
+
+See the :ref:`admin quick start guide <start_quick_start_admin>` for more information about the Envoy admin interface.
+
 .. _start_quick_start_override:
 
-Override the default configuration by merging a config file
------------------------------------------------------------
+Override the default configuration
+----------------------------------
 
-You can provide a configuration override file using ``--config-yaml`` which will merge with the main
+You can provide an override configuration using :option:`--config-yaml` which will merge with the main
 configuration.
+
+This can only be specified once.
 
 Save the following snippet to ``envoy-override.yaml``:
 
@@ -126,7 +132,7 @@ Save the following snippet to ``envoy-override.yaml``:
        socket_address:
          port_value: 9902
 
-Next, start the Envoy server using the override configuration.
+Next, start the Envoy server using the override configuration:
 
 .. tabs::
 
@@ -135,19 +141,20 @@ Next, start the Envoy server using the override configuration.
       .. code-block:: console
 
          $ envoy -c envoy-demo.yaml --config-yaml "$(cat envoy-override.yaml)"
+	 ...
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-         $ docker run --rm -d \
+         $ docker run --rm -it \
                -p 9902:9902 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
                    -c /etc/envoy/envoy.yaml \
                    --config-yaml "$(cat envoy-override.yaml)"
 
-The Envoy admin interface should now be available on http://localhost:9902
+The Envoy admin interface should now be available on http://localhost:9902.
 
 .. code-block:: console
 
@@ -166,7 +173,7 @@ The Envoy admin interface should now be available on http://localhost:9902
 Validating your Envoy configuration
 -----------------------------------
 
-You can start Envoy in :option:`validation mode <--mode>`.
+You can start Envoy in :option:`validate mode <--mode>`.
 
 This allows you to check that Envoy is able to start with your configuration, without actually starting
 or restarting the service, or making any network connections.
@@ -224,7 +231,7 @@ Envoy logging
 
 By default Envoy system logs are sent to ``/dev/stderr``.
 
-This can be overridden using ``--log-path``
+This can be overridden using :option:`--log-path`.
 
 .. tabs::
 
@@ -241,18 +248,20 @@ This can be overridden using ``--log-path``
 
          $ mkdir logs
          $ chmod go+rwx logs/
-         $ docker run --rm -d \
+         $ docker run --rm -it \
                -p 10000:10000 \
                -v $(pwd)/logs:/logs \
                envoyproxy/|envoy_docker_image| \
                -c /etc/envoy/envoy.yaml \
                --log-path logs/custom.log
 
-Access log paths can be set for the admin interface, and for configured listeners.
+:ref:`Access log <arch_overview_access_log>` paths can be set for the
+:ref:`admin interface <start_quick_start_admin>`, and for configured :ref:`listeners`.
 
-Some Envoy filters and extensions may also have additional logging capabilities.
+Some Envoy :ref:`filters and extensions <api-v3_config>` may also have additional logging capabilities.
 
-Envoy can be configured to log to different formats, and to different outputs in addition to files and ``stdout/err``.
+Envoy can be configured to log to :ref:`different formats <config_access_log>`, and to
+:ref:`different outputs <api-v3_config_accesslog>` in addition to files and ``stdout/err``.
 
 .. note::
 
