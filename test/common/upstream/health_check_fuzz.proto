@@ -95,4 +95,5 @@ message HealthCheckTestCase {
   repeated Action actions = 2;
   bool http_verify_cluster = 3; //Determines if verify cluster setting is on
   bool start_failed = 4;
+  bool upstream_cx_success = 5;
 }

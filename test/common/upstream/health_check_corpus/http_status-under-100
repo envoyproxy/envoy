@@ -22,6 +22,10 @@ health_check_config {
         service_name_matcher {
             prefix: "locations"
         }
+        expected_statuses {
+            start: 50
+            end: 500
+        }
     }
 }
 actions {
@@ -45,4 +49,3 @@ actions {
         }
     }
 }
-upstream_cx_success: true
