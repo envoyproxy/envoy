@@ -305,7 +305,7 @@ HTTP 过滤器遵循 HTTP 请求的生命周期，而不是对连接缓冲区和
 当 HTTP/2 编解码器使 HTTP 请求头可用时，它们首先被传递到自定义过滤器中的 ``decodeHeaders()``。如果返回的 ``FilterHeadersStatus`` 为 ``Continue``，
 然后 HCM 将请求头（可能由自定义过滤器导致）传递到路由器过滤器。
 
-解码器和编/解码器过滤器在请求路径上执行。编码器和编/解码器过滤器在响应路径上以 :ref:`相反的方向 <arch_overview_http_filters_ordering>`执行。 
+解码器和编/解码器过滤器在请求路径上执行。编码器和编/解码器过滤器在响应路径上以 :ref:`相反的方向 <arch_overview_http_filters_ordering>` 执行。 
 思考以下示例过滤器链：
 
 .. image:: /_static/lor-http.svg
@@ -409,7 +409,7 @@ directions during a request.
 
 请求完成后，流将被销毁。还会发生以下情况：
 
-* 请求后 :ref:`统计信息 <arch_overview_statistics>` 将进行更新（例如计时，活动请求，升级，运行状况检查）。但是在请求处理期间，某些统计信息会更早更新。 此时，
+* 请求后 :ref:`统计信息 <arch_overview_statistics>` 将进行更新（例如计时、活动请求、升级、运行状况检查）。但是在请求处理期间，某些统计信息会更早更新。 此时，
   统计信息尚未写入统计 :ref:`信息接收器 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>`，而是由主线程定期进行批处理和写入。在我们的示例中，
   这是一个统计信接收器。
 
