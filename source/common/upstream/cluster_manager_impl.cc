@@ -63,10 +63,20 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
 
   const auto initialize_cb = [&cluster, this] { onClusterInit(cluster); };
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
+    // Remove the previous cluster before the cluster object is destroyed.
+    primary_init_clusters_.remove_if(
+        [name_to_remove = cluster.info()->name()](Cluster* cluster_iter) {
+          return cluster_iter->info()->name() == name_to_remove;
+        });
     primary_init_clusters_.push_back(&cluster);
     cluster.initialize(initialize_cb);
   } else {
     ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
+    // Remove the previous cluster before the cluster object is destroyed.
+    secondary_init_clusters_.remove_if(
+        [name_to_remove = cluster.info()->name()](Cluster* cluster_iter) {
+          return cluster_iter->info()->name() == name_to_remove;
+        });
     secondary_init_clusters_.push_back(&cluster);
     if (started_secondary_initialize_) {
       // This can happen if we get a second CDS update that adds new clusters after we have
@@ -238,7 +248,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context)
-    : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
+    : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
       cm_stats_(generateStats(stats)),
@@ -362,8 +372,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // Once the initial set of static bootstrap clusters are created (including the local cluster),
   // we can instantiate the thread local cluster manager.
-  tls_->set([this, local_cluster_name = local_cluster_name_](
-                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  tls_.set([this, local_cluster_name = local_cluster_name_](Event::Dispatcher& dispatcher) {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
 
@@ -422,21 +431,6 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // We have a situation that clusters will be immediately active, such as static and primary
   // cluster. So we must have this prevention logic here.
   if (cluster_data != warming_clusters_.end()) {
-    Network::TransportSocketFactory& factory =
-        cluster.info()->transportSocketMatcher().resolve(&cluster.info()->metadata()).factory_;
-    // If there is no secret entity, currently supports only TLS Certificate and Validation
-    // Context, when it failed to extract them via SDS, it will fail to change cluster status from
-    // warming to active. In current implementation, there is no strategy to activate clusters
-    // which failed to initialize at once.
-    // TODO(shikugawa): To implement to be available by keeping warming after no-available secret
-    // entity behavior occurred. And remove
-    // `envoy.reloadable_features.cluster_keep_warming_no_secret_entity` runtime feature flag.
-    const bool keep_warming_enabled = Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.cluster_keep_warming_no_secret_entity");
-    if (!factory.isReady() && keep_warming_enabled) {
-      ENVOY_LOG(warn, "Failed to activate {}", cluster.info()->name());
-      return;
-    }
     clusterWarmingToActive(cluster.info()->name());
     updateClusterCounts();
   }
@@ -629,7 +623,9 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   //       and easy to understand.
   const bool all_clusters_initialized =
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  loadCluster(cluster, version_info, true, warming_clusters_);
+  // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
+  // before destroy to avoid early initialization complete.
+  const auto previous_cluster = loadCluster(cluster, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
@@ -661,27 +657,21 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
-  tls_->runOnAllThreads([new_cluster = cluster.cluster_->info(),
-                         thread_aware_lb_factory = cluster.loadBalancerFactory()](
-                            ThreadLocal::ThreadLocalObjectSharedPtr object)
-                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    ThreadLocalClusterManagerImpl& cluster_manager =
-        object->asType<ThreadLocalClusterManagerImpl>();
-
-    if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
+  tls_.runOnAllThreads([new_cluster = cluster.cluster_->info(),
+                        thread_aware_lb_factory = cluster.loadBalancerFactory()](
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    if (cluster_manager->thread_local_clusters_.count(new_cluster->name()) > 0) {
       ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
     } else {
       ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
     }
 
     auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
-        cluster_manager, new_cluster, thread_aware_lb_factory);
-    cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
-    for (auto& cb : cluster_manager.update_callbacks_) {
+        *cluster_manager, new_cluster, thread_aware_lb_factory);
+    cluster_manager->thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+    for (auto& cb : cluster_manager->update_callbacks_) {
       cb->onClusterAddOrUpdate(*thread_local_cluster);
     }
-
-    return object;
   });
 }
 
@@ -695,18 +685,13 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
     active_clusters_.erase(existing_active_cluster);
 
     ENVOY_LOG(info, "removing cluster {}", cluster_name);
-    tls_->runOnAllThreads([cluster_name](ThreadLocal::ThreadLocalObjectSharedPtr object)
-                              -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      ThreadLocalClusterManagerImpl& cluster_manager =
-          object->asType<ThreadLocalClusterManagerImpl>();
-
-      ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
+    tls_.runOnAllThreads([cluster_name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+      ASSERT(cluster_manager->thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-      for (auto& cb : cluster_manager.update_callbacks_) {
+      for (auto& cb : cluster_manager->update_callbacks_) {
         cb->onClusterRemoval(cluster_name);
       }
-      cluster_manager.thread_local_clusters_.erase(cluster_name);
-      return object;
+      cluster_manager->thread_local_clusters_.erase(cluster_name);
     });
   }
 
@@ -729,9 +714,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   return removed;
 }
 
-void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                     const std::string& version_info, bool added_via_api,
-                                     ClusterMap& cluster_map) {
+ClusterManagerImpl::ClusterDataPtr
+ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                const std::string& version_info, bool added_via_api,
+                                ClusterMap& cluster_map) {
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
   auto& new_cluster = new_cluster_pair.first;
@@ -776,11 +762,20 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
       }
     });
   }
-
-  cluster_map[cluster_reference.info()->name()] = std::make_unique<ClusterData>(
-      cluster, version_info, added_via_api, std::move(new_cluster), time_source_);
-  const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
-
+  ClusterDataPtr result;
+  auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
+  if (cluster_entry_it != cluster_map.end()) {
+    result = std::exchange(cluster_entry_it->second,
+                           std::make_unique<ClusterData>(cluster, version_info, added_via_api,
+                                                         std::move(new_cluster), time_source_));
+  } else {
+    bool inserted = false;
+    std::tie(cluster_entry_it, inserted) =
+        cluster_map.emplace(cluster_reference.info()->name(),
+                            std::make_unique<ClusterData>(cluster, version_info, added_via_api,
+                                                          std::move(new_cluster), time_source_));
+    ASSERT(inserted);
+  }
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
   // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
   // because the thread_aware_lb_ field takes precedence over the subset lb).
@@ -803,6 +798,7 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
   }
 
   updateClusterCounts();
+  return result;
 }
 
 void ClusterManagerImpl::updateClusterCounts() {
@@ -834,7 +830,7 @@ void ClusterManagerImpl::updateClusterCounts() {
 }
 
 ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
-  auto& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
@@ -873,7 +869,7 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                                            absl::optional<Http::Protocol> protocol,
                                            LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
@@ -899,7 +895,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                                           LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
@@ -924,12 +920,10 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
                                                          const HostVector& hosts_removed) {
-  tls_->runOnAllThreads(
-      [name = cluster.info()->name(), hosts_removed](ThreadLocal::ThreadLocalObjectSharedPtr object)
-          -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        object->asType<ThreadLocalClusterManagerImpl>().removeHosts(name, hosts_removed);
-        return object;
-      });
+  tls_.runOnAllThreads([name = cluster.info()->name(),
+                        hosts_removed](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    cluster_manager->removeHosts(name, hosts_removed);
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
@@ -937,30 +931,25 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
                                                       const HostVector& hosts_removed) {
   const auto& host_set = cluster.prioritySet().hostSetsPerPriority()[priority];
 
-  tls_->runOnAllThreads([name = cluster.info()->name(), priority,
-                         update_params = HostSetImpl::updateHostsParams(*host_set),
-                         locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
-                         overprovisioning_factor = host_set->overprovisioningFactor()](
-                            ThreadLocal::ThreadLocalObjectSharedPtr object)
-                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    object->asType<ThreadLocalClusterManagerImpl>().updateClusterMembership(
-        name, priority, update_params, locality_weights, hosts_added, hosts_removed,
-        overprovisioning_factor);
-    return object;
+  tls_.runOnAllThreads([name = cluster.info()->name(), priority,
+                        update_params = HostSetImpl::updateHostsParams(*host_set),
+                        locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
+                        overprovisioning_factor = host_set->overprovisioningFactor()](
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    cluster_manager->updateClusterMembership(name, priority, update_params, locality_weights,
+                                             hosts_added, hosts_removed, overprovisioning_factor);
   });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
-  tls_->runOnAllThreads([host](ThreadLocal::ThreadLocalObjectSharedPtr object)
-                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    object->asType<ThreadLocalClusterManagerImpl>().onHostHealthFailure(host);
-    return object;
+  tls_.runOnAllThreads([host](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    cluster_manager->onHostHealthFailure(host);
   });
 }
 
 Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
                                                                  LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
@@ -988,7 +977,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 }
 
 Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::string& cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
     return entry->second->http_async_client_;
@@ -999,7 +988,7 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
 
 ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
   return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
 }
 
@@ -1226,7 +1215,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host) {
 
   // Drain all HTTP connection pool connections in the case of a host health failure. If outlier/
-  // health is due to ECMP flow hashing issues for example, a new set of connections might do
+  // health is due to `ECMP` flow hashing issues for example, a new set of connections might do
   // better.
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
   // more granular host set changes, we should be able to capture single host changes and make them
@@ -1395,7 +1384,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
   bool have_transport_socket_options = false;
   if (context && context->upstreamTransportSocketOptions()) {
-    context->upstreamTransportSocketOptions()->hashKey(hash_key);
+    context->upstreamTransportSocketOptions()->hashKey(hash_key, host->transportSocketFactory());
     have_transport_socket_options = true;
   }
 
@@ -1455,7 +1444,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   bool have_transport_socket_options = false;
   if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
     have_transport_socket_options = true;
-    context->upstreamTransportSocketOptions()->hashKey(hash_key);
+    context->upstreamTransportSocketOptions()->hashKey(hash_key, host->transportSocketFactory());
   }
 
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];

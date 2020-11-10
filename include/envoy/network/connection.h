@@ -102,6 +102,11 @@ public:
   virtual void addConnectionCallbacks(ConnectionCallbacks& cb) PURE;
 
   /**
+   * Unregister callbacks which previously fired when connection events occur.
+   */
+  virtual void removeConnectionCallbacks(ConnectionCallbacks& cb) PURE;
+
+  /**
    * Register for callback every time bytes are written to the underlying TransportSocket.
    */
   virtual void addBytesSentCallback(BytesSentCb cb) PURE;
@@ -240,6 +245,12 @@ public:
    * @return State the current state of the connection.
    */
   virtual State state() const PURE;
+
+  /**
+   * @return true if the connection has not completed connecting, false if the connection is
+   * established.
+   */
+  virtual bool connecting() const PURE;
 
   /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any

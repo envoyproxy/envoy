@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/extensions/common/tap:admin",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:admin_stream_mocks",
+        "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
     ],
 )
