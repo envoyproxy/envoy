@@ -480,7 +480,7 @@ TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
   TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
-  EXPECT_THROW_WITH_MESSAGE((void)std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+  EXPECT_THROW_WITH_MESSAGE(std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
                                 cm_, init_manager_, config.remote(), dispatcher_, random_, true,
                                 [&](const std::string&) {}),
                             EnvoyException,
