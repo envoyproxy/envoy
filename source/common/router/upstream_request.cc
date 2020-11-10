@@ -361,7 +361,6 @@ void UpstreamRequest::onPoolReady(
     parent_.requestVcluster()->stats().upstream_rq_total_.inc();
   }
 
-  ASSERT(conn_pool_->protocol().has_value());
   if (conn_pool_->protocol().has_value()) {
     stream_info_.protocol(conn_pool_->protocol().value());
   }

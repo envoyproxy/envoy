@@ -2948,10 +2948,11 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocol) {
   auto cluster = makeCluster(yaml);
 
   EXPECT_EQ(Http::Protocol::Http10,
-            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
   EXPECT_EQ(Http::Protocol::Http11,
-            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
 TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
@@ -2965,10 +2966,13 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
 TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
@@ -2981,12 +2985,13 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt));
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
   EXPECT_EQ(Http::Protocol::Http11,
-            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
   EXPECT_EQ(Http::Protocol::Http11,
-            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.

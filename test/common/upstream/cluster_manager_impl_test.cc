@@ -155,7 +155,7 @@ static_resources:
   return parseBootstrapFromV3Yaml(yaml);
 }
 
-TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
+TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -165,10 +165,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
       http2_protocol_options: {}
       http_protocol_options: {}
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
-      "'protocol_selection' values");
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
