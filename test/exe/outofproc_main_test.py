@@ -1,4 +1,3 @@
-
 #!/usr/bin/python
 
 import os
@@ -9,6 +8,7 @@ import tempfile
 import signal
 import subprocess
 import unittest
+
 
 class OutOfProcEnvoyTests(unittest.TestCase):
   """
@@ -37,7 +37,6 @@ class OutOfProcEnvoyTests(unittest.TestCase):
     with open(envoy_config, 'r') as f:
       content = f.read()
 
-
     content = re.sub("{{ upstream_\d }}", "0", content)
     content = content.replace("{{ ip_any_address }}", "127.0.0.1")
     content = content.replace("{{ dns_lookup_family }}", "V4_ONLY")
@@ -55,9 +54,11 @@ class OutOfProcEnvoyTests(unittest.TestCase):
       creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
     except AttributeError:
       creationflags = 0
-    self.envoy_proc = subprocess.Popen([envoy_path, "--config-path", envoy_config_new], stdin=subprocess.PIPE, creationflags=creationflags)
+    self.envoy_proc = subprocess.Popen([envoy_path, "--config-path", envoy_config_new],
+                                       stdin=subprocess.PIPE,
+                                       creationflags=creationflags)
     time.sleep(2)
-  
+
   @classmethod
   def tearDown(self):
     self.envoy_proc.kill()
@@ -73,6 +74,7 @@ class OutOfProcEnvoyTests(unittest.TestCase):
     time.sleep(2)
     poll = self.envoy_proc.poll()
     self.assertTrue(poll != None)
+
 
 if __name__ == '__main__':
   unittest.main()
