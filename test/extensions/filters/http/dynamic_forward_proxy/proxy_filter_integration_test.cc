@@ -8,11 +8,13 @@
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
 namespace {
 
-class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class ProxyFilterIntegrationTest : public Event::TestUsingSimulatedTime,
+                                   public testing::TestWithParam<Network::Address::IpVersion>,
                                    public HttpIntegrationTest {
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}

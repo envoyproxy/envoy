@@ -23,7 +23,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/types/optional.h"
@@ -42,8 +41,7 @@ struct ApiFilesystemConfig {
 /**
  * Test fixture for all integration tests.
  */
-class BaseIntegrationTest : public Event::TestUsingSimulatedTime,
-                            protected Logger::Loggable<Logger::Id::testing> {
+class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;

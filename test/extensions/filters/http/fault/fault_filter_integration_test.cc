@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
@@ -8,7 +9,8 @@ namespace HttpFilters {
 namespace Fault {
 namespace {
 
-class FaultIntegrationTest : public HttpProtocolIntegrationTest {
+class FaultIntegrationTest : public Event::TestUsingSimulatedTime,
+                             public HttpProtocolIntegrationTest {
 public:
   void initializeFilter(const std::string& filter_config) {
     config_helper_.addFilter(filter_config);

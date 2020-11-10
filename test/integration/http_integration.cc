@@ -228,7 +228,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
-      simTime())};
+      timeSystem())};
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
                                                   host_description, downstream_protocol_);
 }
@@ -265,13 +265,13 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : HttpIntegrationTest::HttpIntegrationTest(
-          downstream_protocol,
-          [version](int) {
-            return Network::Utility::parseInternetAddress(
-                Network::Test::getAnyAddressString(version), 0);
-          },
-          version, config) {}
+    : HttpIntegrationTest::HttpIntegrationTest(downstream_protocol,
+                                               [version](int) {
+                                                 return Network::Utility::parseInternetAddress(
+                                                     Network::Test::getAnyAddressString(version),
+                                                     0);
+                                               },
+                                               version, config) {}
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          const InstanceConstSharedPtrFn& upstream_address_fn,

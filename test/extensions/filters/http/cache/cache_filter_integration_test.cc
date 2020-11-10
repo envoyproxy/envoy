@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,7 +12,8 @@ namespace {
 // cache-control headers, and conditional header fields, as they are
 // implemented.
 
-class CacheIntegrationTest : public HttpProtocolIntegrationTest {
+class CacheIntegrationTest : public Event::TestUsingSimulatedTime,
+                             public HttpProtocolIntegrationTest {
 public:
   void TearDown() override {
     cleanupUpstreamAndDownstream();
