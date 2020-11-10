@@ -15,34 +15,50 @@ import traceback
 import shutil
 import paths
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
-                     "./source/extensions/extensions_build_config.bzl",
-                     "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                     "./tools/pyformat/", "./third_party/")
+EXCLUDED_PREFIXES = (
+    "./generated/",
+    "./thirdparty/",
+    "./build",
+    "./.git/",
+    "./bazel-",
+    "./.cache",
+    "./source/extensions/extensions_build_config.bzl",
+    "./bazel/toolchains/configs/",
+    "./tools/testdata/check_format/",
+    "./tools/pyformat/",
+    "./third_party/",
+    "./test/extensions/filters/http/wasm/test_data",
+    "./test/extensions/filters/network/wasm/test_data",
+    "./test/extensions/stats_sinks/wasm/test_data",
+    "./test/extensions/bootstrap/wasm/test_data",
+    "./test/extensions/common/wasm/test_data",
+    "./test/extensions/access_loggers/wasm/test_data",
+    "./source/extensions/common/wasm/ext",
+    "./examples/wasm-cc",
+)
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_ALLOWLIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
+GOOGLE_PROTOBUF_ALLOWLIST = ("ci/prebuilt", "source/common/protobuf", "api/test",
+                             "test/extensions/bootstrap/wasm/test_data")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
 # Files matching these exact names can reference real-world time. These include the class
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
-REAL_TIME_ALLOWLIST = ("./source/common/common/utility.h",
-                       "./source/extensions/common/aws/utility.cc",
-                       "./source/common/event/real_time_system.cc",
-                       "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
-                       "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
-                       "./source/common/common/perf_annotation.h",
-                       "./test/common/common/log_macros_test.cc",
-                       "./test/test_common/simulated_time_system.cc",
-                       "./test/test_common/simulated_time_system.h",
-                       "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
-                       "./test/test_common/utility.cc", "./test/test_common/utility.h",
-                       "./test/integration/integration.h")
+REAL_TIME_ALLOWLIST = (
+    "./source/common/common/utility.h", "./source/extensions/common/aws/utility.cc",
+    "./source/common/event/real_time_system.cc", "./source/common/event/real_time_system.h",
+    "./source/exe/main_common.cc", "./source/exe/main_common.h",
+    "./source/server/config_validation/server.cc", "./source/common/common/perf_annotation.h",
+    "./test/common/common/log_macros_test.cc", "./test/common/protobuf/utility_test.cc",
+    "./test/test_common/simulated_time_system.cc", "./test/test_common/simulated_time_system.h",
+    "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
+    "./test/test_common/utility.cc", "./test/test_common/utility.h",
+    "./test/integration/integration.h", "./test/tools/wee8_compile/wee8_compile.cc")
 
 # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
 # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
@@ -60,10 +76,12 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
     "./test/extensions/filters/http/common/fuzz/uber_filter.h",
+    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
-JSON_STRING_TO_MESSAGE_ALLOWLIST = ("./source/common/protobuf/utility.cc")
+JSON_STRING_TO_MESSAGE_ALLOWLIST = ("./source/common/protobuf/utility.cc",
+                                    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc")
 
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
@@ -92,6 +110,22 @@ GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
 
+# We want all URL references to exist in repository_locations.bzl files and have
+# metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
+# we have some exceptions for either infrastructure files or places we fall
+# short today (Rust).
+#
+# Please DO NOT extend this allow list without consulting
+# @envoyproxy/dependency-shepherds.
+BUILD_URLS_ALLOWLIST = (
+    "./generated_api_shadow/bazel/repository_locations.bzl",
+    "./generated_api_shadow/bazel/envoy_http_archive.bzl",
+    "./bazel/repository_locations.bzl",
+    "./bazel/external/cargo/crates.bzl",
+    "./api/bazel/repository_locations.bzl",
+    "./api/bazel/envoy_http_archive.bzl",
+)
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
 BUILDOZER_PATH = paths.getBuildozer()
@@ -113,7 +147,8 @@ DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
-RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
+RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
+INVALID_REFLINK = re.compile(".* ref:.*")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
@@ -385,6 +420,9 @@ class FormatChecker:
     return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
         or self.isInSubdir(file_path, 'tools/testdata')
 
+  def allowlistedForBuildUrls(self, file_path):
+    return file_path in BUILD_URLS_ALLOWLIST
+
   def isApiFile(self, file_path):
     return file_path.startswith(self.api_prefix) or file_path.startswith(self.api_shadow_root)
 
@@ -449,11 +487,16 @@ class FormatChecker:
         next_word_to_check = ''  # first word after :
         prior_line = ''
 
+      invalid_reflink_match = INVALID_REFLINK.match(line)
+      if invalid_reflink_match:
+        reportError("Found text \" ref:\". This should probably be \" :ref:\"\n%s" % line)
+
       # make sure flags are surrounded by ``s
       flag_match = RELOADABLE_FLAG_REGEX.match(line)
       if flag_match:
-        if not flag_match.groups()[0].startswith('`'):
-          reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
+        if not flag_match.groups()[0].startswith(' `'):
+          reportError("Flag `%s` should be enclosed in a single set of back ticks" %
+                      flag_match.groups()[1])
 
       if line.startswith("* "):
         if not endsWithPeriod(prior_line):
@@ -782,6 +825,8 @@ class FormatChecker:
         not self.isWorkspaceFile(file_path) and not self.isExternalBuildFile(file_path) and
         "@envoy//" in line):
       reportError("Superfluous '@envoy//' prefix")
+    if not self.allowlistedForBuildUrls(file_path) and (" urls = " in line or " url = " in line):
+      reportError("Only repository_locations.bzl may contains URL references")
 
   def fixBuildLine(self, file_path, line, line_number):
     if (self.envoy_build_rule_check and not self.isStarlarkFile(file_path) and
@@ -1047,6 +1092,11 @@ if __name__ == "__main__":
                       nargs="+",
                       default=[],
                       help="exclude paths from envoy_build_fixer check.")
+  parser.add_argument("--bazel_tools_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from bazel_tools check.")
   parser.add_argument("--include_dir_order",
                       type=str,
                       default=",".join(common.includeDirOrder()),

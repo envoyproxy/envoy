@@ -4,6 +4,7 @@
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::Ge;
 using testing::HasSubstr;
@@ -27,7 +28,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(config, factory_context);
   Stats::IsolatedStoreImpl store;
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
-      server_.sslContextManager().createSslClientContext(store, cfg));
+      server_.sslContextManager().createSslClientContext(store, cfg, nullptr));
 
   const std::string expected_empty_json = R"EOF({
  "certificates": [
@@ -179,6 +180,8 @@ TEST_P(AdminInstanceTest, GetRequest) {
 }
 
 TEST_P(AdminInstanceTest, PostRequest) {
+  // Load TestScopedRuntime to suppress warnings related to runtime features.
+  TestScopedRuntime scoped_runtime;
   Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,

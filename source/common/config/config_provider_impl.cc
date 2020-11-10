@@ -25,11 +25,8 @@ ConfigSubscriptionCommonBase::~ConfigSubscriptionCommonBase() {
 }
 
 void ConfigSubscriptionCommonBase::applyConfigUpdate(const ConfigUpdateCb& update_fn) {
-  tls_->runOnAllThreads([update_fn](ThreadLocal::ThreadLocalObjectSharedPtr previous)
-                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    auto prev_thread_local_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
-    prev_thread_local_config->config_ = update_fn(prev_thread_local_config->config_);
-    return previous;
+  tls_.runOnAllThreads([update_fn](OptRef<ThreadLocalConfig> thread_local_config) {
+    thread_local_config->config_ = update_fn(thread_local_config->config_);
   });
 }
 

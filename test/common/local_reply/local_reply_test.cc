@@ -329,11 +329,10 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
 
   EXPECT_EQ(response_headers_.get_("foo-1"), "bar1");
   EXPECT_EQ(response_headers_.get_("foo-2"), "override-bar2");
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(response_headers_, "foo-3", out);
+  const auto out = response_headers_.get(Http::LowerCaseString("foo-3"));
   ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "bar3");
-  ASSERT_EQ(out[1], "append-bar3");
+  ASSERT_EQ(out[0]->value().getStringView(), "bar3");
+  ASSERT_EQ(out[1]->value().getStringView(), "append-bar3");
 }
 
 TEST_F(LocalReplyTest, TestMapperWithContentType) {

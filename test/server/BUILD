@@ -128,8 +128,6 @@ envoy_cc_test(
     name = "guarddog_impl_test",
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
-    # Fails intermittantly on local build
-    tags = ["flaky_on_windows"],
     deps = [
         "//include/envoy/common:time_interface",
         "//source/common/api:api_lib",
@@ -138,6 +136,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:watchdog_config_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
@@ -269,12 +268,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
-    tags = [
-        "nofips",
-        # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
-        # required by quic_stream_send_buffer.cc
-        "skip_on_windows",
-    ],
+    tags = ["nofips"],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
@@ -380,6 +374,7 @@ envoy_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",

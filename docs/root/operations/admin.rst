@@ -35,6 +35,33 @@ modify different aspects of the server:
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
 
+.. note::
+
+  For an endpoint with *?format=json*, it dumps data as a JSON-serialized proto. Fields with default
+  values are not rendered. For example for */clusters?format=json*, the circuit breakers thresholds
+  priority field is omitted when its value is :ref:`DEFAULT priority
+  <envoy_v3_api_enum_value_config.core.v3.RoutingPriority.DEFAULT>` as shown below:
+
+  .. code-block:: json
+
+    {
+     "thresholds": [
+      {
+       "max_connections": 1,
+       "max_pending_requests": 1024,
+       "max_requests": 1024,
+       "max_retries": 1
+      },
+      {
+       "priority": "HIGH",
+       "max_connections": 1,
+       "max_pending_requests": 1024,
+       "max_requests": 1024,
+       "max_retries": 1
+      }
+     ]
+    }
+
 .. http:get:: /
 
   Render an HTML home page with a table of links to all available options.

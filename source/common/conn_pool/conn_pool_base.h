@@ -138,14 +138,15 @@ public:
                            absl::string_view failure_reason,
                            ConnectionPool::PoolFailureReason pool_failure_reason);
 
-  // Closes any idle connections.
-  void closeIdleConnections();
+  // Closes any idle connections as this pool is drained.
+  void closeIdleConnectionsForDrainingPool();
 
   // Changes the state_ of an ActiveClient and moves to the appropriate list.
   void transitionActiveClientState(ActiveClient& client, ActiveClient::State new_state);
 
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
+  // See if the drain process has started and/or completed.
   void checkForDrained();
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
@@ -155,7 +156,8 @@ public:
 
   virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
 
-  void attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client, AttachContext& context);
+  virtual void attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client,
+                                    AttachContext& context);
 
   virtual void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                              absl::string_view failure_reason,
@@ -172,6 +174,7 @@ public:
   const Network::TransportSocketOptionsSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
+  bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
 protected:
   // Creates up to 3 connections, based on the prefetch ratio.

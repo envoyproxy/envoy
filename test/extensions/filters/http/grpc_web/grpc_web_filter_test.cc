@@ -7,7 +7,7 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 
@@ -255,6 +255,13 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
                      ->statsScope()
                      .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
+}
+
+TEST_P(GrpcWebFilterTest, ExternallyProvidedEncodingHeader) {
+  Http::TestRequestHeaderMapImpl request_headers{{"grpc-accept-encoding", "foo"}, {":path", "/"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ("foo", request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
 }
 
 TEST_P(GrpcWebFilterTest, Unary) {

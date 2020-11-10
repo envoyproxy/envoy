@@ -9,29 +9,65 @@
 namespace Envoy {
 namespace Upstream {
 
-class HttpHealthCheckFuzz : HttpHealthCheckerImplTestBase {
+class HealthCheckFuzz {
+public:
+  HealthCheckFuzz() = default;
+  // This will delegate to the specific classes
+  void initializeAndReplay(test::common::upstream::HealthCheckTestCase input);
+  enum class Type {
+    HTTP,
+    TCP,
+    GRPC,
+  };
+
+  // The specific implementations of respond look into the respond proto, which has all three types
+  // of response
+  virtual void respond(test::common::upstream::Respond respond, bool last_action) PURE;
+
+  virtual void initialize(test::common::upstream::HealthCheckTestCase input) PURE;
+  virtual void triggerIntervalTimer(bool expect_client_create) PURE;
+  virtual void triggerTimeoutTimer(bool last_action) PURE;
+  virtual void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) PURE;
+  // Only implemented by gRPC, otherwise no-op
+  virtual void raiseGoAway(bool no_error) PURE;
+
+  virtual ~HealthCheckFuzz() = default;
+
+private:
+  Network::ConnectionEvent getEventTypeFromProto(const test::common::upstream::RaiseEvent& event);
+
+  void replay(const test::common::upstream::HealthCheckTestCase& input);
+};
+
+class HttpHealthCheckFuzz : public HealthCheckFuzz, HttpHealthCheckerImplTestBase {
 public:
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
-  void initialize(test::common::upstream::HealthCheckTestCase input);
-  void respond(const test::fuzz::Headers& headers, uint64_t status);
-  void triggerIntervalTimer(bool last_action);
-  void triggerTimeoutTimer(bool last_action);
-  void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
+  void initialize(test::common::upstream::HealthCheckTestCase input) override;
+  void respond(test::common::upstream::Respond respond, bool last_action) override;
+  void triggerIntervalTimer(bool expect_client_create) override;
+  void triggerTimeoutTimer(bool last_action) override;
+  void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
+  // No op
+  void raiseGoAway(bool) override {}
+  ~HttpHealthCheckFuzz() override = default;
 
-  // Determines whether the client gets reused or not after respondHeaders()
+  // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
 };
 
-class TcpHealthCheckFuzz : TcpHealthCheckerImplTestBase {
+class TcpHealthCheckFuzz : public HealthCheckFuzz, TcpHealthCheckerImplTestBase {
 public:
   void allocTcpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
-  void initialize(test::common::upstream::HealthCheckTestCase input);
-  void respond(std::string data, bool last_action);
-  void triggerIntervalTimer();
-  void triggerTimeoutTimer(bool last_action);
-  void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
+  void initialize(test::common::upstream::HealthCheckTestCase input) override;
+  void respond(test::common::upstream::Respond respond, bool last_action) override;
+  void triggerIntervalTimer(bool expect_client_create) override;
+  void triggerTimeoutTimer(bool last_action) override;
+  void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
+  // No op
+  void raiseGoAway(bool) override {}
+  ~TcpHealthCheckFuzz() override = default;
 
-  // Determines whether the client gets reused or not after respondHeaders()
+  // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
 
   // Empty response induces a specific codepath in raiseEvent in case of connected, ignores the
@@ -39,27 +75,46 @@ public:
   bool empty_response_ = true;
 };
 
-class HealthCheckFuzz { // TODO: once added tcp/grpc, switch this to an
-                        // abstract health checker test class that can handle
-                        // one of the three types
+class GrpcHealthCheckFuzz : public HealthCheckFuzz, public HealthCheckerTestBase {
 public:
-  HealthCheckFuzz() = default;
-  void initializeAndReplay(test::common::upstream::HealthCheckTestCase
-                               input); // This will delegate to the specific classes
-  enum class Type {
-    HTTP,
-    TCP,
-    GRPC,
+  void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
+  void initialize(test::common::upstream::HealthCheckTestCase input) override;
+  // This has three components, headers, raw bytes, and trailers
+  void respond(test::common::upstream::Respond respond, bool last_action) override;
+  void triggerIntervalTimer(bool expect_client_create) override;
+  void triggerTimeoutTimer(bool last_action) override;
+  void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
+  void raiseGoAway(bool no_error) override;
+  ~GrpcHealthCheckFuzz() override = default;
+
+  // Determines whether the client gets reused or not after response
+  bool reuse_connection_ = true;
+
+  // Determines whether a client closes after responds and timeouts. Exactly maps to
+  // received_no_error_goaway_ in source code.
+  bool received_no_error_goaway_ = false;
+
+  // In order to not affect unit tests, move state here. Since only one test session, we don't need
+  // a vector. Also, we should make Timers NiceMocks.
+  struct TestSession {
+    NiceMock<Event::MockTimer>* interval_timer_{};
+    NiceMock<Event::MockTimer>* timeout_timer_{};
+    Http::MockClientConnection* codec_{};
+    Stats::IsolatedStoreImpl stats_store_;
+    Network::MockClientConnection* client_connection_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
+    CodecClientForTest* codec_client_{};
   };
 
-private:
-  Network::ConnectionEvent getEventTypeFromProto(const test::common::upstream::RaiseEvent& event);
+  using TestSessionPtr = std::unique_ptr<TestSession>;
+  TestSessionPtr test_session_;
 
-  void replay(const test::common::upstream::HealthCheckTestCase& input);
+  void expectSessionCreate();
+  void expectClientCreate();
+  void expectStreamCreate();
 
-  Type type_;
-  std::unique_ptr<HttpHealthCheckFuzz> http_fuzz_test_;
-  std::unique_ptr<TcpHealthCheckFuzz> tcp_fuzz_test_;
+  std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
 };
 
 } // namespace Upstream

@@ -6,9 +6,9 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/json/json_object.h"
 #include "envoy/type/v3/range.pb.h"
 
+#include "common/http/status.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -20,18 +20,6 @@ namespace Http {
 class HeaderUtility {
 public:
   enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix, Contains };
-
-  /**
-   * Get all instances of the header key specified, and return the values in the vector provided.
-   *
-   * This should not be used for inline headers, as it turns a constant time lookup into O(n).
-   *
-   * @param headers the headers to return keys from
-   * @param key the header key to return values for
-   * @param out the vector to return values in
-   */
-  static void getAllOfHeader(const HeaderMap& headers, absl::string_view key,
-                             std::vector<absl::string_view>& out);
 
   /**
    * Get all header values as a single string. Multiple headers are concatenated with ','.
@@ -60,7 +48,8 @@ public:
     friend class HeaderUtility;
   };
   static GetAllOfHeaderAsStringResult getAllOfHeaderAsString(const HeaderMap& headers,
-                                                             const Http::LowerCaseString& key);
+                                                             const Http::LowerCaseString& key,
+                                                             absl::string_view separator = ",");
 
   // A HeaderData specifies one of exact value or regex or range element
   // to match in a request's header, specified in the header_match_type_ member.
@@ -186,6 +175,14 @@ public:
    * @brief Remove the port part from host/authority header if it is equal to provided port
    */
   static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
+
+  /* Does a common header check ensuring required headers are present.
+   * Required request headers include :method header, :path for non-CONNECT requests, and
+   * host/authority for HTTP/1.1 or CONNECT requests.
+   * @return Status containing the result. If failed, message includes details on which header was
+   * missing.
+   */
+  static Http::Status checkRequiredHeaders(const Http::RequestHeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

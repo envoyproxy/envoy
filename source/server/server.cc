@@ -2,12 +2,14 @@
 
 #include <csignal>
 #include <cstdint>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <string>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -147,7 +149,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
   snapped_counters_ = store.counters();
   counters_.reserve(snapped_counters_.size());
   for (const auto& counter : snapped_counters_) {
@@ -172,15 +174,17 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   for (const auto& text_readout : snapped_text_readouts_) {
     text_readouts_.push_back(*text_readout);
   }
+
+  snapshot_time_ = time_source.systemTime();
 }
 
-void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                       TimeSource& time_source) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store);
+  MetricSnapshotImpl snapshot(store, time_source);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -231,7 +235,7 @@ void InstanceImpl::updateServerStats() {
 
 void InstanceImpl::flushStatsInternal() {
   updateServerStats();
-  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
+  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_, timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(config_.statsFlushInterval());
@@ -242,9 +246,9 @@ bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 namespace {
 // Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
-void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
-                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                  std::function<void(Protobuf::Message&, bool)> load_function) {
+void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
+                   envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                   std::function<void(Protobuf::Message&, bool)> load_function) {
 
   if (!bootstrap_version.has_value()) {
     load_function(bootstrap, true);
@@ -254,6 +258,7 @@ void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
     envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
     load_function(bootstrap_v2, false);
     Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
+    MessageUtil::onVersionUpgradeWarn("v2 bootstrap");
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
@@ -275,7 +280,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    loadBootsrap(
+    loadBootstrap(
         options.bootstrapVersion(), bootstrap,
         [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
           MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
@@ -283,10 +288,11 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    loadBootsrap(options.bootstrapVersion(), bootstrap_override,
-                 [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
-                   MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
-                 });
+    loadBootstrap(
+        options.bootstrapVersion(), bootstrap_override,
+        [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
+          MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
+        });
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -485,8 +491,8 @@ void InstanceImpl::initialize(const Options& options,
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
-      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
+      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
       *singleton_manager_);
 
@@ -549,7 +555,7 @@ void InstanceImpl::onRuntimeReady() {
                                                        stats_store_, false)
             ->create(),
         hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
+        stats_store_, *ssl_context_manager_, info_factory_, access_log_manager_,
         *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }
@@ -581,8 +587,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
-      server.stats(), server.random(), server.messageValidationContext().dynamicValidationVisitor(),
-      server.api());
+      server.stats(), server.api().randomGenerator(),
+      server.messageValidationContext().dynamicValidationVisitor(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
@@ -676,8 +682,7 @@ void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
-                                                         "main_thread");
-  watchdog->startWatchdog(*dispatcher_);
+                                                         "main_thread", *dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");

@@ -59,17 +59,15 @@ const std::string& getHostname(const HostSharedPtr& host,
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
 public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
-                                  Envoy::Random::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher,
                                   HealthCheckEventLoggerPtr&& event_logger,
                                   ProtobufMessage::ValidationVisitor& validation_visitor,
                                   Api::Api& api)
-      : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+      : cluster_(cluster), runtime_(runtime), dispatcher_(dispatcher),
         event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor), api_(api) {
   }
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
-  Envoy::Random::RandomGenerator& random() override { return random_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -80,7 +78,6 @@ public:
 private:
   Upstream::Cluster& cluster_;
   Envoy::Runtime::Loader& runtime_;
-  Envoy::Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   HealthCheckEventLoggerPtr event_logger_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
@@ -89,7 +86,7 @@ private:
 
 HealthCheckerSharedPtr HealthCheckerFactory::create(
     const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
-    Runtime::Loader& runtime, Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+    Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   HealthCheckEventLoggerPtr event_logger;
@@ -100,24 +97,26 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
   switch (health_check_config.health_checker_case()) {
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, health_check_config, dispatcher,
-                                                       runtime, random, std::move(event_logger));
+                                                       runtime, api.randomGenerator(),
+                                                       std::move(event_logger));
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
     return std::make_shared<TcpHealthCheckerImpl>(cluster, health_check_config, dispatcher, runtime,
-                                                  random, std::move(event_logger));
+                                                  api.randomGenerator(), std::move(event_logger));
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
       throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
                                        cluster.info()->name()));
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, health_check_config, dispatcher,
-                                                       runtime, random, std::move(event_logger));
+                                                       runtime, api.randomGenerator(),
+                                                       std::move(event_logger));
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
             health_check_config.custom_health_check());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
-        new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
-                                            std::move(event_logger), validation_visitor, api));
+        new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, std::move(event_logger),
+                                            validation_visitor, api));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   default:
@@ -275,7 +274,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   stream_info.setDownstreamRemoteAddress(local_address_);
   stream_info.onUpstreamHostSelected(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
-  request_encoder->encodeHeaders(*request_headers, true);
+  auto status = request_encoder->encodeHeaders(*request_headers, true);
+  // Encoding will only fail if required request headers are missing.
+  ASSERT(status.ok());
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
@@ -617,12 +618,12 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
                   "gRPC protocol violation: unexpected stream end", true);
     return;
   }
-
   // We should end up with only one frame here.
   std::vector<Grpc::Frame> decoded_frames;
   if (!decoder_.decode(data, decoded_frames)) {
     onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "gRPC wire protocol decode error",
                   false);
+    return;
   }
   for (auto& frame : decoded_frames) {
     if (frame.length_ > 0) {
@@ -692,7 +693,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   Router::FilterUtility::setUpstreamScheme(
       headers_message->headers(), host_->transportSocketFactory().implementsSecureTransport());
 
-  request_encoder_->encodeHeaders(headers_message->headers(), false);
+  auto status = request_encoder_->encodeHeaders(headers_message->headers(), false);
+  // Encoding will only fail if required headers are missing.
+  ASSERT(status.ok());
 
   grpc::health::v1::HealthCheckRequest request;
   if (parent_.service_name_.has_value()) {

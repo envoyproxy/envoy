@@ -88,10 +88,6 @@ const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const 
   return parent_context_.localInfo();
 }
 
-Envoy::Random::RandomGenerator& PerFilterChainFactoryContextImpl::random() {
-  return parent_context_.random();
-}
-
 Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
@@ -145,8 +141,9 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
 
-void FilterChainManagerImpl::addFilterChain(
+void FilterChainManagerImpl::addFilterChains(
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
+    const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
@@ -187,8 +184,7 @@ void FilterChainManagerImpl::addFilterChain(
 
     // Reject partial wildcards, we don't match on them.
     for (const auto& server_name : filter_chain_match.server_names()) {
-      if (server_name.find('*') != std::string::npos &&
-          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
+      if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
         throw EnvoyException(
             fmt::format("error adding listener '{}': partial wildcards are not supported in "
                         "\"server_names\"",
@@ -212,11 +208,47 @@ void FilterChainManagerImpl::addFilterChain(
         filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
         filter_chain_match.source_ports(), filter_chain_impl);
+
     fc_contexts_[*filter_chain] = filter_chain_impl;
   }
   convertIPsToTries();
+  copyOrRebuildDefaultFilterChain(default_filter_chain, filter_chain_factory_builder,
+                                  context_creator);
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
             fc_contexts_.size(), new_filter_chain_size);
+}
+
+void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
+    const envoy::config::listener::v3::FilterChain* default_filter_chain,
+    FilterChainFactoryBuilder& filter_chain_factory_builder,
+    FilterChainFactoryContextCreator& context_creator) {
+  // Default filter chain is built exactly once.
+  ASSERT(!default_filter_chain_message_.has_value());
+
+  // Save the default filter chain message. This message could be used in next listener update.
+  if (default_filter_chain == nullptr) {
+    return;
+  }
+  default_filter_chain_message_ = absl::make_optional(*default_filter_chain);
+
+  // Origin filter chain manager could be empty if the current is the ancestor.
+  const auto* origin = getOriginFilterChainManager();
+  if (origin == nullptr) {
+    default_filter_chain_ =
+        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+    return;
+  }
+
+  // Copy from original filter chain manager, or build new filter chain if the default filter chain
+  // is not equivalent to the one in the original filter chain manager.
+  MessageUtil eq;
+  if (origin->default_filter_chain_message_.has_value() &&
+      eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
+    default_filter_chain_ = origin->default_filter_chain_;
+  } else {
+    default_filter_chain_ =
+        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+  }
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
@@ -385,21 +417,30 @@ const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
   const auto& address = socket.localAddress();
 
+  const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
   if (address->type() == Network::Address::Type::Ip) {
     const auto port_match = destination_ports_map_.find(address->ip()->port());
     if (port_match != destination_ports_map_.end()) {
-      return findFilterChainForDestinationIP(*port_match->second.second, socket);
+      best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
+      if (best_match_filter_chain != nullptr) {
+        return best_match_filter_chain;
+      } else {
+        // There is entry for specific port but none of the filter chain matches. Instead of
+        // matching catch-all port 0, the fallback filter chain is returned.
+        return default_filter_chain_.get();
+      }
     }
   }
-
-  // Match on catch-all port 0.
+  // Match on catch-all port 0 if there is no specific port sub tree.
   const auto port_match = destination_ports_map_.find(0);
   if (port_match != destination_ports_map_.end()) {
-    return findFilterChainForDestinationIP(*port_match->second.second, socket);
+    best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
   }
-
-  return nullptr;
+  return best_match_filter_chain != nullptr
+             ? best_match_filter_chain
+             // Neither exact port nor catch-all port matches. Use fallback filter chain.
+             : default_filter_chain_.get();
 }
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
@@ -635,7 +676,6 @@ bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
 const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }
-Envoy::Random::RandomGenerator& FactoryContextImpl::random() { return server_.random(); }
 Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime(); }
 Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }
