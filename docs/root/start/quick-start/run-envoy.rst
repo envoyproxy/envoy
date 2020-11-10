@@ -221,8 +221,8 @@ For invalid configuration the process will print the errors and exit with ``1``.
          $ docker run --rm \
                -v $(pwd)/my-envoy-config.yaml:/my-envoy-config.yaml \
                envoyproxy/|envoy_docker_image| \
-               --mode validate \
-               -c my-envoy-config.yaml
+                   --mode validate \
+                   -c my-envoy-config.yaml
          [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
          - name: base
            static_layer:
@@ -264,8 +264,8 @@ This can be overridden using :option:`--log-path`.
                -p 10000:10000 \
                -v $(pwd)/logs:/logs \
                envoyproxy/|envoy_docker_image| \
-               -c /etc/envoy/envoy.yaml \
-               --log-path logs/custom.log
+                   -c /etc/envoy/envoy.yaml \
+                   --log-path logs/custom.log
          ...
 
 :ref:`Access log <arch_overview_access_logs>` paths can be set for the
@@ -322,9 +322,9 @@ which are set to ``debug`` and ``trace`` respectively.
                -p 9901:9901 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
-               -c /etc/envoy/envoy.yaml \
-               -l off \
-               --component-log-level upstream:debug,connection:trace
+                   -c /etc/envoy/envoy.yaml \
+                   -l off \
+                   --component-log-level upstream:debug,connection:trace
          ...
 
 .. tip::
