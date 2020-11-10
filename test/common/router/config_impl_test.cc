@@ -141,9 +141,17 @@ Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::st
 envoy::config::route::v3::RouteConfiguration
 parseRouteConfigurationFromYaml(const std::string& yaml) {
   envoy::config::route::v3::RouteConfiguration route_config;
+  // Most tests should be v3 and not boost.
+  bool avoid_boosting = true;
+  // If we're under TestDeprecatedV2Api, allow boosting.
+  auto* runtime = Runtime::LoaderSingleton::getExisting();
+  if (runtime != nullptr && runtime->threadsafeSnapshot()->runtimeFeatureEnabled(
+                                "envoy.reloadable_features.enable_deprecated_v2_api")) {
+    avoid_boosting = false;
+  }
   // Load the file and keep the annotations (in case of an upgrade) to make sure
-  // validate() observes the upgrade
-  TestUtility::loadFromYaml(yaml, route_config, true);
+  // validate() observes the upgrade.
+  TestUtility::loadFromYaml(yaml, route_config, true, avoid_boosting);
   TestUtility::validate(route_config);
   return route_config;
 }
@@ -5300,7 +5308,8 @@ virtual_hosts:
       "RouteValidationError.Match: \\[\"value is required\"\\]");
 }
 
-TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
+TEST_F(BadHttpRouteConfigurationsTest, DEPRECATED_FEATURE_TEST(BadRouteEntryConfigPrefixAndRegex)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -5348,7 +5357,8 @@ virtual_hosts:
       "caused by field: \"action\", reason: is required");
 }
 
-TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
+TEST_F(BadHttpRouteConfigurationsTest, DEPRECATED_FEATURE_TEST(BadRouteEntryConfigPathAndRegex)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -5717,7 +5727,8 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
-TEST_F(RoutePropertyTest, TestBadCorsConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestBadCorsConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
