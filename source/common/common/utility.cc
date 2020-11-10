@@ -306,7 +306,7 @@ bool StringUtil::findToken(absl::string_view source, absl::string_view delimiter
                            absl::string_view key_token, bool trim_whitespace) {
   const auto tokens = splitToken(source, delimiters, trim_whitespace);
   if (trim_whitespace) {
-    for (const auto token : tokens) {
+    for (const auto& token : tokens) {
       if (key_token == trim(token)) {
         return true;
       }

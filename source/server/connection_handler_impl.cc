@@ -375,6 +375,18 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 }
 } // namespace
 
+void ConnectionHandlerImpl::ActiveTcpListener::pauseListening() {
+  if (listener_ != nullptr) {
+    listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
+  if (listener_ != nullptr) {
+    listener_->enable();
+  }
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket,
     const envoy::config::core::v3::Metadata& dynamic_metadata) {

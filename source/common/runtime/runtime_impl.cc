@@ -411,7 +411,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Comments are useful for placeholder files with no value.
       const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
       const auto lines = StringUtil::splitToken(text_file, "\n");
-      for (const auto line : lines) {
+      for (const auto& line : lines) {
         if (!line.empty() && line.front() == '#') {
           continue;
         }

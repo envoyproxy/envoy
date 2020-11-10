@@ -134,8 +134,8 @@ private:
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
-    void pauseListening() override { listener_->disable(); }
-    void resumeListening() override { listener_->enable(); }
+    void pauseListening() override;
+    void resumeListening() override;
     void shutdownListener() override { listener_.reset(); }
 
     // Network::BalancedConnectionHandler
