@@ -13,6 +13,10 @@ def envoy_copts(repository, test = False):
         "-Wold-style-cast",
         "-Wvla",
         "-Wno-range-loop-analysis",
+        "-Wno-unknown-warning-option",
+        "-Wno-deprecated-declarations",
+        "-Wno-dangling-gsl",
+        "-Wno-deprecated-copy",
         "-std=c++14",
     ]
 
