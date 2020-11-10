@@ -149,7 +149,8 @@ message TlsCertificate {
   // If specified, updates of file-based *certificate_chain* and *private_key*
   // sources will be triggered by this watch. The certificate/key pair will be
   // read together and validated for atomic read consistency (i.e. no intervening
-  // modification occurred between cert/key read).
+  // modification occurred between cert/key read, verified by file hash
+  // comparisons).
   config.core.v3.WatchedDirectory watched_directory = 7;
 
   // BoringSSL private key method provider. This is an alternative to :ref:`private_key
