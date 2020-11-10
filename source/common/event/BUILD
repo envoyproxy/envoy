@@ -77,9 +77,9 @@ envoy_cc_win32_library(
     deps = [
         ":dispatcher_includes",
         "//include/envoy/event:signal_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:thread_lib",
-       "//source/common/api:os_sys_calls_lib",
-       "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:default_socket_interface_lib",
     ],
 )
 

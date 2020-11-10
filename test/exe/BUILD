@@ -5,6 +5,7 @@ load(
     "envoy_sh_test",
 )
 load("@rules_python//python:defs.bzl", "py_test")
+
 licenses(["notice"])  # Apache 2
 
 envoy_package()
@@ -88,8 +89,8 @@ py_test(
         "outofproc_main_test.py",
     ],
     data = [
-        "//test/config/integration:google_com_proxy_port_0",
         "//source/exe:envoy-static",
+        "//test/config/integration:google_com_proxy_port_0",
     ],
     python_version = "PY3",
     srcs_version = "PY3",
