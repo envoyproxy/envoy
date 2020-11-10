@@ -30,3 +30,4 @@ features. The following sandboxes are available:
     tls
     wasm-cc
     zipkin_tracing
+    skywalking_tracing

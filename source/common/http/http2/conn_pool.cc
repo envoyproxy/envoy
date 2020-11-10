@@ -12,67 +12,69 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+// All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
+// side we do 2^29.
+static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
+
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                            Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http2),
-      random_generator_(random_generator) {}
+                           transport_socket_options, random_generator, {Protocol::Http2}) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
 Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
-void ConnPoolImpl::onGoAway(ActiveClient& client, Http::GoAwayErrorCode) {
-  ENVOY_CONN_LOG(debug, "remote goaway", *client.codec_client_);
-  host_->cluster().stats().upstream_cx_close_notify_.inc();
-  if (client.state_ != ActiveClient::State::DRAINING) {
-    if (client.codec_client_->numActiveRequests() == 0) {
-      client.codec_client_->close();
+
+void ConnPoolImpl::ActiveClient::onGoAway(Http::GoAwayErrorCode) {
+  ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
+  parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
+  if (state_ != ActiveClient::State::DRAINING) {
+    if (codec_client_->numActiveRequests() == 0) {
+      codec_client_->close();
     } else {
-      transitionActiveClientState(client, ActiveClient::State::DRAINING);
+      parent_.transitionActiveClientState(*this, ActiveClient::State::DRAINING);
     }
   }
 }
 
-void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
-  onStreamClosed(client, false);
+void ConnPoolImpl::ActiveClient::onStreamDestroy() {
+  parent().onStreamClosed(*this, false);
 
   // If we are destroying this stream because of a disconnect, do not check for drain here. We will
   // wait until the connection has been fully drained of streams and then check in the connection
   // event callback.
-  if (!client.closed_with_active_rq_) {
-    checkForDrained();
+  if (!closed_with_active_rq_) {
+    parent().checkForDrained();
   }
 }
 
-void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason reason) {
+void ConnPoolImpl::ActiveClient::onStreamReset(Http::StreamResetReason reason) {
   if (reason == StreamResetReason::ConnectionTermination ||
       reason == StreamResetReason::ConnectionFailure) {
-    host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-    client.closed_with_active_rq_ = true;
+    parent_.host()->cluster().stats().upstream_rq_pending_failure_eject_.inc();
+    closed_with_active_rq_ = true;
   } else if (reason == StreamResetReason::LocalReset) {
-    host_->cluster().stats().upstream_rq_tx_reset_.inc();
+    parent_.host()->cluster().stats().upstream_rq_tx_reset_.inc();
   } else if (reason == StreamResetReason::RemoteReset) {
-    host_->cluster().stats().upstream_rq_rx_reset_.inc();
+    parent_.host()->cluster().stats().upstream_rq_rx_reset_.inc();
   }
 }
 
-uint64_t ConnPoolImpl::maxStreamsPerConnection() {
-  uint64_t max_streams_config = host_->cluster().maxRequestsPerConnection();
+uint64_t maxStreamsPerConnection(uint64_t max_streams_config) {
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 
-ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
+ConnPoolImpl::ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent)
     : Envoy::Http::ActiveClient(
-          parent, parent.maxStreamsPerConnection(),
-          parent.host_->cluster().http2Options().max_concurrent_streams().value()) {
+          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
+          parent.host()->cluster().http2Options().max_concurrent_streams().value()) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
-
-  parent.host_->cluster().stats().upstream_cx_http2_total_.inc();
+  parent.host()->cluster().stats().upstream_cx_http2_total_.inc();
 }
 
 bool ConnPoolImpl::ActiveClient::closingWithIncompleteStream() const {

@@ -37,7 +37,7 @@ DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
 
 absl::optional<Envoy::Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
-  return tls_.get().config_;
+  return tls_->config_;
 }
 
 void DynamicFilterConfigProviderImpl::validateConfig(
@@ -53,8 +53,8 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
                                                      const std::string&,
                                                      Config::ConfigAppliedCb cb) {
   tls_.runOnAllThreads(
-      [config, cb](ThreadLocalConfig& tls) {
-        tls.config_ = config;
+      [config, cb](OptRef<ThreadLocalConfig> tls) {
+        tls->config_ = config;
         if (cb) {
           cb();
         }
