@@ -13,6 +13,11 @@ It demonstrates a number of commonly used proxying and ``TLS`` termination patte
 - ``http`` -> ``https``
 - ``https`` passthrough
 
+.. note::
+
+   Envoy can also proxy non-``HTTP`` traffic over ``TLS``.
+   Please the double proxy sandbox <INSERT LINK HERE> for an example of this.
+
 .. warning::
 
    For the sake of simplicity, the examples provided here do not authenticate any client certificates,
