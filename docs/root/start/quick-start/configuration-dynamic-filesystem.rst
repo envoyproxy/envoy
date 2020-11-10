@@ -19,7 +19,7 @@ For the given example you will also need two dynamic configuration files:
 - :ref:`lds.yaml <start_quick_start_dynamic_fs_dynamic_lds>` for listeners.
 - :ref:`cds.yaml <start_quick_start_dynamic_fs_dynamic_cds>` for clusters.
 
-You can also add an :ref:`admin <start_quick_start_dynamic_fs_admin>` section if you wish to monitor Envoy or
+You can also add an :ref:`admin <start_quick_start_admin>` section if you wish to monitor Envoy or
 retrieve stats or configuration information.
 
 The following sections walk through the dynamic configuration provided in the
@@ -90,26 +90,3 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
     :language: yaml
     :linenos:
     :emphasize-lines: 8, 14-15, 19-20
-
-.. _start_quick_start_dynamic_fs_admin:
-
-``admin``
----------
-
-Configuring the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` section is
-the same as for :ref:`static configuration <start_quick_start_static_admin>`.
-
-Enabling the :ref:`admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.admin>` interface with
-dynamic configuration, allows you to use the :ref:`config_dump <operations_admin_interface_config_dump>`
-endpoint to see how Envoy is currently configured.
-
-.. literalinclude:: _include/envoy-dynamic-filesystem-demo.yaml
-    :language: yaml
-    :linenos:
-    :lines: 9-16
-    :lineno-start: 9
-    :emphasize-lines: 3-8
-
-.. warning::
-
-   You may wish to restrict the network address the admin server listens to in your own deployment.
