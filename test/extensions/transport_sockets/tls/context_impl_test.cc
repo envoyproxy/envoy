@@ -251,7 +251,7 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   EXPECT_THROW_WITH_MESSAGE(
-      manager_.createSslClientContext(store_, cfg), EnvoyException,
+      manager_.createSslClientContext(store_, cfg, nullptr), EnvoyException,
       "Failed to initialize cipher suites "
       "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
       "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
@@ -271,7 +271,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
 
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
 
   // Calculate the days until test cert expires
   auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
@@ -292,8 +292,59 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
+}
+
+// Validate that when the context is updated, the daysUntilFirstCertExpires returns the current
+// context value.
+TEST_F(SslContextImplTest, TestContextUpdate) {
+  const std::string expired_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_key.pem"
+)EOF";
+
+  // Validate that daysUntilFirstCertExpires returns correctly when single context is available.
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(expired_yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), 0U);
+
+  const std::string expiring_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+ )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext expiring_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(expiring_yaml), expiring_context);
+
+  ClientContextConfigImpl expiring_cfg(expiring_context, factory_context_);
+
+  Envoy::Ssl::ClientContextSharedPtr new_context(
+      manager_.createSslClientContext(store_, expiring_cfg, context));
+
+  // Validate that when the context is updated, daysUntilFirstCertExpires reflects the current
+  // context expiry.
+  auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
+  EXPECT_EQ(new_context->daysUntilFirstCertExpires(), days_until_expiry);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), days_until_expiry);
+
+  // Update the context again and validate daysUntilFirstCertExpires still reflects the current
+  // expiry.
+  Envoy::Ssl::ClientContextSharedPtr updated_context(
+      manager_.createSslClientContext(store_, cfg, new_context));
+  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), 0U);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), 0U);
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {
@@ -313,7 +364,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
   // days only in the first second that it's valid. We will partially match for up until Days until
   // Expiration: 1.
@@ -363,7 +414,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   std::string ca_cert_json = absl::StrCat(R"EOF({
  "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem",
  "serial_number": ")EOF",
@@ -417,7 +468,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithIPSAN) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   std::string ca_cert_json = absl::StrCat(R"EOF({
  "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem",
  "serial_number": ")EOF",
@@ -475,7 +526,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   std::string ca_cert_json =
       absl::StrCat(R"EOF({
  "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem",
@@ -505,7 +556,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
 TEST_F(SslContextImplTest, TestNoCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
   ClientContextConfigImpl cfg(config, factory_context_);
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
   EXPECT_TRUE(context->getCertChainInformation().empty());
 }
@@ -527,9 +578,9 @@ TEST_F(SslContextImplTest, AtMostOneRsaCert) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException,
-                          "at most one certificate of a given type may be specified");
+  EXPECT_THROW_WITH_REGEX(
+      manager_.createSslServerContext(store_, server_context_config, {}, nullptr), EnvoyException,
+      "at most one certificate of a given type may be specified");
 }
 
 // Multiple ECDSA certificates are rejected.
@@ -549,9 +600,9 @@ TEST_F(SslContextImplTest, AtMostOneEcdsaCert) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException,
-                          "at most one certificate of a given type may be specified");
+  EXPECT_THROW_WITH_REGEX(
+      manager_.createSslServerContext(store_, server_context_config, {}, nullptr), EnvoyException,
+      "at most one certificate of a given type may be specified");
 }
 
 // Certificates with no subject CN and no SANs are rejected.
@@ -567,14 +618,15 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException, "has neither subject CN nor SAN names");
+  EXPECT_THROW_WITH_REGEX(
+      manager_.createSslServerContext(store_, server_context_config, {}, nullptr), EnvoyException,
+      "has neither subject CN nor SAN names");
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
 public:
   Envoy::Ssl::ServerContextSharedPtr loadConfig(ServerContextConfigImpl& cfg) {
-    return manager_.createSslServerContext(store_, cfg, std::vector<std::string>{});
+    return manager_.createSslServerContext(store_, cfg, std::vector<std::string>{}, nullptr);
   }
 
   Envoy::Ssl::ServerContextSharedPtr loadConfigYaml(const std::string& yaml) {
@@ -790,7 +842,7 @@ class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
     Envoy::Ssl::ServerContextSharedPtr server_ctx(
-        manager_.createSslServerContext(store_, cfg, std::vector<std::string>{}));
+        manager_.createSslServerContext(store_, cfg, std::vector<std::string>{}, nullptr));
   }
 
   void loadConfigV2(envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& cfg) {
@@ -1138,7 +1190,7 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateHash) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException, "Invalid hex-encoded SHA-256 .*");
 }
 
@@ -1154,7 +1206,7 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateSpki) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
@@ -1173,7 +1225,7 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  manager.createSslClientContext(store, client_context_config);
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
 // Validate that 1024-bit RSA certificates are rejected.
@@ -1195,12 +1247,12 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   std::string error_msg(
       "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
 #ifdef BORINGSSL_FIPS
-      "with 2048-bit or 3072-bit keys are supported in FIPS mode"
+      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
 #else
       "with 2048-bit or larger keys are supported"
 #endif
   );
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException, error_msg);
 }
 
@@ -1219,11 +1271,10 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  manager.createSslClientContext(store, client_context_config);
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
-// Validate that 4096-bit RSA certificates load successfully in non-FIPS builds, but are rejected
-// in FIPS builds.
+// Validate that 4096-bit RSA certificates load successfully.
 TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
@@ -1238,14 +1289,7 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-#ifdef BORINGSSL_FIPS
-  EXPECT_THROW_WITH_REGEX(
-      manager.createSslClientContext(store, client_context_config), EnvoyException,
-      "Failed to load certificate chain from .*selfsigned_rsa_4096_cert.pem, only RSA certificates "
-      "with 2048-bit or 3072-bit keys are supported in FIPS mode");
-#else
-  manager.createSslClientContext(store, client_context_config);
-#endif
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
 // Validate that P256 ECDSA certs load.
@@ -1263,7 +1307,7 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  manager.createSslClientContext(store, client_context_config);
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
 // Validate that non-P256 ECDSA certs are rejected.
@@ -1281,7 +1325,7 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException,
                           "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
                           "only P-256 ECDSA certificates are supported");
@@ -1487,7 +1531,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException,
                           absl::StrCat("Failed to load private key from ", private_key_path));
 }
@@ -1729,8 +1773,8 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(
-          manager.createSslServerContext(store, client_context_config, std::vector<std::string>{})),
+      Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
+          store, client_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Server TlsCertificates must have a certificate specified");
 }
 
@@ -1827,8 +1871,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(
-          manager.createSslServerContext(store, server_context_config, std::vector<std::string>{})),
+      Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
+          store, server_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Failed to get BoringSSL private key method from provider");
 }
 

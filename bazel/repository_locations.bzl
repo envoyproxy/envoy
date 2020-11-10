@@ -615,11 +615,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WAVM",
         project_desc = "WebAssembly Virtual Machine",
         project_url = "https://wavm.github.io",
-        version = "e8155f1f3af88b4d08802716a7054950ef18d827",
-        sha256 = "cc3fcaf05d57010c9cf8eb920234679dede6c780137b55001fd34e4d14806f7c",
+        version = "e289ba654fe51655ab080819fd85ed9c936aae6e",
+        sha256 = "35e2bfa795c67ef70405470f85bd2a15565738fb5cc08dc9c1a9c4676ee51e60",
         strip_prefix = "WAVM-{version}",
         urls = ["https://github.com/WAVM/WAVM/archive/{version}.tar.gz"],
-        release_date = "2020-07-07",
+        release_date = "2020-09-17",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -666,10 +666,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "8.5.210.20",
+        version = "8.7.220.10",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "ef404643d7da6854b76b9fb9950a79a1acbd037b7a26f02c585ac379b0f7dee1",
+        sha256 = "f22734640e0515bc34d1ca3772513aef24374fafa44d0489d3a9a57cadec69fb",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
@@ -679,7 +679,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        release_date = "2020-08-17",
+        release_date = "2020-10-27",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
@@ -845,8 +845,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "d54b3795e7c3e61015dac2c2110b0da2be999b8e",
-        sha256 = "e95ad57b6b550b039d4baa35c896f7f523e427b7278ba56f22fac6e1bef8c7f0",
+        version = "40fd3d03842c07d65fed907a6b6ed0f89d68d531",
+        sha256 = "b5ae746e66b6209ea0cce86d6c21de99dacbec1da9cdadd53a9ec46bc296a3ba",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -857,7 +857,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        release_date = "2020-10-22",
+        release_date = "2020-10-27",
         cpe = "N/A",
     ),
     emscripten_toolchain = dict(
