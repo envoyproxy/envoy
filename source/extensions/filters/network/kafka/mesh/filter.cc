@@ -19,7 +19,7 @@ namespace Mesh {
 KafkaMeshFilter::KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
                                  UpstreamKafkaFacade& upstream_kafka_facade)
     : KafkaMeshFilter{clustering_configuration, upstream_kafka_facade,
-                      std::shared_ptr<RequestDecoder>(new RequestDecoder(
+                      std::make_shared<RequestDecoder>(std::vector<RequestCallbackSharedPtr>(
                           {std::make_shared<RequestProcessor>(*this, clustering_configuration)}))} {
 }
 

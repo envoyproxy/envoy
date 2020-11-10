@@ -19,7 +19,7 @@ namespace Mesh {
  */
 class UpstreamKafkaFacade {
 public:
-  virtual ~UpstreamKafkaFacade(){};
+  virtual ~UpstreamKafkaFacade() = default;
   virtual RecordSink& getProducerForTopic(const std::string& topic) PURE;
 };
 

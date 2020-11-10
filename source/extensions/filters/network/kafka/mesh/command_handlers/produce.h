@@ -27,7 +27,7 @@ struct RecordFootmark {
 
 class RecordExtractor {
 public:
-  virtual ~RecordExtractor(){};
+  virtual ~RecordExtractor() = default;
 
   virtual std::vector<RecordFootmark>
   computeFootmarks(const std::vector<TopicProduceData>& data) const PURE;

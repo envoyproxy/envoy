@@ -10,7 +10,6 @@ using testing::_;
 using testing::AnyNumber;
 using testing::Return;
 using testing::ReturnNull;
-using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {

@@ -44,7 +44,7 @@ struct ClusterConfig {
  */
 class ClusteringConfiguration {
 public:
-  virtual ~ClusteringConfiguration(){};
+  virtual ~ClusteringConfiguration() = default;
   virtual absl::optional<ClusterConfig>
   computeClusterConfigForTopic(const std::string& topic) const PURE;
   virtual std::pair<std::string, int32_t> getAdvertisedAddress() const PURE;

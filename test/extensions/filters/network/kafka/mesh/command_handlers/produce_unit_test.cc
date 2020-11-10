@@ -10,7 +10,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -218,7 +217,7 @@ MATCHER_P3(HasRecords, topic, partition, expected, "") {
   std::set<absl::string_view> saved_value_pointers = {};
   size_t count = 0;
 
-  for (const auto record : arg) {
+  for (const auto& record : arg) {
     if (record.topic_ == topic && record.partition_ == partition) {
       saved_key_pointers.insert(record.key_);
       saved_value_pointers.insert(record.value_);

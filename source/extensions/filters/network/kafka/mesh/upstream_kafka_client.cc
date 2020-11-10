@@ -10,14 +10,14 @@ class KafkaProducerWrapperImpl : public KafkaProducerWrapper {
 public:
   KafkaProducerWrapperImpl(RdKafka::Producer* arg) : producer_{arg} {};
 
-  virtual RdKafka::ErrorCode produce(const std::string topic_name, int32_t partition, int msgflags,
-                                     void* payload, size_t len, const void* key, size_t key_len,
-                                     int64_t timestamp, void* msg_opaque) override {
+  RdKafka::ErrorCode produce(const std::string topic_name, int32_t partition, int msgflags,
+                             void* payload, size_t len, const void* key, size_t key_len,
+                             int64_t timestamp, void* msg_opaque) override {
     return producer_->produce(topic_name, partition, msgflags, payload, len, key, key_len,
                               timestamp, msg_opaque);
   };
 
-  virtual int poll(int timeout_ms) override { return producer_->poll(timeout_ms); }
+  int poll(int timeout_ms) override { return producer_->poll(timeout_ms); }
 
 private:
   std::unique_ptr<RdKafka::Producer> producer_;

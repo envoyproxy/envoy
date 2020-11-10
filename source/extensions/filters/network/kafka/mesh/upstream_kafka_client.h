@@ -49,7 +49,7 @@ using RawKafkaProducerConfig = std::map<std::string, std::string>;
  */
 class KafkaProducerWrapper {
 public:
-  virtual ~KafkaProducerWrapper(){};
+  virtual ~KafkaProducerWrapper() = default;
   virtual RdKafka::ErrorCode produce(const std::string topic_name, int32_t partition, int msgflags,
                                      void* payload, size_t len, const void* key, size_t key_len,
                                      int64_t timestamp, void* msg_opaque) PURE;
@@ -61,7 +61,7 @@ public:
  */
 class LibRdKafkaUtils {
 public:
-  virtual ~LibRdKafkaUtils(){};
+  virtual ~LibRdKafkaUtils() = default;
   virtual RdKafka::Conf::ConfResult setConfProperty(RdKafka::Conf& conf, const std::string& name,
                                                     const std::string& value,
                                                     std::string& errstr) const PURE;
@@ -80,7 +80,7 @@ public:
  */
 class RecordSink {
 public:
-  virtual ~RecordSink(){};
+  virtual ~RecordSink() = default;
 
   virtual void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
                     const int32_t partition, const absl::string_view key,
