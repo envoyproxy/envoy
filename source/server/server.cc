@@ -54,7 +54,7 @@
 #include "server/ssl_context_manager.h"
 
 namespace {
-constexpr bool platformSupportsSignal(signat_t signal_num) { return signal_num != -1; }
+constexpr bool platformSupportsSignal(signal_t signal_num) { return signal_num != -1; }
 } // namespace
 namespace Envoy {
 namespace Server {

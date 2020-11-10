@@ -19,7 +19,7 @@ namespace Event {
  */
 class SignalEventImpl : public SignalEvent, ImplBase {
 public:
-  SignalEventImpl(DispatcherImpl& dispatcher, signat_t signal_num, SignalCb cb);
+  SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num, SignalCb cb);
 
 private:
   SignalCb cb_;
@@ -27,6 +27,6 @@ private:
 };
 
 using eventBridgeHandlersSingleton =
-    ThreadSafeSingleton<absl::flat_hash_map<signat_t, std::shared_ptr<Network::IoHandle>>>;
+    ThreadSafeSingleton<absl::flat_hash_map<signal_t, std::shared_ptr<Network::IoHandle>>>;
 } // namespace Event
 } // namespace Envoy

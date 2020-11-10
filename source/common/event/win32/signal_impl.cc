@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Event {
 
-SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signat_t signal_num, SignalCb cb)
+SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num, SignalCb cb)
     : cb_(cb) {
   auto handler_it = eventBridgeHandlersSingleton::get().find(signal_num);
   if (handler_it != eventBridgeHandlersSingleton::get().end()) {
