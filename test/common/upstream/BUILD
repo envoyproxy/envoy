@@ -46,12 +46,10 @@ envoy_cc_test(
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -775,5 +773,25 @@ envoy_cc_fuzz_test(
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",
         "//test/fuzz:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "least_request_load_balancer_fuzz_proto",
+    srcs = ["least_request_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "least_request_load_balancer_fuzz_test",
+    srcs = ["least_request_load_balancer_fuzz_test.cc"],
+    corpus = "//test/common/upstream:least_request_load_balancer_corpus",
+    deps = [
+        ":least_request_load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+        ":zone_aware_load_balancer_fuzz_lib",
     ],
 )
