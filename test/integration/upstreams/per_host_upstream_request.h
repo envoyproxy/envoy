@@ -83,8 +83,8 @@ public:
     sub_upstream_.encodeMetadata(metadata_map_vector);
   }
 
-  // Copy, mutate and pass downstream headers to sub upstream.
-  void encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override {
+  Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
+                             bool end_stream) override {
     auto dup = Envoy::Http::RequestHeaderMapImpl::create();
     Envoy::Http::HeaderMapImpl::copyFrom(*dup, headers);
     dup->setCopy(Envoy::Http::LowerCaseString("X-foo"), "foo-common");
@@ -92,7 +92,7 @@ public:
     if (host_->metadata() != nullptr) {
       addHeader(*dup, "X-host-foo", *host_->metadata(), "foo", "bar");
     }
-    sub_upstream_.encodeHeaders(*dup, end_stream);
+    return sub_upstream_.encodeHeaders(*dup, end_stream);
   }
 
   void encodeTrailers(const Envoy::Http::RequestTrailerMap& trailers) override {
