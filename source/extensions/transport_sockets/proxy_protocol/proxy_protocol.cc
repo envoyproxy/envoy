@@ -34,8 +34,7 @@ Network::IoResult UpstreamProxyProtocolSocket::doWrite(Buffer::Instance& buffer,
     auto header_res = writeHeader();
     if (header_buffer_.length() == 0 && header_res.action_ == Network::PostIoAction::KeepOpen) {
       auto inner_res = transport_socket_->doWrite(buffer, end_stream);
-      return {inner_res.action_, header_res.bytes_processed_ + inner_res.bytes_processed_, false,
-              inner_res.io_error_};
+      return {inner_res.action_, header_res.bytes_processed_ + inner_res.bytes_processed_, false};
     }
     return header_res;
   } else {
@@ -92,13 +91,13 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
       ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-        action = Network::PostIoAction::Close;
+        action = Network::PostIoAction::CloseError;
       }
       break;
     }
   } while (true);
 
-  return {action, bytes_written, false, absl::nullopt};
+  return {action, bytes_written, false};
 }
 
 void UpstreamProxyProtocolSocket::onConnected() {

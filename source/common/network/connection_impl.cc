@@ -592,8 +592,7 @@ void ConnectionImpl::onReadReady() {
     result.action_ = PostIoAction::Close;
   }
 
-  if (result.io_error_.has_value()) {
-    ASSERT(result.action_ == PostIoAction::Close);
+  if (result.action_ == PostIoAction::CloseError) {
     if (dynamic_cast<ServerConnectionImpl*>(this)) {
       stream_info_.setConnectionTerminationDetails(kDownstreamConnectionTerminationDetails);
       stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
@@ -616,7 +615,7 @@ void ConnectionImpl::onReadReady() {
   }
 
   // The read callback may have already closed the connection.
-  if (result.action_ == PostIoAction::Close || bothSidesHalfClosed()) {
+  if (result.action_ != PostIoAction::KeepOpen || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "remote close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
   }
@@ -669,8 +668,7 @@ void ConnectionImpl::onWriteReady() {
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
-  if (result.io_error_.has_value()) {
-    ASSERT(result.action_ == PostIoAction::Close);
+  if (result.action_ == PostIoAction::CloseError) {
     if (dynamic_cast<ServerConnectionImpl*>(this)) {
       stream_info_.setConnectionTerminationDetails(kDownstreamConnectionTerminationDetails);
       stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
@@ -685,7 +683,7 @@ void ConnectionImpl::onWriteReady() {
   // period of inactivity from the last write event. Therefore, the timer must be reset to its
   // original timeout value unless the socket is going to be closed as a result of the doWrite().
 
-  if (result.action_ == PostIoAction::Close) {
+  if (result.action_ != PostIoAction::KeepOpen) {
     // It is possible (though unlikely) for the connection to have already been closed during the
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.

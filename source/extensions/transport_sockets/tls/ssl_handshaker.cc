@@ -242,7 +242,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
       return PostIoAction::KeepOpen;
     default:
       handshake_callbacks_->onFailure();
-      return PostIoAction::Close;
+      return PostIoAction::CloseError;
     }
   }
 }

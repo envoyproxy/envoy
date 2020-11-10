@@ -34,11 +34,6 @@ struct IoResult {
    * can only be true for read operations.
    */
   bool end_stream_read_;
-
-  /**
-   * I/O error.
-   */
-  absl::optional<Api::IoError::IoErrorCode> io_error_;
 };
 
 /**

@@ -134,7 +134,7 @@ TEST_F(HandshakerTest, NormalOperation) {
 
   // Run the handshakes from the client and server until SslHandshakerImpl decides
   // we're done and returns PostIoAction::Close.
-  while (post_io_action != Network::PostIoAction::Close) {
+  while (post_io_action == Network::PostIoAction::KeepOpen) {
     SSL_do_handshake(client_ssl_.get());
     post_io_action = handshaker.doHandshake();
   }
@@ -159,13 +159,13 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
 
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
 
-  while (post_io_action != Network::PostIoAction::Close) {
+  while (post_io_action == Network::PostIoAction::KeepOpen) {
     SSL_do_handshake(client_ssl_.get());
     post_io_action = handshaker.doHandshake();
   }
 
   // In the error case, SslHandshakerImpl also closes the connection.
-  EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+  EXPECT_EQ(post_io_action, Network::PostIoAction::CloseError);
 }
 
 // Example SslHandshakerImpl demonstrating special-case behavior which necessitates
@@ -206,7 +206,7 @@ public:
         return Network::PostIoAction::KeepOpen;
       default:
         handshakeCallbacks()->onFailure();
-        return Network::PostIoAction::Close;
+        return Network::PostIoAction::CloseError;
       }
     }
   }
@@ -231,7 +231,7 @@ TEST_F(HandshakerTest, NormalOperationWithSslHandshakerImplForTest) {
 
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
 
-  while (post_io_action != Network::PostIoAction::Close) {
+  while (post_io_action == Network::PostIoAction::KeepOpen) {
     SSL_do_handshake(client_ssl_.get());
     post_io_action = handshaker.doHandshake();
   }

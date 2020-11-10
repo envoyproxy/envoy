@@ -10,7 +10,9 @@ enum class PostIoAction {
   // Close the connection.
   Close,
   // Keep the connection open.
-  KeepOpen
+  KeepOpen,
+  // Close the connection because of an error.
+  CloseError,
 };
 
 } // namespace Network

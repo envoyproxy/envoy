@@ -15,7 +15,6 @@ void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks& call
 
 IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
-  absl::optional<Api::IoError::IoErrorCode> error;
   uint64_t bytes_read = 0;
   bool end_stream = false;
   do {
@@ -39,19 +38,17 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
       ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-        error = result.err_->getErrorCode();
-        action = PostIoAction::Close;
+        action = PostIoAction::CloseError;
       }
       break;
     }
   } while (true);
 
-  return {action, bytes_read, end_stream, error};
+  return {action, bytes_read, end_stream};
 }
 
 IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   PostIoAction action;
-  absl::optional<Api::IoError::IoErrorCode> error;
   uint64_t bytes_written = 0;
   ASSERT(!shutdown_ || buffer.length() == 0);
   do {
@@ -76,14 +73,13 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
         action = PostIoAction::KeepOpen;
       } else {
-        error = result.err_->getErrorCode();
-        action = PostIoAction::Close;
+        action = PostIoAction::CloseError;
       }
       break;
     }
   } while (true);
 
-  return {action, bytes_written, false, error};
+  return {action, bytes_written, false};
 }
 
 std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }

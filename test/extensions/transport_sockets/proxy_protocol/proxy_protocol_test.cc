@@ -104,11 +104,9 @@ TEST_F(ProxyProtocolTest, BytesProcessedIncludesProxyProtocolHeader) {
   {
     InSequence s;
     EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false))
-        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false,
-                                           absl::nullopt}));
+        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
     EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg2), false))
-        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg2.length(), false,
-                                           absl::nullopt}));
+        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg2.length(), false}));
   }
 
   auto resp = proxy_protocol_socket_->doWrite(msg, false);
@@ -144,8 +142,7 @@ TEST_F(ProxyProtocolTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
           return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
         }));
     EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false))
-        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false,
-                                           absl::nullopt}));
+        .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
   }
 
   auto resp = proxy_protocol_socket_->doWrite(msg, false);
@@ -177,7 +174,7 @@ TEST_F(ProxyProtocolTest, ReturnsCloseWhenWriteErrorIsNotAgain) {
   }
 
   auto resp = proxy_protocol_socket_->doWrite(msg, false);
-  EXPECT_EQ(Network::PostIoAction::Close, resp.action_);
+  EXPECT_EQ(Network::PostIoAction::CloseError, resp.action_);
 }
 
 // Test injects V1 PROXY protocol using upstream addresses when transport options are null
