@@ -1,15 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_extension_package",
+    "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_extension_package()
+envoy_package()
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "per_host_upstream_config",
     srcs = [
         "per_host_upstream_config.cc",
@@ -17,8 +16,6 @@ envoy_cc_extension(
     hdrs = [
         "per_host_upstream_config.h",
     ],
-    security_posture = "robust_to_untrusted_downstream",
-    visibility = ["//visibility:public"],
     deps = [
         ":per_host_upstream_request_lib",
         "//source/extensions/upstreams/http/http:upstream_request_lib",
