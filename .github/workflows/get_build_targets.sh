@@ -18,8 +18,8 @@ function get_targets() {
     # This chain of commands from left to right are:
     # 1. Excluding the redundant .cc/.h targets that bazel query emits.
     # 2. Storing only the unique output.
-    # 3. Limiting to the first 10 targets.
-  done | grep -v '\.cc\|\.h' | sort -u | head -n 10
+    # 3. Limiting to the first 3 targets.
+  done | grep -v '\.cc\|\.h' | sort -u | head -n 3
 }
 
 # Fetching the upstream HEAD to compare with and stored in FETCH_HEAD.

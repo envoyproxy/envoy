@@ -11,8 +11,6 @@ services:
     ports:
     - 10000:10000
     - 19000:19000
-    volumes:
-    - ./configs:/var/lib/envoy
 
   service1:
     image: jmalloc/echo-server
