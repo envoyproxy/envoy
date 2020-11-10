@@ -224,11 +224,37 @@ By default Envoy system logs are sent to ``/dev/stderr``.
 
 This can be overridden using ``--log-path``
 
+.. tabs::
+
+   .. tab:: System
+
+      .. code-block:: console
+
+	 $ mkdir logs
+         $ envoy -c envoy-demo.yaml --log-path logs/custom.log
+
+   .. tab:: Docker
+
+      .. substitution-code-block:: console
+
+	 $ mkdir logs
+	 $ chmod go+rwx logs/
+         $ docker run --rm -d \
+               -p 10000:10000 \
+	       -v $(pwd)/logs:/logs \
+               envoyproxy/|envoy_docker_image| \
+	       -c /etc/envoy/envoy.yaml \
+	       --log-path logs/custom.log
+
 Access log paths can be set for the admin interface, and for configured listeners.
 
-Some filters may have additional logging capabilities.
+Some Envoy filters and extensions may also have additional logging capabilities.
 
 Envoy can be configured to log to different formats, and to different outputs in addition to files and ``stdout/err``.
+
+.. note::
+
+   If you are running Envoy on a Windows system Envoy will output to `CON` by default.
 
 Envoy debugging
 ---------------
