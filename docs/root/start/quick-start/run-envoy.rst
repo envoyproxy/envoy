@@ -21,6 +21,7 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
       .. code-block:: console
 
          $ envoy --version
+	 ...
 
    .. tab:: Docker
 
@@ -29,6 +30,7 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
          $ docker run --rm \
                envoyproxy/|envoy_docker_image| \
                    --version
+	 ...
 
 .. _start_quick_start_help:
 
@@ -45,6 +47,7 @@ flag:
       .. code-block:: console
 
          $ envoy --help
+	 ...
 
    .. tab:: Docker
 
@@ -53,6 +56,7 @@ flag:
          $ docker run --rm \
                envoyproxy/|envoy_docker_image| \
                    --help
+	 ...
 
 .. _start_quick_start_config:
 
@@ -71,6 +75,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
       .. code-block:: console
 
          $ envoy -c envoy-demo.yaml
+	 ...
 
    .. tab:: Docker
 
@@ -83,6 +88,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
                -p 9901:9901 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image|
+	 ...
 
       To specify a custom configuration you can mount the config into the container, and specify the path with ``-c``.
 
@@ -96,18 +102,21 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
                    -c /envoy-custom.yaml
+	 ...
 
 Check Envoy is proxying on http://localhost:10000.
 
 .. code-block:: console
 
    $ curl -v localhost:10000
+   ...
 
 The Envoy admin endpoint should also be available at http://localhost:9901.
 
 .. code-block:: console
 
    $ curl -v localhost:9901
+   ...
 
 You can exit the server with `Ctrl-c`.
 
@@ -153,12 +162,14 @@ Next, start the Envoy server using the override configuration:
                envoyproxy/|envoy_docker_image| \
                    -c /etc/envoy/envoy.yaml \
                    --config-yaml "$(cat envoy-override.yaml)"
+	 ...
 
 The Envoy admin interface should now be available on http://localhost:9902.
 
 .. code-block:: console
 
    $ curl -v localhost:9902
+   ...
 
 .. note::
 
@@ -241,6 +252,7 @@ This can be overridden using :option:`--log-path`.
 
          $ mkdir logs
          $ envoy -c envoy-demo.yaml --log-path logs/custom.log
+	 ...
 
    .. tab:: Docker
 
@@ -254,6 +266,7 @@ This can be overridden using :option:`--log-path`.
                envoyproxy/|envoy_docker_image| \
                -c /etc/envoy/envoy.yaml \
                --log-path logs/custom.log
+	 ...
 
 :ref:`Access log <arch_overview_access_logs>` paths can be set for the
 :ref:`admin interface <start_quick_start_admin>`, and for configured
@@ -299,6 +312,7 @@ which are set to ``debug`` and ``trace`` respectively.
       .. code-block:: console
 
          $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
+	 ...
 
    .. tab:: Docker
 
@@ -311,6 +325,7 @@ which are set to ``debug`` and ``trace`` respectively.
                -c /etc/envoy/envoy.yaml \
                -l off \
                --component-log-level upstream:debug,connection:trace
+	 ...
 
 .. tip::
 
