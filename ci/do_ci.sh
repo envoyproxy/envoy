@@ -166,11 +166,12 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
 
+  # Validate skipping system ICU linking.
+  ./ci/check_skip_system_icu_linking.sh
+
   echo "bazel release build with tests..."
   bazel_binary_build release
 
-  # Validate skipping system ICU linking.
-  ./ci/check_skip_system_icu_linking.sh
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
