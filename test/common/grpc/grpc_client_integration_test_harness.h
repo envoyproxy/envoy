@@ -457,6 +457,7 @@ public:
   const TestMetadata empty_metadata_;
 
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
+  Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
   const std::string fake_cluster_name_{"fake_cluster"};
   Upstream::MockClusterManager cm_;
@@ -476,7 +477,6 @@ public:
       new NiceMock<Upstream::MockHostDescription>();
   Upstream::HostDescriptionConstSharedPtr host_description_ptr_{mock_host_description_};
   Upstream::HostConstSharedPtr host_ptr_{mock_host_};
-  Upstream::ClusterConnectivityState state_;
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;

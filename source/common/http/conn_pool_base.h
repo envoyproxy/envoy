@@ -109,7 +109,9 @@ public:
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(), event);
   }
-  size_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
+  size_t numActiveStreams() const override {
+    return codec_client_->numActiveRequests();
+  }
   uint64_t id() const override { return codec_client_->id(); }
 
   Http::CodecClientPtr codec_client_;

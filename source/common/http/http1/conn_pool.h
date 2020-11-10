@@ -37,6 +37,7 @@ protected:
                          public ResponseDecoderWrapper,
                          public StreamCallbacks {
     StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent);
+    ~StreamWrapper() override;
 
     // StreamEncoderWrapper
     void onEncodeComplete() override;
@@ -64,7 +65,7 @@ protected:
 
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
-  class ActiveClient : public Envoy::Http::ActiveClient, public CodecClientCallbacks {
+  class ActiveClient : public Envoy::Http::ActiveClient {
   public:
     ActiveClient(ConnPoolImpl& parent);
 
@@ -74,11 +75,13 @@ protected:
     bool closingWithIncompleteStream() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
-    // CodecClientCallbacks
-    void onStreamPreDecodeComplete() override { stream_wrapper_->decode_complete_ = true; }
-    void onStreamDestroy() override { stream_wrapper_->onStreamDestroy(); }
-    void onStreamReset(Http::StreamResetReason) override {}
-
+    size_t numActiveStreams() const override {
+      // Override the parent class using the codec for numActiveStreams.
+      // Unfortunately for the HTTP/1 codec, the stream is destroyed before decode
+      // is complete, and we must make sure the connection pool does not observe available
+      // capacity and assign a new stream before decode is complete.
+      return stream_wrapper_.get() ? 1 : 0;
+    }
     StreamWrapperPtr stream_wrapper_;
   };
 };

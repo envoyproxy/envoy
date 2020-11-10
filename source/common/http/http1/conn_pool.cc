@@ -43,7 +43,7 @@ ConnPoolImpl::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, Ac
   RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
 }
 
-void ConnPoolImpl::StreamWrapper::onStreamDestroy() {
+ConnPoolImpl::StreamWrapper::~StreamWrapper() {
   // Upstream connection might be closed right after response is complete. Setting delay=true
   // here to attach pending requests in next dispatcher loop to handle that case.
   // https://github.com/envoyproxy/envoy/issues/2715
@@ -78,6 +78,8 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
 }
 
 void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
+  ASSERT(!decode_complete_);
+  decode_complete_ = encode_complete_;
   ENVOY_CONN_LOG(debug, "response complete", *parent_.codec_client_);
 
   if (!parent_.stream_wrapper_->encode_complete_) {
@@ -100,7 +102,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
           parent, parent.host_->cluster().maxRequestsPerConnection(),
           1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
       ) {
-  codec_client_->setCodecClientCallbacks(*this);
   parent.host_->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
