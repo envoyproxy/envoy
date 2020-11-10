@@ -10,5 +10,6 @@ set -e
 #   fi
 # }
 
+ls -la bazel-bin/third_party/icu/googleurl/googleurl_test.runfiles/envoy/third_party/icu
 ls -la bazel-bin/third_party/icu/googleurl/googleurl_test.runfiles/envoy/third_party/icu/googleurl
 ls -la bazel-bin/third_party/icu/googleurl/googleurl_test.runfiles/envoy/third_party/icu/googleurl/googleurl_test
