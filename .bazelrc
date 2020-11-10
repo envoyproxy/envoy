@@ -23,6 +23,9 @@ build --enable_platform_specific_config
 # Enable position independent code, this option is not supported on Windows and default on on macOS.
 build:linux --copt=-fPIC
 
+# Backport: fix macOS toolchain complains about absl::string_view
+build:macos --copt=-Wno-range-loop-analysis
+
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
 
