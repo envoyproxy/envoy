@@ -150,7 +150,7 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests" "@org_unicode_icuuc//:common_test" "//third_party/icu/...")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests" "//bazel/external/icu:ci_tests")
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then

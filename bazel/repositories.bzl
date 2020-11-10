@@ -711,7 +711,7 @@ def _com_googlesource_googleurl():
 def _org_unicode_icuuc():
     native.local_repository(
         name = "org_unicode_icuuc",
-        path = "third_party/icu/shim",
+        path = "bazel/external/icu/shim",
     )
 
 def _org_llvm_releases_compiler_rt():

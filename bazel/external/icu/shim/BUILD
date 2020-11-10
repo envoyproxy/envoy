@@ -20,3 +20,10 @@ cc_test(
         ":common",
     ],
 )
+
+test_suite(
+    name = "ci_tests",
+    tests = [
+        "common_test",
+    ],
+)
