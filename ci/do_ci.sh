@@ -168,6 +168,9 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
 
   echo "bazel release build with tests..."
   bazel_binary_build release
+
+  # Validate skipping system ICU linking.
+  ./ci/check_no_system_icu.sh
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
@@ -426,8 +429,6 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   python3.8 tools/dependency/cve_scan_test.py
   # Validate repository metadata.
   ./ci/check_repository_locations.sh
-  # Validate skipping system ICU linking.
-  ./ci/check_no_system_icu.sh
   exit 0
 elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."
