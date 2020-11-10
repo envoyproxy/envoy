@@ -28,6 +28,11 @@ It demonstrates a number of commonly used proxying and ``TLS`` termination patte
    See also the :ref:`double proxy sandbox <install_sandboxes_double_proxy>` for an example of validation and authentication
    with client certificates using ``mTLS``.
 
+.. admonition:: Requirements
+
+   This example makes use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse the ``json`` output
+   from the upstream echo servers.
+
 .. include:: _include/docker-env-setup.rst
 
 Change directory to ``examples/tls`` in the Envoy repository.
