@@ -56,28 +56,38 @@ void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
 
 } // namespace
 
-void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cluster) {
+void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
   // See comments in ClusterManagerImpl::addOrUpdateCluster() for why this is only called during
   // server initialization.
   ASSERT(state_ != State::AllClustersInitialized);
 
-  const auto initialize_cb = [&cluster, this] { onClusterInit(cluster); };
-  if (cluster.cluster().initializePhase() == Cluster::InitializePhase::Primary) {
-    primary_init_clusters_.push_back(&cluster);
-    cluster.cluster().initialize(initialize_cb);
+  const auto initialize_cb = [&cm_cluster, this] { onClusterInit(cm_cluster); };
+  Cluster& cluster = cm_cluster.cluster();
+  if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
+    // Remove the previous cluster before the cluster object is destroyed.
+    primary_init_clusters_.remove_if(
+        [name_to_remove = cluster.info()->name()](ClusterManagerCluster* cluster_iter) {
+          return cluster_iter->cluster().info()->name() == name_to_remove;
+        });
+    primary_init_clusters_.push_back(&cm_cluster);
+    cluster.initialize(initialize_cb);
   } else {
-    ASSERT(cluster.cluster().initializePhase() == Cluster::InitializePhase::Secondary);
-    secondary_init_clusters_.push_back(&cluster);
+    ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
+    // Remove the previous cluster before the cluster object is destroyed.
+    secondary_init_clusters_.remove_if(
+        [name_to_remove = cluster.info()->name()](ClusterManagerCluster* cluster_iter) {
+          return cluster_iter->cluster().info()->name() == name_to_remove;
+        });
+    secondary_init_clusters_.push_back(&cm_cluster);
     if (started_secondary_initialize_) {
       // This can happen if we get a second CDS update that adds new clusters after we have
       // already started secondary init. In this case, just immediately initialize.
-      cluster.cluster().initialize(initialize_cb);
+      cluster.initialize(initialize_cb);
     }
   }
 
-  ENVOY_LOG(debug, "cm init: adding: cluster={} primary={} secondary={}",
-            cluster.cluster().info()->name(), primary_init_clusters_.size(),
-            secondary_init_clusters_.size());
+  ENVOY_LOG(debug, "cm init: adding: cluster={} primary={} secondary={}", cluster.info()->name(),
+            primary_init_clusters_.size(), secondary_init_clusters_.size());
 }
 
 void ClusterManagerInitHelper::onClusterInit(ClusterManagerCluster& cluster) {
@@ -637,7 +647,9 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   //       and easy to understand.
   const bool all_clusters_initialized =
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  loadCluster(cluster, version_info, true, warming_clusters_);
+  // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
+  // before destroy to avoid early initialization complete.
+  const auto previous_cluster = loadCluster(cluster, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
@@ -705,9 +717,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   return removed;
 }
 
-void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                     const std::string& version_info, bool added_via_api,
-                                     ClusterMap& cluster_map) {
+ClusterManagerImpl::ClusterDataPtr
+ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                const std::string& version_info, bool added_via_api,
+                                ClusterMap& cluster_map) {
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
   auto& new_cluster = new_cluster_pair.first;
@@ -752,11 +765,20 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
       }
     });
   }
-
-  cluster_map[cluster_reference.info()->name()] = std::make_unique<ClusterData>(
-      cluster, version_info, added_via_api, std::move(new_cluster), time_source_);
-  const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
-
+  ClusterDataPtr result;
+  auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
+  if (cluster_entry_it != cluster_map.end()) {
+    result = std::exchange(cluster_entry_it->second,
+                           std::make_unique<ClusterData>(cluster, version_info, added_via_api,
+                                                         std::move(new_cluster), time_source_));
+  } else {
+    bool inserted = false;
+    std::tie(cluster_entry_it, inserted) =
+        cluster_map.emplace(cluster_reference.info()->name(),
+                            std::make_unique<ClusterData>(cluster, version_info, added_via_api,
+                                                          std::move(new_cluster), time_source_));
+    ASSERT(inserted);
+  }
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
   // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
   // because the thread_aware_lb_ field takes precedence over the subset lb).
@@ -779,6 +801,7 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
   }
 
   updateClusterCounts();
+  return result;
 }
 
 void ClusterManagerImpl::updateClusterCounts() {
