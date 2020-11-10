@@ -97,6 +97,6 @@ cc_library(
     ]) + envoy_select_wasm_v8([
         "//external:wee8",
     ]) + envoy_select_wasm_wasmtime([
-        "@com_github_wasmtime_c_api//:lib",
+        "@com_github_wasm_c_api//:wasmtime_lib",
     ]),
 )
