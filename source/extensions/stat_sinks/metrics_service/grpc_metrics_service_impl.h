@@ -29,7 +29,7 @@ using MetricsPtr =
 template <class RequestProto, class ResponseProto>
 class GrpcMetricsStreamer : public Grpc::AsyncStreamCallbacks<ResponseProto> {
 public:
-  GrpcMetricsStreamer(Grpc::AsyncClientFactoryPtr&& factory) : client_(factory->create()) {}
+  explicit GrpcMetricsStreamer(Grpc::AsyncClientFactory& factory) : client_(factory.create()) {}
   ~GrpcMetricsStreamer() override = default;
 
   /**
@@ -82,19 +82,19 @@ using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 
 class MetricsFlusher {
 public:
-  MetricsFlusher(const bool report_counters_as_deltas)
+  explicit MetricsFlusher(const bool report_counters_as_deltas)
       : report_counters_as_deltas_(report_counters_as_deltas) {}
 
   MetricsPtr flush(Stats::MetricSnapshot& snapshot) const;
 
 private:
-  void flushCounter(io::prometheus::client::MetricFamily* metrics_family,
+  void flushCounter(io::prometheus::client::MetricFamily& metrics_family,
                     const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
                     int64_t snapshot_time_ms) const;
-  void flushGauge(io::prometheus::client::MetricFamily* metrics_family, const Stats::Gauge& gauge,
+  void flushGauge(io::prometheus::client::MetricFamily& metrics_family, const Stats::Gauge& gauge,
                   int64_t snapshot_time_ms) const;
-  void flushHistogram(io::prometheus::client::MetricFamily* summary_metrics_family,
-                      io::prometheus::client::MetricFamily* histogram_metrics_family,
+  void flushHistogram(io::prometheus::client::MetricFamily& summary_metrics_family,
+                      io::prometheus::client::MetricFamily& histogram_metrics_family,
                       const Stats::ParentHistogram& envoy_histogram,
                       int64_t snapshot_time_ms) const;
 
@@ -113,7 +113,7 @@ public:
       : flusher_(report_counters_as_deltas), grpc_metrics_streamer_(grpc_metrics_streamer) {}
 
   void flush(Stats::MetricSnapshot& snapshot) override {
-    grpc_metrics_streamer_->send(std::move(flusher_.flush(snapshot)));
+    grpc_metrics_streamer_->send(flusher_.flush(snapshot));
   }
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 

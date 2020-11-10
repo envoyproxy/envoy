@@ -93,8 +93,7 @@ class MockGrpcMetricsStreamer
 public:
   MockGrpcMetricsStreamer(Grpc::AsyncClientFactoryPtr&& factory)
       : GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
-                            envoy::service::metrics::v3::StreamMetricsResponse>(
-            std::move(factory)) {}
+                            envoy::service::metrics::v3::StreamMetricsResponse>(*factory) {}
 
   // GrpcMetricsStreamer
   MOCK_METHOD(void, send, (MetricsPtr && metrics));

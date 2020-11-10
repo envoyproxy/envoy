@@ -22,7 +22,7 @@ GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(
     Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info,
     envoy::config::core::v3::ApiVersion transport_api_version)
     : GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
-                          envoy::service::metrics::v3::StreamMetricsResponse>(std::move(factory)),
+                          envoy::service::metrics::v3::StreamMetricsResponse>(*factory),
       local_info_(local_info),
       service_method_(
           Grpc::VersionedMethods("envoy.service.metrics.v3.MetricsService.StreamMetrics",
@@ -60,31 +60,31 @@ MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
                                  .count();
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      flushCounter(metrics->Add(), counter, snapshot_time_ms);
+      flushCounter(*metrics->Add(), counter, snapshot_time_ms);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      flushGauge(metrics->Add(), gauge.get(), snapshot_time_ms);
+      flushGauge(*metrics->Add(), gauge.get(), snapshot_time_ms);
     }
   }
 
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().used()) {
-      flushHistogram(metrics->Add(), metrics->Add(), histogram.get(), snapshot_time_ms);
+      flushHistogram(*metrics->Add(), *metrics->Add(), histogram.get(), snapshot_time_ms);
     }
   }
 
   return metrics;
 }
 
-void MetricsFlusher::flushCounter(io::prometheus::client::MetricFamily* metrics_family,
+void MetricsFlusher::flushCounter(io::prometheus::client::MetricFamily& metrics_family,
                                   const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
                                   int64_t snapshot_time_ms) const {
-  metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
-  metrics_family->set_name(counter_snapshot.counter_.get().name());
-  auto* metric = metrics_family->add_metric();
+  metrics_family.set_type(io::prometheus::client::MetricType::COUNTER);
+  metrics_family.set_name(counter_snapshot.counter_.get().name());
+  auto* metric = metrics_family.add_metric();
   metric->set_timestamp_ms(snapshot_time_ms);
   auto* counter_metric = metric->mutable_counter();
   if (report_counters_as_deltas_) {
@@ -94,18 +94,18 @@ void MetricsFlusher::flushCounter(io::prometheus::client::MetricFamily* metrics_
   }
 }
 
-void MetricsFlusher::flushGauge(io::prometheus::client::MetricFamily* metrics_family,
+void MetricsFlusher::flushGauge(io::prometheus::client::MetricFamily& metrics_family,
                                 const Stats::Gauge& gauge, int64_t snapshot_time_ms) const {
-  metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
-  metrics_family->set_name(gauge.name());
-  auto* metric = metrics_family->add_metric();
+  metrics_family.set_type(io::prometheus::client::MetricType::GAUGE);
+  metrics_family.set_name(gauge.name());
+  auto* metric = metrics_family.add_metric();
   metric->set_timestamp_ms(snapshot_time_ms);
   auto* gauge_metric = metric->mutable_gauge();
   gauge_metric->set_value(gauge.value());
 }
 
-void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily* summary_metrics_family,
-                                    io::prometheus::client::MetricFamily* histogram_metrics_family,
+void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& summary_metrics_family,
+                                    io::prometheus::client::MetricFamily& histogram_metrics_family,
                                     const Stats::ParentHistogram& envoy_histogram,
                                     int64_t snapshot_time_ms) const {
   // TODO(ramaraochavali): Currently we are sending both quantile information and bucket
@@ -113,9 +113,9 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily* summar
   // performance.
 
   // Add summary information for histograms.
-  summary_metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
-  summary_metrics_family->set_name(envoy_histogram.name());
-  auto* summary_metric = summary_metrics_family->add_metric();
+  summary_metrics_family.set_type(io::prometheus::client::MetricType::SUMMARY);
+  summary_metrics_family.set_name(envoy_histogram.name());
+  auto* summary_metric = summary_metrics_family.add_metric();
   summary_metric->set_timestamp_ms(snapshot_time_ms);
   auto* summary = summary_metric->mutable_summary();
   const Stats::HistogramStatistics& hist_stats = envoy_histogram.intervalStatistics();
@@ -126,9 +126,9 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily* summar
   }
 
   // Add bucket information for histograms.
-  histogram_metrics_family->set_type(io::prometheus::client::MetricType::HISTOGRAM);
-  histogram_metrics_family->set_name(envoy_histogram.name());
-  auto* histogram_metric = histogram_metrics_family->add_metric();
+  histogram_metrics_family.set_type(io::prometheus::client::MetricType::HISTOGRAM);
+  histogram_metrics_family.set_name(envoy_histogram.name());
+  auto* histogram_metric = histogram_metrics_family.add_metric();
   histogram_metric->set_timestamp_ms(snapshot_time_ms);
   auto* histogram = histogram_metric->mutable_histogram();
   histogram->set_sample_count(hist_stats.sampleCount());
