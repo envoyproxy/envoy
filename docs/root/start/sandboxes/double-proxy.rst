@@ -1,7 +1,7 @@
 .. _install_sandboxes_double_proxy:
 
-Double proxy (with encryption)
-==============================
+Double proxy (with ``mTLS`` encryption)
+=======================================
 
 This sandbox demonstrates a basic "double proxy" configuration, in which a simple Flask app
 connects to a PostgreSQL database, with two Envoy proxies in between.
@@ -16,12 +16,12 @@ databases that may be in a different location or subnet, outside of a service me
 Another common use case is with Envoy configured to provide "Points of presence" at the edges of the cloud,
 and to relay requests to upstream servers and services.
 
-This example encrypts the transmission of data between the two middle proxies, using ``mTLS``. The proxies
-also validate and authenticate each others certificates.
+This example encrypts the transmission of data between the two middle proxies and provides mutual authentication
+using ``mTLS``.
 
 This can be useful if the proxies are physically separated or transmit data over untrusted networks.
 
-In order to  use the sandbox you will first need to generate the necessary SSL keys and certificates.
+In order to  use the sandbox you will first need to generate the necessary ``SSL`` keys and certificates.
 
 This example walks through creating a certificate authority, and using it to create a domain key and sign
 certificates for the proxies.

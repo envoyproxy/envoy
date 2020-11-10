@@ -19,9 +19,6 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: postgres_tcp
           cluster: postgres_cluster
-      filter_chain_match:
-        server_names:
-          - proxy-postgres-backend.example.com
       transport_socket:
         name: envoy.transport_sockets.tls
         typed_config:
