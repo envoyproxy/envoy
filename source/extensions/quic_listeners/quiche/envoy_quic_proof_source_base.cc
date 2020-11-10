@@ -21,7 +21,7 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& server_ad
                                         const std::string& hostname,
                                         const std::string& server_config,
                                         quic::QuicTransportVersion /*transport_version*/,
-                                        std::string_view chlo_hash,
+                                        absl::string_view chlo_hash,
                                         std::unique_ptr<quic::ProofSource::Callback> callback) {
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
       GetCertChain(server_address, client_address, hostname);

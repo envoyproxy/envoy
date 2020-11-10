@@ -291,8 +291,8 @@ TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
                     quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{0u, state != quic::NO_FIN};
           }));
-   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
-   EXPECT_TRUE(result.ok());
+  const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
+  EXPECT_TRUE(result.ok());
 
   // Encode 16kB -10 bytes request body. Because the high watermark is 16KB, with previously
   // buffered headers, this call should make the send buffers reach their high watermark.

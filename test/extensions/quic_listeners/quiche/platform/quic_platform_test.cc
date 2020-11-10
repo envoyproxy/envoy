@@ -584,7 +584,8 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
   flag_registry.FindFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
       ->SetValueFromString("true");
-  flag_registry.FindFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")->SetValueFromString("0");
+  flag_registry.FindFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")
+      ->SetValueFromString("0");
   flag_registry.FindFlag("FLAGS_quic_time_wait_list_seconds")->SetValueFromString("100");
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
