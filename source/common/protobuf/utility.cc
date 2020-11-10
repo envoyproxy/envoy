@@ -302,7 +302,7 @@ void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool rejec
   }
   if (reject &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
-    throw DeprecatedMajorversionException(fmt::format(
+    throw DeprecatedMajorVersionException(fmt::format(
         "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
         "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q3 2020 by setting "
         "'--bootstrap-version 2' on the CLI for a v2 bootstrap file and also enabling the runtime "

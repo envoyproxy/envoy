@@ -667,7 +667,7 @@ TEST_P(ServerInstanceImplTest,
        DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapWithoutExplicitVersion)) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      DeprecatedMajorversionException,
+      DeprecatedMajorVersionException,
       "Support for v2 will be removed from Envoy at the start of Q1 2021. You may make use of v2 "
       "in Q3 2020 by setting");
 }
