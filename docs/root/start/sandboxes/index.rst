@@ -30,3 +30,4 @@ features. The following sandboxes are available:
     wasm-cc
     websocket
     zipkin_tracing
+    skywalking_tracing
