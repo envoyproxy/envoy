@@ -266,7 +266,9 @@ Envoy can be configured to log to :ref:`different formats <config_access_log>`, 
 
 .. note::
 
-   If you are running Envoy on a Windows system Envoy will output to `CON` by default.
+   If you are running Envoy on a Windows system Envoy will output to ``CON`` by default.
+
+   This can also be used as a logging path when configuring logging.
 
 Debugging Envoy
 ---------------
