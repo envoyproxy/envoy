@@ -110,5 +110,41 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   }
 }
 
+TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
+  const auto downstream_protocol = std::get<1>(GetParam());
+  const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
+
+  if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  } else {
+    skipEncodingEmptyTrailers(http2_skip_encoding_empty_trailers);
+  }
+
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+
+  Http::TestRequestTrailerMapImpl request_trailers{{"request1", "trailer1"},
+                                                   {"request2", "trailer2"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {"content-type", "application/grpc-web"},
+                                     {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  codec_client_->close();
+}
+
 } // namespace
 } // namespace Envoy
