@@ -111,9 +111,7 @@ public:
          &parent_.host()->cluster().stats().bind_errors_, nullptr});
   }
 
-  virtual absl::optional<Http::Protocol> protocol() const override {
-    return codec_client_->protocol();
-  }
+  absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   void onEvent(Network::ConnectionEvent event) override {

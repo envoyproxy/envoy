@@ -25,7 +25,7 @@ public:
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
 
-  virtual void onConnected(Envoy::ConnectionPool::ActiveClient& client) override;
+  void onConnected(Envoy::ConnectionPool::ActiveClient& client) override;
 
 private:
   bool connected_{};

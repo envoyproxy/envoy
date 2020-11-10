@@ -37,7 +37,7 @@ public:
                  Upstream::Host::CreateConnectionData& data);
     ~ActiveClient() override = default;
 
-    ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
+    HttpConnPoolImplBase& parent() { return static_cast<HttpConnPoolImplBase&>(parent_); }
 
     // ConnPoolImpl::ActiveClient
     bool closingWithIncompleteStream() const override;

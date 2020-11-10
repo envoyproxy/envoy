@@ -94,7 +94,7 @@ public:
   void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
   void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
 
-  virtual absl::optional<Http::Protocol> protocol() const override { return {}; }
+  absl::optional<Http::Protocol> protocol() const override { return {}; }
   void close() override { connection_->close(Network::ConnectionCloseType::NoFlush); }
   size_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
   bool closingWithIncompleteStream() const override { return false; }

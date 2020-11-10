@@ -559,7 +559,7 @@ public:
                Event::TestTimeSystem& time_system, bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               Event::TestTimeSystem& time_system, bool enable_half_close_ = false);
+               Event::TestTimeSystem& time_system, bool enable_half_close = false);
   ~FakeUpstream() override;
 
   FakeHttpConnection::Type httpType() { return http_type_; }

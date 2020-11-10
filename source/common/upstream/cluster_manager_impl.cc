@@ -1347,6 +1347,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   // starting with something simpler.
   auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
   std::vector<uint8_t> hash_key;
+  hash_key.reserve(upstream_protocols.size());
   for (auto protocol : upstream_protocols) {
     hash_key.push_back(uint8_t(protocol));
   }
