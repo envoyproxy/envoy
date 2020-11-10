@@ -39,6 +39,8 @@ This starts four proxies listening on ``localhost`` ports ``10000-10003``.
 
 It also starts two upstream services, one ``HTTP`` and one ``HTTPS``.
 
+The upstream services listen on the internal Docker network on ports ``80`` and ``443`` respectively.
+
 .. code-block:: console
 
   $ pwd
