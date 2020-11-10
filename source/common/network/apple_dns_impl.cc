@@ -90,6 +90,10 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   // However, using a shared connection brings some complexities detailed in the inline comments
   // for kDNSServiceFlagsShareConnection in dns_sd.h, and copied (and edited) in this implementation
   // where relevant.
+  //
+  // When error occurs while the main_sd_ref_ is initialized, the initialize_failure_timer_ will be
+  // enabled to retry initialization. Retries an also be triggered via query submission, @see
+  // AppleDnsResolverImpl::resolve(...) for details.
   auto error = DnsServiceSingleton::get().dnsServiceCreateConnection(&main_sd_ref_);
   if (error != kDNSServiceErr_NoError) {
     stats_.connection_failure_.inc();
@@ -114,6 +118,9 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
       Event::FileReadyType::Read);
   sd_ref_event_->setEnabled(Event::FileReadyType::Read);
 
+  // Disable the failure timer and reset the backoff strategy because the main_sd_ref_ was
+  // successfully initialized. Note that these actions will be no-ops if the timer was not armed to
+  // begin with.
   initialize_failure_timer_->disableTimer();
   backoff_strategy_->reset();
 }
