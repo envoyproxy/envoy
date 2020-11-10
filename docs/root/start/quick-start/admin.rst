@@ -256,7 +256,7 @@ You can also pass a :ref:`format <operations_admin_interface_stats>` argument, f
    ]
 
 
-Envoy Admin web UI
+Envoy admin web UI
 ------------------
 
 Envoy also has a web user interface that allows you to view and modify settings and

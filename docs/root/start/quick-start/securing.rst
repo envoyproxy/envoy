@@ -161,8 +161,8 @@ When connecting to an upstream with client certificates you can set them as foll
 
 .. _start_quick_start_securing_sni:
 
-Provide multiple ``TLS`` domains at the same ``IP`` address
------------------------------------------------------------
+Provide multiple ``TLS`` domains at the same ``IP`` address with ``SNI``
+------------------------------------------------------------------------
 
 ``SNI`` is an extension to the ``TLS`` protocol which allows multiple domains served
 from the same ``IP`` address to be secured with ``TLS``.
@@ -183,8 +183,8 @@ See here for :ref:`more info about creating multiple endpoints with SNI <faq_how
 
 .. _start_quick_start_securing_sni_client:
 
-Connect to an endpoint with SNI
--------------------------------
+Connect to an endpoint with ``SNI``
+-----------------------------------
 
 When connecting to a ``TLS`` endpoint that uses ``SNI`` you should set
 :ref:`sni <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>` in the configuration
