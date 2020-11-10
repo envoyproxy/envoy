@@ -310,9 +310,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
     ),
     kafka_server_binary = dict(
-        sha256 = "a009624fae678fa35968f945e18e45fbea9a30fa8080d5dcce7fdea726120027",
-        strip_prefix = "kafka_2.12-2.2.0",
-        urls = ["https://mirrors.gigenet.com/apache/kafka/2.2.0/kafka_2.12-2.2.0.tgz"],
+        sha256 = "2177cbd14118999e1d76fec628ca78ace7e6f841219dbc6035027c796bbe1a2a",
+        strip_prefix = "kafka_2.12-2.4.1",
+        urls = ["https://mirrors.gigenet.com/apache/kafka/2.4.1/kafka_2.12-2.4.1.tgz"],
     ),
     kafka_python_client = dict(
         sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",
