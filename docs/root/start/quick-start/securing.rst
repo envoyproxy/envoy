@@ -20,15 +20,19 @@ Envoy also has support for transmitting and receiving generic ``TCP`` traffic wi
    Here we provide a guide to using :ref:`mTLS <start_quick_start_securing_mtls>` which provides both encryption
    and mutual authentication.
 
-   You are also strongly encouraged to :ref:`validate <start_quick_start_securing_validation>` all certificates
-   wherever possible.
+   Envoy also offers a number of other ``HTTP``-based protocols for authentication and authorization
+   such as :ref:`JWT <arch_overview_jwt_authn>`, :ref:`RBAC <arch_overview_rbac>`
+   and :ref:`OAuth <envoy_v3_api_file_envoy/extensions/filters/http/oauth2/v3alpha/oauth.proto>`.
+
+   When using ``TLS``, you are strongly encouraged to :ref:`validate <start_quick_start_securing_validation>`
+   all certificates wherever possible.
 
    It is your responsibility to ensure the integrity of your certificate chain, and outside the scope of this guide.
 
 .. _start_quick_start_securing_contexts:
 
-Upstream and downstream TLS contexts
-------------------------------------
+Upstream and downstream ``TLS`` contexts
+----------------------------------------
 
 Machines connecting to Envoy to proxy traffic are "downstream" in relation to Envoy.
 
@@ -102,10 +106,10 @@ certificate is valid for.
 
 .. _start_quick_start_securing_mtls:
 
-Use mututal TLS (mTLS) to enforce client certificate authentication
--------------------------------------------------------------------
+Use mututal ``TLS`` (``mTLS``) to enforce client certificate authentication
+---------------------------------------------------------------------------
 
-With mutual TLS (mTLS), Envoy also provides a way to authenticate connecting clients.
+With mutual ``TLS`` (``mTLS``), Envoy also provides a way to authenticate connecting clients.
 
 At a minimum you will need to set
 :ref:`require_client_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
@@ -139,8 +143,8 @@ similar to validating upstream certificates :ref:`described above <start_quick_s
 
 .. _start_quick_start_securing_mtls_client:
 
-Use mututal TLS (mTLS) to connect with client certificates
-----------------------------------------------------------
+Use mututal ``TLS`` (``mTLS``) to connect with client certificates
+------------------------------------------------------------------
 
 When connecting to an upstream with client certificates you can set them as follows:
 
@@ -154,8 +158,8 @@ When connecting to an upstream with client certificates you can set them as foll
 
 .. _start_quick_start_securing_sni:
 
-Provide multiple TLS domains at the same IP address
----------------------------------------------------
+Provide multiple ``TLS`` domains at the same ``IP`` address
+-----------------------------------------------------------
 
 ``SNI`` is an extension to the ``TLS`` protocol which allows multiple domains served
 from the same ``IP`` address to be secured with ``TLS``.
