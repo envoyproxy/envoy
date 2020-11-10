@@ -30,7 +30,7 @@ constexpr absl::string_view kDownstreamConnectionTerminationDetails =
 constexpr absl::string_view kUpstreamConnectionTerminationDetails =
     "upstream connection was terminated";
 
-}
+} // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
