@@ -3045,10 +3045,10 @@ public:
 
   MOCK_METHOD(Cluster&, cluster, ());
   MOCK_METHOD(LoadBalancerFactorySharedPtr, loadBalancerFactory, ());
-  bool needsAddOrUpdate() override {
-    const bool old_value = added_or_updated_;
+  bool addedOrUpdated() override { return added_or_updated_; }
+  void setAddedOrUpdated() override {
+    ASSERT(!added_or_updated_);
     added_or_updated_ = true;
-    return !old_value;
   }
 
   NiceMock<MockClusterMockPrioritySet> cluster_;

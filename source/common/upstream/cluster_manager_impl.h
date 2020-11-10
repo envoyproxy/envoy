@@ -111,9 +111,11 @@ public:
   // Return a new load balancer factory if the cluster has one.
   virtual LoadBalancerFactorySharedPtr loadBalancerFactory() PURE;
 
-  // Return true once for a cluster, otherwise false. This is used to sequence logic that needs to
-  // happen a single time for a newly added or updated cluster.
-  virtual bool needsAddOrUpdate() PURE;
+  // Return true if a cluster has already been added or updated.
+  virtual bool addedOrUpdated() PURE;
+
+  // Set when a cluster has been added or updated. This is only called a single time for a cluster.
+  virtual void setAddedOrUpdated() PURE;
 };
 
 /**
@@ -316,7 +318,7 @@ protected:
     std::vector<PerPriority> per_priority_update_params_;
   };
 
-  virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cluster,
+  virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
                                             ThreadLocalClusterUpdateParams&& params);
 
 private:
@@ -455,10 +457,10 @@ private:
         return nullptr;
       }
     }
-    bool needsAddOrUpdate() override {
-      const bool old_value = added_or_updated_;
+    bool addedOrUpdated() override { return added_or_updated_; }
+    void setAddedOrUpdated() override {
+      ASSERT(!added_or_updated_);
       added_or_updated_ = true;
-      return !old_value;
     }
 
     const envoy::config::cluster::v3::Cluster cluster_config_;

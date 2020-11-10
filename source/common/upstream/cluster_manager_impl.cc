@@ -519,7 +519,8 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
     }
   });
 
-  // Finally, post updates cross-thread so the per-thread load balancers are ready.
+  // Finally, post updates cross-thread so the per-thread load balancers are ready. First we
+  // populate any update information that may be available after cluster init.
   ThreadLocalClusterUpdateParams params;
   for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
     if (host_set->hosts().empty()) {
@@ -528,7 +529,14 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
     params.per_priority_update_params_.emplace_back(host_set->priority(), host_set->hosts(),
                                                     HostVector{});
   }
-  postThreadLocalClusterUpdate(cm_cluster, std::move(params));
+  // At this point the update is posted if either there are actual updates or the cluster has
+  // not been added yet. The latter can only happen with dynamic cluster as static clusters are
+  // added immediately.
+  // TODO(mattklein123): Per related TODOs we will see if we can centralize all logic so that
+  // clusters only get added in this path and all of the special casing can be removed.
+  if (!params.per_priority_update_params_.empty() || !cm_cluster.addedOrUpdated()) {
+    postThreadLocalClusterUpdate(cm_cluster, std::move(params));
+  }
 }
 
 bool ClusterManagerImpl::scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority,
@@ -929,11 +937,15 @@ void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
   });
 }
 
-void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cluster,
+void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
                                                       ThreadLocalClusterUpdateParams&& params) {
   const bool is_local_cluster = local_cluster_name_.has_value() &&
-                                local_cluster_name_.value() == cluster.cluster().info()->name();
-  bool add_or_update_cluster = cluster.needsAddOrUpdate();
+                                local_cluster_name_.value() == cm_cluster.cluster().info()->name();
+  bool add_or_update_cluster = false;
+  if (!cm_cluster.addedOrUpdated()) {
+    add_or_update_cluster = true;
+    cm_cluster.setAddedOrUpdated();
+  }
   if (is_local_cluster) {
     // TODO(mattklein123): This is needed because of the special case of how local cluster is
     // initialized in the thread local cluster manager constructor. This will all be cleaned up
@@ -943,19 +955,19 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& clu
 
   LoadBalancerFactorySharedPtr load_balancer_factory;
   if (add_or_update_cluster) {
-    load_balancer_factory = cluster.loadBalancerFactory();
+    load_balancer_factory = cm_cluster.loadBalancerFactory();
   }
 
   for (auto& per_priority : params.per_priority_update_params_) {
     const auto& host_set =
-        cluster.cluster().prioritySet().hostSetsPerPriority()[per_priority.priority_];
+        cm_cluster.cluster().prioritySet().hostSetsPerPriority()[per_priority.priority_];
     per_priority.update_hosts_params_ = HostSetImpl::updateHostsParams(*host_set);
     per_priority.locality_weights_ = host_set->localityWeights();
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
   tls_.runOnAllThreads(
-      [info = cluster.cluster().info(), params = std::move(params), add_or_update_cluster,
+      [info = cm_cluster.cluster().info(), params = std::move(params), add_or_update_cluster,
        load_balancer_factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         if (add_or_update_cluster) {
           if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
