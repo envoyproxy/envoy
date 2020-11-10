@@ -22,7 +22,8 @@ public:
 
   void TearDown() override;
 
-  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
+  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name,
+                                                   const std::string& lb_policy = "ROUND_ROBIN");
 
   envoy::config::cluster::v3::Cluster buildTlsCluster(const std::string& name);
 
