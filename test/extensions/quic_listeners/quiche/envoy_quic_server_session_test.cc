@@ -202,10 +202,10 @@ public:
       crypto_stream_ = test_crypto_stream;
     }
     quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, crypto_stream);
-    quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
         std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+    quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
   bool installReadFilter() {

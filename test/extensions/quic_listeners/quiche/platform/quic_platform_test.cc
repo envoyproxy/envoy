@@ -48,7 +48,6 @@
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_pcc_sender.h"
-#include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
@@ -583,10 +582,10 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  flag_registry.FindFlag("quic_reloadable_flag_quic_testonly_default_false")
+  flag_registry.FindFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
       ->SetValueFromString("true");
-  flag_registry.FindFlag("quic_restart_flag_quic_testonly_default_true")->SetValueFromString("0");
-  flag_registry.FindFlag("quic_time_wait_list_seconds")->SetValueFromString("100");
+  flag_registry.FindFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")->SetValueFromString("0");
+  flag_registry.FindFlag("FLAGS_quic_time_wait_list_seconds")->SetValueFromString("100");
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
@@ -655,35 +654,6 @@ TEST_F(FileUtilsTest, ReadFileContents) {
   std::string output;
   ReadFileContents(file_path, &output);
   EXPECT_EQ(data, output);
-}
-
-TEST_F(QuicPlatformTest, PickUnsedPort) {
-  int port = QuicPickServerPortForTestsOrDie();
-  std::vector<Envoy::Network::Address::IpVersion> supported_versions =
-      Envoy::TestEnvironment::getIpVersionsForTest();
-  for (auto ip_version : supported_versions) {
-    Envoy::Network::Address::InstanceConstSharedPtr addr =
-        Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
-    Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
-        Envoy::Network::Utility::getAddressWithPort(*addr, port);
-    Envoy::Network::SocketImpl sock(Envoy::Network::Socket::Type::Datagram, addr_with_port);
-    // binding of given port should success.
-    EXPECT_EQ(0, sock.bind(addr_with_port).rc_);
-  }
-}
-
-TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
-  Envoy::Api::MockOsSysCalls os_sys_calls;
-  Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  // Actually create sockets.
-  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillRepeatedly([](int domain, int type, int protocol) {
-    os_fd_t fd = ::socket(domain, type, protocol);
-    return Envoy::Api::SysCallSocketResult{fd, errno};
-  });
-  // Fail bind call's to mimic port exhaustion.
-  EXPECT_CALL(os_sys_calls, bind(_, _, _))
-      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
-  EXPECT_DEATH(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {

@@ -671,13 +671,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/f72dab0224a385c4a708a47afe17b5a5e87630a6.tar.gz
-        version = "f72dab0224a385c4a708a47afe17b5a5e87630a6",
-        sha256 = "169fbbeddba3f3a63cebf833b3ba91799bfbd7e9cdd3abcdda365663580b9e94",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ecc28c0d7428f3323ea26eb1ddb98a5e06b23dea.tar.gz
+        version = "ecc28c0d7428f3323ea26eb1ddb98a5e06b23dea",
+        sha256 = "52680dea984dbe899c27176155578b97276e1f1516b7c3a63fb16ba593061859",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.transport_sockets.quic"],
-        last_updated = "2020-11-09",
+        release_date = "2020-11-10",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(

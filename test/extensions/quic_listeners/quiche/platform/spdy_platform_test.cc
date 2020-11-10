@@ -91,13 +91,13 @@ TEST(SpdyPlatformTest, SpdyFlags) {
   EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
 
-  flag_registry.FindFlag("spdy_reloadable_flag_spdy_testonly_default_false")
+  flag_registry.FindFlag("FLAGS_quic_reloadable_flag_spdy_testonly_default_false")
       ->SetValueFromString("true");
   EXPECT_TRUE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
 
   flag_registry.ResetFlags();
-  flag_registry.FindFlag("spdy_restart_flag_spdy_testonly_default_false")
+  flag_registry.FindFlag("FLAGS_quic_restart_flag_spdy_testonly_default_false")
       ->SetValueFromString("yes");
   EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_TRUE(GetSpdyRestartFlag(spdy_testonly_default_false));
