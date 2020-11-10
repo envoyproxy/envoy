@@ -183,8 +183,8 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   parent_.checkProtocolConstraintViolation();
 }
 
-void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
-                                                     bool end_stream) {
+Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
+                                                       bool end_stream) {
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
   std::vector<nghttp2_nv> final_headers;
@@ -211,6 +211,7 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
     buildHeaders(final_headers, headers);
   }
   encodeHeadersBase(final_headers, end_stream);
+  return okStatus();
 }
 
 void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& headers,
