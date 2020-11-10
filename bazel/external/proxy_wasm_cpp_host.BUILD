@@ -52,6 +52,8 @@ cc_library(
         "src/wavm/wavm.cc",
     ]) + envoy_select_wasm_wasmtime([
         "include/proxy-wasm/wasmtime.h",
+        "src/common/types.h",
+        "src/wasmtime/types.h",
         "src/wasmtime/wasmtime.cc",
     ]),
     copts = envoy_select_wasm_wavm([
