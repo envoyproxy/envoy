@@ -255,16 +255,19 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
 
 // Tests that health checking gracefully handles a NO_ERROR GOAWAY from the upstream.
 TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
-  const uint32_t cluster_idx = 0;
   initialize();
-  initHttpHealthCheck(cluster_idx);
 
   // GOAWAY doesn't exist in HTTP1.
-  if (upstream_protocol_ != FakeHttpConnection::Type::HTTP1) {
-    // Send a GOAWAY with NO_ERROR and then a 200. The health checker should allow the request
-    // to finish despite the GOAWAY.
-    clusters_[cluster_idx].host_fake_connection_->onGoAway(Http::GoAwayErrorCode::NoError);
+  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+    return;
   }
+
+  const uint32_t cluster_idx = 0;
+  initHttpHealthCheck(cluster_idx);
+
+  // Send a GOAWAY with NO_ERROR and then a 200. The health checker should allow the request
+  // to finish despite the GOAWAY.
+  clusters_[cluster_idx].host_fake_connection_->onGoAway(Http::GoAwayErrorCode::NoError);
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
@@ -275,23 +278,43 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
 
 // Tests that health checking properly handles a GOAWAY with an error, followed by a reset.
 TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayErrorAndReset) {
-  const uint32_t cluster_idx = 0;
   initialize();
-  initHttpHealthCheck(cluster_idx);
 
   // GOAWAY doesn't exist in HTTP1.
-  if (upstream_protocol_ != FakeHttpConnection::Type::HTTP1) {
-    // Send a GOAWAY with an error. The health checker should treat this as an
-    // error and cancel the request.
-    clusters_[cluster_idx].host_fake_connection_->onGoAway(Http::GoAwayErrorCode::Other);
+  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+    return;
   }
-  // This should be ignored by the HTTP/2 health checker since it saw GOAWAY
-  // already. For HTTP/1 this will cause a failed check.
-  clusters_[cluster_idx].host_stream_->onResetStream(Http::StreamResetReason::RemoteReset,
-                                                     "upstream reset");
 
+  const uint32_t cluster_idx = 0;
+  initHttpHealthCheck(cluster_idx);
+
+  // Send a GOAWAY with an error. The health checker should treat this as an
+  // error and cancel the request.
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
+  clusters_[cluster_idx].host_fake_connection_->onGoAway(Http::GoAwayErrorCode::Other);
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  // Advance time to cause another health check.
+  timeSystem().advanceTimeWait(std::chrono::seconds(1));
+
+  ASSERT_TRUE(clusters_[cluster_idx].host_upstream_->waitForHttpConnection(
+      *dispatcher_, clusters_[cluster_idx].host_fake_connection_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+            clusters_[cluster_idx].name_);
+
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
