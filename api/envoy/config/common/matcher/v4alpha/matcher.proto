@@ -78,12 +78,12 @@ message Matcher {
         }
       }
 
-      // A list of matchers. Used to allow using a list within a oneof.
+      // A list of two or more matchers. Used to allow using a list within a oneof.
       message PredicateList {
         option (udpa.annotations.versioning).previous_message_type =
             "envoy.config.common.matcher.v3.Matcher.MatcherList.Predicate.PredicateList";
 
-        repeated Predicate predicate = 1 [(validate.rules).repeated = {min_items: 1}];
+        repeated Predicate predicate = 1 [(validate.rules).repeated = {min_items: 2}];
       }
 
       oneof match_type {
