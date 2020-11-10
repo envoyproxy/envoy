@@ -16,7 +16,7 @@ It demonstrates a number of commonly used proxying and ``TLS`` termination patte
 .. note::
 
    Envoy can also proxy non-``HTTP`` traffic over ``TLS``.
-   Please the double proxy sandbox <INSERT LINK HERE> for an example of this.
+   Please the :ref:`double proxy sandbox <install_sandboxes_double_proxy>` for an example of this.
 
 .. warning::
 
@@ -25,7 +25,7 @@ It demonstrates a number of commonly used proxying and ``TLS`` termination patte
 
    Please see :ref:`securing envoy <start_quick_start_securing>` for more information about using ``TLS`` to secure your network.
 
-   The :ref:`double proxy sandbox <>` also provides an example of validation and authentication
+   See also the :ref:`double proxy sandbox <install_sandboxes_double_proxy>` for an example of validation and authentication
    with client certificates using ``mTLS``.
 
 .. include:: _include/docker-env-setup.rst
