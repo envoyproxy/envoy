@@ -48,7 +48,7 @@ namespace {
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
  */
-class ConnPoolImplForTest : public HttpConnPoolImplBase {
+class ConnPoolImplForTest : public FixedHttpConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster,
