@@ -321,9 +321,10 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, std::get<0>(GetParam())) {}
 
   static std::string paramsToString(const testing::TestParamInfo<Params>& p) {
-    return fmt::format(
-        "{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-        std::get<1>(p.param) == FakeHttpConnection::Type::HTTP1 ? "HTTPUpstream" : "HTTP2Upstream");
+    return fmt::format("{}_{}",
+                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                       std::get<1>(p.param) == FakeHttpConnection::Type::HTTP1 ? "HTTP1Upstream"
+                                                                               : "HTTP2Upstream");
   }
 
   void SetUp() override {
@@ -719,8 +720,8 @@ TEST_P(TcpTunnelingIntegrationTest, H1UpstreamCloseNoConnectionReuse) {
   tcp_client2->close();
 }
 
-TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeadersHttp1) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+TEST_P(TcpTunnelingIntegrationTest, 2xxStatusCodeValidHttp1) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
     return;
   }
   initialize();
@@ -731,16 +732,22 @@ TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeadersHttp1) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-  // Send invalid response_ headers, and verify that the client disconnects and
-  // upstream gets a stream reset.
-  default_response_headers_.setStatus(enumToInt(Http::Code::ServiceUnavailable));
+  // Send valid response headers, in HTTP1 all status codes in the 2xx range
+  // are considered valid.
+  default_response_headers_.setStatus(enumToInt(Http::Code::Accepted));
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  ASSERT_TRUE(upstream_request_->waitForReset());
 
-  // The connection should be fully closed, but the client has no way of knowing
-  // that. Ensure the FIN is read and clean up state.
-  tcp_client->waitForHalfClose();
+  // Send some data from downstream to upstream, and make sure it goes through.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  // Send data from upstream to downstream.
+  upstream_request_->encodeData(12, false);
+  ASSERT_TRUE(tcp_client->waitForData(12));
+
+  // Close the downstream connection and wait for upstream disconnect
   tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
 TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
@@ -755,10 +762,15 @@ TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-  // Send upgrade headers downstream, fully establishing the connection.
+  // Send upgrade headers downstream, including content-length that must be
+  // ignored.
   default_response_headers_.setStatus(enumToInt(Http::Code::IMUsed));
-  default_response_headers_.setContentLength(1024);
+  default_response_headers_.setContentLength(10);
   upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Send data from upstream to downstream.
+  upstream_request_->encodeData(12, false);
+  ASSERT_TRUE(tcp_client->waitForData(12));
 
   // Now send some data and close the TCP client.
   ASSERT_TRUE(tcp_client->write("hello", false));

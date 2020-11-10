@@ -26,10 +26,11 @@ static_resources:
           stat_prefix: tcp_stats
           cluster: "cluster_0"
           tunneling_config:
-            hostname: host.com
+            hostname: host.com:10002
   clusters:
     - name: cluster_0
       connect_timeout: 5s
+      # This ensures HTTP/2 CONNECT is used for establishing the tunnel.
       http2_protocol_options:
         {}
       load_assignment:

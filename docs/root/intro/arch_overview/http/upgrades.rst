@@ -106,7 +106,7 @@ An example set up proxying SMTP would look something like this:
 [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
 
 Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
-If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_connect.yaml --base-id 1`
+If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1`
 and `bazel-bin/source/exe/envoy-static --config-path  configs/terminate_connect.yaml`
 you will be running two Envoys, the first listening for TCP traffic on port 10000 and encapsulating it in an HTTP/2
 CONNECT request, and the second listening for HTTP/2 on 10001, stripping the CONNECT headers, and forwarding the
@@ -121,4 +121,4 @@ Examples of such a set up can be found in the Envoy example config :repo:`direct
 If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
 you will be running Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP/1.1
 CONNECT addressed to an HTTP proxy running on localhost and listenig on port
-3128, having as a final destination dest.host.com on port 443.
+10001, having as a final destination host.com on port 10002.

@@ -20,18 +20,11 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     if (!cluster) {
       return nullptr;
     }
-    auto ret = [&] {
-      if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0) {
-        return std::make_unique<TcpProxy::HttpConnPool>(cluster_name, cluster_manager, context,
-                                                        config.value(), upstream_callbacks,
-                                                        Http::CodecClient::Type::HTTP2);
-      } else {
-        return std::make_unique<TcpProxy::HttpConnPool>(cluster_name, cluster_manager, context,
-                                                        config.value(), upstream_callbacks,
-                                                        Http::CodecClient::Type::HTTP1);
-      }
-    }();
-
+    auto pool_type = ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0)
+                         ? Http::CodecClient::Type::HTTP2
+                         : Http::CodecClient::Type::HTTP1;
+    auto ret = std::make_unique<TcpProxy::HttpConnPool>(
+        cluster_name, cluster_manager, context, config.value(), upstream_callbacks, pool_type);
     return (ret->valid() ? std::move(ret) : nullptr);
   }
   auto ret = std::make_unique<TcpProxy::TcpConnPool>(cluster_name, cluster_manager, context,

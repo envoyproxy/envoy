@@ -26,10 +26,11 @@ static_resources:
           stat_prefix: tcp_stats
           cluster: "cluster_0"
           tunneling_config:
-            hostname: dest.host.com:443
+            hostname: host.com:10002
   clusters:
     - name: cluster_0
       connect_timeout: 5s
+      # This ensures HTTP/1.1 CONNECT is used for establishing the tunnel.
       http_protocol_options:
         {}
       load_assignment:
@@ -40,4 +41,4 @@ static_resources:
                   address:
                     socket_address:
                       address: 127.0.0.1
-                      port_value: 3128
+                      port_value: 10001
