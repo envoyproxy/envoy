@@ -25,6 +25,19 @@ static_resources:
                 route:
                   host_rewrite_literal: www.envoyproxy.io
                   cluster: service_envoyproxy_io
+      filter_chain_match:
+        server_names:
+        - my-service-name.example.com
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              certificate_chain:
+                filename: certs/servercert.pem
+              private_key:
+                filename: certs/serverkey.pem
 
   clusters:
   - name: service_envoyproxy_io

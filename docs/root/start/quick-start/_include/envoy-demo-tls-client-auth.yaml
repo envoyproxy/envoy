@@ -25,6 +25,22 @@ static_resources:
                 route:
                   host_rewrite_literal: www.envoyproxy.io
                   cluster: service_envoyproxy_io
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          require_client_certificate: true
+          common_tls_context:
+            validation_context:
+              trusted_ca:
+                filename: certs/cacert.pem
+              match_subject_alt_names:
+              - exact: proxy-postgres-frontend.example.com
+            tls_certificates:
+              certificate_chain:
+                filename: certs/servercert.pem
+              private_key:
+                filename: certs/serverkey.pem
 
   clusters:
   - name: service_envoyproxy_io
@@ -45,4 +61,9 @@ static_resources:
       name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: www.envoyproxy.io
+        common_tls_context:
+          tls_certificates:
+            certificate_chain:
+              filename: certs/clientcert.pem
+            private_key:
+              filename: certs/clientkey.pem
