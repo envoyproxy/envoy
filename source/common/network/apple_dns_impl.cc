@@ -92,7 +92,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   // where relevant.
   //
   // When error occurs while the main_sd_ref_ is initialized, the initialize_failure_timer_ will be
-  // enabled to retry initialization. Retries an also be triggered via query submission, @see
+  // enabled to retry initialization. Retries can also be triggered via query submission, @see
   // AppleDnsResolverImpl::resolve(...) for details.
   auto error = DnsServiceSingleton::get().dnsServiceCreateConnection(&main_sd_ref_);
   if (error != kDNSServiceErr_NoError) {
@@ -103,6 +103,9 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   }
 
   auto fd = DnsServiceSingleton::get().dnsServiceRefSockFD(main_sd_ref_);
+  // According to dns_sd.h: DnsServiceRefSockFD returns "The DNSServiceRef's underlying socket
+  // descriptor, or -1 on error.". Although it gives no detailed description on when/why this call
+  // would fail.
   if (fd == -1) {
     stats_.socket_failure_.inc();
     initialize_failure_timer_->enableTimer(
