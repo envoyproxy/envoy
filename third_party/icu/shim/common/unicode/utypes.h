@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <iostream>
 
 using UBool = bool;
 using UChar = uint16_t;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include "unicode/utypes.h"
 
 // Initialize UIDNAInfo object with UIDNA_ERROR_DISALLOWED as its errors (any non-zero value should
