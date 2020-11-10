@@ -5,6 +5,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/perf_annotation.h"
 #include "common/common/regex.h"
@@ -64,6 +65,7 @@ TagExtractorPtr TagExtractorImplBase::createTagExtractor(const std::string& name
   case Regex::Type::StdRegex:
     return std::make_unique<TagExtractorStdRegexImpl>(name, regex, substr);
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {
