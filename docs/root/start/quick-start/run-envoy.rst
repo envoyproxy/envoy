@@ -255,7 +255,7 @@ This can be overridden using :option:`--log-path`.
                -c /etc/envoy/envoy.yaml \
                --log-path logs/custom.log
 
-:ref:`Access log <arch_overview_access_log>` paths can be set for the
+:ref:`Access log <arch_overview_access_logs>` paths can be set for the
 :ref:`admin interface <start_quick_start_admin>`, and for configured
 :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
 
