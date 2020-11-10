@@ -4,7 +4,7 @@ TLS
 ===
 
 This example walks through some of the ways that Envoy can be configured to make
-use of encrypted connections using ``TLS`` over ``HTTP``.
+use of encrypted connections using ``HTTP`` over ``TLS`` .
 
 It demonstrates a number of commonly used proxying and ``TLS`` termination patterns:
 
