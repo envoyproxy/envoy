@@ -194,7 +194,7 @@ message JwtProvider {
 
   // Specify the clock skew in seconds when verifying JWT time constraint,
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
-  uint32 clock_skew = 10;
+  uint32 clock_skew_seconds = 10;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

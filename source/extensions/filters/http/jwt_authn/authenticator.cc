@@ -170,11 +170,11 @@ void AuthenticatorImpl::startVerify() {
   ASSERT(jwks_data_ != nullptr);
 
   // Default is 60 seconds
-  uint64_t clock_skew = ::google::jwt_verify::kClockSkewInSecond;
-  if (jwks_data_->getJwtProvider().clock_skew() > 0) {
-    clock_skew = jwks_data_->getJwtProvider().clock_skew();
+  uint64_t clock_skew_seconds = ::google::jwt_verify::kClockSkewInSecond;
+  if (jwks_data_->getJwtProvider().clock_skew_seconds() > 0) {
+    clock_skew_seconds = jwks_data_->getJwtProvider().clock_skew_seconds();
   }
-  status = jwt_->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now()), clock_skew);
+  status = jwt_->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now()), clock_skew_seconds);
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
