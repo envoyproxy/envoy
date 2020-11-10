@@ -531,7 +531,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     static_config:
-      match_config:
+      match:
         http_request_headers_match:
           headers:
             - name: foo
@@ -577,7 +577,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     static_config:
-      match_config:
+      match:
         http_response_headers_match:
           headers:
             - name: bar

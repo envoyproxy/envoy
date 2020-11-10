@@ -116,7 +116,8 @@ name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
-  format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+  log_format:
+    text_format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -1057,7 +1058,8 @@ name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
-  format: "%GRPC_STATUS%\n"
+  log_format:
+    text_format: "%GRPC_STATUS%\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);

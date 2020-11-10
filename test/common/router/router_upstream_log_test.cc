@@ -41,7 +41,8 @@ absl::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
 name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-  format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
+  log_format:
+    text_format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
     %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
     %UPSTREAM_LOCAL_ADDRESS% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
   path: "/dev/null"
@@ -287,7 +288,8 @@ TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
 name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-  format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%
+  log_format:
+    text_format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%
     %DURATION% %RESPONSE_DURATION% %REQUEST_DURATION%"
   path: "/dev/null"
   )EOF";
