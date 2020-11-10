@@ -14,7 +14,9 @@ def get_pr_author_association(issue_number):
     path="repos/envoyproxy/envoy/pulls/%s" % issue_number)["json"]["author_association"]
 
 def is_newcontributor(issue_number):
-  return get_pr_author_association(issue_number) == "FIRST_TIME_CONTRIBUTOR"
+  return (
+    get_pr_author_association(issue_number)
+    in ["NONE", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER"])
 
 def should_message_newcontributor(action, issue_number):
   return (
