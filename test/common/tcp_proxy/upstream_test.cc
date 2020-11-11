@@ -80,7 +80,7 @@ TEST_F(HttpUpstreamTest, ReadDisable) {
 }
 
 TEST_F(HttpUpstreamTest, AddBytesSentCallbackForCoverage) {
-  upstream_->addBytesSentCallback([&](uint64_t) {});
+  upstream_->addBytesSentCallback([&](uint64_t) { return true; });
 }
 
 TEST_F(HttpUpstreamTest, DownstreamDisconnect) {
