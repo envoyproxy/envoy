@@ -232,6 +232,7 @@ envoy_cc_library(
     }),
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
 )
 
 envoy_cc_library(

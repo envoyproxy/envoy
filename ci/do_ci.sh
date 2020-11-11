@@ -374,7 +374,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   setup_clang_toolchain
 
   echo "fix_format..."
-  #./tools/code_format/check_shellcheck_format.sh fix
+  ./tools/code_format/check_shellcheck_format.sh fix
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test

@@ -1141,7 +1141,6 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
 )
 
 envoy_cc_library(
@@ -3963,6 +3962,7 @@ envoy_cc_test(
     deps = [
         ":http2_platform",
         ":http2_test_tools_random",
+        ":quiche_common_test_tools_test_utils_lib",
     ],
 )
 
