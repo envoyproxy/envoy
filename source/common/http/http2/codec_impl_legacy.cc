@@ -730,8 +730,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // was the current time when the ping was sent. This can be useful while debugging
     // to match the ping and ack.
     uint64_t data;
-    static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
-    memcpy(&data, frame->ping.opaque_data, sizeof(data)); // NOLINT(safe-memcpy)
+    SAFE_MEMCPY(&data, &(frame->ping.opaque_data));
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
 
     onKeepaliveResponse();

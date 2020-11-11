@@ -23,7 +23,8 @@ int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
   }
 
   int32_t val;
-  SAFE_MEMCPY(&val, static_cast<int32_t*>(data.linearize(sizeof(int32_t))));
+  void* mem = data.linearize(sizeof(int32_t));
+  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int32_t)); // NOLINT(safe-memcpy)
   return le32toh(val);
 }
 
@@ -43,9 +44,8 @@ void BufferHelper::removeBytes(Buffer::Instance& data, uint8_t* out, size_t out_
     throw EnvoyException("invalid buffer size");
   }
 
-  MemBlockBuilder<uint8_t> mem_builder(out, out_len);
-  mem_builder.appendData(
-      absl::Span<uint8_t>(static_cast<uint8_t*>(data.linearize(out_len)), out_len));
+  void* mem = data.linearize(out_len);
+  std::memcpy(out, mem, out_len); // NOLINT(safe-memcpy)
   data.drain(out_len);
 }
 
@@ -89,7 +89,8 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
   }
 
   int64_t val;
-  SAFE_MEMCPY(&val, static_cast<int64_t*>(data.linearize(sizeof(int64_t))));
+  void* mem = data.linearize(sizeof(int64_t));
+  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int64_t)); // NOLINT(safe-memcpy)
   data.drain(sizeof(int64_t));
   return le64toh(val);
 }

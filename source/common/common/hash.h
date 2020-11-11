@@ -6,6 +6,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
+#include "common/common/macros.h"
 #include "xxhash.h"
 
 namespace Envoy {
@@ -58,7 +59,7 @@ public:
 private:
   static inline uint64_t unalignedLoad(const char* p) {
     uint64_t result;
-    memcpy(&result, p, sizeof(result)); // NOLINT(safe-memcpy)
+    SAFE_MEMCPY(&result, reinterpret_cast<const uint64_t*>(p));
     return result;
   }
 
