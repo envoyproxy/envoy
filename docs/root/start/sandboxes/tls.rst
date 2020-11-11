@@ -72,7 +72,7 @@ The :download:`provided configuration <_include/tls/envoy-https-http.yaml>` adds
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
 :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`.
 
-Querying the service at port ``10000`` we should see am ``x-forwarded-proto`` header of ``https`` has
+Querying the service at port ``10000`` we should see an ``x-forwarded-proto`` header of ``https`` has
 been added:
 
 .. code-block:: console
@@ -97,7 +97,7 @@ The :download:`provided configuration <_include/tls/envoy-https-https.yaml>` add
 :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>` and the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
-Querying the service at port ``10001`` we should see am ``x-forwarded-proto`` header of ``https`` has
+Querying the service at port ``10001`` we should see an ``x-forwarded-proto`` header of ``https`` has
 been added:
 
 .. code-block:: console
@@ -121,7 +121,7 @@ The :download:`provided configuration <_include/tls/envoy-http-https.yaml>` adds
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
-Querying the service at port ``10001`` we should see am ``x-forwarded-proto`` header of ``http`` has
+Querying the service at port ``10001`` we should see an ``x-forwarded-proto`` header of ``http`` has
 been added:
 
 .. code-block:: console
@@ -143,9 +143,9 @@ Step 7: Test proxying ``https`` passthrough
 The Envoy proxy listening on https://localhost:10003 proxies directly to the upstream ``HTTPS`` service which
 does the ``TLS`` termination.
 
-The :download:`provided configuration <_include/tls/envoy-http-https.yaml>` adds ...
+The :download:`provided configuration <_include/tls/envoy-https-passthrough.yaml>` adds ...
 
-Querying the service at port ``10003`` we should see than no ``x-forwarded-proto`` header has been
+Querying the service at port ``10003`` we should see that no ``x-forwarded-proto`` header has been
 added:
 
 .. code-block:: console
