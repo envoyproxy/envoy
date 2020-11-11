@@ -144,7 +144,8 @@ void CodecClient::onData(Buffer::Instance& data) {
 
     // The HTTP/1 codec will pause dispatch after a single response is complete. We redispatch if
     // there is more data.
-    // TODO(asraa): more active requests? responsewith204 fails.
+    // TODO(asraa): Check that there are more active requests? This causes a failure in a response
+    // with 204 integration test.
     if (codec_->protocol() < Protocol::Http2) {
       if (data.length() > 0 && connection_->state() == Network::Connection::State::Open) {
         redispatch = true;
