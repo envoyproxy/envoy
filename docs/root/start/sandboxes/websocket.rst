@@ -79,7 +79,7 @@ to an upstream socket, also without ``TLS``.
 In order for Envoy to terminate the WebSocket connection, the
 :ref:`upgrade_configs <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig>`
 in :ref:`HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`
-must be set, as can be seen in the provided :download:`envoy-ws.yaml <_include/websocket/envoy-ws.yaml>`:
+must be set, as can be seen in the provided :download:`ws -> ws configuration <_include/websocket/envoy-ws.yaml>`:
 
 .. literalinclude:: _include/websocket/envoy-ws.yaml
    :language: yaml
@@ -105,6 +105,14 @@ Step 6: Test proxying ``wss`` -> ``wss``
 The proxy listening on port ``20000`` terminates the WebSocket connection with ``TLS`` and then proxies
 to an upstream ``TLS`` WebSocket.
 
+In addition to the
+:ref:`upgrade_configs <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig>`
+in :ref:`HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`,
+the :download:`wss -> wss configuration <_include/websocket/envoy-wss-wss.yaml>` adds a ``TLS``
+:ref:`transport_socket <extension_envoy.transport_sockets.tls>` to both the
+:ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>` and the
+:ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
+
 You can start an interactive session with the socket as follows:
 
 .. code-block:: console
@@ -121,6 +129,10 @@ Step 7: Test proxying ``wss`` passthrough
 *****************************************
 
 The proxy listening on port ``30000`` passes through all ``TCP`` traffic to an upstream ``TLS`` WebSocket.
+
+The :download:`wss passthrough configuration <_include/websocket/envoy-wss-passthrough.yaml>` requires no ``TLS``
+or ``HTTP`` setup, and instead uses a simple
+:ref:`tcp_proxy  <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy>`.
 
 You can start an interactive session with the socket as follows:
 
