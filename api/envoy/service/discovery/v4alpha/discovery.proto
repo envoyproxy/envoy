@@ -294,8 +294,8 @@ message Resource {
   google.protobuf.Duration ttl = 6;
 
   // If true, xDS proxies may not cache this resource.
-  // Note that this does not apply to non-proxy xDS clients, which must cache resources for their
-  // own use, regardless of the value of this field.
+  // Note that this does not apply to clients other than xDS proxies, which must cache resources
+  // for their own use, regardless of the value of this field.
   // [#not-implemented-hide:]
   bool do_not_cache = 7;
 }
