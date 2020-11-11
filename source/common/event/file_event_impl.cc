@@ -47,16 +47,6 @@ void FileEventImpl::activate(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
 
-  if (enabled_events_ & FileReadyType::Closed && events & FileReadyType::Read) {
-    // We never ask for both early close and read at the same time. If close is requested
-    // keep that instead.
-    events = events & ~FileReadyType::Read;
-  }
-
-  if (events == 0) {
-    return;
-  }
-
   if (!activate_fd_events_next_event_loop_) {
     // Legacy implementation
     int libevent_events = 0;
@@ -172,6 +162,12 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
 
 void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
   if (activate_fd_events_next_event_loop_ && injected_activation_events_ != 0) {
+    if (events & FileReadyType::Closed && activate_fd_events_next_event_loop_ & FileReadyType::Read) {
+      // We never ask for both early close and read at the same time. If close is requested
+      // keep that instead.
+      injected_activation_events_ = injected_activation_events_ & ~FileReadyType::Read;
+    }
+    
     events |= injected_activation_events_;
     injected_activation_events_ = 0;
     activation_cb_->cancel();
