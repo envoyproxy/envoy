@@ -13,6 +13,17 @@ This example walks through some of the ways that Envoy can be configured to prox
 It demonstrates terminating a WebSocket connection with and without ``TLS``, and provides some basic examples
 of proxying to encrypted and non-encrypted upstream sockets.
 
+.. warning::
+
+   For the sake of simplicity, the examples provided here do not authenticate any client certificates,
+   or validate any of the provided certificates.
+
+   When using ``TLS``, you are strongly encouraged to :ref:`validate <start_quick_start_securing_validation>`
+   all certificates wherever possible.
+
+   You should also :ref:`authenticate clients <start_quick_start_securing_mtls>`
+   where you control both sides of the connection, or relevant protocols are available.
+
 .. include:: _include/docker-env-setup.rst
 
 Change directory to ``examples/websocket`` in the Envoy repository.
