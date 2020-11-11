@@ -13,24 +13,23 @@ It demonstrates a number of commonly used proxying and ``TLS`` termination patte
 - ``http`` -> ``https``
 - ``https`` passthrough
 
-.. note::
+To better understand the provided examples, and for a description of how ``TLS`` is
+configured with Envoy, please see the :ref:`securing Envoy quick start guide <start_quick_start_securing>`.
 
-   Envoy can also proxy non-``HTTP`` traffic over ``TLS``.
-   Please the :ref:`double proxy sandbox <install_sandboxes_double_proxy>` for an example of this.
+The :ref:`double proxy sandbox <install_sandboxes_double_proxy>` also provides an example
+of securing traffic between proxies with validation and mutual authentication using ``mTLS``.
 
 .. warning::
 
    For the sake of simplicity, the examples provided here do not authenticate any client certificates,
    or validate any of the provided certificates.
 
-   Please see :ref:`securing envoy <start_quick_start_securing>` for more information about using ``TLS`` to secure your network.
-
-   See also the :ref:`double proxy sandbox <install_sandboxes_double_proxy>` for an example of validation and authentication
-   with client certificates using ``mTLS``.
+   When using ``TLS``, you are strongly encouraged to :ref:`validate <start_quick_start_securing_validation>`
+   all certificates wherever possible.
 
 .. admonition:: Requirements
 
-   This example makes use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse the ``json`` output
+   This example makes use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse ``json`` output
    from the upstream echo servers.
 
 .. include:: _include/docker-env-setup.rst
@@ -69,10 +68,20 @@ Step 4: Test proxying ``https`` -> ``http``
 
 The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and proxies to the upstream ``HTTP`` service.
 
+The :download:`provided configuration <_include/tls/envoy-http-https.yaml>` adds a ``TLS`` ``transport_socket`` to
+the listener.
+
+Querying the service at port ``10000`` we should see am ``x-forwarded-proto`` header of ``https`` has
+been added:
+
 .. code-block:: console
 
    $ curl -sk https://localhost:10000  | jq  '.headers["x-forwarded-proto"]'
    "https"
+
+The upstream ``http`` service handles the request.
+
+.. code-block:: console
 
    $ curl -sk https://localhost:10000  | jq  '.os.hostname'
    "service-http"
