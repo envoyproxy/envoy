@@ -1288,6 +1288,11 @@ void ClientConnectionImpl::onMessageComplete() {
     pending_response_.reset();
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
   }
+
+  // Always pause the parser so that the calling code can process 1 response at a time and apply
+  // back pressure. This means that the calling code needs to detect if there are more active
+  // requests and data in the buffer and dispatch it again.
+  http_parser_pause(&parser_, 1);
 }
 
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {

@@ -125,19 +125,32 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 }
 
 void CodecClient::onData(Buffer::Instance& data) {
-  const Status status = codec_->dispatch(data);
+  bool redispatch;
+  do {
+    redispatch = false;
+    const Status status = codec_->dispatch(data);
 
-  if (!status.ok()) {
-    ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
-    close();
+    if (!status.ok()) {
+      ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
+      close();
 
-    // Don't count 408 responses where we have no active requests as protocol errors
-    if (!isPrematureResponseError(status) ||
-        (!active_requests_.empty() ||
-         getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
-      host_->cluster().stats().upstream_cx_protocol_error_.inc();
+      // Don't count 408 responses where we have no active requests as protocol errors
+      if (!isPrematureResponseError(status) ||
+          (!active_requests_.empty() ||
+           getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
+        host_->cluster().stats().upstream_cx_protocol_error_.inc();
+      }
     }
-  }
+
+    // The HTTP/1 codec will pause dispatch after a single response is complete. We redispatch if
+    // there is more data.
+    // TODO(asraa): more active requests? responsewith204 fails.
+    if (codec_->protocol() < Protocol::Http2) {
+      if (data.length() > 0 && connection_->state() == Network::Connection::State::Open) {
+        redispatch = true;
+      }
+    }
+  } while (redispatch);
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
