@@ -180,9 +180,8 @@ absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   SAFE_MEMCPY(&ipv6_addr, &(address_.sin6_addr.s6_addr));
   result = ipv6_addr; // Use assignment operator which defaults to copy-constructor
 #else
-  memcpy(static_cast<void*>(&result),
-         static_cast<const void*>(&address_.sin6_addr.s6_addr), // NOLINT(safe-memcpy)
-         sizeof(absl::uint128));
+  memcpy(static_cast<void*>(&result), // NOLINT(safe-memcpy)
+         static_cast<const void*>(&address_.sin6_addr.s6_addr), sizeof(absl::uint128));
 #endif
   return result;
 }
