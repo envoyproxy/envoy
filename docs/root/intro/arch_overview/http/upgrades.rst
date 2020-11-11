@@ -1,7 +1,7 @@
 .. _arch_overview_upgrades:
 
 HTTP 升级
-===========================
+==========
 
 Envoy 升级主要用于支持 WebSocket 和 CONNECT 在 HTTP 请求中的的升级，同时也支持其他依赖于 HTTP 的升级。
 HTTP 升级在通常情况下是通过 HTTP 过滤链来传递 HTTP header 和 HTTP 升级所需的负载信息。
@@ -30,7 +30,7 @@ HTTP 升级可以根据 :ref:`每个路由 <envoy_v3_api_field_config.route.v3.R
 注意！所有升级的统计信息是绑定在一起的，例如 WebSocket 或者其他的 HTTP 升级都是通过 downstream_cx_upgrades_total 和 downstream_cx_upgrades_active 来统计信息的。
 
 越过 HTTP1.2 生成 WebSocket
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 默认情况下，HTTP1.2 对 WebSocket 的支持都是关闭的，但 Envoy 却支持 WebSocket 在 HTTP1.2 上进行隧道传输，以便在整个部署过程中可以使用统一的 HTTP1.2 网络。
 例如，可以这样进行部署：
@@ -47,7 +47,7 @@ HTTP 升级可以根据 :ref:`每个路由 <envoy_v3_api_field_config.route.v3.R
 注意！HTTP1.2 升级会非常严格的 HTTP1.1 的路径，因此不能使用代理用于WebSocket 升级的请求和响应。
 
 CONNECT 支持
-^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
 默认情况下，Envoy 内部的 CONNECT 支持都是处于关闭状态的（Envoy 会返回403 状态码以响应 CONNECT 请求）。
 因此，可以通过上述的选项来启用 CONNECT 支持，其中将设置特殊关键字为 “ CONNECT ”。
@@ -65,16 +65,16 @@ Envoy 可以使用两种方法来处理 CONNECT 请求，一种是代理 CONNECT
 在收到来自上游的 TCP 数据时，路由就会生成 HTTP 200 响应头信息，然后将上游返回的 TCP 数据作为 HTTP 响应体。
 
 .. 注意::
+
 如果配置不正确，这种 CONNECT 支持连接会造成严重的安全漏洞。例如如果上游的安全漏洞存在于负载中，那么上游就会转发未经初始化的头信息。谨慎使用！
 
 HTTP1.2 之上的TCP 隧道
-^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 Envoy 还支持将原始 TCP 请求转化为 HTTP1.2 CONNECT 请求，这是通过提前预备的安全链路来代理多路传输的 TCP 请求，并且可以分摊 TLS 握手的成本。
 例如设置代理 SMTP 的流程如下：
 
 [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
 
-如果运行 bazel-bin/source/exe/envoy-static –config-path configs/encapsulate_in_connect.yaml –base-id 1 and bazel-bin/source/exe/envoy-static –config-path configs/terminate_connect.yaml
- 则能在示例配置 :repo:`文件 <configs/>` 中找到对应的示例。
-其中将会运行两个 Envoy ，第一个会监听10000 端口 上的 TCP 流量，接着会将其封装为 HTTP1.2 请求。另一个会监听10001 端口上的 HTTP1.2 请求，去掉请求的请求头，接着将原始 TCP 请求转到上游，在本示例中是 google.com。
+如果运行 bazel-bin/source/exe/envoy-static –config-path configs/encapsulate_in_connect.yaml –base-id 1 and bazel-bin/source/exe/envoy-static –config-path configs/terminate_connect.yaml 则能在示例配置 :repo:`文件 <configs/>` 中找到对应的示例。
+其中将会运行两个 Envoy ，第一个会监听10000 端口 上的 TCP 流量，接着会将其封装为 HTTP1.2 请求；另一个会监听10001 端口上的 HTTP1.2 请求，去掉请求的请求头，接着将原始 TCP 请求转到上游，在本示例中是 google.com。 
