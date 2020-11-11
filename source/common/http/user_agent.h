@@ -65,7 +65,7 @@ public:
    * Initialize the user agent from request headers. This is only done once and the user-agent
    * is assumed to be the same for further requests.
    * @param headers supplies the request headers.
-   * @param prefix supplies the stat prefix for the UA stats.
+   * @param prefix supplies the stat prefix for the `UA` stats.
    * @param scope supplies the backing stat scope.
    */
   void initializeFromHeaders(const RequestHeaderMap& headers, Stats::StatName prefix,

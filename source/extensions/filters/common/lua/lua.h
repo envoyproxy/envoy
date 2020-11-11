@@ -369,7 +369,7 @@ public:
 
   /**
    * @return a global reference previously registered via registerGlobal(). This may return
-   *         LUA_REFNIL if there was no such global.
+   *         `LUA_REFNIL` if there was no such global.
    * @param slot supplies the global slot/index to lookup.
    */
   int getGlobalRef(uint64_t slot);

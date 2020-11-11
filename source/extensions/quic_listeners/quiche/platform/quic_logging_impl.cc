@@ -32,7 +32,7 @@ QuicLogEmitter::~QuicLogEmitter() {
   }
   std::string content = stream_.str();
   if (!content.empty() && content.back() == '\n') {
-    // strip the last trailing '\n' because spd log will add a trailing '\n' to
+    // strip the last trailing '\n' because `spd` log will add a trailing '\n' to
     // the output.
     content.back() = '\0';
   }

@@ -284,7 +284,7 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
   hints.ai_family = family;
 
   /**
-   * ARES_AI_NOSORT result addresses will not be sorted and no connections to resolved addresses
+   * `ARES_AI_NOSORT` result addresses will not be sorted and no connections to resolved addresses
    * will be attempted
    */
   hints.ai_flags = ARES_AI_NOSORT;

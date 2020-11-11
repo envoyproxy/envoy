@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
   Envoy::Options options(argc, argv);
 
   const bool enforce_coverage = options.failUnder() != 0.0;
-  // We need this to ensure WSAStartup is called on Windows
+  // We need this to ensure `WSAStartup` is called on Windows
   Envoy::PlatformImpl platform_impl_;
 
   try {

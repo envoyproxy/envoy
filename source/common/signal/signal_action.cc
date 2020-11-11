@@ -55,7 +55,7 @@ void SignalAction::installSigHandlers() {
 
 void SignalAction::removeSigHandlers() {
 #if defined(__APPLE__)
-  // ss_flags contains SS_DISABLE, but Darwin still checks the size, contrary to the man page
+  // `ss_flags` contains SS_DISABLE, but Darwin still checks the size, contrary to the man page
   if (previous_altstack_.ss_size < MINSIGSTKSZ) {
     previous_altstack_.ss_size = MINSIGSTKSZ;
   }

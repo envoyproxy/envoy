@@ -413,7 +413,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
 
 void executeActions(const test::common::buffer::BufferFuzzTestCase& input, BufferList& buffers,
                     BufferList& linear_buffers, Context& ctxt) {
-  // Soft bound on the available memory for allocation to avoid OOMs and
+  // Soft bound on the available memory for allocation to avoid `OOMs` and
   // timeouts.
   uint32_t available_alloc = 2 * MaxAllocation;
   constexpr auto max_actions = 128;

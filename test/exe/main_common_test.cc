@@ -316,7 +316,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
-// This test is the same as AdminRequestGetStatsAndQuit, except we send ourselves a SIGINT,
+// This test is the same as AdminRequestGetStatsAndQuit, except we send ourselves a `SIGINT`,
 // equivalent to receiving a Ctrl-C from the user.
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
   startEnvoy();

@@ -51,7 +51,7 @@ namespace {
 
 /**
  * Favicon base64 image was harvested by screen-capturing the favicon from a Chrome tab
- * while visiting https://www.envoyproxy.io/. The resulting PNG was translated to base64
+ * while visiting https://www.envoyproxy.io/. The resulting `PNG` was translated to base64
  * by dropping it into https://www.base64-image.de/ and then pasting the resulting string
  * below.
  *

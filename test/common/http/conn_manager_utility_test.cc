@@ -738,7 +738,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
 }
 
-// Make sure we don't remove connection headers for WS requests.
+// Make sure we don't remove connection headers for `WS` requests.
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRequests) {
   TestRequestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
 
@@ -748,7 +748,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketReq
   EXPECT_EQ("websocket", headers.get_("upgrade"));
 }
 
-// Make sure we do remove connection headers for non-WS requests.
+// Make sure we do remove connection headers for `non-WS` requests.
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketRequests) {
   TestRequestHeaderMapImpl headers{{"connection", "close"}, {"upgrade", "websocket"}};
 

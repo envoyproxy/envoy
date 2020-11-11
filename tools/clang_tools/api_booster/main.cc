@@ -1,6 +1,6 @@
 // Upgrade a single Envoy C++ file to the latest API version.
 //
-// Currently this tool is a WIP and only does inference of .pb[.validate].h
+// Currently this tool is a `WIP` and only does inference of .pb[.validate].h
 // #include locations. This already exercises some of the muscles we need, such
 // as AST matching, rudimentary type inference and API type database lookup.
 //

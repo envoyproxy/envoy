@@ -189,7 +189,7 @@ TEST_F(DeltaSubscriptionStateTest, CumulativeUpdates) {
 }
 
 // Verifies that a sequence of good and bad responses from the server all get the appropriate
-// ACKs/NACKs from Envoy.
+// ACKs/`NACKs` from Envoy.
 TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
   // The xDS server's first response includes items for name1 and 2, but not 3.
   {

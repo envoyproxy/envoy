@@ -175,7 +175,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
 
-  // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
+  // We must protect current_lb_ via a `RW` lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.
   absl::ReaderMutexLock lock(&mutex_);
   lb->healthy_per_priority_load_ = healthy_per_priority_load_;

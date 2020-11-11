@@ -195,7 +195,7 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
   }
 
   // Connect responses are special, they have no full reply header
-  // but just an XID with no zxid nor error fields like the ones
+  // but just an XID with no `zxid` nor error fields like the ones
   // available for all other server generated messages.
   if (xid_code == XidCodes::ConnectXid) {
     parseConnectResponse(data, offset, len, latency);
@@ -241,7 +241,7 @@ void DecoderImpl::ensureMaxLength(const int32_t len) const {
 void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   ensureMinLength(len, XID_LENGTH + ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
 
-  // Skip zxid, timeout, and session id.
+  // Skip `zxid`, timeout, and session id.
   offset += ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH;
 
   // Skip password.

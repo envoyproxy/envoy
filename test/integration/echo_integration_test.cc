@@ -104,7 +104,7 @@ filter_chains:
 
   // Now connect. This should fail.
   // Allow for a few attempts, in order to handle a race (likely due to lack of
-  // LEV_OPT_CLOSE_ON_FREE, which would break listener reuse)
+  // `LEV_OPT_CLOSE_ON_FREE`, which would break listener reuse)
   //
   // In order for this test to work, it must be tagged as "exclusive" in its
   // build file. Otherwise, it's possible that when the listener is destroyed

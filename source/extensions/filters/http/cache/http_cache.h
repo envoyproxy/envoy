@@ -46,7 +46,7 @@ class RawByteRange {
 public:
   // - If first==UINT64_MAX, construct a RawByteRange requesting the final last body bytes.
   // - Otherwise, construct a RawByteRange requesting the [first,last] body bytes.
-  // Prereq: first == UINT64_MAX || first <= last
+  // `Prereq`: first == UINT64_MAX || first <= last
   // Invariant: isSuffix() || firstBytePos() <= lastBytePos
   // Examples: RawByteRange(0,4) requests the first 5 bytes.
   //           RawByteRange(UINT64_MAX,4) requests the last 4 bytes.
@@ -87,7 +87,7 @@ public:
 class AdjustedByteRange {
 public:
   // Construct an AdjustedByteRange representing the [first,last) bytes in the
-  // response body. Prereq: first <= last Invariant: begin() <= end()
+  // response body. `Prereq`: first <= last Invariant: begin() <= end()
   // Example: AdjustedByteRange(0,4) represents the first 4 bytes.
   AdjustedByteRange(uint64_t first, uint64_t last) : first_(first), last_(last) {
     ASSERT(first < last, "Illegal byte range.");
@@ -186,7 +186,7 @@ struct ResponseMetadata {
 // to determine what ranges are needed.
 class LookupRequest {
 public:
-  // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
+  // `Prereq`: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
                 const VaryHeader& vary_allow_list);
 

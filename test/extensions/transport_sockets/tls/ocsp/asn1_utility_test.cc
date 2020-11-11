@@ -249,7 +249,7 @@ TEST_F(Asn1UtilityTest, ParseOidTest) {
 }
 
 TEST_F(Asn1UtilityTest, ParseOidInvalidValueTest) {
-  // 0x80 is not valid within an OID
+  // 0x80 is not valid within an `OID`
   std::vector<uint8_t> invalid_oid = {0x6, 0x6, 0x29, 0x80, 0x1, 0x1, 0x1, 0x1};
 
   CBS cbs;

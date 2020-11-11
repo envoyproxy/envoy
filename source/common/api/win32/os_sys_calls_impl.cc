@@ -40,9 +40,9 @@ std::vector<WSABUF> iovecToWSABUF(const iovec* vec, int in_vec) {
   for (const auto& vec : vecs) {
     auto chunk = (CHAR*)vec.iov_base;
     size_t chunk_len = vec.iov_len;
-    // There is the case that the chunk does not fit into a single WSABUF buffer
+    // There is the case that the chunk does not fit into a single `WSABUF` buffer
     // this is the case because sizeof(size_t) > sizeof(DWORD).
-    // In this case we split the chunk into multiple WSABUF buffers
+    // In this case we split the chunk into multiple `WSABUF` buffers
     auto remaining_data = chunk_len;
     do {
       (*it).buf = chunk;
@@ -147,7 +147,7 @@ SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags
   DWORD bytes_received;
   LPFN_WSARECVMSG recvmsg_fn_ptr = getFnPtrWSARecvMsg();
   wsamsgResult wsamsg = msghdrToWSAMSG(msg);
-  // Windows supports only a single flag on input to WSARecvMsg
+  // Windows supports only a single flag on input to `WSARecvMsg`
   wsamsg.wsamsg_->dwFlags = flags & MSG_PEEK;
   const int rc = recvmsg_fn_ptr(sockfd, wsamsg.wsamsg_.get(), &bytes_received, nullptr, nullptr);
   if (rc == SOCKET_ERROR) {

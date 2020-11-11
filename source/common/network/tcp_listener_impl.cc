@@ -75,7 +75,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     const Address::InstanceConstSharedPtr& local_address =
         local_address_ ? local_address_ : io_handle->localAddress();
 
-    // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
+    // The accept() call that filled in remote_addr doesn't fill in more than the `sa_family` field
     // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
     // `sockaddr_un` associated with the client socket when starting from the server socket.
     // We work around this by using our own name for the socket in this case.

@@ -19,7 +19,7 @@ class QuicUnackedPacketMap;
 class RttStats;
 class SendAlgorithmInterface;
 
-// Interface for creating a PCC SendAlgorithmInterface.
+// Interface for creating a `PCC` SendAlgorithmInterface.
 inline SendAlgorithmInterface*
 CreatePccSenderImpl(const QuicClock* /*clock*/, const RttStats* /*rtt_stats*/,
                     const QuicUnackedPacketMap* /*unacked_packets*/, QuicRandom* /*random*/,

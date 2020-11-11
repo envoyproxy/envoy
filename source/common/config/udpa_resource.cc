@@ -9,7 +9,8 @@
 #include "absl/strings/str_split.h"
 
 // TODO(htuch): This file has a bunch of ad hoc URI encoding/decoding based on Envoy's HTTP util
-// functions. Once https://github.com/envoyproxy/envoy/issues/6588 lands, we can replace with GURL.
+// functions. Once https://github.com/envoyproxy/envoy/issues/6588 lands, we can replace with
+// `GURL`.
 
 namespace Envoy {
 namespace Config {

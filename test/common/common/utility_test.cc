@@ -75,7 +75,7 @@ TEST(StringUtil, strtoull) {
   EXPECT_EQ(0b101010101U, out);
 
   // Verify subsequent call to strtoull succeeds after the first one
-  // failed due to errno ERANGE
+  // failed due to errno `ERANGE`
   EXPECT_EQ(nullptr, StringUtil::strtoull("18446744073709551616", out));
   EXPECT_NE(nullptr, StringUtil::strtoull("18446744073709551615", out));
   EXPECT_EQ(18446744073709551615U, out);
@@ -97,7 +97,7 @@ TEST(StringUtil, atoull) {
   EXPECT_EQ(789U, out);
 
   // Verify subsequent call to atoull succeeds after the first one
-  // failed due to errno ERANGE
+  // failed due to errno `ERANGE`
   EXPECT_FALSE(StringUtil::atoull("18446744073709551616", out));
   EXPECT_TRUE(StringUtil::atoull("18446744073709551615", out));
   EXPECT_EQ(18446744073709551615U, out);

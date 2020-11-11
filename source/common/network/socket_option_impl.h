@@ -93,7 +93,7 @@ namespace Network {
 
 // Linux uses IP_PKTINFO for both sending source address and receiving destination
 // address.
-// FreeBSD uses IP_RECVDSTADDR for receiving destination address and IP_SENDSRCADDR for sending
+// FreeBSD uses `IP_RECVDSTADDR` for receiving destination address and `IP_SENDSRCADDR` for sending
 // source address. And these two have same value for convenience purpose.
 #ifdef IP_RECVDSTADDR
 #ifdef IP_SENDSRCADDR
@@ -106,7 +106,7 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 
 #define ENVOY_SELF_IP_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, ENVOY_IP_PKTINFO)
 
-// Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
+// Both Linux and FreeBSD use `IPV6_RECVPKTINFO` for both sending source address and
 // receiving destination address.
 #define ENVOY_SELF_IPV6_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_RECVPKTINFO)
 

@@ -85,7 +85,7 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
 #ifdef HOST_NAME_MAX
   const size_t len = HOST_NAME_MAX;
 #else
-  // This is notably the case in OSX.
+  // This is notably the case in `OSX`.
   const size_t len = 255;
 #endif
   char name[len];

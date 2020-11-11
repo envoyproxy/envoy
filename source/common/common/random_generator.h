@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Random {
 /**
- * Implementation of RandomGenerator that uses per-thread RANLUX generators seeded with current
+ * Implementation of RandomGenerator that uses per-thread `RANLUX` generators seeded with current
  * time.
  */
 class RandomGeneratorImpl : public RandomGenerator {

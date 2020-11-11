@@ -192,7 +192,7 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
 
   /**
-   * Credentials of the peer of a socket as decided by SO_PEERCRED.
+   * Credentials of the peer of a socket as decided by `SO_PEERCRED`.
    */
   struct UnixDomainSocketPeerCredentials {
     /**

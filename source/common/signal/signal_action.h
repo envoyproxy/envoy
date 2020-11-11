@@ -18,10 +18,10 @@ namespace Envoy {
  *
  * These signals are handled:
  *   SIGABRT
- *   SIGBUS
- *   SIGFPE
- *   SIGILL
- *   SIGSEGV
+ *   `SIGBUS`
+ *   `SIGFPE`
+ *   `SIGILL`
+ *   `SIGSEGV`
  *
  * Upon intercepting the signal the following actions are taken:
  *

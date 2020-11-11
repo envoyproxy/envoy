@@ -83,7 +83,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
     is_text_response_ = true;
   }
 
-  // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
+  // Adds `te:trailers` to upstream HTTP2 request. It's required for gRPC.
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
   if (headers.get(Http::CustomHeaders::get().GrpcAcceptEncoding).empty()) {
     // Adds grpc-accept-encoding:identity

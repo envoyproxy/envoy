@@ -20,7 +20,7 @@
 namespace Envoy {
 namespace Quic {
 
-// Derived for network filter chain, stats and QoS. This is used on both client
+// Derived for network filter chain, stats and `QoS`. This is used on both client
 // and server side.
 class EnvoyQuicConnection : public quic::QuicConnection,
                             protected Logger::Loggable<Logger::Id::connection> {

@@ -52,7 +52,7 @@ std::string RandomGeneratorImpl::uuid() {
   // call to this function.
   //
   // There is a diminishing return when increasing the prefetch size, as illustrated below
-  // in a test that generates 100,000,000 UUIDs (results on Intel Xeon E5-1650v3).
+  // in a test that generates 100,000,000 `UUIDs` (results on Intel Xeon E5-1650v3).
   //
   // //test/common/runtime:uuid_util_test - UUIDUtilsTest.DISABLED_benchmark
   //

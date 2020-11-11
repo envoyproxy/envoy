@@ -294,9 +294,9 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
 
   // Currently the following 7 options are not defined in proto, hence the count differs by 7.
-  // 1. version        - default TCLAP argument.
-  // 2. help           - default TCLAP argument.
-  // 3. ignore_rest    - default TCLAP argument.
+  // 1. version        - default `TCLAP` argument.
+  // 2. help           - default `TCLAP` argument.
+  // 3. ignore_rest    - default `TCLAP` argument.
   // 4. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
   // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
   // 6. hot restart version - print the hot restart version and exit.

@@ -37,9 +37,10 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
 
   // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
   // Example from the RFC:
-  //   * Single value per Relative Distinguished Name (RDN): CN=Steve Kille,O=Isode Limited,C=GB
-  //   * Multivalue output in first RDN: OU=Sales+CN=J. Smith,O=Widget Inc.,C=US
-  //   * Quoted comma in Organization: CN=L. Eagle,O=Sue\, Grabbit and Runn,C=GB
+  //   * Single value per Relative Distinguished Name (`RDN`): CN=Steve `Kille`,O=`Isode`
+  //   Limited,C=GB
+  //   * Multivalue output in first `RDN`: OU=Sales+CN=J. Smith,O=Widget Inc.,C=US
+  //   * Quoted comma in Organization: CN=L. Eagle,O=Sue\, `Grabbit` and `Runn`,C=GB
   X509_NAME_print_ex(buf.get(), name, 0 /* indent */, XN_FLAG_RFC2253);
 
   const uint8_t* data;

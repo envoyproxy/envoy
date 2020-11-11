@@ -506,7 +506,7 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
 
 // Run encryption tests.
 // 80877103 is SSL code
-// 80877104 is GSS code
+// 80877104 is `GSS` code
 INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgresProxyFrontendEncrDecoderTest,
                          ::testing::Values(80877103, 80877104));
 

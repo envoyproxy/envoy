@@ -47,7 +47,7 @@ bool StatsMatcherImpl::rejects(const std::string& name) const {
   //        F       |   T   |   F     Default-exclusive and matching an (inclusion) matcher, allow.
   //        F       |   F   |   T     Otherwise, deny.
   //
-  // This is an XNOR, which can be evaluated by checking for equality.
+  // This is an `XNOR`, which can be evaluated by checking for equality.
 
   return (is_inclusive_ == std::any_of(matchers_.begin(), matchers_.end(),
                                        [&name](auto& matcher) { return matcher.match(name); }));
