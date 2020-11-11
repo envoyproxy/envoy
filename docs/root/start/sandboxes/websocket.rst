@@ -40,11 +40,14 @@ This starts three proxies listening on ``localhost`` ports ``10000-30000``.
 
 It also starts two upstream services, one ``ws`` and one ``wss``.
 
+The upstream services listen on the internal Docker network on ports ``80`` and ``443`` respectively.
+
 .. code-block:: console
 
   $ docker-compose pull
   $ docker-compose up --build -d
   $ docker-compose ps
+
               Name                             Command               State            Ports
   ---------------------------------------------------------------------------------------------------
   websocket_proxy-ws_1                /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
