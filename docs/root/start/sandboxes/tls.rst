@@ -72,7 +72,7 @@ The :download:`https -> http configuration <_include/tls/envoy-https-http.yaml>`
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
 :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`.
 
-Querying the service at port ``10000`` we should see an ``x-forwarded-proto`` header of ``https`` has
+Querying the service at port ``10000`` you should see an ``x-forwarded-proto`` header of ``https`` has
 been added:
 
 .. code-block:: console
@@ -97,7 +97,7 @@ The :download:`https -> https configuration <_include/tls/envoy-https-https.yaml
 :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>` and the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
-Querying the service at port ``10001`` we should see an ``x-forwarded-proto`` header of ``https`` has
+Querying the service at port ``10001`` you should see an ``x-forwarded-proto`` header of ``https`` has
 been added:
 
 .. code-block:: console
@@ -121,7 +121,7 @@ The :download:`http -> https configuration <_include/tls/envoy-http-https.yaml>`
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
-Querying the service at port ``10001`` we should see an ``x-forwarded-proto`` header of ``http`` has
+Querying the service at port ``10001`` you should see an ``x-forwarded-proto`` header of ``http`` has
 been added:
 
 .. code-block:: console
@@ -147,7 +147,7 @@ The :download:`https passthrough configuration <_include/tls/envoy-https-passthr
 or ``HTTP`` configuration, and instead uses a simple
 :ref:`tcp_proxy  <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy>`.
 
-Querying the service at port ``10003`` we should see that no ``x-forwarded-proto`` header has been
+Querying the service at port ``10003`` you should see that no ``x-forwarded-proto`` header has been
 added:
 
 .. code-block:: console
