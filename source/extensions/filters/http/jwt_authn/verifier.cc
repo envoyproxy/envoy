@@ -302,7 +302,7 @@ public:
     if (++completion_state.number_completed_children_ == verifiers_.size()) {
       // Aggregate all children status into a final status.
       // JwtMissing should be treated differently than other failure status
-      // since it simplely means there is not Jwt token for the required provider.
+      // since it simply means there is not Jwt token for the required provider.
       // If there is a failure status other than JwtMissing in the children,
       // it should be used as the final status.
       Status final_status = Status::JwtMissed;
