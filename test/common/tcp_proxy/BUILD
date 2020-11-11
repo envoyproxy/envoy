@@ -45,8 +45,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = ["skip_on_windows_clang"],
     deps = [
         "//source/common/tcp_proxy",
         "//test/mocks/http:http_mocks",

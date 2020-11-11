@@ -19,8 +19,6 @@ envoy_package()
 envoy_cc_test(
     name = "tls_inspector_test",
     srcs = ["tls_inspector_test.cc"],
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = ["skip_on_windows_clang"],
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",

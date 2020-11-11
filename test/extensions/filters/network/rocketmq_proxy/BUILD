@@ -102,8 +102,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.network.rocketmq_proxy",
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = ["skip_on_windows_clang"],
     deps = [
         "//source/extensions/filters/network/rocketmq_proxy:config",
         "//test/mocks/local_info:local_info_mocks",

@@ -70,11 +70,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_stream_test",
     srcs = ["envoy_quic_server_stream_test.cc"],
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = [
-        "nofips",
-        "skip_on_windows_clang",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
@@ -95,11 +91,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_stream_test",
     srcs = ["envoy_quic_client_stream_test.cc"],
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = [
-        "nofips",
-        "skip_on_windows_clang",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
@@ -119,11 +111,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_session_test",
     srcs = ["envoy_quic_server_session_test.cc"],
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = [
-        "nofips",
-        "skip_on_windows_clang",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_proof_source_lib",
@@ -152,11 +140,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_session_test",
     srcs = ["envoy_quic_client_session_test.cc"],
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = [
-        "nofips",
-        "skip_on_windows_clang",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",

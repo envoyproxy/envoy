@@ -41,8 +41,6 @@ envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     shard_count = 5,
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = ["skip_on_windows_clang"],
     deps = CODEC_TEST_DEPS,
 )
 
@@ -54,8 +52,6 @@ envoy_cc_test(
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.new_codec_behavior",
     ],
     shard_count = 5,
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = ["skip_on_windows_clang"],
     deps = CODEC_TEST_DEPS,
 )
 
@@ -132,8 +128,6 @@ envoy_cc_test(
         "response_header_corpus/simple_example_huffman",
         "response_header_corpus/simple_example_plain",
     ],
-    # TODO(envoyproxy/windows-dev): Resolve missing pure virtual destructor bug
-    tags = ["skip_on_windows_clang"],
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
