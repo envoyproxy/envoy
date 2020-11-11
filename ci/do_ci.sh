@@ -313,10 +313,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   echo "Building binary with wasm=wavm..."
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
-
-  echo "Building binary with wasm=wasmtime..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
-  collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
