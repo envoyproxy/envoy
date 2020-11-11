@@ -33,6 +33,7 @@ namespace Server {
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_overflow)                                                                  \
   COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_overload_reject)                                                           \
   COUNTER(downstream_global_cx_overflow)                                                           \
   COUNTER(downstream_pre_cx_timeout)                                                               \
   COUNTER(no_filter_chain_match)                                                                   \
@@ -85,6 +86,7 @@ public:
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
+  void setListenerRejectFraction(float reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   /**
@@ -152,12 +154,12 @@ private:
 
     // Network::TcpListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
-    void onReject() override { stats_.downstream_global_cx_overflow_.inc(); }
+    void onReject(RejectCause) override;
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
-    void pauseListening() override { listener_->disable(); }
-    void resumeListening() override { listener_->enable(); }
+    void pauseListening() override;
+    void resumeListening() override;
     void shutdownListener() override { listener_.reset(); }
 
     // StreamListener
@@ -259,7 +261,7 @@ private:
 
     // Network::InternalListenerCallbacks
     void onNewSocket(Network::ConnectionSocketPtr socket) override;
-    
+
     // ActiveListenerImplBase
     Network::Listener* listener() override { return internal_listener_.get(); }
     void pauseListening() override { internal_listener_->disable(); }
@@ -547,6 +549,7 @@ private:
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
+  float listener_reject_fraction_{0};
 };
 
 class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,

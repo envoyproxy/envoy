@@ -307,9 +307,7 @@ public:
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
     return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
   }
-  bool isInternalListener() override {
-    return is_internal_listener_;
-  }
+  bool isInternalListener() override { return is_internal_listener_; }
   Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
     return udp_listener_worker_router_
                ? Network::UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_)

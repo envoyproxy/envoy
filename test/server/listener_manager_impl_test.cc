@@ -311,6 +311,24 @@ filter_chains:
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, TransportSocketConnectTimeout) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  transport_socket_connect_timeout: 3s
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->transportSocketConnectTimeout(), std::chrono::seconds(3));
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
@@ -1499,7 +1517,7 @@ filter_chains:
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   // On Windows if the socket has not been bound to an address with bind
-  // the call to getsockname fails with WSAEINVAL. To avoid that we make sure
+  // the call to getsockname fails with `WSAEINVAL`. To avoid that we make sure
   // that the bind system actually happens and it does not get mocked.
   ON_CALL(os_sys_calls_, bind(_, _, _))
       .WillByDefault(Invoke(
@@ -4529,6 +4547,38 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentNameNotEquivalent) {
   envoy::config::listener::v3::Listener listener2;
   listener2.set_name("listener2");
   EXPECT_FALSE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+}
+
+TEST(ListenerMessageUtilTest, ListenerDefaultFilterChainChangeIsAlwaysFilterChainOnlyChange) {
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("common");
+  envoy::config::listener::v3::FilterChain default_filter_chain_1;
+  default_filter_chain_1.set_name("127.0.0.1");
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("common");
+  envoy::config::listener::v3::FilterChain default_filter_chain_2;
+  default_filter_chain_2.set_name("127.0.0.2");
+
+  {
+    listener1.clear_default_filter_chain();
+    listener2.clear_default_filter_chain();
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+  }
+  {
+    *listener1.mutable_default_filter_chain() = default_filter_chain_1;
+    listener2.clear_default_filter_chain();
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+  }
+  {
+    listener1.clear_default_filter_chain();
+    *listener2.mutable_default_filter_chain() = default_filter_chain_2;
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+  }
+  {
+    *listener1.mutable_default_filter_chain() = default_filter_chain_1;
+    *listener2.mutable_default_filter_chain() = default_filter_chain_2;
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+  }
 }
 
 TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentFilterChainsAreEquivalent) {

@@ -1073,42 +1073,6 @@ TEST_P(Http1ServerConnectionImplTest, FloodProtection) {
   }
 }
 
-TEST_P(Http1ServerConnectionImplTest, FloodProtectionOff) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http1_flood_protection", "false"}});
-  initialize();
-
-  NiceMock<MockRequestDecoder> decoder;
-  Buffer::OwnedImpl local_buffer;
-  // With flood protection off, many responses can be queued up.
-  for (int i = 0; i < 4; ++i) {
-    Http::ResponseEncoder* response_encoder = nullptr;
-    EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](Http::ResponseEncoder& encoder, bool) -> Http::RequestDecoder& {
-          response_encoder = &encoder;
-          return decoder;
-        }));
-
-    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-    auto status = codec_->dispatch(buffer);
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(0U, buffer.length());
-
-    // In most tests the write output is serialized to a buffer here it is
-    // ignored to build up queued "end connection" sentinels.
-    EXPECT_CALL(connection_, write(_, _))
-
-        .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
-          // Move the response out of data while preserving the buffer fragment sentinels.
-          local_buffer.move(data);
-        }));
-
-    TestResponseHeaderMapImpl headers{{":status", "200"}};
-    response_encoder->encodeHeaders(headers, true);
-  }
-}
-
 TEST_P(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   initialize();
 
@@ -2046,7 +2010,7 @@ void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(uint32_t
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"transfer-encoding", "chunked"}};
   Buffer::OwnedImpl expected_data("Hello World");
@@ -2087,7 +2051,7 @@ TEST_P(Http1ClientConnectionImplTest, SimpleGet) {
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_EQ("GET / HTTP/1.1\r\ncontent-length: 0\r\n\r\n", output);
 }
 
@@ -2103,7 +2067,7 @@ TEST_P(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {"my-custom-header", "hey"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\nContent-Length: 0\r\n\r\n", output);
 }
 
@@ -2117,7 +2081,7 @@ TEST_P(Http1ClientConnectionImplTest, HostHeaderTranslate) {
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
 }
 
@@ -2150,7 +2114,7 @@ TEST_P(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
 
   // Request.
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder->encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder->encodeHeaders(headers, true).ok());
   EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
   output.clear();
 
@@ -2178,7 +2142,7 @@ TEST_P(Http1ClientConnectionImplTest, EmptyBodyResponse503) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
@@ -2192,7 +2156,7 @@ TEST_P(Http1ClientConnectionImplTest, EmptyBodyResponse200) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
@@ -2206,7 +2170,7 @@ TEST_P(Http1ClientConnectionImplTest, HeadRequest) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "HEAD"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
@@ -2220,7 +2184,7 @@ TEST_P(Http1ClientConnectionImplTest, 204Response) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\n\r\n");
@@ -2237,7 +2201,7 @@ TEST_P(Http1ClientConnectionImplTest, 204ResponseContentLengthNotAllowed) {
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
     TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-    request_encoder.encodeHeaders(headers, true);
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 20\r\n\r\n");
     auto status = codec_->dispatch(response);
@@ -2255,7 +2219,7 @@ TEST_P(Http1ClientConnectionImplTest, 204ResponseContentLengthNotAllowed) {
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
     TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-    request_encoder.encodeHeaders(headers, true);
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 20\r\n\r\n");
     auto status = codec_->dispatch(response);
@@ -2272,7 +2236,7 @@ TEST_P(Http1ClientConnectionImplTest, 204ResponseWithContentLength0) {
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
     TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-    request_encoder.encodeHeaders(headers, true);
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
     Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 0\r\n\r\n");
@@ -2289,7 +2253,7 @@ TEST_P(Http1ClientConnectionImplTest, 204ResponseWithContentLength0) {
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
     TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-    request_encoder.encodeHeaders(headers, true);
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
     Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 0\r\n\r\n");
@@ -2307,7 +2271,7 @@ TEST_P(Http1ClientConnectionImplTest, 204ResponseTransferEncodingNotAllowed) {
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
     TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-    request_encoder.encodeHeaders(headers, true);
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
     auto status = codec_->dispatch(response);
@@ -2325,7 +2289,7 @@ TEST_P(Http1ClientConnectionImplTest, 204ResponseTransferEncodingNotAllowed) {
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
     TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-    request_encoder.encodeHeaders(headers, true);
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
     auto status = codec_->dispatch(response);
@@ -2340,7 +2304,7 @@ TEST_P(Http1ClientConnectionImplTest, ContinueHeaders) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decode100ContinueHeaders_(_));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
@@ -2362,7 +2326,7 @@ TEST_P(Http1ClientConnectionImplTest, MultipleContinueHeaders) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decode100ContinueHeaders_(_));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
@@ -2391,7 +2355,7 @@ TEST_P(Http1ClientConnectionImplTest, 1xxNonContinueHeaders) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response("HTTP/1.1 102 Processing\r\n\r\n");
@@ -2408,7 +2372,7 @@ TEST_P(Http1ClientConnectionImplTest, 101ResponseTransferEncodingNotAllowed) {
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
     TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-    request_encoder.encodeHeaders(headers, true);
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     Buffer::OwnedImpl response(
         "HTTP/1.1 101 Switching Protocols\r\nTransfer-Encoding: chunked\r\n\r\n");
@@ -2427,7 +2391,7 @@ TEST_P(Http1ClientConnectionImplTest, 101ResponseTransferEncodingNotAllowed) {
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
     TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-    request_encoder.encodeHeaders(headers, true);
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     Buffer::OwnedImpl response(
         "HTTP/1.1 101 Switching Protocols\r\nTransfer-Encoding: chunked\r\n\r\n");
@@ -2441,21 +2405,26 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
 
   NiceMock<MockResponseDecoder> response_decoder;
 
-  // Need to set :method and :path.
-  // New and legacy codecs will behave differently on errors from processing outbound data. The
-  // legacy codecs will throw an exception (that presently will be uncaught in contexts like
-  // sendLocalReply), while the new codecs temporarily RELEASE_ASSERT until Envoy handles errors on
-  // outgoing data.
+  // Invalid outbound data errors are impossible to trigger in normal processing, since bad
+  // downstream data would have been rejected by the codec, and erroneous filter processing would
+  // cause a direct response by the filter manager. An invalid status is returned from new codecs
+  // which protects against future extensions or header modifications after the filter chain. The
+  // old codecs will still throw an exception (that presently will be uncaught in contexts like
+  // sendLocalReply).
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   if (testingNewCodec()) {
-    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
-                 ":method and :path must be specified");
-    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
-                 ":method and :path must be specified");
+    EXPECT_THAT(
+        request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true).message(),
+        testing::HasSubstr("missing required"));
+    EXPECT_THAT(
+        request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true).message(),
+        testing::HasSubstr("missing required"));
   } else {
-    EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
-                 CodecClientException);
-    EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
+    EXPECT_THROW(
+        request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true).IgnoreError(),
+        CodecClientException);
+    EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true)
+                     .IgnoreError(),
                  CodecClientException);
   }
 }
@@ -2466,7 +2435,7 @@ TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl expected_data1("Hello World");
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false));
@@ -2488,7 +2457,7 @@ TEST_P(Http1ClientConnectionImplTest, ResponseWithTrailers) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
                              "World\r\n0\r\nhello: world\r\nsecond: header\r\n\r\n");
@@ -2504,7 +2473,7 @@ TEST_P(Http1ClientConnectionImplTest, GiantPath) {
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/" + std::string(16384, 'a')}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
@@ -2534,7 +2503,7 @@ TEST_P(Http1ClientConnectionImplTest, UpgradeResponse) {
                                    {":authority", "host"},
                                    {"connection", "upgrade"},
                                    {"upgrade", "websocket"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Send upgrade headers
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
@@ -2570,7 +2539,7 @@ TEST_P(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
                                    {":authority", "host"},
                                    {"connection", "upgrade"},
                                    {"upgrade", "websocket"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Send upgrade headers
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
@@ -2590,7 +2559,7 @@ TEST_P(Http1ClientConnectionImplTest, ConnectResponse) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Send response headers
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
@@ -2621,7 +2590,7 @@ TEST_P(Http1ClientConnectionImplTest, ConnectResponseWithEarlyData) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Send response headers and payload
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
@@ -2640,7 +2609,7 @@ TEST_P(Http1ClientConnectionImplTest, ConnectRejected) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl expected_data("12345abcd");
@@ -2671,7 +2640,7 @@ TEST_P(Http1ClientConnectionImplTest, WatermarkTest) {
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Fake out the underlying Network::Connection buffer being drained.
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
@@ -2696,7 +2665,7 @@ TEST_P(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
   request_encoder.getStream().addCallbacks(stream_callbacks);
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Fake a call from the underlying Network::Connection and verify the stream is notified.
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
@@ -2730,7 +2699,7 @@ TEST_P(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
   request_encoder.getStream().addCallbacks(stream_callbacks);
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Fake a call from the underlying Network::Connection and verify the stream is notified.
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
@@ -2903,7 +2872,7 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2923,7 +2892,7 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeFieldRejected) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2942,7 +2911,7 @@ TEST_P(Http1ClientConnectionImplTest, LargeResponseHeadersAccepted) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2964,7 +2933,7 @@ TEST_P(Http1ClientConnectionImplTest, LargeMethodRequestEncode) {
       {":method", long_method}, {":path", "/"}, {":authority", "host"}};
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_EQ(long_method + " / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
 }
 
@@ -2982,7 +2951,7 @@ TEST_P(Http1ClientConnectionImplTest, LargePathRequestEncode) {
       {":method", "GET"}, {":path", long_path}, {":authority", "host"}};
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_EQ("GET " + long_path + " HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
 }
 
@@ -2998,7 +2967,7 @@ TEST_P(Http1ClientConnectionImplTest, LargeHeaderRequestEncode) {
       {":method", "GET"}, {"foo", long_header_value}, {":path", "/"}, {":authority", "host"}};
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\nfoo: " + long_header_value +
                 "\r\ncontent-length: 0\r\n\r\n",
             output);
@@ -3011,7 +2980,7 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersRejected) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   auto status = codec_->dispatch(buffer);
@@ -3031,7 +3000,7 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersAccepted) {
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   auto status = codec_->dispatch(buffer);

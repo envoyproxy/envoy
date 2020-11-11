@@ -23,8 +23,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/http:utility_lib",
-        "//source/common/network:buffered_io_socket_handle_lib",
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
+        "//source/extensions/io_socket/buffered_io_socket:buffered_io_socket_handle_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",

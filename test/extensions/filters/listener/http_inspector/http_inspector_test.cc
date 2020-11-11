@@ -2,7 +2,7 @@
 
 #include "common/common/hex.h"
 #include "common/http/utility.h"
-#include "common/network/buffered_io_socket_handle_impl.h"
+#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "extensions/filters/listener/http_inspector/http_inspector.h"
@@ -335,6 +335,17 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
   EXPECT_EQ(1, cfg_->stats().http2_found_.value());
 }
 
+TEST_F(HttpInspectorTest, ReadClosed) {
+  init();
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK));
+  EXPECT_CALL(socket_, close());
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  socket_.close();
+  file_event_callback_(Event::FileReadyType::Closed);
+  EXPECT_EQ(0, cfg_->stats().http2_found_.value());
+}
+
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   init();
 
@@ -660,8 +671,8 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
 class HttpInspectorTestWithBufferIoSocket : public testing::Test {
 public:
   HttpInspectorTestWithBufferIoSocket() : cfg_(std::make_shared<Config>(store_)) {
-    io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+    io_handle_ = std::make_unique<Extensions::IoSocket::BufferedIoSocket::BufferedIoSocketHandleImpl>();
+    io_handle_peer_ = std::make_unique<Extensions::IoSocket::BufferedIoSocket::BufferedIoSocketHandleImpl>();
     io_handle_->setWritablePeer(io_handle_peer_.get());
     io_handle_peer_->setWritablePeer(io_handle_.get());
   }
@@ -698,8 +709,8 @@ public:
   Network::MockConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_;
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<Extensions::IoSocket::BufferedIoSocket::BufferedIoSocketHandleImpl> io_handle_;
+  std::unique_ptr<Extensions::IoSocket::BufferedIoSocket::BufferedIoSocketHandleImpl> io_handle_peer_;
 };
 
 // Verify peek behavior of BufferedIoSocketHandleImpl.

@@ -7,8 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "common/network/address_impl.h"
-#include "common/network/raw_buffer_socket.h"
 #include "envoy/api/api.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
@@ -21,9 +19,11 @@
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
-#include "common/network/buffered_io_socket_handle_impl.h"
+#include "common/network/address_impl.h"
+#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
+#include "common/network/raw_buffer_socket.h"
 #include "common/network/tcp_listener_impl.h"
 #include "common/network/udp_listener_impl.h"
 #include "common/runtime/runtime_features.h"
@@ -61,6 +61,13 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
 }
 
 DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
+
+void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                                      std::chrono::milliseconds min_touch_interval) {
+  ASSERT(!watchdog_registration_, "Each dispatcher can have at most one registered watchdog.");
+  watchdog_registration_ =
+      std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
+}
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const absl::optional<std::string>& prefix) {
@@ -107,13 +114,13 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ConnectionPtr
+Network::ServerConnectionPtr
 DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
                                        Network::TransportSocketPtr&& transport_socket,
                                        StreamInfo::StreamInfo& stream_info) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
-                                                   std::move(transport_socket), stream_info, true);
+  return std::make_unique<Network::ServerConnectionImpl>(
+      *this, std::move(socket), std::move(transport_socket), stream_info, true);
 }
 
 Network::ClientConnectionPtr
@@ -130,7 +137,8 @@ namespace {
 Network::Address::InstanceConstSharedPtr
 nextClientAddress(const Network::Address::InstanceConstSharedPtr& server_address) {
   static uint64_t id = 0;
-  return std::make_shared<Network::Address::EnvoyInternalInstance>(absl::StrCat(server_address->asStringView(), "_", ++id));
+  return std::make_shared<Network::Address::EnvoyInternalInstance>(
+      absl::StrCat(server_address->asStringView(), "_", ++id));
 }
 } // namespace
 
@@ -156,8 +164,8 @@ DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPt
                                                                   local_address);
   }
 
-  auto client_io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
-  auto server_io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+  auto client_io_handle_ = std::make_unique<Extensions::IoSocket::BufferedIoSocket::BufferedIoSocketHandleImpl>();
+  auto server_io_handle_ = std::make_unique<Extensions::IoSocket::BufferedIoSocket::BufferedIoSocketHandleImpl>();
   client_io_handle_->setWritablePeer(server_io_handle_.get());
   server_io_handle_->setWritablePeer(client_io_handle_.get());
 
@@ -219,7 +227,13 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
-  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
+  return FileEventPtr{new FileEventImpl(
+      *this, fd,
+      [this, cb](uint32_t events) {
+        touchWatchdog();
+        cb(events);
+      },
+      trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
@@ -231,8 +245,8 @@ Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& s
                                                     Network::TcpListenerCallbacks& cb,
                                                     bool bind_to_port, uint32_t backlog_size) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(*this, std::move(socket), cb, bind_to_port,
-                                                    backlog_size);
+  return std::make_unique<Network::TcpListenerImpl>(
+      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
 }
 
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
@@ -248,11 +262,19 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
 
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
   ASSERT(isThreadSafe());
-  return base_scheduler_.createSchedulableCallback(cb);
+  return base_scheduler_.createSchedulableCallback([this, cb]() {
+    touchWatchdog();
+    cb();
+  });
 }
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
-  return scheduler_->createTimer(cb, *this);
+  return scheduler_->createTimer(
+      [this, cb]() {
+        touchWatchdog();
+        cb();
+      },
+      *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
@@ -323,6 +345,12 @@ void DispatcherImpl::runPostCallbacks() {
       post_callbacks_.pop_front();
     }
     callback();
+  }
+}
+
+void DispatcherImpl::touchWatchdog() {
+  if (watchdog_registration_) {
+    watchdog_registration_->touchWatchdog();
   }
 }
 

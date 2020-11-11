@@ -30,7 +30,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:watcher_lib",
-        "//source/common/network:buffered_io_socket_handle_lib",
+        "//source/extensions/io_socket/buffered_io_socket:buffered_io_socket_handle_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",
         "//source/common/network:listener_lib",
@@ -155,12 +155,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "scaled_range_timer_manager",
-    srcs = ["scaled_range_timer_manager.cc"],
-    hdrs = ["scaled_range_timer_manager.h"],
+    name = "scaled_range_timer_manager_lib",
+    srcs = ["scaled_range_timer_manager_impl.cc"],
+    hdrs = ["scaled_range_timer_manager_impl.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:range_timer_interface",
+        "//include/envoy/event:scaled_range_timer_manager_interface",
+        "//include/envoy/event:timer_interface",
         "//source/common/common:scope_tracker",
     ],
 )

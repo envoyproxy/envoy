@@ -18,7 +18,7 @@ namespace Network {
 BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                    const Address::InstanceConstSharedPtr& local_address)
     : local_address_(local_address), dispatcher_(dispatcher), socket_(std::move(socket)) {
-      
+
   if (socket_ != nullptr) {
     const auto ip = socket_->localAddress()->ip();
 

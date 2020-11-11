@@ -187,6 +187,25 @@ public:
     addCompletionCallback();
   }
 
+  void setupNoTrafficHealthyValidationHC() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    no_traffic_healthy_interval: 10s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+    )EOF";
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
   void setupNoServiceValidationHCOneUnhealthy() {
     const std::string yaml = R"EOF(
     timeout: 1s
@@ -876,10 +895,11 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
         EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -951,10 +971,11 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
         EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -985,10 +1006,11 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServicePrefixPatternCheck) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
         EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -1019,10 +1041,11 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceExactPatternCheck) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
         EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -1053,10 +1076,11 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceRegexPatternCheck) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
         EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -1095,9 +1119,10 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -1139,9 +1164,10 @@ TEST_F(HttpHealthCheckerImplTest,
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -1173,9 +1199,10 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -1236,28 +1263,30 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillRepeatedly(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
-        EXPECT_EQ(headers.get(header_ok)->value().getStringView(), value_ok);
-        EXPECT_EQ(headers.get(header_cool)->value().getStringView(), value_cool);
-        EXPECT_EQ(headers.get(header_awesome)->value().getStringView(), value_awesome);
+      .WillRepeatedly(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(headers.get(header_ok)[0]->value().getStringView(), value_ok);
+        EXPECT_EQ(headers.get(header_cool)[0]->value().getStringView(), value_cool);
+        EXPECT_EQ(headers.get(header_awesome)[0]->value().getStringView(), value_awesome);
 
         EXPECT_EQ(headers.getUserAgentValue(), value_user_agent);
-        EXPECT_EQ(headers.get(upstream_metadata)->value().getStringView(), value_upstream_metadata);
+        EXPECT_EQ(headers.get(upstream_metadata)[0]->value().getStringView(),
+                  value_upstream_metadata);
 
-        EXPECT_EQ(headers.get(protocol)->value().getStringView(), value_protocol);
-        EXPECT_EQ(headers.get(downstream_remote_address)->value().getStringView(),
+        EXPECT_EQ(headers.get(protocol)[0]->value().getStringView(), value_protocol);
+        EXPECT_EQ(headers.get(downstream_remote_address)[0]->value().getStringView(),
                   value_downstream_remote_address);
-        EXPECT_EQ(headers.get(downstream_remote_address_without_port)->value().getStringView(),
+        EXPECT_EQ(headers.get(downstream_remote_address_without_port)[0]->value().getStringView(),
                   value_downstream_remote_address_without_port);
-        EXPECT_EQ(headers.get(downstream_local_address)->value().getStringView(),
+        EXPECT_EQ(headers.get(downstream_local_address)[0]->value().getStringView(),
                   value_downstream_local_address);
-        EXPECT_EQ(headers.get(downstream_local_address_without_port)->value().getStringView(),
+        EXPECT_EQ(headers.get(downstream_local_address_without_port)[0]->value().getStringView(),
                   value_downstream_local_address_without_port);
 
         Envoy::DateFormatter date_formatter("%s.%9f");
         std::string current_start_time =
             date_formatter.fromTime(dispatcher_.timeSource().systemTime());
-        EXPECT_EQ(headers.get(start_time)->value().getStringView(), current_start_time);
+        EXPECT_EQ(headers.get(start_time)[0]->value().getStringView(), current_start_time);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -1298,8 +1327,9 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillRepeatedly(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillRepeatedly(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.UserAgent(), nullptr);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -1484,6 +1514,29 @@ TEST_F(HttpHealthCheckerImplTest, SuccessNoTraffic) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, false, true, true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// First start with an unhealthy cluster that moves to
+// no_traffic_healthy_interval.
+TEST_F(HttpHealthCheckerImplTest, UnhealthyTransitionNoTrafficHealthy) {
+  setupNoTrafficHealthyValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // Successful health check should now trigger the no_traffic_healthy_interval 10000ms.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, false, false);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
@@ -2282,9 +2335,10 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -2584,10 +2638,11 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMatch)) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
         EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        return Http::okStatus();
       }));
   health_checker_->start();
 
@@ -3635,7 +3690,7 @@ public:
     expectHealthcheckStart(0);
 
     EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
-        .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+        .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, headers.getContentTypeValue());
           EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.getPathValue());
           EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.getSchemeValue());
@@ -3643,6 +3698,7 @@ public:
           EXPECT_EQ(expected_host, headers.getHostValue());
           EXPECT_EQ(std::chrono::milliseconds(1000).count(),
                     Envoy::Grpc::Common::getGrpcTimeout(headers).value().count());
+          return Http::okStatus();
         }));
     EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) {

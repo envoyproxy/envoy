@@ -69,7 +69,12 @@ public:
     MethodPost = 3,
     Path = 4,
     Status200 = 8,
+    Status204 = 9,
+    Status206 = 10,
+    Status304 = 11,
+    Status400 = 12,
     Status404 = 13,
+    Status500 = 14,
     SchemeHttps = 7,
     Host = 38,
   };
@@ -113,6 +118,11 @@ public:
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
   static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
                                           HeadersFlags flags = HeadersFlags::None);
+  static Http2Frame makeHeadersFrameNoStatus(uint32_t stream_index);
+  static Http2Frame makeHeadersFrameWithStatus(
+      std::string status,
+      uint32_t stream_index); // Want to test overridden int here, so make it string
+  // TODO: MakeHeadersFrameWithStatusAndNonStaticHeaders
   static Http2Frame makeEmptyContinuationFrame(uint32_t stream_index,
                                                HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeEmptyDataFrame(uint32_t stream_index, DataFlags flags = DataFlags::None);
@@ -138,6 +148,12 @@ public:
                                 absl::string_view path, const std::vector<Header> extra_headers);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
                                     absl::string_view path);
+  static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
+                                    absl::string_view path,
+                                    const std::vector<Header> extra_headers);
+  static Http2Frame makeDataFrame(uint32_t stream_index, absl::string_view data,
+                                  DataFlags flags = DataFlags::None);
+
   /**
    * Creates a frame with the given contents. This frame can be
    * malformed/invalid depending on the given contents.

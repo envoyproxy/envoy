@@ -19,6 +19,7 @@ public:
   void enable() override;
 
   void setUpInternalListener();
+  void setRejectFraction(float) override {}
 
 public:
   std::string internal_listener_id_;

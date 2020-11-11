@@ -72,9 +72,7 @@ public:
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
-  bool isInternalListener() override {
-    return false;
-  }
+  bool isInternalListener() override { return false; }
   Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
     return absl::nullopt;
   }

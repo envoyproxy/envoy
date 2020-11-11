@@ -109,6 +109,7 @@ envoy_cc_library(
         "//include/envoy/network:dns_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
@@ -166,7 +167,6 @@ envoy_cc_library(
     hdrs = ["io_socket_error_impl.h"],
     deps = [
         "//include/envoy/api:io_error_interface",
-        "//include/envoy/api:os_sys_calls_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
@@ -272,6 +272,7 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
+        ":default_socket_interface_lib",
         ":listen_socket_lib",
         ":udp_default_writer_config",
         "//include/envoy/event:dispatcher_interface",
@@ -286,7 +287,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/event:dispatcher_includes",
-        "//source/common/network:buffered_io_socket_handle_lib",
+        "//source/extensions/io_socket/buffered_io_socket:buffered_io_socket_handle_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -479,25 +480,5 @@ envoy_cc_library(
         "//include/envoy/network:proxy_protocol_options_lib",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
-    ],
-)
-
-envoy_cc_library(
-    name = "peer_buffer_lib",
-    hdrs = ["peer_buffer.h"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/buffer:watermark_buffer_lib",
-        "//source/common/common:empty_string",
-    ],
-)
-
-envoy_cc_library(
-    name = "buffered_io_socket_handle_lib",
-    srcs = ["buffered_io_socket_handle_impl.cc"],
-    hdrs = ["buffered_io_socket_handle_impl.h"],
-    deps = [
-        "default_socket_interface_lib",
-        ":peer_buffer_lib",
     ],
 )

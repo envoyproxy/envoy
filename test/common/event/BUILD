@@ -20,6 +20,7 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:connection_mocks",
+        "//test/mocks/server:watch_dog_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -44,10 +45,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "scaled_range_timer_manager_test",
-    srcs = ["scaled_range_timer_manager_test.cc"],
+    name = "scaled_range_timer_manager_impl_test",
+    srcs = ["scaled_range_timer_manager_impl_test.cc"],
     deps = [
-        "//source/common/event:scaled_range_timer_manager",
+        "//source/common/event:scaled_range_timer_manager_lib",
         "//test/mocks/event:wrapped_dispatcher",
         "//test/test_common:simulated_time_system_lib",
     ],

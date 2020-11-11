@@ -11,7 +11,7 @@
 #include "common/common/utility.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
-#include "common/network/buffered_io_socket_handle_impl.h"
+#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "absl/strings/str_cat.h"

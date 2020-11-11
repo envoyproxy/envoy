@@ -18,6 +18,7 @@
 // These must follow afterwards
 #include <mswsock.h>
 #include <ws2tcpip.h>
+#include <mstcpip.h>
 
 // This is introduced in Windows SDK 10.0.17063.0 which is required
 // to build Envoy on Windows (we will reevaluate whether earlier builds
@@ -26,6 +27,7 @@
 
 // <windows.h> defines some frequently used symbols, so we need to undef these
 // interfering symbols.
+#undef ASSERT
 #undef DELETE
 #undef ERROR
 #undef GetMessage
@@ -255,7 +257,7 @@ constexpr absl::string_view null_device_path{"/dev/null"};
 // Therefore, we decided to remove the Android check introduced here in
 // https://github.com/envoyproxy/envoy/pull/10120. If someone out there encounters problems with
 // this please bring up in Envoy's slack channel #envoy-udp-quic-dev.
-#if defined(__linux__)
+#if defined(__linux__) || defined(__EMSCRIPTEN__)
 #define ENVOY_MMSG_MORE 1
 #else
 #define ENVOY_MMSG_MORE 0

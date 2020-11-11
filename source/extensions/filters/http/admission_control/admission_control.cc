@@ -34,7 +34,8 @@ static constexpr double defaultSuccessRateThreshold = 95.0;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-    Random::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
+    Random::RandomGenerator& random, Stats::Scope& scope,
+    ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
     std::shared_ptr<ResponseEvaluator> response_evaluator)
     : random_(random), scope_(scope), tls_(std::move(tls)),
       admission_control_feature_(proto_config.enabled(), runtime),

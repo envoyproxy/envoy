@@ -52,6 +52,17 @@
 namespace Envoy {
 namespace Http {
 
+bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
+  if (!headers) {
+    return false;
+  }
+  if (protocol <= Protocol::Http11) {
+    return HeaderUtility::isConnect(*headers);
+  }
+  // All HTTP/2 style upgrades were originally connect requests.
+  return HeaderUtility::isConnect(*headers) || Utility::isUpgrade(*headers);
+}
+
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
   return ConnectionManagerStats(
@@ -85,10 +96,11 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
       local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
-      overload_stop_accepting_requests_ref_(overload_manager.getThreadLocalOverloadState().getState(
-          Server::OverloadActionNames::get().StopAcceptingRequests)),
-      overload_disable_keepalive_ref_(overload_manager.getThreadLocalOverloadState().getState(
-          Server::OverloadActionNames::get().DisableHttpKeepAlive)),
+      overload_state_(overload_manager.getThreadLocalOverloadState()),
+      overload_stop_accepting_requests_ref_(
+          overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
+      overload_disable_keepalive_ref_(
+          overload_state_.getState(Server::OverloadActionNames::get().DisableHttpKeepAlive)),
       time_source_(time_source) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -109,7 +121,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_.idleTimeout()) {
-    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+    connection_idle_timer_ = overload_state_.createScaledTimer(
+        Server::OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
         [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
@@ -177,7 +190,19 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
     // TODO(snowp): This call might not be necessary, try to clean up + remove setter function.
     stream.filter_manager_.setLocalComplete();
     stream.state_.codec_saw_local_complete_ = true;
-    stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+
+    // Per https://tools.ietf.org/html/rfc7540#section-8.3 if there was an error
+    // with the TCP connection during a CONNECT request, it should be
+    // communicated via CONNECT_ERROR
+    if (requestWasConnect(stream.request_headers_, codec_->protocol()) &&
+        (stream.filter_manager_.streamInfo().hasResponseFlag(
+             StreamInfo::ResponseFlag::UpstreamConnectionFailure) ||
+         stream.filter_manager_.streamInfo().hasResponseFlag(
+             StreamInfo::ResponseFlag::UpstreamConnectionTermination))) {
+      stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
+    } else {
+      stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+    }
     reset_stream = true;
   }
 

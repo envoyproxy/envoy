@@ -134,6 +134,10 @@ public:
 
 enum class Type { Ip, Pipe, EnvoyInternal };
 
+constexpr absl::string_view IpName = "Ip";
+constexpr absl::string_view PipeName = "Pipe";
+constexpr absl::string_view EnvoyInternalName = "EnvoyInternal";
+
 /**
  * Interface for all network addresses.
  */

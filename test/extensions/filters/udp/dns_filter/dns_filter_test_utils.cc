@@ -18,10 +18,11 @@ std::string buildQueryFromBytes(const char* bytes, const size_t count) {
   return query;
 }
 
-std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint16_t rec_class) {
+std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint16_t rec_class,
+                                const uint16_t query_id) {
   Random::RandomGeneratorImpl random_;
-  struct DnsMessageParser::DnsHeader query {};
-  uint16_t id = random_.random() & 0xFFFF;
+  struct DnsHeader query {};
+  uint16_t id = (query_id ? query_id : random_.random() & 0xFFFF);
 
   // Generate a random query ID
   query.id = id;

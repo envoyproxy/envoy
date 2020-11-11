@@ -252,8 +252,13 @@ private:
    */
   struct NullOverloadManager : public OverloadManager {
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
+      NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
+      Event::TimerPtr createScaledTimer(OverloadTimerType, Event::TimerCb callback) override {
+        return dispatcher_.createTimer(callback);
+      }
 
+      Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
 
@@ -261,8 +266,8 @@ private:
         : tls_(slot_allocator.allocateSlot()) {}
 
     void start() override {
-      tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<NullThreadLocalOverloadState>();
+      tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        return std::make_shared<NullThreadLocalOverloadState>(dispatcher);
       });
     }
 
@@ -345,9 +350,7 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    bool isInternalListener() override {
-      return false;
-    }
+    bool isInternalListener() override { return false; }
     Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -384,6 +387,10 @@ private:
     // Network::FilterChain
     const Network::TransportSocketFactory& transportSocketFactory() const override {
       return transport_socket_factory_;
+    }
+
+    std::chrono::milliseconds transportSocketConnectTimeout() const override {
+      return std::chrono::milliseconds::zero();
     }
 
     const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {

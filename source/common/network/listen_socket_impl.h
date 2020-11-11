@@ -1,11 +1,10 @@
 #pragma once
 
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
-#include <cstring>
 
-#include "common/common/logger.h"
 #include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
@@ -13,6 +12,7 @@
 #include "envoy/network/socket_interface.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 #include "common/network/socket_impl.h"
 
 namespace Envoy {
@@ -22,6 +22,11 @@ class ListenSocketImpl : public SocketImpl {
 protected:
   ListenSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
       : SocketImpl(std::move(io_handle), local_address) {}
+
+  SocketPtr duplicate() override {
+    // Using `new` to access a non-public constructor.
+    return absl::WrapUnique(new ListenSocketImpl(io_handle_->duplicate(), local_address_));
+  }
 
   void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
@@ -108,7 +113,8 @@ public:
     socket_.setLocalAddress(local_address);
   }
   IoHandle& ioHandle() override { return socket_.ioHandle(); }
-
+  // ConnectionSocket is connected socket and is never duplicated.
+  std::unique_ptr<Socket> duplicate() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const IoHandle& ioHandle() const override { return socket_.ioHandle(); }
   Address::Type addressType() const override { return socket_.addressType(); }
   absl::optional<Address::IpVersion> ipVersion() const override { return socket_.ipVersion(); }
