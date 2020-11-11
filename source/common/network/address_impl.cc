@@ -287,6 +287,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
     }
     pipe_.abstract_namespace_ = true;
     pipe_.address_length_ = pipe_path.size();
+    // The following statement is safe since pipe_path size was checked at the beginning of this function
     memcpy(&pipe_.address_.sun_path[0], pipe_path.data(), pipe_path.size()); // NOLINT(safe-memcpy)
     pipe_.address_.sun_path[0] = '\0';
     pipe_.address_.sun_path[pipe_path.size()] = '\0';

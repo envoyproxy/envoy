@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//include/envoy/network:connection_interface",
         "//source/common/network:address_lib",
+        "//source/common/common:mem_block_builder_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
