@@ -65,7 +65,6 @@ fi
 
 # Environment setup.
 export TEST_TMPDIR=${BUILD_DIR}/tmp
-export PATH=/opt/llvm/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
@@ -81,7 +80,7 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
+export LLVM_ROOT="${LLVM_ROOT:-/usr}"
 "$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")

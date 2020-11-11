@@ -31,6 +31,10 @@ else
   export CXX=$${CXX:-g++}
 fi
 
+if [[ -f /etc/alpine-release ]]; then
+  export CXXFLAGS="$${CXXFLAGS-} -Wno-unused-const-variable"
+fi
+
 export AR=$${AR:-ar}
 export NM=$${NM:-nm}
 
@@ -99,6 +103,9 @@ if [[ -f /etc/centos-release ]] && [[ $$(cat /etc/centos-release) =~ "CentOS Lin
   # Using system default gn tools
   # This is done only for CentOS 7, as it has an old version of GLIBC which is otherwise incompatible
   gn=$$(command -v gn)
+elif [[ -f /etc/alpine-release ]] && [[ -x "$$(command -v gn)" ]]; then
+  # Using system default gn tools
+  gn=$$(command -v gn)
 elif [[ "$$(uname -s)" == "Darwin" ]]; then
   gn=buildtools/mac/gn
 elif [[ "$$(uname -s)-$$(uname -m)" == "Linux-x86_64" ]]; then
@@ -110,6 +117,9 @@ fi
 
 if [[ "$$(uname -s)" == "Darwin" ]]; then
   ninja=third_party/depot_tools/ninja
+elif [[ -f /etc/alpine-release ]] && [[ -x "$$(command -v ninja)" ]]; then
+  # Using system default ninja tools
+  ninja=$$(command -v ninja)
 elif [[ "$$(uname -s)-$$(uname -m)" == "Linux-x86_64" ]]; then
   ninja=third_party/depot_tools/ninja
 else

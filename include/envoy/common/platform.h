@@ -291,8 +291,10 @@ struct mmsghdr {
 #define SUPPORTS_PTHREAD_NAMING 1
 #endif // __ANDROID_API__ >= 26
 #elif defined(__linux__)
+#if defined(__GLIBC__)
 #undef SUPPORTS_PTHREAD_NAMING
 #define SUPPORTS_PTHREAD_NAMING 1
+#endif // defined(__GLIBC__)
 #endif // defined(__ANDROID_API__)
 
 #if defined(__linux__)

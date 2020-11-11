@@ -40,10 +40,7 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  START_COMMAND=("/bin/bash" "-lc" "groupadd --gid $(id -g) -f envoygroup \
-    && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
-    && usermod -a -G pcap envoybuild \
-    && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
+  START_COMMAND=("/bin/bash" "-c" "cd /source && $*")
 fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker

@@ -14,6 +14,7 @@ def envoy_copts(repository, test = False):
         "-Wformat",
         "-Wformat-security",
         "-Wvla",
+        "-Wno-sign-compare",
         "-Wno-deprecated-declarations",
     ]
 
