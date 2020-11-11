@@ -262,7 +262,7 @@ public:
     for (const auto& it : or_list.requirements()) {
       switch (it.requires_type_case()) {
       case JwtRequirement::RequiresTypeCase::kAllowMissingOrFailed:
-        is_allow_failed_ = true;
+        is_allow_missing_or_failed_ = true;
         break;
       case JwtRequirement::RequiresTypeCase::kAllowMissing:
         is_allow_missing_ = true;
@@ -274,9 +274,9 @@ public:
     }
 
     // RequiresAny only has one missing or failed requirement.
-    if (verifiers_.empty() && (is_allow_failed_ || is_allow_missing_)) {
+    if (verifiers_.empty() && (is_allow_missing_or_failed_ || is_allow_missing_)) {
       JwtRequirement requirement;
-      if (is_allow_failed_) {
+      if (is_allow_missing_or_failed_) {
         requirement.mutable_allow_missing_or_failed();
       } else {
         requirement.mutable_allow_missing();
@@ -300,16 +300,23 @@ public:
 
     // Then wait for all children to be done.
     if (++completion_state.number_completed_children_ == verifiers_.size()) {
-      // Aggregate status from children, group into either Missed error or other failures
+      // Aggregate all children status into a final status.
+      // JwtMissing should be treated differently than other failure status
+      // since it simplely means there is not Jwt token for the required provider.
+      // If there is a failure status other than JwtMissing in the children,
+      // it should be used as the final status.
       Status final_status = Status::JwtMissed;
       for (const auto& it : verifiers_) {
+        // If a Jwt is extracted from a location not specified by the required provider,
+        // the authenticator returns JwtUnknownIssuer. It should be treated the same as
+        // JwtMissed.
         Status child_status = context.getCompletionState(it.get()).status_;
         if (child_status != Status::JwtMissed && child_status != Status::JwtUnknownIssuer) {
           final_status = child_status;
         }
       }
 
-      if (is_allow_failed_) {
+      if (is_allow_missing_or_failed_) {
         final_status = Status::Ok;
       } else if (is_allow_missing_ && final_status == Status::JwtMissed) {
         final_status = Status::Ok;
@@ -320,7 +327,7 @@ public:
   }
 
 private:
-  bool is_allow_failed_{false};
+  bool is_allow_missing_or_failed_{false};
   bool is_allow_missing_{false};
 };
 
