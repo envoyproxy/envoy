@@ -434,7 +434,6 @@ elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   echo "verify examples..."
-  sudo apt-get -y update && sudo apt-get install -y -qq --no-install-recommends expect
   docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
   _images=$(docker image list --format "{{.Repository}}")
   while read -r line; do images+=("$line"); done \
