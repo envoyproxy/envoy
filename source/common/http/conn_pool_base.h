@@ -154,8 +154,8 @@ public:
   }
 
 protected:
-  CreateCodecFn codec_fn_;
-  CreateClientFn client_fn_;
+  const CreateCodecFn codec_fn_;
+  const CreateClientFn client_fn_;
 };
 
 } // namespace Http
