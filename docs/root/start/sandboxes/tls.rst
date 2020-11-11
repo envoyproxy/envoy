@@ -144,7 +144,7 @@ The Envoy proxy listening on https://localhost:10003 proxies directly to the ups
 does the ``TLS`` termination.
 
 The :download:`https passthrough configuration <_include/tls/envoy-https-passthrough.yaml>` requires no ``TLS``
-or ``HTTP`` configuration, and instead uses a simple
+or ``HTTP`` setup, and instead uses a simple
 :ref:`tcp_proxy  <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy>`.
 
 Querying the service at port ``10003`` you should see that no ``x-forwarded-proto`` header has been
