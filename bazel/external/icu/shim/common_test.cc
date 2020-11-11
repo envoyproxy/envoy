@@ -1,6 +1,7 @@
+// NOLINT(namespace-envoy)
 // Basic smoke test to ensure that ICU shim works properly.
-
 #include <iostream>
+
 #include "unicode/uidna.h"
 
 #define ASSERT_EQ(v1, v2)                                                                          \

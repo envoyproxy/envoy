@@ -1,6 +1,6 @@
-#include "url/gurl.h"
-
 #include "test/fuzz/fuzz_runner.h"
+
+#include "url/gurl.h"
 
 namespace Envoy {
 namespace Fuzz {

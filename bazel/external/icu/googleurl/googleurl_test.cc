@@ -1,6 +1,6 @@
-#include "url/gurl.h"
-
+// NOLINT(namespace-envoy)
 #include "gtest/gtest.h"
+#include "url/gurl.h"
 
 namespace {
 
