@@ -175,7 +175,15 @@ std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
   static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
-  SAFE_MEMCPY(&result, &address_.sin6_addr.s6_addr);
+#ifdef __SIZEOF_INT128__
+  unsigned __int128 ipv6_addr;
+  SAFE_MEMCPY(&ipv6_addr, &(address_.sin6_addr.s6_addr));
+  result = ipv6_addr; // Use assignment operator which defaults to copy-constructor
+#else
+  memcpy(static_cast<void*>(&result),
+         static_cast<const void*>(&address_.sin6_addr.s6_addr), // NOLINT(safe-memcpy)
+         sizeof(absl::uint128));
+#endif
   return result;
 }
 
