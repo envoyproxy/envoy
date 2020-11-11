@@ -29,7 +29,8 @@ typed_config:
     runtime_key: "foo.enabled"
 )EOF";
 
-class AdmissionControlIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class AdmissionControlIntegrationTest : public Event::TestUsingSimulatedTime,
+                                        public testing::TestWithParam<Network::Address::IpVersion>,
                                         public HttpIntegrationTest {
 public:
   AdmissionControlIntegrationTest()
