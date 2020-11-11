@@ -57,9 +57,9 @@ public:
   virtual TimeSource& timeSource() PURE;
 
   /**
-   * @return a constant reference to the root Stats::Scope
+   * @return a reference to the root Stats::Scope
    */
-  virtual const Stats::Scope& rootScope() PURE;
+  virtual Stats::Scope& rootScope() PURE;
 
   /**
    * @return a reference to the RandomGenerator.
