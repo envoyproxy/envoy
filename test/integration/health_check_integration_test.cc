@@ -15,7 +15,8 @@ namespace {
 // Integration tests for active health checking.
 // The tests fetch the cluster configuration using CDS in order to actively start health
 // checking after Envoy and the hosts are initialized.
-class HealthCheckIntegrationTestBase : public HttpIntegrationTest {
+class HealthCheckIntegrationTestBase : public Event::TestUsingSimulatedTime,
+                                       public HttpIntegrationTest {
 public:
   HealthCheckIntegrationTestBase(
       Network::Address::IpVersion ip_version,
