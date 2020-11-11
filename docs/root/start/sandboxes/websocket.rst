@@ -108,7 +108,7 @@ to an upstream ``TLS`` WebSocket.
 In addition to the
 :ref:`upgrade_configs <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig>`
 in :ref:`HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`,
-the :download:`wss -> wss configuration <_include/websocket/envoy-wss-wss.yaml>` adds a ``TLS``
+the :download:`wss -> wss configuration <_include/websocket/envoy-wss.yaml>` adds a ``TLS``
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to both the
 :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>` and the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
