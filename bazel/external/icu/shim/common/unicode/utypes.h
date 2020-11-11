@@ -1,3 +1,4 @@
+// NOLINT(namespace-envoy)
 #pragma once
 
 #include <cstdint>
