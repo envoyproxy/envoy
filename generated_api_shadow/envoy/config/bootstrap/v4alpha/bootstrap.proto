@@ -429,13 +429,19 @@ message Watchdog {
   type.v3.Percent multikill_threshold = 5;
 }
 
-// Fatal actions to run while crashing.
-// We will run all safe actions before we run unsafe actions.
+// Fatal actions to run while crashing. Actions can be safe (meaning they are
+// async-signal safe) or unsafe. We run all safe actions before we run unsafe actions.
+// If using an unsafe action that could get stuck or deadlock, it important to
+// have an out of band system to terminate the process.
+//
+// See the interface for the extensions in include/envoy/server/fatal_action_config.h.
+// FatalAction extensions should live in source/extensions/fatal_actions.
 message FatalAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.FatalAction";
 
-  // Extension specific configuration for the action.
+  // Extension specific configuration for the action. It's expected to conform
+  // to the interface at include/envoy/server/fatal_action_config.
   core.v4alpha.TypedExtensionConfig config = 1;
 }
 
