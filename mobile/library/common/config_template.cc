@@ -202,16 +202,19 @@ stats_config:
       patterns:
         - safe_regex:
             google_re2: {}
+            regex: '^client.*'
+        - safe_regex:
+            google_re2: {}
             regex: '^cluster\.[\w]+?\.upstream_cx_[\w]+'
         - safe_regex:
             google_re2: {}
             regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
         - safe_regex:
             google_re2: {}
-            regex: '^http.dispatcher.*'
+            regex: '^dns.apple.*'
         - safe_regex:
             google_re2: {}
-            regex: '^client.*'
+            regex: '^http.dispatcher.*'
         - safe_regex:
             google_re2: {}
             regex: '^http.hcm.decompressor.*'
