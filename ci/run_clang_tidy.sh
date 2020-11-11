@@ -88,7 +88,7 @@ function exclude_wasm_examples() {
 
 # Exclude files which are part of ICU shim.
 function exclude_icu_shim() {
-  grep -v bazel/external/icu/shim
+  grep -v bazel/external/icu
 }
 
 function filter_excludes() {
