@@ -117,7 +117,7 @@ The upstream ``service-https`` handles the request.
 Step 6: Test proxying ``http`` -> ``https``
 *******************************************
 
-The Envoy proxy listening on https://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` service.
+The Envoy proxy listening on http://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` service.
 
 The :download:`provided configuration <_include/tls/envoy-http-https.yaml>` adds a ``TLS``
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
