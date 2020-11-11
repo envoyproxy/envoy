@@ -1,13 +1,16 @@
-// NOLINT(namespace-envoy)
 #include "gtest/gtest.h"
+
 #include "url/gurl.h"
 
+namespace Envoy {
 namespace {
 
 void expectInvalidUrl(const std::string& input) {
   GURL url(input);
   EXPECT_FALSE(url.is_valid());
 }
+
+} // namespace
 
 // Verifies that valid URLs are parsed correctly.
 TEST(GoogleUrl, ValidUrl) {
@@ -42,5 +45,4 @@ TEST(GoogleUrl, InvalidUrl) {
   expectInvalidUrl("http://[wwww].example");
   expectInvalidUrl("http://?k=v");
 }
-
-} // namespace
+} // namespace Envoy
