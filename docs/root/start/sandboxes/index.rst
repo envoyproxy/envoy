@@ -28,6 +28,7 @@ features. The following sandboxes are available:
     mysql
     postgres
     redis
+    tls
     wasm-cc
     zipkin_tracing
     skywalking_tracing

@@ -85,6 +85,18 @@ responds_with \
     -H 'Origin: https://example-service.com'
 ```
 
+#### Utility functions: `responds_without`
+
+You can also check that a request *does not* respond with given `HTTP` content:
+
+```bash
+responds_without \
+    "Anything unexpected" \
+    "http://localhost:8000"
+```
+
+`responds_without` can accept additional curl arguments like `responds_with`
+
 #### Utility functions: `responds_with_header`
 
 You can check that a request responds with an expected header as follows:
