@@ -5,11 +5,11 @@ TLS
 
 .. sidebar:: Requirements
 
-   `jq <https://stedolan.github.io/jq/>`
+   `jq <https://stedolan.github.io/jq/>`_
       Used to parse ``json`` output from the upstream echo servers.
 
 This example walks through some of the ways that Envoy can be configured to make
-use of encrypted connections using ``HTTP`` over ``TLS`` .
+use of encrypted connections using ``HTTP`` over ``TLS``.
 
 It demonstrates a number of commonly used proxying and ``TLS`` termination patterns:
 
