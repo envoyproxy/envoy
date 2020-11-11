@@ -32,7 +32,7 @@ class OutOfProcEnvoyTests(unittest.TestCase):
 
     content = content.replace("{{ ip_any_address }}", "127.0.0.1")
     content = content.replace("{{ dns_lookup_family }}", "V4_ONLY")
-    
+
     if sys.platform == 'win32':
       content = content.replace("{{ null_device_path }}", "NUL")
     else:
