@@ -3,6 +3,11 @@
 WebSockets
 ==========
 
+.. sidebar:: Requirements
+
+   `openssl <https://www.openssl.org/>`_
+      Used to create a TLS certificate for the websocket.
+
 This example walks through some of the ways that Envoy can be configured to proxy WebSockets.
 
 It demonstrates terminating a WebSocket connection with and without ``TLS``, and provides some basic examples
@@ -119,3 +124,14 @@ The socket server is a very trivial implementation, that simply outputs ``[wss] 
 any input.
 
 Type ``Ctrl-c`` to exit the socket session.
+
+
+
+.. seealso::
+
+   :ref:`Securing Envoy quick start guide <start_quick_start_securing>`
+      Outline of key concepts for securing Envoy.
+
+   :ref:`Double proxy sandbox <install_sandboxes_double_proxy>`
+      An example of securing traffic between proxies with validation and
+      mutual authentication using ``mTLS`` with non-``HTTP`` traffic.
