@@ -721,7 +721,7 @@ TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecv) {
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
       "15000\r\ncontent-length: 0\r\n\r\n";
 
-  io_handle_->getBufferForTest().add(header);
+  io_handle_->getWriteBuffer()->add(header);
   const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
 
