@@ -11,7 +11,7 @@ WebSockets
 This example walks through some of the ways that Envoy can be configured to proxy WebSockets.
 
 It demonstrates terminating a WebSocket connection with and without ``TLS``, and provides some basic examples
-of proxying to secure upstream sockets.
+of proxying to encrypted and non-encrypted upstream sockets.
 
 .. include:: _include/docker-env-setup.rst
 
@@ -42,6 +42,9 @@ It also starts two upstream services, one ``ws`` and one ``wss``.
 
 The upstream services listen on the internal Docker network on ports ``80`` and ``443`` respectively.
 
+The socket servers are very trivial implementations, that simply output ``[ws] HELO`` and
+``[wss] HELO`` in response to any input.
+
 .. code-block:: console
 
   $ docker-compose pull
@@ -62,9 +65,10 @@ Step 5: Test proxying ``ws`` -> ``ws``
 The proxy listening on port ``10000`` terminates the WebSocket connection without ``TLS`` and then proxies
 to an upstream socket, also without ``TLS``.
 
-In order for Envoy to terminate the WebSocket connection, the ``upgrade_configs`` setting of the
-``HttpConnectionManager`` must be set, as can be seen in the provided
-:download:`envoy-ws.yaml <_include/websocket/envoy-ws.yaml>`:
+In order for Envoy to terminate the WebSocket connection, the
+:ref:`upgrade_configs <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig>`
+in :ref:`HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`
+must be set, as can be seen in the provided :download:`envoy-ws.yaml <_include/websocket/envoy-ws.yaml>`:
 
 .. literalinclude:: _include/websocket/envoy-ws.yaml
    :language: yaml
@@ -81,9 +85,6 @@ You can start an interactive session with the socket as follows:
    [ws] HELO
    GOODBYE
    [ws] HELO
-
-The socket server is a very trivial implementation, that simply outputs ``[ws] HELO`` in response to
-any input.
 
 Type ``Ctrl-c`` to exit the socket session.
 
@@ -103,9 +104,6 @@ You can start an interactive session with the socket as follows:
    GOODBYE
    [wss] HELO
 
-The socket server is a very trivial implementation, that simply outputs ``[wss] HELO`` in response to
-any input.
-
 Type ``Ctrl-c`` to exit the socket session.
 
 Step 7: Test proxying ``wss`` passthrough
@@ -123,12 +121,7 @@ You can start an interactive session with the socket as follows:
    GOODBYE
    [wss] HELO
 
-The socket server is a very trivial implementation, that simply outputs ``[wss] HELO`` in response to
-any input.
-
 Type ``Ctrl-c`` to exit the socket session.
-
-
 
 .. seealso::
 
