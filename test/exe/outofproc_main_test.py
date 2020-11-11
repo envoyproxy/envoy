@@ -32,10 +32,11 @@ class OutOfProcEnvoyTests(unittest.TestCase):
 
     content = content.replace("{{ ip_any_address }}", "127.0.0.1")
     content = content.replace("{{ dns_lookup_family }}", "V4_ONLY")
-    if os.name != 'nt':
-      content = content.replace("{{ null_device_path }}", "/dev/null")
-    else:
+    
+    if sys.platform == 'win32':
       content = content.replace("{{ null_device_path }}", "NUL")
+    else:
+      content = content.replace("{{ null_device_path }}", "/dev/null")
 
     envoy_config_new = os.path.join(os.getenv('TEST_TMPDIR'), 'google_com_proxy_port_0.yaml')
     with open(envoy_config_new, "w") as f:
