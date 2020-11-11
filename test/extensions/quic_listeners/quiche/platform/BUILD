@@ -10,15 +10,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "quiche_platform_test",
-    srcs = ["quiche_platform_test.cc"],
-    external_deps = ["quiche_common_platform"],
-    deps = [
-        "@com_googlesource_quiche//:quiche_common_platform",
-    ],
-)
-
-envoy_cc_test(
     name = "http2_platform_test",
     srcs = ["http2_platform_test.cc"],
     external_deps = ["quiche_http2_platform"],
