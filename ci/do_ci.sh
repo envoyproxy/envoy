@@ -448,7 +448,7 @@ elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   done
   docker images
   sudo apt-get update -y
-  sudo apt-get install -y -qq --no-install-recommends redis-tools
+  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
   export DOCKER_NO_PULL=1
   umask 027
   chmod -R o-rwx examples/
