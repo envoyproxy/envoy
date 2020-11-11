@@ -64,7 +64,7 @@ Connection attributes
 ---------------------
 
 The following attributes are available once the downstream connection is
-established (which also applies to HTTP requests, so they can be used for
+established (which also applies to HTTP requests making them suitable for
 RBAC):
 
 .. csv-table::
@@ -97,7 +97,7 @@ The following additional attributes are available upon the downstream connection
 Upstream attributes
 -------------------
 
-The following attribues are available once the upstream connection is established:
+The following attributes are available once the upstream connection is established:
 
 .. csv-table::
    :header: Attribute, Type, Description
