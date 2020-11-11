@@ -1,5 +1,4 @@
 #include "gtest/gtest.h"
-
 #include "url/gurl.h"
 
 namespace Envoy {
