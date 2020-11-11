@@ -296,11 +296,11 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     TEST_TARGETS=("@envoy//test/...")
   fi
   # Building all the dependencies from scratch to link them against libc++.
-  echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
-
   echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+
+  echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
   # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
   # integration tests with asan.
