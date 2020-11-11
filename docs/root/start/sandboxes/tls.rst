@@ -1,8 +1,7 @@
 .. _install_sandboxes_tls:
 
-=====
- TLS
-=====
+TLS
+===
 
 This example walks through some of the ways that Envoy can be configured to make
 use of encrypted connections using ``HTTP`` over ``TLS`` .
@@ -38,7 +37,7 @@ of securing traffic between proxies with validation and mutual authentication us
 Change directory to ``examples/tls`` in the Envoy repository.
 
 Step 3: Build the sandbox
-=========================
+*************************
 
 This starts four proxies listening on ``localhost`` ports ``10000-10003``.
 
@@ -65,7 +64,7 @@ The upstream services listen on the internal Docker network on ports ``80`` and 
   tls_service-https_1             node ./index.js                Up
 
 Step 4: Test proxying ``https`` -> ``http``
-===========================================
+*******************************************
 
 The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and proxies to the upstream ``HTTP`` service.
 
@@ -89,7 +88,7 @@ The upstream ``service-http`` handles the request.
    "service-http"
 
 Step 5: Test proxying ``https`` -> ``https``
-============================================
+********************************************
 
 The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and proxies to the upstream ``HTTPS`` service.
 
@@ -114,7 +113,7 @@ The upstream ``service-https`` handles the request.
    "service-https"
 
 Step 6: Test proxying ``http`` -> ``https``
-===========================================
+*******************************************
 
 The Envoy proxy listening on https://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` service.
 
@@ -139,7 +138,7 @@ The upstream ``service-https`` handles the request.
 
 
 Step 7: Test proxying ``https`` passthrough
-===========================================
+*******************************************
 
 The Envoy proxy listening on https://localhost:10003 proxies directly to the upstream ``HTTPS`` service which
 does the ``TLS`` termination.
