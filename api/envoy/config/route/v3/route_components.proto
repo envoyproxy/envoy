@@ -751,7 +751,7 @@ message RouteAction {
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
     string upgrade_type = 1
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;

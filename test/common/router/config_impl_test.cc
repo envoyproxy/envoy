@@ -7120,6 +7120,29 @@ virtual_hosts:
   EXPECT_FALSE(upgrade_map.find("disabled")->second);
 }
 
+TEST_F(RouteConfigurationV2, EmptyFilterConfigRejected) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+            - upgrade_type: disabled
+            - enabled: false
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Proto constraint validation failed.*");
+}
+
 TEST_F(RouteConfigurationV2, DuplicateUpgradeConfigs) {
   const std::string yaml = R"EOF(
 virtual_hosts:
