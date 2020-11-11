@@ -70,7 +70,7 @@ Step 4: Test proxying ``https`` -> ``http``
 
 The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and proxies to the upstream ``HTTP`` service.
 
-The :download:`provided configuration <_include/tls/envoy-https-http.yaml>` adds a ``TLS``
+The :download:`https -> http configuration <_include/tls/envoy-https-http.yaml>` adds a ``TLS``
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
 :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`.
 
@@ -94,7 +94,7 @@ Step 5: Test proxying ``https`` -> ``https``
 
 The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and proxies to the upstream ``HTTPS`` service.
 
-The :download:`provided configuration <_include/tls/envoy-https-https.yaml>` adds a ``TLS``
+The :download:`https -> https configuration <_include/tls/envoy-https-https.yaml>` adds a ``TLS``
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to both the
 :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>` and the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
@@ -119,7 +119,7 @@ Step 6: Test proxying ``http`` -> ``https``
 
 The Envoy proxy listening on http://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` service.
 
-The :download:`provided configuration <_include/tls/envoy-http-https.yaml>` adds a ``TLS``
+The :download:`http -> https configuration <_include/tls/envoy-http-https.yaml>` adds a ``TLS``
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
@@ -145,7 +145,7 @@ Step 7: Test proxying ``https`` passthrough
 The Envoy proxy listening on https://localhost:10003 proxies directly to the upstream ``HTTPS`` service which
 does the ``TLS`` termination.
 
-The :download:`provided configuration <_include/tls/envoy-https-passthrough.yaml>` requires no ``TLS``
+The :download:`https passthrough configuration <_include/tls/envoy-https-passthrough.yaml>` requires no ``TLS``
 or ``HTTP`` configuration, and instead uses a simple
 :ref:`tcp_proxy  <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy>`.
 
