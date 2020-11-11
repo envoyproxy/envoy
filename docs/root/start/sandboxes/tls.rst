@@ -5,8 +5,8 @@ TLS
 
 .. sidebar:: Requirements
 
-   This example makes use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse ``json`` output
-   from the upstream echo servers.
+   `jq <https://stedolan.github.io/jq/>`
+      Used to parse ``json`` output from the upstream echo servers.
 
 This example walks through some of the ways that Envoy can be configured to make
 use of encrypted connections using ``HTTP`` over ``TLS`` .
@@ -163,5 +163,6 @@ The upstream ``service-https`` handles the request.
 
 .. seealso::
 
-   The :ref:`double proxy sandbox <install_sandboxes_double_proxy>` also provides an example
-   of securing traffic between proxies with validation and mutual authentication using ``mTLS``.
+   :ref:`double proxy sandbox <install_sandboxes_double_proxy>`
+      Provides an example of securing traffic between proxies with validation and
+      mutual authentication using ``mTLS``.
