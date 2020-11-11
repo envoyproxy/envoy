@@ -1,7 +1,6 @@
 .. _arch_overview_udp_proxy:
 
-UDP proxy
+UDP 代理
 =========
 
-Envoy supports UDP proxy via the :ref:`UDP proxy listener filter
-<config_udp_listener_filters_udp_proxy>`.
+Envoy 通过 :ref:`UDP 代理监听器 filter <config_udp_listener_filters_udp_proxy>` 支持 UDP 代理。
