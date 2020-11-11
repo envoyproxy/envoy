@@ -1,4 +1,4 @@
-Upstream clusters
+上游集群
 =================
 
 .. toctree::
