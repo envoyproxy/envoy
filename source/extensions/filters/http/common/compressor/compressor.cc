@@ -202,7 +202,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   }
 
   // Find all encodings accepted by the user agent and adjust the list of allowed compressors.
-  for (const auto token : StringUtil::splitToken(*accept_encoding_, ",", false /* keep_empty */)) {
+  for (const auto& token : StringUtil::splitToken(*accept_encoding_, ",", false /* keep_empty */)) {
     EncPair pair =
         std::make_pair(StringUtil::trim(StringUtil::cropRight(token, ";")), static_cast<float>(1));
     const auto params = StringUtil::cropLeft(token, ";");
@@ -242,7 +242,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   // Find intersection of encodings accepted by the user agent and provided
   // by the allowed compressors and choose the one with the highest q-value.
   EncPair choice{Http::Headers::get().AcceptEncodingValues.Identity, static_cast<float>(0)};
-  for (const auto pair : pairs) {
+  for (const auto& pair : pairs) {
     if ((pair.second > choice.second) &&
         (allowed_compressors.count(std::string(pair.first)) ||
          pair.first == Http::Headers::get().AcceptEncodingValues.Identity ||
