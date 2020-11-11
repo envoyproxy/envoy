@@ -13,7 +13,8 @@ namespace Envoy {
 namespace {
 
 class SniDynamicProxyFilterIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion> public HttpIntegrationTest {
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
 public:
   // This test is using HTTP integration test to use the utilities to pass SNI from downstream
   // to upstream. The config being tested is tcp_proxy.
