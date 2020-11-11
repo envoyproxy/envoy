@@ -165,6 +165,9 @@ The upstream ``service-https`` handles the request.
 
 .. seealso::
 
-   :ref:`double proxy sandbox <install_sandboxes_double_proxy>`
-      Provides an example of securing traffic between proxies with validation and
-      mutual authentication using ``mTLS``.
+   :ref:`Securing Envoy quick start guide <start_quick_start_securing>`
+      Outline of key concepts for securing Envoy.
+
+   :ref:`Double proxy sandbox <install_sandboxes_double_proxy>`
+      An example of securing traffic between proxies with validation and
+      mutual authentication using ``mTLS`` with non-``HTTP`` traffic.
