@@ -58,7 +58,8 @@ void SdsApi::onWatchUpdate() {
     next_hash = getHashForFiles(files);
   }
   if (next_hash != prev_hash) {
-    ENVOY_LOG_MISC(warn, "Unable to refresh secrets due to > {} non-atomic rotations observed",
+    ENVOY_LOG_MISC(warn,
+                   "Unable to atomically refresh secrets due to > {} non-atomic rotations observed",
                    MaxBoundedRetries);
   }
   const uint64_t new_hash = next_hash;

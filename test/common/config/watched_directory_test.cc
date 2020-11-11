@@ -1,6 +1,6 @@
-#include "common/config/watched_directory.h"
-
 #include "envoy/filesystem/watcher.h"
+
+#include "common/config/watched_directory.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
