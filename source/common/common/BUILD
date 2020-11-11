@@ -106,8 +106,8 @@ envoy_cc_library(
     name = "hash_lib",
     srcs = ["hash.cc"],
     hdrs = ["hash.h"],
-    deps = [":macros"],
     external_deps = ["xxhash"],
+    deps = [":macros"],
 )
 
 envoy_cc_library(

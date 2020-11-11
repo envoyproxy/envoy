@@ -2,11 +2,12 @@
 
 #include <string>
 
+#include "common/common/macros.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
-#include "common/common/macros.h"
 #include "xxhash.h"
 
 namespace Envoy {
