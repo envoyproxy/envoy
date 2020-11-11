@@ -275,7 +275,7 @@ TEST_F(GzipFilterTest, ContentLengthNoCompression) {
 
 // Verifies that compression is NOT skipped when content-length header is allowed.
 TEST_F(GzipFilterTest, ContentLengthCompression) {
-  setUpFilter(R"EOF({"content_length": 500})EOF");
+  setUpFilter(R"EOF({"compressor": {"content_length": 500}})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "1000"}}, false);
 }
@@ -284,15 +284,17 @@ TEST_F(GzipFilterTest, ContentLengthCompression) {
 TEST_F(GzipFilterTest, ContentTypeNoCompression) {
   setUpFilter(R"EOF(
     {
-      "content_type": [
-        "text/html",
-        "text/css",
-        "text/plain",
-        "application/javascript",
-        "application/json",
-        "font/eot",
-        "image/svg+xml"
-      ]
+      "compressor": {
+        "content_type": [
+          "text/html",
+          "text/css",
+          "text/plain",
+          "application/javascript",
+          "application/json",
+          "font/eot",
+          "image/svg+xml"
+        ]
+      }
     }
   )EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
@@ -311,7 +313,7 @@ TEST_F(GzipFilterTest, ContentTypeCompression) {
 
 // Verifies that compression is skipped when etag header is NOT allowed.
 TEST_F(GzipFilterTest, EtagNoCompression) {
-  setUpFilter(R"EOF({ "disable_on_etag_header": true })EOF");
+  setUpFilter(R"EOF({"compressor": { "disable_on_etag_header": true }})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", R"EOF(W/"686897696a7c876b7e")EOF"}});
@@ -402,7 +404,7 @@ TEST_F(GzipFilterTest, VaryAlreadyHasAcceptEncoding) {
 TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
-    setUpFilter(R"EOF({"remove_accept_encoding_header": true})EOF");
+    setUpFilter(R"EOF({"compressor": {"remove_accept_encoding_header": true}})EOF");
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }

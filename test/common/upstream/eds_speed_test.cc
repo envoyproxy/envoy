@@ -25,6 +25,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -139,6 +140,7 @@ public:
            num_hosts);
   }
 
+  TestDeprecatedV2Api _deprecated_v2_api_;
   State& state_;
   const bool v2_config_;
   const std::string type_url_;

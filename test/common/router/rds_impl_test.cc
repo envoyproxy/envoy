@@ -100,7 +100,7 @@ codec_type: auto
 stat_prefix: foo
 http_filters:
 - name: http_dynamo_filter
-  config: {}
+  typed_config: {}
     )EOF";
 
     EXPECT_CALL(outer_init_manager_, add(_));
@@ -166,7 +166,7 @@ TEST_F(RdsImplTest, Basic) {
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "foo_route_config",
       "virtual_hosts": null
     }
@@ -196,7 +196,7 @@ TEST_F(RdsImplTest, Basic) {
   "version_info": "2",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "foo_route_config",
       "virtual_hosts": [
         {
@@ -248,7 +248,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "INVALID_NAME_FOR_route_config",
       "virtual_hosts": null
     }
@@ -730,7 +730,7 @@ dynamic_route_configs:
   const std::string response1_yaml = R"EOF(
 version_info: '1'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+- "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
   name: foo_route_config
   virtual_hosts:
   - name: integration

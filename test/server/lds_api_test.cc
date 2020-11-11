@@ -223,13 +223,13 @@ TEST_F(LdsApiTest, Basic) {
   "version_info": "0",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener1",
       "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
     },
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener2",
       "address": { "socket_address": { "address": "tcp://0.0.0.2", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
@@ -256,13 +256,13 @@ TEST_F(LdsApiTest, Basic) {
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener1",
       "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
     },
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener3",
       "address": { "socket_address": { "address": "tcp://0.0.0.3", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
@@ -296,7 +296,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   "version_info": "0",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener1",
       "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
@@ -345,7 +345,7 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   std::string response1_yaml = R"EOF(
 version_info: '1'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Listener
+- "@type": type.googleapis.com/envoy.config.listener.v3.Listener
   name: listener0
   address:
     socket_address:
@@ -368,7 +368,7 @@ resources:
   std::string response2_basic = R"EOF(
 version_info: '1'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Listener
+- "@type": type.googleapis.com/envoy.config.listener.v3.Listener
   name: listener-8080
   address:
     socket_address:
@@ -378,7 +378,7 @@ resources:
   - transport_socket:
       name: tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
         common_tls_context:
           tls_certificates:
           - certificate_chain:
@@ -427,13 +427,13 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   "version_info": "0",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener1",
       "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
     },
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener2",
       "address": { "socket_address": { "address": "tcp://0.0.0.2", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
@@ -460,13 +460,13 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener1",
       "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
     },
     {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
       "name": "listener3",
       "address": { "socket_address": { "address": "tcp://0.0.0.2", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]

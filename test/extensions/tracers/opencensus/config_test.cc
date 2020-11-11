@@ -26,7 +26,7 @@ TEST(OpenCensusTracerConfigTest, InvalidStackdriverConfiguration) {
   http:
     name: envoy.tracers.opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       stackdriver_exporter_enabled: true
       stackdriver_grpc_service:
         envoy_grpc:
@@ -49,7 +49,7 @@ TEST(OpenCensusTracerConfigTest, InvalidOcagentConfiguration) {
   http:
     name: envoy.tracers.opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       ocagent_exporter_enabled: true
       ocagent_grpc_service:
         envoy_grpc:
@@ -87,7 +87,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   http:
     name: opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       trace_config:
         rate_limiting_sampler:
           qps: 123
@@ -129,7 +129,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
   http:
     name: opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       trace_config:
         rate_limiting_sampler:
           qps: 123
@@ -177,7 +177,7 @@ TEST(OpenCensusTracerConfigTest, ShouldCreateAtMostOneOpenCensusTracer) {
   http:
     name: envoy.tracers.opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       trace_config:
         rate_limiting_sampler:
           qps: 123
@@ -230,7 +230,7 @@ TEST(OpenCensusTracerConfigTest, ShouldNotCacheInvalidConfiguration) {
   http:
     name: envoy.tracers.opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       ocagent_exporter_enabled: true
       ocagent_grpc_service:
         envoy_grpc:
@@ -248,7 +248,7 @@ TEST(OpenCensusTracerConfigTest, ShouldNotCacheInvalidConfiguration) {
   http:
     name: envoy.tracers.opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       ocagent_exporter_enabled: true
       ocagent_grpc_service:
         google_grpc:
@@ -279,7 +279,7 @@ TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDiffere
   http:
     name: envoy.tracers.opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       trace_config:
         rate_limiting_sampler:
           qps: 123
@@ -296,7 +296,7 @@ TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDiffere
   http:
     name: envoy.tracers.opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       trace_config:
         rate_limiting_sampler:
           qps: 321
@@ -317,7 +317,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverGrpc) {
   http:
     name: opencensus
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
       stackdriver_exporter_enabled: true
       stackdriver_grpc_service:
         google_grpc:

@@ -140,7 +140,7 @@ public:
       R"EOF(
 name: tap
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     admin_config:
       config_id: test_config_id
@@ -528,10 +528,10 @@ TEST_P(TapIntegrationTest, StaticFilePerTapStreaming) {
       R"EOF(
 name: tap
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     static_config:
-      match_config:
+      match:
         http_request_headers_match:
           headers:
             - name: foo
@@ -574,10 +574,10 @@ TEST_P(TapIntegrationTest, StaticFilePerTapStreamingWithRequestBuffering) {
       R"EOF(
 name: tap
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     static_config:
-      match_config:
+      match:
         http_response_headers_match:
           headers:
             - name: bar

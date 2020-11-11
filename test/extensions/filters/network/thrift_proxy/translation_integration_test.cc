@@ -29,7 +29,7 @@ public:
       filters:
         - name: thrift
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
+            "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy
             stat_prefix: thrift_stats
             route_config:
               name: "routes"

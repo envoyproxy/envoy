@@ -67,7 +67,7 @@ static_resources:
     - filters:
       - name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
           - name: envoy.filters.http.on_demand
@@ -76,6 +76,7 @@ static_resources:
           rds:
             route_config_name: my_route
             config_source:
+              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
                 grpc_services:
@@ -100,6 +101,7 @@ const char RdsConfig[] = R"EOF(
 name: my_route
 vhds:
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
       grpc_services:
@@ -117,6 +119,7 @@ virtual_hosts:
     route: { cluster: my_service }
 vhds:
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
       grpc_services:
@@ -367,8 +370,8 @@ public:
     resource->set_name("my_route/vhost_1");
     resource->set_version("4");
     resource->mutable_resource()->PackFrom(
-        API_DOWNGRADE(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first"))));
+        TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first")));
     resource->add_aliases("my_route/vhost.first");
     ret.set_nonce("test-nonce-0");
 

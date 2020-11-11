@@ -93,8 +93,8 @@ public:
             }
             expected_request += "\"resource_names\":[\"" + joined_cluster_names + "\"]";
           }
-          expected_request +=
-              ",\"type_url\":\"type.googleapis.com/envoy.api.v2.ClusterLoadAssignment\"";
+          expected_request += ",\"type_url\":\"type.googleapis.com/"
+                              "envoy.config.endpoint.v3.ClusterLoadAssignment\"";
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
           EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
@@ -129,7 +129,7 @@ public:
     std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"
-                       "envoy.api.v2.ClusterLoadAssignment\",\"cluster_name\":\"" +
+                       "envoy.config.endpoint.v3.ClusterLoadAssignment\",\"cluster_name\":\"" +
                        cluster + "\"},";
     }
     response_json.pop_back();

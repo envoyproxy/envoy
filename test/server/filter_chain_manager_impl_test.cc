@@ -119,7 +119,7 @@ public:
       transport_socket:
         name: tls
         typed_config:
-          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }

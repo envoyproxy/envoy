@@ -13,7 +13,7 @@ namespace {
 const std::string RBAC_CONFIG = R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
   rules:
     policies:
       foo:
@@ -26,7 +26,7 @@ typed_config:
 const std::string RBAC_CONFIG_WITH_DENY_ACTION = R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
   rules:
     action: DENY
     policies:
@@ -40,7 +40,7 @@ typed_config:
 const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
   rules:
     policies:
       foo:
@@ -53,7 +53,7 @@ typed_config:
 const std::string RBAC_CONFIG_WITH_PATH_EXACT_MATCH = R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
   rules:
     policies:
       foo:
@@ -67,7 +67,7 @@ typed_config:
 const std::string RBAC_CONFIG_WITH_PATH_IGNORE_CASE_MATCH = R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
   rules:
     policies:
       foo:

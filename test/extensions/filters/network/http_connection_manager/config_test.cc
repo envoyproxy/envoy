@@ -23,6 +23,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -128,7 +129,7 @@ http_filters:
 - name: envoy.filters.http.router
 - name: health_check
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
   )EOF";
 
@@ -156,7 +157,7 @@ route_config:
 http_filters:
 - name: health_check
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
   )EOF";
 
@@ -169,6 +170,7 @@ http_filters:
 // When deprecating v2, remove the old style "operation_name: egress" config
 // but retain the rest of the test.
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(MiscConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 codec_type: http1
 server_name: foo
@@ -367,7 +369,6 @@ route_config:
       route:
         cluster: cluster
 tracing:
-  operation_name: ingress
   max_path_tag_length: 128
   provider:                # notice inlined tracing provider configuration
     name: zipkin
@@ -447,6 +448,7 @@ tracing:
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(RequestHeaderForTagsConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -469,6 +471,7 @@ tracing:
 
 TEST_F(HttpConnectionManagerConfigTest,
        DEPRECATED_FEATURE_TEST(ListenerDirectionOutboundOverride)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -496,6 +499,7 @@ http_filters:
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(ListenerDirectionInboundOverride)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -529,8 +533,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
     unix_sockets: true
   route_config:
     name: local_route
-  tracing:
-    operation_name: ingress
+  tracing: {}
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -560,7 +563,6 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   route_config:
     name: local_route
   tracing:
-    operation_name: ingress
     client_sampling:
       value: 1
     random_sampling:
@@ -595,7 +597,6 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
   route_config:
     name: local_route
   tracing:
-    operation_name: ingress
     client_sampling:
       value: 0.1
     random_sampling:
@@ -715,6 +716,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
 
 // Validate that deprecated idle_timeout is still ingested.
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   idle_timeout: 1s
@@ -1257,7 +1259,7 @@ http_filters:
 access_log:
 - name: accesslog
   typed_config:
-    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
     path: "/dev/null"
   filter: []
   )EOF";
@@ -1286,7 +1288,7 @@ http_filters:
 access_log:
 - name: accesslog
   typed_config:
-    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
     path: "/dev/null"
   filter:
     bad_type: {}
@@ -1316,7 +1318,7 @@ http_filters:
 access_log:
 - name: accesslog
   typed_config:
-    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
     path: "/dev/null"
   filter:
     and_filter:
@@ -1819,9 +1821,9 @@ http_filters:
   config_discovery:
     config_source: { ads: {} }
     default_config:
-      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -1882,14 +1884,14 @@ http_filters:
       "@type": type.googleapis.com/udpa.type.v1.TypedStruct
       type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
       createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "Error: filter config has type URL envoy.extensions.filters.http.router.v3.Router but "
-      "expect envoy.config.filter.http.health_check.v2.HealthCheck.");
+      "expect envoy.extensions.filters.http.health_check.v3.HealthCheck.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterRequireTypeUrlMissingFactory) {
@@ -1938,10 +1940,10 @@ http_filters:
   config_discovery:
     config_source: { ads: {} }
     default_config:
-      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
       pass_through_mode: false
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     apply_default_config_without_warming: true
 - name: envoy.filters.http.router
   )EOF";
@@ -2003,12 +2005,12 @@ http_filters:
   config_discovery:
     config_source: { ads: {} }
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: bar
   config_discovery:
     config_source: { ads: {} }
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: envoy.filters.http.router
   )EOF";
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,

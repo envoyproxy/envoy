@@ -12,6 +12,7 @@
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -433,7 +434,8 @@ static_resources:
       "'CLUSTER_PROVIDED' or 'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'");
 }
 
-TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
+TEST_F(ClusterManagerImplTest, DEPRECATED_FEATURE_TEST(OriginalDstLbRestriction2)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
  static_resources:
   clusters:
@@ -554,7 +556,8 @@ INSTANTIATE_TEST_SUITE_P(ClusterManagerSubsetInitializationTest,
                          testing::ValuesIn(ClusterManagerSubsetInitializationTest::lbPolicies()),
                          ClusterManagerSubsetInitializationTest::paramName);
 
-TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
+TEST_F(ClusterManagerImplTest, DEPRECATED_FEATURE_TEST(SubsetLoadBalancerOriginalDstRestriction)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
  static_resources:
   clusters:

@@ -33,6 +33,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -154,6 +155,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(EmptyRouteConfig)) {
 }
 
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
   stat_prefix: name
   cluster: cluster
@@ -366,6 +368,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
 
 // Tests that a deprecated_v1 route gets the top-level endpoint selector.
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(RouteWithTopLevelMetadataMatchConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
   stat_prefix: name
   cluster: cluster
@@ -1955,6 +1958,7 @@ public:
 };
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   setup(false);
 
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
@@ -1976,6 +1980,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
 }
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   setup(false);
 
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
@@ -1998,6 +2003,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
 
 // Test that the tcp proxy uses the cluster from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionCluster)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   setup(false);
   initializeFilter();
 
@@ -2015,6 +2021,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
 
 // Test that the tcp proxy forwards the requested server name from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   setup(false);
   initializeFilter();
 
@@ -2045,6 +2052,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 
 // Test that the tcp proxy override ALPN from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   setup(false);
   initializeFilter();
 

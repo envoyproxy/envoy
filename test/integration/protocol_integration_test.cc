@@ -175,7 +175,7 @@ TEST_P(ProtocolIntegrationTest, ComputedHealthCheck) {
   config_helper_.addFilter(R"EOF(
 name: health_check
 typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
@@ -196,7 +196,7 @@ TEST_P(ProtocolIntegrationTest, ModifyBuffer) {
   config_helper_.addFilter(R"EOF(
 name: health_check
 typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }

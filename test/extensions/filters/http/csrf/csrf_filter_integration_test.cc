@@ -5,7 +5,7 @@ namespace {
 const std::string CSRF_ENABLED_CONFIG = R"EOF(
 name: csrf
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
+  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 100
@@ -19,7 +19,7 @@ typed_config:
 const std::string CSRF_FILTER_ENABLED_CONFIG = R"EOF(
 name: csrf
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
+  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 100
@@ -29,7 +29,7 @@ typed_config:
 const std::string CSRF_SHADOW_ENABLED_CONFIG = R"EOF(
 name: csrf
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
+  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 0
@@ -43,7 +43,7 @@ typed_config:
 const std::string CSRF_DISABLED_CONFIG = R"EOF(
 name: csrf
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
+  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 0

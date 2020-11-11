@@ -38,6 +38,7 @@ admin:
       port_value: 0
 dynamic_resources:
   cds_config:
+    resource_api_version: V3
     api_config_source:
       api_type: GRPC
       grpc_services:
@@ -64,7 +65,7 @@ static_resources:
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
         clusters:
         - cluster_1
         - cluster_2
@@ -78,7 +79,7 @@ static_resources:
       filters:
         name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.filters.http.router

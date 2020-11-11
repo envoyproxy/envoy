@@ -35,7 +35,8 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
       R"EOF(
   http:
     name: envoy.tracers.dynamic_ot
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v3.DynamicOtConfig
       library: %s
       config:
         output_file: fake_file

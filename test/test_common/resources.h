@@ -12,15 +12,17 @@ namespace Config {
  */
 class TypeUrlValues {
 public:
-  const std::string Listener{"type.googleapis.com/envoy.api.v2.Listener"};
-  const std::string Cluster{"type.googleapis.com/envoy.api.v2.Cluster"};
-  const std::string ClusterLoadAssignment{"type.googleapis.com/envoy.api.v2.ClusterLoadAssignment"};
-  const std::string Secret{"type.googleapis.com/envoy.api.v2.auth.Secret"};
-  const std::string RouteConfiguration{"type.googleapis.com/envoy.api.v2.RouteConfiguration"};
-  const std::string VirtualHost{"type.googleapis.com/envoy.api.v2.route.VirtualHost"};
+  const std::string Listener{"type.googleapis.com/envoy.config.listener.v3.Listener"};
+  const std::string Cluster{"type.googleapis.com/envoy.config.cluster.v3.Cluster"};
+  const std::string ClusterLoadAssignment{
+      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"};
+  const std::string Secret{"type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"};
+  const std::string RouteConfiguration{
+      "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"};
+  const std::string VirtualHost{"type.googleapis.com/envoy.config.route.v3.VirtualHost"};
   const std::string ScopedRouteConfiguration{
-      "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration"};
-  const std::string Runtime{"type.googleapis.com/envoy.service.discovery.v2.Runtime"};
+      "type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration"};
+  const std::string Runtime{"type.googleapis.com/envoy.service.runtime.v3.Runtime"};
 };
 
 using TypeUrl = ConstSingleton<TypeUrlValues>;

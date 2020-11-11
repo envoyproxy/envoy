@@ -33,7 +33,7 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   http:
     name: datadog
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.DatadogConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.DatadogConfig
       collector_cluster: fake_cluster
       service_name: fake_file
    )EOF";

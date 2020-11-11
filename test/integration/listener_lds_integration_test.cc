@@ -60,6 +60,8 @@ protected:
                 http_connection_manager) {
           auto* rds_config = http_connection_manager.mutable_rds();
           rds_config->set_route_config_name(route_table_name_);
+          rds_config->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               rds_config->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -78,8 +80,9 @@ protected:
       listener_config_.set_name(listener_name_);
       ENVOY_LOG_MISC(error, "listener config: {}", listener_config_.DebugString());
       bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
-      auto* lds_api_config_source =
-          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->mutable_api_config_source();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
       lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       envoy::config::core::v3::GrpcService* grpc_service =
           lds_api_config_source->add_grpc_services();
@@ -151,7 +154,7 @@ protected:
     for (const auto& listener_blob : listener_configs) {
       const auto listener_config =
           TestUtility::parseYaml<envoy::config::listener::v3::Listener>(listener_blob);
-      response.add_resources()->PackFrom(API_DOWNGRADE(listener_config));
+      response.add_resources()->PackFrom(listener_config);
     }
     ASSERT(lds_upstream_info_.stream_by_resource_name_[listener_name_] != nullptr);
     lds_upstream_info_.stream_by_resource_name_[listener_name_]->sendGrpcMessage(response);
@@ -163,7 +166,7 @@ protected:
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     const auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(API_DOWNGRADE(route_configuration));
+    response.add_resources()->PackFrom(route_configuration);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);

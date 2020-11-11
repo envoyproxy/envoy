@@ -1,7 +1,7 @@
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -324,7 +324,7 @@ public:
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          envoy::config::filter::network::tcp_proxy::v2::TcpProxy proxy_config;
+          envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
           proxy_config.set_stat_prefix("tcp_stats");
           proxy_config.set_cluster("cluster_0");
           proxy_config.mutable_tunneling_config()->set_hostname("host.com");
@@ -467,9 +467,10 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
     ASSERT_TRUE(
-        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+        config_blob
+            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
     auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());

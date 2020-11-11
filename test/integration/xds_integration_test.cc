@@ -17,7 +17,7 @@ namespace {
 
 using testing::HasSubstr;
 
-// This is a minimal litmus test for the v2 xDS APIs.
+// This is a minimal litmus test for the v3 xDS APIs.
 class XdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
@@ -113,7 +113,7 @@ public:
       filters:
       - name: envoy.filters.network.tcp_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
     - filter_chain_match:
@@ -121,7 +121,7 @@ public:
       filters:
       - name: envoy.filters.network.tcp_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_1
 )EOF") {}
@@ -471,17 +471,17 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
                                           -> void {
     auto default_filter_chain =
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_default_filter_chain();
-    default_filter_chain->set_name("default_filter_chain_v2");
+    default_filter_chain->set_name("default_filter_chain_v3");
   });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 
-  auto codec_client_default_v2 = createHttpCodec("alpndefaultv2");
+  auto codec_client_default_v3 = createHttpCodec("alpndefaultv3");
 
-  Cleanup cleanup2([c_default_v2 = codec_client_default_v2.get()]() { c_default_v2->close(); });
+  Cleanup cleanup2([c_default_v3 = codec_client_default_v3.get()]() { c_default_v3->close(); });
   expectResponseHeaderConnectionClose(*codec_client_default, true);
-  expectResponseHeaderConnectionClose(*codec_client_default_v2, false);
+  expectResponseHeaderConnectionClose(*codec_client_default_v3, false);
   expectConnenctionServed();
 }
 

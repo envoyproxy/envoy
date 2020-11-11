@@ -117,7 +117,7 @@ public:
     filter_chains:
       - filters:
         - name: envoy.test.router
-          config:
+          typed_config:
       )EOF");
   }
 

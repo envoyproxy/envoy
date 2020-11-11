@@ -38,6 +38,7 @@
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -2397,7 +2398,9 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
 }
 
 // This test case can't be converted for V3 API as it is specific for extension_protocol_options
-TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
+TEST_F(ClusterInfoImplTest,
+       DEPRECATED_FEATURE_TEST(OneofExtensionProtocolOptionsForUnknownFilter)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s

@@ -242,6 +242,9 @@ public:
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
 
+  // Enable deprecated v2 API resources via the runtime.
+  void enableDeprecatedV2Api();
+
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
                                 absl::string_view cluster_name = "cluster_0");

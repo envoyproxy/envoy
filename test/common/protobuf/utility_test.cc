@@ -26,6 +26,7 @@
 #include "test/proto/sensitive.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/node_hash_set.h"
@@ -36,34 +37,32 @@ using namespace std::chrono_literals;
 
 namespace Envoy {
 
-class RuntimeStatsHelper {
+class RuntimeStatsHelper : public TestScopedRuntime {
 public:
-  RuntimeStatsHelper()
-      : api_(Api::createApiForTest(store_)),
-        runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
+  RuntimeStatsHelper(bool allow_deprecated_v2_api = false)
+      : runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
         deprecated_feature_seen_since_process_start_(
             store_.gauge("runtime.deprecated_feature_seen_since_process_start",
                          Stats::Gauge::ImportMode::NeverImport)) {
-    envoy::config::bootstrap::v3::LayeredRuntime config;
-    config.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-        Runtime::LoaderPtr{new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, store_,
-                                                   generator_, validation_visitor_, *api_)});
+    if (allow_deprecated_v2_api) {
+      Runtime::LoaderSingleton::getExisting()->mergeValues({
+          {"envoy.reloadable_features.enable_deprecated_v2_api", "true"},
+          {"envoy.features.enable_all_deprecated_features", "true"},
+      });
+    }
   }
 
-  Event::MockDispatcher dispatcher_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::TestUtil::TestStore store_;
-  Random::MockRandomGenerator generator_;
-  Api::ApiPtr api_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 class ProtobufUtilityTest : public testing::Test, protected RuntimeStatsHelper {};
+// TODO(htuch): During/before the v2 removal, cleanup the various examples that explicitly refer to
+// v2 API protos and replace with upgrade examples not tie to the concrete API.
+class ProtobufV2ApiUtilityTest : public testing::Test, protected RuntimeStatsHelper {
+public:
+  ProtobufV2ApiUtilityTest() : RuntimeStatsHelper(true) {}
+};
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -267,7 +266,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadBinaryV2ProtoFromFile)) {
+TEST_F(ProtobufV2ApiUtilityTest, DEPRECATED_FEATURE_TEST(LoadBinaryV2ProtoFromFile)) {
   // Allow the use of v2.Bootstrap.runtime.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.config.bootstrap.v2.Bootstrap.runtime", "True "}});
@@ -370,7 +369,7 @@ TEST_F(ProtobufUtilityTest, LoadJsonFromFileNoBoosting) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadV2TextProtoFromFile)) {
+TEST_F(ProtobufV2ApiUtilityTest, DEPRECATED_FEATURE_TEST(LoadV2TextProtoFromFile)) {
   API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap) bootstrap;
   bootstrap.mutable_node()->set_build_version("foo");
 
@@ -1234,7 +1233,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
 }
 
 // MessageUtility::unpackTo() with the wrong type throws.
-TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
+TEST_F(ProtobufV2ApiUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
@@ -1268,7 +1267,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
 }
 
 // MessageUtility::unpackTo() with API message works across version.
-TEST_F(ProtobufUtilityTest, UnpackToNextVersion) {
+TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersion) {
   API_NO_BOOST(envoy::api::v2::Cluster) source;
   source.set_drain_connections_on_host_removal(true);
   ProtobufWkt::Any source_any;
@@ -1280,7 +1279,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNextVersion) {
 }
 
 // Validate warning messages on v2 upgrades.
-TEST_F(ProtobufUtilityTest, V2UpgradeWarningLogs) {
+TEST_F(ProtobufV2ApiUtilityTest, V2UpgradeWarningLogs) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
   // First attempt works.
   EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
@@ -1295,7 +1294,8 @@ TEST_F(ProtobufUtilityTest, V2UpgradeWarningLogs) {
   EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
                       MessageUtil::loadFromJson("{drain_connections_on_host_removal: false}", dst,
                                                 ProtobufMessage::getNullValidationVisitor()));
-  // This is kind of terrible, but it's hard to do dependency injection at onVersionUpgradeWarn().
+  // This is kind of terrible, but it's hard to do dependency injection at
+  // onVersionUpgradeDeprecation().
   std::this_thread::sleep_for(5s); // NOLINT
   // We can log the original warning again.
   EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
@@ -1353,7 +1353,7 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonNoBoosting) {
 }
 
 // MessageUtility::loadFromJson() with API message works across version.
-TEST_F(ProtobufUtilityTest, LoadFromJsonNextVersion) {
+TEST_F(ProtobufV2ApiUtilityTest, LoadFromJsonNextVersion) {
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,

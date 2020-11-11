@@ -58,6 +58,7 @@ class SdsGenericSecretTestFilterConfig
 public:
   SdsGenericSecretTestFilterConfig()
       : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("sds-generic-secret-test") {
+    config_source_.set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     auto* api_config_source = config_source_.mutable_api_config_source();
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     auto* grpc_service = api_config_source->add_grpc_services();
@@ -121,7 +122,7 @@ public:
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info("0");
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(API_DOWNGRADE(secret));
+    discovery_response.add_resources()->PackFrom(secret);
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 

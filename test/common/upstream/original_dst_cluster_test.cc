@@ -25,6 +25,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -143,7 +144,8 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
       "ORIGINAL_DST clusters must have no load assignment or hosts configured");
 }
 
-TEST_F(OriginalDstClusterTest, BadConfigWithDeprecatedHosts) {
+TEST_F(OriginalDstClusterTest, DEPRECATED_FEATURE_TEST(BadConfigWithDeprecatedHosts)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s

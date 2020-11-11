@@ -46,7 +46,6 @@ class FaultFilterTest : public testing::Test {
 public:
   const std::string fixed_delay_and_abort_nodes_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -62,7 +61,6 @@ public:
 
   const std::string fixed_delay_only_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -79,7 +77,6 @@ public:
 
   const std::string fixed_delay_and_abort_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -100,7 +97,6 @@ public:
 
   const std::string fixed_delay_and_abort_match_headers_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -118,7 +114,6 @@ public:
 
   const std::string delay_with_upstream_cluster_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -208,7 +203,6 @@ TEST(FaultFilterBadConfigTest, BadDelayType) {
 TEST(FaultFilterBadConfigTest, BadDelayDuration) {
   const std::string yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 50
       denominator: HUNDRED
@@ -221,7 +215,6 @@ TEST(FaultFilterBadConfigTest, BadDelayDuration) {
 TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
   const std::string yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 50
       denominator: HUNDRED

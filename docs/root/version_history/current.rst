@@ -5,6 +5,8 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
+* config: v2 is now fatal-by-default. This may be overridden by setting :option:`--bootstrap-version` 2 on the CLI for a v2 bootstrap file and also enabling the runtime `envoy.reloadable_features.enable_deprecated_v2_api` feature.
+
 Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
