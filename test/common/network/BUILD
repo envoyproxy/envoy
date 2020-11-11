@@ -234,6 +234,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "raw_buffer_socket_test",
+    srcs = ["raw_buffer_socket_test.cc"],
+    deps = [
+        "//source/common/network:raw_buffer_socket_lib",
+        "//test/test_common:network_utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "udp_listener_impl_test_base_lib",
     hdrs = ["udp_listener_impl_test_base.h"],

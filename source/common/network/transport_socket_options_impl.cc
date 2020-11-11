@@ -16,7 +16,8 @@
 namespace Envoy {
 namespace Network {
 namespace {
-void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8_t>& key) {
+void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8_t>& key,
+                   const Network::TransportSocketFactory& factory) {
   const auto& server_name_overide = options.serverNameOverride();
   if (server_name_overide.has_value()) {
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(server_name_overide.value()), key);
@@ -35,19 +36,30 @@ void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8
       pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
     }
   }
+
   const auto& alpn_fallback = options.applicationProtocolFallback();
   if (alpn_fallback.has_value()) {
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(*alpn_fallback), key);
   }
+
+  // Proxy protocol options should only be included in the hash if the upstream
+  // socket intends to use them.
+  const auto& proxy_protocol_options = options.proxyProtocolOptions();
+  if (proxy_protocol_options.has_value() && factory.usesProxyProtocolOptions()) {
+    pushScalarToByteVector(
+        StringUtil::CaseInsensitiveHash()(proxy_protocol_options.value().asStringForHash()), key);
+  }
 }
 } // namespace
 
-void AlpnDecoratingTransportSocketOptions::hashKey(std::vector<uint8_t>& key) const {
-  commonHashKey(*this, key);
+void AlpnDecoratingTransportSocketOptions::hashKey(
+    std::vector<uint8_t>& key, const Network::TransportSocketFactory& factory) const {
+  commonHashKey(*this, key, factory);
 }
 
-void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
-  commonHashKey(*this, key);
+void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key,
+                                         const Network::TransportSocketFactory& factory) const {
+  commonHashKey(*this, key, factory);
 }
 
 TransportSocketOptionsSharedPtr
