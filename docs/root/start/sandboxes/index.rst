@@ -64,6 +64,7 @@ The following sandboxes are available:
     redis
     skywalking_tracing
     tls
+    tls-sni
     wasm-cc
     websocket
     zipkin_tracing
