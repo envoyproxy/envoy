@@ -116,7 +116,7 @@ private:
    */
   void onMinTimerComplete() {
     ASSERT(manager_.dispatcher_.isThreadSafe());
-    ENVOY_LOG_MISC(info, "min timer complete for {}", static_cast<void*>(this));
+    ENVOY_LOG_MISC(trace, "min timer complete for {}", static_cast<void*>(this));
     ASSERT(absl::holds_alternative<WaitingForMin>(state_));
     const WaitingForMin& waiting = absl::get<WaitingForMin>(state_);
 
