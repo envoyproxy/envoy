@@ -465,7 +465,7 @@ public:
   ~MockFilterChainFactoryCallbacks() override;
 
   MOCK_METHOD(MatchTreeAndData, createMatchTree,
-              (const envoy::config::common::matcher::v3::MatchTree&));
+              (const envoy::config::common::matcher::v3::Matcher&));
   MOCK_METHOD(void, addStreamDecoderFilter,
               (Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr,
                MatchingDataSharedPtr));

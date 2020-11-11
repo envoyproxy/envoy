@@ -7,6 +7,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -554,7 +555,7 @@ public:
    * This will be called prior to the filter seeing the last bit of headers/data/trailers that
    * resulted in a match.
    */
-  virtual void onMatchCallback(absl::string_view) {}
+  virtual void onMatchCallback(const envoy::config::core::v3::TypedExtensionConfig&) {}
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -870,7 +871,7 @@ public:
 
   using MatchTreeAndData = std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>;
   virtual MatchTreeAndData
-  createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) PURE;
+  createMatchTree(const envoy::config::common::matcher::v3::Matcher& config) PURE;
 
   /**
    * Add a decoder filter that is used when reading stream data.

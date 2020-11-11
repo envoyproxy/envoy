@@ -35,6 +35,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",
     ],
 )
 

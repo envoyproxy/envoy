@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
@@ -17,82 +18,40 @@ namespace Http {
 
 class FilterManager;
 
-struct HttpMatchingData : public MatchingData, public MatchTreeFactoryCallbacks {
+struct HttpMatchingData : public MatchingData {
 public:
-  // MatchTreeFactoryCallbacks
-  void addPredicateMatcher(MatchWrapperSharedPtr matcher) {
-    matchers_.push_back(std::move(matcher));
-  }
-
-  void onNewStream() {
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onNewStream(matcher->status_);
-    }
-  }
+  void onNewStream() {}
 
   void onRequestHeaders(Http::RequestHeaderMap& request_headers) {
     request_headers_ = &request_headers;
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onHttpRequestHeaders(request_headers, matcher->status_);
-    }
   }
 
-  void onRequestData(const Buffer::Instance& buffer) {
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onRequestBody(buffer, matcher->status_);
-    }
+  void onRequestData(const Buffer::Instance&) {
+    // TODO(snowp): ???
   }
 
   void onRequestTrailers(Http::RequestTrailerMap& request_trailers) {
     request_trailers_ = &request_trailers;
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onHttpRequestTrailers(request_trailers, matcher->status_);
-    }
   }
 
   void onResponseHeaders(Http::ResponseHeaderMap& response_headers) {
     response_headers_ = &response_headers;
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onHttpResponseHeaders(response_headers, matcher->status_);
-    }
   }
 
-  void onResponseData(const Buffer::Instance& buffer) {
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onResponseBody(buffer, matcher->status_);
-    }
+  void onResponseData(const Buffer::Instance&) {
+    // TODO(snowp): ???
   }
 
   void onResponseTrailers(Http::ResponseTrailerMap& response_trailers) {
     response_trailers_ = &response_trailers;
-    for (const auto& matcher : matchers_) {
-      matcher->rootMatcher().onHttpResponseTrailers(response_trailers, matcher->status_);
-    }
   }
 
-  std::vector<MatchWrapperSharedPtr> matchers_;
   Http::RequestHeaderMap* request_headers_{};
   Http::RequestTrailerMap* request_trailers_{};
   Http::ResponseHeaderMap* response_headers_{};
   Http::ResponseTrailerMap* response_trailers_{};
 };
 using HttpMatchingDataSharedPtr = std::unique_ptr<HttpMatchingData>;
-
-class HttpKeyNamespaceMapper : public KeyNamespaceMapper {
-public:
-  void forEachValue(absl::string_view ns, absl::string_view key, const MatchingData& matching_data,
-                    std::function<void(absl::string_view)> value_cb) override {
-    const HttpMatchingData& http_data = dynamic_cast<const HttpMatchingData&>(matching_data);
-    // TODO(snowp): We only support request headers for now, add others.
-    if (ns == "request_headers") {
-      Http::LowerCaseString lcs((std::string(key)));
-      auto* header = http_data.request_headers_->get(lcs);
-      if (header) {
-        value_cb(header->value().getStringView());
-      }
-    }
-  }
-};
 
 /**
  * Base class wrapper for both stream encoder and decoder filters.
@@ -142,8 +101,11 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void doMetadata() PURE;
   // TODO(soya3129): make this pure when adding impl to encoder filter.
   virtual void handleMetadataAfterHeadersCallback() PURE;
-  void doMatchCallback(absl::string_view value) { invokeMatchCallback(value, dual_filter_); }
-  virtual void invokeMatchCallback(absl::string_view value, bool dual_filter) PURE;
+  void doMatchCallback(const envoy::config::core::v3::TypedExtensionConfig& value) {
+    invokeMatchCallback(value, dual_filter_);
+  }
+  virtual void invokeMatchCallback(const envoy::config::core::v3::TypedExtensionConfig& value,
+                                   bool dual_filter) PURE;
 
   // Http::StreamFilterCallbacks
   const Network::Connection* connection() override;
@@ -258,7 +220,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
-  void invokeMatchCallback(absl::string_view value, bool) override {
+  void invokeMatchCallback(const envoy::config::core::v3::TypedExtensionConfig& value,
+                           bool) override {
     // TODO(snowp): Track whether we've fired the callback.
     handle_->onMatchCallback(value);
   }
@@ -342,7 +305,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
   void handleMetadataAfterHeadersCallback() override;
-  void invokeMatchCallback(absl::string_view value, bool) override {
+  void invokeMatchCallback(const envoy::config::core::v3::TypedExtensionConfig& value,
+                           bool) override {
     handle_->onMatchCallback(value);
   }
 
@@ -624,7 +588,7 @@ public:
 
   // Http::FilterChainFactoryCallbacks
   std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
-  createMatchTree(const envoy::config::common::matcher::v3::MatchTree&) override {
+  createMatchTree(const envoy::config::common::matcher::v3::Matcher&) override {
     return {nullptr, nullptr};
   }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {

@@ -1,52 +1,56 @@
 #include "common/matcher/matcher.h"
 
+#include "common/common/assert.h"
+#include "common/config/utility.h"
+
 namespace Envoy {
 MatchTreeSharedPtr
-MatchTreeFactory::create(const envoy::config::common::matcher::v3::MatchTree& config,
-                         KeyNamespaceMapperSharedPtr key_namespace_mapper,
-                         MatchTreeFactoryCallbacks& callbacks) {
-  if (config.has_matcher()) {
-    return createSublinerMatcher(config.matcher(), key_namespace_mapper, callbacks);
-  } else if (config.has_leaf()) {
-    return createLinearMatcher(config.leaf(), key_namespace_mapper, callbacks);
+MatchTreeFactory::create(const envoy::config::common::matcher::v3::Matcher& config) {
+  if (config.has_matcher_tree()) {
+    return createTreeMatcher(config);
+  } else if (config.has_matcher_list()) {
+    return createListMatcher(config);
   } else {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-MatchTreeSharedPtr MatchTreeFactory::createLinearMatcher(
-    const envoy::config::common::matcher::v3::MatchTree::MatchLeaf& config,
-    KeyNamespaceMapperSharedPtr, MatchTreeFactoryCallbacks& callbacks) {
-  auto leaf = std::make_shared<LeafNode>(
-      config.has_no_match_action()
-          ? absl::make_optional(MatchAction::fromProto(config.no_match_action()))
-          : absl::nullopt);
+MatchTreeSharedPtr
+MatchTreeFactory::createListMatcher(const envoy::config::common::matcher::v3::Matcher& config) {
+  auto leaf = std::make_shared<ListMatcher>(createOnMatch(config.on_no_match()));
 
-  for (const auto& matcher : config.matchers()) {
-    auto predicate_matcher = std::make_shared<MatchWrapper>(matcher.predicate());
-    callbacks.addPredicateMatcher(predicate_matcher);
-    leaf->addMatcher(std::make_unique<HttpPredicateMatcher>(predicate_matcher),
-                     MatchAction::fromProto(matcher.action()));
-  }
+  // for (const auto& _ : config.matcher_list().matchers()) {
+  //   // TODO
+  // }
 
   return leaf;
 }
 
-MatchTreeSharedPtr MatchTreeFactory::createSublinerMatcher(
-    const envoy::config::common::matcher::v3::MatchTree::SublinearMatcher& matcher,
-    KeyNamespaceMapperSharedPtr key_namespace_mapper, MatchTreeFactoryCallbacks& callbacks) {
+MatchTreeSharedPtr
+MatchTreeFactory::createTreeMatcher(const envoy::config::common::matcher::v3::Matcher& matcher) {
   auto multimap_matcher = std::make_shared<MultimapMatcher>(
-      matcher.multimap_matcher().key(), matcher.multimap_matcher().key_namespace(),
-      key_namespace_mapper,
-      matcher.has_no_match_tree()
-          ? MatchTreeFactory::create(matcher.no_match_tree(), key_namespace_mapper, callbacks)
-          : nullptr);
+      createDataInput(matcher.matcher_tree().input()), createOnMatch(matcher.on_no_match()));
 
-  for (const auto& children : matcher.multimap_matcher().exact_matches()) {
-    multimap_matcher->addChild(
-        children.first, MatchTreeFactory::create(children.second, key_namespace_mapper, callbacks));
+  for (const auto& children : matcher.matcher_tree().exact_match_map().map()) {
+    multimap_matcher->addChild(children.first, MatchTreeFactory::createOnMatch(children.second));
   }
 
   return multimap_matcher;
+}
+OnMatch MatchTreeFactory::createOnMatch(
+    const envoy::config::common::matcher::v3::Matcher::OnMatch& on_match) {
+  if (on_match.has_matcher()) {
+    return {{}, create(on_match.matcher())};
+  } else if (on_match.has_action()) {
+    return {on_match.action(), {}};
+  } else {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+DataInputPtr
+MatchTreeFactory::createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
+  auto& factory = Config::Utility::getAndCheckFactory<DataInputFactory>(config);
+  return factory.create();
 }
 } // namespace Envoy

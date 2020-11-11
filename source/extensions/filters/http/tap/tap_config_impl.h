@@ -25,12 +25,12 @@ public:
 
   // TapFilter::HttpTapConfig
   HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) override;
-  const envoy::config::common::matcher::v3::MatchTree& matchTreeConfig() override {
+  const envoy::config::common::matcher::v3::Matcher& matchTreeConfig() override {
     return match_tree_config_;
   }
 
 private:
-  envoy::config::common::matcher::v3::MatchTree match_tree_config_;
+  envoy::config::common::matcher::v3::Matcher match_tree_config_;
 };
 
 class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<Logger::Id::tap> {

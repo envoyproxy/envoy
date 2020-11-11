@@ -82,7 +82,6 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override {}
   void onMatchCallback(absl::string_view callback) override {
-    std::cout << "SEEING CALLBACK " << callback << std::endl;
     if (callback == "match") {
       tapper_->onMatch();
     } else if (callback == "no_match") {

@@ -3,6 +3,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/http.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/config/version_converter.h"
@@ -28,13 +30,22 @@ fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*
 }
 } // namespace
 
+ListMatcher fromPredicate(const envoy::config::tap::v3::MatchPredicate& predicate) {
+  switch (predicate.rule_case()) {}
+}
 HttpTapConfigImpl::HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_config,
                                      Common::Tap::Sink* admin_streamer)
     : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer) {
-  auto* leaf = match_tree_config_.mutable_leaf();
-  leaf->mutable_no_match_action()->set_callback("no_match");
+  auto* on_no_match_action = match_tree_config_.mutable_on_no_match()->mutable_action();
+  on_no_match_action->set_name("tap_config");
+  {
+    envoy::extensions::filters::http::tap::v3::MatchAction action;
+    action.set_perform_tap(false);
+    on_no_match_action->mutable_typed_config()->PackFrom(action);
+  }
 
-  auto* matcher = leaf->add_matchers();
+  auto* matcher_list = match_tree_config_.mutable_matcher_list();
+  auto* matcher = matcher_list->add_matchers();
   if (proto_config.has_match()) {
     matcher->mutable_predicate()->MergeFrom(proto_config.match());
   } else {

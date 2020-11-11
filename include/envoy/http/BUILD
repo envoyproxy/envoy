@@ -83,6 +83,7 @@ envoy_cc_library(
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

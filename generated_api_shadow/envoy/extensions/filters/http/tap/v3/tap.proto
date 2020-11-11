@@ -17,6 +17,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Tap :ref:`configuration overview <config_http_filters_tap>`.
 // [#extension: envoy.filters.http.tap]
 
+message MatchAction {
+  bool perform_tap = 1;
+}
+
 // Top level configuration for the tap filter.
 message Tap {
   option (udpa.annotations.versioning).previous_message_type =

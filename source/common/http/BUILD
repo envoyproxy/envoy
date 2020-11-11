@@ -174,6 +174,8 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 

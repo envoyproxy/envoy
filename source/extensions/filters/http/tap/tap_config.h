@@ -80,7 +80,7 @@ public:
    */
   virtual HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) PURE;
 
-  virtual const envoy::config::common::matcher::v3::MatchTree& matchTreeConfig() PURE;
+  virtual const envoy::config::common::matcher::v3::Matcher& matchTreeConfig() PURE;
 };
 
 using HttpTapConfigSharedPtr = std::shared_ptr<HttpTapConfig>;

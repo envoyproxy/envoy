@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
@@ -439,21 +441,20 @@ void FilterManager::maybeContinueDecoding(
 
 bool FilterManager::applyDataAndAttemptMatch(ActiveStreamFilterBase& filter,
                                              std::function<void(HttpMatchingData&)> data_update) {
-  std::cout << "about to match" << std::endl;
   if (!state_.match_tree_completed_ && filter.matchingData()) {
     data_update(filter.matchingData()->get());
-    auto match = filter.match_tree_->match(*filter.match_data_);
-    if (match.first && match.second) {
+    const auto result = evaluateMatch(*filter.match_tree_, *filter.match_data_);
+    if (result) {
       state_.match_tree_completed_ = true;
-      if (match.second->isSkip()) {
-        std::cout << "is skip" << std::endl;
+      // TODO(snowp): Register a factory for this
+      if (result->typed_config()
+              .Is<envoy::extensions::filters::network::http_connection_manager::v3::
+                      SkipFilterAction>()) {
         filter.skip_ = true;
         return true;
       }
 
-      std::cout << "is callback " << *match.second->callback() << std::endl;
-
-      filter.doMatchCallback(*match.second->callback());
+      filter.doMatchCallback(*result);
     }
   }
 
