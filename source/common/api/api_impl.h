@@ -28,7 +28,7 @@ public:
   Thread::ThreadFactory& threadFactory() override { return thread_factory_; }
   Filesystem::Instance& fileSystem() override { return file_system_; }
   TimeSource& timeSource() override { return time_system_; }
-  const Stats::Scope& rootScope() override { return store_; }
+  Stats::Scope& rootScope() override { return store_; }
   Random::RandomGenerator& randomGenerator() override { return random_generator_; }
   ProcessContextOptRef processContext() override { return process_context_; }
 

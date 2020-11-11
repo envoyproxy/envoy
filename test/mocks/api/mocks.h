@@ -41,7 +41,7 @@ public:
                Event::TimeSystem&));
   MOCK_METHOD(Filesystem::Instance&, fileSystem, ());
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
-  MOCK_METHOD(const Stats::Scope&, rootScope, ());
+  MOCK_METHOD(Stats::Scope&, rootScope, ());
   MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
 
