@@ -3,6 +3,13 @@
 TLS
 ===
 
+.. sidebar::
+
+   .. admonition:: Requirements
+
+      This example makes use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse ``json`` output
+      from the upstream echo servers.
+
 This example walks through some of the ways that Envoy can be configured to make
 use of encrypted connections using ``HTTP`` over ``TLS`` .
 
@@ -26,11 +33,6 @@ of securing traffic between proxies with validation and mutual authentication us
 
    When using ``TLS``, you are strongly encouraged to :ref:`validate <start_quick_start_securing_validation>`
    all certificates wherever possible.
-
-.. admonition:: Requirements
-
-   This example makes use of the `jq <https://stedolan.github.io/jq/>`_ tool to parse ``json`` output
-   from the upstream echo servers.
 
 .. include:: _include/docker-env-setup.rst
 
