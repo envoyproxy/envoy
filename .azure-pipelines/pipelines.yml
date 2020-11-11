@@ -252,7 +252,7 @@ stages:
     dependsOn: ["precheck"]
     jobs:
       - job: test
-        timeoutInMinutes: 180
+        timeoutInMinutes: 360
         pool:
           vmImage: "macos-latest"
         steps:
