@@ -89,6 +89,7 @@ py_test(
         "outofproc_main_test.py",
     ],
     data = [
+        "@rules_python//python/runfiles",
         "//source/exe:envoy-static",
         "//test/config/integration:google_com_proxy_port_0",
     ],
