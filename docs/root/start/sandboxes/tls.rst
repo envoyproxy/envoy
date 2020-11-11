@@ -23,16 +23,14 @@ It demonstrates a number of commonly used proxying and ``TLS`` termination patte
 To better understand the provided examples, and for a description of how ``TLS`` is
 configured with Envoy, please see the :ref:`securing Envoy quick start guide <start_quick_start_securing>`.
 
-The :ref:`double proxy sandbox <install_sandboxes_double_proxy>` also provides an example
-of securing traffic between proxies with validation and mutual authentication using ``mTLS``.
-
 .. warning::
 
    For the sake of simplicity, the examples provided here do not authenticate any client certificates,
    or validate any of the provided certificates.
 
    When using ``TLS``, you are strongly encouraged to :ref:`validate <start_quick_start_securing_validation>`
-   all certificates wherever possible.
+   all certificates wherever possible, and :ref:`authenticate clients <start_quick_start_securing_mtls>`
+   where you control both sides of the connection, or the relevant protocols are available.
 
 .. include:: _include/docker-env-setup.rst
 
@@ -163,3 +161,9 @@ The upstream ``service-https`` handles the request.
 
    $ curl -sk https://localhost:10003  | jq '.os.hostname'
    "service-https"
+
+
+.. seealso::
+
+   The :ref:`double proxy sandbox <install_sandboxes_double_proxy>` also provides an example
+   of securing traffic between proxies with validation and mutual authentication using ``mTLS``.
