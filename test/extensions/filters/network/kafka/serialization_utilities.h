@@ -21,7 +21,7 @@ void assertStringViewIncrement(absl::string_view incremented, absl::string_view 
                                size_t difference);
 
 // Helper function converting buffer to raw bytes.
-const char* getRawData(const Buffer::OwnedImpl& buffer);
+const char* getRawData(const Buffer::Instance& buffer);
 
 // Exactly what is says on the tin:
 // 1. serialize expected using Encoder,

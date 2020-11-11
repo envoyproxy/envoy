@@ -154,6 +154,8 @@ TEST(VarUInt32Deserializer, ShouldThrowIfNoEndWith5Bytes) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
+// Missing tests (chunks).
+
 TEST(VarInt32Deserializer, ShouldDeserialize) {
   Buffer::OwnedImpl buffer;
   const char input[1] = {0};
