@@ -36,9 +36,18 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-class TestConnPoolImpl : public ConnPoolImpl {
+class TestConnPoolImpl : public FixedHttpConnPoolImpl {
 public:
-  using ConnPoolImpl::ConnPoolImpl;
+  TestConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                   Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+      : FixedHttpConnPoolImpl(
+            std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
+            random_generator,
+            [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
+            [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) { return nullptr; },
+            std::vector<Protocol>{Protocol::Http2}) {}
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
     // We expect to own the connection, but already have it, so just release it to prevent it from
