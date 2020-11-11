@@ -77,15 +77,15 @@ been added:
 
 .. code-block:: console
 
-   $ curl -sk https://localhost:10000  | jq '.headers["x-forwarded-proto"]'
-   "https"
+   $ curl -sk https://localhost:10000  | jq -r '.headers["x-forwarded-proto"]'
+   https
 
 The upstream ``service-http`` handles the request.
 
 .. code-block:: console
 
-   $ curl -sk https://localhost:10000  | jq '.os.hostname'
-   "service-http"
+   $ curl -sk https://localhost:10000  | jq -r '.os.hostname'
+   service-http
 
 Step 5: Test proxying ``https`` -> ``https``
 ********************************************
@@ -102,15 +102,15 @@ been added:
 
 .. code-block:: console
 
-   $ curl -sk https://localhost:10001  | jq '.headers["x-forwarded-proto"]'
-   "https"
+   $ curl -sk https://localhost:10001  | jq -r '.headers["x-forwarded-proto"]'
+   https
 
 The upstream ``service-https`` handles the request.
 
 .. code-block:: console
 
-   $ curl -sk https://localhost:10001  | jq '.os.hostname'
-   "service-https"
+   $ curl -sk https://localhost:10001  | jq -r '.os.hostname'
+   service-https
 
 Step 6: Test proxying ``http`` -> ``https``
 *******************************************
@@ -126,15 +126,15 @@ been added:
 
 .. code-block:: console
 
-   $ curl -s http://localhost:10002  | jq '.headers["x-forwarded-proto"]'
-   "http"
+   $ curl -s http://localhost:10002  | jq -r '.headers["x-forwarded-proto"]'
+   http
 
 The upstream ``service-https`` handles the request.
 
 .. code-block:: console
 
-   $ curl -s http://localhost:10002  | jq '.os.hostname'
-   "service-https"
+   $ curl -s http://localhost:10002  | jq -r '.os.hostname'
+   service-https
 
 
 Step 7: Test proxying ``https`` passthrough
@@ -152,16 +152,15 @@ added:
 
 .. code-block:: console
 
-   $ curl -sk https://localhost:10003  | jq '.headers["x-forwarded-proto"]'
+   $ curl -sk https://localhost:10003  | jq -r '.headers["x-forwarded-proto"]'
    null
 
 The upstream ``service-https`` handles the request.
 
 .. code-block:: console
 
-   $ curl -sk https://localhost:10003  | jq '.os.hostname'
-   "service-https"
-
+   $ curl -sk https://localhost:10003  | jq -r '.os.hostname'
+   service-https
 
 .. seealso::
 
