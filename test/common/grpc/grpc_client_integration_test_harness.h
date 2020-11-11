@@ -298,7 +298,7 @@ public:
     EXPECT_CALL(*mock_host_, createConnection_(_, _)).WillRepeatedly(Return(connection_data));
     EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
-    http_conn_pool_ = std::make_unique<Http::Http2::ProdConnPoolImpl>(
+    http_conn_pool_ = Http::Http2::allocateConnPool(
         *dispatcher_, random_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr);
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
