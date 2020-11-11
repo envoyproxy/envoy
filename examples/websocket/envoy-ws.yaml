@@ -39,4 +39,4 @@ static_resources:
             address:
               socket_address:
                 address: service-ws
-                port_value: 8080
+                port_value: 80

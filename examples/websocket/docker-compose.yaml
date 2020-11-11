@@ -25,11 +25,11 @@ services:
   service-ws:
     image: solsson/websocat
     hostname: service-ws
-    command: -E ws-listen:0.0.0.0:8080 literalreply:'[ws] HELO'
+    command: -E ws-listen:0.0.0.0:80 literalreply:'[ws] HELO'
 
   service-wss:
     image: solsson/websocat
     hostname: service-wss
-    command: wss-listen:0.0.0.0:8080 literalreply:"[wss] HELO" --pkcs12-der /certs/output.pkcs12
+    command: wss-listen:0.0.0.0:443 literalreply:"[wss] HELO" --pkcs12-der /certs/output.pkcs12
     volumes:
       - ./certs/output.pkcs12:/certs/output.pkcs12
