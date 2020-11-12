@@ -440,7 +440,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     // `envoy.reloadable_features.cluster_keep_warming_no_secret_entity` runtime feature flag.
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.cluster_keep_warming_no_secret_entity") &&
-        !cluster.info()->transportSocketMatcher().resolve(nullptr).factory_.isReady()) {
+        !cluster.info()->transportSocketMatcher().factoriesReady()) {
       ENVOY_LOG(warn, "Failed to activate {}", cluster.info()->name());
       return;
     }

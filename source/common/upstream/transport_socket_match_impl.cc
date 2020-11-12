@@ -48,5 +48,14 @@ TransportSocketMatcherImpl::resolve(const envoy::config::core::v3::Metadata* met
   return MatchData(*default_match_.factory, default_match_.stats, default_match_.name);
 }
 
+bool TransportSocketMatcherImpl::factoriesReady() const {
+  for (const auto& match : matches_) {
+    if (!match.factory->isReady()) {
+      return false;
+    }
+  }
+  return default_match_.factory->isReady();
+}
+
 } // namespace Upstream
 } // namespace Envoy

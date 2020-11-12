@@ -39,6 +39,7 @@ public:
       Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
 
   MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const override;
+  bool factoriesReady() const override;
 
 protected:
   TransportSocketMatchStats generateStats(const std::string& prefix);

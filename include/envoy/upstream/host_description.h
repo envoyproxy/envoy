@@ -182,6 +182,11 @@ public:
    * @return the match information of the transport socket selected.
    */
   virtual MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const PURE;
+
+  /**
+   * Check if all transport socket factories are ready.
+   */
+  virtual bool factoriesReady() const PURE;
 };
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
