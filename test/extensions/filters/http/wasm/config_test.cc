@@ -29,7 +29,7 @@ using Common::Wasm::WasmException;
 namespace HttpFilters {
 namespace Wasm {
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 class WasmFilterConfigTest : public Event::TestUsingSimulatedTime,
                              public testing::TestWithParam<std::string> {
 protected:
@@ -71,13 +71,20 @@ auto testing_values = testing::Values(
 #if defined(ENVOY_WASM_V8)
     "v8"
 #endif
-#if defined(ENVOY_WASM_V8) && defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8) && (defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME))
     ,
 #endif
 #if defined(ENVOY_WASM_WAVM)
     "wavm"
 #endif
+#if (defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)) && defined(ENVOY_WASM_WASMTIME)
+    ,
+#endif
+#if defined(ENVOY_WASM_WASMTIME)
+    "wasmtime"
+#endif
 );
+
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFilterConfigTest, testing_values);
 
 TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {

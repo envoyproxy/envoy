@@ -48,6 +48,9 @@ auto testing_values = testing::Values(
 #if defined(ENVOY_WASM_WAVM)
     "wavm",
 #endif
+#if defined(ENVOY_WASM_WASMTIME)
+    "wasmtime",
+#endif
     "null");
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmAccessLogConfigTest, testing_values);
 

@@ -17,6 +17,9 @@
 #if defined(ENVOY_WASM_WAVM)
 #include "include/proxy-wasm/wavm.h"
 #endif
+#if defined(ENVOY_WASM_WASMTIME)
+#include "include/proxy-wasm/wasmtime.h"
+#endif
 
 using ContextBase = proxy_wasm::ContextBase;
 using Word = proxy_wasm::Word;
@@ -81,6 +84,13 @@ WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& s
   } else if (runtime == WasmRuntimeNames::get().Wavm) {
     auto wasm = proxy_wasm::createWavmVm();
     wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "wavm");
+    return wasm;
+#endif
+#if defined(ENVOY_WASM_WASMTIME)
+  } else if (runtime == WasmRuntimeNames::get().Wasmtime) {
+    auto wasm = proxy_wasm::createWasmtimeVm();
+    wasm->integration() =
+        getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "wasmtime");
     return wasm;
 #endif
   } else {
