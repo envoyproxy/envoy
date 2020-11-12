@@ -31,8 +31,7 @@ TEST_F(ClusterUpdateTrackerTest, ClusterDoesNotExistAtConstructionTime) {
 
   ClusterUpdateTracker cluster_tracker(cm_, cluster_name_);
 
-  EXPECT_FALSE(cluster_tracker.exists());
-  EXPECT_EQ(cluster_tracker.info(), nullptr);
+  EXPECT_FALSE(cluster_tracker.threadLocalCluster().has_value());
 }
 
 TEST_F(ClusterUpdateTrackerTest, ClusterDoesExistAtConstructionTime) {
@@ -40,8 +39,8 @@ TEST_F(ClusterUpdateTrackerTest, ClusterDoesExistAtConstructionTime) {
 
   ClusterUpdateTracker cluster_tracker(cm_, cluster_name_);
 
-  EXPECT_TRUE(cluster_tracker.exists());
-  EXPECT_EQ(cluster_tracker.info(), expected_.cluster_.info_);
+  EXPECT_TRUE(cluster_tracker.threadLocalCluster().has_value());
+  EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);
 }
 
 TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
@@ -49,41 +48,36 @@ TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
 
   ClusterUpdateTracker cluster_tracker(cm_, cluster_name_);
 
-  {
-    EXPECT_FALSE(cluster_tracker.exists());
-    EXPECT_EQ(cluster_tracker.info(), nullptr);
-  }
+  { EXPECT_FALSE(cluster_tracker.threadLocalCluster().has_value()); }
 
   {
     // Simulate addition of an irrelevant cluster.
     cluster_tracker.onClusterAddOrUpdate(irrelevant_);
 
-    EXPECT_FALSE(cluster_tracker.exists());
-    EXPECT_EQ(cluster_tracker.info(), nullptr);
+    EXPECT_FALSE(cluster_tracker.threadLocalCluster().has_value());
   }
 
   {
     // Simulate addition of the relevant cluster.
     cluster_tracker.onClusterAddOrUpdate(expected_);
 
-    EXPECT_TRUE(cluster_tracker.exists());
-    EXPECT_EQ(cluster_tracker.info(), expected_.cluster_.info_);
+    EXPECT_TRUE(cluster_tracker.threadLocalCluster().has_value());
+    EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);
   }
 
   {
     // Simulate removal of an irrelevant cluster.
     cluster_tracker.onClusterRemoval(irrelevant_.cluster_.info_->name_);
 
-    EXPECT_TRUE(cluster_tracker.exists());
-    EXPECT_EQ(cluster_tracker.info(), expected_.cluster_.info_);
+    EXPECT_TRUE(cluster_tracker.threadLocalCluster().has_value());
+    EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);
   }
 
   {
     // Simulate removal of the relevant cluster.
     cluster_tracker.onClusterRemoval(cluster_name_);
 
-    EXPECT_FALSE(cluster_tracker.exists());
-    EXPECT_EQ(cluster_tracker.info(), nullptr);
+    EXPECT_FALSE(cluster_tracker.threadLocalCluster().has_value());
   }
 }
 

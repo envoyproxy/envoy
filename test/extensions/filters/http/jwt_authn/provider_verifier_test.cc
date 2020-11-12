@@ -90,7 +90,9 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
                      .setTimeout(std::chrono::milliseconds(5 * 1000))
                      .setParentSpan(parent_span_)
                      .setChildSpanName("JWT Remote PubKey Fetch");
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, Eq(options))).Times(1);
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _, Eq(options)))
+      .Times(1);
 
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},

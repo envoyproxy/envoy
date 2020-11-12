@@ -130,18 +130,20 @@ public:
   }
 
   void connectUpstream() {
-    EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
+    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+                addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
         }));
 
     conn_state_.reset();
-    EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+                connectionState())
         .WillRepeatedly(
             Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
 
     EXPECT_CALL(callbacks_, continueDecoding());
-    context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+    context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
 
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
@@ -153,7 +155,8 @@ public:
 
     initializeMetadata(msg_type);
 
-    EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
+    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+                addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
         }));
@@ -170,11 +173,12 @@ public:
     EXPECT_CALL(callbacks_, protocolType()).WillOnce(Return(ProtocolType::Dubbo));
 
     EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
-    EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
+    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
         .WillOnce(
             Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-              context_.cluster_manager_.tcp_conn_pool_.newConnectionImpl(cb);
-              context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
+              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
+                  upstream_connection_);
               return nullptr;
             }));
   }
@@ -194,7 +198,8 @@ public:
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Complete));
-    EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
+    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+                released(Ref(upstream_connection_)));
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
@@ -248,7 +253,7 @@ TEST_F(DubboRouterTest, PoolRemoteConnectionFailure) {
       }));
   startRequest(MessageType::Request);
 
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
@@ -264,7 +269,8 @@ TEST_F(DubboRouterTest, PoolTimeout) {
       }));
   startRequest(MessageType::Request);
 
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Timeout);
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
+      ConnectionPool::PoolFailureReason::Timeout);
 }
 
 TEST_F(DubboRouterTest, PoolOverflowFailure) {
@@ -279,7 +285,8 @@ TEST_F(DubboRouterTest, PoolOverflowFailure) {
       }));
   startRequest(MessageType::Request);
 
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Overflow);
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
+      ConnectionPool::PoolFailureReason::Overflow);
 }
 
 TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
@@ -309,7 +316,7 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_, tcpConnPoolForCluster(cluster_name_, _, _))
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
@@ -334,7 +341,7 @@ TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
   EXPECT_CALL(callbacks_, resetStream()).Times(1);
   EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   destroyRouter();
@@ -419,7 +426,8 @@ TEST_F(DubboRouterTest, OneWay) {
   initializeRouter();
   initializeMetadata(MessageType::Oneway);
 
-  EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+              released(Ref(upstream_connection_)));
 
   startRequest(MessageType::Oneway);
   connectUpstream();
@@ -489,7 +497,7 @@ TEST_F(DubboRouterTest, DestroyWhileConnecting) {
   initializeMetadata(MessageType::Request);
 
   NiceMock<Envoy::ConnectionPool::MockCancellable> conn_pool_handle;
-  EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
       .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
         return &conn_pool_handle;
       }));

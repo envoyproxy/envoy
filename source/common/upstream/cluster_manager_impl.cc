@@ -855,7 +855,7 @@ ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view 
 }
 
 void ClusterManagerImpl::maybePrefetch(
-    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+    ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
     std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
   // TODO(alyssawilk) As currently implemented, this will always just prefetch
   // one connection ahead of actually needed connections.
@@ -871,63 +871,48 @@ void ClusterManagerImpl::maybePrefetch(
   //  per-upstream prefetch.
   //
   //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
-  if (cluster_entry->cluster_info_->peekaheadRatio() > 1.0) {
+  if (cluster_entry.cluster_info_->peekaheadRatio() > 1.0) {
     ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
     if (prefetch_pool) {
-      prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
+      prefetch_pool->maybePrefetch(cluster_entry.cluster_info_->peekaheadRatio());
     }
   }
 }
 
 Http::ConnectionPool::Instance*
-ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                           absl::optional<Http::Protocol> protocol,
-                                           LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
-
-  auto entry = cluster_manager.thread_local_clusters_.find(cluster);
-  if (entry == cluster_manager.thread_local_clusters_.end()) {
-    return nullptr;
-  }
-
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
+    ResourcePriority priority, absl::optional<Http::Protocol> protocol,
+    LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = entry->second->connPool(priority, protocol, context, false);
+  auto ret = connPool(priority, protocol, context, false);
 
   // Now see if another host should be prefetched.
-  // httpConnPoolForCluster is called immediately before a call for newStream. newStream doesn't
+  // httpConnPool is called immediately before a call for newStream. newStream doesn't
   // have the load balancer context needed to make selection decisions so prefetching must be
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  maybePrefetch(entry->second, [&entry, &priority, &protocol, &context]() {
-    return entry->second->connPool(priority, protocol, context, true);
+  maybePrefetch(*this, [this, &priority, &protocol, &context]() {
+    return connPool(priority, protocol, context, true);
   });
 
   return ret;
 }
 
 Tcp::ConnectionPool::Instance*
-ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                          LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
-
-  auto entry = cluster_manager.thread_local_clusters_.find(cluster);
-  if (entry == cluster_manager.thread_local_clusters_.end()) {
-    return nullptr;
-  }
-
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
+    ResourcePriority priority, LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = entry->second->tcpConnPool(priority, context, false);
+  auto ret = tcpConnPool(priority, context, false);
 
-  // tcpConnPoolForCluster is called immediately before a call for newConnection. newConnection
+  // tcpConnPool is called immediately before a call for newConnection. newConnection
   // doesn't have the load balancer context needed to make selection decisions so prefetching must
   // be performed here in anticipation of the new connection.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
   // Now see if another host should be prefetched.
-  maybePrefetch(entry->second, [&entry, &priority, &context]() {
-    return entry->second->tcpConnPool(priority, context, true);
-  });
+  maybePrefetch(*this,
+                [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
 
   return ret;
 }
@@ -1005,43 +990,31 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
   });
 }
 
-Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
-                                                                 LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
-
-  auto entry = cluster_manager.thread_local_clusters_.find(cluster);
-  if (entry == cluster_manager.thread_local_clusters_.end()) {
-    throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
-  }
-
-  HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
+Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
+    LoadBalancerContext* context) {
+  HostConstSharedPtr logical_host = lb_->chooseHost(context);
   if (logical_host) {
     auto conn_info = logical_host->createConnection(
-        cluster_manager.thread_local_dispatcher_, nullptr,
+        parent_.thread_local_dispatcher_, nullptr,
         context == nullptr ? nullptr : context->upstreamTransportSocketOptions());
-    if ((entry->second->cluster_info_->features() &
+    if ((cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
-      auto& conn_map = cluster_manager.host_tcp_conn_map_[logical_host];
+      auto& conn_map = parent_.host_tcp_conn_map_[logical_host];
       conn_map.emplace(conn_info.connection_.get(),
                        std::make_unique<ThreadLocalClusterManagerImpl::TcpConnContainer>(
-                           cluster_manager, logical_host, *conn_info.connection_));
+                           parent_, logical_host, *conn_info.connection_));
     }
     return conn_info;
   } else {
-    entry->second->cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    cluster_info_->stats().upstream_cx_none_healthy_.inc();
     return {nullptr, nullptr};
   }
 }
 
-Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::string& cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
-  auto entry = cluster_manager.thread_local_clusters_.find(cluster);
-  if (entry != cluster_manager.thread_local_clusters_.end()) {
-    return entry->second->http_async_client_;
-  } else {
-    throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
-  }
+Http::AsyncClient&
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
+  return http_async_client_;
 }
 
 ClusterUpdateCallbacksHandlePtr

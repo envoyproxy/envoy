@@ -49,7 +49,8 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
   in_flight_request_ =
-      cm_.httpAsyncClientForCluster(uri_.cluster())
+      cm_.getThreadLocalCluster(uri_.cluster())
+          ->httpAsyncClient()
           .send(std::move(msg), *this,
                 Http::AsyncClient::RequestOptions().setTimeout(
                     std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));

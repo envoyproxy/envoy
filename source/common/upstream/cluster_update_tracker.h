@@ -14,9 +14,7 @@ namespace Upstream {
 class ClusterUpdateTracker : public ClusterUpdateCallbacks {
 public:
   ClusterUpdateTracker(ClusterManager& cm, const std::string& cluster_name);
-
-  bool exists() { return cluster_info_ != nullptr; }
-  ClusterInfoConstSharedPtr info() { return cluster_info_; }
+  ThreadLocalClusterOptRef threadLocalCluster() { return thread_local_cluster_; };
 
   // ClusterUpdateCallbacks
   void onClusterAddOrUpdate(ThreadLocalCluster& cluster) override;
@@ -26,7 +24,7 @@ private:
   const std::string cluster_name_;
   const ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_handle_;
 
-  ClusterInfoConstSharedPtr cluster_info_;
+  ThreadLocalClusterOptRef thread_local_cluster_;
 };
 
 } // namespace Upstream

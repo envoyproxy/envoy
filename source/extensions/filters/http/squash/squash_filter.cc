@@ -153,7 +153,8 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
 
   is_squashing_ = true;
   in_flight_request_ =
-      cm_.httpAsyncClientForCluster(config_->clusterName())
+      cm_.getThreadLocalCluster(config_->clusterName())
+          ->httpAsyncClient()
           .send(std::move(request), create_attachment_callback_,
                 Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
 
@@ -275,7 +276,8 @@ void SquashFilter::pollForAttachment() {
   request->headers().setReferenceHost(SERVER_AUTHORITY);
 
   in_flight_request_ =
-      cm_.httpAsyncClientForCluster(config_->clusterName())
+      cm_.getThreadLocalCluster(config_->clusterName())
+          ->httpAsyncClient()
           .send(std::move(request), check_attachment_callback_,
                 Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
   // No need to check if in_flight_request_ is null as onFailure will take care of

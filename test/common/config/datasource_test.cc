@@ -33,7 +33,7 @@ protected:
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
-  NiceMock<Http::MockAsyncClientRequest> request_{&cm_.async_client_};
+  NiceMock<Http::MockAsyncClientRequest> request_{&cm_.thread_local_cluster_.async_client_};
 
   Config::DataSource::LocalAsyncDataProviderPtr local_data_provider_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
@@ -53,15 +53,17 @@ protected:
       return retry_timer_;
     }));
 
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1"))
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .Times(AtLeast(1))
-        .WillRepeatedly(ReturnRef(cm_.async_client_));
+        .WillRepeatedly(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
     EXPECT_CALL(*retry_timer_, disableTimer());
     if (num_retries == 1) {
-      EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(AtLeast(1)).WillRepeatedly(Invoke(func));
+      EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+          .Times(AtLeast(1))
+          .WillRepeatedly(Invoke(func));
     } else {
-      EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+      EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
           .Times(num_retries)
           .WillRepeatedly(Invoke(func));
     }
@@ -114,6 +116,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
   TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
+  cm_.initializeThreadLocalClusters({"cluster_1"});
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     callbacks.onFailure(request_, Envoy::Http::AsyncClient::FailureReason::Reset);
@@ -154,6 +157,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
   TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
+  cm_.initializeThreadLocalClusters({"cluster_1"});
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     callbacks.onSuccess(
@@ -196,6 +200,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
+  cm_.initializeThreadLocalClusters({"cluster_1"});
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     callbacks.onSuccess(
@@ -240,6 +245,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
 
   const std::string body = "hello world";
 
+  cm_.initializeThreadLocalClusters({"cluster_1"});
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
@@ -284,6 +290,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
   TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
+  cm_.initializeThreadLocalClusters({"cluster_1"});
   const std::string body = "hello world";
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -326,6 +333,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
   TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
+  cm_.initializeThreadLocalClusters({"cluster_1"});
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     callbacks.onSuccess(
@@ -367,6 +375,7 @@ TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
     TestUtility::loadFromYamlAndValidate(yaml, config);
     EXPECT_TRUE(config.has_remote());
 
+    cm_.initializeThreadLocalClusters({"cluster_1"});
     initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
       Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
@@ -411,6 +420,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
   TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
+  cm_.initializeThreadLocalClusters({"cluster_1"});
   const std::string body = "hello world";
   int num_retries = 3;
 
@@ -439,7 +449,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
       .WillRepeatedly(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
         if (--num_retries == 0) {
-          EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+          EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
               .WillOnce(Invoke(
                   [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
