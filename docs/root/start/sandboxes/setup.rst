@@ -16,7 +16,7 @@ The user account running the examples will need to have permission to use Docker
 
 .. _start_sandboxes_setup_docker_compose:
 
-Install docker-compose
+Install Docker Compose
 ----------------------
 
 You will need a fairly recent version of docker-compose.
