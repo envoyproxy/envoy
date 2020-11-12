@@ -40,15 +40,25 @@ public:
                                               generator_, validation_visitor_, *api_));
   }
 
-private:
+protected:
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::TestStore store_;
   Random::MockRandomGenerator generator_;
   Api::ApiPtr api_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
+};
+
+class TestDeprecatedV2Api : public TestScopedRuntime {
+public:
+  TestDeprecatedV2Api() {
+    Runtime::LoaderSingleton::getExisting()->mergeValues({
+        {"envoy.reloadable_features.enable_deprecated_v2_api", "true"},
+        {"envoy.features.enable_all_deprecated_features", "true"},
+    });
+  }
 };
 
 } // namespace Envoy

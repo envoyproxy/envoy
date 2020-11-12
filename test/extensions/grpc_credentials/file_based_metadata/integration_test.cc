@@ -41,7 +41,7 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (!header_value_1_.empty()) {
       const std::string yaml1 = fmt::format(R"EOF(
-"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig
+"@type": type.googleapis.com/envoy.config.grpc_credential.v3.FileBasedMetadataConfig
 secret_data:
   inline_string: {}
 header_key: {}
@@ -56,7 +56,7 @@ header_prefix: {}
     if (!header_value_2_.empty()) {
       // uses default key/prefix
       const std::string yaml2 = fmt::format(R"EOF(
-"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig
+"@type": type.googleapis.com/envoy.config.grpc_credential.v3.FileBasedMetadataConfig
 secret_data:
   inline_string: {}
 )EOF",
