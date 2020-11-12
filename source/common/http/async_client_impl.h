@@ -411,7 +411,7 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
-  bool recreateStream() override { return false; }
+  bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }

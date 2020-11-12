@@ -495,19 +495,24 @@ public:
    */
   virtual uint32_t decoderBufferLimit() PURE;
 
-  // Takes a stream, and acts as if the headers are newly arrived.
-  // On success, this will result in a creating a new filter chain and likely upstream request
-  // associated with the original downstream stream.
-  // On failure, if the preconditions outlined below are not met, the caller is
-  // responsible for handling or terminating the original stream.
-  //
-  // This is currently limited to
-  //   - streams which are completely read
-  //   - streams which do not have a request body.
-  //
-  // Note that HttpConnectionManager sanitization will *not* be performed on the
-  // recreated stream, as it is assumed that sanitization has already been done.
-  virtual bool recreateStream() PURE;
+  /**
+   * Takes a stream, and acts as if the headers are newly arrived.
+   * On success, this will result in a creating a new filter chain and likely
+   * upstream request associated with the original downstream stream. On
+   * failure, if the preconditions outlined below are not met, the caller is
+   * responsible for handling or terminating the original stream.
+   *
+   * This is currently limited to
+   *   - streams which are completely read
+   *   - streams which do not have a request body.
+   *
+   * Note that HttpConnectionManager sanitization will *not* be performed on the
+   * recreated stream, as it is assumed that sanitization has already been done.
+   *
+   * @param original_response_headers Headers used for logging in the access logs and for charging
+   * stats. Ignored if null.
+   */
+  virtual bool recreateStream(const ResponseHeaderMap* original_response_headers) PURE;
 
   /**
    * Adds socket options to be applied to any connections used for upstream requests. Note that

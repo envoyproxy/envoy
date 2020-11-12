@@ -1,5 +1,7 @@
 #include "common/http/filter_manager.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
@@ -1253,7 +1255,7 @@ void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
 
 uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
-bool ActiveStreamDecoderFilter::recreateStream() {
+bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
@@ -1263,6 +1265,18 @@ bool ActiveStreamDecoderFilter::recreateStream() {
 
   parent_.stream_info_.setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
+
+  if (headers != nullptr) {
+    // The call to setResponseHeaders is needed to ensure that the headers are properly logged in
+    // access logs before the stream is destroyed. Since the function expects a ResponseHeaderPtr&&,
+    // ownership of the headers must be passed. This cannot happen earlier in the flow (such as in
+    // the call to setupRedirect) because at that point it is still possible for the headers to be
+    // used in a different logical branch. We work around this by creating a copy and passing
+    // ownership of the copy instead.
+    ResponseHeaderMapPtr headers_copy = createHeaderMap<ResponseHeaderMapImpl>(*headers);
+    parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers_copy));
+    parent_.filter_manager_callbacks_.chargeStats(*headers);
+  }
 
   parent_.filter_manager_callbacks_.recreateStream(parent_.stream_info_.filter_state_);
 

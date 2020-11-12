@@ -792,6 +792,14 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     }
   }
 
+  // No response is sent back downstream for internal redirects, so don't charge downstream stats.
+  const absl::optional<std::string>& response_code_details =
+      filter_manager_.streamInfo().responseCodeDetails();
+  if (response_code_details.has_value() &&
+      response_code_details == Envoy::StreamInfo::ResponseCodeDetails::get().InternalRedirect) {
+    return;
+  }
+
   connection_manager_.stats_.named_.downstream_rq_completed_.inc();
   connection_manager_.listener_stats_.downstream_rq_completed_.inc();
   if (CodeUtility::is1xx(response_code)) {
