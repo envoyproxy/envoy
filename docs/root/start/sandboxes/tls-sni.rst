@@ -35,8 +35,8 @@ Create self-signed certificates for these endpoints as follows:
 
    $ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
 	    -subj "/C=US/ST=CA/O=MyExample, Inc./CN=domain1.example.com" \
-	    -keyout certs/domain1.key \
-	    -out certs/domain1.crt
+	    -keyout certs/domain1.key.pem \
+	    -out certs/domain1.crt.pem
    Generating a RSA private key
    .............+++++
    ...................+++++
@@ -45,8 +45,8 @@ Create self-signed certificates for these endpoints as follows:
 
    $ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
 	    -subj "/C=US/ST=CA/O=MyExample, Inc./CN=domain2.example.com" \
-	    -keyout certs/domain2.key \
-	    -out certs/domain2.crt
+	    -keyout certs/domain2.key.pem \
+	    -out certs/domain2.crt.pem
    Generating a RSA private key
    .............+++++
    ...................+++++
@@ -55,8 +55,8 @@ Create self-signed certificates for these endpoints as follows:
 
    $ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
 	    -subj "/C=US/ST=CA/O=MyExample, Inc./CN=domain3.example.com" \
-	    -keyout certs/domain3.key \
-	    -out certs/domain3.crt
+	    -keyout certs/domain3.key.pem \
+	    -out certs/domain3.crt.pem
    Generating a RSA private key
    .............+++++
    ...................+++++
