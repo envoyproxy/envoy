@@ -11,19 +11,21 @@ private let kFilteredHeaders =
 final class ViewController: UITableViewController {
   private var results = [Result<Response, RequestError>]()
   private var timer: Timer?
-  private var client: StreamClient?
+  private var streamClient: StreamClient?
+  private var statsClient: StatsClient?
 
   override func viewDidLoad() {
     super.viewDidLoad()
     do {
       NSLog("starting Envoy...")
-      self.client = try EngineBuilder()
+      let engine = try EngineBuilder()
         .addFilter(factory: DemoFilter.init)
         .addFilter(factory: BufferDemoFilter.init)
         .addFilter(factory: AsyncDemoFilter.init)
         .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
         .build()
-        .streamClient()
+      self.streamClient = engine.streamClient()
+      self.statsClient = engine.statsClient()
     } catch let error {
       NSLog("starting Envoy failed: \(error)")
     }
@@ -41,11 +43,12 @@ final class ViewController: UITableViewController {
   private func startRequests() {
     self.timer = .scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
       self?.performRequest()
+      self?.recordStats()
     }
   }
 
   private func performRequest() {
-    guard let client = self.client else {
+    guard let streamClient = self.streamClient else {
       NSLog("failed to start request - Envoy is not running")
       return
     }
@@ -60,7 +63,7 @@ final class ViewController: UITableViewController {
       .addUpstreamHttpProtocol(.http2)
       .build()
 
-    client
+    streamClient
       .newStreamPrototype()
       .setOnResponseHeaders { [weak self] headers, _ in
         let statusCode = headers.httpStatus ?? -1
@@ -103,6 +106,21 @@ final class ViewController: UITableViewController {
     self.tableView.reloadData()
   }
 
+  private func recordStats() {
+    guard let statsClient = self.statsClient else {
+      NSLog("failed to send stats - Envoy is not running")
+      return
+    }
+
+    let counter = statsClient.counter(elements: ["foo", "bar", "counter"])
+    counter.increment()
+    counter.increment(count: 5)
+
+    let gauge = statsClient.gauge(elements: ["foo", "bar", "counter"])
+    gauge.set(value: 5)
+    gauge.add(amount: 10)
+    gauge.sub(amount: 1)
+  }
   // MARK: - UITableView
 
   override func numberOfSections(in tableView: UITableView) -> Int {

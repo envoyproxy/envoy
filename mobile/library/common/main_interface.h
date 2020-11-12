@@ -102,7 +102,7 @@ envoy_status_t set_preferred_network(envoy_network_t network);
  * @param elements, the string that identifies the counter to increment.
  * @param count, the count to increment by.
  */
-envoy_status_t record_counter(envoy_engine_t engine, const char* elements, uint64_t count);
+envoy_status_t record_counter_inc(envoy_engine_t engine, const char* elements, uint64_t count);
 
 /**
  * Set a gauge of a given string of elements with the given value.

@@ -17,7 +17,7 @@ class StatsClientImplTest {
     counter.increment()
     val elementsCaptor = ArgumentCaptor.forClass(String::class.java)
     val countCaptor = ArgumentCaptor.forClass(Int::class.java)
-    verify(envoyEngine).recordCounter(elementsCaptor.capture(), countCaptor.capture())
+    verify(envoyEngine).recordCounterInc(elementsCaptor.capture(), countCaptor.capture())
     assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
     assertThat(countCaptor.getValue()).isEqualTo(1)
   }
@@ -29,7 +29,7 @@ class StatsClientImplTest {
     counter.increment(5)
     val elementsCaptor = ArgumentCaptor.forClass(String::class.java)
     val countCaptor = ArgumentCaptor.forClass(Int::class.java)
-    verify(envoyEngine).recordCounter(elementsCaptor.capture(), countCaptor.capture())
+    verify(envoyEngine).recordCounterInc(elementsCaptor.capture(), countCaptor.capture())
     assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
     assertThat(countCaptor.getValue()).isEqualTo(5)
   }

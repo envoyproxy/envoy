@@ -66,11 +66,11 @@ envoy_status_t set_preferred_network(envoy_network_t network) {
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t record_counter(envoy_engine_t, const char* elements, uint64_t count) {
+envoy_status_t record_counter_inc(envoy_engine_t, const char* elements, uint64_t count) {
   // TODO: use specific engine once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
   if (auto e = engine_.lock()) {
-    return e->recordCounter(std::string(elements), count);
+    return e->recordCounterInc(std::string(elements), count);
   }
   return ENVOY_FAILURE;
 }
