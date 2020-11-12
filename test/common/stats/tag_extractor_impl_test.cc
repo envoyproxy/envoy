@@ -30,30 +30,17 @@ TEST(TagExtractorTest, TwoSubexpressions) {
 }
 
 TEST(TagExtractorTest, RE2Variants) {
-  re2::RE2 re("^cluster\\.((.*?)\\.)");
-  re2::StringPiece match1, match2;
-  ASSERT_TRUE(
-      re2::RE2::PartialMatch("cluster.test_cluster.upstream_cx_total", re, &match1, &match2));
-  EXPECT_EQ("test_cluster.", std::string(match1));
-  EXPECT_EQ("test_cluster", std::string(match2));
-
-  re2::RE2 alternate_re("^cluster\\.([^\\.]+)\\..*");
-  ASSERT_TRUE(re2::RE2::FullMatch("cluster.test_cluster.upstream_cx_total", alternate_re, &match1));
-  EXPECT_EQ("test_cluster", std::string(match1));
-
-  re2::RE2 alternate_re2("^cluster\\.(([^\\.]+)\\.).*");
-  ASSERT_TRUE(re2::RE2::FullMatch("cluster.test_cluster.upstream_cx_total", alternate_re2, &match1,
-                                  &match2));
-  EXPECT_EQ("test_cluster.", std::string(match1));
-  EXPECT_EQ("test_cluster", std::string(match2));
-
-  std::regex sr("^cluster\\.((.*?)\\.)");
-  std::match_results<std::string::const_iterator> smatch;
-  std::string str("cluster.test_cluster.upstream_cx_total");
-  ASSERT_TRUE(std::regex_search(str, smatch, sr));
-  ASSERT_LE(3, smatch.size());
-  EXPECT_EQ("test_cluster.", std::string(smatch[1]));
-  EXPECT_EQ("test_cluster", std::string(smatch[2]));
+  TagExtractorRe2Impl tag_extractor("cluster_name", "^cluster\\.(([^\\.]+)\\.).*");
+  EXPECT_EQ("cluster_name", tag_extractor.name());
+  std::string name = "cluster.test_cluster.upstream_cx_total";
+  TagVector tags;
+  IntervalSetImpl<size_t> remove_characters;
+  ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
+  std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
+  EXPECT_EQ("cluster.upstream_cx_total", tag_extracted_name);
+  ASSERT_EQ(1, tags.size());
+  EXPECT_EQ("test_cluster", tags.at(0).value_);
+  EXPECT_EQ("cluster_name", tags.at(0).name_);
 }
 
 TEST(TagExtractorTest, SingleSubexpression) {

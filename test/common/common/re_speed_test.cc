@@ -11,22 +11,22 @@
 
 // NOLINT(namespace-envoy)
 
-static const char* cluster_inputs[] = {
+static const char* ClusterInputs[] = {
     "cluster.no_trailing_dot",
     "cluster.match.",
     "cluster.match.normal",
     "cluster.match.and.a.whole.lot.of.things.coming.after.the.matches.really.too.much.stuff",
 };
 
-static const char cluster_re_pattern[] = "^cluster\\.((.*?)\\.)";
-static const char cluster_re_alt_pattern[] = "^cluster\\.(([^\\.]+)\\.).*";
+static const char ClusterRePattern[] = "^cluster\\.((.*?)\\.)";
+static const char ClusterReAltPattern[] = "^cluster\\.(([^\\.]+)\\.).*";
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StdRegex(benchmark::State& state) {
-  std::regex re(cluster_re_pattern);
+  std::regex re(ClusterRePattern);
   uint32_t passes = 0;
   std::vector<std::string> inputs;
-  for (const char* cluster_input : cluster_inputs) {
+  for (const char* cluster_input : ClusterInputs) {
     inputs.push_back(cluster_input);
   }
 
@@ -47,9 +47,9 @@ BENCHMARK(BM_StdRegex);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StdRegexStringView(benchmark::State& state) {
-  std::regex re(cluster_re_pattern);
+  std::regex re(ClusterRePattern);
   std::vector<absl::string_view> inputs;
-  for (const char* cluster_input : cluster_inputs) {
+  for (const char* cluster_input : ClusterInputs) {
     inputs.push_back(cluster_input);
   }
   uint32_t passes = 0;
@@ -70,9 +70,9 @@ BENCHMARK(BM_StdRegexStringView);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StdRegexStringViewAltPattern(benchmark::State& state) {
-  std::regex re(cluster_re_alt_pattern);
+  std::regex re(ClusterReAltPattern);
   std::vector<absl::string_view> inputs;
-  for (const char* cluster_input : cluster_inputs) {
+  for (const char* cluster_input : ClusterInputs) {
     inputs.push_back(cluster_input);
   }
   uint32_t passes = 0;
@@ -93,10 +93,10 @@ BENCHMARK(BM_StdRegexStringViewAltPattern);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_RE2(benchmark::State& state) {
-  re2::RE2 re(cluster_re_pattern);
+  re2::RE2 re(ClusterRePattern);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
-    for (const char* cluster_input : cluster_inputs) {
+    for (const char* cluster_input : ClusterInputs) {
       re2::StringPiece match1, match2;
       if (re2::RE2::PartialMatch(cluster_input, re, &match1, &match2)) {
         ASSERT(match1 == "match.");
@@ -111,10 +111,10 @@ BENCHMARK(BM_RE2);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_RE2_AltPattern(benchmark::State& state) {
-  re2::RE2 re(cluster_re_alt_pattern);
+  re2::RE2 re(ClusterReAltPattern);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
-    for (const char* cluster_input : cluster_inputs) {
+    for (const char* cluster_input : ClusterInputs) {
       re2::StringPiece match1, match2;
       if (re2::RE2::PartialMatch(cluster_input, re, &match1, &match2)) {
         ASSERT(match1 == "match.");

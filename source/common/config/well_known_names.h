@@ -66,7 +66,7 @@ public:
     const std::string name_;
     const std::string regex_;
     const std::string substr_;
-    Regex::Type re_type_;
+    const Regex::Type re_type_;
   };
 
   // Cluster name tag

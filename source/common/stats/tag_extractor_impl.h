@@ -25,12 +25,12 @@ public:
    *               to avoid large numbers of failed regex lookups.
    * @return TagExtractorPtr newly constructed TagExtractor.
    */
-  static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex,
-                                            const std::string& substr = "",
+  static TagExtractorPtr createTagExtractor(absl::string_view name, absl::string_view regex,
+                                            absl::string_view substr = "",
                                             Regex::Type re_type = Regex::Type::StdRegex);
 
-  TagExtractorImplBase(const std::string& name, const std::string& regex,
-                       const std::string& substr = "");
+  TagExtractorImplBase(absl::string_view name, absl::string_view regex,
+                       absl::string_view substr = "");
   std::string name() const override { return name_; }
   absl::string_view prefixToken() const override { return prefix_; }
 
@@ -56,8 +56,8 @@ protected:
 
 class TagExtractorStdRegexImpl : public TagExtractorImplBase {
 public:
-  TagExtractorStdRegexImpl(const std::string& name, const std::string regex,
-                           const std::string& substr = "");
+  TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
+                           absl::string_view substr = "");
 
   bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
@@ -68,8 +68,8 @@ private:
 
 class TagExtractorRe2Impl : public TagExtractorImplBase {
 public:
-  TagExtractorRe2Impl(const std::string& name, const std::string regex,
-                      const std::string& substr = "");
+  TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
+                      absl::string_view substr = "");
 
   bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
