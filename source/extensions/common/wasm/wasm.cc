@@ -243,16 +243,16 @@ ContextBase* Wasm::createRootContext(const std::shared_ptr<PluginBase>& plugin) 
 
 ContextBase* Wasm::createVmContext() { return new Context(this); }
 
-void Wasm::log(absl::string_view root_id, const Http::RequestHeaderMap* request_headers,
+void Wasm::log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
                const Http::ResponseHeaderMap* response_headers,
                const Http::ResponseTrailerMap* response_trailers,
                const StreamInfo::StreamInfo& stream_info) {
-  auto context = getRootContext(root_id);
+  auto context = getRootContext(plugin, true);
   context->log(request_headers, response_headers, response_trailers, stream_info);
 }
 
-void Wasm::onStatsUpdate(absl::string_view root_id, Envoy::Stats::MetricSnapshot& snapshot) {
-  auto context = getRootContext(root_id);
+void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot) {
+  auto context = getRootContext(plugin, true);
   context->onStatsUpdate(snapshot);
 }
 
@@ -278,6 +278,14 @@ getCloneFactory(WasmExtension* wasm_extension, Event::Dispatcher& dispatcher,
              WasmHandleBaseSharedPtr base_wasm) -> std::shared_ptr<WasmHandleBase> {
     return wasm_clone_factory(std::static_pointer_cast<WasmHandle>(base_wasm), dispatcher,
                               create_root_context_for_testing);
+  };
+}
+
+static proxy_wasm::PluginHandleFactory getPluginFactory(WasmExtension* wasm_extension) {
+  auto wasm_plugin_factory = wasm_extension->pluginFactory();
+  return [wasm_plugin_factory](WasmHandleBaseSharedPtr base_wasm,
+                               absl::string_view plugin_key) -> std::shared_ptr<PluginHandleBase> {
+    return wasm_plugin_factory(std::static_pointer_cast<WasmHandle>(base_wasm), plugin_key);
   };
 }
 
@@ -474,13 +482,21 @@ bool createWasm(const VmConfig& vm_config, const PluginSharedPtr& plugin,
                             create_root_context_for_testing);
 }
 
-WasmHandleSharedPtr getOrCreateThreadLocalWasm(const WasmHandleSharedPtr& base_wasm,
-                                               const PluginSharedPtr& plugin,
-                                               Event::Dispatcher& dispatcher,
-                                               CreateContextFn create_root_context_for_testing) {
-  return std::static_pointer_cast<WasmHandle>(proxy_wasm::getOrCreateThreadLocalWasm(
+PluginHandleSharedPtr
+getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
+                             Event::Dispatcher& dispatcher,
+                             CreateContextFn create_root_context_for_testing) {
+  if (!base_wasm) {
+    if (!plugin->fail_open_) {
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
+                          "Plugin configured to fail closed failed to load");
+    }
+    return nullptr;
+  }
+  return std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
       std::static_pointer_cast<WasmHandle>(base_wasm), plugin,
-      getCloneFactory(getWasmExtension(), dispatcher, create_root_context_for_testing)));
+      getCloneFactory(getWasmExtension(), dispatcher, create_root_context_for_testing),
+      getPluginFactory(getWasmExtension())));
 }
 
 } // namespace Wasm

@@ -183,7 +183,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  filter_config.wasm()->fail(proxy_wasm::FailState::RuntimeError, "");
+  filter_config.wasmForTest()->fail(proxy_wasm::FailState::RuntimeError, "");
   EXPECT_EQ(filter_config.createFilter(), nullptr);
 }
 

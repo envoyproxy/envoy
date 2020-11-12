@@ -12,13 +12,15 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Wasm {
 
-using Envoy::Extensions::Common::Wasm::WasmHandle;
+using Envoy::Extensions::Common::Wasm::PluginHandle;
+using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 
 class WasmAccessLog : public AccessLog::Instance {
 public:
-  WasmAccessLog(absl::string_view root_id, ThreadLocal::SlotPtr tls_slot,
+  WasmAccessLog(const PluginSharedPtr& plugin, ThreadLocal::TypedSlotPtr<PluginHandle>&& tls_slot,
                 AccessLog::FilterPtr filter)
-      : root_id_(root_id), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
+      : plugin_(plugin), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
+
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
@@ -30,20 +32,21 @@ public:
       }
     }
 
-    if (tls_slot_->get()) {
-      tls_slot_->getTyped<WasmHandle>().wasm()->log(root_id_, request_headers, response_headers,
-                                                    response_trailers, stream_info);
+    auto handle = tls_slot_->get();
+    if (handle.has_value()) {
+      handle->wasm()->log(plugin_, request_headers, response_headers, response_trailers,
+                          stream_info);
     }
   }
 
-  void setTlsSlot(ThreadLocal::SlotPtr tls_slot) {
+  void setTlsSlot(ThreadLocal::TypedSlotPtr<PluginHandle>&& tls_slot) {
     ASSERT(tls_slot_ == nullptr);
     tls_slot_ = std::move(tls_slot);
   }
 
 private:
-  std::string root_id_;
-  ThreadLocal::SlotPtr tls_slot_;
+  PluginSharedPtr plugin_;
+  ThreadLocal::TypedSlotPtr<PluginHandle> tls_slot_;
   AccessLog::FilterPtr filter_;
 };
 

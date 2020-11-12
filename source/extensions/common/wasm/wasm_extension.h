@@ -31,6 +31,8 @@ class EnvoyWasmVmIntegration;
 using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
 using CreateContextFn =
     std::function<ContextBase*(Wasm* wasm, const std::shared_ptr<Plugin>& plugin)>;
+using PluginHandleExtensionFactory = std::function<PluginHandleBaseSharedPtr(
+    const WasmHandleSharedPtr& base_wasm, absl::string_view plugin_key)>;
 using WasmHandleExtensionFactory = std::function<WasmHandleBaseSharedPtr(
     const VmConfig& vm_config, const Stats::ScopeSharedPtr& scope,
     Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
@@ -54,6 +56,7 @@ public:
   virtual std::unique_ptr<EnvoyWasmVmIntegration>
   createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime,
                                absl::string_view short_runtime) = 0;
+  virtual PluginHandleExtensionFactory pluginFactory() = 0;
   virtual WasmHandleExtensionFactory wasmFactory() = 0;
   virtual WasmHandleExtensionCloneFactory wasmCloneFactory() = 0;
   enum class WasmEvent : int {
@@ -100,6 +103,7 @@ public:
   std::unique_ptr<EnvoyWasmVmIntegration>
   createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime,
                                absl::string_view short_runtime) override;
+  PluginHandleExtensionFactory pluginFactory() override;
   WasmHandleExtensionFactory wasmFactory() override;
   WasmHandleExtensionCloneFactory wasmCloneFactory() override;
   void onEvent(WasmEvent event, const PluginSharedPtr& plugin) override;

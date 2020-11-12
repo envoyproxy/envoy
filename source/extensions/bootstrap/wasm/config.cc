@@ -37,18 +37,18 @@ void WasmFactory::createWasm(const envoy::extensions::wasm::v3::WasmService& con
     }
     if (singleton) {
       // Return a Wasm VM which will be stored as a singleton by the Server.
-      cb(std::make_unique<WasmService>(
-          Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, context.dispatcher())));
+      cb(std::make_unique<WasmService>(plugin, Common::Wasm::getOrCreateThreadLocalPlugin(
+                                                   base_wasm, plugin, context.dispatcher())));
       return;
     }
     // Per-thread WASM VM.
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    auto tls_slot = context.threadLocal().allocateSlot();
+    auto tls_slot =
+        ThreadLocal::TypedSlot<Common::Wasm::PluginHandle>::makeUnique(context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(
-          Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher));
+      return Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher);
     });
-    cb(std::make_unique<WasmService>(std::move(tls_slot)));
+    cb(std::make_unique<WasmService>(plugin, std::move(tls_slot)));
   };
 
   if (!Common::Wasm::createWasm(
