@@ -422,7 +422,13 @@ private:
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
 
-    ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher);
+    struct LocalClusterParams {
+      LoadBalancerFactorySharedPtr load_balancer_factory_;
+      ClusterInfoConstSharedPtr info_;
+    };
+
+    ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
+                                  const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
