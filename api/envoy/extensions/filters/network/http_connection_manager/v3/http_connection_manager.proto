@@ -834,3 +834,50 @@ message RequestIDExtension {
   // Request ID extension specific configuration.
   google.protobuf.Any typed_config = 1;
 }
+
+// If this is used, the cluster will only operate on one of the possible upstream protocols (HTTP/1.1, HTTP/2).
+// If :ref:`http2_protocol_options <envoy_api_field_config.cluster.v3.Cluster.http2_protocol_options>` are
+// present, HTTP2 will be used, otherwise HTTP1.1 will be used.
+message ExplicitHttpConfig {
+  oneof protocol_config {
+    config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
+
+    config.core.v3.Http1ProtocolOptions http2_protocol_options = 2;
+  }
+}
+
+// If this is used, the cluster can use either of the configured protocols, and
+// will use whichecer protocol was used by the downstream connection.
+message UseDownstreamHttpConfig {
+  config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
+
+  config.core.v3.Http1ProtocolOptions http2_protocol_options = 2;
+}
+
+// If this is used, Envoy will negotiate ALPN to determine if HTTP/1 or HTTP/2 should be used.
+message AlpnHttpConfig {
+  config.core.v3.Http1ProtocolOptions http_protocol_options = 3;
+
+  config.core.v3.Http1ProtocolOptions http2_protocol_options = 4;
+}
+
+// HttpProtocolOptions specifies Http upstream protocol options. This object
+// is used in
+// :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+// // keyed by the name `envoy.filters.network.http_connection_manager`.
+//
+// This controls what protocol should be used for upstream.
+// [#next-free-field: 6]
+message HttpProtocolOptions {
+  config.core.v3.HttpProtocolOptions common_http_protocol_options = 1;
+
+  config.core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 2;
+
+  oneof upstream_protocol_options {
+    ExplicitHttpConfig explicit_http_config = 3;
+
+    UseDownstreamHttpConfig use_downstream_protocol_config = 4;
+
+    AlpnHttpConfig alpn_config = 5;
+  }
+}
