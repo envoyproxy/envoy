@@ -257,6 +257,15 @@ message DeltaDiscoveryResponse {
 message Resource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Resource";
 
+  // Cache control properties for the resource.
+  // [#not-implemented-hide:]
+  message CacheControl {
+    // If true, xDS proxies may not cache this resource.
+    // Note that this does not apply to clients other than xDS proxies, which must cache resources
+    // for their own use, regardless of the value of this field.
+    bool do_not_cache = 1;
+  }
+
   // The resource's name, to distinguish it from others of the same type of resource.
   string name = 3 [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
 
@@ -289,9 +298,5 @@ message Resource {
   // with the management server.
   google.protobuf.Duration ttl = 6;
 
-  // If true, xDS proxies may not cache this resource.
-  // Note that this does not apply to clients other than xDS proxies, which must cache resources
-  // for their own use, regardless of the value of this field.
-  // [#not-implemented-hide:]
-  bool do_not_cache = 7;
+  CacheControl cache_control = 7;
 }
