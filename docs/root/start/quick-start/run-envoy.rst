@@ -252,7 +252,6 @@ This can be overridden using :option:`--log-path`.
 
          $ mkdir logs
          $ envoy -c envoy-demo.yaml --log-path logs/custom.log
-         ...
 
    .. tab:: Docker
 
@@ -266,11 +265,27 @@ This can be overridden using :option:`--log-path`.
                envoyproxy/|envoy_docker_image| \
                    -c /etc/envoy/envoy.yaml \
                    --log-path logs/custom.log
-         ...
 
 :ref:`Access log <arch_overview_access_logs>` paths can be set for the
 :ref:`admin interface <start_quick_start_admin>`, and for configured
 :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
+
+The :download:`demo configuration <_include/envoy-demo.yaml>` is configured with a
+:ref:`listener <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>` that logs access
+to ``/dev/stdout``:
+
+.. literalinclude:: _include/envoy-demo.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 12
+   :lines: 12-22
+   :emphasize-lines: 4-8
+
+The default configuration in the Envoy Docker container also logs access in this way.
+
+Logging to ``/dev/stderr`` and ``/dev/stdout`` for system and access logs respectively can
+be useful when running Envoy inside a container as the streams can be separated, and logging requires no
+additional files or directories to be mounted.
 
 Some Envoy :ref:`filters and extensions <api-v3_config>` may also have additional logging capabilities.
 
@@ -288,8 +303,6 @@ Debugging Envoy
 
 The log level for Envoy system logs can be set using the :option:`-l or --log-level <--log-level>` option.
 
-The default  is ``info``.
-
 The available log levels are:
 
 - ``trace``
@@ -299,6 +312,8 @@ The available log levels are:
 - ``error``
 - ``critical``
 - ``off``
+
+The default  is ``info``.
 
 You can also set the log level for specific components using the :option:`--component-log-level` option.
 
