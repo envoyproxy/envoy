@@ -5,8 +5,7 @@ CORS filter
 
 .. sidebar:: Requirements
 
-   :ref:`Sandbox environment <start_sandboxes_setup>`
-	Sandbox environment
+   .. include:: _include/docker-env-setup-link.rst
 
 Cross-Origin Resource Sharing (CORS) is a method of enforcing client-side
 access controls on resources by specifying external domains that are able to

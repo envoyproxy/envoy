@@ -5,8 +5,7 @@ Double proxy (with ``mTLS`` encryption)
 
 .. sidebar:: Requirements
 
-   :ref:`Sandbox environment <start_sandboxes_setup>`
-	Sandbox environment
+   .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
 	Used to make ``HTTP`` requests.

@@ -5,8 +5,7 @@ CSRF filter
 
 .. sidebar:: Requirements
 
-   :ref:`Sandbox environment <start_sandboxes_setup>`
-	Sandbox environment
+   .. include:: _include/docker-env-setup-link.rst
 
 Cross-Site Request Forgery (CSRF) is an attack that occurs when a malicious
 third-party website exploits a vulnerability that allows them to submit an

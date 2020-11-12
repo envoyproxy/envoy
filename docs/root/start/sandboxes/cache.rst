@@ -15,12 +15,16 @@ In this example, we demonstrate how HTTP caching can be utilized in Envoy by usi
 The setup of this sandbox is based on the setup of the :ref:`Front Proxy sandbox <install_sandboxes_front_proxy>`.
 
 All incoming requests are routed via the front Envoy, which acts as a reverse proxy sitting on
-the edge of the ``envoymesh`` network. Port ``8000`` is exposed by docker
-compose (see :repo:`/examples/cache/docker-compose.yaml`) to handle ``HTTP`` calls
+the edge of the ``envoymesh`` network.
+
+Port ``8000`` is exposed by :download:`docker compose <_include/cache/docker-compose.yaml>` to handle ``HTTP`` calls
 to the services. Two backend services are deployed behind the front Envoy, each with a sidecar Envoy.
 
 The front Envoy is configured to run the Cache Filter, which stores cacheable responses in an in-memory cache,
-and serves it to subsequent requests. In this demo, the responses that are served by the deployed services are stored in :repo:`/examples/cache/responses.yaml`.
+and serves it to subsequent requests.
+
+In this demo, the responses that are served by the deployed services are stored in :download:`responses.yaml <_include/cache/responses.yaml`.
+
 This file is mounted to both services' containers, so any changes made to the stored responses while the services are running should be instantly effective (no need to rebuild or rerun).
 
 For the purposes of the demo, a response's date of creation is appended to its body before being served.
