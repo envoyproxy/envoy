@@ -1,8 +1,15 @@
 .. _install_sandboxes_cache_filter:
 
-Cache Filter
+Cache filter
 ============
 .. TODO(yosrym93): When a documentation is written for a production-ready Cache Filter, link to it through this doc.
+
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
 
 In this example, we demonstrate how HTTP caching can be utilized in Envoy by using the Cache Filter.
 The setup of this sandbox is based on the setup of the :ref:`Front Proxy sandbox <install_sandboxes_front_proxy>`.
@@ -22,10 +29,10 @@ Cached responses can be identified by having an ``age`` header. Validated respon
 as when a response is validated the ``date`` header is updated, while the body stays the same. Validated responses do not have an ``age`` header.
 Responses served from the backend service have no ``age`` header, and their ``date`` header is the same as their generation date.
 
-.. include:: _include/docker-env-setup.rst
-
-Step 3: Start all of our containers
+Step 1: Start all of our containers
 ***********************************
+
+Change to the ``examples/cache`` directory.
 
 .. code-block:: console
 
@@ -41,7 +48,7 @@ Step 3: Start all of our containers
     cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     cache_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
-Step 4: Test Envoy's HTTP caching capabilities
+Step 2: Test Envoy's HTTP caching capabilities
 **********************************************
 
 You can now send a request to both services via the ``front-envoy``. Note that since the two services have different routes,

@@ -3,6 +3,12 @@
 Jaeger Tracing
 ==============
 
+.. sidebar:: Requirements
+
+   `curl <https://curl.se/>`_
+
+      Used to make ``HTTP`` requests.
+
 The Jaeger tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `Jaeger <https://jaegertracing.io/>`_ as the tracing provider. This sandbox
 is very similar to the front proxy architecture described above, with one difference:

@@ -1,7 +1,15 @@
 .. _install_sandboxes_ext_authz:
 
-External Authorization Filter
-=============================
+External authorization (ext_authz) filter
+=========================================
+
+.. sidebar:: Requirements
+
+   :ref:`Sandbox environment <start_sandboxes_setup>`
+	Sandbox environment
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
 
 The External Authorization sandbox demonstrates Envoy's :ref:`ext_authz filter <config_http_filters_ext_authz>`
 capability to delegate authorization of incoming requests through Envoy to an external services.
@@ -14,10 +22,10 @@ service behind the proxy will be checked by an external HTTP or gRPC service. In
 for every authorized call, the external authorization service adds additional ``x-current-user``
 header entry to the original request headers to be forwarded to the upstream service.
 
-.. include:: _include/docker-env-setup.rst
-
-Step 3: Start all of our containers
+Step 1: Start all of our containers
 ***********************************
+
+Change to the ``examples/ext_authz`` directory.
 
 To build this sandbox example and start the example services, run the following commands:
 

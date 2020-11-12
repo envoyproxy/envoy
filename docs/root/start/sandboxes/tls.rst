@@ -5,7 +5,12 @@ TLS
 
 .. sidebar:: Requirements
 
+   `curl <https://curl.se/>`_
+
+      Used to make ``HTTP`` requests.
+
    `jq <https://stedolan.github.io/jq/>`_
+
       Used to parse ``json`` output from the upstream echo servers.
 
 This example walks through some of the ways that Envoy can be configured to make
@@ -121,7 +126,7 @@ The :download:`http -> https configuration <_include/tls/envoy-http-https.yaml>`
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
-Querying the service at port ``10001`` you should see an ``x-forwarded-proto`` header of ``http`` has
+Querying the service at port ``10002`` you should see an ``x-forwarded-proto`` header of ``http`` has
 been added:
 
 .. code-block:: console

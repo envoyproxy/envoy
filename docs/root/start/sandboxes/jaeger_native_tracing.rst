@@ -3,6 +3,12 @@
 Jaeger Native Tracing
 =====================
 
+.. sidebar:: Requirements
+
+   `curl <https://curl.se/>`_
+
+      Used to make ``HTTP`` requests.
+
 The Jaeger tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `Jaeger <https://jaegertracing.io/>`_ as the tracing provider and Jaeger's native
 `C++ client <https://github.com/jaegertracing/jaeger-client-cpp>`_ as a plugin. Using Jaeger with its

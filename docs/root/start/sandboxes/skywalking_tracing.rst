@@ -3,6 +3,12 @@
 SkyWalking Tracing
 ==================
 
+.. sidebar:: Requirements
+
+   `curl <https://curl.se/>`_
+
+      Make ``HTTP`` requests.
+
 The SkyWalking tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `SkyWalking <http://skywalking.apache.org>`_ as the tracing provider. This sandbox
 is very similar to the Zipkin sandbox. All containers will be deployed inside a virtual network

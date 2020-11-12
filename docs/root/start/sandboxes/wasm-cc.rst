@@ -3,6 +3,12 @@
 WASM C++ filter
 ===============
 
+.. sidebar:: Requirements
+
+   `curl <https://curl.se/>`_
+
+      Make ``HTTP`` requests.
+
 This sandbox demonstrates a basic C++ Wasm filter which injects content into the body of an ``HTTP`` response, and adds
 and updates some headers.
 

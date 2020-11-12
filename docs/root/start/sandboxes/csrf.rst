@@ -1,7 +1,12 @@
 .. _install_sandboxes_csrf:
 
-CSRF Filter
+CSRF filter
 ===========
+
+.. sidebar:: Requirements
+
+   :ref:`Sandbox environment <start_sandboxes_setup>`
+	Sandbox environment
 
 Cross-Site Request Forgery (CSRF) is an attack that occurs when a malicious
 third-party website exploits a vulnerability that allows them to submit an
@@ -27,12 +32,10 @@ enforcement. The CSRF enforcement choices are:
   * Ignored: CSRF is enabled but the request type is a GET. This should bypass
     the CSRF filter and return successfully.
 
-.. include:: _include/docker-env-setup.rst
-
-Step 3: Start all of our containers
+Step 1: Start all of our containers
 ***********************************
 
-Switch to the ``samesite`` directory in the ``csrf`` example, and start the containers:
+Change to the ``examples/csrf/samesite`` directory, and start the containers:
 
 .. code-block:: console
 
@@ -61,7 +64,7 @@ Now, switch to the ``crosssite`` directory in the ``csrf`` example, and start th
   crosssite_front-envoy_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp
   crosssite_service_1          /docker-entrypoint.sh /bin ... Up      10000/tcp
 
-Step 4: Test Envoy's CSRF capabilities
+Step 2: Test Envoy's CSRF capabilities
 **************************************
 
 You can now open a browser at http://localhost:8002 to view your ``crosssite`` frontend service.
@@ -86,7 +89,7 @@ For example:
 If you change the destination to be the same as one displaying the website and
 set the ``CSRF`` enforcement to enabled the request will go through successfully.
 
-Step 5: Check stats of backend via admin
+Step 3: Check stats of backend via admin
 ****************************************
 
 When Envoy runs, it can listen to ``admin`` requests if a port is configured. In

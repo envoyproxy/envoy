@@ -3,6 +3,12 @@
 Redis Filter
 ============
 
+.. sidebar:: Requirements
+
+   `redis-cli <https://redis.io/topics/rediscli>`_
+
+      Redis client.
+
 In this example, we show how a :ref:`Redis filter <config_network_filters_redis_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a Redis filter that routes egress requests to redis server.
 
 .. include:: _include/docker-env-setup.rst

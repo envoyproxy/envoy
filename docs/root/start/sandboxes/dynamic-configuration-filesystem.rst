@@ -3,17 +3,26 @@
 Dynamic configuration (filesystem)
 ==================================
 
+.. sidebar:: Requirements
+
+   :ref:`Sandbox environment <start_sandboxes_setup>`
+	Sandbox environment
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+   :ref:`jq <start_sandboxes_setup_jq>`
+	Parse ``json`` output from the upstream echo servers.
+
 This example walks through configuring Envoy using filesystem-based dynamic configuration.
 
 It demonstrates how configuration provided to Envoy dynamically can be updated without
 restarting the server.
 
-.. include:: _include/docker-env-setup.rst
+Step 1: Start the proxy container
+*********************************
 
 Change directory to ``examples/dynamic-config-fs`` in the Envoy repository.
-
-Step 3: Start the proxy container
-*********************************
 
 Build and start the containers.
 
@@ -33,7 +42,7 @@ This should also start two upstream ``HTTP`` echo servers, ``service1`` and ``se
     dynamic-config-fs_service1_1   /bin/echo-server               Up      8080/tcp
     dynamic-config-fs_service2_1   /bin/echo-server               Up      8080/tcp
 
-Step 4: Check web response
+Step 2: Check web response
 **************************
 
 You should be able to make a request to port ``10000``, which will be served by ``service1``.
@@ -52,7 +61,7 @@ You should be able to make a request to port ``10000``, which will be served by 
    X-Request-Id: 6672902d-56ca-456c-be6a-992a603cab9a
    X-Envoy-Expected-Rq-Timeout-Ms: 15000
 
-Step 5: Dump Envoy's ``dynamic_active_clusters`` config
+Step 3: Dump Envoy's ``dynamic_active_clusters`` config
 *******************************************************
 
 If you now dump the proxy’s ``dynamic_active_clusters`` configuration, you should see it is configured with
@@ -66,7 +75,7 @@ the ``example_proxy_cluster`` pointing to ``service1``.
    :language: json
    :emphasize-lines: 10, 18-19
 
-Step 5: Edit ``cds.yaml`` inside the container to update upstream cluster
+Step 4: Edit ``cds.yaml`` inside the container to update upstream cluster
 *************************************************************************
 
 The example setup provides Envoy with two dynamic configuration files:
@@ -92,7 +101,7 @@ You can do this using ``sed`` inside the container:
 
    docker-compose exec -T proxy sed -i s/service1/service2/ /var/lib/envoy/cds.yaml
 
-Step 6: Check Envoy uses updated configuration
+Step 5: Check Envoy uses updated configuration
 **********************************************
 
 Checking the web response again, the request should now be handled by ``service2``:

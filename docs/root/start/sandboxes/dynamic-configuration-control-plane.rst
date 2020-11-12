@@ -3,18 +3,27 @@
 Dynamic configuration (control plane)
 =====================================
 
+.. sidebar:: Requirements
+
+   :ref:`Sandbox environment <start_sandboxes_setup>`
+	Sandbox environment
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+   :ref:`jq <start_sandboxes_setup_jq>`
+	Parse ``json`` output from the upstream echo servers.
+
 This example walks through configuring Envoy using the `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_
 reference implementation.
 
 It demonstrates how configuration provided to Envoy persists, even when the control plane is not available,
 and provides a trivial example of how to update Envoy's configuration dynamically.
 
-.. include:: _include/docker-env-setup.rst
+Step 1: Start the proxy container
+*********************************
 
 Change directory to ``examples/dynamic-config-cp`` in the Envoy repository.
-
-Step 3: Start the proxy container
-*********************************
 
 First build the containers and start the ``proxy`` container.
 
@@ -36,7 +45,7 @@ The control plane has not yet been started.
     dynamic-config-cp_service1_1   /bin/echo-server               Up      8080/tcp
     dynamic-config-cp_service2_1   /bin/echo-server               Up      8080/tcp
 
-Step 4: Check initial config and web response
+Step 2: Check initial config and web response
 *********************************************
 
 As we have not yet started the control plane, nothing should be responding on port ``10000``.
@@ -64,7 +73,7 @@ No ``dynamic_active_clusters`` have been configured yet:
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
    null
 
-Step 5: Start the control plane
+Step 3: Start the control plane
 *******************************
 
 Start up the ``go-control-plane`` service.
@@ -83,7 +92,7 @@ You may need to wait a moment or two for it to become ``healthy``.
     dynamic-config-cp_service1_1          /bin/echo-server               Up            8080/tcp
     dynamic-config-cp_service2_1          /bin/echo-server               Up            8080/tcp
 
-Step 6: Query the proxy
+Step 4: Query the proxy
 ***********************
 
 Once the control plane has started and is ``healthy``, you should be able to make a request to port ``10000``,

@@ -3,6 +3,12 @@
 Zipkin Tracing
 ==============
 
+.. sidebar:: Requirements
+
+   `curl <https://curl.se/>`_
+
+      Make ``HTTP`` requests.
+
 The Zipkin tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `Zipkin <https://zipkin.io/>`_ as the tracing provider. This sandbox
 is very similar to the front proxy architecture described above, with one difference:

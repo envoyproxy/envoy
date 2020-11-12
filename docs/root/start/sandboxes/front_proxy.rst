@@ -3,6 +3,12 @@
 Front Proxy
 ===========
 
+.. sidebar:: Requirements
+
+   `curl <https://curl.se/>`_
+
+      Used to make ``HTTP`` requests.
+
 To get a flavor of what Envoy has to offer as a front proxy, we are releasing a `docker compose <https://docs.docker.com/compose/>`_
 sandbox that deploys a front Envoy and a couple of services (simple Flask apps) colocated with a
 running service Envoy. The three containers will be deployed inside a virtual network called
