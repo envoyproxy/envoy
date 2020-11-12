@@ -31,6 +31,9 @@ run_examples () {
     cd "${SRCDIR}/examples" || exit 1
     examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" | sort)
     for example in $examples; do
+	if [[ "${example}" == _* ]]; then
+	    continue
+	fi
         pushd "$example" > /dev/null || return 1
         ./verify.sh
         popd > /dev/null || return 1
