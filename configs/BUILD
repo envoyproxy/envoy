@@ -31,11 +31,15 @@ filegroup(
             "using_deprecated_config.yaml",
             "**/*.template.yaml",
             "freebind/freebind.yaml",
+            "envoy-demo.yaml",
         ],
     ) + select({
-        "//bazel:apple": [],
+        "//bazel:apple": ["envoy-demo.yaml"],
         "//bazel:windows_x86_64": [],
-        "//conditions:default": ["freebind/freebind.yaml"],
+        "//conditions:default": [
+            "envoy-demo.yaml",
+            "freebind/freebind.yaml",
+        ],
     }),
 )
 
