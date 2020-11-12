@@ -21,6 +21,7 @@ static const char* cluster_inputs[] = {
 static const char cluster_re_pattern[] = "^cluster\\.((.*?)\\.)";
 static const char cluster_re_alt_pattern[] = "^cluster\\.(([^\\.]+)\\.).*";
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StdRegex(benchmark::State& state) {
   std::regex re(cluster_re_pattern);
   uint32_t passes = 0;
@@ -44,6 +45,7 @@ static void BM_StdRegex(benchmark::State& state) {
 }
 BENCHMARK(BM_StdRegex);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StdRegexStringView(benchmark::State& state) {
   std::regex re(cluster_re_pattern);
   std::vector<absl::string_view> inputs;
@@ -66,6 +68,7 @@ static void BM_StdRegexStringView(benchmark::State& state) {
 }
 BENCHMARK(BM_StdRegexStringView);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StdRegexStringViewAltPattern(benchmark::State& state) {
   std::regex re(cluster_re_alt_pattern);
   std::vector<absl::string_view> inputs;
@@ -88,6 +91,7 @@ static void BM_StdRegexStringViewAltPattern(benchmark::State& state) {
 }
 BENCHMARK(BM_StdRegexStringViewAltPattern);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_RE2(benchmark::State& state) {
   re2::RE2 re(cluster_re_pattern);
   uint32_t passes = 0;
@@ -105,6 +109,7 @@ static void BM_RE2(benchmark::State& state) {
 }
 BENCHMARK(BM_RE2);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_RE2_AltPattern(benchmark::State& state) {
   re2::RE2 re(cluster_re_alt_pattern);
   uint32_t passes = 0;
