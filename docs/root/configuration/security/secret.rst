@@ -239,6 +239,39 @@ Path to CA certificate bundle for validating the xDS server certificate is given
           trusted_ca:
             filename: /certs/cacert.pem
 
+In the above example, a watch will be established on ``/certs``. File movement in this directory
+will trigger an update. An alternative common key rotation scheme that provides improved atomicity
+is to establish an active symlink ``/certs/current`` and use an atomic move operation to replace the
+symlink. The watch in this case needs to be on the certificate's grandparent directory. Envoy
+supports this scheme via the use of *watched_path*. Continuing the above examples:
+
+.. code-block:: yaml
+
+    resources:
+      - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+        tls_certificate:
+          certificate_chain:
+            filename: /certs/current/sds_cert.pem
+          private_key:
+            filename: /certs/current/sds_key.pem
+          watched_directory:
+            path: /certs
+
+.. code-block:: yaml
+
+    resources:
+      - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+        validation_context:
+          trusted_ca:
+            filename: /certs/current/cacert.pem
+          watched_directory:
+            path: /certs
+
+Secret rotation can be performed with:
+
+.. code-block:: bash
+
+  ln -s <path to new secrets> /certs/new && mv -Tf /certs/new /certs/current
 
 Statistics
 ----------
