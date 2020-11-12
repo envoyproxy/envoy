@@ -152,7 +152,8 @@ public:
     std::string host("www.abc.com");
     Http::TestRequestHeaderMapImpl request_headers{
         {":authority", host}, {":method", "GET"}, {":path", "/"}};
-    stream.encodeHeaders(request_headers, true);
+    const auto result = stream.encodeHeaders(request_headers, true);
+    ASSERT(result.ok());
     return stream;
   }
 

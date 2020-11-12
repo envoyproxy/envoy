@@ -3,7 +3,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/upstream/cds_api.h"
@@ -435,7 +434,8 @@ static_resources:
       "'CLUSTER_PROVIDED' or 'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'");
 }
 
-TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
+TEST_F(ClusterManagerImplTest, DEPRECATED_FEATURE_TEST(OriginalDstLbRestriction2)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
  static_resources:
   clusters:
@@ -556,7 +556,8 @@ INSTANTIATE_TEST_SUITE_P(ClusterManagerSubsetInitializationTest,
                          testing::ValuesIn(ClusterManagerSubsetInitializationTest::lbPolicies()),
                          ClusterManagerSubsetInitializationTest::paramName);
 
-TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
+TEST_F(ClusterManagerImplTest, DEPRECATED_FEATURE_TEST(SubsetLoadBalancerOriginalDstRestriction)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
  static_resources:
   clusters:
@@ -1233,6 +1234,105 @@ dynamic_warming_clusters:
   checkStats(1 /*added*/, 0 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
+  const std::string json = fmt::sprintf(
+      R"EOF(
+  {
+    "dynamic_resources": {
+      "cds_config": {
+        "api_config_source": {
+          "api_type": "0",
+          "refresh_delay": "30s",
+          "cluster_names": ["cds_cluster"]
+        }
+      }
+    },
+    "static_resources": {
+      %s
+    }
+  }
+  )EOF",
+      clustersJson({
+          defaultStaticClusterJson("cds_cluster"),
+      }));
+
+  MockCdsApi* cds = new MockCdsApi();
+  std::shared_ptr<MockClusterMockPrioritySet> cds_cluster(
+      new NiceMock<MockClusterMockPrioritySet>());
+  cds_cluster->info_->name_ = "cds_cluster";
+
+  // This part tests static init.
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cds_cluster, nullptr)));
+  ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
+  EXPECT_CALL(*cds, setInitializedCb(_));
+  EXPECT_CALL(*cds_cluster, initialize(_));
+
+  create(parseBootstrapFromV3Json(json));
+
+  ReadyWatcher cm_initialized;
+  cluster_manager_->setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  const std::string ready_cluster_yaml = R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+
+  const std::string warming_cluster_yaml = R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: foo.com
+                port_value: 11001
+  )EOF";
+
+  {
+    SCOPED_TRACE("Add a primary cluster staying in warming.");
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _));
+    EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(warming_cluster_yaml),
+                                                     "warming"));
+
+    // Mark all the rest of the clusters ready. Now the only warming cluster is the above one.
+    EXPECT_CALL(cm_initialized, ready()).Times(0);
+    cds_cluster->initialize_callback_();
+  }
+
+  {
+    SCOPED_TRACE("Modify the only warming primary cluster to immediate ready.");
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _));
+    EXPECT_CALL(*cds, initialize());
+    EXPECT_TRUE(
+        cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(ready_cluster_yaml), "ready"));
+  }
+  {
+    SCOPED_TRACE("All clusters are ready.");
+    EXPECT_CALL(cm_initialized, ready());
+    cds->initialized_callback_();
+  }
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()));
 }
 
 TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
@@ -2308,154 +2408,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   factory_.tls_.shutdownThread();
 }
 
-TEST_F(ClusterManagerImplTest,
-       DynamicAddedAndKeepWarmingWithoutCertificateValidationContextEntity) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.cluster_keep_warming_no_secret_entity", "true"}});
-  create(defaultConfig());
-
-  ReadyWatcher initialized;
-  EXPECT_CALL(initialized, ready());
-  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  cluster1->info_->name_ = "fake_cluster";
-
-  auto transport_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
-  EXPECT_CALL(*transport_socket_factory, isReady()).WillOnce(Return(false));
-
-  auto transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
-      std::move(transport_socket_factory));
-  cluster1->info_->transport_socket_matcher_ = std::move(transport_socket_matcher);
-
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
-      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
-  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
-  EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
-  cluster1->initialize_callback_();
-
-  // Check to be keep warming fake_cluster after callback invoked.
-  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
-}
-
-TEST_F(ClusterManagerImplTest,
-       DynamicAddedAndKeepWarmingDisabledWithoutCertificateValidationContextEntity) {
-  create(defaultConfig());
-
-  ReadyWatcher initialized;
-  EXPECT_CALL(initialized, ready());
-  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  cluster1->info_->name_ = "fake_cluster";
-
-  auto transport_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
-  EXPECT_CALL(*transport_socket_factory, isReady()).WillOnce(Return(false));
-
-  auto transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
-      std::move(transport_socket_factory));
-  cluster1->info_->transport_socket_matcher_ = std::move(transport_socket_matcher);
-
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
-      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
-  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
-  EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
-  cluster1->initialize_callback_();
-
-  // Check to be keep warming fake_cluster after callback invoked.
-  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
-  EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
-
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
-}
-
-TEST_F(ClusterManagerImplTest, DynamicAddedAndKeepWarmingWithoutTlsCertificateEntity) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.cluster_keep_warming_no_secret_entity", "true"}});
-  create(defaultConfig());
-
-  ReadyWatcher initialized;
-  EXPECT_CALL(initialized, ready());
-  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  cluster1->info_->name_ = "fake_cluster";
-
-  auto transport_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
-  EXPECT_CALL(*transport_socket_factory, isReady()).WillOnce(Return(false));
-
-  auto transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
-      std::move(transport_socket_factory));
-  cluster1->info_->transport_socket_matcher_ = std::move(transport_socket_matcher);
-
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
-      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
-  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
-  EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
-  cluster1->initialize_callback_();
-
-  // Check to be keep warming fake_cluster after callback invoked.
-  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
-}
-
-TEST_F(ClusterManagerImplTest, DynamicAddedAndKeepWarmingDisabledWithoutTlsCertificateEntity) {
-  create(defaultConfig());
-
-  ReadyWatcher initialized;
-  EXPECT_CALL(initialized, ready());
-  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  cluster1->info_->name_ = "fake_cluster";
-
-  auto transport_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
-  EXPECT_CALL(*transport_socket_factory, isReady()).WillOnce(Return(false));
-
-  auto transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
-      std::move(transport_socket_factory));
-  cluster1->info_->transport_socket_matcher_ = std::move(transport_socket_matcher);
-
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
-      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
-  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
-  EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
-  cluster1->initialize_callback_();
-
-  // Check to be keep warming fake_cluster after callback invoked.
-  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
-  EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
-
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
-}
-
 class MockConnPoolWithDestroy : public Http::ConnectionPool::MockInstance {
 public:
   ~MockConnPoolWithDestroy() override { onDestroy(); }
@@ -3134,6 +3086,33 @@ TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
   cluster1.initialize_callback_();
 }
 
+// Verify that primary cluster can be updated in warming state.
+TEST_F(ClusterManagerInitHelperTest, TestUpdateWarming) {
+  InSequence s;
+
+  auto sds = std::make_unique<NiceMock<MockClusterMockPrioritySet>>();
+  ON_CALL(*sds, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*sds, initialize(_));
+  init_helper_.addCluster(*sds);
+  init_helper_.onStaticLoadComplete();
+
+  NiceMock<MockClusterMockPrioritySet> updated_sds;
+  ON_CALL(updated_sds, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(updated_sds, initialize(_));
+  init_helper_.addCluster(updated_sds);
+
+  // The override cluster is added. Manually drop the previous cluster. In production flow this is
+  // achieved by ClusterManagerImpl.
+  sds.reset();
+
+  ReadyWatcher primary_initialized;
+  init_helper_.setPrimaryClustersInitializedCb([&]() -> void { primary_initialized.ready(); });
+
+  EXPECT_CALL(*this, onClusterInit(Ref(updated_sds)));
+  EXPECT_CALL(primary_initialized, ready());
+  updated_sds.initialize_callback_();
+}
+
 TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   InSequence s;
 
@@ -3237,6 +3216,7 @@ TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   init_helper_.addCluster(cluster1);
 
   NiceMock<MockClusterMockPrioritySet> cluster2;
+  cluster2.info_->name_ = "cluster2";
   ON_CALL(cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster2);
 
@@ -3249,6 +3229,8 @@ TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   init_helper_.startInitializingSecondaryClusters();
 
   NiceMock<MockClusterMockPrioritySet> cluster3;
+  cluster3.info_->name_ = "cluster3";
+
   ON_CALL(cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   EXPECT_CALL(cluster3, initialize(_));
   init_helper_.addCluster(cluster3);
