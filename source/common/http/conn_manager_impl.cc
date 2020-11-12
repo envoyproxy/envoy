@@ -470,13 +470,13 @@ void ConnectionManagerImpl::onIdleTimeout() {
   }
 }
 
-// TODO(#13142): Add DurationTimeout response flag for HCM.
 void ConnectionManagerImpl::onConnectionDurationTimeout() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   stats_.named_.downstream_cx_max_duration_reached_.inc();
   if (!codec_) {
     // Attempt to write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt,
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite,
+                      StreamInfo::ResponseFlag::DurationTimeout,
                       StreamInfo::ResponseCodeDetails::get().DurationTimeout);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
