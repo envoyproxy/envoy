@@ -20,7 +20,7 @@ import subprocess
 import sys
 import tempfile
 
-from api_proto_plugin import utils
+# from api_proto_plugin import utils
 
 from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
@@ -57,6 +57,30 @@ SERVICE_REGEX = re.compile('service \w+ {')
 PACKAGE_REGEX = re.compile('\npackage: "([^"]*)"')
 PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(r'previous_message_type\s+=\s+"([^"]*)";')
 
+def ProtoFileCanonicalFromLabel(label):
+  """Compute path from API root to a proto file from a Bazel proto label.
+  Args:
+    label: Bazel source proto label string.
+  Returns:
+    A string with the path, e.g. for @envoy_api//envoy/type/matcher:metadata.proto
+    this would be envoy/type/matcher/matcher.proto.
+  """
+  assert (label.startswith('@envoy_api_canonical//'))
+  return label[len('@envoy_api_canonical//'):].replace(':', '/')
+
+
+def BazelBinPathForOutputArtifact(label, suffix, root=''):
+  """Find the location in bazel-bin/ for an api_proto_plugin output file.
+  Args:
+    label: Bazel source proto label string.
+    suffix: output suffix for the artifact from label, e.g. ".types.pb_text".
+    root: location of bazel-bin/, if not specified, PWD.
+  Returns:
+    Path in bazel-bin/external/envoy_api_canonical for label output with given suffix.
+  """
+  proto_file_path = ProtoFileCanonicalFromLabel(label)
+  return os.path.join(root, 'bazel-bin/external/envoy_api_canonical',
+                      os.path.dirname(proto_file_path), 'pkg', proto_file_path + suffix)
 
 class ProtoSyncError(Exception):
   pass
@@ -378,11 +402,8 @@ def Sync(api_root, mode, labels, shadow):
     dst_dir = pathlib.Path(tmp).joinpath("b")
     paths = []
     for label in labels:
-      paths.append(utils.BazelBinPathForOutputArtifact(label, '.active_or_frozen.proto'))
-      paths.append(
-          utils.BazelBinPathForOutputArtifact(
-              label, '.next_major_version_candidate.envoy_internal.proto'
-              if shadow else '.next_major_version_candidate.proto'))
+      paths.append(BazelBinPathForOutputArtifact(label, '.active_or_frozen.proto'))
+      paths.append(BazelBinPathForOutputArtifact(label, '.next_major_version_candidate.envoy_internal.proto' if shadow else '.next_major_version_candidate.proto'))
     dst_src_paths = defaultdict(list)
     for path in paths:
       if os.stat(path).st_size > 0:
@@ -415,8 +436,8 @@ def Sync(api_root, mode, labels, shadow):
 
     if diff.strip():
       if mode == "check":
-        print("Please apply following patch to directory '{}'".format(api_root), file=sys.stderr)
-        print(diff.decode(), file=sys.stderr)
+        # print("Please apply following patch to directory '{}'".format(api_root), file=sys.stderr)
+        # print(diff.decode(), file=sys.stderr)
         sys.exit(1)
       if mode == "fix":
         git_status = GitStatus(api_root)
