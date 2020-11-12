@@ -199,3 +199,11 @@ of ``2``, and ``example_proxy_cluster`` is configured to proxy to ``service2``:
 .. literalinclude:: _include/dynamic-config-cp/response-config-active-clusters-updated.json
    :language: json
    :emphasize-lines: 3, 11, 19-20
+
+.. seealso::
+
+   :ref:`Dynamic configuration (control plane) quick start guide <start_quick_start_dynamic_control_plane>`
+      Quick start guide to dynamic configuration of Envoy with a control plane.
+
+   :ref:`Dynamic configuration (filesystem) sandbox <install_sandboxes_dynamic_config_fs>`
+      Configure Envoy using filesystem-based dynamic configuration.

@@ -180,3 +180,11 @@ Checking the response at http://localhost:10000, you should see the output from 
 
    $ curl -s http://localhost:10000
    Connected to Postgres, version: PostgreSQL 13.0 (Debian 13.0-1.pgdg100+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 8.3.0-6) 8.3.0, 64-bit
+
+.. seealso::
+
+   :ref:`Securing Envoy quick start guide <start_quick_start_securing>`
+      Outline of key concepts for securing Envoy.
+
+   :ref:`TLS sandbox <install_sandboxes_tls>`
+      Examples of various ``TLS`` termination patterns with Envoy.

@@ -120,3 +120,12 @@ configured to proxy to ``service2``:
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters-updated.json
    :language: json
    :emphasize-lines: 10, 18-19
+
+
+.. seealso::
+
+   :ref:`Dynamic configuration (filesystem) quick start guide <start_quick_start_dynamic_filesystem>`
+      Quick start guide to filesystem-based dynamic configuration of Envoy.
+
+   :ref:`Dynamic configuration (control plane) sandbox <install_sandboxes_dynamic_config_cp>`
+      Configure Envoy dynamically with the Go Control Plane.

@@ -234,5 +234,8 @@ You will receive a new response that's served from the backend service.
 The new response will be cached for subsequent requests.
 
 You can also add new responses to the yaml file with different ``cache-control`` headers and start experimenting!
-To learn more about caching and ``cache-control`` headers visit
-the `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
+
+.. seealso::
+
+   `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
+      To learn more about caching and ``cache-control``.
