@@ -94,7 +94,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "abseil-cpp-{version}",
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-10-16",
+        release_date = "2020-10-17",
         cpe = "N/A",
     ),
     com_github_c_ares_c_ares = dict(
