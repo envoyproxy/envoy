@@ -95,6 +95,16 @@ responds_with () {
     }
 }
 
+responds_without () {
+    local expected
+    expected="$1"
+    shift
+    _curl "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
+        echo "ERROR: curl without (${*}): $expected" >&2
+        return 1
+    }
+}
+
 responds_with_header () {
     local expected
     expected="$1"

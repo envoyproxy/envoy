@@ -109,7 +109,7 @@ std::string ConfigHelper::tcpProxyConfig() {
       filters:
         name: tcp
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
 )EOF");
@@ -128,7 +128,7 @@ std::string ConfigHelper::httpProxyConfig() {
       filters:
         name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           delayed_close_timeout:
             nanos: 100
@@ -140,7 +140,7 @@ std::string ConfigHelper::httpProxyConfig() {
             filter:
               not_health_check_filter:  {{}}
             typed_config:
-              "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
               path: {}
           route_config:
             virtual_hosts:
@@ -167,7 +167,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
       filters:
         name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.filters.http.router
@@ -177,7 +177,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
             filter:
               not_health_check_filter:  {{}}
             typed_config:
-              "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
               path: {}
           route_config:
             virtual_hosts:
@@ -199,7 +199,7 @@ std::string ConfigHelper::defaultBufferFilter() {
   return R"EOF(
 name: buffer
 typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
+    "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
     max_request_bytes : 5242880
 )EOF";
 }
@@ -208,7 +208,7 @@ std::string ConfigHelper::smallBufferFilter() {
   return R"EOF(
 name: buffer
 typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
+    "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
     max_request_bytes : 1024
 )EOF";
 }
@@ -217,7 +217,7 @@ std::string ConfigHelper::defaultHealthCheckFilter() {
   return R"EOF(
 name: health_check
 typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
 )EOF";
 }
@@ -226,7 +226,7 @@ std::string ConfigHelper::defaultSquashFilter() {
   return R"EOF(
 name: squash
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.squash.v2.Squash
+  "@type": type.googleapis.com/envoy.extensions.filters.http.squash.v3.Squash
   cluster: squash
   attachment_template:
     spec:
@@ -259,6 +259,7 @@ admin:
       port_value: 0
 dynamic_resources:
   cds_config:
+    resource_api_version: V3
     api_config_source:
       api_type: {}
       grpc_services:
@@ -288,7 +289,7 @@ static_resources:
       filters:
         name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.filters.http.router
@@ -477,7 +478,7 @@ ConfigHelper::buildListener(const std::string& name, const std::string& route_co
         filters:
         - name: http
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
             stat_prefix: {}
             codec_type: HTTP2
             rds:
@@ -615,6 +616,11 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
+}
+
+void ConfigHelper::enableDeprecatedV2Api() {
+  addRuntimeOverride("envoy.reloadable_features.enable_deprecated_v2_api", "true");
+  addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
 void ConfigHelper::setNewCodecs() {
