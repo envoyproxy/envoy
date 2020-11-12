@@ -202,7 +202,12 @@ void Registry::setLogLevel(spdlog::level::level_enum log_level) {
 
 void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
-    logger.logger_->set_pattern(log_format);
+    auto formatter = std::make_unique<spdlog::pattern_formatter>();
+    formatter
+        ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
+            CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
+        .set_pattern(log_format);
+    logger.logger_->set_formatter(std::move(formatter));
   }
 }
 
@@ -217,5 +222,15 @@ Logger* Registry::logger(const std::string& log_name) {
   return logger_to_return;
 }
 
+namespace CustomFlagFormatter {
+
+void EscapeMessageNewLine::format(const spdlog::details::log_msg& msg, const std::tm&,
+                                  spdlog::memory_buf_t& dest) {
+  auto escaped = absl::StrReplaceAll(absl::string_view(msg.payload.data(), msg.payload.size()),
+                                     replacements());
+  dest.append(escaped.data(), escaped.data() + escaped.size());
+}
+
+} // namespace CustomFlagFormatter
 } // namespace Logger
 } // namespace Envoy
