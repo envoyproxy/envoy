@@ -419,8 +419,9 @@ public:
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    generic_secret_ = std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
-        secret.generic_secret());
+    generic_secret_ =
+        std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
+            secret.generic_secret());
   }
   void
   validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
