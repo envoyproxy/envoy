@@ -48,8 +48,9 @@ TEST(TagExtractorTest, RE2Variants) {
   EXPECT_EQ("test_cluster", std::string(match2));
 
   std::regex sr("^cluster\\.((.*?)\\.)");
-  std::match_results<absl::string_view::iterator> smatch;
-  ASSERT_TRUE(std::regex_search("cluster.test_cluster.upstream_cx_total", smatch, sr));
+  std::match_results<std::string::const_iterator> smatch;
+  std::string str("cluster.test_cluster.upstream_cx_total");
+  ASSERT_TRUE(std::regex_search(str, smatch, sr));
   ASSERT_LE(3, smatch.size());
   EXPECT_EQ("test_cluster.", std::string(smatch[1]));
   EXPECT_EQ("test_cluster", std::string(smatch[2]));

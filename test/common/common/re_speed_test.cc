@@ -30,7 +30,7 @@ static void BM_StdRegex(benchmark::State& state) {
     inputs.push_back(cluster_input);
   }
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : inputs) {
       std::smatch match;
       if (std::regex_search(cluster_input, match, re)) {
@@ -53,7 +53,7 @@ static void BM_StdRegexStringView(benchmark::State& state) {
     inputs.push_back(cluster_input);
   }
   uint32_t passes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (absl::string_view cluster_input : inputs) {
       std::match_results<absl::string_view::iterator> smatch;
       if (std::regex_search(cluster_input.begin(), cluster_input.end(), smatch, re)) {
@@ -76,7 +76,7 @@ static void BM_StdRegexStringViewAltPattern(benchmark::State& state) {
     inputs.push_back(cluster_input);
   }
   uint32_t passes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (absl::string_view cluster_input : inputs) {
       std::match_results<absl::string_view::iterator> smatch;
       if (std::regex_search(cluster_input.begin(), cluster_input.end(), smatch, re)) {
@@ -95,7 +95,7 @@ BENCHMARK(BM_StdRegexStringViewAltPattern);
 static void BM_RE2(benchmark::State& state) {
   re2::RE2 re(cluster_re_pattern);
   uint32_t passes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (const char* cluster_input : cluster_inputs) {
       re2::StringPiece match1, match2;
       if (re2::RE2::PartialMatch(cluster_input, re, &match1, &match2)) {
@@ -113,7 +113,7 @@ BENCHMARK(BM_RE2);
 static void BM_RE2_AltPattern(benchmark::State& state) {
   re2::RE2 re(cluster_re_alt_pattern);
   uint32_t passes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     for (const char* cluster_input : cluster_inputs) {
       re2::StringPiece match1, match2;
       if (re2::RE2::PartialMatch(cluster_input, re, &match1, &match2)) {
