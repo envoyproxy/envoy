@@ -1,4 +1,4 @@
-.. _install_sandboxes_tls:
+.. _install_sandboxes_tls_sni:
 
 TLS (SNI)
 =========
