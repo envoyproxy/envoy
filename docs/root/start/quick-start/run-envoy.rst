@@ -281,8 +281,10 @@ to ``/dev/stdout``:
    :lines: 12-22
    :emphasize-lines: 4-8
 
-Logging to ``/dev/stderr`` and ``/dev/stdout`` for system and access logs can be useful when
-running Envoy inside a container as the streams can be separated, and logging requires no
+The default configuration in the Envoy Docker container also logs access in this way.
+
+Logging to ``/dev/stderr`` and ``/dev/stdout`` for system and access logs respectively can
+be useful when running Envoy inside a container as the streams can be separated, and logging requires no
 additional files or directories to be mounted.
 
 Some Envoy :ref:`filters and extensions <api-v3_config>` may also have additional logging capabilities.
