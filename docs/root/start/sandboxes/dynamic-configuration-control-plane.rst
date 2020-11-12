@@ -142,11 +142,11 @@ The Envoy proxy should continue proxying responses from ``service1``.
    $ curl http://localhost:10000 | grep "served by"
    Request served by service1
 
-Step 7: Edit resource.go and restart the go-control-plane
-*********************************************************
+Step 7: Edit ``go`` file and restart the control plane
+******************************************************
 
-The example setup starts `go-control-plane <https://github.com/envoyproxy/go-control-plane>`_
-with a custom :download:`resource.go <_include/dynamic-config-cp/resource.go>` file which
+The example setup starts the `go-control-plane <https://github.com/envoyproxy/go-control-plane>`_
+service with a custom :download:`resource.go <_include/dynamic-config-cp/resource.go>` file which
 specifies the configuration provided to Envoy.
 
 Update this to have Envoy proxy instead to ``service2``.
@@ -210,3 +210,6 @@ of ``2``, and ``example_proxy_cluster`` is configured to proxy to ``service2``:
 
    :ref:`Dynamic configuration (filesystem) sandbox <install_sandboxes_dynamic_config_fs>`
       Configure Envoy using filesystem-based dynamic configuration.
+
+   `Go control plane <https://github.com/envoyproxy/go-control-plane>`_
+      Reference implementation of Envoy control plane written in ``go``.

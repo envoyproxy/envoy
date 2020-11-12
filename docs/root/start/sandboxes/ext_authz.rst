@@ -127,7 +127,7 @@ An example of successful requests can be observed as follows:
     Hello user1 from behind Envoy!
 
 We can also employ `Open Policy Agent <https://www.openpolicyagent.org/>`_ server
-(with `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-istio-plugin>`_ plugin enabled)
+(with `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-envoy-plugin>`_ plugin enabled)
 as the authorization server. To run this example:
 
 .. code-block:: console
@@ -222,10 +222,10 @@ Trying to send a request with method other than ``GET`` gives a rejection:
 .. seealso::
 
    `Open Policy Agent <https://www.openpolicyagent.org/>`_
-      Open Policy Agent...
+      Policy-based control for cloud native environments.
 
-   `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-istio-plugin>`_
-      Open Policy Agent Istio plugin
+   `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-envoy-plugin>`_
+      Open Policy Agent Envoy plugin.
 
    `environment variables in Compose documentation <https://docs.docker.com/compose/environment-variables>`_.
       Further information about using env variables with Docker Compose.

@@ -239,4 +239,4 @@ You can also add new responses to the yaml file with different ``cache-control``
 .. seealso::
 
    `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
-      To learn more about caching and ``cache-control``.
+      Learn more about caching and ``cache-control`` on the web.
