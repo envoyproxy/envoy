@@ -30,5 +30,6 @@ features. The following sandboxes are available:
     redis
     tls
     wasm-cc
+    websocket
     zipkin_tracing
     skywalking_tracing
