@@ -102,6 +102,7 @@ template <> bool TypedFlag<int64_t>::SetValueFromString(const std::string& value
 template <> bool TypedFlag<double>::SetValueFromString(const std::string& value_str);
 template <> bool TypedFlag<std::string>::SetValueFromString(const std::string& value_str);
 template <> bool TypedFlag<unsigned long>::SetValueFromString(const std::string& value_str);
+template <> bool TypedFlag<unsigned long long>::SetValueFromString(const std::string& value_str);
 
 // Flag declarations
 #define QUIC_FLAG(flag, ...) extern TypedFlag<bool>* flag;
