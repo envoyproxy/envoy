@@ -34,6 +34,140 @@ TEST_P(AdsIntegrationTest, Basic) {
   testBasicFlow();
 }
 
+// Basic CDS/EDS update that warms and makes active a single cluster.
+TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", false);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1", false);
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+}
+
+// Update the only warming cluster. Verify that the new cluster is still warming and the cluster
+// manager as a whole is not initialized.
+TEST_P(AdsIntegrationTest, ClusterInitializationUpdateTheOnlyWarmingCluster) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", false);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  // Update lb policy to MAGLEV so that cluster update is not skipped due to the same hash.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0", "MAGLEV")}, {buildCluster("cluster_0", "MAGLEV")},
+      {}, "2", false);
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1", false);
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+}
+
+// Primary cluster is warming during cluster initialization. Update the cluster with immediate ready
+// config and verify that all the clusters are initialized.
+TEST_P(AdsIntegrationTest, TestPrimaryClusterWarmClusterInitialization) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V3);
+  auto loopback = Network::Test::getLoopbackAddressString(ipVersion());
+  addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+  auto port = fake_upstreams_.back()->localAddress()->ip()->port();
+
+  // This cluster will be blocked since endpoint name cannot be resolved.
+  auto warming_cluster = ConfigHelper::buildStaticCluster("fake_cluster", port, loopback);
+  // Below endpoint accepts request but never return. The health check hangs 1 hour which covers the
+  // test running.
+  auto blocking_health_check = TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(R"EOF(
+      timeout: 3600s
+      interval: 3600s
+      unhealthy_threshold: 2
+      healthy_threshold: 2
+      tcp_health_check:
+        send:
+          text: '01'
+        receive:
+          - text: '02'
+          )EOF");
+  *warming_cluster.add_health_checks() = blocking_health_check;
+
+  // Active cluster has the same name with warming cluster but has no blocking health check.
+  auto active_cluster = ConfigHelper::buildStaticCluster("fake_cluster", port, loopback);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {warming_cluster},
+                                                             {warming_cluster}, {}, "1", false);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_.back()->waitForRawConnection(fake_upstream_connection));
+
+  // fake_cluster is in warming.
+  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 1);
+
+  // Now replace the warming cluster by the config which will turn ready immediately.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {active_cluster},
+                                                             {active_cluster}, {}, "2", false);
+
+  // All clusters are ready.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+}
+
+// Two cluster warming, update one of them. Verify that the clusters are eventually initialized.
+TEST_P(AdsIntegrationTest, ClusterInitializationUpdateOneOfThe2Warming) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url,
+      {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
+       buildCluster("cluster_0"), buildCluster("cluster_1")},
+      {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
+       buildCluster("cluster_0"), buildCluster("cluster_1")},
+      {}, "1", false);
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+
+  // Update lb policy to MAGLEV so that cluster update is not skipped due to the same hash.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url,
+      {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
+       buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")},
+      {ConfigHelper::buildStaticCluster("primary_cluster", 8000, "127.0.0.1"),
+       buildCluster("cluster_0", "MAGLEV"), buildCluster("cluster_1")},
+      {}, "2", false);
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0", "cluster_1"},
+                                      {"cluster_0", "cluster_1"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url,
+      {buildClusterLoadAssignment("cluster_0"), buildClusterLoadAssignment("cluster_1")},
+      {buildClusterLoadAssignment("cluster_0"), buildClusterLoadAssignment("cluster_1")}, {}, "1",
+      false);
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+}
 // Validate basic config delivery and upgrade with RateLimiting.
 TEST_P(AdsIntegrationTest, BasicWithRateLimiting) {
   initializeAds(true);
@@ -736,7 +870,7 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
-                                envoy::config::core::v3::ApiVersion::V2)) {
+                                envoy::config::core::v3::ApiVersion::V3)) {
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -777,7 +911,7 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
-                                envoy::config::core::v3::ApiVersion::V2)) {
+                                envoy::config::core::v3::ApiVersion::V3)) {
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -939,7 +1073,7 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
-                                envoy::config::core::v3::ApiVersion::V2)) {
+                                envoy::config::core::v3::ApiVersion::V3)) {
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -973,6 +1107,7 @@ public:
       ads_eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
       auto* eds_cluster_config = ads_eds_cluster->mutable_eds_cluster_config();
       auto* eds_config = eds_cluster_config->mutable_eds_config();
+      eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       eds_config->mutable_ads();
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -1033,6 +1168,7 @@ public:
       rtds_layer->set_name("ads_rtds_layer");
       auto* rtds_config = rtds_layer->mutable_rtds_config();
       rtds_config->mutable_ads();
+      rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
       ads_config->set_set_node_on_first_message_only(true);
@@ -1081,6 +1217,8 @@ public:
       eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
       auto* eds_cluster_config = eds_cluster->mutable_eds_cluster_config();
       eds_cluster_config->mutable_eds_config()->mutable_ads();
+      eds_cluster_config->mutable_eds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
     });
     AdsIntegrationTestWithRtds::initialize();
   }
@@ -1123,70 +1261,85 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   testBasicFlow();
 }
 
-// Check if EDS cluster defined in file is loaded before ADS request and used as xDS server
-class AdsClusterV3Test : public AdsIntegrationTest {
+// Some v2 ADS integration tests, these validate basic v2 support but are not complete, they reflect
+// tests that have historically been worth validating on both v2 and v3. They will be removed in Q1.
+class AdsClusterV2Test : public AdsIntegrationTest {
 public:
-  AdsClusterV3Test() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V3) {}
+  AdsClusterV2Test() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2) {}
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterV3Test,
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterV2Test,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
-TEST_P(AdsClusterV3Test, BasicClusterInitialWarming) {
+// Basic CDS/EDS update that warms and makes active a single cluster (v2 API).
+TEST_P(AdsClusterV2Test, BasicClusterInitialWarming) {
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-      envoy::config::core::v3::ApiVersion::V3);
+      envoy::config::core::v3::ApiVersion::V2);
   const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      envoy::config::core::v3::ApiVersion::V3);
+      envoy::config::core::v3::ApiVersion::V2);
 
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", false);
+      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", true);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url, {buildClusterLoadAssignment("cluster_0")},
-      {buildClusterLoadAssignment("cluster_0")}, {}, "1", false);
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1", true);
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 }
 
+// If we attempt to use v2 APIs by default, the configuration should be rejected.
+TEST_P(AdsClusterV2Test, RejectV2ConfigByDefault) {
+  fatal_by_default_v2_override_ = true;
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V2);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", true);
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+}
+
 // Verify CDS is paused during cluster warming.
-TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
+TEST_P(AdsClusterV2Test, CdsPausedDuringWarming) {
   initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-      envoy::config::core::v3::ApiVersion::V3);
+      envoy::config::core::v3::ApiVersion::V2);
   const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      envoy::config::core::v3::ApiVersion::V3);
+      envoy::config::core::v3::ApiVersion::V2);
   const auto lds_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>(
-      envoy::config::core::v3::ApiVersion::V3);
+      envoy::config::core::v3::ApiVersion::V2);
   const auto rds_type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-      envoy::config::core::v3::ApiVersion::V3);
+      envoy::config::core::v3::ApiVersion::V2);
 
   // Send initial configuration, validate we can process a request.
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", false);
+      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", true);
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
 
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url, {buildClusterLoadAssignment("cluster_0")},
-      {buildClusterLoadAssignment("cluster_0")}, {}, "1", false);
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1", true);
 
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(lds_type_url, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
       lds_type_url, {buildListener("listener_0", "route_config_0")},
-      {buildListener("listener_0", "route_config_0")}, {}, "1", false);
+      {buildListener("listener_0", "route_config_0")}, {}, "1", true);
 
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {"cluster_0"}, {}, {}));
   EXPECT_TRUE(
       compareDiscoveryRequest(rds_type_url, "", {"route_config_0"}, {"route_config_0"}, {}));
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       rds_type_url, {buildRouteConfig("route_config_0", "cluster_0")},
-      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1", false);
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1", true);
 
   EXPECT_TRUE(compareDiscoveryRequest(lds_type_url, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(rds_type_url, "1", {"route_config_0"}, {}, {}));
@@ -1197,7 +1350,7 @@ TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
   // Send the first warming cluster.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("warming_cluster_1")}, {buildCluster("warming_cluster_1")},
-      {"cluster_0"}, "2", false);
+      {"cluster_0"}, "2", true);
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
@@ -1207,7 +1360,7 @@ TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
   // Send the second warming cluster.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("warming_cluster_2")}, {buildCluster("warming_cluster_2")}, {},
-      "3", false);
+      "3", true);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
   // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
 
@@ -1221,7 +1374,7 @@ TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
        buildClusterLoadAssignment("warming_cluster_2")},
       {buildClusterLoadAssignment("warming_cluster_1"),
        buildClusterLoadAssignment("warming_cluster_2")},
-      {"cluster_0"}, "2", false);
+      {"cluster_0"}, "2", true);
 
   // Validate that clusters are warmed.
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
@@ -1239,7 +1392,7 @@ TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
 }
 
 // Validates that the initial xDS request batches all resources referred to in static config
-TEST_P(AdsClusterV3Test, XdsBatching) {
+TEST_P(AdsClusterV2Test, XdsBatching) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
     bootstrap.mutable_dynamic_resources()->clear_lds_config();
@@ -1259,9 +1412,9 @@ TEST_P(AdsClusterV3Test, XdsBatching) {
 
     const auto eds_type_url =
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-            envoy::config::core::v3::ApiVersion::V3);
+            envoy::config::core::v3::ApiVersion::V2);
     const auto rds_type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V3);
+        envoy::config::core::v3::ApiVersion::V2);
 
     EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"eds_cluster2", "eds_cluster"},
                                         {"eds_cluster2", "eds_cluster"}, {}, true));
@@ -1269,7 +1422,7 @@ TEST_P(AdsClusterV3Test, XdsBatching) {
         eds_type_url,
         {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster2")},
         {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster2")}, {},
-        "1", false);
+        "1", true);
 
     EXPECT_TRUE(compareDiscoveryRequest(rds_type_url, "", {"route_config2", "route_config"},
                                         {"route_config2", "route_config"}, {}));
@@ -1279,7 +1432,7 @@ TEST_P(AdsClusterV3Test, XdsBatching) {
          buildRouteConfig("route_config", "dummy_cluster")},
         {buildRouteConfig("route_config2", "eds_cluster2"),
          buildRouteConfig("route_config", "dummy_cluster")},
-        {}, "1", false);
+        {}, "1", true);
   };
 
   initialize();

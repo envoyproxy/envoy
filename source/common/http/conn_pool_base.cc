@@ -64,6 +64,8 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
   }
 }
 
+HttpConnPoolImplBase::~HttpConnPoolImplBase() { destructAllConnections(); }
+
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
                                 Http::ConnectionPool::Callbacks& callbacks) {

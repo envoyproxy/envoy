@@ -14,6 +14,7 @@ features. The following sandboxes are available:
     cache
     cors
     csrf
+    double-proxy
     dynamic-configuration-filesystem
     dynamic-configuration-control-plane
     ext_authz
@@ -27,6 +28,8 @@ features. The following sandboxes are available:
     mysql
     postgres
     redis
+    tls
     wasm-cc
+    websocket
     zipkin_tracing
     skywalking_tracing

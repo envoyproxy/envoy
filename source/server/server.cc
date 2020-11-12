@@ -258,7 +258,7 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
     envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
     load_function(bootstrap_v2, false);
     Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
-    MessageUtil::onVersionUpgradeWarn("v2 bootstrap");
+    MessageUtil::onVersionUpgradeDeprecation("v2 bootstrap", false);
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }

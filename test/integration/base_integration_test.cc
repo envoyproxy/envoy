@@ -259,7 +259,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
       timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, use_real_stats_);
+      concurrency_, drain_time_, drain_strategy_, use_real_stats_, v2_bootstrap_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -416,6 +416,22 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
   }
 }
 
+AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
+                            absl::string_view name) {
+  if (set1 == set2) {
+    return AssertionSuccess();
+  }
+  auto failure = AssertionFailure() << name << " field not as expected.\nExpected: {";
+  for (const auto& x : set1) {
+    failure << x << ", ";
+  }
+  failure << "}\nActual: {";
+  for (const auto& x : set2) {
+    failure << x << ", ";
+  }
+  return failure << "}";
+}
+
 AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
@@ -442,12 +458,12 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
   }
   EXPECT_TRUE(
       IsSubstring("", "", expected_error_substring, discovery_request.error_detail().message()));
-  const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
-                                                discovery_request.resource_names().cend());
-  if (expected_resource_names != resource_names) {
-    return AssertionFailure() << fmt::format(
-               "resources {} do not match expected {} in {}", absl::StrJoin(resource_names, ","),
-               absl::StrJoin(expected_resource_names, ","), discovery_request.DebugString());
+  const std::set<std::string> resource_names_in_request(discovery_request.resource_names().cbegin(),
+                                                        discovery_request.resource_names().cend());
+  if (auto resource_name_result = compareSets(
+          std::set<std::string>(expected_resource_names.cbegin(), expected_resource_names.cend()),
+          resource_names_in_request, "Sotw resource names")) {
+    return resource_name_result;
   }
   if (expected_version != discovery_request.version_info()) {
     return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
@@ -455,22 +471,6 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
                                              discovery_request.DebugString());
   }
   return AssertionSuccess();
-}
-
-AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
-                            absl::string_view name) {
-  if (set1 == set2) {
-    return AssertionSuccess();
-  }
-  auto failure = AssertionFailure() << name << " field not as expected.\nExpected: {";
-  for (const auto& x : set1) {
-    failure << x << ", ";
-  }
-  failure << "}\nActual: {";
-  for (const auto& x : set2) {
-    failure << x << ", ";
-  }
-  return failure << "}";
 }
 
 AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
