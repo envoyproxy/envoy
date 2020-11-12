@@ -9,7 +9,7 @@
 
 namespace Envoy {
 
-// DRYs up the creation of a simple filter config for a filter that requires no config.
+// `DRYs` up the creation of a simple filter config for a filter that requires no config.
 template <class T>
 class SimpleFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:

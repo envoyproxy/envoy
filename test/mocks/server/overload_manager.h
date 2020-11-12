@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "gmock/gmock.h"
 
@@ -13,6 +14,8 @@ class MockThreadLocalOverloadState : public ThreadLocalOverloadState {
 public:
   MockThreadLocalOverloadState();
   MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
+  Event::TimerPtr createScaledTimer(OverloadTimerType timer_type, Event::TimerCb callback) override;
+  MOCK_METHOD(Event::Timer*, createScaledTimer_, (OverloadTimerType, Event::TimerCb));
 
 private:
   const OverloadActionState disabled_state_;

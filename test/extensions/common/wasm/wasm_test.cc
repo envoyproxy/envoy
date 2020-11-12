@@ -19,6 +19,7 @@
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
+#include "zlib.h"
 
 using Envoy::Server::ServerLifecycleNotifier;
 using StageCallbackWithCompletion =
@@ -96,6 +97,9 @@ auto test_values = testing::Values(
 #endif
 #if defined(ENVOY_WASM_WAVM)
     "wavm",
+#endif
+#if defined(ENVOY_WASM_WASMTIME)
+    "wasmtime",
 #endif
     "null");
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest, test_values);
@@ -233,8 +237,8 @@ TEST_P(WasmCommonTest, Logging) {
   wasm_handle.reset();
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   // This will fault on nullptr if wasm has been deleted.
-  plugin->plugin_configuration_ = "done";
-  wasm_weak.lock()->configure(root_context, plugin);
+  wasm_weak.lock()->setTimerPeriod(root_context->id(), std::chrono::milliseconds(10));
+  wasm_weak.lock()->tickHandler(root_context->id());
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher->clearDeferredDeleteList();
 }
@@ -531,8 +535,13 @@ TEST_P(WasmCommonTest, Foreign) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
+#ifdef ZLIBNG_VERSION
+        EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 22")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 22 -> 2000")));
+#else
         EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 23")));
         EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 23 -> 2000")));
+#endif
         return root_context;
       });
   wasm->start(plugin);
@@ -639,7 +648,7 @@ TEST_P(WasmCommonTest, VmCache) {
   auto root_id = "";
   auto vm_id = "";
   auto vm_configuration = "vm_cache";
-  auto plugin_configuration = "init";
+  auto plugin_configuration = "done";
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
@@ -683,7 +692,7 @@ TEST_P(WasmCommonTest, VmCache) {
   EXPECT_NE(wasm_handle2, nullptr);
   EXPECT_EQ(wasm_handle, wasm_handle2);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -692,22 +701,24 @@ TEST_P(WasmCommonTest, VmCache) {
             nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
               auto root_context = new TestContext(wasm, plugin);
               EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_vm_start vm_cache")));
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_configuration init")));
               EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_done logging")));
               EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
   wasm_handle2.reset();
 
-  auto wasm = wasm_handle_local->wasm().get();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-
-  plugin->plugin_configuration_ = "done";
   wasm->configure(wasm->getContext(1), plugin);
   plugin.reset();
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -786,7 +797,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
 
   EXPECT_NE(wasm_handle, nullptr);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -800,11 +811,17 @@ TEST_P(WasmCommonTest, RemoteCode) {
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
 
-  auto wasm = wasm_handle_local->wasm().get();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
+
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   wasm->configure(wasm->getContext(1), plugin);
   plugin.reset();
@@ -896,7 +913,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_NE(wasm_handle, nullptr);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -910,11 +927,16 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
 
-  auto wasm = wasm_handle_local->wasm().get();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   wasm->configure(wasm->getContext(1), plugin);

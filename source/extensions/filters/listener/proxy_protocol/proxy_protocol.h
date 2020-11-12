@@ -118,7 +118,6 @@ private:
   size_t lenV2Address(char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
-  Event::FileEventPtr file_event_;
 
   // The offset in buf_ that has been fully read
   size_t buf_off_{};

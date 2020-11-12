@@ -28,9 +28,14 @@ namespace Http {
 enum class FilterHeadersStatus {
   // Continue filter chain iteration.
   Continue,
-  // Do not iterate to any of the remaining filters in the chain. Returning
-  // FilterDataStatus::Continue from decodeData()/encodeData() or calling
+  // Do not iterate for headers on any of the remaining filters in the chain.
+  //
+  // Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  //
+  // Note that if a local reply was sent, no further iteration for headers as well as data and
+  // trailers for the current filter and the filters following will happen. A local reply can be
+  // triggered via sendLocalReply() or encodeHeaders().
   StopIteration,
   // Continue headers iteration to remaining filters, but delay ending the stream. This status MUST
   // NOT be returned when end_stream is already set to false.
@@ -129,6 +134,10 @@ enum class FilterDataStatus {
   // body data for later dispatching. Returning FilterDataStatus::Continue from
   // decodeData()/encodeData() or calling continueDecoding()/continueEncoding() MUST be called if
   // continued filter iteration is desired.
+  //
+  // Note that if a local reply was sent, no further iteration for either data or trailers
+  // for the current filter and the filters following will happen. A local reply can be
+  // triggered via sendLocalReply() or encodeHeaders().
   StopIterationNoBuffer
 };
 
@@ -486,19 +495,24 @@ public:
    */
   virtual uint32_t decoderBufferLimit() PURE;
 
-  // Takes a stream, and acts as if the headers are newly arrived.
-  // On success, this will result in a creating a new filter chain and likely upstream request
-  // associated with the original downstream stream.
-  // On failure, if the preconditions outlined below are not met, the caller is
-  // responsible for handling or terminating the original stream.
-  //
-  // This is currently limited to
-  //   - streams which are completely read
-  //   - streams which do not have a request body.
-  //
-  // Note that HttpConnectionManager sanitization will *not* be performed on the
-  // recreated stream, as it is assumed that sanitization has already been done.
-  virtual bool recreateStream() PURE;
+  /**
+   * Takes a stream, and acts as if the headers are newly arrived.
+   * On success, this will result in a creating a new filter chain and likely
+   * upstream request associated with the original downstream stream. On
+   * failure, if the preconditions outlined below are not met, the caller is
+   * responsible for handling or terminating the original stream.
+   *
+   * This is currently limited to
+   *   - streams which are completely read
+   *   - streams which do not have a request body.
+   *
+   * Note that HttpConnectionManager sanitization will *not* be performed on the
+   * recreated stream, as it is assumed that sanitization has already been done.
+   *
+   * @param original_response_headers Headers used for logging in the access logs and for charging
+   * stats. Ignored if null.
+   */
+  virtual bool recreateStream(const ResponseHeaderMap* original_response_headers) PURE;
 
   /**
    * Adds socket options to be applied to any connections used for upstream requests. Note that

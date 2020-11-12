@@ -58,7 +58,7 @@ public:
         "" /* root_id */, "" /* vm_configuration */, fail_open);
   }
 
-  void setupFilter() { setupFilterBase<TestFilter>(""); }
+  void setupFilter() { setupFilterBase<TestFilter>(); }
 
   TestFilter& filter() { return *static_cast<TestFilter*>(context_.get()); }
 
@@ -90,6 +90,9 @@ auto testing_values = testing::Values(
 #endif
 #if defined(ENVOY_WASM_WAVM)
     std::make_tuple("wavm", "cpp"), std::make_tuple("wavm", "rust"),
+#endif
+#if defined(ENVOY_WASM_WASMTIME)
+    std::make_tuple("wasmtime", "cpp"), std::make_tuple("wasmtime", "rust"),
 #endif
     std::make_tuple("null", "cpp"));
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmNetworkFilterTest, testing_values);
