@@ -851,7 +851,7 @@ message ExplicitHttpConfig {
   oneof protocol_config {
     config.core.v4alpha.Http1ProtocolOptions http_protocol_options = 1;
 
-    config.core.v4alpha.Http1ProtocolOptions http2_protocol_options = 2;
+    config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
   }
 }
 
@@ -863,7 +863,7 @@ message UseDownstreamHttpConfig {
 
   config.core.v4alpha.Http1ProtocolOptions http_protocol_options = 1;
 
-  config.core.v4alpha.Http1ProtocolOptions http2_protocol_options = 2;
+  config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
 }
 
 // If this is used, Envoy will negotiate ALPN to determine if HTTP/1 or HTTP/2 should be used.
@@ -873,7 +873,7 @@ message AlpnHttpConfig {
 
   config.core.v4alpha.Http1ProtocolOptions http_protocol_options = 3;
 
-  config.core.v4alpha.Http1ProtocolOptions http2_protocol_options = 4;
+  config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 4;
 }
 
 // HttpProtocolOptions specifies Http upstream protocol options. This object
