@@ -643,7 +643,8 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
   // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"warming_cluster_2"}, {"warming_cluster_2"}, {"warming_cluster_1"}));
+                                      {"warming_cluster_2"}, {"warming_cluster_2"},
+                                      {"warming_cluster_1"}));
 
   // Finish warming the clusters. Note that the first warming cluster is not included in the
   // response.

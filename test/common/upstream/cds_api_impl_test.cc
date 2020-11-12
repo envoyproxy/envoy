@@ -111,7 +111,8 @@ resources:
 )EOF";
   auto response2 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
-  EXPECT_CALL(cm_, allClusterNames()).WillOnce(Return(absl::flat_hash_set<std::string>{"cluster1"}));
+  EXPECT_CALL(cm_, allClusterNames())
+      .WillOnce(Return(absl::flat_hash_set<std::string>{"cluster1"}));
   EXPECT_CALL(cm_, removeCluster("cluster1")).WillOnce(Return(true));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
@@ -301,7 +302,8 @@ resources:
   auto response2 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
 
-  EXPECT_CALL(cm_, allClusterNames()).WillOnce(Return(absl::flat_hash_set<std::string>{"cluster1", "cluster2"}));
+  EXPECT_CALL(cm_, allClusterNames())
+      .WillOnce(Return(absl::flat_hash_set<std::string>{"cluster1", "cluster2"}));
   expectAdd("cluster1", "1");
   expectAdd("cluster3", "1");
   EXPECT_CALL(cm_, removeCluster("cluster2"));
