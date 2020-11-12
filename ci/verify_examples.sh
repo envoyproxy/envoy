@@ -29,11 +29,8 @@ trap exit 1 INT
 run_examples () {
     local examples example
     cd "${SRCDIR}/examples" || exit 1
-    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" | sort)
+    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" ! -iname "_*" | sort)
     for example in $examples; do
-	if [[ "${example}" == _* ]]; then
-	    continue
-	fi
         pushd "$example" > /dev/null || return 1
         ./verify.sh
         popd > /dev/null || return 1
