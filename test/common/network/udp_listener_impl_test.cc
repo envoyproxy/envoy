@@ -137,6 +137,9 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   client_.write(first, *send_to_addr_);
   const std::string second("second");
   client_.write(second, *send_to_addr_);
+  // This will get dropped.
+  const std::string third(4096, 'b');
+  client_.write(third, *send_to_addr_);
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
@@ -147,7 +150,7 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(1, listener_->packetsDropped());
+  EXPECT_EQ(2, listener_->packetsDropped());
 }
 
 // Test a large datagram that gets dropped using recvmsg.
@@ -159,6 +162,9 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
   client_.write(first, *send_to_addr_);
   const std::string second("second");
   client_.write(second, *send_to_addr_);
+  // This will get dropped.
+  const std::string third(4096, 'b');
+  client_.write(third, *send_to_addr_);
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
@@ -169,7 +175,7 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
   }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(1, listener_->packetsDropped());
+  EXPECT_EQ(2, listener_->packetsDropped());
 }
 
 /**
