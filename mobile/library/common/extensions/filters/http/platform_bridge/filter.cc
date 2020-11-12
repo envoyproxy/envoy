@@ -335,7 +335,7 @@ Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, 
 
   // Delegate to shared implementation for request and response path.
   Buffer::Instance* internal_buffer = nullptr;
-  if (decoder_callbacks_->decodingBuffer()) {
+  if (iteration_state_ == IterationState::Stopped && decoder_callbacks_->decodingBuffer()) {
     decoder_callbacks_->modifyDecodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
       internal_buffer = &mutable_buffer;
     });
@@ -352,7 +352,7 @@ Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, 
 
   // Delegate to shared implementation for request and response path.
   Buffer::Instance* internal_buffer = nullptr;
-  if (encoder_callbacks_->encodingBuffer()) {
+  if (iteration_state_ == IterationState::Stopped && encoder_callbacks_->encodingBuffer()) {
     encoder_callbacks_->modifyEncodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
       internal_buffer = &mutable_buffer;
     });
@@ -369,7 +369,7 @@ Http::FilterTrailersStatus PlatformBridgeFilter::decodeTrailers(Http::RequestTra
 
   // Delegate to shared implementation for request and response path.
   Buffer::Instance* internal_buffer = nullptr;
-  if (decoder_callbacks_->decodingBuffer()) {
+  if (iteration_state_ == IterationState::Stopped && decoder_callbacks_->decodingBuffer()) {
     decoder_callbacks_->modifyDecodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
       internal_buffer = &mutable_buffer;
     });
@@ -390,7 +390,7 @@ PlatformBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 
   // Delegate to shared implementation for request and response path.
   Buffer::Instance* internal_buffer = nullptr;
-  if (encoder_callbacks_->encodingBuffer()) {
+  if (iteration_state_ == IterationState::Stopped && encoder_callbacks_->encodingBuffer()) {
     encoder_callbacks_->modifyEncodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
       internal_buffer = &mutable_buffer;
     });
