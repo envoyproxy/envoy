@@ -15,7 +15,7 @@ filegroup(
         [
             "**/*.yaml",
             "**/*.lua",
-            "**/*.pem",
+            "_extra_certs/*.pem",
         ],
         exclude = [
             "cache/responses.yaml",
