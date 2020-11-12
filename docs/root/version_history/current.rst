@@ -5,6 +5,8 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
+* config: v2 is now fatal-by-default. This may be overridden by setting :option:`--bootstrap-version` 2 on the CLI for a v2 bootstrap file and also enabling the runtime `envoy.reloadable_features.enable_deprecated_v2_api` feature.
+
 Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
@@ -24,6 +26,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* config: validate that upgrade configs have a non-empty :ref:`upgrade_type <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.upgrade_type>`, fixing a bug where an errant "-" could result in unexpected behavior.
 * dns: fix a bug where custom resolvers provided in configuration were not preserved after network issues.
 * dns_filter: correctly associate DNS response IDs when multiple queries are received.
 * http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
