@@ -33,7 +33,7 @@ Http::FilterHeadersStatus CdnLoopFilter::decodeHeaders(Http::RequestHeaderMap& h
       header_entry != nullptr) {
     if (StatusOr<int> count =
             countCdnLoopOccurrences(header_entry->value().getStringView(), cdn_id_);
-        !count) {
+        !count.ok()) {
       decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, ParseErrorMessage, nullptr,
                                          absl::nullopt, ParseErrorDetails);
       return Http::FilterHeadersStatus::StopIteration;
