@@ -810,8 +810,8 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
   case WasmBufferType::VmConfiguration:
     return buffer_.set(wasm()->vm_configuration());
   case WasmBufferType::PluginConfiguration:
-    if (plugin_) {
-      return buffer_.set(plugin_->plugin_configuration_);
+    if (temp_plugin_) {
+      return buffer_.set(temp_plugin_->plugin_configuration_);
     }
     return nullptr;
   case WasmBufferType::HttpRequestBody:
@@ -1182,18 +1182,18 @@ bool Context::validateConfiguration(absl::string_view configuration,
   if (!wasm()->validate_configuration_) {
     return true;
   }
-  plugin_ = plugin_base;
+  temp_plugin_ = plugin_base;
   auto result =
       wasm()
           ->validate_configuration_(this, id_, static_cast<uint32_t>(configuration.size()))
           .u64_ != 0;
-  plugin_.reset();
+  temp_plugin_.reset();
   return result;
 }
 
 absl::string_view Context::getConfiguration() {
-  if (plugin_) {
-    return plugin_->plugin_configuration_;
+  if (temp_plugin_) {
+    return temp_plugin_->plugin_configuration_;
   } else {
     return wasm()->vm_configuration();
   }

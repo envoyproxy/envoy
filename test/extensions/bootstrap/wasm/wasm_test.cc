@@ -223,7 +223,7 @@ TEST_P(WasmTest, Segv) {
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before badptr")));
   EXPECT_FALSE(wasm_->configure(context, plugin_));
-  wasm_->isFailed();
+  EXPECT_TRUE(wasm_->isFailed());
 }
 
 TEST_P(WasmTest, DivByZero) {
@@ -235,7 +235,7 @@ TEST_P(WasmTest, DivByZero) {
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before div by zero")));
   context->onLog();
-  wasm_->isFailed();
+  EXPECT_TRUE(wasm_->isFailed());
 }
 
 TEST_P(WasmTest, IntrinsicGlobals) {
