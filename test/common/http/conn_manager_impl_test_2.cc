@@ -2908,7 +2908,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
 
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
-  decoder_filters_[0]->callbacks_->recreateStream();
+  decoder_filters_[0]->callbacks_->recreateStream(nullptr);
   conn_manager_->onData(fake_input, false);
 
   // The connection life time data should have been written to the connection filter state.
