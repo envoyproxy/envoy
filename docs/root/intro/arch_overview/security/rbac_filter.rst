@@ -58,7 +58,7 @@ whether the request path starts with `/v1/`:
     - const_expr:
        string_value: /v1/
 
-Envoy provides a number of :ref:`request attributes <arch_overview_attributes>`
+Envoy provides a number of :ref:`request attributes <arch_overview_request_attributes>`
 for expressive policies. Most attributes are optional and provide the default
 value based on the type of the attribute. CEL supports presence checks for
 attributes and maps using `has()` syntax, e.g. `has(request.referer)`.

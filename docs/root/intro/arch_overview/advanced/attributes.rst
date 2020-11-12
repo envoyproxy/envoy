@@ -5,10 +5,36 @@ Attributes
 
 Attributes refer to contextual properties provided by Envoy during request and
 connection processing. They are named by a dot-separated path (e.g.
-`request.path`), have a fixed type (e.g. `string` or `int64`), and may be
+`request.path`), have a fixed type (e.g. `string` or `int`), and may be
 absent or present depending on the context. Attributes are exposed to CEL
 runtime in :ref:`RBAC filter <arch_overview_rbac>`, as well as Wasm extensions
 via `get_property` ABI method.
+
+Attribute value types are limited to:
+
+* `string` for UTF-8 strings
+* `bytes` for byte buffers
+* `int` for 64-bit signed integers
+* `uint` for 64-bit unsigned integers
+* `bool` for booleans
+* `list` for lists of values
+* `map` for associative arrays with string, integer, or boolean keys
+* `timestamp` for timestamps as specified by `Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_
+* `duration` for durations as specified by `Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_
+* Protocol buffer message types
+
+CEL provides standard helper functions for operating on abstract types such as
+`getMonth` for `timestamp` values. Note that integer literals (e.g. `7`) are of
+type `int`, which is distinct from `uint` (e.g. `7u`), and the arithmetic
+conversion is not automatic (use `uint(7)` for explicit conversion).
+
+Wasm extensions receive the attribute values as a serialized buffer according
+to the type of the attribute. Strings and bytes are passed as-is, integers are
+passed as 64 bits directly, timestamps and durations are approximated to
+nano-seconds, and structured values are converted to a sequence of pairs
+recursively.
+
+.. _arch_overview_request_attributes:
 
 Request attributes
 ------------------
@@ -18,6 +44,7 @@ processing, which makes them suitable for RBAC policies:
 
 .. csv-table::
    :header: Attribute, Type, Description
+   :escape: '
    :widths: 1, 1, 4
 
    request.path, string, The path portion of the URL
@@ -29,36 +56,38 @@ processing, which makes them suitable for RBAC policies:
    request.referer, string, Referer request header
    request.useragent, string, User agent request header
    request.time, timestamp, Time of the first byte received
-   request.id, string, Request ID
-   request.protocol, string, Request protocol e.g. "HTTP/2"
+   request.id, string, Request ID corresponding to `x-request-id` header value
+   request.protocol, string, "Request protocol ('"HTTP/1.0'", '"HTTP/1.1'", '"HTTP/2'", or '"HTTP/3'")"
 
-Additional attributes are available once the request is finished:
+Header values in `request.headers` associative array are comma-concatenated in case of multiple values.
+
+Additional attributes are available once the request completes:
 
 .. csv-table::
    :header: Attribute, Type, Description
    :widths: 1, 1, 4
 
    request.duration, duration, Total duration of the request
-   request.size, int64, Size of the request body. Content length header is used if available.
-   request.total_size, int64, Total size of the request including the approximate uncompressed size of the headers
+   request.size, int, Size of the request body. Content length header is used if available.
+   request.total_size, int, Total size of the request including the approximate uncompressed size of the headers
 
 Response attributes
 -------------------
 
-Response attributes are only available after the request is finished.
+Response attributes are only available after the request completes.
 
 .. csv-table::
    :header: Attribute, Type, Description
    :widths: 1, 1, 4
 
-   response.code, int64, Response HTTP status code
+   response.code, int, Response HTTP status code
    response.code_details, string, Internal response code details (subject to change)
-   response.flags, int64, Additional details about the response beyond the standard response code encoded as a bit-vector
-   response.grpc_status, int64, Response gRPC status code
+   response.flags, int, Additional details about the response beyond the standard response code encoded as a bit-vector
+   response.grpc_status, int, Response gRPC status code
    response.headers, "map<string, string>", All response headers indexed by the lower-cased header name
    response.trailers, "map<string, string>", All response trailers indexed by the lower-cased trailer name
-   response.size, int64, Size of the response body
-   response.total_size, int64, Total size of the response including the approximate uncompressed size of the headers and the trailers
+   response.size, int, Size of the response body
+   response.total_size, int, Total size of the response including the approximate uncompressed size of the headers and the trailers
 
 Connection attributes
 ---------------------
@@ -72,10 +101,10 @@ RBAC):
    :widths: 1, 1, 4
 
    source.address, string, Downstream connection remote address
-   source.port, int64, Downstream connection remote port
+   source.port, int, Downstream connection remote port
    destination.address, string, Downstream connection local address
-   destination.port, int64, Downstream connection local port
-   connection.id, uint64, Downstream connection ID
+   destination.port, int, Downstream connection local port
+   connection.id, uint, Downstream connection ID
    connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
    connection.requested_server_name, string, Requested server name in the downstream TLS connection
    connection.tls_version, string, TLS version of the downstream TLS connection
@@ -104,7 +133,7 @@ The following attributes are available once the upstream connection is establish
    :widths: 1, 1, 4
 
    upstream.address, string, Upstream connection remote address
-   upstream.port, int64, Upstream connection remote port
+   upstream.port, int, Upstream connection remote port
    upstream.tls_version, string, TLS version of the upstream TLS connection
    upstream.subject_local_certificate, string, The subject field of the local certificate in the upstream TLS connection
    upstream.subject_peer_certificate, string, The subject field of the peer certificate in the upstream TLS connection
@@ -145,9 +174,18 @@ In addition to all above, the following extra attributes are available to Wasm e
    node, :ref:`Node<envoy_api_msg_core.Node>`, Local node description
    cluster_name, string, Upstream cluster name
    cluster_metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Upstream cluster metadata
-   listener_direction, int64, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`
+   listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`
    listener_metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Listener metadata
    route_name, string, Route name
    route_metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Route metadata
    upstream_host_metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Upstream host metadata
 
+Path expressions
+----------------
+
+Path expressions allow access to inner fields in structured attributes via a
+sequence of field names, map, and list indexes following an attribute name. For
+example, `get_property({"node", "id"})` in Wasm ABI extracts the value of `id`
+field in `node` message attribute, while `get_property({"request", "headers",
+"my-header"})` refers to the comma-concatenated value of a particular request
+header.
