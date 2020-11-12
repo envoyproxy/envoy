@@ -36,9 +36,9 @@ static_resources:
           common_tls_context:
             tls_certificates:
               certificate_chain:
-                filename: certs/domain1.crt
+                filename: certs/domain1.crt.pem
               private_key:
-                filename: certs/domain1.key
+                filename: certs/domain1.key.pem
 
     - filter_chain_match:
         server_names:
@@ -69,9 +69,9 @@ static_resources:
           common_tls_context:
             tls_certificates:
               certificate_chain:
-                filename: certs/domain2.crt
+                filename: certs/domain2.crt.pem
               private_key:
-                filename: certs/domain2.key
+                filename: certs/domain2.key.pem
 
     - filter_chain_match:
         server_names:
@@ -102,9 +102,9 @@ static_resources:
           common_tls_context:
             tls_certificates:
               certificate_chain:
-                filename: certs/domain3.crt
+                filename: certs/domain3.crt.pem
               private_key:
-                filename: certs/domain3.key
+                filename: certs/domain3.key.pem
 
   clusters:
   - name: service-http
