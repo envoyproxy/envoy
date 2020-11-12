@@ -1,7 +1,7 @@
 #include <chrono>
 
 #include "envoy/config/overload/v3/overload.pb.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 

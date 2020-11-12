@@ -11,7 +11,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
-#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"

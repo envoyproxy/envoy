@@ -32,6 +32,7 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/server:lifecycle_notifier_interface",
+        "//include/envoy/thread_local:thread_local_object",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/config:datasource_lib",
         "//source/common/singleton:const_singleton",
