@@ -40,7 +40,7 @@ Create self-signed certificates for these endpoints as follows:
    Generating a RSA private key
    .............+++++
    ...................+++++
-   writing new private key to 'certs/domain1.key'
+   writing new private key to 'certs/domain1.key.pem'
    -----
 
    $ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
@@ -50,7 +50,7 @@ Create self-signed certificates for these endpoints as follows:
    Generating a RSA private key
    .............+++++
    ...................+++++
-   writing new private key to 'certs/domain2.key'
+   writing new private key to 'certs/domain2.key.pem'
    -----
 
    $ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
@@ -60,7 +60,7 @@ Create self-signed certificates for these endpoints as follows:
    Generating a RSA private key
    .............+++++
    ...................+++++
-   writing new private key to 'certs/domain3.key'
+   writing new private key to 'certs/domain3.key.pem'
    -----
 
 Step 4: Start the containers
