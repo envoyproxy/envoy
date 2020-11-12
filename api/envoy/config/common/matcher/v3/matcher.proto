@@ -18,6 +18,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Unified Matcher API]
 
+message MatchingFilterConfig {
+  Matcher matcher = 1;
+
+  core.v3.TypedExtensionConfig typed_config = 2;
+}
+
 // A matcher, which may traverse a matching tree in order to result in a match action.
 // During matching, the tree will be traversed until a match is found, or if no match
 // is found the action specified by the most specific on_no_match will be evaluated.

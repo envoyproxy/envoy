@@ -17,6 +17,15 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // [#protodoc-title: Unified Matcher API]
 
+message MatchingFilterConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.common.matcher.v3.MatchingFilterConfig";
+
+  Matcher matcher = 1;
+
+  core.v4alpha.TypedExtensionConfig typed_config = 2;
+}
+
 // A matcher, which may traverse a matching tree in order to result in a match action.
 // During matching, the tree will be traversed until a match is found, or if no match
 // is found the action specified by the most specific on_no_match will be evaluated.

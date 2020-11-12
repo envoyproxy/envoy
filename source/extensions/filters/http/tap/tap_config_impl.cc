@@ -30,15 +30,36 @@ fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*
 }
 } // namespace
 
-ListMatcher fromPredicate(const envoy::config::tap::v3::MatchPredicate& predicate) {
-  switch (predicate.rule_case()) {}
+envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate
+fromPredicate(const envoy::config::tap::v3::MatchPredicate& predicate) {
+  envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate new_predicate;
+  switch (predicate.rule_case()) {
+  case (envoy::config::tap::v3::MatchPredicate::kOrMatch): {
+    auto* list = new_predicate.mutable_or_matcher();
+
+    for (const auto& p : predicate.or_match().rules()) {
+      list->add_predicate()->MergeFrom(fromPredicate(p));
+    }
+  } break;
+  case (envoy::config::tap::v3::MatchPredicate::kAndMatch): {
+    auto* list = new_predicate.mutable_and_matcher();
+
+    for (const auto& p : predicate.or_match().rules()) {
+      list->add_predicate()->MergeFrom(fromPredicate(p));
+    }
+  } break;
+  default:
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  return new_predicate;
 }
 HttpTapConfigImpl::HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_config,
                                      Common::Tap::Sink* admin_streamer)
     : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer) {
-  auto* on_no_match_action = match_tree_config_.mutable_on_no_match()->mutable_action();
-  on_no_match_action->set_name("tap_config");
   {
+    auto* on_no_match_action = match_tree_config_.mutable_on_no_match()->mutable_action();
+    on_no_match_action->set_name("tap_config");
     envoy::extensions::filters::http::tap::v3::MatchAction action;
     action.set_perform_tap(false);
     on_no_match_action->mutable_typed_config()->PackFrom(action);
@@ -53,7 +74,12 @@ HttpTapConfigImpl::HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_c
     Config::VersionConverter::upgrade(proto_config.match_config(), match);
     matcher->mutable_predicate()->MergeFrom(match);
   }
-  matcher->mutable_action()->set_callback("match");
+  {
+    auto* on_match = matcher->mutable_on_match();
+    envoy::extensions::filters::http::tap::v3::MatchAction action;
+    action.set_perform_tap(true);
+    on_match->mutable_action()->mutable_typed_config()->PackFrom(action);
+  }
 }
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t stream_id) {

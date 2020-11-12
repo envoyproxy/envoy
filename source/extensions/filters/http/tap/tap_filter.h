@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
@@ -81,10 +82,13 @@ public:
 
   // Http::StreamFilterBase
   void onDestroy() override {}
-  void onMatchCallback(absl::string_view callback) override {
-    if (callback == "match") {
+  void onMatchCallback(const envoy::config::core::v3::TypedExtensionConfig& config) override {
+    envoy::extensions::filters::http::tap::v3::MatchAction action;
+    MessageUtil::unpackTo(config.typed_config(), action);
+
+    if (action.perform_tap()) {
       tapper_->onMatch();
-    } else if (callback == "no_match") {
+    } else {
       tapper_->onFailedToMatch();
     }
   }
