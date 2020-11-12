@@ -38,13 +38,13 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, 
 
 void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                 const std::string& version_info) {
-  ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
+  auto clusters_to_remove = cm_.allClusterNames();
   std::vector<envoy::config::cluster::v3::Cluster> clusters;
   for (const auto& resource : resources) {
     clusters_to_remove.erase(resource.get().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
-  for (const auto& [cluster_name, _] : clusters_to_remove) {
+  for (const auto& cluster_name : clusters_to_remove) {
     *to_remove_repeated.Add() = cluster_name;
   }
   onConfigUpdate(resources, to_remove_repeated, version_info);
@@ -64,7 +64,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
             removed_resources.size());
 
   std::vector<std::string> exception_msgs;
-  absl::node_hash_set<std::string> cluster_names;
+  absl::flat_hash_set<std::string> cluster_names(added_resources.size());
   bool any_applied = false;
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster;

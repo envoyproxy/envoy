@@ -223,6 +223,19 @@ public:
 
     return clusters_map;
   }
+
+  absl::flat_hash_set<std::string> allClusterNames() override {
+    absl::flat_hash_set<std::string> clusters_names(active_clusters_.size() + warming_clusters_.size());
+    
+    for (const auto& [name, _ ] : active_clusters_) {
+      clusters_names.emplace(name);
+    }
+    for (const auto& [name, _ ] : warming_clusters_) {
+      clusters_names.emplace(name);
+    }
+    return clusters_names;
+  }
+  
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* get(absl::string_view cluster) override;
 

@@ -133,6 +133,12 @@ public:
    */
   virtual ClusterInfoMap clusters() PURE;
 
+  /**
+   * @return absl::flat_hash_set<std::string> all current clusters names including warming and
+   * active.
+   */
+  virtual absl::flat_hash_set<std::string> allClusterNames() PURE;
+
   using ClusterSet = absl::flat_hash_set<std::string>;
 
   /**
