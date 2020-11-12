@@ -23,9 +23,10 @@ to the services. Two backend services are deployed behind the front Envoy, each 
 The front Envoy is configured to run the Cache Filter, which stores cacheable responses in an in-memory cache,
 and serves it to subsequent requests.
 
-In this demo, the responses that are served by the deployed services are stored in :download:`responses.yaml <_include/cache/responses.yaml`.
+In this demo, the responses that are served by the deployed services are stored in :download:`responses.yaml <_include/cache/responses.yaml>`.
 
-This file is mounted to both services' containers, so any changes made to the stored responses while the services are running should be instantly effective (no need to rebuild or rerun).
+This file is mounted to both services' containers, so any changes made to the stored responses while the services are
+running should be instantly effective (no need to rebuild or rerun).
 
 For the purposes of the demo, a response's date of creation is appended to its body before being served.
 An Etag is computed for every response for validation purposes, which only depends on the response body in the yaml file (i.e. the appended date is not taken into account).
