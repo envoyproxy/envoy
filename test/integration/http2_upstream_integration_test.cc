@@ -333,13 +333,13 @@ TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
         const std::string yaml_string = fmt::format(R"EOF(
 name: router
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   upstream_log:
     name: accesslog
     filter:
       not_health_check_filter: {{}}
     typed_config:
-      "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
       path: {}
   )EOF",
                                                     Platform::null_device_path);
@@ -458,13 +458,13 @@ TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
         const std::string yaml_string = R"EOF(
 name: router
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   upstream_log:
     name: grpc_accesslog
     filter:
       not_health_check_filter: {}
     typed_config:
-      "@type": type.googleapis.com/envoy.config.accesslog.v2.HttpGrpcAccessLogConfig
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
       common_config:
         log_name: foo
         grpc_service:
