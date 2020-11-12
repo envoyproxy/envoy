@@ -439,7 +439,6 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
 
     request_ = std::make_unique<ActiveRequest>(callbacks_.newDecoderEventHandler());
     frame_started_ = true;
-    // TODO: add an option to configure passthrough
     state_machine_ =
         std::make_unique<DecoderStateMachine>(protocol_, metadata_, request_->handler_);
 

@@ -1417,7 +1417,7 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
-// TODO: use TEST_P to avoid duplicating test cases
+// TODO(caitong93): use TEST_P to avoid duplicating test cases
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughOnDataHandlesThriftCall) {
   const std::string yaml = R"EOF(
 transport: FRAMED
