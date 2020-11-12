@@ -155,6 +155,7 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
   }
 
   for (const auto& [name, callback] : callbacks_map) {
+    UNREFERENCED_PARAMETER(name);
     ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
@@ -200,6 +201,7 @@ void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
   }
 
   for (const auto& [name, callback] : callbacks_map) {
+    UNREFERENCED_PARAMETER(name);
     ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
@@ -220,6 +222,7 @@ ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
 
   for (const auto& [name, cluster_ref] : server_.clusterManager().clusters()) {
+    UNREFERENCED_PARAMETER(name);
     const Upstream::Cluster& cluster = cluster_ref.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

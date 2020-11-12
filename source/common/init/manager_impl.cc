@@ -71,6 +71,7 @@ void ManagerImpl::dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& unre
   auto& message = *unready_targets_dumps.mutable_unready_targets_dumps()->Add();
   message.set_name(name_);
   for (const auto& [target_name, count] : target_names_count_) {
+    UNREFERENCED_PARAMETER(count);
     message.add_target_names(target_name);
   }
 }

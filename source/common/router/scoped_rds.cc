@@ -427,6 +427,7 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash = scope_name_by_hash_;
   absl::erase_if(scope_name_by_hash, [&updated_or_removed_scopes](const auto& key_name) {
     auto const& [key, name] = key_name;
+    UNREFERENCED_PARAMETER(key);
     return updated_or_removed_scopes.contains(name);
   });
   absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>

@@ -346,6 +346,7 @@ private:
     auto mapping = std::make_unique<absl::flat_hash_map<std::string, Base*>>();
 
     for (const auto& [factory_name, factory] : factories()) {
+      UNREFERENCED_PARAMETER(factory_name);
       if (factory == nullptr) {
         continue;
       }
