@@ -35,7 +35,7 @@ public:
         R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
             )EOF";
@@ -462,7 +462,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
               ignore_unknown_query_parameters : true
@@ -486,7 +486,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true
@@ -511,7 +511,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true
@@ -536,7 +536,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true
