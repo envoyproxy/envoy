@@ -115,6 +115,8 @@ public:
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           hcm.mutable_rds()->set_route_config_name(route_config_name);
+          hcm.mutable_rds()->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               hcm.mutable_rds()->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -215,7 +217,7 @@ TEST_P(LuaIntegrationTest, CallMetadataDuringLocalReply) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       local metadata = response_handle:metadata():get("foo.bar")
@@ -240,7 +242,7 @@ TEST_P(LuaIntegrationTest, RequestAndResponse) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:logTrace("log test")
@@ -266,6 +268,10 @@ typed_config:
       end
       request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
       request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
+      request_handle:headers():add("request_downstream_local_address_value", 
+        request_handle:streamInfo():downstreamLocalAddress())
+      request_handle:headers():add("request_downstream_directremote_address_value", 
+        request_handle:streamInfo():downstreamDirectRemoteAddress())
     end
 
     function envoy_on_response(response_handle)
@@ -325,6 +331,20 @@ typed_config:
                        ->value()
                        .getStringView());
 
+  EXPECT_TRUE(
+      absl::StrContains(upstream_request_->headers()
+                            .get(Http::LowerCaseString("request_downstream_local_address_value"))[0]
+                            ->value()
+                            .getStringView(),
+                        GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+  EXPECT_TRUE(absl::StrContains(
+      upstream_request_->headers()
+          .get(Http::LowerCaseString("request_downstream_directremote_address_value"))[0]
+          ->value()
+          .getStringView(),
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data1("good");
@@ -361,7 +381,7 @@ TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -419,7 +439,7 @@ TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -469,7 +489,7 @@ TEST_P(LuaIntegrationTest, UpstreamAsyncHttpCall) {
       R"EOF(
 name: envoy.filters.http.lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -519,7 +539,7 @@ TEST_P(LuaIntegrationTest, ChangeRoute) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:headers():remove(":path")
@@ -553,7 +573,7 @@ TEST_P(LuaIntegrationTest, SurviveMultipleCalls) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:streamInfo():dynamicMetadata()
@@ -589,7 +609,7 @@ TEST_P(LuaIntegrationTest, SignatureVerification) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function string.fromhex(str)
       return (str:gsub('..', function (cc)
@@ -938,7 +958,7 @@ TEST_P(LuaIntegrationTest, RewriteResponseBuffer) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       local content_length = response_handle:body():setBytes("ok")
@@ -957,7 +977,7 @@ TEST_P(LuaIntegrationTest, RewriteChunkedBody) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       response_handle:headers():replace("content-length", 2)

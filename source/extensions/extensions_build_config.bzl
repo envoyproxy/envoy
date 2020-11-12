@@ -166,6 +166,7 @@ EXTENSIONS = {
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
     # WiP
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
+    "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
 
     #
     # Transport sockets
@@ -214,7 +215,6 @@ EXTENSIONS = {
     # Watchdog actions
     #
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
-    "envoy.watchdog.abort_action":                      "//source/extensions/watchdog/abort_action:config",
 
 }
 

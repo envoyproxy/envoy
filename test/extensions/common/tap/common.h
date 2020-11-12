@@ -13,7 +13,7 @@ namespace data {
 namespace tap {
 namespace v3 {
 
-// TODO(mattklein123): AFAICT gtest has built in printing for proto messages but it doesn't seem
+// TODO(mattklein123): `AFAICT` gtest has built in printing for proto messages but it doesn't seem
 // to work unless this is here.
 std::ostream& operator<<(std::ostream& os, const TraceWrapper& trace);
 
@@ -35,6 +35,13 @@ MATCHER_P(TraceEqual, rhs, "") {
 
 namespace Common {
 namespace Tap {
+
+// Reads a PROTO_BINARY_LENGTH_DELIMITED set of messages from a file, found within the specified
+// path prefix.
+std::vector<envoy::data::tap::v3::TraceWrapper> readTracesFromPath(const std::string& path_prefix);
+
+// Reads a PROTO_BINARY_LENGTH_DELIMITED set of messages from a file.
+std::vector<envoy::data::tap::v3::TraceWrapper> readTracesFromFile(const std::string& file);
 
 class MockPerTapSinkHandleManager : public PerTapSinkHandleManager {
 public:

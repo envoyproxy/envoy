@@ -285,11 +285,6 @@ TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
 
 // Verify client response when authorization server returns a 200 OK.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(_, _));
-  bool timer_destroyed = false;
-  timer->timer_destroyed_ = &timer_destroyed;
-
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
@@ -299,8 +294,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_->onSuccess(async_request_, std::move(check_response));
-  // make sure the internal timeout timer is destroyed
-  EXPECT_EQ(timer_destroyed, true);
 }
 
 using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string>;
@@ -484,11 +477,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
 
 // Test the client when an unknown error occurs.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(_, _));
-  bool timer_destroyed = false;
-  timer->timer_destroyed_ = &timer_destroyed;
-
   envoy::service::auth::v3::CheckRequest request;
 
   client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
@@ -496,8 +484,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
-  // make sure the internal timeout timer is destroyed
-  // EXPECT_EQ(timer_destroyed, true);
 }
 
 // Test the client when a call to authorization server returns a 5xx error status.

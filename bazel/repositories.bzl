@@ -4,7 +4,7 @@ load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
-load(":crates.bzl", "raze_fetch_remote_crates")
+load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -13,7 +13,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
-    "envoy.watchdog.abort_action",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -183,6 +182,8 @@ def envoy_dependencies(skip_targets = []):
 
     _org_llvm_llvm()
     _com_github_wavm_wavm()
+    _com_github_wasmtime()
+    _com_github_wasm_c_api()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -346,10 +347,20 @@ def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
         build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
 def _com_google_cel_cpp():
-    external_http_archive("com_google_cel_cpp")
+    external_http_archive(
+        "com_google_cel_cpp",
+        patch_args = ["-p1"],
+        # Patches to remove "fast" protobuf-internal access
+        # The patch can be removed when the "fast" access is safe to be enabled back.
+        # This requires public visibility of Reflection::LookupMapValue in protobuf and
+        # any release of cel-cpp after 10/27/2020.
+        patches = ["@envoy//bazel:cel-cpp.patch"],
+    )
     external_http_archive("rules_antlr")
 
     # Parser dependencies
@@ -773,7 +784,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 1.39.6-upstream && ./emsdk activate --embedded 1.39.6-upstream || true",
+            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7 || true",
         ],
     )
 
@@ -853,6 +864,18 @@ def _com_github_wavm_wavm():
     native.bind(
         name = "wavm",
         actual = "@envoy//bazel/foreign_cc:wavm",
+    )
+
+def _com_github_wasmtime():
+    external_http_archive(
+        name = "com_github_wasmtime",
+        build_file = "@envoy//bazel/external:wasmtime.BUILD",
+    )
+
+def _com_github_wasm_c_api():
+    external_http_archive(
+        name = "com_github_wasm_c_api",
+        build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
     )
 
 def _kafka_deps():

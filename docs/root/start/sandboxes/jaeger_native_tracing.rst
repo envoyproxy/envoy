@@ -43,10 +43,6 @@ calls to other services. In the sandbox we have provided, the simple flask app
 (see trace function in :repo:`/examples/front-proxy/service.py`) acting as service1 propagates
 the trace headers while making an outbound call to service2.
 
-
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
-
 .. include:: _include/docker-env-setup.rst
 
 Step 3: Build the sandbox
@@ -62,12 +58,12 @@ To build this sandbox example, and start the example apps run the following comm
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                Name                              Command                State                                                      Ports
-    -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    jaeger-native-tracing_front-envoy_1   /start-front.sh                Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
-    jaeger-native-tracing_jaeger_1        /go/bin/all-in-one-linux - ... Up      14250/tcp, 14268/tcp, 0.0.0.0:16686->16686/tcp, 5775/udp, 5778/tcp, 6831/udp, 6832/udp, 0.0.0.0:9411->9411/tcp
-    jaeger-native-tracing_service1_1      /start-service.sh              Up      10000/tcp, 8000/tcp
-    jaeger-native-tracing_service2_1      /start-service.sh              Up      10000/tcp, 8000/tcp
+                Name                              Command                State                     Ports
+    -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    jaeger-native-tracing_front-envoy_1   /start-front.sh                Up      10000/tcp, 0.0.0.0:8000->8000/tcp
+    jaeger-native-tracing_jaeger_1        /go/bin/all-in-one-linux - ... Up      14250/tcp, 14268/tcp, 0.0.0.0:16686->16686/tcp, 5775/udp, 5778/tcp, 6831/udp, 6832/udp
+    jaeger-native-tracing_service1_1      /start-service.sh              Up      10000/tcp
+    jaeger-native-tracing_service2_1      /start-service.sh              Up      10000/tcp
 
 Step 4: Generate some load
 **************************

@@ -20,8 +20,8 @@ load(
     _envoy_select_hot_restart = "envoy_select_hot_restart",
     _envoy_select_new_codecs_in_integration_tests = "envoy_select_new_codecs_in_integration_tests",
     _envoy_select_wasm = "envoy_select_wasm",
-    _envoy_select_wasm_all_v8_wavm_none = "envoy_select_wasm_all_v8_wavm_none",
     _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
+    _envoy_select_wasm_wasmtime = "envoy_select_wasm_wasmtime",
     _envoy_select_wasm_wavm = "envoy_select_wasm_wavm",
 )
 load(
@@ -181,8 +181,8 @@ envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_wasm = _envoy_select_wasm
-envoy_select_wasm_all_v8_wavm_none = _envoy_select_wasm_all_v8_wavm_none
 envoy_select_wasm_wavm = _envoy_select_wasm_wavm
+envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
 envoy_select_wasm_v8 = _envoy_select_wasm_v8
 envoy_select_new_codecs_in_integration_tests = _envoy_select_new_codecs_in_integration_tests
 

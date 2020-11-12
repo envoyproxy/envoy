@@ -113,6 +113,7 @@ envoy_cc_library(
         ":watchdog_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/common:time_interface",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_config_interface",
@@ -127,7 +128,9 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/watchdog:abort_action_config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -256,6 +259,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/event:scaled_range_timer_manager_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
@@ -470,11 +474,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "watchdog_lib",
-    srcs = ["watchdog_impl.cc"],
     hdrs = ["watchdog_impl.h"],
     deps = [
         "//include/envoy/common:time_interface",
-        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:watchdog_interface",
         "//source/common/common:assert_lib",
     ],
