@@ -99,7 +99,7 @@ to provide a ``Bearer`` token via the ``Authorization`` header.
 
 .. note::
 
-    A complete list of users is defined in :download:`auth/users.json <_include/ext_auth/auth/users.json>`
+    A complete list of users is defined in :download:`auth/users.json <_include/ext_authz/auth/users.json>`
     file. For example, the ``token1`` used in the below example is corresponding to ``user1``.
 
 An example of successful requests can be observed as follows:

@@ -17,7 +17,7 @@ The setup of this sandbox is based on the setup of the :ref:`Front Proxy sandbox
 All incoming requests are routed via the front Envoy, which acts as a reverse proxy sitting on
 the edge of the ``envoymesh`` network.
 
-Port ``8000`` is exposed by :download:`docker compose <_include/cache/docker-compose.yaml>` to handle ``HTTP`` calls
+Port ``8000`` is exposed by :download:`docker-compose.yaml <_include/cache/docker-compose.yaml>` to handle ``HTTP`` calls
 to the services. Two backend services are deployed behind the front Envoy, each with a sidecar Envoy.
 
 The front Envoy is configured to run the Cache Filter, which stores cacheable responses in an in-memory cache,
@@ -66,7 +66,8 @@ To send a request:
 
 ``service_no``: The service to send the request to, 1 or 2.
 
-``response``: The response that is being requested. The responses are found in :repo:`/examples/cache/responses.yaml`.
+``response``: The response that is being requested. The responses are found in
+:download:`responses.yaml <_include/cache/responses.yaml>`.
 
 
 The provided example responses are:
