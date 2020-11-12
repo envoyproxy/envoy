@@ -32,6 +32,18 @@ namespace Envoy {
 namespace Secret {
 
 /**
+ * All SDS API. @see stats_macros.h
+ */
+#define ALL_SDS_API_STATS(COUNTER) COUNTER(key_rotation_failed)
+
+/**
+ * Struct definition for all SDS API stats. @see stats_macros.h
+ */
+struct SdsApiStats {
+  ALL_SDS_API_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * SDS API implementation that fetches secrets from SDS server via Subscription.
  */
 class SdsApi : public Envoy::Config::SubscriptionBase<
@@ -96,8 +108,10 @@ private:
   uint64_t getHashForFiles(const FileContentMap& files);
   // Invoked for filesystem watches on update.
   void onWatchUpdate();
+  SdsApiStats generateStats(Stats::Scope& scope);
 
-  Stats::Store& stats_;
+  Stats::ScopePtr scope_;
+  SdsApiStats sds_api_stats_;
 
   const envoy::config::core::v3::ConfigSource sds_config_;
   Config::SubscriptionPtr subscription_;

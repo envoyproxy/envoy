@@ -316,3 +316,12 @@ For upstream clusters, they are in the *cluster.<CLUSTER_NAME>.client_ssl_socket
 
      ssl_context_update_by_sds, Total number of ssl context has been updated.
      upstream_context_secrets_not_ready, Total number of upstream connections reset due to empty ssl certificate.
+
+SDS has a :ref:`statistics <subscription_statistics>` tree rooted in the *sds.<SECRET_NAME>.*
+namespace. In addition, the following statistics are tracked in this namespace:
+
+.. csv-table::
+     :header: Name, Description
+     :widths: 1, 2
+
+     key_rotation_failed, Total number of filesystem key rotations that failed outside of an SDS update.

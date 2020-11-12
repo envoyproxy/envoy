@@ -225,6 +225,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(Grpc::ClientType::EnvoyGrpc)));
 
+// Validate that a basic key-cert rotation works via symlink rename.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
   v3_resource_api_ = true;
   TestEnvironment::exec(
@@ -251,7 +252,50 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
                               TestEnvironment::temporaryPath("root/current"));
   test_server_->waitForCounterGe(
       listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 2);
+  // The rotation is not a SDS attempt, so no change to these stats.
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_rejected")->value());
+
   // First request with server_ecdsa{cert,key}.pem.
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+}
+
+// Validate that rotating to a directory with missing certs is handled.
+TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
+  v3_resource_api_ = true;
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+
+  on_server_init_function_ = [this]() {
+    createSdsStream(*(fake_upstreams_[1]));
+    sendSdsResponse(getCurrentServerSecret());
+  };
+  initialize();
+
+  // Initial update from filesystem.
+  test_server_->waitForCounterGe(
+      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  // First request with server{cert,key}.pem.
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+  cleanupUpstreamAndDownstream();
+
+  // Rotate to an empty directory, this should fail.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/empty"),
+                              TestEnvironment::temporaryPath("root/current"));
+  test_server_->waitForCounterEq("sds.server_cert.key_rotation_failed", 1);
+  EXPECT_EQ(1,
+            test_server_
+                ->counter(listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"))
+                ->value());
+  // The rotation is not a SDS attempt, so no change to these stats.
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_rejected")->value());
+
+  // Requests continue to work with key/cert pair.
   testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
@@ -268,6 +312,10 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_rejected")->value());
 }
 
 // A test that SDS server send a bad secret for a static listener,
@@ -285,6 +333,10 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   EXPECT_FALSE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
 
+  // Failure
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_success")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_rejected")->value());
+
   sendSdsResponse(getServerSecret());
 
   // Wait for ssl_context_updated_by_sds counter.
@@ -295,6 +347,10 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_rejected")->value());
 }
 
 class SdsDynamicDownstreamCertValidationContextTest : public SdsDynamicDownstreamIntegrationTest {
@@ -423,6 +479,10 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.validation_secret.update_rejected")->value());
 }
 
 // A test that SDS server sends a certificate validation context for a static listener.
@@ -440,6 +500,10 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationCont
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.validation_secret.update_rejected")->value());
 }
 
 // A test that verifies that both: static cluster and LDS listener are updated when using
@@ -463,6 +527,10 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicWithSharedSecret) {
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.validation_secret.update_rejected")->value());
 }
 
 // A test that verifies that both: static cluster and LDS listener are updated when using
@@ -487,6 +555,10 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedValidationContextW
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.validation_secret.update_rejected")->value());
 }
 
 // Upstream SDS integration test: a static cluster has ssl cert from SDS.
@@ -558,6 +630,10 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
   testRouterHeaderOnlyRequestAndResponse();
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.client_cert.update_rejected")->value());
 }
 
 // To test a static cluster with sds. SDS send a bad client secret first.
@@ -581,11 +657,19 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
+  // Failure
+  EXPECT_EQ(0, test_server_->counter("sds.client_cert.update_success")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_rejected")->value());
+
   sendSdsResponse(getClientSecret());
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
   testRouterHeaderOnlyRequestAndResponse();
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_success")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_rejected")->value());
 }
 
 } // namespace Ssl
