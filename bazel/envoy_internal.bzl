@@ -44,6 +44,7 @@ def envoy_copts(repository, test = False):
         # Allow 'nodiscard' function return values to be discarded
         # TODO(wrowe,sunjayBhatia): Drop this option when all causes are fixed
         "-wd4834",
+        "-Wv:19.4",
     ]
 
     return select({
