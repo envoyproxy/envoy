@@ -502,16 +502,17 @@ TEST_P(IntegrationTest, TestPipelinedResponses) {
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"));
 
-  tcp_client->waitForData("\r\n\r\n", false);
+  tcp_client->waitForData("0\r\n\r\n", false);
   std::string response = tcp_client->data();
 
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
   EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
-  EXPECT_THAT(response, EndsWith("\r\n\r\n"));
+  EXPECT_THAT(response, EndsWith("0\r\n\r\n"));
 
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->close();
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value(), 1);
 }
 
 TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
