@@ -109,8 +109,10 @@ envoy_cc_test(
         "//include/envoy/network:dns_interface",
         "//source/common/event:dispatcher_includes",
         "//include/envoy/event:file_event_interface",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
+        "//source/common/common:random_generator_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
@@ -226,6 +228,15 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "raw_buffer_socket_test",
+    srcs = ["raw_buffer_socket_test.cc"],
+    deps = [
+        "//source/common/network:raw_buffer_socket_lib",
+        "//test/test_common:network_utility_lib",
     ],
 )
 
