@@ -8,7 +8,7 @@ Istio 一直是服务网格产品中的佼佼者，其数据面的组件—— E
 
 | 责任范围 | 人员 |GitHub 账号 |
 | :---: | :---: |:---: |
-| 翻译跟踪、文档更新 | 马景贺 | [lhb008](https://github.com/lhb008)|
+| 翻译跟踪、文档更新 | 马景贺 | [majinghe](https://github.com/majinghe)|
 | 翻译跟踪、文档更新 | 许振文 | [helight](https://github.com/helight)|
 | 翻译跟踪、文档更新 | 张晓辉 | [addozhang](https://github.com/addozhang)|
 
@@ -124,6 +124,13 @@ $ git checkout <自定义分支名>
 翻译任务相关内容，在此过程中，可以参考并共同完善[术语表](https://github.com/cloudnativeto/envoy/tree/zh/docs/root/term.md)。
 
 ### 4 本地构建和预览
+
+本地构建可以按照 [Envoy 官方](https://github.com/envoyproxy/envoy/tree/master/docs)给的文档格式进行。进入到与 `docs` 目录同级的目录下，执行以下运行命令：
+
+```
+./ci/run_envoy_docker.sh 'docs/build.sh'
+```
+然后根据编译的结果来对自己的翻译内容进行相应的修改。如果本地编译通过，则可以进行 PR 提交。
 
 > 由于 Envoy 文档的特殊性，本次翻译没有设置 netlify 做预览，只配置了 github action 做定时的翻译发布（每天两次）。当提交PR 之后，等待 reviewer review 之后将代码合入之后，才会在定时发布之后看到[翻译效果](https://cloudnative.to/envoy/)
 
