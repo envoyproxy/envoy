@@ -22,6 +22,9 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // is found the action specified by the most specific on_no_match will be evaluated.
 // As an on_no_match might result in another matching tree being evaluated, this process
 // might repeat several times until the final OnMatch (or no match) is decided.
+//
+// This API is a work in progress.
+// [#not-implemented-hide:]
 message Matcher {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.matcher.v3.Matcher";
