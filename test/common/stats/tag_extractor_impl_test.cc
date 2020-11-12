@@ -10,7 +10,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include "re2/re2.h"
 
 namespace Envoy {
 namespace Stats {

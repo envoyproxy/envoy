@@ -75,7 +75,7 @@ public:
                   IntervalSet<size_t>& remove_characters) const override;
 
 private:
-  re2::RE2 regex_;
+  const re2::RE2 regex_;
 };
 
 } // namespace Stats
