@@ -33,6 +33,26 @@ SDS Configuration
 
 *SdsSecretConfig* is used in two fields in :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`. The first field is *tls_certificate_sds_secret_configs* to use SDS to get :ref:`TlsCertificate <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`. The second field is *validation_context_sds_secret_config* to use SDS to get :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`.
 
+.. _sds_key_rotation:
+
+Key rotation
+------------
+
+It's usually preferrable to perform key rotation via gRPC SDS, but when this is not possible or
+desired (e.g. during bootstrap of SDS credentials), SDS allows for filesystem rotation when secrets
+refer to filesystem paths. This currently is supported for the following secret types:
+
+* :ref:`TlsCertificate <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`
+* :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
+
+By default, directories containing secrets are watched for filesystem move events. Explicit control over
+the watched directory is possible by specifying a *watched_directory* path in :ref:`TlsCertificate
+<envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.watched_directory>` and
+:ref:`CertificateValidationContext
+<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.watched_directory>`.
+
+An example of key rotation is provided :ref:`below <xds_certificate_rotation>`.
+
 Example one: static_resource
 -----------------------------
 
@@ -211,9 +231,11 @@ In contrast, :ref:`sds_server_example` requires a restart to reload xDS certific
           "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext"
           common_tls_context:
             tls_certificate_sds_secret_configs:
+              name: tls_sds
               sds_config:
                 path: /etc/envoy/tls_certificate_sds_secret.yaml
             validation_context_sds_secret_config:
+              name: validation_context_sds
               sds_config:
                 path: /etc/envoy/validation_context_sds_secret.yaml
 
@@ -243,7 +265,7 @@ In the above example, a watch will be established on ``/certs``. File movement i
 will trigger an update. An alternative common key rotation scheme that provides improved atomicity
 is to establish an active symlink ``/certs/current`` and use an atomic move operation to replace the
 symlink. The watch in this case needs to be on the certificate's grandparent directory. Envoy
-supports this scheme via the use of *watched_path*. Continuing the above examples:
+supports this scheme via the use of *watched_directory*. Continuing the above examples:
 
 .. code-block:: yaml
 
