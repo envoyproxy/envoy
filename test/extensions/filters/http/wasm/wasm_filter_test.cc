@@ -7,6 +7,7 @@
 #include "test/test_common/wasm_base.h"
 
 using testing::Eq;
+using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -615,6 +616,55 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
         callbacks->onSuccess(request, std::move(response_message));
         return proxy_wasm::WasmResult::Ok;
       }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter().decodeHeaders(request_headers, false));
+
+  EXPECT_NE(callbacks, nullptr);
+}
+
+TEST_P(WasmHttpFilterTest, StopAndResumeViaAsyncCall) {
+  setupTest("resume_call");
+  setupFilter();
+
+  InSequence s;
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
+  EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                      {":path", "/"},
+                                                      {":authority", "foo"},
+                                                      {"content-length", "6"}}),
+                      message->headers());
+            callbacks = &cb;
+            return &request;
+          }));
+
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("onRequestHeaders")))
+      .WillOnce(Invoke([&](uint32_t, absl::string_view) -> proxy_wasm::WasmResult {
+        Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        NiceMock<Tracing::MockSpan> span;
+        Http::TestResponseHeaderMapImpl response_header{{":status", "200"}};
+        callbacks->onBeforeFinalizeUpstreamSpan(span, &response_header);
+        callbacks->onSuccess(request, std::move(response_message));
+        return proxy_wasm::WasmResult::Ok;
+      }));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("continueRequest")));
+
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks, continueDecoding()).WillOnce(Invoke([&]() {
+    // Verify that we're not resuming processing from within Wasm callback.
+    EXPECT_EQ(proxy_wasm::current_context_, nullptr);
+  }));
+
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter().decodeHeaders(request_headers, false));
 
