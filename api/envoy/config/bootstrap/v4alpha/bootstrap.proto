@@ -421,14 +421,15 @@ message Watchdog {
 // If using an unsafe action that could get stuck or deadlock, it important to
 // have an out of band system to terminate the process.
 //
-// See the interface for the extensions in include/envoy/server/fatal_action_config.h.
-// FatalAction extensions should live in source/extensions/fatal_actions.
+// The interface for the extension is ``Envoy::Server::Configuration::FatalAction``.
+// *FatalAction* extensions live in the ``envoy.extensions.fatal_actions`` API
+// namespace.
 message FatalAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.FatalAction";
 
   // Extension specific configuration for the action. It's expected to conform
-  // to the interface at include/envoy/server/fatal_action_config.
+  // to the ``Envoy::Server::Configuration::FatalAction`` interface.
   core.v4alpha.TypedExtensionConfig config = 1;
 }
 
