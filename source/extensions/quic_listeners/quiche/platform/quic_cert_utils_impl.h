@@ -13,10 +13,8 @@ namespace quic {
 
 class QuicCertUtilsImpl {
 public:
+  // NOLINTNEXTLINE(readability-identifier-naming)
   static bool ExtractSubjectNameFromDERCert(absl::string_view cert, absl::string_view* subject_out);
-
-private:
-  static bool SeekToSubject(absl::string_view cert, CBS* tbs_certificate);
 };
 
 } // namespace quic

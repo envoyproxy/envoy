@@ -15,7 +15,7 @@ namespace quiche {
 
 namespace {
 
-absl::flat_hash_map<std::string, Flag*> MakeFlagMap() {
+absl::flat_hash_map<std::string, Flag*> makeFlagMap() {
   absl::flat_hash_map<std::string, Flag*> flags;
 
 #define QUIC_FLAG(flag, ...) flags.emplace(flag->name(), flag);
@@ -45,7 +45,7 @@ FlagRegistry& FlagRegistry::GetInstance() {
   return *instance;
 }
 
-FlagRegistry::FlagRegistry() : flags_(MakeFlagMap()) {}
+FlagRegistry::FlagRegistry() : flags_(makeFlagMap()) {}
 
 void FlagRegistry::ResetFlags() const {
   for (auto& kv : flags_) {
@@ -151,12 +151,11 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 // Select the right macro based on the number of arguments.
 #define GET_6TH_ARG(arg1, arg2, arg3, arg4, arg5, arg6, ...) arg6
 
-#define QUIC_PROTOCOL_FLAG_MACRO_CHOOSER(arg1, arg2, arg3, ...)                                    \
-  GET_6TH_ARG(arg1, arg2, arg3, __VA_ARGS__, DEFINE_QUIC_PROTOCOL_FLAG_TWO_VALUES,                 \
+#define QUIC_PROTOCOL_FLAG_MACRO_CHOOSER(...)                                                      \
+  GET_6TH_ARG(__VA_ARGS__, DEFINE_QUIC_PROTOCOL_FLAG_TWO_VALUES,                                   \
               DEFINE_QUIC_PROTOCOL_FLAG_SINGLE_VALUE)
 
-#define QUIC_PROTOCOL_FLAG(arg1, arg2, arg3, ...)                                                  \
-  QUIC_PROTOCOL_FLAG_MACRO_CHOOSER(arg1, arg2, arg3, __VA_ARGS__)(arg1, arg2, arg3, __VA_ARGS__)
+#define QUIC_PROTOCOL_FLAG(...) QUIC_PROTOCOL_FLAG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 

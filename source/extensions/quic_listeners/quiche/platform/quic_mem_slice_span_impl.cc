@@ -10,6 +10,7 @@
 
 namespace quic {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 absl::string_view QuicMemSliceSpanImpl::GetData(size_t index) {
   Envoy::Buffer::RawSliceVector slices = buffer_->getRawSlices(/*max_slices=*/index + 1);
   ASSERT(slices.size() > index);

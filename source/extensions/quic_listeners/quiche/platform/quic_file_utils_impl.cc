@@ -36,6 +36,7 @@ void depthFirstTraverseDirectory(const std::string& dirname, std::vector<std::st
 } // namespace
 
 // Traverses the directory |dirname| and returns all of the files it contains.
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::vector<std::string> ReadFileContentsImpl(const std::string& dirname) {
   std::vector<std::string> files;
   depthFirstTraverseDirectory(dirname, files);
@@ -43,6 +44,7 @@ std::vector<std::string> ReadFileContentsImpl(const std::string& dirname) {
 }
 
 // Reads the contents of |filename| as a string into |contents|.
+// NOLINTNEXTLINE(readability-identifier-naming)
 void ReadFileContentsImpl(absl::string_view filename, std::string* contents) {
 #ifdef WIN32
   Envoy::Filesystem::InstanceImplWin32 fs;

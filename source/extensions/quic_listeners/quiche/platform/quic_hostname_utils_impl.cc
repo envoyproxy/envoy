@@ -19,6 +19,7 @@
 namespace quic {
 
 // static
+// NOLINTNEXTLINE(readability-identifier-naming)
 bool QuicHostnameUtilsImpl::IsValidSNI(absl::string_view sni) {
   // TODO(wub): Implement it on top of GoogleUrl, once it is available.
 
@@ -27,6 +28,7 @@ bool QuicHostnameUtilsImpl::IsValidSNI(absl::string_view sni) {
 }
 
 // static
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::string QuicHostnameUtilsImpl::NormalizeHostname(absl::string_view hostname) {
   // TODO(wub): Implement it on top of GoogleUrl, once it is available.
   std::string host = absl::AsciiStrToLower(hostname);

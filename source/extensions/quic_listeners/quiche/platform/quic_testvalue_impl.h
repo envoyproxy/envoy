@@ -10,6 +10,7 @@
 
 namespace quic {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 template <class T> void AdjustTestValueImpl(absl::string_view /*label*/, T* /*var*/) {}
 
 } // namespace quic

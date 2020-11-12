@@ -43,9 +43,13 @@ public:
   }
 
   // QuicMemSliceSpan
+  // NOLINTNEXTLINE(readability-identifier-naming)
   absl::string_view GetData(size_t index);
+  // NOLINTNEXTLINE(readability-identifier-naming)
   QuicByteCount total_length() { return buffer_->length(); };
+  // NOLINTNEXTLINE(readability-identifier-naming)
   size_t NumSlices() { return buffer_->getRawSlices().size(); }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   template <typename ConsumeFunction> QuicByteCount ConsumeAll(ConsumeFunction consume);
   bool empty() const { return buffer_->length() == 0; }
 
@@ -54,6 +58,7 @@ private:
 };
 
 template <typename ConsumeFunction>
+// NOLINTNEXTLINE(readability-identifier-naming)
 QuicByteCount QuicMemSliceSpanImpl::ConsumeAll(ConsumeFunction consume) {
   size_t saved_length = 0;
   for (auto& slice : buffer_->getRawSlices()) {

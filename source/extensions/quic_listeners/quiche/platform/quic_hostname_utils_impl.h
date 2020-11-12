@@ -18,6 +18,7 @@ public:
   //  (2) check that the hostname contains valid characters only; and
   //  (3) contains at least one dot.
   // NOTE(wub): Only (3) is implemented for now.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   static bool IsValidSNI(absl::string_view sni);
 
   // Normalize a hostname:
@@ -27,6 +28,7 @@ public:
   //  (3) Remove the trailing '.'.
   // WARNING: May mutate |hostname| in place.
   // NOTE(wub): Only (2) and (3) are implemented for now.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   static std::string NormalizeHostname(absl::string_view hostname);
 
 private:
