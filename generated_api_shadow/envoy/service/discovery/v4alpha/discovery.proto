@@ -305,5 +305,7 @@ message Resource {
   // with the management server.
   google.protobuf.Duration ttl = 6;
 
+  // Cache control properties for the resource.
+  // [#not-implemented-hide:]
   CacheControl cache_control = 7;
 }
