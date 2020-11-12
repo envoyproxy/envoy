@@ -221,7 +221,7 @@ protected:
     handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
   }
 
-  ~TlsCertificateSdsRotationApiTest() { handle_->remove(); }
+  ~TlsCertificateSdsRotationApiTest() override { handle_->remove(); }
 
   void onConfigUpdate(const std::string& cert_value, const std::string& key_value) {
     const std::string yaml = fmt::format(
@@ -291,7 +291,7 @@ protected:
     handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
   }
 
-  ~CertificateValidationContextSdsRotationApiTest() { handle_->remove(); }
+  ~CertificateValidationContextSdsRotationApiTest() override { handle_->remove(); }
 
   void onConfigUpdate(const std::string& trusted_ca_path, const std::string& trusted_ca_value,
                       const std::string& watch_path) {

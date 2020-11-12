@@ -406,7 +406,7 @@ public:
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
-    return generic_secret.get();
+    return generic_secret_.get();
   }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
     return update_callback_manager_.add(callback);
@@ -419,7 +419,7 @@ public:
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    generic_secret = std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
+    generic_secret_ = std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
         secret.generic_secret());
   }
   void
@@ -430,7 +430,7 @@ protected:
   Config::WatchedDirectory* getWatchedDirectory() override { return nullptr; }
 
 private:
-  GenericSecretPtr generic_secret;
+  GenericSecretPtr generic_secret_;
   Common::CallbackManager<const envoy::extensions::transport_sockets::tls::v3::GenericSecret&>
       validation_callback_manager_;
 };
