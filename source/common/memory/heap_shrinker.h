@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 

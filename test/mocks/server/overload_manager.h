@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "gmock/gmock.h"
 
