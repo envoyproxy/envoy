@@ -10,6 +10,7 @@
 #include "common/config/version_converter.h"
 #include "common/matcher/matcher.h"
 #include "common/protobuf/protobuf.h"
+#include "external/envoy_api/envoy/config/common/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,23 +32,31 @@ fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*
 } // namespace
 
 envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate
-fromPredicate(const envoy::config::tap::v3::MatchPredicate& predicate) {
+fromPredicate(const envoy::config::common::matcher::v3::MatchPredicate& predicate) {
   envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate new_predicate;
   switch (predicate.rule_case()) {
-  case (envoy::config::tap::v3::MatchPredicate::kOrMatch): {
+  case (envoy::config::common::matcher::v3::MatchPredicate::kOrMatch): {
     auto* list = new_predicate.mutable_or_matcher();
 
     for (const auto& p : predicate.or_match().rules()) {
       list->add_predicate()->MergeFrom(fromPredicate(p));
     }
   } break;
-  case (envoy::config::tap::v3::MatchPredicate::kAndMatch): {
+  case (envoy::config::common::matcher::v3::MatchPredicate::kAndMatch): {
     auto* list = new_predicate.mutable_and_matcher();
 
     for (const auto& p : predicate.or_match().rules()) {
       list->add_predicate()->MergeFrom(fromPredicate(p));
     }
   } break;
+  case (envoy::config::common::matcher::v3::MatchPredicate::kHttpRequestHeadersMatch): {
+    auto* list = new_predicate.mutable_and_matcher();
+
+    for (const auto& p : predicate.http_request_headers_matcher().headers()) {
+
+      list->add_predicate()->mutable_single_predicate()-
+    }
+  }
   default:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
@@ -68,7 +77,7 @@ HttpTapConfigImpl::HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_c
   auto* matcher_list = match_tree_config_.mutable_matcher_list();
   auto* matcher = matcher_list->add_matchers();
   if (proto_config.has_match()) {
-    matcher->mutable_predicate()->MergeFrom(proto_config.match());
+    matcher->mutable_predicate()->mutable_single_predicate()->MergeFrom(fromPredicate(proto_config.match()));
   } else {
     envoy::config::common::matcher::v3::MatchPredicate match;
     Config::VersionConverter::upgrade(proto_config.match_config(), match);

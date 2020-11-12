@@ -861,6 +861,8 @@ class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEn
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
+struct HttpMatchingData;
+
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
  * build the filter chain in an application specific way.
@@ -869,7 +871,7 @@ class FilterChainFactoryCallbacks {
 public:
   virtual ~FilterChainFactoryCallbacks() = default;
 
-  using MatchTreeAndData = std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>;
+  using MatchTreeAndData = std::pair<MatchTreeSharedPtr<HttpMatchingData>, std::shared_ptr<HttpMatchingData>>;
   virtual MatchTreeAndData
   createMatchTree(const envoy::config::common::matcher::v3::Matcher& config) PURE;
 
@@ -880,8 +882,8 @@ public:
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
-                                      MatchTreeSharedPtr match_tree,
-                                      MatchingDataSharedPtr matching_data) PURE;
+                                      MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                                      std::shared_ptr<HttpMatchingData> matching_data) PURE;
 
   /**
    * Add an encoder filter that is used when writing stream data.
@@ -890,8 +892,8 @@ public:
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
-                                      MatchTreeSharedPtr match_tree,
-                                      MatchingDataSharedPtr matching_data) PURE;
+                                      MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                                      std::shared_ptr<HttpMatchingData> matching_data) PURE;
 
   /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
@@ -899,8 +901,8 @@ public:
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
 
-  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
-                               MatchingDataSharedPtr matching_data) PURE;
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                               std::shared_ptr<HttpMatchingData> matching_data) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.

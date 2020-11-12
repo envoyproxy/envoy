@@ -492,17 +492,15 @@ void HttpConnectionManagerConfig::processFilter(
 
   auto config_copy = proto_config;
 
-  MatchTreeFactoryCb match_tree = [](Http::HttpMatchingData&) { return nullptr; };
+  MatchTreeFactoryCb match_tree = []() { return nullptr; };
   // Attempt to extract a match config from the configuration. If so, we unwrap the config to get
   // the actual filter config.
   if (proto_config.typed_config().Is<envoy::config::common::matcher::v3::MatchingFilterConfig>()) {
     envoy::config::common::matcher::v3::MatchingFilterConfig matching_filter;
     MessageUtil::unpackTo(proto_config.typed_config(), matching_filter);
 
-    match_tree = [matching_filter](Http::HttpMatchingData& matching_data) {
-      return MatchTreeFactory::create(matching_filter.match_tree(),
-                                      std::make_unique<Http::HttpKeyNamespaceMapper>(),
-                                      matching_data);
+    match_tree = [matching_filter]() {
+      return MatchTreeFactory().create(matching_filter.matcher());
     };
     config_copy.clear_typed_config();
     config_copy.mutable_typed_config()->MergeFrom(matching_filter.typed_config());
@@ -647,11 +645,9 @@ public:
       : callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
 
   std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
-  createMatchTree(const envoy::config::common::matcher::v3::MatchTree& config) override {
+  createMatchTree(const envoy::config::common::matcher::v3::Matcher& config) override {
     auto matching_data = std::make_shared<Http::HttpMatchingData>();
-    return {MatchTreeFactory::create(config, std::make_unique<Http::HttpKeyNamespaceMapper>(),
-                                     *matching_data),
-            matching_data};
+    return {MatchTreeFactory().create(config), matching_data};
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
@@ -703,7 +699,7 @@ private:
 
     // Otherwise we allocate a new data object for this tree and pass it to the factory function.
     auto data = std::make_unique<Http::HttpMatchingData>();
-    auto matcher = match_tree_(*data);
+    auto matcher = match_tree_();
     factory_func(filter, matcher, matcher ? std::move(data) : nullptr);
   }
 
