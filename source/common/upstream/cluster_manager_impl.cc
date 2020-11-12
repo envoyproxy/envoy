@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "common/common/macros.h"
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -931,14 +932,22 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
                                                       const HostVector& hosts_removed) {
   const auto& host_set = cluster.prioritySet().hostSetsPerPriority()[priority];
 
-  tls_.runOnAllThreads([name = cluster.info()->name(), priority,
-                        update_params = HostSetImpl::updateHostsParams(*host_set),
-                        locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
-                        overprovisioning_factor = host_set->overprovisioningFactor()](
-                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-    cluster_manager->updateClusterMembership(name, priority, update_params, locality_weights,
-                                             hosts_added, hosts_removed, overprovisioning_factor);
-  });
+  tls_.runOnAllThreads(
+      [name = cluster.info()->name(), priority,
+       update_params = HostSetImpl::updateHostsParams(*host_set),
+       locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
+       overprovisioning_factor = host_set->overprovisioningFactor()](
+          OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        cluster_manager->updateClusterMembership(name, priority, update_params, locality_weights,
+                                                 hosts_added, hosts_removed,
+                                                 overprovisioning_factor);
+      },
+      // This completion is guaranteed to be executed on master thread.
+      // Still the host can be snapped by dataplane and need to addressed separately.
+      [hosts_added_guard = hosts_added, hosts_removed_guard = hosts_removed]() {
+        UNREFERENCED_PARAMETER(hosts_added_guard);
+        UNREFERENCED_PARAMETER(hosts_removed_guard);
+      });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
