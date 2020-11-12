@@ -417,10 +417,10 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnRequestData) {
 
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(decoder_callbacks_, decodingBuffer())
-      .Times(3)
+      .Times(2)
       .WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-      .Times(3)
+      .Times(2)
       .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(decoding_buffer);
       }));
@@ -489,10 +489,10 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {
 
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(decoder_callbacks_, decodingBuffer())
-      .Times(2)
+      .Times(1)
       .WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-      .Times(2)
+      .Times(1)
       .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(decoding_buffer);
       }));
@@ -1190,10 +1190,10 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnResponseData) {
 
   Buffer::OwnedImpl encoding_buffer;
   EXPECT_CALL(encoder_callbacks_, encodingBuffer())
-      .Times(3)
+      .Times(2)
       .WillRepeatedly(Return(&encoding_buffer));
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
-      .Times(3)
+      .Times(2)
       .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(encoding_buffer);
       }));
@@ -1262,10 +1262,10 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnResponseData) {
 
   Buffer::OwnedImpl encoding_buffer;
   EXPECT_CALL(encoder_callbacks_, encodingBuffer())
-      .Times(2)
+      .Times(1)
       .WillRepeatedly(Return(&encoding_buffer));
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
-      .Times(2)
+      .Times(1)
       .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(encoding_buffer);
       }));
