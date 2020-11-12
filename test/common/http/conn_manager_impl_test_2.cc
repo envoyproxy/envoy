@@ -309,6 +309,28 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, ConnectionDurationResponseFlag) {
+  // Not used in the test.
+  delete codec_;
+
+  max_connection_duration_ = (std::chrono::milliseconds(10));
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
+  setup(false, "");
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  filter_callbacks_.connection_.streamInfo().setResponseFlag(
+      StreamInfo::ResponseFlag::DurationTimeout);
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_TRUE(filter_callbacks_.connection_.streamInfo().hasResponseFlag(
+      StreamInfo::ResponseFlag::DurationTimeout));
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoCodec) {
   // Not used in the test.
   delete codec_;
