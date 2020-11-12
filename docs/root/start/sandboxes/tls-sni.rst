@@ -3,6 +3,11 @@
 TLS (SNI)
 =========
 
+.. sidebar:: Requirements
+
+   `openssl <https://www.openssl.org/>`_
+
+      Used to create a TLS certificate for the websocket.
 
 This example demonstrates a server that listens on multiple domains
 and provides separate ``TLS`` termination for each.
