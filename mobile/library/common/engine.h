@@ -40,7 +40,7 @@ public:
    * @param elements, joined elements of the timeseries.
    * @param count, amount to add to the counter.
    */
-  envoy_status_t recordCounter(const std::string& elements, uint64_t count);
+  envoy_status_t recordCounterInc(const std::string& elements, uint64_t count);
 
   /**
    * Set a gauge of a given string of elements with the given value.

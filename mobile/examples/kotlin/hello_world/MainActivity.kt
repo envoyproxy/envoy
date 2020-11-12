@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
+import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
@@ -61,17 +62,18 @@ class MainActivity : Activity() {
     thread.start()
     val handler = Handler(thread.looper)
 
-    // Run a request loop until the application exits.
+    // Run a request loop and record stats until the application exits.
     handler.postDelayed(
       object : Runnable {
         override fun run() {
           try {
             makeRequest()
+            recordStats()
           } catch (e: IOException) {
-            Log.d("MainActivity", "exception making request.", e)
+            Log.d("MainActivity", "exception making request or recording stats", e)
           }
 
-          // Make a call again
+          // Make a call and report stats again
           handler.postDelayed(this, TimeUnit.SECONDS.toMillis(1))
         }
       },
@@ -127,5 +129,16 @@ class MainActivity : Activity() {
       }
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, true)
+  }
+
+  private fun recordStats() {
+    val counter = engine.statsClient().counter(Element("foo"), Element("bar"), Element("counter"))
+    val gauge = engine.statsClient().gauge(Element("foo"), Element("bar"), Element("gauge"))
+    counter.increment()
+    counter.increment(5)
+
+    gauge.set(5)
+    gauge.add(10)
+    gauge.sub(1)
   }
 }

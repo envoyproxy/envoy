@@ -6,7 +6,10 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
+import io.envoyproxy.envoymobile.Counter;
 import io.envoyproxy.envoymobile.Engine;
+import io.envoyproxy.envoymobile.Element;
+import io.envoyproxy.envoymobile.Gauge;
 import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
@@ -69,13 +72,14 @@ public class MainActivity extends Activity {
     recyclerView.addItemDecoration(dividerItemDecoration);
     thread.start();
 
-    // Run a request loop until the application exits.
+    // Run a request loop and record stats until the application exits.
     final Handler handler = new Handler(thread.getLooper());
     handler.postDelayed(new Runnable() {
       @Override
       public void run() {
         makeRequest();
-        // Make a call again
+        recordStats();
+        // Make a call and record stats again
         handler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
       }
     }, TimeUnit.SECONDS.toMillis(1));
@@ -126,5 +130,20 @@ public class MainActivity extends Activity {
         })
         .start(Executors.newSingleThreadExecutor())
         .sendHeaders(requestHeaders, true);
+  }
+
+  private void recordStats() {
+    final Counter counter = engine.statsClient().counter(new Element("foo"), new Element("bar"),
+                                                         new Element("counter"));
+
+    final Gauge gauge =
+        engine.statsClient().gauge(new Element("foo"), new Element("bar"), new Element("gauge"));
+
+    counter.increment(1);
+    counter.increment(5);
+
+    gauge.set(5);
+    gauge.add(10);
+    gauge.sub(1);
   }
 }

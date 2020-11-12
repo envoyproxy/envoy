@@ -13,7 +13,8 @@ NSString *_REQUEST_SCHEME = @"https";
 #pragma mark - ViewController
 
 @interface ViewController ()
-@property (nonatomic, strong) id<StreamClient> client;
+@property (nonatomic, strong) id<StreamClient> streamClient;
+@property (nonatomic, strong) id<StatsClient> statsClient;
 @property (nonatomic, strong) NSArray<NSString *> *filteredHeaders;
 @property (nonatomic, strong) NSMutableArray<Result *> *results;
 @property (nonatomic, weak) NSTimer *requestTimer;
@@ -46,7 +47,8 @@ NSString *_REQUEST_SCHEME = @"https";
     NSLog(@"starting Envoy failed: %@", error);
   } else {
     NSLog(@"started Envoy, beginning requests...");
-    self.client = [engine streamClient];
+    self.streamClient = [engine streamClient];
+    self.statsClient = [engine statsClient];
     [self startRequests];
   }
 }
@@ -61,9 +63,13 @@ NSString *_REQUEST_SCHEME = @"https";
 - (void)startRequests {
   self.requestTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
                                                        target:self
-                                                     selector:@selector(performRequest)
+                                                     selector:@selector(timerFired)
                                                      userInfo:nil
                                                       repeats:YES];
+}
+- (void)timerFired {
+  [self performRequest];
+  [self recordStats];
 }
 
 - (void)performRequest {
@@ -80,7 +86,7 @@ NSString *_REQUEST_SCHEME = @"https";
   RequestHeaders *headers = [builder build];
 
   __weak ViewController *weakSelf = self;
-  StreamPrototype *prototype = [self.client newStreamPrototype];
+  StreamPrototype *prototype = [self.streamClient newStreamPrototype];
   [prototype setOnResponseHeadersWithClosure:^(ResponseHeaders *headers, BOOL endStream) {
     int statusCode = [[[headers valueForName:@":status"] firstObject] intValue];
     NSString *message = [NSString stringWithFormat:@"received headers with status %i", statusCode];
@@ -121,6 +127,22 @@ NSString *_REQUEST_SCHEME = @"https";
 
   [self.results insertObject:result atIndex:0];
   [self.tableView reloadData];
+}
+
+- (void)recordStats {
+  Element *elementFoo = [[Element alloc] initWithStringLiteral:@"foo"];
+  Element *elementBar = [[Element alloc] initWithStringLiteral:@"bar"];
+  Element *elementCounter = [[Element alloc] initWithStringLiteral:@"counter"];
+  Element *elementGauge = [[Element alloc] initWithStringLiteral:@"gauge"];
+  id<Counter> counter =
+      [self.statsClient counterWithElements:@[ elementFoo, elementBar, elementCounter ]];
+  [counter incrementWithCount:1];
+  [counter incrementWithCount:5];
+
+  id<Gauge> gauge = [self.statsClient gaugeWithElements:@[ elementFoo, elementBar, elementGauge ]];
+  [gauge setWithValue:5];
+  [gauge addWithAmount:10];
+  [gauge subWithAmount:1];
 }
 
 #pragma mark - UITableView

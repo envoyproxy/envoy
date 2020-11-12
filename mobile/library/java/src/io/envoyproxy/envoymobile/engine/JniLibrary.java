@@ -161,7 +161,7 @@ class JniLibrary {
    * @param count Amount to add to the counter.
    * @return A status indicating if the action was successful.
    */
-  protected static native int recordCounter(long engine, String elements, int count);
+  protected static native int recordCounterInc(long engine, String elements, int count);
 
   /**
    * Set a gauge of a given string of elements with the given value.
