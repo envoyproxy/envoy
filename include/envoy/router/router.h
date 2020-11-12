@@ -790,6 +790,12 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
+   * @return bool measure timeout() from when the request is started, instead of when it is
+   * completly sent upstream.
+   */
+  virtual bool measureTimeoutOnRequestStart() const PURE;
+
+  /**
    * @return optional<std::chrono::milliseconds> the route's idle timeout. Zero indicates a
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */

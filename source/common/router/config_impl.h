@@ -497,6 +497,7 @@ public:
     return vhost_.virtualClusterFromEntries(headers);
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
+  bool measureTimeoutOnRequestStart() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
@@ -610,6 +611,7 @@ private:
       return parent_->shadowPolicies();
     }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
+    bool measureTimeoutOnRequestStart() const override { return parent_->measureTimeoutOnRequestStart(); }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override {
       return parent_->idleTimeout();
     }

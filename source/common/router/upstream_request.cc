@@ -416,6 +416,8 @@ void UpstreamRequest::onPoolReady(
     }
   }
 
+  parent_.finalizeTimeoutHeaders();
+
   const Http::Status status =
       upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
   calling_encode_headers_ = false;

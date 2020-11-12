@@ -160,6 +160,9 @@ public:
                                   bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
+  static void setTimeoutHeaders(const RouteEntry& route, uint64_t expected_timeout,
+                            Http::RequestHeaderMap& request_headers,
+                            bool insert_envoy_expected_request_timeout_ms, bool grpc_request);
 
   static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
                                   TimeoutData& timeout);
@@ -277,6 +280,7 @@ public:
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
   virtual FilterConfig& config() PURE;
   virtual FilterUtility::TimeoutData timeout() PURE;
+  virtual void finalizeTimeoutHeaders() PURE;
   virtual Http::RequestHeaderMap* downstreamHeaders() PURE;
   virtual Http::RequestTrailerMap* downstreamTrailers() PURE;
   virtual bool downstreamResponseStarted() const PURE;
@@ -447,6 +451,7 @@ public:
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }
   FilterUtility::TimeoutData timeout() override { return timeout_; }
+  void finalizeTimeoutHeaders() override;
   Http::RequestHeaderMap* downstreamHeaders() override { return downstream_headers_; }
   Http::RequestTrailerMap* downstreamTrailers() override { return downstream_trailers_; }
   bool downstreamResponseStarted() const override { return downstream_response_started_; }
@@ -529,6 +534,7 @@ private:
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
+  absl::optional<MonotonicTime> deadline_;
   FilterUtility::HedgingParams hedging_params_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   std::list<UpstreamRequestPtr> upstream_requests_;
@@ -553,6 +559,7 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
+  bool timedout_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 
