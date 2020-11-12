@@ -94,3 +94,8 @@ invalid and valid origins increment as you make requests from the frontend clust
 
   http.ingress_http.cors.origin_invalid: 2
   http.ingress_http.cors.origin_valid: 7
+
+.. seealso::
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.

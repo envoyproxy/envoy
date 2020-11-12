@@ -205,5 +205,8 @@ of ``2``, and ``example_proxy_cluster`` is configured to proxy to ``service2``:
    :ref:`Dynamic configuration (control plane) quick start guide <start_quick_start_dynamic_control_plane>`
       Quick start guide to dynamic configuration of Envoy with a control plane.
 
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.
+
    :ref:`Dynamic configuration (filesystem) sandbox <install_sandboxes_dynamic_config_fs>`
       Configure Envoy using filesystem-based dynamic configuration.

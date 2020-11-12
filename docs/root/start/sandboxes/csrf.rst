@@ -103,3 +103,8 @@ invalid and valid origins increment as you make requests from the frontend clust
   http.ingress_http.csrf.missing_source_origin: 0
   http.ingress_http.csrf.request_invalid: 1
   http.ingress_http.csrf.request_valid: 0
+
+.. seealso::
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.

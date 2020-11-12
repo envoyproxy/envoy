@@ -48,11 +48,16 @@ To build this sandbox example and start the example services, run the following 
     This sandbox has multiple setup controlled by ``FRONT_ENVOY_YAML`` environment variable which
     points to the effective Envoy configuration to be used. The default value of ``FRONT_ENVOY_YAML``
     can be defined in the ``.env`` file or provided inline when running the ``docker-compose up``
-    command. For more information, pease take a look at `environment variables in Compose documentation <https://docs.docker.com/compose/environment-variables>`_.
+    command.
 
-By default, ``FRONT_ENVOY_YAML`` points to ``config/grpc-service/v3.yaml`` file which bootstraps
-front-envoy with ext_authz HTTP filter with gRPC service ``V3`` (this is specified by :ref:`transport_api_version field<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>`).
-The possible values of ``FRONT_ENVOY_YAML`` can be found inside the ``envoy/examples/ext_authz/config``
+    For more information, please take a look at
+    `environment variables in Compose documentation <https://docs.docker.com/compose/environment-variables>`_.
+
+By default, ``FRONT_ENVOY_YAML`` points to :download:`config/grpc-service/v3.yaml <_include/ext_authz/config/grpc-service/v3.yaml>`
+file which bootstraps front-envoy with ext_authz HTTP filter with gRPC service ``V3`` (this is specified by
+:ref:`transport_api_version field<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>`).
+
+The possible values of ``FRONT_ENVOY_YAML`` can be found inside the ``config``
 directory.
 
 For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
@@ -94,8 +99,8 @@ to provide a ``Bearer`` token via the ``Authorization`` header.
 
 .. note::
 
-    A complete list of users is defined in ``envoy/examples/ext_authz/auth/users.json`` file. For
-    example, the ``token1`` used in the below example is corresponding to ``user1``.
+    A complete list of users is defined in :download:`auth/users.json <_include/ext_auth/auth/users.json>`
+    file. For example, the ``token1`` used in the below example is corresponding to ``user1``.
 
 An example of successful requests can be observed as follows:
 
@@ -158,7 +163,8 @@ And sending a request to the upstream service (via the Front Envoy) gives:
     Hello OPA from behind Envoy!
 
 From the logs, we can observe the policy decision message from the Open Policy Agent server (for
-the above request against the defined policy in ``config/opa-service/policy.rego``):
+the above request against the defined policy in
+:download:`config/opa-service/policy.rego <_include/ext_authz/config/opa-service/policy.rego>`):
 
 .. code-block:: console
 
@@ -212,3 +218,14 @@ Trying to send a request with method other than ``GET`` gives a rejection:
     < date: Thu, 02 Jul 2020 06:46:13 GMT
     < server: envoy
     < content-length: 0
+
+.. seealso::
+
+   `Open Policy Agent <https://www.openpolicyagent.org/>`_
+      Open Policy Agent...
+
+   `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-istio-plugin>`_
+      Open Policy Agent Istio plugin
+
+   `environment variables in Compose documentation <https://docs.docker.com/compose/environment-variables>`_.
+      Further information about using env variables with Docker Compose.

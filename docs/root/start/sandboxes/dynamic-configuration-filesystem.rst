@@ -127,5 +127,8 @@ configured to proxy to ``service2``:
    :ref:`Dynamic configuration (filesystem) quick start guide <start_quick_start_dynamic_filesystem>`
       Quick start guide to filesystem-based dynamic configuration of Envoy.
 
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.
+
    :ref:`Dynamic configuration (control plane) sandbox <install_sandboxes_dynamic_config_cp>`
       Configure Envoy dynamically with the Go Control Plane.
