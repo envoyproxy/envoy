@@ -58,7 +58,7 @@ public:
         "" /* root_id */, "" /* vm_configuration */, fail_open);
   }
 
-  void setupFilter() { setupFilterBase<TestFilter>(""); }
+  void setupFilter() { setupFilterBase<TestFilter>(); }
 
   TestFilter& filter() { return *static_cast<TestFilter*>(context_.get()); }
 

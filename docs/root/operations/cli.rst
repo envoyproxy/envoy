@@ -126,6 +126,7 @@ following are the command line options that Envoy supports.
    The supported format flags are (with example output):
 
    :%v:	The actual message to log ("some user text")
+   :%_:	The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")
@@ -188,8 +189,8 @@ following are the command line options that Envoy supports.
 
   *(optional)* Enables fine-grain logger with file level log control and runtime update at administration
   interface. If enabled, main log macros including `ENVOY_LOG`, `ENVOY_CONN_LOG`, `ENVOY_STREAM_LOG` and
-  `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any 
-  more. The administration interface usage is similar. Please see `Administration interface 
+  `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any
+  more. The administration interface usage is similar. Please see `Administration interface
   <https://www.envoyproxy.io/docs/envoy/latest/operations/admin>`_ for more detail.
 
 .. option:: --socket-path <path string>

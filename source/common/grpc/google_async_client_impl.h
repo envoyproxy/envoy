@@ -10,7 +10,7 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
-#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/linked_object.h"
