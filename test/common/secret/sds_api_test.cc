@@ -456,7 +456,7 @@ TEST_P(TlsCertificateSdsRotationApiTest, RotationConsistencyExhaustion) {
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("f"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("g"));
-  // We've exhaused the bounded retries, but continue with the non-atomic rotation.
+  // We've exhausted the bounded retries, but continue with the non-atomic rotation.
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
   EXPECT_LOG_CONTAINS(
       "warn", "Unable to atomically refresh secrets due to > 5 non-atomic rotations observed",
