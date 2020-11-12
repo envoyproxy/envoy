@@ -10,8 +10,8 @@ namespace Envoy {
 namespace ThreadLocal {
 
 /**
-* All objects that are stored via the ThreadLocal interface must derive from this type.
-*/
+ * All objects that are stored via the ThreadLocal interface must derive from this type.
+ */
 class ThreadLocalObject {
 public:
   virtual ~ThreadLocalObject() = default;
