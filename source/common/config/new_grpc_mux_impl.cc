@@ -90,6 +90,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 
 void NewGrpcMuxImpl::onStreamEstablished() {
   for (auto& [type_url, subscription] : subscriptions_) {
+    UNREFERENCED_PARAMETER(type_url);
     subscription->sub_state_.markStreamFresh();
   }
   trySendDiscoveryRequests();
