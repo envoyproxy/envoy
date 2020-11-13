@@ -1185,6 +1185,8 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
       "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
 }
 
+// Insufficent support on Windows.
+#ifndef WIN32
 class SafeFatalAction : public Configuration::FatalAction {
 public:
   void run(const ScopeTrackedObject* /*current_object*/) override {
@@ -1247,6 +1249,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
       },
       "");
 }
+#endif
 
 // Static configuration validation. We test with both allow/reject settings various aspects of
 // configuration from YAML.
