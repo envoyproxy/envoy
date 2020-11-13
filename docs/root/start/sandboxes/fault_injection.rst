@@ -10,8 +10,13 @@ Fault Injection Filter
 This simple example demonstrates Envoy's :ref:`fault injection <config_http_filters_fault_injection>` capability
 using Envoy's :ref:`runtime support <config_runtime>` to control the feature.
 
+It demonstrates fault injection that cause the request to abort and fail, and also faults that simply delay the
+response.
+
 Step 1: Start all of our containers
 ***********************************
+
+Change to the ``examples/fault_injection`` directory.
 
 Terminal 1
 
@@ -40,10 +45,10 @@ Terminal 2
   $ docker-compose exec envoy bash
   $ bash send_request.sh
 
-The script above (``send_request.sh``) sends a continuous stream of HTTP requests to Envoy, which in turn forwards
-the requests to the backend container.
+The script above (:download:`send_request.sh <_include/fault-injection/send_request.sh>`) sends a continuous stream
+of HTTP requests to Envoy, which in turn forwards the requests to the backend container.
 
-Fauilt injection is configured in Envoy but turned off (i.e. affects 0% of requests).
+Fault injection is configured in Envoy but turned off (i.e. affects 0% of requests).
 
 Consequently, you should see a continuous sequence of ``HTTP 200`` response codes.
 
