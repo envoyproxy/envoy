@@ -175,7 +175,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
     test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
                                              scope_, "test.");
 
-    EXPECT_EQ(test_config_->authScopes(), "user")
+    EXPECT_EQ(test_config_->authScopes(), "user");
 }
 
 /**
