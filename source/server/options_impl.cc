@@ -111,11 +111,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg enable_fine_grain_logging(
       "", "enable-fine-grain-logging",
       "Logger mode: enable file level log control(Fancy Logger)or not", cmd, false);
-  TCLAP::ValueArg<bool> log_format_prefix_with_location(
-      "", "log-format-prefix-with-location",
-      "Prefix all occurrences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] "
-      "').",
-      false, false, "bool", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
@@ -201,9 +196,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   log_format_ = log_format.getValue();
-  if (log_format_prefix_with_location.getValue()) {
-    log_format_ = absl::StrReplaceAll(log_format_, {{"%%", "%%"}, {"%v", "[%g:%#] %v"}});
-  }
   log_format_escaped_ = log_format_escaped.getValue();
   enable_fine_grain_logging_ = enable_fine_grain_logging.getValue();
 
