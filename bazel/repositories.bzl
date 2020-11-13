@@ -183,6 +183,8 @@ def envoy_dependencies(skip_targets = []):
 
     _org_llvm_llvm()
     _com_github_wavm_wavm()
+    _com_github_wasmtime()
+    _com_github_wasm_c_api()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -872,6 +874,18 @@ def _com_github_wavm_wavm():
     native.bind(
         name = "wavm",
         actual = "@envoy//bazel/foreign_cc:wavm",
+    )
+
+def _com_github_wasmtime():
+    external_http_archive(
+        name = "com_github_wasmtime",
+        build_file = "@envoy//bazel/external:wasmtime.BUILD",
+    )
+
+def _com_github_wasm_c_api():
+    external_http_archive(
+        name = "com_github_wasm_c_api",
+        build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
     )
 
 def _kafka_deps():

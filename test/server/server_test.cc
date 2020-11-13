@@ -662,20 +662,48 @@ TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
   EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
 }
 
-// Validate that bootstrap v2 pb_text with deprecated fields loads.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromPbText)) {
-  EXPECT_LOG_CONTAINS(
-      "trace", "Configuration does not parse cleanly as v3",
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"));
+// Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapWithoutExplicitVersion)) {
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      DeprecatedMajorVersionException,
+      "Support for v2 will be removed from Envoy at the start of Q1 2021. You may make use of v2 "
+      "in Q3 2020 by setting");
+}
+
+// Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(LoadsV2BootstrapWithExplicitVersionFromPbText)) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
 }
 
-// Validate that bootstrap v2 YAML with deprecated fields loads.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromYaml)) {
+// Validate that bootstrap v2 pb_text with deprecated fields fails to load when
+// --bootstrap-version is not set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapFromPbText)) {
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "The v2 xDS major version is deprecated and disabled by default.");
+}
+
+// Validate that bootstrap v2 YAML with deprecated fields loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(LoadsV2BootstrapWithExplicitVersionFromYaml)) {
+  options_.bootstrap_version_ = 2;
   EXPECT_LOG_CONTAINS(
       "trace", "Configuration does not parse cleanly as v3",
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"));
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
+}
+
+// Validate that bootstrap v2 YAML with deprecated fields fails to load when
+// --bootstrap-version is not set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailsToLoadV2BootstrapFromYaml)) {
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
+      EnvoyException, "The v2 xDS major version is deprecated and disabled by default.");
 }
 
 // Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
@@ -849,6 +877,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
 }
 
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
+  options_.bootstrap_version_ = 2;
   EXPECT_THROW_WITH_MESSAGE(
       initialize("test/server/test_data/server/invalid_legacy_runtime_bootstrap.yaml"),
       EnvoyException, "Invalid runtime entry value for foo");
@@ -1109,6 +1138,7 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
+  options_.bootstrap_version_ = 2;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing_deprecated_config.yaml"));
   EXPECT_EQ("zipkin", server_->httpContext().defaultTracingConfig().http().name());
 }
