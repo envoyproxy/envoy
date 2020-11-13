@@ -561,8 +561,8 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 }
 
 TEST_F(QuicPlatformTest, QuicFlags) {
-  auto& flag_registry = quiche::FlagRegistry::GetInstance();
-  flag_registry.ResetFlags();
+  auto& flag_registry = quiche::FlagRegistry::getInstance();
+  flag_registry.resetFlags();
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
@@ -578,15 +578,15 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 
-  flag_registry.ResetFlags();
+  flag_registry.resetFlags();
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  flag_registry.FindFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
-      ->SetValueFromString("true");
-  flag_registry.FindFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")
-      ->SetValueFromString("0");
-  flag_registry.FindFlag("FLAGS_quic_time_wait_list_seconds")->SetValueFromString("100");
+  flag_registry.findFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
+      ->setValueFromString("true");
+  flag_registry.findFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")
+      ->setValueFromString("0");
+  flag_registry.findFlag("FLAGS_quic_time_wait_list_seconds")->setValueFromString("100");
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));

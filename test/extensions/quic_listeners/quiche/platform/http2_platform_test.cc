@@ -78,8 +78,8 @@ TEST(Http2PlatformTest, Http2Macro) {
 }
 
 TEST(Http2PlatformTest, Http2Flags) {
-  auto& flag_registry = quiche::FlagRegistry::GetInstance();
-  flag_registry.ResetFlags();
+  auto& flag_registry = quiche::FlagRegistry::getInstance();
+  flag_registry.resetFlags();
   EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
   SetHttp2ReloadableFlag(http2_testonly_default_false, true);
   EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
@@ -87,22 +87,22 @@ TEST(Http2PlatformTest, Http2Flags) {
   for (std::string s : {"1", "t", "true", "TRUE", "y", "yes", "Yes"}) {
     SetHttp2ReloadableFlag(http2_testonly_default_false, false);
     EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
-    EXPECT_TRUE(flag_registry.FindFlag("FLAGS_quic_reloadable_flag_http2_testonly_default_false")
-                    ->SetValueFromString(s));
+    EXPECT_TRUE(flag_registry.findFlag("FLAGS_quic_reloadable_flag_http2_testonly_default_false")
+                    ->setValueFromString(s));
     EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
   }
   for (std::string s : {"0", "f", "false", "FALSE", "n", "no", "No"}) {
     SetHttp2ReloadableFlag(http2_testonly_default_false, true);
     EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
-    EXPECT_TRUE(flag_registry.FindFlag("FLAGS_quic_reloadable_flag_http2_testonly_default_false")
-                    ->SetValueFromString(s));
+    EXPECT_TRUE(flag_registry.findFlag("FLAGS_quic_reloadable_flag_http2_testonly_default_false")
+                    ->setValueFromString(s));
     EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
   }
   for (std::string s : {"some", "invalid", "values", ""}) {
     SetHttp2ReloadableFlag(http2_testonly_default_false, false);
     EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
-    EXPECT_FALSE(flag_registry.FindFlag("FLAGS_quic_reloadable_flag_http2_testonly_default_false")
-                     ->SetValueFromString(s));
+    EXPECT_FALSE(flag_registry.findFlag("FLAGS_quic_reloadable_flag_http2_testonly_default_false")
+                     ->setValueFromString(s));
     EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
   }
 }

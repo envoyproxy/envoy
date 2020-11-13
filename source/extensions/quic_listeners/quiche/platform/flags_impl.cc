@@ -40,84 +40,84 @@ absl::flat_hash_map<std::string, Flag*> makeFlagMap() {
 } // namespace
 
 // static
-FlagRegistry& FlagRegistry::GetInstance() {
+FlagRegistry& FlagRegistry::getInstance() {
   static auto* instance = new FlagRegistry();
   return *instance;
 }
 
 FlagRegistry::FlagRegistry() : flags_(makeFlagMap()) {}
 
-void FlagRegistry::ResetFlags() const {
+void FlagRegistry::resetFlags() const {
   for (auto& kv : flags_) {
-    kv.second->ResetValue();
+    kv.second->resetValue();
   }
 }
 
-Flag* FlagRegistry::FindFlag(const std::string& name) const {
+Flag* FlagRegistry::findFlag(const std::string& name) const {
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;
 }
 
-template <> bool TypedFlag<bool>::SetValueFromString(const std::string& value_str) {
+template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_str) {
   static const auto* kTrueValues = new std::set<std::string>({"1", "t", "true", "y", "yes"});
   static const auto* kFalseValues = new std::set<std::string>({"0", "f", "false", "n", "no"});
   auto lower = absl::AsciiStrToLower(value_str);
   if (kTrueValues->find(lower) != kTrueValues->end()) {
-    SetValue(true);
+    setValue(true);
     return true;
   }
   if (kFalseValues->find(lower) != kFalseValues->end()) {
-    SetValue(false);
+    setValue(false);
     return true;
   }
   return false;
 }
 
-template <> bool TypedFlag<int32_t>::SetValueFromString(const std::string& value_str) {
+template <> bool TypedFlag<int32_t>::setValueFromString(const std::string& value_str) {
   int32_t value;
   if (absl::SimpleAtoi(value_str, &value)) {
-    SetValue(value);
+    setValue(value);
     return true;
   }
   return false;
 }
 
-template <> bool TypedFlag<int64_t>::SetValueFromString(const std::string& value_str) {
+template <> bool TypedFlag<int64_t>::setValueFromString(const std::string& value_str) {
   int64_t value;
   if (absl::SimpleAtoi(value_str, &value)) {
-    SetValue(value);
+    setValue(value);
     return true;
   }
   return false;
 }
 
-template <> bool TypedFlag<double>::SetValueFromString(const std::string& value_str) {
+template <> bool TypedFlag<double>::setValueFromString(const std::string& value_str) {
   double value;
   if (absl::SimpleAtod(value_str, &value)) {
-    SetValue(value);
+    setValue(value);
     return true;
   }
   return false;
 }
 
-template <> bool TypedFlag<std::string>::SetValueFromString(const std::string& value_str) {
-  SetValue(value_str);
+template <> bool TypedFlag<std::string>::setValueFromString(const std::string& value_str) {
+  setValue(value_str);
   return true;
 }
 
-template <> bool TypedFlag<unsigned long>::SetValueFromString(const std::string& value_str) {
+template <> bool TypedFlag<unsigned long>::setValueFromString(const std::string& value_str) {
   unsigned long value;
   if (absl::SimpleAtoi(value_str, &value)) {
-    SetValue(value);
+    setValue(value);
     return true;
   }
   return false;
 }
 
-template <> bool TypedFlag<unsigned long long>::SetValueFromString(const std::string& value_str) {
+template <> bool TypedFlag<unsigned long long>::setValueFromString(const std::string& value_str) {
   unsigned long long value;
   if (absl::SimpleAtoi(value_str, &value)) {
-    SetValue(value);
+    setValue(value);
     return true;
   }
   return false;

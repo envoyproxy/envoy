@@ -26,13 +26,13 @@ public:
   ~FlagRegistry() = default;
 
   // Return singleton instance.
-  static FlagRegistry& GetInstance();
+  static FlagRegistry& getInstance();
 
   // Reset all registered flags to their default values.
-  void ResetFlags() const;
+  void resetFlags() const;
 
   // Look up a flag by name.
-  Flag* FindFlag(const std::string& name) const;
+  Flag* findFlag(const std::string& name) const;
 
 private:
   FlagRegistry();
@@ -48,10 +48,10 @@ public:
   virtual ~Flag() = default;
 
   // Set flag value from given string, returning true iff successful.
-  virtual bool SetValueFromString(const std::string& value_str) = 0;
+  virtual bool setValueFromString(const std::string& value_str) = 0;
 
   // Reset flag to default value.
-  virtual void ResetValue() = 0;
+  virtual void resetValue() = 0;
 
   // Return flag name.
   std::string name() const { return name_; }
@@ -70,15 +70,15 @@ public:
   TypedFlag(const char* name, T default_value, const char* help)
       : Flag(name, help), value_(default_value), default_value_(default_value) {}
 
-  bool SetValueFromString(const std::string& value_str) override;
+  bool setValueFromString(const std::string& value_str) override;
 
-  void ResetValue() override {
+  void resetValue() override {
     absl::MutexLock lock(&mutex_);
     value_ = default_value_;
   }
 
   // Set flag value.
-  void SetValue(T value) {
+  void setValue(T value) {
     absl::MutexLock lock(&mutex_);
     value_ = value;
   }
@@ -96,13 +96,13 @@ private:
 };
 
 // SetValueFromString specializations
-template <> bool TypedFlag<bool>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<int32_t>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<int64_t>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<double>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<std::string>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<unsigned long>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<unsigned long long>::SetValueFromString(const std::string& value_str);
+template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<int32_t>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<int64_t>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<double>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<std::string>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<unsigned long>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<unsigned long long>::setValueFromString(const std::string& value_str);
 
 // Flag declarations
 #define QUIC_FLAG(flag, ...) extern TypedFlag<bool>* flag;

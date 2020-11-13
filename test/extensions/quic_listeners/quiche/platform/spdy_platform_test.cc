@@ -86,19 +86,19 @@ TEST(SpdyPlatformTest, SpdyTestHelpers) {
 }
 
 TEST(SpdyPlatformTest, SpdyFlags) {
-  auto& flag_registry = quiche::FlagRegistry::GetInstance();
-  flag_registry.ResetFlags();
+  auto& flag_registry = quiche::FlagRegistry::getInstance();
+  flag_registry.resetFlags();
   EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
 
-  flag_registry.FindFlag("FLAGS_quic_reloadable_flag_spdy_testonly_default_false")
-      ->SetValueFromString("true");
+  flag_registry.findFlag("FLAGS_quic_reloadable_flag_spdy_testonly_default_false")
+      ->setValueFromString("true");
   EXPECT_TRUE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
 
-  flag_registry.ResetFlags();
-  flag_registry.FindFlag("FLAGS_quic_restart_flag_spdy_testonly_default_false")
-      ->SetValueFromString("yes");
+  flag_registry.resetFlags();
+  flag_registry.findFlag("FLAGS_quic_restart_flag_spdy_testonly_default_false")
+      ->setValueFromString("yes");
   EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_TRUE(GetSpdyRestartFlag(spdy_testonly_default_false));
 }
