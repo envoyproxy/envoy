@@ -149,6 +149,35 @@ TEST_F(OAuth2Test, InvalidCluster) {
                             "specify which cluster to direct OAuth requests to.");
 }
 
+// Verifies that the OAuth config is created with a default value for auth_scopes field when it is not set in proto/yaml.
+TEST_F(OAuth2Test, DefaultAuthScope) {
+
+    // Set up proto fields
+    envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.set_forward_bearer_token(true);
+    auto* matcher = p.add_pass_through_matcher();
+    matcher->set_name(":method");
+    matcher->set_exact_match("OPTIONS");
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+    // Create the OAuth config.
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    FilterConfigSharedPtr test_config_
+    test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
+                                             scope_, "test.");
+
+    EXPECT_EQ(test_config_->auth_scopes_, "user")
+}
+
 /**
  * Scenario: The OAuth filter receives a sign out request.
  *

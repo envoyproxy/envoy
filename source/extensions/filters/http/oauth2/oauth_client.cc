@@ -41,7 +41,6 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                        encoded_secret, encoded_cb_url);
   request->body().add(body);
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
-  ENVOY_LOG(debug, "Access token request: {}", body);
   dispatchRequest(std::move(request));
 
   ASSERT(state_ == OAuthState::Idle);
