@@ -1,10 +1,9 @@
 .. _arch_overview_external_deps:
 
-External dependencies
+外部依赖
 =====================
 
-Below we enumerate the external dependencies that may be linked into the Envoy binary. We exclude
-dependencies that only are used in CI or developer tooling above.
+下面列举了可能被链接到 Envoy 二进制文件中的外部依赖项，排除了那些只在 CI 或开发者工具中使用的依赖项。
 
 Data plane (core)
 -----------------
