@@ -1,32 +1,18 @@
-Terminology
+术语
 ===========
 
-A few definitions before we dive into the main architecture documentation. Some of the definitions
-are slightly contentious within the industry, however they are how Envoy uses them throughout the
-documentation and codebase, so *c'est la vie*.
+在深入主架构文档之前的一些定义。部分定义在行业中略有争议，下面将展开在 Envoy 文档和代码库中如何使用它们。
 
-**Host**: An entity capable of network communication (application on a mobile phone, server, etc.).
-In this documentation a host is a logical network application. A physical piece of hardware could
-possibly have multiple hosts running on it as long as each of them can be independently addressed.
+**Host/主机**: 能够进行网络通信的实体（如移动设备、服务器上的应用程序）。在此文档中，主机是逻辑网络应用程序。一块物理硬件上可能运行有多个主机，只要它们是可以独立寻址的。
 
-**Downstream**: A downstream host connects to Envoy, sends requests, and receives responses.
+**Downstream/下游**: 下游主机连接到 Envoy，发送请求并接收响应。
 
-**Upstream**: An upstream host receives connections and requests from Envoy and returns responses.
+**Upstream/上游**: 上游主机接收来自 Envoy 的连接和请求，并返回响应。
 
-**Listener**: A listener is a named network location (e.g., port, unix domain socket, etc.) that can
-be connected to by downstream clients. Envoy exposes one or more listeners that downstream hosts
-connect to.
+**Listener/监听器**: 监听器是命名网地址（例如，端口、unix domain socket等)，可以被下游客户端连接。Envoy 暴露一个或者多个监听器给下游主机连接。
 
-**Cluster**: A cluster is a group of logically similar upstream hosts that Envoy connects to. Envoy
-discovers the members of a cluster via :ref:`service discovery <arch_overview_service_discovery>`.
-It optionally determines the health of cluster members via :ref:`active health checking
-<arch_overview_health_checking>`. The cluster member that Envoy routes a request to is determined
-by the :ref:`load balancing policy <arch_overview_load_balancing>`.
+**Cluster**: 集群是指 Envoy 连接到的逻辑上相同的一组上游主机。Envoy 通过 :ref:`服务发现 <arch_overview_service_discovery>` 来发现集群的成员。可以选择通过 :ref:`主动健康检查 <arch_overview_health_checking>` 来确定集群成员的健康状态。Envoy 通过 :ref:`负载均衡策略 <arch_overview_load_balancing>` 来决定将请求路由到哪个集群成员。
 
-**Mesh**: A group of hosts that coordinate to provide a consistent network topology. In this
-documentation, an “Envoy mesh” is a group of Envoy proxies that form a message passing substrate for
-a distributed system comprised of many different services and application platforms.
+**Mesh/网格**: 一组主机，协调好以提供一致的网络拓扑。在本文档中，“Envoy mesh”是一组 Envoy 代理，它们构成了分布式系统的消息传递基础，这个分布式系统由很多不同服务和应用程序平台组成。
 
-**Runtime configuration**: Out of band realtime configuration system deployed alongside Envoy.
-Configuration settings can be altered that will affect operation without needing to restart Envoy or
-change the primary configuration.
+**Runtime configuration/运行时配置**: 外置实时配置系统，和 Envoy 一起部署。可以更改配置设置，影响操作，而无需重启 Envoy 或更改主要配置。
