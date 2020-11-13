@@ -221,6 +221,9 @@ Trying to send a request with method other than ``GET`` gives a rejection:
 
 .. seealso::
 
+   :ref:`ext_authz filter <config_http_filters_ext_authz>`
+      Learn more about using Envoy's ``ext_authz`` filter.
+
    `Open Policy Agent <https://www.openpolicyagent.org/>`_
       Policy-based control for cloud native environments.
 

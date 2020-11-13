@@ -3,6 +3,10 @@
 gRPC Bridge
 ===========
 
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
+
 The gRPC bridge sandbox is an example usage of Envoy's
 :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>`.
 
@@ -24,8 +28,9 @@ Step 3: Generate the protocol stubs
 A docker-compose file is provided that generates the stubs for both ``client`` and ``server`` from the
 specification in the ``protos`` directory.
 
-Inspecting the ``docker-compose-protos.yaml`` file, you will see that it contains both the ``python``
-and ``go`` gRPC protoc commands necessary for generating the protocol stubs.
+Inspecting the :download:`docker-compose-protos.yaml <_include/grpc_bridge/docker-compose-protos.yaml>` file,
+you will see that it contains both the ``python`` and ``go`` gRPC protoc commands necessary for generating the
+protocol stubs.
 
 Generate the stubs as follows:
 
@@ -126,3 +131,10 @@ In the running docker-compose container, you should see the gRPC service printin
   grpc_1    | 2017/05/30 12:05:09 set: foo = bar
   grpc_1    | 2017/05/30 12:05:12 get: foo
   grpc_1    | 2017/05/30 12:05:18 set: foo = baz
+
+
+
+.. seealso::
+
+   :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>`.
+      Learn more about configuring Envoy's gRPC bridge filter.

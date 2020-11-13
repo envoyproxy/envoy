@@ -30,7 +30,7 @@ Moreover, notice that all traffic routed by the front Envoy to the service conta
 routed to the service Envoys (routes setup in :download:`front-envoy.yaml <_include/front-proxy/front-envoy.yaml>`).
 
 In turn the service Envoys route the request to the Flask app via the loopback
-address (routes setup in :download:`service-envoy.yaml <_include/service-proxy/service-envoy.yaml>`). This
+address (routes setup in :download:`service-envoy.yaml <_include/front-proxy/service-envoy.yaml>`). This
 setup illustrates the advantage of running service Envoys collocated with your services: all
 requests are handled by the service Envoy, and efficiently routed to your services.
 
