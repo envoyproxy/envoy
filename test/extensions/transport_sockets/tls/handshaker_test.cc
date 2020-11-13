@@ -133,13 +133,13 @@ TEST_F(HandshakerTest, NormalOperation) {
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
 
   // Run the handshakes from the client and server until SslHandshakerImpl decides
-  // we're done and returns PostIoAction::Close.
+  // we're done and returns PostIoAction::CloseGraceful.
   while (post_io_action == Network::PostIoAction::KeepOpen) {
     SSL_do_handshake(client_ssl_.get());
     post_io_action = handshaker.doHandshake();
   }
 
-  EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+  EXPECT_EQ(post_io_action, Network::PostIoAction::CloseGraceful);
 }
 
 // We induce some kind of BIO mismatch and force the SSL_do_handshake to
@@ -193,7 +193,7 @@ public:
     if (rc == 1) {
       setState(Ssl::SocketState::HandshakeComplete);
       handshakeCallbacks()->onSuccess(ssl());
-      return Network::PostIoAction::Close;
+      return Network::PostIoAction::CloseGraceful;
     } else {
       switch (SSL_get_error(ssl(), rc)) {
       case SSL_ERROR_WANT_READ:
@@ -236,7 +236,7 @@ TEST_F(HandshakerTest, NormalOperationWithSslHandshakerImplForTest) {
     post_io_action = handshaker.doHandshake();
   }
 
-  EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+  EXPECT_EQ(post_io_action, Network::PostIoAction::CloseGraceful);
 }
 
 } // namespace

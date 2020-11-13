@@ -589,7 +589,7 @@ void ConnectionImpl::onReadReady() {
   // a connection close.
   if ((!enable_half_close_ && result.end_stream_read_)) {
     result.end_stream_read_ = false;
-    result.action_ = PostIoAction::Close;
+    result.action_ = PostIoAction::CloseGraceful;
   }
 
   if (result.action_ == PostIoAction::CloseError) {

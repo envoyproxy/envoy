@@ -8,7 +8,7 @@ namespace Network {
  */
 enum class PostIoAction {
   // Close the connection.
-  Close,
+  CloseGraceful,
   // Keep the connection open.
   KeepOpen,
   // Close the connection because of an error.

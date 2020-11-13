@@ -2699,7 +2699,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, false);
         EXPECT_EQ(data.length(), 0);
-        // Calling close(FlushWrite) in onEvent() callback results in PostIoAction::Close,
+        // Calling close(FlushWrite) in onEvent() callback results in PostIoAction::CloseGraceful,
         // after which the connection is closed without write ready event being delivered,
         // and with all outstanding data (here, "hello") being lost.
       }));

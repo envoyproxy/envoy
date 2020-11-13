@@ -110,7 +110,7 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
       } else {
         ENVOY_CONN_LOG(debug, "TSI: Handshake validation failed: {}", callbacks_->connection(),
                        err);
-        return Network::PostIoAction::Close;
+        return Network::PostIoAction::CloseGraceful;
       }
     } else {
       ENVOY_CONN_LOG(debug, "TSI: Handshake validation skipped.", callbacks_->connection());
@@ -172,7 +172,7 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
     }
 
     if (!handshake_complete_ && result.end_stream_read_ && result.bytes_processed_ == 0) {
-      return {Network::PostIoAction::Close, result.bytes_processed_, result.end_stream_read_};
+      return {Network::PostIoAction::CloseError, result.bytes_processed_, result.end_stream_read_};
     }
 
     end_stream_read_ = result.end_stream_read_;
