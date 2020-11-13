@@ -1,17 +1,27 @@
 .. _install_sandboxes_postgres:
 
-Postgres Filter
-===============
+PostgreSQL filter
+=================
 
-In this example, we show how the :ref:`Postgres filter <config_network_filters_postgres_proxy>`
-can be used with the Envoy proxy. The Envoy proxy configuration includes a Postgres filter that
-parses queries and collects Postgres-specific metrics.
+.. sidebar:: Requirements
 
-.. include:: _include/docker-env-setup.rst
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+In this example, we show how the :ref:`PostgreSQL filter <config_network_filters_postgres_proxy>`
+can be used with the Envoy proxy.
+
+The Envoy proxy configuration includes a PostgreSQL filter that parses queries and collects Postgres-specific metrics.
 
 
-Step 3: Build the sandbox
+Step 1: Build the sandbox
 *************************
+
+Change to the ``examples/postgres`` directory.
+
+Build and start the containers.
 
 .. code-block:: console
 
@@ -26,7 +36,7 @@ Step 3: Build the sandbox
   postgres_postgres_1   docker-entrypoint.sh postgres  Up      5432/tcp
   postgres_proxy_1      /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
 
-Step 4: Issue commands using psql
+Step 2: Issue commands using psql
 *********************************
 
 This example uses ``psql`` client inside a container to issue some commands and
@@ -65,7 +75,7 @@ filter can't decode encrypted sessions.
   testdb=# \q
 
 
-Step 5: Check egress stats
+Step 3: Check egress stats
 **************************
 
 Check egress stats were updated.
@@ -105,7 +115,7 @@ Check egress stats were updated.
   postgres.egress_postgres.transactions_rollback: 0
 
 
-Step 6: Check TCP stats
+Step 4: Check TCP stats
 ***********************
 
 Check TCP stats were updated.
@@ -125,3 +135,14 @@ Check TCP stats were updated.
   tcp.postgres_tcp.max_downstream_connection_duration: 0
   tcp.postgres_tcp.upstream_flush_active: 0
   tcp.postgres_tcp.upstream_flush_total: 0
+
+.. seealso::
+
+   :ref:`Envoy PostgreSQL filter <config_network_filters_postgres_proxy>`
+      Learn more about using the Envoy PostgreSQL filter.
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.
+
+   `PostgreSQL <https://www.postgresql.org>`_
+      The PostgreSQL database.

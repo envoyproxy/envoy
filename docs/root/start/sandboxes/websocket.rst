@@ -5,8 +5,10 @@ WebSockets
 
 .. sidebar:: Requirements
 
-   `openssl <https://www.openssl.org/>`_
-      Used to create a TLS certificate for the websocket.
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`openssl <start_sandboxes_setup_openssl>`
+	Generate ``SSL`` keys and certificates.
 
 This example walks through some of the ways that Envoy can be configured to proxy WebSockets.
 
@@ -24,12 +26,10 @@ of proxying to encrypted and non-encrypted upstream sockets.
    You should also :ref:`authenticate clients <start_quick_start_securing_mtls>`
    where you control both sides of the connection, or relevant protocols are available.
 
-.. include:: _include/docker-env-setup.rst
+Step 1: Create a certificate file for wss
+*****************************************
 
 Change directory to ``examples/websocket`` in the Envoy repository.
-
-Step 3: Create a certificate file for wss
-*****************************************
 
 .. code-block:: console
 
@@ -44,7 +44,7 @@ Step 3: Create a certificate file for wss
    -----
    $ openssl pkcs12 -export -passout pass: -out certs/output.pkcs12 -inkey certs/key.pem -in certs/cert.pem
 
-Step 4: Build and start the sandbox
+Step 2: Build and start the sandbox
 ***********************************
 
 This starts three proxies listening on ``localhost`` ports ``10000-30000``.
@@ -70,7 +70,7 @@ The socket servers are very trivial implementations, that simply output ``[ws] H
   websocket_service-ws_1              websocat -E ws-listen:0.0. ... Up
   websocket_service-wss_1             websocat wss-listen:0.0.0. ... Up
 
-Step 5: Test proxying ``ws`` -> ``ws``
+Step 3: Test proxying ``ws`` -> ``ws``
 **************************************
 
 The proxy listening on port ``10000`` terminates the WebSocket connection without ``TLS`` and then proxies
@@ -99,7 +99,7 @@ You can start an interactive session with the socket as follows:
 
 Type ``Ctrl-c`` to exit the socket session.
 
-Step 6: Test proxying ``wss`` -> ``wss``
+Step 4: Test proxying ``wss`` -> ``wss``
 ****************************************
 
 The proxy listening on port ``20000`` terminates the WebSocket connection with ``TLS`` and then proxies
@@ -125,7 +125,7 @@ You can start an interactive session with the socket as follows:
 
 Type ``Ctrl-c`` to exit the socket session.
 
-Step 7: Test proxying ``wss`` passthrough
+Step 5: Test proxying ``wss`` passthrough
 *****************************************
 
 The proxy listening on port ``30000`` passes through all ``TCP`` traffic to an upstream ``TLS`` WebSocket.
@@ -154,3 +154,6 @@ Type ``Ctrl-c`` to exit the socket session.
    :ref:`Double proxy sandbox <install_sandboxes_double_proxy>`
       An example of securing traffic between proxies with validation and
       mutual authentication using ``mTLS`` with non-``HTTP`` traffic.
+
+   :ref:`TLS sandbox <install_sandboxes_tls>`
+      Examples of various ``TLS`` termination patterns with Envoy.

@@ -324,6 +324,8 @@ modify different aspects of the server:
    traffic direction are stopped, listener additions and modifications in that direction
    are not allowed.
 
+.. _operations_admin_interface_server_info:
+
 .. http:get:: /server_info
 
   Outputs a JSON message containing information about the running server.

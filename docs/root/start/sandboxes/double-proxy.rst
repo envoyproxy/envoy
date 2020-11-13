@@ -3,6 +3,16 @@
 Double proxy (with ``mTLS`` encryption)
 =======================================
 
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+   :ref:`openssl <start_sandboxes_setup_openssl>`
+	Generate ``SSL`` keys and certificates.
+
 This sandbox demonstrates a basic "double proxy" configuration, in which a simple Flask app
 connects to a PostgreSQL database, with two Envoy proxies in between.
 
@@ -26,11 +36,9 @@ In order to  use the sandbox you will first need to generate the necessary ``SSL
 This example walks through creating a certificate authority, and using it to create a domain key and sign
 certificates for the proxies.
 
-.. include:: _include/docker-env-setup.rst
-
 Change to the ``examples/double-proxy`` directory.
 
-Step 3: Create a certificate authority
+Step 1: Create a certificate authority
 **************************************
 
 First create a key for the certificate authority:
@@ -71,7 +79,7 @@ For the purpose of this example, the defaults should be sufficient.
    Common Name (e.g. server FQDN or YOUR name) []:
    Email Address []:
 
-Step 4: Create a domain key
+Step 2: Create a domain key
 ***************************
 
 Create a key for the example domain:
@@ -84,7 +92,7 @@ Create a key for the example domain:
    .................................................+++++
    e is 65537 (0x010001)
 
-Step 5: Generate certificate signing requests for the proxies
+Step 3: Generate certificate signing requests for the proxies
 *************************************************************
 
 Use the domain key to generate certificate signing requests for each of the proxies:
@@ -100,7 +108,7 @@ Use the domain key to generate certificate signing requests for each of the prox
         -subj "/C=US/ST=CA/O=MyExample, Inc./CN=proxy-postgres-backend.example.com" \
         -out certs/proxy-postgres-backend.example.com.csr
 
-Step 6: Sign the proxy certificates
+Step 4: Sign the proxy certificates
 ***********************************
 
 You can now use the certificate authority that you created to sign the certificate requests.
@@ -140,7 +148,7 @@ the proxies.
 
 They keys and certificates are stored in the ``certs/`` directory.
 
-Step 7: Start all of our containers
+Step 5: Start all of our containers
 ***********************************
 
 Build and start the containers.
@@ -163,7 +171,7 @@ This will load the required keys and certificates into the frontend and backend 
    double-proxy_proxy-postgres-backend_1    /docker-entrypoint.sh /usr ... Up      10000/tcp
    double-proxy_proxy-postgres-frontend_1   /docker-entrypoint.sh /usr ... Up      10000/tcp
 
-Step 8: Check the flask app can connect to the database
+Step 6: Check the flask app can connect to the database
 *******************************************************
 
 Checking the response at http://localhost:10000, you should see the output from the Flask app:
@@ -172,3 +180,11 @@ Checking the response at http://localhost:10000, you should see the output from 
 
    $ curl -s http://localhost:10000
    Connected to Postgres, version: PostgreSQL 13.0 (Debian 13.0-1.pgdg100+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 8.3.0-6) 8.3.0, 64-bit
+
+.. seealso::
+
+   :ref:`Securing Envoy quick start guide <start_quick_start_securing>`
+      Outline of key concepts for securing Envoy.
+
+   :ref:`TLS sandbox <install_sandboxes_tls>`
+      Examples of various ``TLS`` termination patterns with Envoy.

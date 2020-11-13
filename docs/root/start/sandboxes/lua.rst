@@ -1,18 +1,30 @@
 .. _install_sandboxes_lua:
 
-Lua Filter
+Lua filter
 ==========
 
-In this example, we show how a Lua filter can be used with the Envoy
-proxy. The Envoy proxy configuration includes a Lua
-filter that contains two functions namely
-``envoy_on_request(request_handle)`` and
-``envoy_on_response(response_handle)`` as documented :ref:`here <config_http_filters_lua>`.
+.. sidebar:: Requirements
 
-.. include:: _include/docker-env-setup.rst
+   .. include:: _include/docker-env-setup-link.rst
 
-Step 3: Build the sandbox
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+In this example, we show how a `Lua <https://www.lua.org/>`_ filter can be used with the Envoy
+proxy.
+
+The Envoy proxy configuration includes a Lua filter that contains two functions:
+
+- ``envoy_on_request(request_handle)``
+- ``envoy_on_response(response_handle)``
+
+:ref:`See here <config_http_filters_lua>` for an overview of Envoy's Lua filter and documentation
+regarding these functions.
+
+Step 1: Build the sandbox
 *************************
+
+Change to the ``examples/lua`` directory.
 
 .. code-block:: console
 
@@ -27,7 +39,7 @@ Step 3: Build the sandbox
   lua_proxy_1         /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
   lua_web_service_1   node ./index.js                Up      0.0.0.0:8080->80/tcp
 
-Step 4: Send a request to the service
+Step 2: Send a request to the service
 *************************************
 
 The output from the ``curl`` command below should include the headers ``foo``.
@@ -83,3 +95,11 @@ Terminal 1
     }
   * Connection #0 to host localhost left intact
   }* Closing connection 0
+
+.. seealso::
+
+   :ref:`Envoy Lua filter <config_http_filters_lua>`
+      Learn  more about the Envoy Lua filter.
+
+   `Lua <https://www.lua.org/>`_
+      The Lua programming language.
