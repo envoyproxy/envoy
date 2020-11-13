@@ -158,6 +158,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "matching_data_lib",
+    hdrs = [
+        "matching_data.h",
+    ],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/http:header_map_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_manager_lib",
     srcs = [
         "filter_manager.cc",
@@ -167,6 +178,7 @@ envoy_cc_library(
     ],
     deps = [
         ":headers_lib",
+        ":matching_data_lib",
         "//include/envoy/http:filter_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:linked_object",

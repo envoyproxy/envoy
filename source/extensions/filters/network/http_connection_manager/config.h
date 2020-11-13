@@ -96,7 +96,7 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using MatchTreeFactoryCb = std::function<MatchTreeSharedPtr()>;
+  using MatchTreeFactoryCb = std::function<MatchTreeSharedPtr<Http::HttpMatchingData>()>;
   using FilterFactoriesList =
       std::list<std::pair<Filter::Http::FilterConfigProviderPtr, MatchTreeFactoryCb>>;
   struct FilterConfig {

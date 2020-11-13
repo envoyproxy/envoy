@@ -315,6 +315,9 @@ tap_config:
       "http",
       findHeader("x-forwarded-proto", trace.http_buffered_trace().request().headers())->value());
   EXPECT_EQ(trace.http_buffered_trace().response().headers().size(), 5);
+  for (const auto& header : trace.http_buffered_trace().response().headers()) {
+    std::cout << "H: " << header.key() << std::endl;
+  }
   EXPECT_NE(nullptr, findHeader("date", trace.http_buffered_trace().response().headers()));
   EXPECT_EQ("baz", findHeader("bar", trace.http_buffered_trace().response().headers())->value());
 

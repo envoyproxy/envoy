@@ -86,6 +86,7 @@ public:
     envoy::extensions::filters::http::tap::v3::MatchAction action;
     MessageUtil::unpackTo(config.typed_config(), action);
 
+    std::cout << "got match callback: " << action.perform_tap() << std::endl;
     if (action.perform_tap()) {
       tapper_->onMatch();
     } else {

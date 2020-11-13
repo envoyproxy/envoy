@@ -387,8 +387,8 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
 }
 
 void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                                 MatchTreeSharedPtr match_tree,
-                                                 MatchingDataSharedPtr matching_data,
+                                                 MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                                                 HttpMatchingDataSharedPtr matching_data,
                                                  bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(
       *this, filter, dual_filter, std::move(match_tree), std::move(matching_data)));
@@ -405,8 +405,8 @@ void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr fi
 }
 
 void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                                 MatchTreeSharedPtr match_tree,
-                                                 MatchingDataSharedPtr matching_data,
+                                                 MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                                                 HttpMatchingDataSharedPtr matching_data,
                                                  bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(
       *this, filter, std::move(match_tree), std::move(matching_data), dual_filter));
@@ -444,17 +444,20 @@ bool FilterManager::applyDataAndAttemptMatch(ActiveStreamFilterBase& filter,
   if (!state_.match_tree_completed_ && filter.matchingData()) {
     data_update(filter.matchingData()->get());
     const auto result = evaluateMatch(*filter.match_tree_, *filter.match_data_);
-    if (result) {
+    if (result.final_) {
       state_.match_tree_completed_ = true;
-      // TODO(snowp): Register a factory for this
-      if (result->typed_config()
-              .Is<envoy::extensions::filters::network::http_connection_manager::v3::
-                      SkipFilterAction>()) {
-        filter.skip_ = true;
-        return true;
-      }
 
-      filter.doMatchCallback(*result);
+      if (result.result_) {
+        // TODO(snowp): Register a factory for this
+        if (result.result_->typed_config()
+                .Is<envoy::extensions::filters::network::http_connection_manager::v3::
+                        SkipFilterAction>()) {
+          filter.skip_ = true;
+          return true;
+        }
+
+        filter.doMatchCallback(*result.result_);
+      }
     }
   }
 

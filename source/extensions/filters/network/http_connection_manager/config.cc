@@ -500,7 +500,7 @@ void HttpConnectionManagerConfig::processFilter(
     MessageUtil::unpackTo(proto_config.typed_config(), matching_filter);
 
     match_tree = [matching_filter]() {
-      return MatchTreeFactory().create(matching_filter.matcher());
+      return MatchTreeFactory<Http::HttpMatchingData>().create(matching_filter.matcher());
     };
     config_copy.clear_typed_config();
     config_copy.mutable_typed_config()->MergeFrom(matching_filter.typed_config());
@@ -644,46 +644,46 @@ public:
                                       HttpConnectionManagerConfig::MatchTreeFactoryCb match_tree)
       : callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
 
-  std::pair<MatchTreeSharedPtr, MatchingDataSharedPtr>
+  std::pair<MatchTreeSharedPtr<Http::HttpMatchingData>, Http::HttpMatchingDataSharedPtr>
   createMatchTree(const envoy::config::common::matcher::v3::Matcher& config) override {
     auto matching_data = std::make_shared<Http::HttpMatchingData>();
-    return {MatchTreeFactory().create(config), matching_data};
+    return {MatchTreeFactory<Http::HttpMatchingData>().create(config), matching_data};
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr matcher,
-                              MatchingDataSharedPtr data) {
+    wrapFilter(filter, [this](Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
+                              Http::HttpMatchingDataSharedPtr data) {
       callbacks_.addStreamDecoderFilter(filter, matcher, data);
     });
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
-                              MatchTreeSharedPtr match_tree,
-                              MatchingDataSharedPtr matching_data) override {
+                              MatchTreeSharedPtr<Http::HttpMatchingData> match_tree,
+                              Http::HttpMatchingDataSharedPtr matching_data) override {
     callbacks_.addStreamDecoderFilter(filter, std::move(match_tree), std::move(matching_data));
   }
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr matcher,
-                              MatchingDataSharedPtr data) {
+    wrapFilter(filter, [this](Http::StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
+                              Http::HttpMatchingDataSharedPtr data) {
       callbacks_.addStreamEncoderFilter(filter, matcher, data);
     });
   }
 
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
-                              MatchTreeSharedPtr match_tree,
-                              MatchingDataSharedPtr matching_data) override {
+                              MatchTreeSharedPtr<Http::HttpMatchingData> match_tree,
+                              Http::HttpMatchingDataSharedPtr matching_data) override {
     callbacks_.addStreamEncoderFilter(filter, std::move(match_tree), std::move(matching_data));
   }
 
   void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr matcher,
-                              MatchingDataSharedPtr data) {
+    wrapFilter(filter, [this](Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
+                              Http::HttpMatchingDataSharedPtr data) {
       callbacks_.addStreamFilter(filter, matcher, data);
     });
   }
 
-  void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
-                       MatchingDataSharedPtr matching_data) override {
+  void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<Http::HttpMatchingData> match_tree,
+                       Http::HttpMatchingDataSharedPtr matching_data) override {
     callbacks_.addStreamFilter(filter, std::move(match_tree), std::move(matching_data));
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {

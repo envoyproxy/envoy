@@ -467,15 +467,15 @@ public:
   MOCK_METHOD(MatchTreeAndData, createMatchTree,
               (const envoy::config::common::matcher::v3::Matcher&));
   MOCK_METHOD(void, addStreamDecoderFilter,
-              (Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr,
-               MatchingDataSharedPtr));
+              (Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr<HttpMatchingData>,
+               HttpMatchingDataSharedPtr));
   MOCK_METHOD(void, addStreamDecoderFilter, (Http::StreamDecoderFilterSharedPtr filter));
   MOCK_METHOD(void, addStreamEncoderFilter,
-              (Http::StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr,
-               MatchingDataSharedPtr));
+              (Http::StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr<HttpMatchingData>,
+               HttpMatchingDataSharedPtr));
   MOCK_METHOD(void, addStreamEncoderFilter, (Http::StreamEncoderFilterSharedPtr filter));
   MOCK_METHOD(void, addStreamFilter,
-              (Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr, MatchingDataSharedPtr));
+              (Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<HttpMatchingData>, HttpMatchingDataSharedPtr));
   MOCK_METHOD(void, addStreamFilter, (Http::StreamFilterSharedPtr filter));
   MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
 };
