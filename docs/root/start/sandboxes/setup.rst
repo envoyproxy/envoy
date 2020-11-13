@@ -5,7 +5,7 @@ Setup the sandbox environment
 
 Before you can run the Envoy sandboxes you will need to set up your environment
 with :ref:`Docker <start_sandboxes_setup_docker>` and
-:ref:`Docker Compose <start_sandboxes_setup_docker_compsoe>`.
+:ref:`Docker Compose <start_sandboxes_setup_docker_compose>`.
 
 You should also clone the :ref:`Envoy repository <start_sandboxes_setup_envoy>` with
 :ref:`Git <start_sandboxes_setup_git>`
@@ -14,7 +14,7 @@ You should also clone the :ref:`Envoy repository <start_sandboxes_setup_envoy>` 
 
    If you are working on a Mac OS or Windows system, a simple way to install both
    :ref:`Docker <start_sandboxes_setup_docker>` and
-   :ref:`Docker Compose <start_sandboxes_setup_docker_compsoe>` is with
+   :ref:`Docker Compose <start_sandboxes_setup_docker_compose>` is with
    `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
 
 .. _start_sandboxes_setup_docker:
