@@ -13,6 +13,9 @@ Sandboxes
    `Pull Request <https://github.com/envoyproxy/envoy/pulls>`_ with the necessary changes
    should you be able to create one.
 
+   :repo:`See the sandbox developer documentation <examples/DEVELOPER.md>` for more information about
+   creating your own sandbox.
+
 .. sidebar:: Compatibility
 
    As the examples use the pre-built :ref:`Envoy Docker images <install_binaries>` they should work
