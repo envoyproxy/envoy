@@ -113,7 +113,7 @@ private:
 
   /**
    * Given a char * & len, parse the header as per spec.
-   * @return bool true if parsing succeded, false if parsing failed.
+   * @return bool true if parsing succeeded, false if parsing failed.
    */
   bool parseV1Header(char* buf, size_t len);
   bool parseV2Header(char* buf);
