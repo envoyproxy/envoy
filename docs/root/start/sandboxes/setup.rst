@@ -10,6 +10,11 @@ with :ref:`Docker <start_sandboxes_setup_docker>` and
 You should also clone the :ref:`Envoy repository <start_sandboxes_setup_envoy>` with
 :ref:`Git <start_sandboxes_setup_git>`
 
+Some of the examples require the installation of
+:ref:`additional dependencies <start_sandboxes_setup_additional>`.
+
+It is indicated in the sandbox documentation where this is the case.
+
 .. tip::
 
    If you are working on a Mac OS or Windows system, a simple way to install both
