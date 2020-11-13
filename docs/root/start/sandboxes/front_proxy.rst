@@ -1,6 +1,6 @@
 .. _install_sandboxes_front_proxy:
 
-Front Proxy
+Front proxy
 ===========
 
 .. sidebar:: Requirements

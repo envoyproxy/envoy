@@ -1,6 +1,6 @@
 .. _install_sandboxes_fault_injection:
 
-Fault Injection Filter
+Fault injection filter
 ======================
 
 .. sidebar:: Requirements

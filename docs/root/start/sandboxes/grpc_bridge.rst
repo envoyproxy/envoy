@@ -1,6 +1,6 @@
 .. _install_sandboxes_grpc_bridge:
 
-gRPC Bridge
+gRPC bridge
 ===========
 
 .. sidebar:: Requirements

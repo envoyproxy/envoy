@@ -1,6 +1,6 @@
 .. _install_sandboxes_jaeger_native_tracing:
 
-Jaeger Native Tracing
+Jaeger native tracing
 =====================
 
 .. sidebar:: Requirements
@@ -105,7 +105,7 @@ to service2, as well as the latency incurred at each hop.
 
 .. seealso::
 
-   :ref:`request tracing <arch_overview_tracing>`
+   :ref:`Request tracing <arch_overview_tracing>`
       Learn more about using Envoy's request tracing.
 
    `Jaeger <https://jaegertracing.io/>`_
