@@ -76,6 +76,7 @@ openssl
 
 `openssl <https://www.openssl.org/>`_
 
+.. _start_sandboxes_setup_redis:
 
 redis
 ~~~~~
