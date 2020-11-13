@@ -3,7 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
-load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary", "wasm_rust_binary")
+load("//bazel/wasm:wasm.bzl", "wasm_cc_binary", "wasm_rust_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -69,7 +69,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "asm2wasm_cpp.wasm",
     srcs = ["asm2wasm_cpp.cc"],
     deps = [
@@ -77,7 +77,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "bad_signature_cpp.wasm",
     srcs = ["bad_signature_cpp.cc"],
     deps = [
@@ -85,7 +85,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "emscripten_cpp.wasm",
     srcs = ["emscripten_cpp.cc"],
     deps = [
@@ -93,7 +93,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "logging_cpp.wasm",
     srcs = ["logging_cpp.cc"],
     deps = [
@@ -101,7 +101,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "missing_cpp.wasm",
     srcs = ["missing_cpp.cc"],
     linkopts = [
@@ -113,7 +113,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "segv_cpp.wasm",
     srcs = ["segv_cpp.cc"],
     deps = [
@@ -121,7 +121,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "speed_cpp.wasm",
     srcs = ["speed_cpp.cc"],
     deps = [
@@ -129,7 +129,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "start_cpp.wasm",
     srcs = ["start_cpp.cc"],
     deps = [
@@ -137,7 +137,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "stats_cpp.wasm",
     srcs = ["stats_cpp.cc"],
     deps = [

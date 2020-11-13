@@ -3,7 +3,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary")
+load("//bazel/wasm:wasm.bzl", "wasm_cc_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -33,7 +33,7 @@ filegroup(
     }),
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "envoy_filter_http_wasm_example.wasm",
     srcs = ["envoy_filter_http_wasm_example.cc"],
     deps = [
@@ -41,7 +41,7 @@ envoy_wasm_cc_binary(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "envoy_filter_http_wasm_updated_example.wasm",
     srcs = ["envoy_filter_http_wasm_updated_example.cc"],
     deps = [

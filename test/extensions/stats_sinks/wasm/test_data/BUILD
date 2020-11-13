@@ -3,7 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
-load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary")
+load("//bazel/wasm:wasm.bzl", "wasm_cc_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -24,7 +24,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_wasm_cc_binary(
+wasm_cc_binary(
     name = "test_context_cpp.wasm",
     srcs = ["test_context_cpp.cc"],
     deps = [
