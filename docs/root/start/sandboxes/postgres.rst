@@ -21,6 +21,8 @@ Step 1: Build the sandbox
 
 Change to the ``examples/postgres`` directory.
 
+Build and start the containers.
+
 .. code-block:: console
 
   $ pwd

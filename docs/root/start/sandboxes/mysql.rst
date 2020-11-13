@@ -20,6 +20,8 @@ Step 1: Build the sandbox
 
 Change to the ``examples/mysql`` directory.
 
+Build and start the containers.
+
 Terminal 1
 
 .. code-block:: console

@@ -13,9 +13,13 @@ Lua filter
 In this example, we show how a `Lua <https://www.lua.org/>`_ filter can be used with the Envoy
 proxy.
 
-The Envoy proxy configuration includes a Lua filter that contains two functions namely
-``envoy_on_request(request_handle)`` and
-``envoy_on_response(response_handle)`` as documented :ref:`here <config_http_filters_lua>`.
+The Envoy proxy configuration includes a Lua filter that contains two functions:
+
+- ``envoy_on_request(request_handle)``
+- ``envoy_on_response(response_handle)``
+
+:ref:`See here <config_http_filters_lua>` for an overview of Envoy's Lua filter and documentation
+regarding these functions.
 
 Step 1: Build the sandbox
 *************************

@@ -1,13 +1,14 @@
 .. _install_sandboxes_skywalking_tracing:
 
-SkyWalking Tracing
+SkyWalking tracing
 ==================
 
 .. sidebar:: Requirements
 
-   `curl <https://curl.se/>`_
+   .. include:: _include/docker-env-setup-link.rst
 
-      Make ``HTTP`` requests.
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
 
 The SkyWalking tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `SkyWalking <http://skywalking.apache.org>`_ as the tracing provider. This sandbox
