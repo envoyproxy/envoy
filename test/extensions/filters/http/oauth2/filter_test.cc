@@ -171,7 +171,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
 
     // Create the OAuth config.
     auto secret_reader = std::make_shared<MockSecretReader>();
-    FilterConfigSharedPtr test_config_
+    FilterConfigSharedPtr test_config_;
     test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
                                              scope_, "test.");
 
