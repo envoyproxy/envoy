@@ -167,6 +167,11 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
     matcher->set_name(":method");
     matcher->set_exact_match("OPTIONS");
 
+    auto credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
     // Create the OAuth config.
@@ -544,8 +549,8 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   Http::TestRequestHeaderMapImpl final_request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
-                                        "state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
+                                        "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
