@@ -3,17 +3,14 @@
 MongoDB
 =======
 
-Envoy supports a network level MongoDB sniffing filter with the following features:
+Envoy 支持具有以下功能的网络级别 MongoDB 嗅探过滤器：
+* MongoDB wire 格式的 BSON 解析器。
+* 详细的 MongoDB 查询/操作统计信息，包括路由集群的计时和 scatter/multi-get 计数。
+* 查询记录。
+* 通过 $comment 参数做每个调用点的统计分析报告。
+* 故障注入。
 
-* MongoDB wire format BSON parser.
-* Detailed MongoDB query/operation statistics including timings and scatter/multi-get counts for
-  routed clusters.
-* Query logging.
-* Per callsite statistics via the $comment query parameter.
-* Fault injection.
+MongoDB 过滤器是 Envoy 的可扩展性和核心抽象能力的典范案例。在 Lyft 中，我们将这个过滤器应用在所有的应用以及数据库中。它提供了重要的数据源，而这与应用程序平台和所使用的特定 MongoDB 的驱动程序无关。
 
-The MongoDB filter is a good example of Envoy’s extensibility and core abstractions. At Lyft we use
-this filter between all applications and our databases. It provides an invaluable source of data
-that is agnostic to the application platform and specific MongoDB driver in use.
+MongoDB 代理过滤器 :ref:`配置参考 <config_network_filters_mongo_proxy>`。
 
-MongoDB proxy filter :ref:`configuration reference <config_network_filters_mongo_proxy>`.
