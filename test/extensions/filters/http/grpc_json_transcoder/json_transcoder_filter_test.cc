@@ -1296,7 +1296,7 @@ protected:
 
 TEST_P(GrpcJsonTranscoderFilterUnescapeTest, UnescapeSpec) {
   Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", "text/plain"}, {":method", "POST"}, {":path", "/wildcard/%2f%23%20%2523"}};
+      {"content-type", "text/plain"}, {":method", "POST"}, {":path", "/wildcard/%2f%23/%20%2523"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl request_data{"{}"};
@@ -1326,21 +1326,21 @@ INSTANTIATE_TEST_SUITE_P(GrpcJsonTranscoderFilterUnescapeOptions,
      "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"]
     })",
-                                 "%2f%23 %23"},
+                                 "%2f%23/ %23"},
                              GrpcJsonTranscoderFilterUnescapeTestParam{
                                  R"({
      "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "url_unescape_spec": "ALL_CHARACTERS_EXCEPT_SLASH"
     })",
-                                 "%2f# %23"},
+                                 "%2f#/ %23"},
                              GrpcJsonTranscoderFilterUnescapeTestParam{
                                  R"({
      "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "url_unescape_spec": "ALL_CHARACTERS"
     })",
-                                 "/# %23"}));
+                                 "/#/ %23"}));
 
 } // namespace
 } // namespace GrpcJsonTranscoder
