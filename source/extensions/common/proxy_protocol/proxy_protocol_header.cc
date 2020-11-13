@@ -4,6 +4,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
+
 #include "common/common/mem_block_builder.h"
 #include "common/network/address_impl.h"
 
@@ -86,8 +87,10 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
         Network::Address::Ipv6Instance(src_addr, src_port).ip()->ipv6()->address();
     const auto net_dst_addr =
         Network::Address::Ipv6Instance(dst_addr, dst_port).ip()->ipv6()->address();
-    addrs.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_src_addr), 16));
-    addrs.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_dst_addr), 16));
+    addrs.appendData(
+        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_src_addr), 16));
+    addrs.appendData(
+        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_dst_addr), 16));
     out.add(addrs.releasePointer(), 32);
     break;
   }
