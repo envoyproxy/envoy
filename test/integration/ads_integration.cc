@@ -34,8 +34,9 @@ AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion
 
 void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
 
-envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "ROUND_ROBIN", api_version_);
+envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name,
+                                                                     const std::string& lb_policy) {
+  return ConfigHelper::buildCluster(name, lb_policy, api_version_);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildTlsCluster(const std::string& name) {
@@ -74,7 +75,7 @@ AdsIntegrationTest::buildRedisListener(const std::string& name, const std::strin
         filters:
         - name: redis
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
+            "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
             settings:
               op_timeout: 1s
             stat_prefix: {}
@@ -127,6 +128,9 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  if (api_version_ == envoy::config::core::v3::ApiVersion::V2 && !fatal_by_default_v2_override_) {
+    config_helper_.enableDeprecatedV2Api();
+  }
   HttpIntegrationTest::initialize();
   if (xds_stream_ == nullptr) {
     createXdsConnection();

@@ -248,22 +248,6 @@ void LoadBalancerFuzzBase::replay(
       break;
     }
   }
-  clearStaticHostsState();
-}
-
-void LoadBalancerFuzzBase::clearStaticHostsState() {
-  // The only outstanding health flags set are those that are set from hosts being placed in
-  // degraded and excluded. Thus, use the priority set pointer to know which flags to clear.
-  for (uint32_t priority_level = 0; priority_level < priority_set_.hostSetsPerPriority().size();
-       ++priority_level) {
-    MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
-    for (auto& host : host_set.degraded_hosts_) {
-      host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-    }
-    for (auto& host : host_set.excluded_hosts_) {
-      host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-    }
-  }
 }
 
 } // namespace Upstream

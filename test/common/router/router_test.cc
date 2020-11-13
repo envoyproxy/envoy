@@ -462,6 +462,36 @@ TEST_F(RouterTest, RouteNotFound) {
   EXPECT_EQ(callbacks_.details(), "route_not_found");
 }
 
+TEST_F(RouterTest, MissingRequiredHeaders) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.removeMethod();
+
+  EXPECT_CALL(encoder, encodeHeaders(_, _))
+      .WillOnce(Invoke([](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        return Http::HeaderUtility::checkRequiredHeaders(headers);
+      }));
+  EXPECT_CALL(callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable,
+                             testing::Eq("missing required header: :method"), _, _,
+                             "filter_removed_required_headers{missing required header: :method}"))
+      .WillOnce(testing::InvokeWithoutArgs([] {}));
+  router_.decodeHeaders(headers, true);
+  router_.onDestroy();
+}
+
 TEST_F(RouterTest, ClusterNotFound) {
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
 
@@ -1507,8 +1537,9 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(encoder, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   Http::TestRequestHeaderMapImpl headers;
@@ -4482,7 +4513,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
   setNumPreviousRedirect(3);
   sendRequest();
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4501,7 +4532,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
 
   redirect_headers_->setLocation("");
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4519,7 +4550,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
 
   redirect_headers_->setLocation("h");
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4536,7 +4567,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
 
   sendRequest(false);
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4554,7 +4585,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
 
   redirect_headers_->removeLocation();
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl data("1234567890");
@@ -4571,7 +4602,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
   EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(body_data.get()));
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl data("1234567890");
@@ -4589,7 +4620,7 @@ TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   redirect_headers_->setLocation("https://www.foo.com");
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4613,7 +4644,7 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
   EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
   ON_CALL(*mock_predicate, name()).WillByDefault(Return("mock_predicate"));
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4636,7 +4667,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4661,7 +4692,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4684,7 +4715,7 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
               isCrossSchemeRedirectAllowed())
       .WillOnce(Return(true));
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -5837,8 +5868,9 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   // :authority header in the outgoing request should match the DNS name of
   // the selected upstream host
   EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&outgoing_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
@@ -5874,8 +5906,9 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   // :authority header in the outgoing request should match the :authority header of
   // the incoming request
   EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&incoming_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
