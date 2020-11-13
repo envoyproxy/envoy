@@ -85,7 +85,7 @@ void Filter::onRead() {
       config_->stats_.downstream_cx_proxy_proto_error_.inc();
       cb_->continueFilterChain(false);
     }
-  } catch (EnvoyException ex) {
+  } catch (const EnvoyException& ee) {
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
     cb_->continueFilterChain(false);
   }
