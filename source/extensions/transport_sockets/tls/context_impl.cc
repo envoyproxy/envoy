@@ -421,7 +421,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
           throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}",
                                            tls_certificate.privateKeyPath(),
-                                           Utility::getLastCryptoError().value_or("not found")));
+                                           Utility::getLastCryptoError().value_or("unknown")));
         }
 
 #ifdef BORINGSSL_FIPS
