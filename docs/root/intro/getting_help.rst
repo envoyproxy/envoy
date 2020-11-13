@@ -1,15 +1,13 @@
 .. _getting_help:
 
-Getting help
+获取帮助
 ============
 
-We are very interested in building a community around Envoy. Please reach out to us if you are
-interested in using it and need help or want to contribute.
+我们非常有兴趣围绕 Envoy 建立社区。如果你有兴趣使用它，并且需要帮助或想要贡献，请与我们联系。
 
-Please see `contact info <https://github.com/envoyproxy/envoy#contact>`_.
+请查看 `联系信息 <https://github.com/envoyproxy/envoy#contact>`_。
 
-Reporting security vulnerabilities
+报告安全漏洞
 ----------------------------------
 
-Please see `security contact info
-<https://github.com/envoyproxy/envoy#reporting-security-vulnerabilities>`_.
+请查看 `安全联系信息 <https://github.com/envoyproxy/envoy#reporting-security-vulnerabilities>`_。
