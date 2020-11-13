@@ -47,6 +47,11 @@ path = "../../../test/extensions/filters/http/wasm/test_data/metadata_rust.rs"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "http_resume_call_rust"
+path = "../../../test/extensions/filters/http/wasm/test_data/resume_call_rust.rs"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "http_shared_data_rust"
 path = "../../../test/extensions/filters/http/wasm/test_data/shared_data_rust.rs"
 crate-type = ["cdylib"]

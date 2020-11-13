@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:metadata_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_data_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
