@@ -139,18 +139,9 @@ void CodecClient::onData(Buffer::Instance& data) {
     }
   }
 
-  // The HTTP/1 codec will pause dispatch after a single response is complete. If there is more
-  // data, drain and close the connection.
-  if (codec_->protocol() < Protocol::Http2 && data.length() > 0) {
-    ENVOY_CONN_LOG(debug, "CONNECTION STATE {}", *connection_, connection_->state());
-    ENVOY_CONN_LOG(debug, "Draining remaining {} bytes", *connection_, data.length());
-    host_->cluster().stats().upstream_cx_protocol_error_.inc();
-    data.drain(data.length());
-    close();
-  }
-
   // All data should be consumed at this point.
-  // ASSERT(data.length() == 0);
+  ASSERT(data.length() == 0 || connection_->state() != Network::Connection::State::Open,
+         absl::StrCat("number of bytes ", data.toString()));
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,

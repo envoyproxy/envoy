@@ -525,6 +525,24 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
       [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
 }
 
+Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status {
+        Http::Status status = innerDispatch(data);
+        if (status.ok() && data.length() > 0) {
+          // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
+          // after a response is complete indicates an error.
+          return codecProtocolError(
+              "http/1.1 protocol error: extraneous data after response complete");
+        }
+        return status;
+      },
+      data);
+}
+
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   ASSERT(buffered_body_.length() == 0);

@@ -555,6 +555,24 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
       [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
 }
 
+Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status {
+        Http::Status status = innerDispatch(data);
+        if (status.ok() && data.length() > 0) {
+          // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
+          // after a response is complete indicates an error.
+          return codecProtocolError(
+              "http/1.1 protocol error: extraneous data after response complete");
+        }
+        return status;
+      },
+      data);
+}
+
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
@@ -1289,9 +1307,7 @@ void ClientConnectionImpl::onMessageComplete() {
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
   }
 
-  // Always pause the parser so that the calling code can process 1 response at a time and apply
-  // back pressure. This means that the calling code needs to detect if there are more active
-  // requests and data in the buffer and dispatch it again.
+  // Pause the parser after a response is complete. Any remaining data indicates an error.
   http_parser_pause(&parser_, 1);
 }
 

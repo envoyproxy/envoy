@@ -145,7 +145,6 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
   // When we get a remote close with an active request we should try to send zero bytes through
   // the codec.
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
-  EXPECT_CALL(*codec_, protocol()).WillOnce(Return(Protocol::Http11));
   EXPECT_CALL(*codec_, dispatch(_));
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
   connection_cb_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -200,7 +199,6 @@ TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
   // When we get a remote close with an active request validate idleTimer is reset after client
   // close
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
-  EXPECT_CALL(*codec_, protocol()).WillOnce(Return(Protocol::Http11));
   EXPECT_CALL(*codec_, dispatch(_));
   EXPECT_NE(client_->numActiveRequests(), 0);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
@@ -232,7 +230,6 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
 }
 
 TEST_F(CodecClientTest, ProtocolError) {
-  EXPECT_CALL(*codec_, protocol()).WillOnce(Return(Protocol::Http11));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -243,7 +240,6 @@ TEST_F(CodecClientTest, ProtocolError) {
 }
 
 TEST_F(CodecClientTest, 408Response) {
-  EXPECT_CALL(*codec_, protocol()).WillOnce(Return(Protocol::Http11));
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Return(prematureResponseError("", Code::RequestTimeout)));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -255,7 +251,6 @@ TEST_F(CodecClientTest, 408Response) {
 }
 
 TEST_F(CodecClientTest, PrematureResponse) {
-  EXPECT_CALL(*codec_, protocol()).WillOnce(Return(Protocol::Http11));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(prematureResponseError("", Code::OK)));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -377,7 +372,6 @@ TEST_P(CodecNetworkTest, SendData) {
   const std::string full_data = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n";
   Buffer::OwnedImpl data(full_data);
   upstream_connection_->write(data, false);
-  EXPECT_CALL(*codec_, protocol()).WillOnce(Return(Protocol::Http11));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     EXPECT_EQ(full_data, data.toString());
     data.drain(data.length());
@@ -400,7 +394,6 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   Buffer::OwnedImpl data(full_data);
   upstream_connection_->write(data, false);
   upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
-  EXPECT_CALL(*codec_, protocol()).Times(2).WillRepeatedly(Return(Protocol::Http11));
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -441,11 +434,17 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   client_connection_->readDisable(false);
 
-  EXPECT_CALL(*codec_, protocol()).WillOnce(Return(Protocol::Http11));
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    EXPECT_EQ(full_data, data.toString());
-    return Http::okStatus();
-  }));
+  EXPECT_CALL(*codec_, dispatch(_))
+      .Times(2)
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        EXPECT_EQ(full_data, data.toString());
+        data.drain(data.length());
+        return Http::okStatus();
+      }))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        EXPECT_EQ("", data.toString());
+        return Http::okStatus();
+      }));
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {
       callbacks->onResetStream(StreamResetReason::RemoteReset, absl::string_view());

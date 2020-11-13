@@ -254,6 +254,15 @@ protected:
     NoBodyData = 2,
   };
 
+  /**
+   * An inner dispatch call that executes the dispatching logic. While exception removal is in
+   * migration (#10878), this function may either throw an exception or return an error status.
+   * Exceptions are caught and translated to their corresponding statuses in the outer level
+   * dispatch.
+   * TODO(#10878): Remove this when exception removal is complete.
+   */
+  Http::Status innerDispatch(Buffer::Instance& data);
+
   bool resetStreamCalled() { return reset_stream_called_; }
   Status onMessageBeginBase();
 
@@ -314,15 +323,6 @@ private:
   virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
     return false;
   }
-
-  /**
-   * An inner dispatch call that executes the dispatching logic. While exception removal is in
-   * migration (#10878), this function may either throw an exception or return an error status.
-   * Exceptions are caught and translated to their corresponding statuses in the outer level
-   * dispatch.
-   * TODO(#10878): Remove this when exception removal is complete.
-   */
-  Http::Status innerDispatch(Buffer::Instance& data);
 
   /**
    * Dispatch a memory span.
@@ -580,6 +580,7 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
   Status onMessageBegin() override { return okStatus(); }
   Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
