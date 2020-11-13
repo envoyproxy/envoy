@@ -18,7 +18,7 @@ Attribute value types are limited to:
 * `uint` for 64-bit unsigned integers
 * `bool` for booleans
 * `list` for lists of values
-* `map` for associative arrays with string, integer, or boolean keys
+* `map` for associative arrays with string keys
 * `timestamp` for timestamps as specified by `Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_
 * `duration` for durations as specified by `Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_
 * Protocol buffer message types
