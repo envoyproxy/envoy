@@ -121,7 +121,6 @@ the ``example_proxy_cluster`` should now be configured to proxy to ``service2``:
    :language: json
    :emphasize-lines: 10, 18-19
 
-
 .. seealso::
 
    :ref:`Dynamic configuration (filesystem) quick start guide <start_quick_start_dynamic_filesystem>`
