@@ -23,6 +23,8 @@ requests and will be visible in LRS Server logs.
 Step 1: Build the sandbox
 *************************
 
+Change to the ``examples/load-reporting-service`` directory.
+
 Terminal 1 ::
 
     $ pwd

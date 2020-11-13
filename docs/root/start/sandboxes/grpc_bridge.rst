@@ -23,6 +23,8 @@ base routing via its route configuration.
 Step 1: Generate the protocol stubs
 ***********************************
 
+Change to the ``examples/grpc-bridge`` directory.
+
 A docker-compose file is provided that generates the stubs for both ``client`` and ``server`` from the
 specification in the ``protos`` directory.
 

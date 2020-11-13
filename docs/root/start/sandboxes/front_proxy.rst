@@ -37,6 +37,8 @@ requests are handled by the service Envoy, and efficiently routed to your servic
 Step 1: Start all of our containers
 ***********************************
 
+Change to the ``examples/front-proxy`` directory.
+
 .. code-block:: console
 
     $ pwd

@@ -1,6 +1,6 @@
 .. _install_sandboxes_lua:
 
-Lua Filter
+Lua filter
 ==========
 
 .. sidebar:: Requirements
@@ -10,14 +10,17 @@ Lua Filter
    :ref:`curl <start_sandboxes_setup_curl>`
 	Used to make ``HTTP`` requests.
 
-In this example, we show how a Lua filter can be used with the Envoy
-proxy. The Envoy proxy configuration includes a Lua
-filter that contains two functions namely
+In this example, we show how a `Lua <https://www.lua.org/>`_ filter can be used with the Envoy
+proxy.
+
+The Envoy proxy configuration includes a Lua filter that contains two functions namely
 ``envoy_on_request(request_handle)`` and
 ``envoy_on_response(response_handle)`` as documented :ref:`here <config_http_filters_lua>`.
 
 Step 1: Build the sandbox
 *************************
+
+Change to the ``examples/lua`` directory.
 
 .. code-block:: console
 
@@ -91,5 +94,8 @@ Terminal 1
 
 .. seealso::
 
-   :ref:`here <config_http_filters_lua>`
-      Envoy Lua filter.
+   :ref:`Envoy Lua filter <config_http_filters_lua>`
+      Learn  more about the Envoy Lua filter.
+
+   `Lua <https://www.lua.org/>`_
+      The Lua programming language.
