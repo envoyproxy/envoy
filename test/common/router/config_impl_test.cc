@@ -2608,7 +2608,7 @@ TEST_F(RouterMatcherFilterStateHashPolicyTest, NullValue) {
   EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers_, add_cookie_nop_,
                                                                filter_state_));
 }
-// `Nonhashable`.
+// `Nonhashable` Key.
 TEST_F(RouterMatcherFilterStateHashPolicyTest, ValueNonHashable) {
   firstRouteHashPolicy()->mutable_filter_state()->set_key("nonhashable");
   Router::RouteConstSharedPtr route = config().route(headers_, 0);

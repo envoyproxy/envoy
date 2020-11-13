@@ -238,7 +238,7 @@ ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
   // being posted. This assert is extremely useful for debugging the common path so we will leave it
   // for now. If it becomes a problem (developers hitting this assert when using debug builds) we
   // can revisit. This case, if it happens, should be benign on production builds. This case is
-  // covered in `ConnectionHandlerTest::RemoveListenerDuringRebalance`.
+  // covered in ConnectionHandlerTest::RemoveListenerDuringRebalance.
   ASSERT(num_listener_connections_ == 0);
 }
 

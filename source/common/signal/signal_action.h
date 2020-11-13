@@ -17,7 +17,7 @@ namespace Envoy {
  * This class installs signal handlers for fatal signal types.
  *
  * These signals are handled:
- *   SIGABRT
+ *   `SIGABRT`
  *   `SIGBUS`
  *   `SIGFPE`
  *   `SIGILL`

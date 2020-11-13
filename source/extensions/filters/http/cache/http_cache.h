@@ -87,7 +87,7 @@ public:
 class AdjustedByteRange {
 public:
   // Construct an AdjustedByteRange representing the [first,last) bytes in the
-  // response body. `Prereq`: first <= last Invariant: begin() <= end()
+  // response body. Prerequisite: first <= last Invariant: begin() <= end()
   // Example: AdjustedByteRange(0,4) represents the first 4 bytes.
   AdjustedByteRange(uint64_t first, uint64_t last) : first_(first), last_(last) {
     ASSERT(first < last, "Illegal byte range.");

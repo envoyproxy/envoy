@@ -29,7 +29,7 @@ TcpDump::TcpDump(const std::string& path, const std::string& iface,
   }
   ENVOY_LOG_MISC(debug, "tcpdumping iface {} to {} with filter \"{}\"", iface, path, port_expr);
   // Fork a child process. We use explicit fork/wait over popen/pclose to gain
-  // the ability to send signals to the `pid`.
+  // the ability to send signals to the pid.
   tcpdump_pid_ = ::fork();
   RELEASE_ASSERT(tcpdump_pid_ >= 0, "");
   // execlp in the child process.
