@@ -82,7 +82,7 @@ message OAuth2Config {
   repeated config.route.v4alpha.HeaderMatcher pass_through_matcher = 8;
 
   // Space separated list of scopes to be claimed in the authorization request
-  string auth_scopes = 9;
+  string auth_scopes = 9 [(validate.rules).string = {min_len: 1}];
 }
 
 // Filter config.
