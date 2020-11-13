@@ -179,8 +179,8 @@ message GrpcJsonTranscoder {
 
   // URL unescaping policy.
   // This spec is only applied when extracting variable with multiple segments.
-  // For example, in case of `/foo/{x=*}/bar/{y=in/*}/{z=**}` `x` variable is single segment and `y` and `z` are multiple segments.
-  // For a path with `/foo/abc/bar/in/aaa/bbb/ccc`, `x=abc`, `y=in/aaa`, `z=bbb/ccc`.
+  // For example, in case of `/foo/{x=*}/bar/{y=prefix/*}/{z=**}` `x` variable is single segment and `y` and `z` are multiple segments.
+  // For a path with `/foo/first/bar/prefix/second/third/fourth`, `x=first`, `y=prefix/second`, `z=third/fourth`.
   // If this setting is not specified, the value defaults to :ref:`ALL_CHARACTERS_EXCEPT_RESERVED<envoy_api_enum_value_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec.ALL_CHARACTERS_EXCEPT_RESERVED>`.
   UrlUnescapeSpec url_unescape_spec = 10 [(validate.rules).enum = {defined_only: true}];
 }
