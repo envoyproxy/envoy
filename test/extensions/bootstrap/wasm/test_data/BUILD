@@ -104,10 +104,6 @@ wasm_cc_binary(
 wasm_cc_binary(
     name = "missing_cpp.wasm",
     srcs = ["missing_cpp.cc"],
-    linkopts = [
-        "--js-library external/proxy_wasm_cpp_sdk/proxy_wasm_intrinsics.js",
-        "-s ERROR_ON_UNDEFINED_SYMBOLS=0",
-    ],
     deps = [
         "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
     ],
