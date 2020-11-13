@@ -236,15 +236,17 @@ public:
     init_helper_.setInitializedCb(callback);
   }
 
-  ClusterInfoMap clusters() override {
-    // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    ClusterInfoMap clusters_map;
+  ClusterInfoMaps clusters() override {
+    ClusterInfoMaps clusters_maps;
     for (auto& cluster : active_clusters_) {
-      clusters_map.emplace(cluster.first, *cluster.second->cluster_);
+      clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
     }
-
-    return clusters_map;
+    for (auto& cluster : warming_clusters_) {
+      clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+    }
+    return clusters_maps;
   }
+
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* get(absl::string_view cluster) override;
 
