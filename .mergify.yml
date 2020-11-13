@@ -42,7 +42,7 @@ pull_request_rules:
   - name: Automatic merge when approved by zhangxiaohui
     conditions:
       - "approved-reviews-by=addozhang"
-      - "#approved-reviews-by>=1"
+      - "#approved-reviews-by>=2"
       - base=zh
     actions:
       merge:
