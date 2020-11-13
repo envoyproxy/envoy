@@ -361,7 +361,7 @@ static_resources:
 
   create(parseBootstrapFromV3Yaml(yaml));
   cluster_manager_->clusters()
-      .find("cluster:name")
+      .active_clusters_.find("cluster:name")
       ->second.get()
       .info()
       ->statsScope()
@@ -1490,7 +1490,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
-  EXPECT_EQ(1UL, cluster_manager_->clusters().size());
+  EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(cp));
   EXPECT_EQ(cp, cluster_manager_->httpConnPoolForCluster("fake_cluster", ResourcePriority::Default,
@@ -1520,7 +1520,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*cp2, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb2));
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
-  EXPECT_EQ(0UL, cluster_manager_->clusters().size());
+  EXPECT_EQ(0UL, cluster_manager_->clusters().active_clusters_.size());
 
   // Close the TCP connection. Success is no ASSERT or crash due to referencing
   // the removed cluster.

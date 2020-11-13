@@ -54,16 +54,20 @@ protected:
         .WillOnce(Throw(EnvoyException(exception_msg)));
   }
 
-  ClusterManager::ClusterInfoMap makeClusterMap(const std::vector<std::string>& clusters) {
-    ClusterManager::ClusterInfoMap map;
-    for (const auto& cluster : clusters) {
-      map.emplace(cluster, cm_.thread_local_cluster_.cluster_);
+  ClusterManager::ClusterInfoMaps
+  makeClusterInfoMaps(const std::vector<std::string>& active_clusters,
+                      const std::vector<std::string>& warming_clusters = {}) {
+    ClusterManager::ClusterInfoMaps maps;
+    for (const auto& cluster : active_clusters) {
+      maps.active_clusters_.emplace(cluster, cm_.thread_local_cluster_.cluster_);
     }
-    return map;
+    for (const auto& cluster : warming_clusters) {
+      maps.warming_clusters_.emplace(cluster, cm_.thread_local_cluster_.cluster_);
+    }
+    return maps;
   }
 
   NiceMock<MockClusterManager> cm_;
-  Upstream::ClusterManager::ClusterInfoMap cluster_map_;
   Upstream::MockClusterMockPrioritySet mock_cluster_;
   Stats::IsolatedStoreImpl store_;
   CdsApiPtr cds_;
@@ -92,7 +96,7 @@ resources:
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
 
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
   expectAdd("cluster1", "0");
   EXPECT_CALL(initialized_, ready());
   EXPECT_EQ("", cds_->versionInfo());
@@ -108,7 +112,7 @@ resources:
 )EOF";
   auto response2 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1"})));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({"cluster1"})));
   EXPECT_CALL(cm_, removeCluster("cluster1")).WillOnce(Return(true));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
@@ -126,7 +130,7 @@ TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   cluster_1.set_name("duplicate_cluster");
   const auto decoded_resources = TestUtility::decodeResources({cluster_1, cluster_1});
 
-  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(makeClusterInfoMaps({})));
   EXPECT_CALL(initialized_, ready());
   EXPECT_THROW_WITH_MESSAGE(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
                             EnvoyException,
@@ -139,7 +143,7 @@ TEST_F(CdsApiImplTest, EmptyConfigUpdate) {
 
   setup();
 
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
   EXPECT_CALL(initialized_, ready());
 
   cds_callbacks_->onConfigUpdate({}, "");
@@ -151,7 +155,7 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
     setup();
   }
 
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
   EXPECT_CALL(initialized_, ready());
 
   envoy::config::cluster::v3::Cluster cluster_1;
@@ -224,7 +228,7 @@ TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
     setup();
   }
 
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
   EXPECT_CALL(initialized_, ready());
 
   envoy::config::cluster::v3::Cluster cluster_1;
@@ -269,7 +273,7 @@ resources:
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
 
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
   expectAdd("cluster1", "0");
   expectAdd("cluster2", "0");
   EXPECT_CALL(initialized_, ready());
@@ -298,7 +302,7 @@ resources:
   auto response2 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
 
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1", "cluster2"})));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({"cluster1", "cluster2"})));
   expectAdd("cluster1", "1");
   expectAdd("cluster3", "1");
   EXPECT_CALL(cm_, removeCluster("cluster2"));
@@ -334,7 +338,7 @@ resources:
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
 
-  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(makeClusterInfoMaps({})));
   EXPECT_CALL(initialized_, ready());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);

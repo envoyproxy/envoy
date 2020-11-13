@@ -14,11 +14,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, ClustersJson) {
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  cluster_map.emplace(cluster.info_->name_, cluster);
+  cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
   ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));

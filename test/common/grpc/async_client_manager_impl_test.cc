@@ -38,10 +38,10 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
   Upstream::MockClusterMockPrioritySet cluster;
-  cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  cluster_maps.active_clusters_.emplace("foo", cluster);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_maps));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi());
 
@@ -65,7 +65,8 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cm_, clusters())
+      .WillOnce(Return(Upstream::ClusterManager::ClusterInfoMaps{cluster_map, {}}));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(

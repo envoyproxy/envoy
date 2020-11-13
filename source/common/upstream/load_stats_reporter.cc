@@ -62,11 +62,11 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
+  auto all_clusters = cm_.clusters();
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
-    auto cluster_info_map = cm_.clusters();
-    auto it = cluster_info_map.find(cluster_name);
-    if (it == cluster_info_map.end()) {
+    auto it = all_clusters.active_clusters_.find(cluster_name);
+    if (it == all_clusters.active_clusters_.end()) {
       ENVOY_LOG(debug, "Cluster {} does not exist", cluster_name);
       continue;
     }
@@ -154,7 +154,8 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // converge.
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
-    for (const auto& p : cm_.clusters()) {
+    auto cluster_info_map = cm_.clusters();
+    for (const auto& p : cluster_info_map.active_clusters_) {
       const std::string& cluster_name = p.first;
       if (clusters_.count(cluster_name) > 0) {
         existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
@@ -173,9 +174,10 @@ void LoadStatsReporter::startLoadReportPeriod() {
     clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
                                         ? existing_clusters[cluster_name]
                                         : time_source_.monotonicTime().time_since_epoch());
+    // TODO(lambdai): Move the clusters() call out of this lambda.
     auto cluster_info_map = cm_.clusters();
-    auto it = cluster_info_map.find(cluster_name);
-    if (it == cluster_info_map.end()) {
+    auto it = cluster_info_map.active_clusters_.find(cluster_name);
+    if (it == cluster_info_map.active_clusters_.end()) {
       return;
     }
     // Don't reset stats for existing tracked clusters.
@@ -193,7 +195,8 @@ void LoadStatsReporter::startLoadReportPeriod() {
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
   };
   if (message_->send_all_clusters()) {
-    for (const auto& p : cm_.clusters()) {
+    auto cluster_info_map = cm_.clusters();
+    for (const auto& p : cluster_info_map.active_clusters_) {
       const std::string& cluster_name = p.first;
       handle_cluster_func(cluster_name);
     }
