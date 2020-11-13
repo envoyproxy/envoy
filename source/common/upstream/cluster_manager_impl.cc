@@ -439,7 +439,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
       // marking it active immediately, keep it warming until the next CDS update. This let
       // keep Envoy not advertise itself in ready state so it won't get traffic in deployments
       // with readiness probes that checks the state.
-      // TODO(lizan): #13777/#13952 In long term we want to fix this behavir with init manager
+      // TODO(lizan): #13777/#13952 In long term we want to fix this behavior with init manager
       // to keep clusters in warming state until Envoy get SDS response.
       ENVOY_LOG(warn, "Failed to activate {} due to no secret entity", cluster.info()->name());
       return;
