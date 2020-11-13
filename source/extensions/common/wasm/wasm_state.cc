@@ -1,5 +1,6 @@
 #include "extensions/common/wasm/wasm_state.h"
 
+#include "eval/public/structs/cel_proto_wrapper.h"
 #include "flatbuffers/reflection.h"
 #include "tools/flatbuffers_backed_impl.h"
 
@@ -23,7 +24,7 @@ CelValue WasmState::exprValue(Protobuf::Arena* arena, bool last) const {
       }
       // Note that this is very expensive since it incurs a de-serialization
       const auto any = serializeAsProto();
-      return CelValue::CreateMessage(any.get(), arena);
+      return google::api::expr::runtime::CelProtoWrapper::CreateMessage(any.get(), arena);
     }
     case WasmType::FlatBuffers:
       if (last) {
