@@ -156,7 +156,7 @@ config:
   EXPECT_CALL(context, api());
   EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_EQ(cb.auth_scopes(), "user")
+  EXPECT_EQ(cb.auth_scopes(), "user");
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));  
   cb(filter_callback);
