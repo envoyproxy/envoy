@@ -30,7 +30,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   http:
     name: zipkin
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
       collector_cluster: fake_cluster
       collector_endpoint: /api/v1/spans
       collector_endpoint_version: HTTP_JSON
@@ -57,7 +57,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   http:
     name: zipkin
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
       collector_cluster: fake_cluster
       collector_endpoint: /api/v2/spans
       collector_endpoint_version: HTTP_PROTO

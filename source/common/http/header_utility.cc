@@ -276,5 +276,27 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
   return false;
 }
 
+Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Method()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Method.get()));
+  }
+  bool is_connect = Http::HeaderUtility::isConnect(headers);
+  if (is_connect) {
+    if (!headers.Host()) {
+      // Host header must be present for CONNECT request.
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
+    }
+  } else {
+    if (!headers.Path()) {
+      // :path header must be present for non-CONNECT requests.
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
+    }
+  }
+  return Http::okStatus();
+}
+
 } // namespace Http
 } // namespace Envoy

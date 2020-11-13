@@ -227,6 +227,10 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.stream_idle_timer_ = nullptr;
   }
   stream.filter_manager_.disarmRequestTimeout();
+  if (stream.request_header_timer_ != nullptr) {
+    stream.request_header_timer_->disableTimer();
+    stream.request_header_timer_ = nullptr;
+  }
 
   stream.completeRequest();
   stream.filter_manager_.onStreamComplete();
@@ -466,13 +470,13 @@ void ConnectionManagerImpl::onIdleTimeout() {
   }
 }
 
-// TODO(#13142): Add DurationTimeout response flag for HCM.
 void ConnectionManagerImpl::onConnectionDurationTimeout() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   stats_.named_.downstream_cx_max_duration_reached_.inc();
   if (!codec_) {
     // Attempt to write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt,
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite,
+                      StreamInfo::ResponseFlag::DurationTimeout,
                       StreamInfo::ResponseCodeDetails::get().DurationTimeout);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
@@ -639,10 +643,19 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
 
   if (connection_manager_.config_.requestTimeout().count()) {
-    std::chrono::milliseconds request_timeout_ms_ = connection_manager_.config_.requestTimeout();
+    std::chrono::milliseconds request_timeout = connection_manager_.config_.requestTimeout();
     request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onRequestTimeout(); });
-    request_timer_->enableTimer(request_timeout_ms_, this);
+    request_timer_->enableTimer(request_timeout, this);
+  }
+
+  if (connection_manager_.config_.requestHeadersTimeout().count()) {
+    std::chrono::milliseconds request_headers_timeout =
+        connection_manager_.config_.requestHeadersTimeout();
+    request_header_timer_ =
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onRequestHeaderTimeout(); });
+    request_header_timer_->enableTimer(request_headers_timeout, this);
   }
 
   const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
@@ -736,6 +749,14 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
                  StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
+void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
+  connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
+  sendLocalReply(request_headers_ != nullptr &&
+                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+                 Http::Code::RequestTimeout, "request header timeout", nullptr, absl::nullopt,
+                 StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
+}
+
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
@@ -769,6 +790,14 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     if (req_resp_stats.has_value()) {
       req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
     }
+  }
+
+  // No response is sent back downstream for internal redirects, so don't charge downstream stats.
+  const absl::optional<std::string>& response_code_details =
+      filter_manager_.streamInfo().responseCodeDetails();
+  if (response_code_details.has_value() &&
+      response_code_details == Envoy::StreamInfo::ResponseCodeDetails::get().InternalRedirect) {
+    return;
   }
 
   connection_manager_.stats_.named_.downstream_rq_completed_.inc();
@@ -819,6 +848,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
   filter_manager_.requestHeadersInitialized();
+  if (request_header_timer_ != nullptr) {
+    request_header_timer_->disableTimer();
+    request_header_timer_.reset();
+  }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host =
       connection_manager_.read_callbacks_->upstreamHost();
