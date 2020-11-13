@@ -9,6 +9,7 @@
 
 #include "eval/public/cel_value.h"
 #include "eval/public/cel_value_producer.h"
+#include "eval/public/structs/cel_proto_wrapper.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,6 +18,7 @@ namespace Common {
 namespace Expr {
 
 using CelValue = google::api::expr::runtime::CelValue;
+using CelProtoWrapper = google::api::expr::runtime::CelProtoWrapper;
 
 // Symbols for traversing the request properties
 constexpr absl::string_view Request = "request";
@@ -188,7 +190,7 @@ class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
 public:
   MetadataProducer(const envoy::config::core::v3::Metadata& metadata) : metadata_(metadata) {}
   CelValue Produce(ProtobufWkt::Arena* arena) override {
-    return CelValue::CreateMessage(&metadata_, arena);
+    return CelProtoWrapper::CreateMessage(&metadata_, arena);
   }
 
 private:
