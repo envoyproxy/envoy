@@ -721,12 +721,17 @@ https://github.com/bazelbuild/bazel/issues/2805.
 
 # Coverage builds
 
-To generate coverage results, make sure you are using a clang toolchain and have `llvm-cov` and
+To generate coverage results, make sure you are using a Clang toolchain and have `llvm-cov` and
 `llvm-profdata` in your `PATH`. Then run:
 
 ```
 test/run_envoy_bazel_coverage.sh
 ```
+
+**Note** that it is important to ensure that the versions of `clang`, `llvm-cov` and `llvm-profdata`
+are consistent and that they match the most recent Clang/LLVM toolchain version in use by Envoy (see
+the [build container
+toolchain](https://github.com/envoyproxy/envoy-build-tools/blob/master/build_container/build_container_ubuntu.sh) for reference).
 
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
