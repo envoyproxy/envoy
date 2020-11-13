@@ -54,8 +54,8 @@ As we have not yet started the control plane, nothing should be responding on po
    $ curl http://localhost:10000
    curl: (56) Recv failure: Connection reset by peer
 
-Dump the proxy's ``static_clusters`` configuration and you should see the cluster named ``xds_cluster``
-configured for the control plane:
+Dump the proxy's :ref:`static_clusters <envoy_v3_api_field_admin.v3.ClustersConfigDump.static_clusters>`
+configuration and you should see the cluster named ``xds_cluster`` configured for the control plane:
 
 .. code-block:: console
 
@@ -65,7 +65,8 @@ configured for the control plane:
    :language: json
    :emphasize-lines: 10, 18-19
 
-No ``dynamic_active_clusters`` have been configured yet:
+No :ref:`dynamic_active_clusters <envoy_v3_api_field_admin.v3.ClustersConfigDump.dynamic_active_clusters>`
+have been configured yet:
 
 .. code-block:: console
 
@@ -115,8 +116,8 @@ which will be served by ``service1``.
 Step 5: Dump Envoy's ``dynamic_active_clusters`` config
 *******************************************************
 
-If you now dump the proxy's ``dynamic_active_clusters`` configuration, you should see it is configured
-with the ``example_proxy_cluster`` pointing to ``service1``, and a version of ``1``.
+If you now dump the proxy's :ref:`dynamic_active_clusters <envoy_v3_api_field_admin.v3.ClustersConfigDump.dynamic_active_clusters>`
+configuration, you should see it is configured with the ``example_proxy_cluster`` pointing to ``service1``, and a version of ``1``.
 
 .. code-block:: console
 
@@ -145,7 +146,7 @@ The Envoy proxy should continue proxying responses from ``service1``.
 Step 7: Edit ``go`` file and restart the control plane
 ******************************************************
 
-The example setup starts the `go-control-plane <https://github.com/envoyproxy/go-control-plane>`_
+The example setup starts the ``go-control-plane``
 service with a custom :download:`resource.go <_include/dynamic-config-cp/resource.go>` file which
 specifies the configuration provided to Envoy.
 
@@ -189,8 +190,9 @@ Now when you make a request to the proxy it should be served by the ``service2``
    $ curl http://localhost:10000 | grep "served by"
    Request served by service2
 
-Dumping the ``dynamic_active_clusters`` you should see the cluster configuration now has a version
-of ``2``, and ``example_proxy_cluster`` is configured to proxy to ``service2``:
+Dumping the :ref:`dynamic_active_clusters <envoy_v3_api_field_admin.v3.ClustersConfigDump.dynamic_active_clusters>`
+you should see the cluster configuration now has a version of ``2``, and ``example_proxy_cluster``
+is configured to proxy to ``service2``:
 
 .. code-block:: console
 
