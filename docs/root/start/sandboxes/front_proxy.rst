@@ -5,14 +5,16 @@ Front Proxy
 
 .. sidebar:: Requirements
 
-   `curl <https://curl.se/>`_
+   .. include:: _include/docker-env-setup-link.rst
 
-      Used to make ``HTTP`` requests.
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
 
-To get a flavor of what Envoy has to offer as a front proxy, we are releasing a `docker compose <https://docs.docker.com/compose/>`_
-sandbox that deploys a front Envoy and a couple of services (simple Flask apps) colocated with a
-running service Envoy. The three containers will be deployed inside a virtual network called
-``envoymesh``.
+To get a flavor of what Envoy has to offer as a front proxy, we are releasing a
+`docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front Envoy and a
+couple of services (simple Flask apps) colocated with a running service Envoy.
+
+The three containers will be deployed inside a virtual network called ``envoymesh``.
 
 Below you can see a graphic showing the docker compose deployment:
 
@@ -21,18 +23,16 @@ Below you can see a graphic showing the docker compose deployment:
 
 All incoming requests are routed via the front Envoy, which is acting as a reverse proxy sitting on
 the edge of the ``envoymesh`` network. Port ``8080``, ``8443``, and ``8001`` are exposed by docker
-compose (see :repo:`/examples/front-proxy/docker-compose.yaml`) to handle ``HTTP``, ``HTTPS`` calls
-to the services and requests to ``/admin`` respectively.
+compose (see :download:`docker-compose.yaml <_include/front-proxy/docker-compose.yaml>`) to handle
+``HTTP``, ``HTTPS`` calls to the services and requests to ``/admin`` respectively.
 
 Moreover, notice that all traffic routed by the front Envoy to the service containers is actually
-routed to the service Envoys (routes setup in :repo:`/examples/front-proxy/front-envoy.yaml`).
+routed to the service Envoys (routes setup in :download:`front-envoy.yaml <_include/front-proxy/front-envoy.yaml>`).
 
 In turn the service Envoys route the request to the Flask app via the loopback
-address (routes setup in :repo:`/examples/front-proxy/service-envoy.yaml`). This
+address (routes setup in :download:`service-envoy.yaml <_include/service-proxy/service-envoy.yaml>`). This
 setup illustrates the advantage of running service Envoys collocated with your services: all
 requests are handled by the service Envoy, and efficiently routed to your services.
-
-.. include:: _include/docker-env-setup.rst
 
 Step 3: Start all of our containers
 ***********************************
@@ -246,8 +246,8 @@ In the example configs the admin is bound to port ``8001``.
 
 We can ``curl`` it to gain useful information:
 
-- ``/server_info`` provides information about the Envoy version you are running.
-- ``/stats`` provides statistics about the  Envoy server.
+- :ref:`/server_info <operations_admin_interface_server_info>` provides information about the Envoy version you are running.
+- :ref:`/stats <operations_admin_interface_stats>` provides statistics about the  Envoy server.
 
 In the example we can we can enter the ``front-envoy`` container to query admin:
 
@@ -324,3 +324,8 @@ In the example we can we can enter the ``front-envoy`` container to query admin:
 
 Notice that we can get the number of members of upstream clusters, number of requests fulfilled by
 them, information about http ingress, and a plethora of other useful stats.
+
+.. seealso::
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.

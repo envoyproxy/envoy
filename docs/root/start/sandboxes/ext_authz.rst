@@ -1,7 +1,7 @@
 .. _install_sandboxes_ext_authz:
 
-External authorization (ext_authz) filter
-=========================================
+External authorization (``ext_authz``) filter
+=============================================
 
 .. sidebar:: Requirements
 
