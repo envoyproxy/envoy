@@ -98,6 +98,27 @@ protected:
 class ClusterManagerImpl;
 
 /**
+ * Wrapper for a cluster owned by the cluster manager. Used by both the cluster manager and the
+ * cluster manager init helper which needs to pass clusters back to the cluster manager.
+ */
+class ClusterManagerCluster {
+public:
+  virtual ~ClusterManagerCluster() = default;
+
+  // Return the underlying cluster.
+  virtual Cluster& cluster() PURE;
+
+  // Return a new load balancer factory if the cluster has one.
+  virtual LoadBalancerFactorySharedPtr loadBalancerFactory() PURE;
+
+  // Return true if a cluster has already been added or updated.
+  virtual bool addedOrUpdated() PURE;
+
+  // Set when a cluster has been added or updated. This is only called a single time for a cluster.
+  virtual void setAddedOrUpdated() PURE;
+};
+
+/**
  * This is a helper class used during cluster management initialization. Dealing with primary
  * clusters, secondary clusters, and CDS, is quite complicated, so this makes it easier to test.
  */
@@ -107,8 +128,9 @@ public:
    * @param per_cluster_init_callback supplies the callback to call when a cluster has itself
    *        initialized. The cluster manager can use this for post-init processing.
    */
-  ClusterManagerInitHelper(ClusterManager& cm,
-                           const std::function<void(Cluster&)>& per_cluster_init_callback)
+  ClusterManagerInitHelper(
+      ClusterManager& cm,
+      const std::function<void(ClusterManagerCluster&)>& per_cluster_init_callback)
       : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
@@ -135,9 +157,9 @@ public:
     AllClustersInitialized
   };
 
-  void addCluster(Cluster& cluster);
+  void addCluster(ClusterManagerCluster& cluster);
   void onStaticLoadComplete();
-  void removeCluster(Cluster& cluster);
+  void removeCluster(ClusterManagerCluster& cluster);
   void setCds(CdsApi* cds);
   void setPrimaryClustersInitializedCb(ClusterManager::PrimaryClustersReadyCallback callback);
   void setInitializedCb(ClusterManager::InitializationCompleteCallback callback);
@@ -151,15 +173,15 @@ private:
 
   void initializeSecondaryClusters();
   void maybeFinishInitialize();
-  void onClusterInit(Cluster& cluster);
+  void onClusterInit(ClusterManagerCluster& cluster);
 
   ClusterManager& cm_;
-  std::function<void(Cluster& cluster)> per_cluster_init_callback_;
+  std::function<void(ClusterManagerCluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
   ClusterManager::InitializationCompleteCallback initialized_callback_;
-  std::list<Cluster*> primary_init_clusters_;
-  std::list<Cluster*> secondary_init_clusters_;
+  std::list<ClusterManagerCluster*> primary_init_clusters_;
+  std::list<ClusterManagerCluster*> secondary_init_clusters_;
   State state_{State::Loading};
   bool started_secondary_initialize_{};
 };
@@ -273,9 +295,33 @@ public:
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
                                                const HostVector& hosts_removed);
-  virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
-                                            const HostVector& hosts_added,
-                                            const HostVector& hosts_removed);
+
+  // Parameters for calling postThreadLocalClusterUpdate()
+  struct ThreadLocalClusterUpdateParams {
+    struct PerPriority {
+      PerPriority(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)
+          : priority_(priority), hosts_added_(hosts_added), hosts_removed_(hosts_removed) {}
+
+      const uint32_t priority_;
+      const HostVector hosts_added_;
+      const HostVector hosts_removed_;
+      PrioritySet::UpdateHostsParams update_hosts_params_;
+      LocalityWeightsConstSharedPtr locality_weights_;
+      uint32_t overprovisioning_factor_;
+    };
+
+    ThreadLocalClusterUpdateParams() = default;
+    ThreadLocalClusterUpdateParams(uint32_t priority, const HostVector& hosts_added,
+                                   const HostVector& hosts_removed)
+        : per_priority_update_params_{{priority, hosts_added, hosts_removed}} {}
+
+    std::vector<PerPriority> per_priority_update_params_;
+  };
+
+  virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
+                                            ThreadLocalClusterUpdateParams&& params) {
+    return postThreadLocalClusterUpdateNonVirtual(cm_cluster, std::move(params));
+  }
 
 private:
   /**
@@ -361,8 +407,7 @@ private:
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
 
-    ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
-                                  const absl::optional<std::string>& local_cluster_name);
+    ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher);
     ~ThreadLocalClusterManagerImpl() override;
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
@@ -395,7 +440,7 @@ private:
     bool destroying_{};
   };
 
-  struct ClusterData {
+  struct ClusterData : public ClusterManagerCluster {
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
                 const std::string& version_info, bool added_via_api, ClusterSharedPtr&& cluster,
                 TimeSource& time_source)
@@ -405,12 +450,19 @@ private:
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
-    LoadBalancerFactorySharedPtr loadBalancerFactory() {
+    // ClusterManagerCluster
+    Cluster& cluster() override { return *cluster_; }
+    LoadBalancerFactorySharedPtr loadBalancerFactory() override {
       if (thread_aware_lb_ != nullptr) {
         return thread_aware_lb_->factory();
       } else {
         return nullptr;
       }
+    }
+    bool addedOrUpdated() override { return added_or_updated_; }
+    void setAddedOrUpdated() override {
+      ASSERT(!added_or_updated_);
+      added_or_updated_ = true;
     }
 
     const envoy::config::cluster::v3::Cluster cluster_config_;
@@ -421,6 +473,7 @@ private:
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     SystemTime last_updated_;
+    bool added_or_updated_{};
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
@@ -471,10 +524,9 @@ private:
   using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
   using ClusterUpdatesMap = absl::node_hash_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
-  void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdates& updates);
-  bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable,
+  void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
+  bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
-  void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
 
@@ -485,8 +537,10 @@ private:
   ClusterDataPtr loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                              const std::string& version_info, bool added_via_api,
                              ClusterMap& cluster_map);
-  void onClusterInit(Cluster& cluster);
+  void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
+  void postThreadLocalClusterUpdateNonVirtual(ClusterManagerCluster& cm_cluster,
+                                              ThreadLocalClusterUpdateParams&& params);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
   void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
