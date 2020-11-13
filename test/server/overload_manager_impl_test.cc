@@ -39,47 +39,6 @@ using testing::Property;
 using testing::Return;
 
 namespace Envoy {
-namespace Event {
-
-// Define helper functions for comparing and printing ScaledTimerMinimum and
-// friends.
-
-bool operator==(const ScaledMinimum& lhs, const ScaledMinimum& rhs) {
-  return lhs.scale_factor_ == rhs.scale_factor_;
-}
-
-bool operator==(const AbsoluteMinimum& lhs, const AbsoluteMinimum& rhs) {
-  return lhs.value_ == rhs.value_;
-}
-
-bool operator==(const ScaledTimerMinimum& lhs, const ScaledTimerMinimum& rhs) {
-  using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
-  return absl::visit(
-      [&](const auto& minimum) {
-        using T = std::remove_const_t<std::remove_reference_t<decltype(minimum)>>;
-        return absl::holds_alternative<T>(rhs) &&
-               absl::get<T>(static_cast<const Variant&>(lhs)) ==
-                   absl::get<T>(static_cast<const Variant&>(rhs));
-      },
-      static_cast<const Variant&>(lhs));
-}
-
-void printTo(std::ostream& output, const ScaledMinimum& minimum) {
-  output << "ScaledMinimum { scale_factor_ = " << minimum.scale_factor_ << " }";
-}
-void printTo(std::ostream& output, const AbsoluteMinimum& minimum) {
-  output << "AbsoluteMinimum { value = " << minimum.value_.count() << "ms }";
-}
-
-std::ostream& operator<<(std::ostream& output, const ScaledTimerMinimum& minimum) {
-  using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
-  absl::visit([&](const auto& minimum) { printTo(output, minimum); },
-              static_cast<const Variant&>(minimum));
-  return output;
-}
-
-} // namespace Event
-
 namespace Server {
 namespace {
 

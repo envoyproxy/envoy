@@ -9,7 +9,6 @@
 #include "envoy/api/api.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/server/overload/overload_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/lock_guard.h"

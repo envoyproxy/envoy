@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ostream>
+
 #include "envoy/common/pure.h"
 #include "envoy/event/timer.h"
 
@@ -13,6 +15,13 @@ namespace Event {
  */
 struct ScaledMinimum {
   explicit constexpr ScaledMinimum(double scale_factor) : scale_factor_(scale_factor) {}
+  inline bool operator==(const ScaledMinimum& other) const {
+    return other.scale_factor_ == scale_factor_;
+  }
+  inline friend std::ostream& operator<<(std::ostream& output, const ScaledMinimum& minimum) {
+    return output << "ScaledMinimum { scale_factor_ = " << minimum.scale_factor_ << " }";
+  }
+
   const double scale_factor_;
 };
 
@@ -21,6 +30,10 @@ struct ScaledMinimum {
  */
 struct AbsoluteMinimum {
   explicit constexpr AbsoluteMinimum(std::chrono::milliseconds value) : value_(value) {}
+  inline bool operator==(const AbsoluteMinimum& other) const { return other.value_ == value_; }
+  inline friend std::ostream& operator<<(std::ostream& output, const AbsoluteMinimum& minimum) {
+    return output << "AbsoluteMinimum { value = " << minimum.value_.count() << "ms }";
+  }
   const std::chrono::milliseconds value_;
 };
 
@@ -54,10 +67,16 @@ public:
         Visitor(maximum), *this);
   }
 
-  // Test-only functions that need access to the internals of
-  // ScaledTimerMinimum. These are declared here but only defined in tests.
-  friend bool operator==(const ScaledTimerMinimum&, const ScaledTimerMinimum&);
-  friend std::ostream& operator<<(std::ostream&, const ScaledTimerMinimum&);
+  inline bool operator==(const ScaledTimerMinimum& other) const {
+    using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
+    return static_cast<const Variant&>(*this) == static_cast<const Variant>(other);
+  }
+
+  inline friend std::ostream& operator<<(std::ostream& output, const ScaledTimerMinimum& minimum) {
+    using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
+    return absl::visit([&](const auto& minimum) -> std::ostream& { return output << minimum; },
+                       static_cast<const Variant&>(minimum));
+  }
 };
 
 /**
