@@ -21,7 +21,7 @@ class SendAlgorithmInterface;
 
 // Interface for creating a `PCC` SendAlgorithmInterface.
 inline SendAlgorithmInterface*
-createPccSenderImpl(const QuicClock* /*clock*/, const RttStats* /*rtt_stats*/,
+CreatePccSenderImpl(const QuicClock* /*clock*/, const RttStats* /*rtt_stats*/,
                     const QuicUnackedPacketMap* /*unacked_packets*/, QuicRandom* /*random*/,
                     QuicConnectionStats* /*stats*/, QuicPacketCount /*initial_congestion_window*/,
                     QuicPacketCount /*max_congestion_window*/) {
