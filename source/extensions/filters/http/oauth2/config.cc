@@ -36,6 +36,8 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
     return secret_manager.findStaticGenericSecretProvider(config.name());
   }
 }
+
+const std::string DEFAULT_AUTH_SCOPE = "user";
 } // namespace
 
 Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
@@ -67,6 +69,10 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       secret_provider_token_secret, secret_provider_hmac_secret, context.api());
+
+  auto auth_scopes = 
+    (!proto_config.auth_scopes().empty()) ? proto_config.auth_scopes() : DEFAULT_AUTH_SCOPE;
+
   auto config = std::make_shared<FilterConfig>(proto_config, cluster_manager, secret_reader,
                                                context.scope(), stats_prefix);
 
