@@ -1185,7 +1185,7 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
       "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
 }
 
-// Insufficent support on Windows.
+// Insufficient support on Windows.
 #ifndef WIN32
 class SafeFatalAction : public Configuration::FatalAction {
 public:
