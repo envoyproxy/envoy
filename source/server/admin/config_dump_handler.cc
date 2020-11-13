@@ -157,6 +157,7 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
   }
 
   for (const auto& [name, callback] : callbacks_map) {
+    UNREFERENCED_PARAMETER(name);
     ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
@@ -204,6 +205,7 @@ void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
   }
 
   for (const auto& [name, callback] : callbacks_map) {
+    UNREFERENCED_PARAMETER(name);
     ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
@@ -225,6 +227,7 @@ ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
   for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
+    UNREFERENCED_PARAMETER(name);
     const Upstream::Cluster& cluster = cluster_ref.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
