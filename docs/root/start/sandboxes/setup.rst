@@ -117,7 +117,7 @@ openssl
 `OpenSSL <https://www.openssl.org/>`_ is a robust, commercial-grade, and full-featured toolkit for
 the Transport Layer Security (``TLS``) and Secure Sockets Layer (``SSL``) protocols.
 
-Binary distributions of `OpenSSL <https://www.openssl.org/>`_ are available for Mac OS with `brew <brew.sh>`_
+Binary distributions of `OpenSSL <https://www.openssl.org/>`_ are available for Mac OS with `brew <https://brew.sh>`_
 and in most if not all flavours of Linux.
 
 Windows users can either use an `unofficial binary <https://wiki.openssl.org/index.php/Binaries>`_ or compile from source.
