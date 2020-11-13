@@ -39,24 +39,20 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, 
 void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                 const std::string& version_info) {
   auto all_existing_clusters = cm_.clusters();
-  absl::flat_hash_set<absl::string_view> clusters_to_remove(
-      all_existing_clusters.active_clusters_.size() +
-      all_existing_clusters.warming_clusters_.size());
-
-  for (const auto& [name, _] : all_existing_clusters.active_clusters_) {
-    clusters_to_remove.emplace(name);
-  }
-  for (const auto& [name, _] : all_existing_clusters.warming_clusters_) {
-    clusters_to_remove.emplace(name);
-  }
-
-  std::vector<envoy::config::cluster::v3::Cluster> clusters;
+  // Exclude the clusters which CDS wants to add.
   for (const auto& resource : resources) {
-    clusters_to_remove.erase(resource.get().name());
+    all_existing_clusters.active_clusters_.erase(resource.get().name());
+    all_existing_clusters.warming_clusters_.erase(resource.get().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
-  for (const auto& cluster_name : clusters_to_remove) {
+  for (const auto& [cluster_name, _] : all_existing_clusters.active_clusters_) {
     *to_remove_repeated.Add() = cluster_name;
+  }
+  for (const auto& [cluster_name, _] : all_existing_clusters.warming_clusters_) {
+    // Do not add the cluster twice when the cluster is both active and warming.
+    if (all_existing_clusters.active_clusters_.count(cluster_name) == 0) {
+      *to_remove_repeated.Add() = cluster_name;
+    }
   }
   onConfigUpdate(resources, to_remove_repeated, version_info);
 }
