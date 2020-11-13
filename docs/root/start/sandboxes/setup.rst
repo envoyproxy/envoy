@@ -129,7 +129,7 @@ Check for installation instructions specific to your operating system.
 redis
 ~~~~~
 
-Binary distributions of `Redis <https://redis.io/>`_ are available for Mac OS with `brew <brew.sh>`_
+Binary distributions of `Redis <https://redis.io/>`_ are available for Mac OS with `brew <https://brew.sh>`_
 and in most flavours of Linux.
 
 Windows users should check out the `Windows port of Redis <https://github.com/microsoftarchive/redis>`_.
