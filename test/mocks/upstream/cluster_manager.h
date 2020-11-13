@@ -42,8 +42,7 @@ public:
   MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
   MOCK_METHOD(void, initializeSecondaryClusters,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
-  MOCK_METHOD(ClusterInfoMap, clusters, ());
-  MOCK_METHOD(absl::flat_hash_set<std::string>, allClusterNames, ());
+  MOCK_METHOD(ClusterInfoMaps, clusters, ());
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, get, (absl::string_view cluster));

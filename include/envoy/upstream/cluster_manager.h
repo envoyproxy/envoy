@@ -126,18 +126,15 @@ public:
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   using ClusterInfoMap = absl::node_hash_map<std::string, std::reference_wrapper<const Cluster>>;
+  struct ClusterInfoMaps {
+    ClusterInfoMap active_clusters_;
+    ClusterInfoMap warming_clusters_;
+  };
 
   /**
-   * @return ClusterInfoMap all current clusters. These are the primary (not thread local)
-   * clusters which should only be used for stats/admin.
+   * @return ClusterInfoMap all current clusters including active and warming.
    */
-  virtual ClusterInfoMap clusters() PURE;
-
-  /**
-   * @return absl::flat_hash_set<std::string> all current clusters names including warming and
-   * active.
-   */
-  virtual absl::flat_hash_set<std::string> allClusterNames() PURE;
+  virtual ClusterInfoMaps clusters() PURE;
 
   using ClusterSet = absl::flat_hash_set<std::string>;
 

@@ -38,7 +38,18 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, 
 
 void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                 const std::string& version_info) {
-  auto clusters_to_remove = cm_.allClusterNames();
+  auto all_existing_clusters = cm_.clusters();
+  absl::flat_hash_set<absl::string_view> clusters_to_remove(
+      all_existing_clusters.active_clusters_.size() +
+      all_existing_clusters.warming_clusters_.size());
+
+  for (const auto& [name, _] : all_existing_clusters.active_clusters_) {
+    clusters_to_remove.emplace(name);
+  }
+  for (const auto& [name, _] : all_existing_clusters.warming_clusters_) {
+    clusters_to_remove.emplace(name);
+  }
+
   std::vector<envoy::config::cluster::v3::Cluster> clusters;
   for (const auto& resource : resources) {
     clusters_to_remove.erase(resource.get().name());

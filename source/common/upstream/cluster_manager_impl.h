@@ -214,27 +214,16 @@ public:
     init_helper_.setInitializedCb(callback);
   }
 
-  ClusterInfoMap clusters() override {
+  ClusterInfoMaps clusters() override {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    ClusterInfoMap clusters_map;
+    ClusterInfoMaps clusters_maps;
     for (auto& cluster : active_clusters_) {
-      clusters_map.emplace(cluster.first, *cluster.second->cluster_);
+      clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
     }
-
-    return clusters_map;
-  }
-
-  absl::flat_hash_set<std::string> allClusterNames() override {
-    absl::flat_hash_set<std::string> clusters_names(active_clusters_.size() +
-                                                    warming_clusters_.size());
-
-    for (const auto& [name, _] : active_clusters_) {
-      clusters_names.emplace(name);
+    for (auto& cluster : warming_clusters_) {
+      clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
     }
-    for (const auto& [name, _] : warming_clusters_) {
-      clusters_names.emplace(name);
-    }
-    return clusters_names;
+    return clusters_maps;
   }
 
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
