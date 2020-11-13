@@ -7,9 +7,6 @@ Load reporting service (``LRS``)
 
    .. include:: _include/docker-env-setup-link.rst
 
-   :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
-
 This simple example demonstrates Envoy's :ref:`Load reporting service (LRS) <arch_overview_load_reporting_service>`
 capability and how to use it.
 
