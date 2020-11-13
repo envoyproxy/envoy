@@ -146,7 +146,7 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
   DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, value, doc)
 
 #define DEFINE_QUIC_PROTOCOL_FLAG_TWO_VALUES(type, flag, internal_value, external_value, doc)      \
-  DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, internal_value, doc)
+  DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, external_value, doc)
 
 // Select the right macro based on the number of arguments.
 #define GET_6TH_ARG(arg1, arg2, arg3, arg4, arg5, arg6, ...) arg6
