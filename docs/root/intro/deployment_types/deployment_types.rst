@@ -1,9 +1,7 @@
-Deployment types
+部署类型
 ================
 
-Envoy is usable in a variety of different scenarios, however it's most useful when deployed as a
-*mesh* across all hosts in an infrastructure. This section describes three recommended deployment
-types in increasing order of complexity.
+Envoy 有多种使用场景，其中更多情况下会作为 *mesh* 被部署在基础设施的不同主机上。本章节将按照复杂性上升的顺序讨论 envoy 的三种推荐部署类型。
 
 .. toctree::
 
