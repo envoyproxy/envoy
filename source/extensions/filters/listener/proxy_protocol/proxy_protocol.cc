@@ -79,7 +79,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 void Filter::onRead() {
-  ReadOrParseState read_state = onReadWorker();
+  const ReadOrParseState read_state = onReadWorker();
   if (read_state == ReadOrParseState::Error) {
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
     cb_->continueFilterChain(false);
