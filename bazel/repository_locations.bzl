@@ -101,12 +101,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/libprotobuf-mutator/archive/dd89da92b59b1714bab6e2a135093948a1cf1c6a.tar.gz"],
     ),
     com_github_gperftools_gperftools = dict(
-        # TODO(cmluciano): Bump to release 2.8
-        # This sha is specifically chosen to fix ppc64le builds that require inclusion
-        # of asm/ptrace.h
-        sha256 = "18574813a062eee487bc1b761e8024a346075a7cb93da19607af362dc09565ef",
-        strip_prefix = "gperftools-fc00474ddc21fff618fc3f009b46590e241e425e",
-        urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
+        sha256 = "240deacdd628b6459671b83eb0c4db8e97baadf659f25b92e9a078d536bd513e",
+        strip_prefix = "gperftools-2.8",
+        urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-2.8/gperftools-2.8.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
         sha256 = "ffbe61269160ea745e487f79b0fd06b6edd3d50c6d9123f053b5634737cf2f69",
@@ -310,9 +307,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
     ),
     kafka_server_binary = dict(
-        sha256 = "a009624fae678fa35968f945e18e45fbea9a30fa8080d5dcce7fdea726120027",
-        strip_prefix = "kafka_2.12-2.2.0",
-        urls = ["https://mirrors.gigenet.com/apache/kafka/2.2.0/kafka_2.12-2.2.0.tgz"],
+        sha256 = "2177cbd14118999e1d76fec628ca78ace7e6f841219dbc6035027c796bbe1a2a",
+        strip_prefix = "kafka_2.12-2.4.1",
+        urls = ["https://mirrors.gigenet.com/apache/kafka/2.4.1/kafka_2.12-2.4.1.tgz"],
     ),
     kafka_python_client = dict(
         sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",
