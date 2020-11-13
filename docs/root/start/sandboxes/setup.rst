@@ -91,7 +91,7 @@ curl
 Many of the examples use the `curl <https://curl.se/>`_ utility to make ``HTTP`` requests.
 
 Instructions for installing `curl <https://curl.se/>`_ on many platforms and operating systems
-can be `found here <https://curl.haxx.se/download.html>`_.
+can be `found on the curl website <https://curl.haxx.se/download.html>`_.
 
 .. _start_sandboxes_setup_jq:
 
@@ -101,8 +101,8 @@ jq
 The `jq <https://stedolan.github.io/jq/>`_ tool is very useful for parsing ``json`` data,
 whether it be ``HTTP`` response data, logs or statistics.
 
-Instructions for installing `curl <https://curl.se/>`_ on many platforms and operating systems
-can be `found here <https://stedolan.github.io/jq/download/>`_.
+Instructions for installing `jq <https://stedolan.github.io/jq/>`_ on many platforms and operating systems
+can be `found on the jq website <https://stedolan.github.io/jq/download/>`_.
 
 .. _start_sandboxes_setup_openssl:
 
@@ -113,7 +113,7 @@ openssl
 the Transport Layer Security (``TLS``) and Secure Sockets Layer (``SSL``) protocols.
 
 Binary distributions of `OpenSSL <https://www.openssl.org/>`_ are available for Mac OS with `brew <brew.sh>`_
-and in most flavours of Linux.
+and in most if not all flavours of Linux.
 
 Windows users can either use an `unofficial binary <https://wiki.openssl.org/index.php/Binaries>`_ or compile from source.
 
@@ -127,6 +127,6 @@ redis
 Binary distributions of `Redis <https://redis.io/>`_ are available for Mac OS with `brew <brew.sh>`_
 and in most flavours of Linux.
 
-Windows users should check the `Windows port of Redis <https://github.com/microsoftarchive/redis>`_.
+Windows users should check out the `Windows port of Redis <https://github.com/microsoftarchive/redis>`_.
 
 Check for installation instructions specific to your operating system.
