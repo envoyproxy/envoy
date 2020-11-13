@@ -1493,12 +1493,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
   switch (stream_type) {
   case WasmStreamType::Request:
     if (decoder_callbacks_) {
-      decoder_callbacks_->continueDecoding();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { decoder_callbacks_->continueDecoding(); });
     }
     break;
   case WasmStreamType::Response:
     if (encoder_callbacks_) {
-      encoder_callbacks_->continueEncoding();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { encoder_callbacks_->continueEncoding(); });
     }
     break;
   default:
