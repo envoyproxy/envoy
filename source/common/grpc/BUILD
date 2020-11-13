@@ -93,6 +93,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:hash_lib",
         "//source/common/common:macros",
+        "//source/common/common:mem_block_builder_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http:header_utility_lib",

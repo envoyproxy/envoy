@@ -4,7 +4,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
-#include "common/common/mem_builder_impl.h"
+#include "common/common/mem_block_builder.h"
 #include "common/network/address_impl.h"
 
 namespace Envoy {
@@ -72,8 +72,8 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
         Network::Address::Ipv4Instance(src_addr, src_port).ip()->ipv4()->address();
     const auto net_dst_addr =
         Network::Address::Ipv4Instance(dst_addr, dst_port).ip()->ipv4()->address();
-    addrs.appendData(absl::Span<uint8_t>(&net_src_addr, 4));
-    addrs.appendData(absl::Span<uint8_t>(&net_dst_addr, 4));
+    addrs.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_src_addr), 4));
+    addrs.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_dst_addr), 4));
     out.add(addrs.releasePointer(), 8);
     break;
   }
@@ -86,9 +86,9 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
         Network::Address::Ipv6Instance(src_addr, src_port).ip()->ipv6()->address();
     const auto net_dst_addr =
         Network::Address::Ipv6Instance(dst_addr, dst_port).ip()->ipv6()->address();
-    addrs.appendData(absl::Span<uint8_t>(&net_src_addr, 16));
-    addrs.appendData(absl::Span<uint8_t>(&net_dst_addr, 16));
-    out.add(addrs.realsePointer(), 32);
+    addrs.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_src_addr), 16));
+    addrs.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_dst_addr), 16));
+    out.add(addrs.releasePointer(), 32);
     break;
   }
   }
@@ -96,9 +96,9 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
   MemBlockBuilder<uint8_t> ports(4);
   const auto net_src_port = htons(static_cast<uint16_t>(src_port));
   const auto net_dst_port = htons(static_cast<uint16_t>(dst_port));
-  ports.appendData(absl::Span<uint8_t>(&net_src_port, 2));
-  ports.appendData(absl::Span<uint8_t>(&net_dst_port, 2));
-  out.add(ports, 4);
+  ports.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_src_port), 2));
+  ports.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_dst_port), 2));
+  out.add(ports.releasePointer(), 4);
 }
 
 void generateV2Header(const Network::Address::Ip& source_address,
