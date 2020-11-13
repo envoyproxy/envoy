@@ -2,8 +2,41 @@
 
 #include "common/http/matching_data.h"
 #include "common/matcher/matcher.h"
+#include <sys/types.h>
 
 namespace Envoy {
+
+class HttpRequestBody : public DataInput<Http::HttpMatchingData> {
+public:
+  HttpRequestBody(uint32_t limit) : limit_(limit) {}
+  DataInputGetResult get(const Http::HttpMatchingData& matching_data) {
+    if (!matching_data.request_buffer_copy_) {
+      return {true, false, absl::nullopt};
+    }
+
+    return {false, matching_data.request_buffer_copy_->length() < limit_,
+            matching_data.request_buffer_copy_->toString()};
+  }
+
+private:
+  const uint32_t limit_;
+};
+
+class HttpResponseBody : public DataInput<Http::HttpMatchingData> {
+public:
+  HttpResponseBody(uint32_t limit) : limit_(limit) {}
+  DataInputGetResult get(const Http::HttpMatchingData& matching_data) {
+    if (!matching_data.response_buffer_copy_) {
+      return {true, false, absl::nullopt};
+    }
+
+    return {false, matching_data.response_buffer_copy_->length() < limit_,
+            matching_data.response_buffer_copy_->toString()};
+  }
+
+private:
+  const uint32_t limit_;
+};
 
 class HttpRequestHeaders : public DataInput<Http::HttpMatchingData> {
 public:
@@ -12,18 +45,13 @@ public:
 
   DataInputGetResult get(const Http::HttpMatchingData& matching_data) {
     if (!matching_data.request_headers_) {
-      return {true, absl::nullopt};
-    }
-
-    auto header = matching_data.request_headers_->get(header_name_);
-    if (header.size() > 0) {
-      std::cout << header[0]->value().getStringView() << std::endl;
+      return {true, false, absl::nullopt};
     }
 
     result_ =
         Http::HeaderUtility::getAllOfHeaderAsString(*matching_data.request_headers_, header_name_);
 
-    return {false, result_.result()};
+    return {false, false, result_.result()};
   }
 
 private:
@@ -38,18 +66,13 @@ public:
 
   DataInputGetResult get(const Http::HttpMatchingData& matching_data) {
     if (!matching_data.response_headers_) {
-      return {true, absl::nullopt};
-    }
-
-    auto header = matching_data.request_headers_->get(header_name_);
-    if (header.size() > 0) {
-      std::cout << header[0]->value().getStringView() << std::endl;
+      return {true, false, absl::nullopt};
     }
 
     result_ =
         Http::HeaderUtility::getAllOfHeaderAsString(*matching_data.response_headers_, header_name_);
 
-    return {false, result_.result()};
+    return {false, false, result_.result()};
   }
 
 private:

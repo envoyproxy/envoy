@@ -42,7 +42,11 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
 }
 
 struct DataInputGetResult {
+  // The data has not arrived yet, nothing to match against.
   bool not_available_yet;
+  // Some data is available, so matching can be attempted. If it fails, more data might arrive which could satisfy the match.
+  bool more_data_available;
+  // The data is available: result of looking up the data. If the lookup failed against partial or complete data this will remain abls::nullopt.
   absl::optional<absl::string_view> data_;
 };
 
@@ -204,7 +208,6 @@ public:
       return absl::nullopt;
     }
 
-    std::cout << "got data? " << input.data_.has_value() << std::endl;
     // TODO(snowp): Expose the optional so that we can match on not present.
     return input.data_ && input_matcher_->match(*input.data_);
   }

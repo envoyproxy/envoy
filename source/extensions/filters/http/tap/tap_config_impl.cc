@@ -46,7 +46,7 @@ fromPredicate(const envoy::config::common::matcher::v3::MatchPredicate& predicat
   case (envoy::config::common::matcher::v3::MatchPredicate::kAndMatch): {
     auto* list = new_predicate.mutable_and_matcher();
 
-    for (const auto& p : predicate.or_match().rules()) {
+    for (const auto& p : predicate.and_match().rules()) {
       list->add_predicate()->MergeFrom(fromPredicate(p));
     }
   } break;
@@ -90,6 +90,36 @@ fromPredicate(const envoy::config::common::matcher::v3::MatchPredicate& predicat
     auto* custom_match = single_predicate->mutable_custom_match();
     custom_match->set_name("envoy.matcher.matchers.always");
     custom_match->mutable_typed_config();
+
+    break;
+  }
+  case (envoy::config::common::matcher::v3::MatchPredicate::kHttpResponseGenericBodyMatch): {
+    auto* and_matcher = new_predicate.mutable_and_matcher();
+
+    for (const auto& pattern : predicate.http_response_generic_body_match().patterns()) {
+      auto single_predicate = and_matcher->add_predicate()->mutable_single_predicate();
+      auto* input = single_predicate->mutable_input();
+      input->set_name("envoy.matcher.inputs.response_data");
+
+      auto* value_match = single_predicate->mutable_value_match();
+      // TODO support binary match
+      value_match->mutable_string_match()->mutable_safe_regex()->set_regex(pattern.string_match());
+    }
+
+    break;
+  }
+  case (envoy::config::common::matcher::v3::MatchPredicate::kHttpRequestGenericBodyMatch): {
+    auto* and_matcher = new_predicate.mutable_and_matcher();
+
+    for (const auto& pattern : predicate.http_request_generic_body_match().patterns()) {
+      auto single_predicate = and_matcher->add_predicate()->mutable_single_predicate();
+      auto* input = single_predicate->mutable_input();
+      input->set_name("envoy.matcher.inputs.request_data");
+
+      auto* value_match = single_predicate->mutable_value_match();
+      // TODO support binary match
+      value_match->mutable_string_match()->mutable_safe_regex()->set_regex(pattern.string_match());
+    }
 
     break;
   }

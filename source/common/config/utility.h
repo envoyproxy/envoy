@@ -220,9 +220,6 @@ public:
       ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
     }
 
-    for (const auto& name : Registry::FactoryRegistry<Factory>::factories()) {
-      std::cout << "nam,e: " << name.first << std::endl;
-    }
     Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
 
     if (factory == nullptr) {

@@ -7,6 +7,37 @@
 #include "envoy/extensions/matching/input/v3/http_input.pb.validate.h"
 
 namespace Envoy {
+
+class HttpRequestBodyFactory : public DataInputFactory<Http::HttpMatchingData> {
+public:
+  DataInputPtr<Http::HttpMatchingData>
+  create(const envoy::config::core::v3::TypedExtensionConfig& config) override {
+    envoy::extensions::matching::input::v3::HttpRequestBodyInput input;
+    MessageUtil::unpackTo(config.typed_config(), input);
+    return std::make_unique<HttpRequestBody>(input.limit());
+  }
+  std::string name() const override { return "envoy.matcher.inputs.http_request_body"; };
+  std::string category() const override { return "bkag"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::matching::input::v3::HttpRequestBodyInput>();
+  }
+};
+
+class HttpResponseBodyFactory : public DataInputFactory<Http::HttpMatchingData> {
+public:
+  DataInputPtr<Http::HttpMatchingData>
+  create(const envoy::config::core::v3::TypedExtensionConfig& config) override {
+    envoy::extensions::matching::input::v3::HttpResponseBodyInput input;
+    MessageUtil::unpackTo(config.typed_config(), input);
+    return std::make_unique<HttpResponseBody>(input.limit());
+  }
+  std::string name() const override { return "envoy.matcher.inputs.http_response_body"; };
+  std::string category() const override { return "bkag"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::matching::input::v3::HttpResponseBodyInput>();
+  }
+};
+
 class HttpRequestHeadersFactory : public DataInputFactory<Http::HttpMatchingData> {
 public:
   DataInputPtr<Http::HttpMatchingData>
@@ -38,7 +69,7 @@ public:
 };
 
 template <class T> class FixedData : public DataInput<T> {public:
-  DataInputGetResult get(const T&) { return {false, ""}; }
+  DataInputGetResult get(const T&) { return {false, false, ""}; }
 };
 
 class FixedDataInputFactory : public DataInputFactory<Http::HttpMatchingData> {

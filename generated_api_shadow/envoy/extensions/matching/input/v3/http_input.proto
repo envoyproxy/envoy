@@ -17,3 +17,11 @@ message HttpRequestHeaderInput {
 message HttpResponseHeaderInput {
   string header = 1;
 }
+
+message HttpRequestBodyInput {
+  uint32 limit = 1;
+}
+
+message HttpResponseBodyInput {
+  uint32 limit = 1;
+}
