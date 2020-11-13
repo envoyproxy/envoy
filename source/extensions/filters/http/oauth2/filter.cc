@@ -61,7 +61,7 @@ constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
 constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
 constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
 
-const std:string DEFAULT_AUTH_SCOPE = "user";
+const std::string& DEFAULT_AUTH_SCOPE = "user";
 
 template <class T>
 std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
@@ -93,7 +93,7 @@ FilterConfig::FilterConfig(
       signout_path_(proto_config.signout_path()), 
       secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
-      auth_scopes_((!proto_config.auth_scopes()) ? proto_config.auth_scopes() : DEFAULT_AUTH_SCOPE ),
+      auth_scopes_((!proto_config.auth_scopes().empty()) ? proto_config.auth_scopes() : DEFAULT_AUTH_SCOPE ),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
   if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
