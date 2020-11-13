@@ -471,7 +471,6 @@ private:
   void handlePath(RequestHeaderMap& headers, unsigned int method);
 
   // ConnectionImpl
-  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override;
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
@@ -556,6 +555,7 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
