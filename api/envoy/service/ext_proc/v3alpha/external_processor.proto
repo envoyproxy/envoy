@@ -220,7 +220,7 @@ message CommonResponse {
     // received from downstream or upstream will be ignored.
     // This can be used to add a body to a request or response that does not
     // have one already.
-    CONTINUE_AND_DO_NOT_END_STREAM = 1;
+    CONTINUE_AND_REPLACE = 1;
   }
 
   // If set, provide additional direction on how the Envoy proxy should
