@@ -28,7 +28,7 @@ Step 3: Generate the protocol stubs
 A docker-compose file is provided that generates the stubs for both ``client`` and ``server`` from the
 specification in the ``protos`` directory.
 
-Inspecting the :download:`docker-compose-protos.yaml <_include/grpc_bridge/docker-compose-protos.yaml>` file,
+Inspecting the :download:`docker-compose-protos.yaml <_include/grpc-bridge/docker-compose-protos.yaml>` file,
 you will see that it contains both the ``python`` and ``go`` gRPC protoc commands necessary for generating the
 protocol stubs.
 
