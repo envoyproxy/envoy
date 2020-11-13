@@ -10,6 +10,11 @@ Wasm C++ filter
    :ref:`curl <start_sandboxes_setup_curl>`
 	Used to make ``HTTP`` requests.
 
+.. sidebar:: Compatibility
+
+   The provided Wasm binary was compiled for the ``x86_64`` architecture. If you would like to use this sandbox
+   with the ``arm64`` architecture, change directory to ``examples/wasm-cc`` and skip to Step 3.
+
 This sandbox demonstrates a basic :ref:`Envoy Wasm filter <config_http_filters_wasm>` written in C++ which injects
 content into the body of an ``HTTP`` response, and adds and updates some headers.
 
@@ -18,11 +23,6 @@ and run it with Envoy.
 
 Step 1: Start all of our containers
 ***********************************
-
-.. note::
-
-   The provided Wasm binary was compiled for the ``x86_64`` architecture. If you would like to use this sandbox
-   with the ``arm64`` architecture, skip to Step 5.
 
 First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a backend which echos back our request.
 

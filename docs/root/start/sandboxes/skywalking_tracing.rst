@@ -27,10 +27,10 @@ in :download:`front-envoy-skywalking.yaml <_include/skywalking-tracing/front-env
 When service1 accepts the request forwarded from front envoy, it will make an API call to service2 before
 returning a response.
 
-.. include:: _include/docker-env-setup.rst
-
-Step 3: Build the sandbox
+Step 1: Build the sandbox
 *************************
+
+Change to the ``examples/skywalking-tracing`` directory.
 
 To build this sandbox example, and start the example apps run the following commands:
 
@@ -51,7 +51,7 @@ To build this sandbox example, and start the example apps run the following comm
     skywalking-tracing_skywalking-oap_1   bash docker-entrypoint.sh      Up (healthy)   0.0.0.0:11800->11800/tcp, 1234/tcp, 0.0.0.0:12800->12800/tcp
     skywalking-tracing_skywalking-ui_1    bash docker-entrypoint.sh      Up             0.0.0.0:8080->8080/tcp
 
-Step 4: Generate some load
+Step 2: Generate some load
 **************************
 
 You can now send a request to service1 via the front-envoy as follows:
@@ -87,12 +87,12 @@ You can get SkyWalking stats of front-envoy after some requests as follows:
     tracing.skywalking.segments_flushed: 0
     tracing.skywalking.segments_sent: 13
 
-Step 5: View the traces in SkyWalking UI
+Step 3: View the traces in SkyWalking UI
 ****************************************
 
 Point your browser to http://localhost:8080 . You should see the SkyWalking dashboard.
 Set the service to "front-envoy" and set the start time to a few minutes before
-the start of the test (step 2) and hit enter. You should see traces from the front-proxy.
+the start of the test and hit enter. You should see traces from the front-proxy.
 Click on a trace to explore the path taken by the request from front-proxy to service1
 to service2, as well as the latency incurred at each hop.
 

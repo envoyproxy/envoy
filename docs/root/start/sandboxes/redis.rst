@@ -1,6 +1,6 @@
 .. _install_sandboxes_redis_filter:
 
-Redis Filter
+Redis filter
 ============
 
 .. sidebar:: Requirements
