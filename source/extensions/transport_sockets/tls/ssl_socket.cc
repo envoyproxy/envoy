@@ -36,9 +36,11 @@ public:
   absl::string_view failureReason() const override { return NotReadyReason; }
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
-  Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
+  Network::IoResult doRead(Buffer::Instance&) override {
+    return {PostIoAction::CloseError, 0, false};
+  }
   Network::IoResult doWrite(Buffer::Instance&, bool) override {
-    return {PostIoAction::Close, 0, false};
+    return {PostIoAction::CloseError, 0, false};
   }
   void onConnected() override {}
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }

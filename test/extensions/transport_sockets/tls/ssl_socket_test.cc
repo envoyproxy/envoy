@@ -4726,9 +4726,9 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_EQ(nullptr, transport_socket->ssl());
   Buffer::OwnedImpl buffer;
   Network::IoResult result = transport_socket->doRead(buffer);
-  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ(Network::PostIoAction::CloseError, result.action_);
   result = transport_socket->doWrite(buffer, true);
-  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ(Network::PostIoAction::CloseError, result.action_);
   EXPECT_EQ("TLS error: Secret is not supplied by SDS", transport_socket->failureReason());
 }
 
@@ -4761,9 +4761,9 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_EQ(nullptr, transport_socket->ssl());
   Buffer::OwnedImpl buffer;
   Network::IoResult result = transport_socket->doRead(buffer);
-  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ(Network::PostIoAction::CloseError, result.action_);
   result = transport_socket->doWrite(buffer, true);
-  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ(Network::PostIoAction::CloseError, result.action_);
   EXPECT_EQ("TLS error: Secret is not supplied by SDS", transport_socket->failureReason());
 }
 
