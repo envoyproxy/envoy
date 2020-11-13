@@ -88,7 +88,7 @@ config:
   signout_path:
     path:
       exact: /signout
-  auth_scopes: user
+  auth_scopes: email profile
     )EOF";
 
   OAuth2Config factory;
@@ -114,6 +114,53 @@ config:
   cb(filter_callback);
 }
 
+TEST(ConfigTest, CreateFilterDefaultAuthScope) {
+  // yaml config without auth_scope value set.
+  const std::string yaml = R"EOF(
+config:
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  Server::Configuration::MockFactoryContext context;
+
+  // This returns non-nullptr for token_secret and hmac_secret.
+  auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, scope());
+  EXPECT_CALL(context, timeSource());
+  EXPECT_CALL(context, api());
+  EXPECT_CALL(context, getTransportSocketFactoryContext());
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_EQ(cb.auth_scopes(), "user")
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));  
+  cb(filter_callback);
+}
 TEST(ConfigTest, InvalidTokenSecret) {
   expectInvalidSecretConfig("token", "invalid token secret configuration");
 }
