@@ -1,9 +1,9 @@
-Observability
+可观察性
 =============
 
 .. toctree::
   :maxdepth: 2
 
-  statistics
-  access_logging
-  tracing
+  统计
+  访问日志
+  追踪
