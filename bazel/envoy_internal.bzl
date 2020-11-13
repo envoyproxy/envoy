@@ -44,7 +44,6 @@ def envoy_copts(repository, test = False):
         # Allow 'nodiscard' function return values to be discarded
         # TODO(wrowe,sunjayBhatia): Drop this option when all causes are fixed
         "-wd4834",
-        "-Wv:19.4",
     ]
 
     return select({
@@ -65,7 +64,7 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions", "-Wrange-loop-analysis"],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
                # TODO: Replace with /Zc:preprocessor for cl.exe versions >= 16.5
-               repository + "//bazel:windows_x86_64": ["-experimental:preprocessor"],
+               repository + "//bazel:windows_x86_64": ["-experimental:preprocessor", "-Wv:19.4"],
                "//conditions:default": [],
            }) + select({
                repository + "//bazel:no_debug_info": ["-g0"],
