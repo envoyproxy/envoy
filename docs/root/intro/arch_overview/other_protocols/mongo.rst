@@ -3,7 +3,7 @@
 MongoDB
 =======
 
-Envoy 支持网络层的 MongoDB 嗅探过滤器，并拥有如下特性：
+Envoy 支持具有以下功能的网络级别 MongoDB 嗅探过滤器：
 * MongoDB wire 格式的 BSON 解析器。
 * 详细的 MongoDB 查询/操作统计信息，包括路由集群的计时和 scatter/multi-get 计数。
 * 查询记录。
