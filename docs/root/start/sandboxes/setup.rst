@@ -75,3 +75,9 @@ openssl
 ~~~~~~~
 
 `openssl <https://www.openssl.org/>`_
+
+
+redis
+~~~~~
+
+`redis <https://redis.io/>`_
