@@ -116,9 +116,6 @@ following are the command line options that Envoy supports.
    *(optional)* The format string to use for laying out the log message metadata. If this is not
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"`` is used.
 
-   When used in conjunction with :option:`--log-format-prefix-with-location` set to 1, the logger can be
-   configured to prefix ``%v`` by a file path and a line number.
-
    When used in conjunction with :option:`--log-format-escaped`, the logger can be configured
    to log in a format that is parsable by log viewers. Known integrations are documented
    in the :ref:`application logging configuration <config_application_logs>` section.
@@ -160,14 +157,6 @@ following are the command line options that Envoy supports.
    :%g: Full relative path of the source file ("/some/dir/my_file.cc")
    :%#: Source line ("123")
    :%!: Source function ("myFunc")
-
-.. option:: --log-format-prefix-with-location <1|0>
-
-   *(optional)* This temporary flag allows replacing all entries of ``"%v"`` in the log format by
-   ``"[%g:%#] %v"``. This flag is provided for migration purposes only. If this is not set, a
-   default value 0 is used.
-
-   **NOTE**: The flag will be removed at 1.17.0 release.
 
 .. option:: --log-format-escaped
 

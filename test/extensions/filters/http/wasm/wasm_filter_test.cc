@@ -7,6 +7,7 @@
 #include "test/test_common/wasm_base.h"
 
 using testing::Eq;
+using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -214,7 +215,7 @@ TEST_P(WasmHttpFilterTest, HeadersStopAndContinue) {
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy-wasm-pause"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, true));
   root_context_->onTick(0);
   filter().clearRouteCache();
@@ -615,7 +616,56 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
         callbacks->onSuccess(request, std::move(response_message));
         return proxy_wasm::WasmResult::Ok;
       }));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, false));
+
+  EXPECT_NE(callbacks, nullptr);
+}
+
+TEST_P(WasmHttpFilterTest, StopAndResumeViaAsyncCall) {
+  setupTest("resume_call");
+  setupFilter();
+
+  InSequence s;
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
+  EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                      {":path", "/"},
+                                                      {":authority", "foo"},
+                                                      {"content-length", "6"}}),
+                      message->headers());
+            callbacks = &cb;
+            return &request;
+          }));
+
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("onRequestHeaders")))
+      .WillOnce(Invoke([&](uint32_t, absl::string_view) -> proxy_wasm::WasmResult {
+        Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        NiceMock<Tracing::MockSpan> span;
+        Http::TestResponseHeaderMapImpl response_header{{":status", "200"}};
+        callbacks->onBeforeFinalizeUpstreamSpan(span, &response_header);
+        callbacks->onSuccess(request, std::move(response_message));
+        return proxy_wasm::WasmResult::Ok;
+      }));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("continueRequest")));
+
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks, continueDecoding()).WillOnce(Invoke([&]() {
+    // Verify that we're not resuming processing from within Wasm callback.
+    EXPECT_EQ(proxy_wasm::current_context_, nullptr);
+  }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   EXPECT_NE(callbacks, nullptr);
@@ -680,7 +730,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallFailure) {
   } else {
     EXPECT_CALL(rootContext(), log_(spdlog::level::info, Eq("async_call failed")));
   }
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   EXPECT_NE(callbacks, nullptr);
@@ -711,7 +761,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallAfterDestroyed) {
           }));
 
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("onRequestHeaders")));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   EXPECT_CALL(request, cancel()).WillOnce([&]() { callbacks = nullptr; });
@@ -772,7 +822,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
       }));
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("response")));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   ProtobufWkt::Value value;
@@ -856,7 +906,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
       }));
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("failure bad")));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   // Test some additional error paths.
@@ -917,7 +967,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
         return std::move(client_factory);
       }));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   rootContext().onQueueReady(0);
@@ -961,7 +1011,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
         return std::move(client_factory);
       }));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   rootContext().onQueueReady(1);
@@ -1006,7 +1056,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
       }));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   EXPECT_CALL(request, cancel()).WillOnce([&]() { callbacks = nullptr; });
@@ -1071,7 +1121,7 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("response response")));
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("close done")));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   ProtobufWkt::Value value;
@@ -1102,7 +1152,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("response close")));
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("close ok")));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   ProtobufWkt::Value value;
@@ -1132,7 +1182,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("response response")));
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("close close")));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   ProtobufWkt::Value value;
@@ -1159,7 +1209,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
   setupGrpcStreamTest(callbacks);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   ProtobufWkt::Value value;
@@ -1187,7 +1237,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
 
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("response response")));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
 
   ProtobufWkt::Value value;
