@@ -1034,6 +1034,7 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 
 namespace Api {
 ApiPtr createApiForTest();
+ApiPtr createApiForTest(Filesystem::Instance& filesystem);
 ApiPtr createApiForTest(Random::RandomGenerator& random);
 ApiPtr createApiForTest(Stats::Store& stat_store);
 ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& random);
