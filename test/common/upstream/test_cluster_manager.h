@@ -199,10 +199,12 @@ public:
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
-  void postThreadLocalClusterUpdate(const Cluster&, uint32_t priority,
-                                    const HostVector& hosts_added,
-                                    const HostVector& hosts_removed) override {
-    local_cluster_update_.post(priority, hosts_added, hosts_removed);
+  void postThreadLocalClusterUpdate(ClusterManagerCluster&,
+                                    ThreadLocalClusterUpdateParams&& params) override {
+    for (const auto& per_priority : params.per_priority_update_params_) {
+      local_cluster_update_.post(per_priority.priority_, per_priority.hosts_added_,
+                                 per_priority.hosts_removed_);
+    }
   }
 
   void postThreadLocalDrainConnections(const Cluster&, const HostVector& hosts_removed) override {

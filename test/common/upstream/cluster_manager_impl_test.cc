@@ -3035,21 +3035,39 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
 
 class ClusterManagerInitHelperTest : public testing::Test {
 public:
-  MOCK_METHOD(void, onClusterInit, (Cluster & cluster));
+  MOCK_METHOD(void, onClusterInit, (ClusterManagerCluster & cluster));
 
   NiceMock<MockClusterManager> cm_;
-  ClusterManagerInitHelper init_helper_{cm_, [this](Cluster& cluster) { onClusterInit(cluster); }};
+  ClusterManagerInitHelper init_helper_{
+      cm_, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }};
+};
+
+class MockClusterManagerCluster : public ClusterManagerCluster {
+public:
+  MockClusterManagerCluster() { ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_)); }
+
+  MOCK_METHOD(Cluster&, cluster, ());
+  MOCK_METHOD(LoadBalancerFactorySharedPtr, loadBalancerFactory, ());
+  bool addedOrUpdated() override { return added_or_updated_; }
+  void setAddedOrUpdated() override {
+    ASSERT(!added_or_updated_);
+    added_or_updated_ = true;
+  }
+
+  NiceMock<MockClusterMockPrioritySet> cluster_;
+  bool added_or_updated_{};
 };
 
 TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
   InSequence s;
 
-  NiceMock<MockClusterMockPrioritySet> cluster1;
-  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(cluster1, initialize(_));
+  NiceMock<MockClusterManagerCluster> cluster1;
+  ON_CALL(cluster1.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster1.cluster_, initialize(_));
   init_helper_.addCluster(cluster1);
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
-  cluster1.initialize_callback_();
+  cluster1.cluster_.initialize_callback_();
 
   init_helper_.onStaticLoadComplete();
   init_helper_.startInitializingSecondaryClusters();
@@ -3062,20 +3080,21 @@ TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
 TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
   InSequence s;
 
-  NiceMock<MockClusterMockPrioritySet> sds;
-  ON_CALL(sds, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(sds, initialize(_));
+  NiceMock<MockClusterManagerCluster> sds;
+  ON_CALL(sds.cluster_, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(sds.cluster_, initialize(_));
   init_helper_.addCluster(sds);
   EXPECT_CALL(*this, onClusterInit(Ref(sds)));
-  sds.initialize_callback_();
+  sds.cluster_.initialize_callback_();
 
-  NiceMock<MockClusterMockPrioritySet> cluster1;
-  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  NiceMock<MockClusterManagerCluster> cluster1;
+  ON_CALL(cluster1.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
   init_helper_.onStaticLoadComplete();
 
-  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(cluster1.cluster_, initialize(_));
   init_helper_.startInitializingSecondaryClusters();
 
   ReadyWatcher cm_initialized;
@@ -3083,22 +3102,24 @@ TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
-  cluster1.initialize_callback_();
+  cluster1.cluster_.initialize_callback_();
 }
 
 // Verify that primary cluster can be updated in warming state.
 TEST_F(ClusterManagerInitHelperTest, TestUpdateWarming) {
   InSequence s;
 
-  auto sds = std::make_unique<NiceMock<MockClusterMockPrioritySet>>();
-  ON_CALL(*sds, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(*sds, initialize(_));
+  auto sds = std::make_unique<NiceMock<MockClusterManagerCluster>>();
+  ON_CALL(sds->cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(sds->cluster_, initialize(_));
   init_helper_.addCluster(*sds);
   init_helper_.onStaticLoadComplete();
 
-  NiceMock<MockClusterMockPrioritySet> updated_sds;
-  ON_CALL(updated_sds, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(updated_sds, initialize(_));
+  NiceMock<MockClusterManagerCluster> updated_sds;
+  ON_CALL(updated_sds.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(updated_sds.cluster_, initialize(_));
   init_helper_.addCluster(updated_sds);
 
   // The override cluster is added. Manually drop the previous cluster. In production flow this is
@@ -3110,7 +3131,7 @@ TEST_F(ClusterManagerInitHelperTest, TestUpdateWarming) {
 
   EXPECT_CALL(*this, onClusterInit(Ref(updated_sds)));
   EXPECT_CALL(primary_initialized, ready());
-  updated_sds.initialize_callback_();
+  updated_sds.cluster_.initialize_callback_();
 }
 
 TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
@@ -3122,25 +3143,27 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
-  NiceMock<MockClusterMockPrioritySet> cluster1;
-  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(cluster1, initialize(_));
+  NiceMock<MockClusterManagerCluster> cluster1;
+  ON_CALL(cluster1.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster1.cluster_, initialize(_));
   init_helper_.addCluster(cluster1);
 
-  NiceMock<MockClusterMockPrioritySet> cluster2;
-  ON_CALL(cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(cluster2, initialize(_));
+  NiceMock<MockClusterManagerCluster> cluster2;
+  ON_CALL(cluster2.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster2.cluster_, initialize(_));
   init_helper_.addCluster(cluster2);
 
   init_helper_.onStaticLoadComplete();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
-  cluster1.initialize_callback_();
+  cluster1.cluster_.initialize_callback_();
   init_helper_.removeCluster(cluster1);
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster2)));
   EXPECT_CALL(primary_clusters_initialized, ready());
-  cluster2.initialize_callback_();
+  cluster2.cluster_.initialize_callback_();
 
   EXPECT_CALL(cm_initialized, ready());
   init_helper_.startInitializingSecondaryClusters();
@@ -3159,18 +3182,19 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
-  NiceMock<MockClusterMockPrioritySet> cluster1;
-  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  NiceMock<MockClusterManagerCluster> cluster1;
+  ON_CALL(cluster1.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
   EXPECT_CALL(primary_clusters_initialized, ready());
   init_helper_.onStaticLoadComplete();
-  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(cluster1.cluster_, initialize(_));
   init_helper_.startInitializingSecondaryClusters();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
-  cluster1.initialize_callback_();
+  cluster1.cluster_.initialize_callback_();
 }
 
 // If secondary clusters initialization triggered inside of CdsApiImpl::onConfigUpdate()'s
@@ -3186,19 +3210,20 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
-  NiceMock<MockClusterMockPrioritySet> cluster1;
-  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  NiceMock<MockClusterManagerCluster> cluster1;
+  ON_CALL(cluster1.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
   EXPECT_CALL(primary_clusters_initialized, ready());
   init_helper_.onStaticLoadComplete();
 
-  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(cluster1.cluster_, initialize(_));
   init_helper_.startInitializingSecondaryClusters();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
-  cluster1.initialize_callback_();
+  cluster1.cluster_.initialize_callback_();
 }
 
 TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
@@ -3210,44 +3235,48 @@ TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
-  NiceMock<MockClusterMockPrioritySet> cluster1;
-  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(cluster1, initialize(_));
+  NiceMock<MockClusterManagerCluster> cluster1;
+  ON_CALL(cluster1.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster1.cluster_, initialize(_));
   init_helper_.addCluster(cluster1);
 
-  NiceMock<MockClusterMockPrioritySet> cluster2;
-  cluster2.info_->name_ = "cluster2";
-  ON_CALL(cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  NiceMock<MockClusterManagerCluster> cluster2;
+  cluster2.cluster_.info_->name_ = "cluster2";
+  ON_CALL(cluster2.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster2);
 
   init_helper_.onStaticLoadComplete();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(primary_clusters_initialized, ready());
-  EXPECT_CALL(cluster2, initialize(_));
-  cluster1.initialize_callback_();
+  EXPECT_CALL(cluster2.cluster_, initialize(_));
+  cluster1.cluster_.initialize_callback_();
   init_helper_.startInitializingSecondaryClusters();
 
-  NiceMock<MockClusterMockPrioritySet> cluster3;
-  cluster3.info_->name_ = "cluster3";
+  NiceMock<MockClusterManagerCluster> cluster3;
+  cluster3.cluster_.info_->name_ = "cluster3";
 
-  ON_CALL(cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  EXPECT_CALL(cluster3, initialize(_));
+  ON_CALL(cluster3.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  EXPECT_CALL(cluster3.cluster_, initialize(_));
   init_helper_.addCluster(cluster3);
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster3)));
-  cluster3.initialize_callback_();
+  cluster3.cluster_.initialize_callback_();
   EXPECT_CALL(*this, onClusterInit(Ref(cluster2)));
   EXPECT_CALL(cm_initialized, ready());
-  cluster2.initialize_callback_();
+  cluster2.cluster_.initialize_callback_();
 }
 
 // Tests the scenario encountered in Issue 903: The cluster was removed from
 // the secondary init list while traversing the list.
 TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   InSequence s;
-  NiceMock<MockClusterMockPrioritySet> cluster;
-  ON_CALL(cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  NiceMock<MockClusterManagerCluster> cluster;
+  ON_CALL(cluster.cluster_, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster);
 
   // onStaticLoadComplete() must not initialize secondary clusters
@@ -3256,7 +3285,7 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   // Set up the scenario seen in Issue 903 where initialize() ultimately results
   // in the removeCluster() call. In the real bug this was a long and complex call
   // chain.
-  EXPECT_CALL(cluster, initialize(_)).WillOnce(Invoke([&](std::function<void()>) -> void {
+  EXPECT_CALL(cluster.cluster_, initialize(_)).WillOnce(Invoke([&](std::function<void()>) -> void {
     init_helper_.removeCluster(cluster);
   }));
 
