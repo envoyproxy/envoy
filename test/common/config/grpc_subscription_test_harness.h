@@ -116,7 +116,7 @@ public:
           last_cluster_names_.end()) {
         envoy::config::endpoint::v3::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
-        response->add_resources()->PackFrom(API_DOWNGRADE(*load_assignment));
+        response->add_resources()->PackFrom(*load_assignment);
       }
     }
     const auto decoded_resources =

@@ -618,12 +618,12 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
                   "gRPC protocol violation: unexpected stream end", true);
     return;
   }
-
   // We should end up with only one frame here.
   std::vector<Grpc::Frame> decoded_frames;
   if (!decoder_.decode(data, decoded_frames)) {
     onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "gRPC wire protocol decode error",
                   false);
+    return;
   }
   for (auto& frame : decoded_frames) {
     if (frame.length_ > 0) {

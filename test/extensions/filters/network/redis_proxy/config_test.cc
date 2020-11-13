@@ -69,7 +69,7 @@ settings: {}
 
 TEST(RedisProxyFilterConfigFactoryTest,
      DEPRECATED_FEATURE_TEST(RedisProxyCorrectProtoLegacyCluster)) {
-  TestScopedRuntime scoped_runtime;
+  TestDeprecatedV2Api _deprecated_v2_api;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.config.filter.network.redis_proxy.v2.RedisProxy.cluster",
         "true"},
@@ -97,7 +97,7 @@ settings:
 
 TEST(RedisProxyFilterConfigFactoryTest,
      DEPRECATED_FEATURE_TEST(RedisProxyCorrectProtoLegacyCatchAllCluster)) {
-  TestScopedRuntime scoped_runtime;
+  TestDeprecatedV2Api _deprecated_v2_api;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.config.filter.network.redis_proxy.v2.RedisProxy."
         "PrefixRoutes.catch_all_cluster",

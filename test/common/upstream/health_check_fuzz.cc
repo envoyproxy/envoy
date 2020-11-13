@@ -104,6 +104,9 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
       .WillByDefault(testing::Return(input.http_verify_cluster()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  if (input.upstream_cx_success()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
   expectStreamCreate(0);
   // This sets up the possibility of testing hosts that never become healthy
@@ -212,6 +215,9 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   allocTcpHealthCheckerFromProto(input.health_check_config());
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  if (input.upstream_cx_success()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
   expectClientCreate();
   health_checker_->start();
@@ -306,7 +312,7 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
 
 void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
-  health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+  health_checker_ = std::make_shared<NiceMock<TestGrpcHealthCheckerImpl>>(
       *cluster_, config, dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Test Grpc Health Checker");
@@ -317,6 +323,9 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   allocGrpcHealthCheckerFromProto(input.health_check_config());
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  if (input.upstream_cx_success()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
   ON_CALL(dispatcher_, createClientConnection_(_, _, _, _))
       .WillByDefault(testing::InvokeWithoutArgs(
@@ -462,6 +471,7 @@ void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
 void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
   test_session_->client_connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
+    received_no_error_goaway_ = false; // from resetState()
     // Close events will always blow away the client
     ENVOY_LOG_MISC(trace, "Triggering interval timer after close event");
     // Interval timer is guaranteed to be enabled from a close event - calls
@@ -475,6 +485,7 @@ void GrpcHealthCheckFuzz::raiseGoAway(bool no_error) {
     test_session_->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
     // Will cause other events to blow away client, because this is a "graceful" go away
     received_no_error_goaway_ = true;
+    triggerIntervalTimer(true);
   } else {
     // go away events without no error flag explicitly blow away client
     test_session_->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);

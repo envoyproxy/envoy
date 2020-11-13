@@ -1015,7 +1015,8 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      verify_subject_alt_name: "spiffe://lyft.com/test-team"
+      match_subject_alt_names:
+        exact: "spiffe://lyft.com/test-team"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
@@ -1030,7 +1031,8 @@ TEST_P(SslSocketTest, Ipv4San) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
-      verify_subject_alt_name: "127.0.0.1"
+      match_subject_alt_names:
+        exact: "127.0.0.1"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1053,7 +1055,8 @@ TEST_P(SslSocketTest, Ipv6San) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
-      verify_subject_alt_name: "::1"
+      match_subject_alt_names:
+        exact: "::1"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1455,7 +1458,8 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      verify_subject_alt_name: "example.com"
+      match_subject_alt_names:
+        exact: "example.com"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
@@ -1482,7 +1486,8 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      verify_subject_alt_name: "example.com"
+      match_subject_alt_names:
+        exact: "example.com"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
@@ -2694,26 +2699,41 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, false);
         EXPECT_EQ(data.length(), 0);
+        // Calling close(FlushWrite) in onEvent() callback results in PostIoAction::Close,
+        // after which the connection is closed without write ready event being delivered,
+        // and with all outstanding data (here, "hello") being lost.
+      }));
+
+  EXPECT_CALL(*client_read_filter, onNewConnection())
+      .WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), false))
+      .WillOnce(Invoke([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
+        read_buffer.drain(read_buffer.length());
+        // Close without sending close_notify alert.
+        const SslHandshakerImpl* ssl_socket =
+            dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+        EXPECT_EQ(ssl_socket->state(), Ssl::SocketState::HandshakeComplete);
+        SSL_set_quiet_shutdown(ssl_socket->ssl(), 1);
+        client_connection->close(Network::ConnectionCloseType::FlushWrite);
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*server_read_filter, onNewConnection())
+      .WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(*server_read_filter, onData(BufferStringEqual(""), true))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> Network::FilterStatus {
         // Close without sending close_notify alert.
         const SslHandshakerImpl* ssl_socket =
             dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
         EXPECT_EQ(ssl_socket->state(), Ssl::SocketState::HandshakeComplete);
         SSL_set_quiet_shutdown(ssl_socket->ssl(), 1);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
-      }));
-
-  EXPECT_CALL(*client_read_filter, onNewConnection())
-      .WillOnce(Return(Network::FilterStatus::Continue));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), true))
-      .WillOnce(Invoke([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
-        read_buffer.drain(read_buffer.length());
-        client_connection->close(Network::ConnectionCloseType::NoFlush);
         return Network::FilterStatus::StopIteration;
       }));
 
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -4648,7 +4668,22 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   // in the config.
   server_ctx->add_alpn_protocols("test");
   transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
-      "", std::vector<std::string>{}, std::vector<std::string>{}, "test");
+      "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{"test"});
+  testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
+      transport_socket_options));
+
+  // With multiple fallbacks specified, a single match will match.
+  transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{},
+      std::vector<std::string>{"foo", "test"});
+  testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
+      transport_socket_options));
+
+  // With multiple matching fallbacks specified, a single match will match.
+  server_ctx->add_alpn_protocols("foo");
+  transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{},
+      std::vector<std::string>{"foo", "test"});
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
 

@@ -103,6 +103,9 @@ auto testing_values = testing::Values(
 #if defined(ENVOY_WASM_WAVM)
     std::make_tuple("wavm", "cpp"), std::make_tuple("wavm", "rust"),
 #endif
+#if defined(ENVOY_WASM_WASMTIME)
+    std::make_tuple("wasmtime", "cpp"), std::make_tuple("wasmtime", "rust"),
+#endif
     std::make_tuple("null", "cpp"));
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest, testing_values);
 
@@ -1208,7 +1211,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
 
 // Test metadata access including CEL expressions.
 // TODO: re-enable this on Windows if and when the CEL `Antlr` parser compiles on Windows.
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 TEST_P(WasmHttpFilterTest, Metadata) {
   setupTest("", "metadata");
   setupFilter();
@@ -1436,7 +1439,8 @@ TEST_P(WasmHttpFilterTest, RootId2) {
   setupFilter("context2");
   EXPECT_CALL(filter(), log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders2 2"))));
   Http::TestRequestHeaderMapImpl request_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, true));
 }
 
 } // namespace Wasm

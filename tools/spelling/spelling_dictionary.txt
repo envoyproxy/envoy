@@ -1145,6 +1145,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wasmtime
 websocket
 wepoll
 whitespace
