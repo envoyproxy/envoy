@@ -871,7 +871,8 @@ class FilterChainFactoryCallbacks {
 public:
   virtual ~FilterChainFactoryCallbacks() = default;
 
-  using MatchTreeAndData = std::pair<MatchTreeSharedPtr<HttpMatchingData>, std::shared_ptr<HttpMatchingData>>;
+  using MatchTreeAndData =
+      std::pair<MatchTreeSharedPtr<HttpMatchingData>, std::shared_ptr<HttpMatchingData>>;
   virtual MatchTreeAndData
   createMatchTree(const envoy::config::common::matcher::v3::Matcher& config) PURE;
 
@@ -901,7 +902,8 @@ public:
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
 
-  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<HttpMatchingData> match_tree,
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
+                               MatchTreeSharedPtr<HttpMatchingData> match_tree,
                                std::shared_ptr<HttpMatchingData> matching_data) PURE;
 
   /**

@@ -10,6 +10,9 @@ REGISTER_FACTORY(HttpResponseHeadersFactory, DataInputFactory<Http::HttpMatching
 
 REGISTER_FACTORY(HttpRequestHeadersFactory, DataInputFactory<Http::HttpMatchingData>);
 
-REGISTER_FACTORY(FixedDataInputFactory,
-                 DataInputFactory<Http::HttpMatchingData>);
-}
+REGISTER_FACTORY(HttpResponseTrailersFactory, DataInputFactory<Http::HttpMatchingData>);
+
+REGISTER_FACTORY(HttpRequestTrailersFactory, DataInputFactory<Http::HttpMatchingData>);
+
+REGISTER_FACTORY(FixedDataInputFactory, DataInputFactory<Http::HttpMatchingData>);
+} // namespace Envoy

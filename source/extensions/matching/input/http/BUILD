@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
 )
@@ -22,13 +21,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "config",
-    hdrs = ["config.h"],
     srcs = ["config.cc"],
+    hdrs = ["config.h"],
     deps = [
         ":http_inputs",
         "//source/common/http:matching_data_lib",
         "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/input/v3:pkg_cc_proto",
-        ],
+    ],
     #security_posture = "unknown",
 )

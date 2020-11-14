@@ -1,8 +1,9 @@
 #pragma once
 
+#include <sys/types.h>
+
 #include "common/http/matching_data.h"
 #include "common/matcher/matcher.h"
-#include <sys/types.h>
 
 namespace Envoy {
 
@@ -14,11 +15,23 @@ public:
       return {true, false, absl::nullopt};
     }
 
-    return {false, matching_data.request_buffer_copy_->length() < limit_,
-            matching_data.request_buffer_copy_->toString()};
+    storage_ = matching_data.request_buffer_copy_->toString();
+    return {false, canGetMoreData(matching_data), storage_};
   }
 
 private:
+  bool canGetMoreData(const Http::HttpMatchingData& matching_data) {
+    if (matching_data.request_end_stream_) {
+      return false;
+    }
+
+    if (limit_ == 0) {
+      return true;
+    }
+
+    return matching_data.request_buffer_copy_->length() < limit_;
+  }
+  std::string storage_;
   const uint32_t limit_;
 };
 
@@ -30,12 +43,68 @@ public:
       return {true, false, absl::nullopt};
     }
 
-    return {false, matching_data.response_buffer_copy_->length() < limit_,
-            matching_data.response_buffer_copy_->toString()};
+    storage_ = matching_data.response_buffer_copy_->toString();
+    return {false, canGetMoreData(matching_data), storage_};
   }
 
 private:
+  bool canGetMoreData(const Http::HttpMatchingData& matching_data) {
+    if (matching_data.response_end_stream_) {
+      return false;
+    }
+
+    if (limit_ == 0) {
+      return true;
+    }
+
+    return matching_data.response_buffer_copy_->length() < limit_;
+  }
+  std::string storage_;
   const uint32_t limit_;
+};
+
+class HttpRequestTrailers : public DataInput<Http::HttpMatchingData> {
+public:
+  explicit HttpRequestTrailers(absl::string_view header_name)
+      : header_name_(std::string(header_name)) {}
+
+  DataInputGetResult get(const Http::HttpMatchingData& matching_data) {
+    if (!matching_data.request_trailers_) {
+      return {true, false, absl::nullopt};
+    }
+
+    result_ =
+        Http::HeaderUtility::getAllOfHeaderAsString(*matching_data.request_trailers_, header_name_);
+
+    return {false, false, result_.result()};
+  }
+
+private:
+  Http::HeaderUtility::GetAllOfHeaderAsStringResult result_;
+  const Http::LowerCaseString header_name_;
+};
+
+class HttpResponseTrailers : public DataInput<Http::HttpMatchingData> {
+public:
+  explicit HttpResponseTrailers(absl::string_view header_name)
+      : header_name_(std::string(header_name)) {}
+
+  DataInputGetResult get(const Http::HttpMatchingData& matching_data) {
+    if (!matching_data.response_trailers_) {
+      std::cout << "no trailers!" << std::endl;
+      return {true, false, absl::nullopt};
+    }
+
+    std::cout << *matching_data.response_trailers_ << std::endl;
+    result_ = Http::HeaderUtility::getAllOfHeaderAsString(*matching_data.response_trailers_,
+                                                          header_name_);
+
+    return {false, false, result_.result()};
+  }
+
+private:
+  Http::HeaderUtility::GetAllOfHeaderAsStringResult result_;
+  const Http::LowerCaseString header_name_;
 };
 
 class HttpRequestHeaders : public DataInput<Http::HttpMatchingData> {

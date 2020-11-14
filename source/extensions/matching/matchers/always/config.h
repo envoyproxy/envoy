@@ -1,8 +1,10 @@
 #pragma once
 
-#include "external/envoy_api/envoy/config/core/v3/extension.pb.h"
-#include "common/matcher/matcher.h"
 #include <memory>
+
+#include "common/matcher/matcher.h"
+
+#include "external/envoy_api/envoy/config/core/v3/extension.pb.h"
 
 namespace Envoy {
 
@@ -17,12 +19,8 @@ public:
     return std::make_unique<AlwaysTrueMatcher>();
   }
 
-  std::string name() const override {
-return "envoy.matcher.matchers.always";
-  }
-  std::string category() const override {
-return "envoy.matcher.matchers";
-  }
+  std::string name() const override { return "envoy.matcher.matchers.always"; }
+  std::string category() const override { return "envoy.matcher.matchers"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<google::protobuf::Empty>();

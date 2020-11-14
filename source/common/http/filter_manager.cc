@@ -552,8 +552,8 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if (applyDataAndAttemptMatch(**entry,
-                                 [&](auto& matching_data) { matching_data.onRequestData(data); })) {
+    if (applyDataAndAttemptMatch(
+            **entry, [&](auto& matching_data) { matching_data.onRequestData(data, end_stream); })) {
       continue;
     }
 
@@ -1102,8 +1102,9 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
   for (; entry != encoder_filters_.end(); entry++) {
-    if (applyDataAndAttemptMatch(
-            **entry, [&](auto& matching_data) { matching_data.onResponseData(data); })) {
+    if (applyDataAndAttemptMatch(**entry, [&](auto& matching_data) {
+          matching_data.onResponseData(data, end_stream);
+        })) {
       continue;
     }
     // If the filter pointed by entry has stopped for all frame type, return now.

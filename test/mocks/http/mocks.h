@@ -475,7 +475,8 @@ public:
                HttpMatchingDataSharedPtr));
   MOCK_METHOD(void, addStreamEncoderFilter, (Http::StreamEncoderFilterSharedPtr filter));
   MOCK_METHOD(void, addStreamFilter,
-              (Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<HttpMatchingData>, HttpMatchingDataSharedPtr));
+              (Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<HttpMatchingData>,
+               HttpMatchingDataSharedPtr));
   MOCK_METHOD(void, addStreamFilter, (Http::StreamFilterSharedPtr filter));
   MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
 };

@@ -11,6 +11,7 @@
 #include "common/config/version_converter.h"
 #include "common/matcher/matcher.h"
 #include "common/protobuf/protobuf.h"
+
 #include "external/envoy_api/envoy/config/common/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
@@ -93,17 +94,54 @@ fromPredicate(const envoy::config::common::matcher::v3::MatchPredicate& predicat
 
     break;
   }
+  case (envoy::config::common::matcher::v3::MatchPredicate::kHttpRequestTrailersMatch): {
+    auto* list = new_predicate.mutable_and_matcher();
+
+    for (const auto& p : predicate.http_request_trailers_match().headers()) {
+      envoy::extensions::matching::input::v3::HttpRequestTrailerInput input;
+      input.set_header(p.name());
+
+      auto* single_expression = list->add_predicate()->mutable_single_predicate();
+      auto* input_extension = single_expression->mutable_input();
+      input_extension->mutable_typed_config()->PackFrom(input);
+      input_extension->set_name("envoy.matcher.inputs.http_request_trailers");
+
+      // TODO(snowp): Support everything here.
+      single_expression->mutable_value_match()->mutable_string_match()->set_exact(p.exact_match());
+    }
+  } break;
+  case (envoy::config::common::matcher::v3::MatchPredicate::kHttpResponseTrailersMatch): {
+    auto* list = new_predicate.mutable_and_matcher();
+
+    for (const auto& p : predicate.http_response_trailers_match().headers()) {
+      envoy::extensions::matching::input::v3::HttpResponseTrailerInput input;
+      input.set_header(p.name());
+
+      auto* single_expression = list->add_predicate()->mutable_single_predicate();
+      auto* input_extension = single_expression->mutable_input();
+      input_extension->mutable_typed_config()->PackFrom(input);
+      input_extension->set_name("envoy.matcher.inputs.http_response_trailers");
+
+      // TODO(snowp): Support everything here.
+      single_expression->mutable_value_match()->mutable_string_match()->set_exact(p.exact_match());
+    }
+  } break;
   case (envoy::config::common::matcher::v3::MatchPredicate::kHttpResponseGenericBodyMatch): {
     auto* and_matcher = new_predicate.mutable_and_matcher();
 
     for (const auto& pattern : predicate.http_response_generic_body_match().patterns()) {
+      envoy::extensions::matching::input::v3::HttpResponseBodyInput input_config;
+
       auto single_predicate = and_matcher->add_predicate()->mutable_single_predicate();
       auto* input = single_predicate->mutable_input();
-      input->set_name("envoy.matcher.inputs.response_data");
+      input->set_name("envoy.matcher.inputs.http_response_body");
+      input->mutable_typed_config()->PackFrom(input_config);
 
       auto* value_match = single_predicate->mutable_value_match();
       // TODO support binary match
-      value_match->mutable_string_match()->mutable_safe_regex()->set_regex(pattern.string_match());
+      value_match->mutable_string_match()->mutable_safe_regex()->set_regex(
+          fmt::format(".*{}.*", pattern.string_match()));
+      value_match->mutable_string_match()->mutable_safe_regex()->mutable_google_re2();
     }
 
     break;
@@ -112,13 +150,18 @@ fromPredicate(const envoy::config::common::matcher::v3::MatchPredicate& predicat
     auto* and_matcher = new_predicate.mutable_and_matcher();
 
     for (const auto& pattern : predicate.http_request_generic_body_match().patterns()) {
+      envoy::extensions::matching::input::v3::HttpRequestBodyInput input_config;
+
       auto single_predicate = and_matcher->add_predicate()->mutable_single_predicate();
       auto* input = single_predicate->mutable_input();
-      input->set_name("envoy.matcher.inputs.request_data");
+      input->set_name("envoy.matcher.inputs.http_request_body");
+      input->mutable_typed_config()->PackFrom(input_config);
 
       auto* value_match = single_predicate->mutable_value_match();
       // TODO support binary match
-      value_match->mutable_string_match()->mutable_safe_regex()->set_regex(pattern.string_match());
+      value_match->mutable_string_match()->mutable_safe_regex()->set_regex(
+          fmt::format(".*{}.*", pattern.string_match()));
+      value_match->mutable_string_match()->mutable_safe_regex()->mutable_google_re2();
     }
 
     break;
@@ -144,8 +187,7 @@ HttpTapConfigImpl::HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_c
   auto* matcher_list = match_tree_config_.mutable_matcher_list();
   auto* matcher = matcher_list->add_matchers();
   if (proto_config.has_match()) {
-    matcher->mutable_predicate()->MergeFrom(
-        fromPredicate(proto_config.match()));
+    matcher->mutable_predicate()->MergeFrom(fromPredicate(proto_config.match()));
   } else {
     envoy::config::common::matcher::v3::MatchPredicate match;
     Config::VersionConverter::upgrade(proto_config.match_config(), match);

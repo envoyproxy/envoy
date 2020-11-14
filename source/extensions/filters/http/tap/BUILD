@@ -49,6 +49,7 @@ envoy_cc_library(
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/http:filter_interface",
         "//source/extensions/common/tap:extension_config_base",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",
     ],
 )

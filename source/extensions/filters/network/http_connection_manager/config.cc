@@ -651,7 +651,8 @@ public:
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
+    wrapFilter(filter, [this](Http::StreamDecoderFilterSharedPtr filter,
+                              MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
                               Http::HttpMatchingDataSharedPtr data) {
       callbacks_.addStreamDecoderFilter(filter, matcher, data);
     });
@@ -663,7 +664,8 @@ public:
     callbacks_.addStreamDecoderFilter(filter, std::move(match_tree), std::move(matching_data));
   }
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
+    wrapFilter(filter, [this](Http::StreamEncoderFilterSharedPtr filter,
+                              MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
                               Http::HttpMatchingDataSharedPtr data) {
       callbacks_.addStreamEncoderFilter(filter, matcher, data);
     });
@@ -676,13 +678,15 @@ public:
   }
 
   void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
-    wrapFilter(filter, [this](Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
+    wrapFilter(filter, [this](Http::StreamFilterSharedPtr filter,
+                              MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
                               Http::HttpMatchingDataSharedPtr data) {
       callbacks_.addStreamFilter(filter, matcher, data);
     });
   }
 
-  void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr<Http::HttpMatchingData> match_tree,
+  void addStreamFilter(Http::StreamFilterSharedPtr filter,
+                       MatchTreeSharedPtr<Http::HttpMatchingData> match_tree,
                        Http::HttpMatchingDataSharedPtr matching_data) override {
     callbacks_.addStreamFilter(filter, std::move(match_tree), std::move(matching_data));
   }

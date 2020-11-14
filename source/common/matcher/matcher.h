@@ -44,9 +44,11 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
 struct DataInputGetResult {
   // The data has not arrived yet, nothing to match against.
   bool not_available_yet;
-  // Some data is available, so matching can be attempted. If it fails, more data might arrive which could satisfy the match.
+  // Some data is available, so matching can be attempted. If it fails, more data might arrive which
+  // could satisfy the match.
   bool more_data_available;
-  // The data is available: result of looking up the data. If the lookup failed against partial or complete data this will remain abls::nullopt.
+  // The data is available: result of looking up the data. If the lookup failed against partial or
+  // complete data this will remain abls::nullopt.
   absl::optional<absl::string_view> data_;
 };
 
@@ -114,7 +116,10 @@ public:
   absl::optional<bool> match(absl::string_view input) override {
     ProtobufWkt::Value value;
     value.set_string_value(std::string(input));
-    return matcher_->match(value);
+    const auto r = matcher_->match(value);
+
+    std::cout << "input " << input << " " << r << std::endl;
+    return r;
   }
 
 private:
@@ -154,8 +159,8 @@ public:
         return result;
       }
 
-      // One of the values did not match.
-      if (result && !*result) {
+      // Field did not match.
+      if (!*result) {
         std::cout << "one of the fields did not match" << std::endl;
         return false;
       }
@@ -208,8 +213,23 @@ public:
       return absl::nullopt;
     }
 
+    if (!input.data_) {
+      return false;
+    }
+
+    const auto current_match = input_matcher_->match(*input.data_);
+    if (input.data_) {
+      std::cout << "seeing " << *input.data_ << std::endl;
+    }
+    if ((!current_match || (current_match && !*current_match)) && input.more_data_available) {
+      std::cout << "deferring" << *input.data_ << std::endl;
+      return absl::nullopt;
+    }
+    // std::cout << "m: " << current_match << std::endl;
+    std::cout << "more: " << input.more_data_available << std::endl;
+
     // TODO(snowp): Expose the optional so that we can match on not present.
-    return input.data_ && input_matcher_->match(*input.data_);
+    return current_match;
   }
 
 private:
@@ -226,11 +246,8 @@ public:
       const auto maybe_match = matcher.first->match(matching_data);
       // One of the matchers don't have enough information, delay.
       if (!maybe_match) {
-      std::cout << "attempted linear match, not enough information" << std::endl;
         return {false, {}};
       }
-
-      std::cout << "attempted linear match, got " << *maybe_match << std::endl;
 
       if (*maybe_match) {
         return {true, matcher.second};

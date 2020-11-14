@@ -11,23 +11,20 @@
 
 namespace Envoy {
 
-template<class DataType>
-class MatchTree;
+template <class DataType> class MatchTree;
 
-template<class DataType>
-using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
+template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
 
 using TypedExtensionConfigOpt = absl::optional<envoy::config::core::v3::TypedExtensionConfig>;
 
 // On match we either return a Any or we continue to match down a tree.
-template<class DataType>
+template <class DataType>
 using OnMatch = std::pair<TypedExtensionConfigOpt, MatchTreeSharedPtr<DataType>>;
 
 /**
  * MatchTree provides an extensible interface for matching on some input data.
  */
-template<class DataType> 
-class MatchTree {
+template <class DataType> class MatchTree {
 public:
   virtual ~MatchTree() = default;
 

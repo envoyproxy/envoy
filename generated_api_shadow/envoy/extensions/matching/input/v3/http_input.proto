@@ -18,6 +18,14 @@ message HttpResponseHeaderInput {
   string header = 1;
 }
 
+message HttpRequestTrailerInput {
+  string header = 1;
+}
+
+message HttpResponseTrailerInput {
+  string header = 1;
+}
+
 message HttpRequestBodyInput {
   uint32 limit = 1;
 }

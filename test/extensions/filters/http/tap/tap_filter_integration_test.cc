@@ -619,11 +619,11 @@ tap_config:
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   // Should not tap, request and response body do not match.
-  makeRequest(request_headers_no_tap_, {{"This is test payload"}}, nullptr,
-              response_headers_no_tap_, {{"This is test payload"}}, nullptr);
-  // Should not tap, request matches but response body does not match.
-  makeRequest(request_headers_no_tap_, {{"This is request payload"}}, nullptr,
-              response_headers_no_tap_, {{"This is test payload"}}, nullptr);
+  // makeRequest(request_headers_no_tap_, {{"This is test payload"}}, nullptr,
+  //             response_headers_no_tap_, {{"This is test payload"}}, nullptr);
+  // // Should not tap, request matches but response body does not match.
+  // makeRequest(request_headers_no_tap_, {{"This is request payload"}}, nullptr,
+  //             response_headers_no_tap_, {{"This is test payload"}}, nullptr);
   // Should tap, request and response body match.
   makeRequest(request_headers_no_tap_, {{"This is request payload"}}, nullptr,
               response_headers_no_tap_, {{"This is resp"}, {"onse payload"}}, nullptr);
@@ -631,6 +631,7 @@ tap_config:
   envoy::data::tap::v3::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
+  std::cout << MessageUtil::getYamlStringFromMessage(trace) << std::endl;
   EXPECT_NE(std::string::npos,
             trace.http_buffered_trace().request().body().as_string().find("request"));
   EXPECT_NE(std::string::npos,
