@@ -13,8 +13,13 @@ Server name indication (``TLS``/``SNI``)
    :ref:`jq <start_sandboxes_setup_jq>`
 	Parse ``json`` output from the upstream echo servers.
 
-This example demonstrates a server that listens on multiple domains
-and provides separate ``TLS`` termination for each.
+This example demonstrates an Envoy proxy that listens on multiple domains
+on the same ``IP`` address and provides separate ``TLS`` termination for each.
+
+It also demonstrates Envoy acting as a client proxy connecting to upstream
+``SNI`` services.
+
+.. _install_sandboxes_tls_sni_step1:
 
 Step 1: Create keypairs for each of the domain endpoints
 ********************************************************
@@ -63,12 +68,36 @@ Create self-signed certificates for these endpoints as follows:
    writing new private key to 'certs/domain3.key.pem'
    -----
 
+.. note::
+
+   ``SNI`` does *not* validate that the certificates presented are correct for the domain, or that they
+   were issued by a recognised certificate authority.
+
+   See the :ref:`Securing Envoy quick start guide <start_quick_start_securing>` for more information about
+   :ref:`validating cerfificates <start_quick_start_securing_validation>`.
+
+.. _install_sandboxes_tls_sni_step2:
+
 Step 2: Start the containers
 ****************************
 
 Build and start the containers.
 
-This will load the required keys and certificates you created into the Envoy proxy container.
+This starts three upstream ``HTTP`` containers each listening on the internal Docker network on port ``80``.
+
+In front of these is an Envoy proxy that listens on https://localhost:10000 and servers three ``SNI`` routed
+``TLS`` domains:
+
+- ``domain1.example.com``
+- ``domain2.example.com``
+- ``domain3.example.com``
+
+This proxy uses the keys and certificates :ref:`you created in step 1 <install_sandboxes_tls_sni_step1>`.
+
+It also starts an Envoy proxy client which listens on http://localhost:20000 and routes three paths -
+``/domain1``, ``/domain2`` and ``/domain3``.
+
+The client proxy has no ``TLS`` termination but instead proxies to the ``TLS`` endpoints using ``SNI``.
 
 .. code-block:: console
 
@@ -78,10 +107,13 @@ This will load the required keys and certificates you created into the Envoy pro
    $ docker-compose up -d
    $ docker-compose ps
 
-          Name                                 Command                State         Ports
-   ---------------------------------------------------------------------------------------------------
-   tls-sni_proxy_1                     /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
-   tls-sni_service-http_1              node ./index.js                Up
+          Name                        Command                State         Ports
+   -------------------------------------------------------------------------------------------
+   tls-sni_http-upstream1_1   node ./index.js                Up
+   tls-sni_http-upstream2_1   node ./index.js                Up
+   tls-sni_http-upstream3_1   node ./index.js                Up
+   tls-sni_proxy-client_1     /docker-entrypoint.sh /usr ... Up      0.0.0.0:20000->10000/tcp
+   tls-sni_proxy_1            /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
 
 Step 2: Query the ``SNI`` endpoints directly with curl
 ******************************************************
