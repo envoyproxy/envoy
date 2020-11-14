@@ -26,7 +26,7 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  cluster: service-http
+                  cluster: service-http-domain1
           http_filters:
           - name: envoy.filters.http.router
       transport_socket:
@@ -59,7 +59,7 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  cluster: service-http
+                  cluster: service-http-domain2
           http_filters:
           - name: envoy.filters.http.router
       transport_socket:
@@ -92,7 +92,7 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  cluster: service-http
+                  cluster: service-http-domain3
           http_filters:
           - name: envoy.filters.http.router
       transport_socket:
@@ -107,16 +107,43 @@ static_resources:
                 filename: certs/domain3.key.pem
 
   clusters:
-  - name: service-http
+  - name: service-http-domain1
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
     load_assignment:
-      cluster_name: service-http
+      cluster_name: service-http-domain1
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: service-http
+                address: service-http-domain1
+                port_value: 80
+  - name: service-http-domain2
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: service-http-domain2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service-http-domain2
+                port_value: 80
+
+  - name: service-http-domain3
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: service-http-domain3
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service-http-domain3
                 port_value: 80

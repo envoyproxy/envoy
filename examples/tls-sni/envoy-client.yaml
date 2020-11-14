@@ -1,0 +1,95 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 20000
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          codec_type: auto
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: app
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/domain1"
+                route:
+                  cluster: service-http-domain1
+              - match:
+                  prefix: "/domain2"
+                route:
+                  cluster: service-http-domain2
+              - match:
+                  prefix: "/domain3"
+                route:
+                  cluster: service-http-domain3
+          http_filters:
+          - name: envoy.filters.http.router
+
+  clusters:
+  - name: service-http-domain1
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: service-http-domain1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: proxy
+                port_value: 10000
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: domain1
+
+  - name: service-http-domain2
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: service-http-domain2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: proxy
+                port_value: 10000
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: domain2
+
+
+  - name: service-http-domain3
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: service-http-domain3
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: proxy
+                port_value: 10000
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: domain3

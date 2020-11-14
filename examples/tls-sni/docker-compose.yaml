@@ -8,8 +8,27 @@ services:
     ports:
       - "10000:10000"
 
-  service-http:
+  proxy-client:
+    build:
+      context: .
+      dockerfile: Dockerfile-client
+    ports:
+      - "20000:20000"
+
+  service-http-domain1:
     image: mendhak/http-https-echo
-    hostname: service-http
+    hostname: service-http-domain1
+    environment:
+      - HTTPS_PORT=0
+
+  service-http-domain2:
+    image: mendhak/http-https-echo
+    hostname: service-http-domain2
+    environment:
+      - HTTPS_PORT=0
+
+  service-http-domain3:
+    image: mendhak/http-https-echo
+    hostname: service-http-domain3
     environment:
       - HTTPS_PORT=0

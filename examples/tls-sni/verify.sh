@@ -17,8 +17,33 @@ create_self_signed_certs () {
 
 mkdir -p certs
 
+run_log "Create certificates for each of the services"
 create_self_signed_certs domain1
 create_self_signed_certs domain2
 create_self_signed_certs domain3
 
 bring_up_example
+
+run_log "Query domain1 with curl and tls/sni"
+curl -sk --resolve domain1:10000:127.0.0.1 https://domain1:10000 \
+    | jq '.os.hostname' | grep service-http-domain1
+
+run_log "Query domain2 with curl and tls/sni"
+curl -sk --resolve domain2:10000:127.0.0.1 https://domain2:10000 \
+    | jq '.os.hostname' | grep service-http-domain2
+
+run_log "Query domain3 with curl and tls/sni"
+curl -sk --resolve domain3:10000:127.0.0.1 https://domain3:10000 \
+    | jq '.os.hostname' | grep service-http-domain3
+
+run_log "Query domain1 via Envoy sni client"
+curl -s http://localhost:20000/domain1 \
+    | jq '.os.hostname' | grep service-http-domain1
+
+run_log "Query domain2 via Envoy sni client"
+curl -s http://localhost:20000/domain2 \
+    | jq '.os.hostname' | grep service-http-domain2
+
+run_log "Query domain3 via Envoy sni client"
+curl -s http://localhost:20000/domain3 \
+    | jq '.os.hostname' | grep service-http-domain3
