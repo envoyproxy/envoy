@@ -1,40 +1,26 @@
 .. _arch_overview_statistics:
 
-Statistics
+统计
 ==========
 
-One of the primary goals of Envoy is to make the network understandable. Envoy emits a large number
-of statistics depending on how it is configured. Generally the statistics fall into three categories:
+Envoy 的主要目标之一是使网络易于理解。Envoy 根据不同的配置产生了大量的统计数据。通常，统计数据分为以下三类：
 
-* **Downstream**: Downstream statistics relate to incoming connections/requests. They are emitted by
-  listeners, the HTTP connection manager, the TCP proxy filter, etc.
-* **Upstream**: Upstream statistics relate to outgoing connections/requests. They are emitted by
-  connection pools, the router filter, the TCP proxy filter, etc.
-* **Server**: Server statistics describe how the Envoy server instance is working. Statistics like
-  server uptime or amount of allocated memory are categorized here.
+* **Downstream**: 下游统计信息与传入的连接/请求有关。它们由侦听器、HTTP 连接管理器、TCP 代理过滤器等生成。
+* **Upstream**: 上游统计信息与传出连接/请求有关。它们由连接池，路由器过滤器，TCP 代理过滤器等生成。
+* **Server**: 服务器统计信息描述了 Envoy 服务器实例的工作方式。服务器正常运行时间或分配内存量等统计信息在此处分类。
 
-A single proxy scenario typically involves both downstream and upstream statistics. The two types
-can be used to get a detailed picture of that particular network hop. Statistics from the entire
-mesh give a very detailed picture of each hop and overall network health. The statistics emitted are
-documented in detail in the operations guide.
+单个代理场景通常涉及下游和上游统计信息。这两种类型可用于获取该特定网络跃点的详细信息。整体统计网格可以非常详细地描述每个跃点和整个网络的运行状况。发布的统计数据在操作指南中详细记录。
 
-As of the v2 API, Envoy has the ability to support custom, pluggable sinks. :ref:`A
-few standard sink implementations<envoy_v3_api_msg_config.metrics.v3.StatsSink>` are included in Envoy.
-Some sinks also support emitting statistics with tags/dimensions.
+从 v2 API 开始，Envoy 能够支持自定义可插入接收器。:ref:`A Envoy 中包含一些标准的接收器实现<envoy_v3_api_msg_config.metrics.v3.StatsSink>`。一些接收器还支持生成带有标签/维度的统计信息。
 
-Within Envoy and throughout the documentation, statistics are identified by a canonical string
-representation. The dynamic portions of these strings are stripped to become tags. Users can
-configure this behavior via :ref:`the Tag Specifier configuration <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>`.
+在 Envoy 中以及整个文档中，统计信息均由规范字符串标识表示。这些字符串的动态部分被剥离成为标签。用户可以通过标签说明符配置 :ref:`Tag Specifier 配置 <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>` 配置此行为。
 
-Envoy emits three types of values as statistics:
+Envoy 发出三种类型的值作为统计信息：
 
-* **Counters**: Unsigned integers that only increase and never decrease. E.g., total requests.
-* **Gauges**: Unsigned integers that both increase and decrease. E.g., currently active requests.
-* **Histograms**: Unsigned integers that are part of a stream of values that are then aggregated by
-  the collector to ultimately yield summarized percentile values. E.g., upstream request time.
+* **Counters（计数器）**: 无符号整数只会增加而不减少。 例如，总请求数。
+* **Gauges（量表）**: 无符号整数，既有增加也有减少。 例如，当前有效的请求。
+* **Histograms（直方图）**: 无符号整数是值流的一部分，然后由收集器最终得出汇总的百分数值。 例如，上游请求时间。
 
-Internally, counters and gauges are batched and periodically flushed to improve performance.
-Histograms are written as they are received. Note: what were previously referred to as timers have
-become histograms as the only difference between the two representations was the units.
+在内部，对计数器和计量器进行批处理并定期更新以提高性能。直方图在收到时写入。 注意：以前称为计时器的内容成为直方图，因为两种表示形式之间的唯一区别是单位。
 
-* :ref:`v3 API reference <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>`.
+* :ref:`v3 API 参考 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>`。
