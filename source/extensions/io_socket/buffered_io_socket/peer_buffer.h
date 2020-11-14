@@ -30,10 +30,10 @@ public:
   virtual void onPeerDestroy() PURE;
 
   /**
-   * Notify that consumable data arrives. The consumable data can be either data to read, or the end
+   * Notify that consumable data arrived. The consumable data can be either data to read, or the end
    * of stream event.
    */
-  virtual void maybeSetNewData() PURE;
+  virtual void setNewDataAvailable() PURE;
 
   /**
    * @return the buffer to be written.
@@ -41,7 +41,7 @@ public:
   virtual Buffer::Instance* getWriteBuffer() PURE;
 
   /**
-   * @return false more data is acceptable.
+   * @return true if more data is acceptable at the destination buffer.
    */
   virtual bool isWritable() const PURE;
 
@@ -53,11 +53,11 @@ public:
   /**
    * Raised by the peer when the peer switch from high water mark to low.
    */
-  virtual void onPeerBufferWritable() PURE;
+  virtual void onPeerBufferLowWatermark() PURE;
 };
 
 /**
- * The interface as the union of ReadableSource and WritablePeer.
+ * The interface for the peer as a writer and supplied read status query.
  */
 class ReadWritable : public WritablePeer {
 public:
@@ -69,7 +69,7 @@ public:
   virtual bool isPeerShutDownWrite() const PURE;
 
   /**
-   * @return true if the pending receive buffer is not full.
+    * @return true if the pending receive buffer is not empty or read_end is set.
    */
   virtual bool isReadable() const PURE;
 };

@@ -35,11 +35,11 @@ public:
   MOCK_METHOD(void, setWriteEnd, ());
   MOCK_METHOD(bool, isWriteEndSet, ());
   MOCK_METHOD(void, onPeerDestroy, ());
-  MOCK_METHOD(void, maybeSetNewData, ());
+  MOCK_METHOD(void, setNewDataAvailable, ());
   MOCK_METHOD(Buffer::Instance*, getWriteBuffer, ());
   MOCK_METHOD(bool, isWritable, (), (const));
   MOCK_METHOD(bool, isPeerWritable, (), (const));
-  MOCK_METHOD(void, onPeerBufferWritable, ());
+  MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
   MOCK_METHOD(bool, isReadable, (), (const));
 };

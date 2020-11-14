@@ -15,8 +15,6 @@ namespace Extensions {
 namespace IoSocket {
 namespace BufferedIoSocket {
 
-class BufferedIoSocketHandleImpl;
-
 // Return the enabled events except EV_CLOSED. This implementation is generally good since only
 // epoll supports EV_CLOSED but the entire envoy code base supports another poller. The event owner
 // must assume EV_CLOSED is never activated. Also event owner must tolerate that OS could notify
@@ -26,7 +24,7 @@ class EventListenerImpl {
 public:
   ~EventListenerImpl() = default;
 
-  void onEventEnabled(uint32_t enabled_events);
+  void clearEphemeralEvents(uint32_t enabled_events);
   void onEventActivated(uint32_t activated_events);
 
   uint32_t getAndClearEphemeralEvents() { return std::exchange(ephemeral_events_, 0); }
@@ -43,13 +41,9 @@ public:
   UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
                          ReadWritable& io_source);
 
-  ~UserSpaceFileEventImpl() override = default;
-
   // Event::FileEvent
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
-
-  friend class BufferedIoSocketHandleImpl;
 
 private:
   // Used to populate the event operations of enable and activate.
@@ -58,10 +52,7 @@ private:
   // The handle to registered async callback from dispatcher.
   Event::SchedulableCallbackPtr schedulable_;
 
-  // The registered callback of this event. This callback is usually on top of the frame of
-  // Dispatcher::run().
-  std::function<void()> cb_;
-
+  // Supplies readable and writable status.
   ReadWritable& io_source_;
 };
 } // namespace BufferedIoSocket

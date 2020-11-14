@@ -19,7 +19,7 @@ namespace Extensions {
 namespace IoSocket {
 namespace BufferedIoSocket {
 namespace {
-Api::SysCallIntResult makeInvalidSyscall() {
+Api::SysCallIntResult makeInvalidSyscallResult() {
   return Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP};
 }
 } // namespace
@@ -27,15 +27,13 @@ Api::SysCallIntResult makeInvalidSyscall() {
 BufferedIoSocketHandleImpl::BufferedIoSocketHandleImpl()
     : pending_received_data_(
           [this]() -> void {
-            over_high_watermark_ = false;
             if (writable_peer_) {
               ENVOY_LOG(debug, "Socket {} switches to low watermark. Notify {}.",
                         static_cast<void*>(this), static_cast<void*>(writable_peer_));
-              writable_peer_->onPeerBufferWritable();
+              writable_peer_->onPeerBufferLowWatermark();
             }
           },
-          [this]() -> void {
-            over_high_watermark_ = true;
+          []() -> void {
             // Low to high is checked by peer after peer writes data.
           },
           []() -> void {}) {}
@@ -54,7 +52,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
                 static_cast<void*>(writable_peer_));
       // Notify the peer we won't write more data. shutdown(WRITE).
       writable_peer_->setWriteEnd();
-      writable_peer_->maybeSetNewData();
+      writable_peer_->setNewDataAvailable();
       // Notify the peer that we no longer accept data. shutdown(RD).
       writable_peer_->onPeerDestroy();
       writable_peer_ = nullptr;
@@ -91,12 +89,13 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
     auto bytes_to_read_in_this_slice =
         std::min(std::min(pending_received_data_.length(), max_length) - bytes_offset,
                  uint64_t(slices[i].len_));
-    pending_received_data_.copyOut(bytes_offset, bytes_to_read_in_this_slice, slices[i].mem_);
+    // Copy and drain, so pending_received_data_ always copy from offset 0.
+    pending_received_data_.copyOut(0, bytes_to_read_in_this_slice, slices[i].mem_);
+    pending_received_data_.drain(bytes_to_read_in_this_slice);
     bytes_offset += bytes_to_read_in_this_slice;
   }
   auto bytes_read = bytes_offset;
   ASSERT(bytes_read <= max_length);
-  pending_received_data_.drain(bytes_read);
   ENVOY_LOG(trace, "socket {} readv {} bytes", static_cast<void*>(this), bytes_read);
   return {bytes_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
@@ -123,6 +122,17 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                            uint64_t num_slice) {
+  // Empty input is allowed even though the peer is shutdown.
+  bool is_input_empty = true;
+  for (uint64_t i = 0; i < num_slice; i++) {
+    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
+      is_input_empty = false;
+      break;
+    }
+  }
+  if (is_input_empty) {
+    return Api::ioCallUint64ResultNoError();
+  };
   if (!isOpen()) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
@@ -134,7 +144,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
   }
   // Error: write after close.
   if (writable_peer_->isWriteEndSet()) {
-    // TODO(lambdai): EPIPE or ENOTCONN
+    // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
   }
@@ -151,12 +161,16 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
       bytes_written += slices[i].len_;
     }
   }
-  writable_peer_->maybeSetNewData();
+  writable_peer_->setNewDataAvailable();
   ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), bytes_written);
   return {bytes_written, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buffer) {
+  // Empty input is allowed even though the peer is shutdown.
+  if (buffer.length() == 0) {
+    return Api::ioCallUint64ResultNoError();
+  }
   if (!isOpen()) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
@@ -168,7 +182,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
   }
   // Error: write after close.
   if (writable_peer_->isWriteEndSet()) {
-    // TODO(lambdai): EPIPE or ENOTCONN
+    // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
   }
@@ -179,7 +193,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
   }
   uint64_t total_bytes_to_write = buffer.length();
   writable_peer_->getWriteBuffer()->move(buffer);
-  writable_peer_->maybeSetNewData();
+  writable_peer_->setNewDataAvailable();
   ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), total_bytes_to_write);
   return {total_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
@@ -227,10 +241,10 @@ bool BufferedIoSocketHandleImpl::supportsMmsg() const { return false; }
 bool BufferedIoSocketHandleImpl::supportsUdpGro() const { return false; }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::bind(Network::Address::InstanceConstSharedPtr) {
-  return makeInvalidSyscall();
+  return makeInvalidSyscallResult();
 }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::listen(int) { return makeInvalidSyscall(); }
+Api::SysCallIntResult BufferedIoSocketHandleImpl::listen(int) { return makeInvalidSyscallResult(); }
 
 Network::IoHandlePtr BufferedIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -244,14 +258,16 @@ BufferedIoSocketHandleImpl::connect(Network::Address::InstanceConstSharedPtr) {
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::setOption(int, int, const void*, socklen_t) {
-  return makeInvalidSyscall();
+  return makeInvalidSyscallResult();
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::getOption(int, int, void*, socklen_t*) {
-  return makeInvalidSyscall();
+  return makeInvalidSyscallResult();
 }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::setBlocking(bool) { return makeInvalidSyscall(); }
+Api::SysCallIntResult BufferedIoSocketHandleImpl::setBlocking(bool) {
+  return makeInvalidSyscallResult();
+}
 
 absl::optional<int> BufferedIoSocketHandleImpl::domain() { return absl::nullopt; }
 
@@ -305,7 +321,7 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
     ASSERT(writable_peer_);
     // Notify the peer we won't write more data.
     writable_peer_->setWriteEnd();
-    writable_peer_->maybeSetNewData();
+    writable_peer_->setNewDataAvailable();
     write_shutdown_ = true;
   }
   return {0, 0};

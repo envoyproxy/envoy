@@ -25,31 +25,33 @@ public:
 class BufferedIoSocketHandlePlatformTest : public testing::Test {
 public:
   BufferedIoSocketHandlePlatformTest() {
-    io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    io_handle_->setWritablePeer(io_handle_peer_.get());
-    io_handle_peer_->setWritablePeer(io_handle_.get());
+    first_io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
+    second_io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
+    first_io_handle_->setWritablePeer(second_io_handle_.get());
+    second_io_handle_->setWritablePeer(first_io_handle_.get());
   }
 
   ~BufferedIoSocketHandlePlatformTest() override {
-    if (io_handle_->isOpen()) {
-      io_handle_->close();
+    if (first_io_handle_->isOpen()) {
+      first_io_handle_->close();
     }
-    if (io_handle_peer_->isOpen()) {
-      io_handle_peer_->close();
+    if (second_io_handle_->isOpen()) {
+      second_io_handle_->close();
     }
   }
 
-  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_;
-  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<BufferedIoSocketHandleImpl> first_io_handle_;
+  std::unique_ptr<BufferedIoSocketHandleImpl> second_io_handle_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   MockFileEventCallback cb_;
 };
 
 TEST_F(BufferedIoSocketHandlePlatformTest, TestCreatePlatformDefaultTriggerTypeFailOnWindows) {
-  auto scheduable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration()).Times(0);
-  io_handle_->initializeFileEvent(
+  // scheduable_cb will be destroyed by IoHandle.
+  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb, enabled());
+  EXPECT_CALL(*scheduable_cb, cancel());
+  first_io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 }

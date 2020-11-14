@@ -38,7 +38,10 @@ public:
   ~BufferedIoSocketHandleImpl() override;
 
   // Network::IoHandle
-  os_fd_t fdDoNotUse() const override { return INVALID_SOCKET; }
+  os_fd_t fdDoNotUse() const override {
+    ASSERT(false, "not supported");
+    return INVALID_SOCKET;
+  }
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
@@ -81,7 +84,7 @@ public:
   // WritablePeer
   void setWriteEnd() override { read_end_stream_ = true; }
   bool isWriteEndSet() override { return read_end_stream_; }
-  void maybeSetNewData() override {
+  void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
       user_file_event_->activate(Event::FileReadyType::Read);
@@ -91,12 +94,12 @@ public:
     writable_peer_ = nullptr;
     write_shutdown_ = true;
   }
-  void onPeerBufferWritable() override {
+  void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
       user_file_event_->activate(Event::FileReadyType::Write);
     }
   }
-  bool isWritable() const override { return !over_high_watermark_; }
+  bool isWritable() const override { return !pending_received_data_.highWatermarkTriggered(); }
   bool isPeerWritable() const override {
     return writable_peer_ != nullptr && !writable_peer_->isWriteEndSet() &&
            writable_peer_->isWritable();
@@ -140,9 +143,6 @@ private:
 
   // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};
-
-  // The watermark state of pending_received_data_.
-  bool over_high_watermark_{false};
 };
 } // namespace BufferedIoSocket
 } // namespace IoSocket

@@ -1,3 +1,4 @@
+#include "common/common/fancy_logger.h"
 #include "envoy/event/file_event.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -20,11 +21,12 @@ namespace IoSocket {
 namespace BufferedIoSocket {
 namespace {
 
-MATCHER(IsInvalidateAddress, "") {
+MATCHER(IsInvalidAddress, "") {
   return arg.err_->getErrorCode() == Api::IoError::IoErrorCode::NoSupport;
 }
 
 MATCHER(IsNotSupportedResult, "") { return arg.errno_ == SOCKET_ERROR_NOT_SUP; }
+
 class MockFileEventCallback {
 public:
   MOCK_METHOD(void, called, (uint32_t arg));
@@ -61,38 +63,10 @@ public:
   absl::FixedArray<char> buf_;
 };
 
-TEST_F(BufferedIoSocketHandleTest, TestErrorOnClosedIoHandle) {
-  io_handle_->close();
-  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
-  result = io_handle_->recv(buf_.data(), buf_.size(), 0);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-
-  Buffer::OwnedImpl buf("0123456789");
-
-  result = io_handle_->read(buf, 10);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-
-  Buffer::RawSlice slice;
-  buf.reserve(1024, &slice, 1);
-  result = io_handle_->readv(1024, &slice, 1);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-
-  result = io_handle_->write(buf);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-
-  result = io_handle_->writev(&slice, 1);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-}
-
 // Test recv side effects.
 TEST_F(BufferedIoSocketHandleTest, TestBasicRecv) {
   auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
-  // EAGAIN.
+  // `EAGAIN`.
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   io_handle_->setWriteEnd();
@@ -400,6 +374,36 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
   io_handle_->resetFileEvents();
 }
 
+TEST_F(BufferedIoSocketHandleTest, TestErrorOnClosedIoHandle) {
+  io_handle_->close();
+  auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+
+  Buffer::OwnedImpl buf("0123456789");
+
+  result = io_handle_->read(buf, 10);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+
+  Buffer::RawSlice slice;
+  auto r = buf.reserve(1024, &slice, 1);
+  FANCY_LOG(debug,"r length= ", r);
+  FANCY_LOG(debug, "lambdai: slice.len = {}", slice.len_);
+  result = io_handle_->readv(1024, &slice, 1);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+
+  result = io_handle_->write(buf);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+
+  FANCY_LOG(debug, "lambdai: slice.len = {}", slice.len_);
+  result = io_handle_->writev(&slice, 1);
+  ASSERT(!result.ok());
+  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+}
+
 // Test that a readable event is raised when peer shutdown write. Also confirm read will return
 // EAGAIN.
 TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
@@ -465,7 +469,6 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
 // Test write return error code. Ignoring the side effect of event scheduling.
 TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
   Buffer::OwnedImpl buf("0123456789");
-  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 
   {
     // Populate write destination with massive data so as to not writable.
@@ -473,7 +476,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
     internal_buffer.setWatermarks(1024);
     internal_buffer.add(std::string(2048, ' '));
 
-    result = io_handle_->write(buf);
+    auto result = io_handle_->write(buf);
     ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
     EXPECT_EQ(10, buf.length());
   }
@@ -481,7 +484,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
   {
     // Write after shutdown.
     io_handle_->shutdown(ENVOY_SHUT_WR);
-    result = io_handle_->write(buf);
+    auto result = io_handle_->write(buf);
     ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
     EXPECT_EQ(10, buf.length());
   }
@@ -489,7 +492,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
   {
     io_handle_peer_->close();
     EXPECT_TRUE(io_handle_->isOpen());
-    result = io_handle_->write(buf);
+    auto result = io_handle_->write(buf);
     ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
   }
 }
@@ -498,21 +501,20 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
 TEST_F(BufferedIoSocketHandleTest, TestWritevErrorCode) {
   std::string buf(10, 'a');
   Buffer::RawSlice slice{static_cast<void*>(buf.data()), 10};
-  Api::IoCallUint64Result result{0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 
   {
     // Populate write destination with massive data so as to not writable.
     auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
     internal_buffer.setWatermarks(1024);
     internal_buffer.add(std::string(2048, ' '));
-    result = io_handle_->writev(&slice, 1);
+    auto result = io_handle_->writev(&slice, 1);
     ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
   }
 
   {
     // Writev after shutdown.
     io_handle_->shutdown(ENVOY_SHUT_WR);
-    result = io_handle_->writev(&slice, 1);
+    auto result = io_handle_->writev(&slice, 1);
     ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
   }
 
@@ -520,7 +522,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevErrorCode) {
     // Close the peer.
     io_handle_peer_->close();
     EXPECT_TRUE(io_handle_->isOpen());
-    result = io_handle_->writev(&slice, 1);
+    auto result = io_handle_->writev(&slice, 1);
     ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
   }
 }
@@ -777,18 +779,18 @@ TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnSetBlocking) {
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnSendmsg) {
   EXPECT_THAT(io_handle_->sendmsg(&slice_, 0, 0, nullptr,
                                   Network::Address::EnvoyInternalInstance("listener_id")),
-              IsInvalidateAddress());
+              IsInvalidAddress());
 }
 
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnRecvmsg) {
   Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
-  EXPECT_THAT(io_handle_->recvmsg(&slice_, 0, 0, output_is_ignored), IsInvalidateAddress());
+  EXPECT_THAT(io_handle_->recvmsg(&slice_, 0, 0, output_is_ignored), IsInvalidAddress());
 }
 
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnRecvmmsg) {
   RawSliceArrays slices_is_ignored(1, absl::FixedArray<Buffer::RawSlice>({slice_}));
   Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
-  EXPECT_THAT(io_handle_->recvmmsg(slices_is_ignored, 0, output_is_ignored), IsInvalidateAddress());
+  EXPECT_THAT(io_handle_->recvmmsg(slices_is_ignored, 0, output_is_ignored), IsInvalidAddress());
 }
 
 TEST_F(BufferedIoSocketHandleNotImplementedTest, TestErrorOnBind) {
