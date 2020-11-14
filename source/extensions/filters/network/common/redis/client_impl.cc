@@ -118,7 +118,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     command = redis_command_stats_->getUnusedStatName();
   }
 
-  pending_requests_.emplace_back(*this, callbacks, command);
+  pending_requests_.emplace_back(*this, callbacks, command, request.noreply_);
   encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
@@ -252,6 +252,8 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
         callbacks.onResponse(std::move(value));
       }
     }
+  } else if (request.noreply_) {
+    callbacks.onResponse(Common::Redis::Utility::makeError("noreply"));
   } else {
     callbacks.onResponse(std::move(value));
   }
@@ -268,13 +270,9 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
 }
 
-std::string ClientImpl::backends() {
-  return backends_;
-}
-
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks,
-                                           Stats::StatName command)
-    : parent_(parent), callbacks_(callbacks), command_{command},
+                                           Stats::StatName command, bool noreply)
+    : parent_(parent), callbacks_(callbacks), command_{command}, noreply_(noreply),
       aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
           parent_.scope_, parent_.time_source_)) {
   if (parent_.config_.enableCommandStats()) {

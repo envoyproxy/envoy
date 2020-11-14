@@ -92,7 +92,7 @@ public:
   void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
   bool connectionAllowed() { return connection_allowed_; }
-  std::string backends() override { return backends_; }
+  std::string backends() { return backends_; }
 private:
   friend class RedisProxyFilterTest;
 

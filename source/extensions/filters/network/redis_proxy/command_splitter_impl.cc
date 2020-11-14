@@ -171,38 +171,6 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   return request_ptr;
 }
 
-// mc cmd handler
-// cmd format: cmd key <flag ...>
-SplitRequestPtr McSimpleRequest::create(Router& router,
-                                        Common::Redis::RespValuePtr &&incoming_request,
-                                        SplitCallbacks &callbacks, CommandStats &command_stats,
-                                        TimeSource &time_source, bool delay_command_latency) {
-  std::string cmd = incoming_request.get()->asArray()[0].asString();
-  std::string key = incoming_request.get()->asArray()[1].asString();
-  std::cout << "cmd: " << cmd << "  key: " << key << std::endl;
-
-  ASSERT(incoming_request.get() != nullptr);
-
-  std::unique_ptr<McSimpleRequest> request_ptr{
-        new McSimpleRequest(callbacks, command_stats, time_source, delay_command_latency)};
-
-  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
-  if (route) {
-    Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
-
-    request_ptr->handle_ =
-          makeSingleServerRequest(route, base_request->asArray()[0].asString(),
-                                  base_request->asArray()[1].asString(), base_request, *request_ptr);
-  }
-
-  if (!request_ptr->handle_) {
-    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
-    return nullptr;
-  }
-
-  return request_ptr;
-}
-
 SplitRequestPtr McRetrievalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool delay_command_latency) {
@@ -252,11 +220,19 @@ SplitRequestPtr McRetrievalRequest::create(Router& router, Common::Redis::RespVa
 void McRetrievalRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
   pending_requests_[index].handle_ = nullptr;
 
-  pending_response_->asArray()[index].type(value->type());
+  ENVOY_LOG(trace, "onChildResponse {}", value->toString());
 
-  if (value->asArray().size() > 1) {
+  pending_response_->asArray()[index].type(Common::Redis::RespType::Array);
+
+  switch (value->type()) {
+    case Common::Redis::RespType::Error:
+      pending_response_->asArray()[index].asArray().emplace_back(value->asString());
+      break;
+    case Common::Redis::RespType::Array:
     pending_response_->asArray()[index].asArray().swap(value->asArray());
-    // pending_response_->asArray()[index].asArray().push_back(item);
+    default:
+      // FIXME(lvht)
+      break;
   }
 
   ASSERT(num_pending_responses_ > 0);
@@ -542,7 +518,7 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),
-      mc_simple_command_handler_(*router_), mc_retrieval_commands_handler_(*router_),
+      mc_retrieval_commands_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
@@ -556,11 +532,6 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
   for (const std::string& command :
        Common::Redis::SupportedCommands::hashMultipleSumResultCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, split_keys_sum_result_handler_);
-  }
-
-  // TODO mc cmd add prefix ?
-  for (const std::string& command : Common::Redis::SupportedCommands::mcSimpleCommands()) {
-    addHandler(scope, stat_prefix, command, latency_in_micros, mc_simple_command_handler_);
   }
 
   for (const std::string& command : Common::Redis::SupportedCommands::mcRetrievalCommands()) {
@@ -580,8 +551,6 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
                                           SplitCallbacks& callbacks,
                                           Event::Dispatcher& dispatcher) {
   ASSERT(request->type() == Common::Redis::RespType::Array);
-  // TODO
-  /*
   if ((request->type() != Common::Redis::RespType::Array) || request->asArray().empty()) {
     onInvalidRequest(callbacks);
     return nullptr;
@@ -593,7 +562,6 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
       return nullptr;
     }
   }
-  */
 
   std::string to_lower_string = absl::AsciiStrToLower(request->asArray()[0].asString());
 
@@ -608,14 +576,6 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
       callbacks.onAuth(request->asArray()[1].asString());
     }
 
-    return nullptr;
-  }
-
-  if (request->type() == Common::Redis::RespType::Array && to_lower_string == Common::Redis::SupportedCommands::quit()) {
-    Common::Redis::RespValuePtr pong(new Common::Redis::RespValue());
-    pong->type(Common::Redis::RespType::SimpleString);
-    pong->asString() = "";
-    callbacks.onResponse(std::move(pong));
     return nullptr;
   }
 

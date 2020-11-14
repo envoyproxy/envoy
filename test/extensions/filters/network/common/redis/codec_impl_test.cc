@@ -428,6 +428,359 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidBulkStringExpectLF) {
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
+class MemcachedEncoderDecoderImplTest : public testing::Test, public DecoderCallbacks {
+public:
+  MemcachedEncoderDecoderImplTest() : decoder_(*this) {}
+
+  // RedisProxy::DecoderCallbacks
+  void onRespValue(RespValuePtr&& value) override {
+    decoded_value_ = std::move(value);
+  }
+
+  MemcachedEncoder encoder_;
+  MemcachedDecoder decoder_;
+  Buffer::OwnedImpl buffer_;
+  RespValuePtr decoded_value_;
+};
+
+TEST_F(MemcachedEncoderDecoderImplTest, SimpleStrings) {
+  std::array<std::string, 11> strs = {
+    "DELETED\r\n", "EXISTS\r\n", "NOT_FOUND\r\n", "NOT_STORED\r\n",
+    "STORED\r\n", "TOUCHED\r\n", "ERROR\r\n", "END\r\n", "123\r\n",
+    "CLIENT_ERROR <error>\r\n", "SERVER_ERROR <error>\r\n" };
+
+  for(const auto& str: strs) {
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(1, decoded_value_->asArray().size());
+    EXPECT_EQ(str, decoded_value_->asArray()[0].asString()+"\r\n");
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+}
+
+TEST_F(MemcachedEncoderDecoderImplTest, ValueResp) {
+  {
+    auto str = "VALUE foo 12 10\r\n0123456789\r\nEND\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(5, decoded_value_->asArray().size());
+    EXPECT_EQ("VALUE", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("10", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ("0123456789", decoded_value_->asArray()[4].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString()+"END\r\n");
+  }
+
+  {
+    auto str = "VALUE foo 12 10 casxxxx\r\n0123456789\r\nEND\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(6, decoded_value_->asArray().size());
+    EXPECT_EQ("VALUE", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("10", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ("casxxxx", decoded_value_->asArray()[4].asString());
+    EXPECT_EQ("0123456789", decoded_value_->asArray()[5].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString()+"END\r\n");
+  }
+}
+
+TEST_F(MemcachedEncoderDecoderImplTest, RetrievalCommands) {
+  std::array<std::string, 1> cmds = {"gets"};
+  for(const auto& cmd : cmds) {
+    auto str = cmd+" foo bar baz\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(4, decoded_value_->asArray().size());
+    EXPECT_EQ(cmd, decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("bar", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("baz", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+}
+
+TEST_F(MemcachedEncoderDecoderImplTest, GetAndTouch) {
+  std::array<std::string, 2> cmds = {"gat", "gats"};
+  for(const auto& cmd : cmds) {
+    auto str = cmd + " 1024 foo bar baz\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(5, decoded_value_->asArray().size());
+    EXPECT_EQ(cmd, decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("1024", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("bar", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ("baz", decoded_value_->asArray()[4].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+}
+
+TEST_F(MemcachedEncoderDecoderImplTest, StorageCommands) {
+  std::array<std::string, 5> cmds = {"set", "add", "replace", "append", "prepend" };
+  for(const auto& cmd : cmds) {
+    auto str = cmd+" foo 12 34 2\r\nhi\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(6, decoded_value_->asArray().size());
+    EXPECT_EQ(cmd, decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("34", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ("2", decoded_value_->asArray()[4].asString());
+    EXPECT_EQ("hi", decoded_value_->asArray()[5].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+
+  {
+    auto str = "set foo 12 34 0\r\n\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(6, decoded_value_->asArray().size());
+    EXPECT_EQ("set", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("34", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ("0", decoded_value_->asArray()[4].asString());
+    EXPECT_EQ("", decoded_value_->asArray()[5].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+
+  {
+    auto str = "set foo 12 34 10 noreply\r\n0123456789\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(6, decoded_value_->asArray().size());
+    EXPECT_EQ("set", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("34", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ("10", decoded_value_->asArray()[4].asString());
+    EXPECT_EQ("0123456789", decoded_value_->asArray()[5].asString());
+    EXPECT_EQ(true, decoded_value_->noreply_);
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ("set foo 12 34 10\r\n0123456789\r\n", buf.toString());
+  }
+
+  {
+    auto str = "cas foo 12 34 2 111\r\nhi\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(7, decoded_value_->asArray().size());
+    EXPECT_EQ("cas", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("34", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ("2", decoded_value_->asArray()[4].asString());
+    EXPECT_EQ("111", decoded_value_->asArray()[5].asString());
+    EXPECT_EQ("hi", decoded_value_->asArray()[6].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+
+  {
+    auto str = "cas foo 12 34 2 111 noreply\r\nhi\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(7, decoded_value_->asArray().size());
+    EXPECT_EQ("cas", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("34", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ("2", decoded_value_->asArray()[4].asString());
+    EXPECT_EQ("111", decoded_value_->asArray()[5].asString());
+    EXPECT_EQ("hi", decoded_value_->asArray()[6].asString());
+    EXPECT_EQ(true, decoded_value_->noreply_);
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ("cas foo 12 34 2 111\r\nhi\r\n", buf.toString());
+  }
+}
+
+TEST_F(MemcachedEncoderDecoderImplTest, DeleteCommands) {
+  {
+    auto str = "delete foo\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(2, decoded_value_->asArray().size());
+    EXPECT_EQ("delete", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+
+  {
+    auto str = "delete foo noreply\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(2, decoded_value_->asArray().size());
+    EXPECT_EQ("delete", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ(true, decoded_value_->noreply_);
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ("delete foo\r\n", buf.toString());
+  }
+}
+
+TEST_F(MemcachedEncoderDecoderImplTest, MiscUpdateCommands) {
+  std::array<std::string, 2> cmds = {"incr", "decr"};
+  for(const auto& cmd : cmds) {
+    auto str = cmd+" foo 12\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(3, decoded_value_->asArray().size());
+    EXPECT_EQ(cmd, decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+
+  for(const auto& cmd : cmds) {
+    auto str = cmd+" foo 12 noreply\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(3, decoded_value_->asArray().size());
+    EXPECT_EQ(cmd, decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ(true, decoded_value_->noreply_);
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(cmd+" foo 12\r\n", buf.toString());
+  }
+}
+
+TEST_F(MemcachedEncoderDecoderImplTest, QuitCommand) {
+  {
+    auto str = "quit\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(1, decoded_value_->asArray().size());
+    EXPECT_EQ("quit", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+}
+
+TEST_F(MemcachedEncoderDecoderImplTest, McMagicCommands) {
+  {
+    auto str = "touch foo 12\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(3, decoded_value_->asArray().size());
+    EXPECT_EQ("touchmc", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("12", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+
+  {
+    auto str = "get foo bar baz\r\n";
+
+    buffer_.add(str);
+    decoder_.decode(buffer_);
+    EXPECT_EQ(RespType::Array, decoded_value_->type());
+    EXPECT_EQ(4, decoded_value_->asArray().size());
+    EXPECT_EQ("getmc", decoded_value_->asArray()[0].asString());
+    EXPECT_EQ("foo", decoded_value_->asArray()[1].asString());
+    EXPECT_EQ("bar", decoded_value_->asArray()[2].asString());
+    EXPECT_EQ("baz", decoded_value_->asArray()[3].asString());
+    EXPECT_EQ(0UL, buffer_.length());
+
+    Buffer::OwnedImpl buf;
+    encoder_.encode(*decoded_value_, buf);
+    EXPECT_EQ(str, buf.toString());
+  }
+}
+
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

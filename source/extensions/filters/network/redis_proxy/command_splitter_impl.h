@@ -392,7 +392,6 @@ private:
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
-  CommandHandlerFactory<McSimpleRequest> mc_simple_command_handler_;
   CommandHandlerFactory<McRetrievalRequest> mc_retrieval_commands_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;

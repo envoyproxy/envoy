@@ -136,6 +136,8 @@ public:
   RespType type() const { return type_; }
   void type(RespType type);
 
+  bool noreply_;
+
 private:
   union {
     std::vector<RespValue> array_;
@@ -166,8 +168,6 @@ public:
    * @param value supplies the decoded value that is now owned by the callee.
    */
   virtual void onRespValue(RespValuePtr&& value) PURE;
-
-  virtual std::string backends() PURE;
 };
 
 /**

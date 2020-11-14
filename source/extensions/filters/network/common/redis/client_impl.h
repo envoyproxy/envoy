@@ -90,7 +90,6 @@ public:
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
-  std::string backends() override;
 private:
   friend class RedisClientImplTest;
 
@@ -107,7 +106,7 @@ private:
   };
 
   struct PendingRequest : public PoolRequest {
-    PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks, Stats::StatName stat_name);
+    PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks, Stats::StatName stat_name, bool noreply);
     ~PendingRequest() override;
 
     // PoolRequest
@@ -117,6 +116,7 @@ private:
     ClientCallbacks& callbacks_;
     Stats::StatName command_;
     bool canceled_{};
+    bool noreply_{};
     Stats::TimespanPtr aggregate_request_timer_;
     Stats::TimespanPtr command_request_timer_;
   };

@@ -62,6 +62,11 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 }
 
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
+  if (value->asArray()[0].asString() == "quit") {
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    return;
+  }
+
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
   CommandSplitter::SplitRequestPtr split =

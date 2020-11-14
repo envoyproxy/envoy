@@ -31,7 +31,9 @@ struct SupportedCommands {
         "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "zadd",
         "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
         "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
-        "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
+        "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore",
+	/* memcached additional simple commands */
+	"cas", "add", "replace", "prepend", "delete", "touchmc");
   }
 
   /**
@@ -49,18 +51,13 @@ struct SupportedCommands {
   }
 
   /**
-   * @return commands which mc simple cmd
+   * @return commands which mc gets cmd
+   *
+   * Only support gets to retrive multiple keys.
+   * Redis use get as well, but only allow single key.
    */
-  static const absl::flat_hash_set<std::string>& mcSimpleCommands() {
-    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "set", "cas", "add", "replace", "append",
-        "prepend", "incr", "decr", "delete", "touch");
-  }
-
-  /**
- * @return commands which mc get/gets cmd
- */
   static const absl::flat_hash_set<std::string>& mcRetrievalCommands() {
-    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "gets", "get");
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "getmc", "gets");
   }
 
   /**
