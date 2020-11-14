@@ -68,7 +68,7 @@ Create self-signed certificates for these endpoints as follows:
    writing new private key to 'certs/domain3.key.pem'
    -----
 
-.. note::
+.. warning::
 
    ``SNI`` does *not* validate that the certificates presented are correct for the domain, or that they
    were issued by a recognised certificate authority.
