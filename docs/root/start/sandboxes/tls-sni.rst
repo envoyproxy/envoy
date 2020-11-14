@@ -112,8 +112,8 @@ The client proxy has no ``TLS`` termination but instead proxies to the ``TLS`` e
    tls-sni_http-upstream1_1   node ./index.js                Up
    tls-sni_http-upstream2_1   node ./index.js                Up
    tls-sni_http-upstream3_1   node ./index.js                Up
-   tls-sni_proxy-client_1     /docker-entrypoint.sh /usr ... Up      0.0.0.0:20000->10000/tcp
    tls-sni_proxy_1            /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
+   tls-sni_proxy-client_1     /docker-entrypoint.sh /usr ... Up      0.0.0.0:20000->10000/tcp
 
 Step 2: Query the ``SNI`` endpoints directly with curl
 ******************************************************
