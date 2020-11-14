@@ -1,34 +1,25 @@
 .. _arch_overview_load_balancing_degraded:
 
-Degraded endpoints
+降级的端点
 ------------------
 
-Envoy supports marking certain endpoints as degraded, meaning that they are able to receive
-traffic, but should only receive traffic once there are not sufficient healthy hosts available.
+Envoy 支持将某些端点做降级处理，这意味着它们能够接收流量，但只有在没有足够的健康主机可用时才可以接收流量。
 
-Routing to degraded hosts can be thought of as similar to routing to hosts in a
-lower :ref:`priority <arch_overview_load_balancing_priority_levels>`, although
-degraded hosts will count against their original priority's health percentage
-for the purposes of computing traffic spillover. As the amount of healthy hosts
-available is no longer sufficient to handle 100% of the load, traffic will
-spill over to degraded hosts using the same mechanism as priority spillover for
-healthy hosts. This ensures that traffic is gradually shifted to degraded hosts
-as it becomes necessary.
+向降级的主机进行路由，可以理解为类似于向处于较低 :ref:`优先级 <arch_overview_load_balancing_priority_levels>` 的主机进行路由，不过在计算流量溢出时，降级主机将计入其原有优先级的健康百分比。当可用的健康主机数量不再足以处理 100% 的负载时，按照健康主机的优先级溢出机制，流量将会被导流到降级主机。这样可以确保流量在必要时逐渐转移到降级主机上。
 
 
-+--------------------------------+------------------------------+-------------------------------+
-| P=0 healthy/degraded/unhealthy | Traffic to P=0 healthy hosts | Traffic to P=0 degraded hosts |
-+================================+==============================+===============================+
-| 100%/0%/0%                     | 100%                         |   0%                          |
-+--------------------------------+------------------------------+-------------------------------+
-| 71%/0%/29%                     | 100%                         |   0%                          |
-+--------------------------------+------------------------------+-------------------------------+
-| 71%/29%/0%                     | 99%                          |   1%                          |
-+--------------------------------+------------------------------+-------------------------------+
-| 25%/65%/10%                    | 35%                          |   65%                         |
-+--------------------------------+------------------------------+-------------------------------+
-| 5%/0%/95%                      | 100%                         |   0%                          |
-+--------------------------------+------------------------------+-------------------------------+
++----------------------------+-----------------------+-----------------------+
+| P=0 健康到/降级到/不健康到 | 到 P=0 健康主机的流量 | 到 P=0 降级主机的流量 |
++============================+=======================+=======================+
+| 100%/0%/0%                 | 100%                  | 0%                    |
++----------------------------+-----------------------+-----------------------+
+| 71%/0%/29%                 | 100%                  | 0%                    |
++----------------------------+-----------------------+-----------------------+
+| 71%/29%/0%                 | 99%                   | 1%                    |
++----------------------------+-----------------------+-----------------------+
+| 25%/65%/10%                | 35%                   | 65%                   |
++----------------------------+-----------------------+-----------------------+
+| 5%/0%/95%                  | 100%                  | 0%                    |
++----------------------------+-----------------------+-----------------------+
 
-Endpoints can be marked as degraded by using active health checking and having the upstream host
-return a :ref:`special header <arch_overview_health_checking_degraded>`.
+通过主动健康检查并让上游主机返回一个 :ref:`特殊头部 <arch_overview_health_checking_degraded>`，可以将端点标记为降级。
