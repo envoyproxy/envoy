@@ -1,24 +1,19 @@
 .. _arch_overview_network_filters:
 
-Network (L3/L4) filters
+网络 (L3/L4) 过滤器
 =======================
 
-As discussed in the :ref:`listener <arch_overview_listeners>` section, network level (L3/L4) filters
-form the core of Envoy connection handling. The filter API allows for different sets of filters to
-be mixed and matched and attached to a given listener. There are three different types of network
-filters:
+如在监听器部分的描述一样，网络 (L3/L4) 过滤器构成了 Envoy 连接处理的核心。
+过滤器 API 允许混合和匹配不同的过滤器集，并将其附加到特定的监听器上。
+下面就有三种不同的网络过滤器：
 
-* **Read**: Read filters are invoked when Envoy receives data from a downstream connection.
-* **Write**: Write filters are invoked when Envoy is about to send data to a downstream connection.
-* **Read/Write**: Read/Write filters are invoked both when Envoy receives data from a downstream
-  connection and when it is about to send data to a downstream connection.
+* **读取**: 当Envoy 从下游连接接收数据时，将会调用读取过滤器。
+* **写入**:  当Envoy 将要向下游发送数据时，将会调用写入过滤器。
+* **读取/写入**: 读取/写入过滤器会在 Envoy 从下游连接接收数据或者向下游连接写入数据时都会被调用。
 
-The API for network level filters is relatively simple since ultimately the filters operate on raw
-bytes and a small number of connection events (e.g., TLS handshake complete, connection disconnected
-locally or remotely, etc.). Filters in the chain can stop and subsequently continue iteration to
-further filters. This allows for more complex scenarios such as calling a :ref:`rate limiting
-service <arch_overview_global_rate_limit>`, etc. Network level filters can also share state (static and
-dynamic) among themselves within the context of a single downstream connection. Refer to
-:ref:`data sharing between filters <arch_overview_data_sharing_between_filters>` for more details.
-Envoy already includes several network level filters that are documented in this architecture
-overview as well as the :ref:`configuration reference <config_network_filters>`.
+网络过滤器的 API 都相对简单，因为过滤器在原始字节和少量连接事件上运行。（比如 TLS 握手完成、本地或远程断开连接）
+链中的过滤器可以停止，然后继续迭代到下一步的过滤器。
+这样就能允许在更复杂的场景中使用，比如 :ref:`调用速率限制服务 <arch_overview_global_rate_limit>` 。
+同时网络筛选器可以在单个下游连接的上下文中彼此共享状态（静态和动态）。
+有关其他的信息，可以参考 :ref:`过滤器之间的数据共享 <arch_overview_data_sharing_between_filters>` 。
+Envoy 现在已经有好几个网络过滤器，这些过滤器在本体系架构概述和 :ref:`配置参考 <config_network_filters>` 中都有记录。
