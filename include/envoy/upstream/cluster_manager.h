@@ -24,6 +24,7 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/store.h"
+#include "envoy/stats/symbol_table.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/health_checker.h"
@@ -297,6 +298,8 @@ public:
 
 using CdsApiPtr = std::unique_ptr<CdsApi>;
 
+struct ClusterManagerStatNames;
+
 /**
  * Factory for objects needed during cluster manager operation.
  */
@@ -347,6 +350,8 @@ public:
    * Returns the secret manager.
    */
   virtual Secret::SecretManager& secretManager() PURE;
+
+  virtual ClusterManagerStatNames& statNames() PURE;
 };
 
 /**

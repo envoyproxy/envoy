@@ -251,7 +251,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
-      cm_stats_(generateStats(stats)),
+      cm_stats_(generateStats(stats, factory)),
       init_helper_(*this, [this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
@@ -415,10 +415,29 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   }
 }
 
-ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
-  const std::string final_prefix = "cluster_manager.";
+/*ClusterManagerStats::ClusterManagerStats(
+    const ClusterManagerStatNames& stat_names, Stats::Scope& scope)
+    : scope_(scope)
+      //BLAH(cluster_added) {}
+      WITH_STAT_CONTEXT(stat_names, stat_names.prefix_, scope,
+                        ALL_CLUSTER_MANAGER_STATS(BLAH, BLAB)) {}
+
+      //WITH_STAT_CONTEXT(stat_names, stat_names.prefix_ BLAH(cluster_added) {}
+
+        ALL_CLUSTER_MANAGER_STATS(
+            WITH_STAT_NAME_CONTEXT(scope, stat_names, stat_names.prefix_,
+            GENERATE_GAUGE_PREFIX_FROM_STAT_NAME(scope, stat_names, stat_names.prefix_)) {}
+
+  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+        */
+
+ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope,
+                                                      ClusterManagerFactory& factory) {
+  /*  const std::string final_prefix = "cluster_manager.";
   return {ALL_CLUSTER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
+  */
+  return ClusterManagerStats(factory.statNames(), factory.statNames().prefix_, scope);
 }
 
 void ClusterManagerImpl::onClusterInit(Cluster& cluster) {

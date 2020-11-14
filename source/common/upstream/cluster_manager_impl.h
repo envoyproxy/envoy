@@ -36,6 +36,46 @@ namespace Envoy {
 namespace Upstream {
 
 /**
+ * All cluster manager stats. @see stats_macros.h
+ */
+#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE)                                                  \
+  COUNTER(cluster_added)                                                                           \
+  COUNTER(cluster_modified)                                                                        \
+  COUNTER(cluster_removed)                                                                         \
+  COUNTER(cluster_updated)                                                                         \
+  COUNTER(cluster_updated_via_merge)                                                               \
+  COUNTER(update_merge_cancelled)                                                                  \
+  COUNTER(update_out_of_merge_window)                                                              \
+  GAUGE(active_clusters, NeverImport)                                                              \
+  GAUGE(warming_clusters, NeverImport)
+
+struct ClusterManagerStatNames {
+  ClusterManagerStatNames(Stats::SymbolTable& symbol_table)
+      : pool_(symbol_table),
+        prefix_(pool_.add("cluster_manager"))
+        ALL_CLUSTER_MANAGER_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT) {}
+
+  Stats::StatNamePool pool_;
+  Stats::StatName prefix_;
+  ALL_CLUSTER_MANAGER_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)
+};
+
+#define STAT_STRUCT(Stats, StatNames, STAT_MACRO)
+
+MAKE_STATS_STRUCT(ClusterManagerStats, ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
+
+/*
+ALL_STATS(BLAH, BLAB) {}
+struct ClusterManagerStats {
+  ClusterManagerStats(const ClusterManagerStatNames& stat_names, Stats::StatName prefix, Stats::Scope& scope)
+      : scope_(scope) ALL_CLUSTER_MANAGER_STATS(BLAH, BLAB) {}
+
+  Stats::Scope& scope_;
+  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+*/
+
+/**
  * Production implementation of ClusterManagerFactory.
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
@@ -55,7 +95,7 @@ public:
         runtime_(runtime), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager) {}
+        singleton_manager_(singleton_manager), stat_names_(stats.symbolTable()) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -75,6 +115,7 @@ public:
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
+  virtual ClusterManagerStatNames& statNames() override { return stat_names_; }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
@@ -92,6 +133,7 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
+  ClusterManagerStatNames stat_names_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -165,25 +207,18 @@ private:
 };
 
 /**
- * All cluster manager stats. @see stats_macros.h
- */
-#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE)                                                  \
-  COUNTER(cluster_added)                                                                           \
-  COUNTER(cluster_modified)                                                                        \
-  COUNTER(cluster_removed)                                                                         \
-  COUNTER(cluster_updated)                                                                         \
-  COUNTER(cluster_updated_via_merge)                                                               \
-  COUNTER(update_merge_cancelled)                                                                  \
-  COUNTER(update_out_of_merge_window)                                                              \
-  GAUGE(active_clusters, NeverImport)                                                              \
-  GAUGE(warming_clusters, NeverImport)
-
-/**
  * Struct definition for all cluster manager stats. @see stats_macros.h
  */
-struct ClusterManagerStats {
+struct ClusterManagerStatsOld {
   ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
+
+/*struct ClusterManagerStats {
+  ClusterManagerStats(const ClusterManagerStatNames& stat_names, Stats::Scope& scope);
+
+  Stats::Scope& scope_;
+  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  };*/
 
 /**
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
@@ -476,7 +511,7 @@ private:
                       const uint64_t timeout);
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
-  static ClusterManagerStats generateStats(Stats::Scope& scope);
+  static ClusterManagerStats generateStats(Stats::Scope& scope, ClusterManagerFactory& factory);
 
   /**
    * @return ClusterDataPtr contains the previous cluster in the cluster_map, or

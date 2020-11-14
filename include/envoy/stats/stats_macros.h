@@ -5,6 +5,9 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
+#include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
+
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -45,6 +48,25 @@ namespace Envoy {
 #define FINISH_STAT_DECL_MODE_(X, MODE) #X), Envoy::Stats::Gauge::ImportMode::MODE),
 #define FINISH_STAT_DECL_UNIT_(X, UNIT) #X), Envoy::Stats::Histogram::Unit::UNIT),
 
+#define FINISH_STAT_NAME_DECL_(X) X##_)),
+#define FINISH_STAT_NAME_DECL_MODE_(X, MODE) X##_), Envoy::Stats::Gauge::ImportMode::MODE),
+#define FINISH_STAT_NAME_DECL_UNIT_(X, UNIT) X##_), Envoy::Stats::Histogram::Unit::UNIT),
+
+//#define WITH_STAT_CONTEXT(POOL, STAT_NAMES, PREFIX, EXPR) , EXPR
+//#define STAT_NAME_DECL_(NAME)                                         \
+//  , NAME##_(Envoy::Stats::Utility::counterFromStatNames((POOL), Envoy::statNameJoin(PREFIX, STAT_NAMES.NAME##_)))
+
+// Used for declaring StatNames in a structure.
+#define GENERATE_STAT_NAME_STRUCT(NAME, ...) Envoy::Stats::StatName NAME##_;
+#define GENERATE_STAT_NAME_INIT(NAME, ...) , NAME##_(pool_.add(#NAME))
+#define GENERATE_COUNTER_FROM_STAT_NAME(NAME) , NAME##_(scope.counterFromStatName(stat_names.NAME##_))
+#define GENERATE_COUNTER_PREFIX_FROM_STAT_NAME(POOL, STAT_NAMES, PREFIX) \
+  , Envoy::Stats::Utility::counterFromStatNames((POOL), Envoy::statNameJoin(PREFIX, STAT_NAMES.FINISH_STAT_NAME_DECL_
+#define GENERATE_GAUGE_FROM_STAT_NAME(NAME, MODE) \
+  , NAME##_(scope.gaugeFromStatName(stat_names.NAME##_, Envoy::Stats::Gauge::ImportMode::MODE))
+#define GENERATE_GAUGE_PREFIX_FROM_STAT_NAME(POOL, STAT_NAMES, PREFIX)   \
+  , Envoy::Stats::Utility::gaugeFromStatNames((POOL), Envoy::statNameJoin(PREFIX, STAT_NAMES.FINISH_STAT_NAME_DECL_MODE_
+
 static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_view token) {
   if (prefix.empty()) {
     return std::string(token);
@@ -53,6 +75,23 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
     return absl::StrCat(prefix, token);
   }
   return absl::StrCat(prefix, ".", token);
+}
+
+// Macros for declaring stat-structures using StatNames, for those that must be
+// instantiated during operation, and where speed and scale matters.
+#define MAKE_STATS_STRUCT_COUNTER_HELPER_(NAME) , NAME##_(Envoy::Stats::Utility::counterFromStatNames( \
+    scope, {prefix, stat_names.NAME##_}))
+#define MAKE_STATS_STRUCT_GAUGE_HELPER_(NAME, MODE) , NAME##_(Envoy::Stats::Utility::gaugeFromStatNames( \
+    scope, {prefix, stat_names.NAME##_}, Envoy::Stats::Gauge::ImportMode::MODE))
+
+#define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)    \
+  struct StatsStruct { \
+    StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::StatName prefix, \
+                Envoy::Stats::Scope& scope)                             \
+        : scope_(scope) \
+          ALL_STATS(MAKE_STATS_STRUCT_COUNTER_HELPER_, MAKE_STATS_STRUCT_GAUGE_HELPER_) {} \
+  Envoy::Stats::Scope& scope_; \
+  ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT) \
 }
 
 #define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counterFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_

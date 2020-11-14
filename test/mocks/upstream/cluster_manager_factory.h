@@ -37,6 +37,8 @@ public:
   MOCK_METHOD(CdsApiPtr, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm));
 
+  MOCK_METHOD(ClusterManagerStatNames&, statNames, ());
+
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
 };
