@@ -4,8 +4,6 @@ static_resources:
       socket_address:
         address: 0.0.0.0
         port_value: 20000
-    listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -23,25 +21,25 @@ static_resources:
               - match:
                   prefix: "/domain1"
                 route:
-                  cluster: service-http-domain1
+                  cluster: proxy-client-domain1
               - match:
                   prefix: "/domain2"
                 route:
-                  cluster: service-http-domain2
+                  cluster: proxy-client-domain2
               - match:
                   prefix: "/domain3"
                 route:
-                  cluster: service-http-domain3
+                  cluster: proxy-client-domain3
           http_filters:
           - name: envoy.filters.http.router
 
   clusters:
-  - name: service-http-domain1
+  - name: proxy-client-domain1
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
     load_assignment:
-      cluster_name: service-http-domain1
+      cluster_name: proxy-client-domain1
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -53,14 +51,14 @@ static_resources:
       name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: domain1
+        sni: domain1.example.com
 
-  - name: service-http-domain2
+  - name: proxy-client-domain2
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
     load_assignment:
-      cluster_name: service-http-domain2
+      cluster_name: proxy-client-domain2
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -72,15 +70,14 @@ static_resources:
       name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: domain2
+        sni: domain2.example.com
 
-
-  - name: service-http-domain3
+  - name: proxy-client-domain3
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
     load_assignment:
-      cluster_name: service-http-domain3
+      cluster_name: proxy-client-domain3
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -92,4 +89,4 @@ static_resources:
       name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: domain3
+        sni: domain3.example.com
