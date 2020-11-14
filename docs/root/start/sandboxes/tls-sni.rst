@@ -1,6 +1,6 @@
 .. _install_sandboxes_tls_sni:
 
-Server name indication (``TLS``/``SNI``)
+``TLS`` Server name indication (``SNI``)
 ========================================
 
 .. sidebar:: Requirements
@@ -118,13 +118,49 @@ The client proxy has no ``TLS`` termination but instead proxies to the ``TLS`` e
 Step 2: Query the ``SNI`` endpoints directly with curl
 ******************************************************
 
-asdf
+We can use curl to query the ``SNI``-routed ``HTTPS`` endpoints of the Envoy proxy directly.
 
+To do this we must explicitly tell curl to resolve the ``DNS`` for the endpoints correctly.
+
+Each endpoint should proxy to the respective ``http-upstream`` service.
+
+.. code-block:: console
+
+   $ curl -sk --resolve domain1.example.com:10000:127.0.0.1 \
+	 https://domain1.example.com:10000 \
+	| jq -r '.os.hostname'
+   http-upstream1
+
+   $ curl -sk --resolve domain2.example.com:10000:127.0.0.1 \
+	 https://domain2.example.com:10000 \
+	| jq -r '.os.hostname'
+   http-upstream2
+
+   $ curl -sk --resolve domain3.example.com:10000:127.0.0.1 \
+	 https://domain3.example.com:10000 \
+	| jq -r '.os.hostname'
+   http-upstream3
 
 Step 2: Query the ``SNI`` endpoints via an Envoy proxy client
 *************************************************************
 
-asdf
+We can also query the Envoy proxy client paths.
+
+These route via the ``SNI`` proxy endpoints to the respective ``http-upstream`` services.
+
+.. code-block:: console
+
+   $ curl -s http://localhost:20000/domain1 \
+        | jq '.os.hostname'
+   http-upstream1
+
+   $ curl -s http://localhost:20000/domain2 \
+        | jq '.os.hostname'
+   http-upstream2
+
+   $ curl -s http://localhost:20000/domain3 \
+        | jq '.os.hostname'
+   http-upstream3
 
 .. seealso::
 
