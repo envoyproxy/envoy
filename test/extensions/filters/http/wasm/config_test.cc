@@ -67,6 +67,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFilterConfigTest,
                          Envoy::Extensions::Common::Wasm::sandbox_runtime_values);
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterConfigTest);
 
 TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
   const std::string json = TestEnvironment::substitute(absl::StrCat(R"EOF(

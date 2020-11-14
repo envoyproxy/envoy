@@ -6,12 +6,12 @@ namespace Common {
 namespace Wasm {
 
 std::vector<std::string> runtimes() {
-  std::vector<std::string> runtimes = sandbox_runtimes();
+  std::vector<std::string> runtimes = sandboxRuntimes();
   runtimes.push_back("null");
   return runtimes;
 }
 
-std::vector<std::string> sandbox_runtimes() {
+std::vector<std::string> sandboxRuntimes() {
   std::vector<std::string> runtimes;
 #if defined(ENVOY_WASM_V8)
   runtimes.push_back("v8");
@@ -25,9 +25,9 @@ std::vector<std::string> sandbox_runtimes() {
   return runtimes;
 }
 
-std::vector<std::tuple<std::string, std::string>> runtimes_and_languages() {
+std::vector<std::tuple<std::string, std::string>> runtimesAndLanguages() {
   std::vector<std::tuple<std::string, std::string>> values;
-  for (const auto& runtime : sandbox_runtimes()) {
+  for (const auto& runtime : sandboxRuntimes()) {
     values.push_back(std::make_tuple(runtime, "cpp"));
     values.push_back(std::make_tuple(runtime, "rust"));
   }

@@ -81,6 +81,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest,
                          Envoy::Extensions::Common::Wasm::sandbox_runtime_values);
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTest);
 
 class WasmNullTest : public WasmTestBase, public testing::TestWithParam<std::string> {
 public:
@@ -119,6 +120,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
                          testing::Combine(Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
                                           testing::Values("cpp", "rust")));
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
 TEST_P(WasmTestMatrix, Logging) {
   plugin_configuration_ = "configure-test";
