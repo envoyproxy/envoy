@@ -1,63 +1,37 @@
 .. _arch_overview_load_balancing:
 
-Overview
+概述
 ========
 
-What is Load Balancing?
+什么是负载均衡？
 -----------------------
 
-Load balancing is a way of distributing traffic between multiple hosts within a single upstream cluster in order to effectively make use of available resources. There are many different ways
-of accomplishing this, so Envoy provides several different load balancing strategies.
-At a high level, we can break these strategies into two categories: global
-load balancing and distributed load balancing.
+负载均衡是一种在单个上游群集内分配流量到多个主机的方式，以便有效利用可用资源。有多种方法可以实现，因此 Envoy 提供了几种不同的负载均衡策略。从高层次上讲，我们可以将这些策略分为两类：全局负载均衡和分布式负载均衡。
 
 .. _arch_overview_load_balancing_distributed_lb:
 
-Distributed Load Balancing
+分布式负载均衡
 --------------------------
 
-Distributed load balancing refers to having Envoy itself determine how load should be distributed
-to the endpoints based on knowing the location of the upstream hosts.
+分布式负载平衡是指让 Envoy 自己根据了解上游主机的位置来决定如何将负载分配到端点。
 
-Examples
+例子
 ^^^^^^^^
 
-* :ref:`Active health checking <arch_overview_health_checking>`: by health checking upstream
-  hosts, Envoy can adjust the weights of priorities and localities to account for unavailable
-  hosts.
-* :ref:`Zone aware routing <arch_overview_load_balancing_zone_aware_routing>`: this can be used
-  to make Envoy prefer closer endpoints without having to explicitly configure priorities in the
-  control plane.
-* :ref:`Load balancing algorithms <arch_overview_load_balancing_types>`: Envoy can use several
-  different algorithms to use the provided weights to determine which host to select.
+* :ref:`主动健康检查 <arch_overview_health_checking>`：通过对上游主机进行健康检查，Envoy 可以调整优先级和位置的权重以解决不可用主机的问题。
+* :ref:`区域感知路由 <arch_overview_load_balancing_zone_aware_routing>`：这可用于使 Envoy 更倾向近一些的端点，而不必在控制平面中显式配置优先级。
+* :ref:`负载均衡算法 <arch_overview_load_balancing_types>`：Envoy 可以使用几种不同的算法来使用提供的权重来确定选择哪个主机。
 
 .. _arch_overview_load_balancing_global_lb:
 
-Global Load Balancing
+全局负载均衡
 ---------------------
 
-Global load balancing refers to having a single, global authority that decides how load should
-be distributed between hosts. For Envoy, this would be done by the control plane, which is able
-to adjust the load applied to individual endpoints by specifying various parameters, such as
-priority, locality weight, endpoint weight and endpoint health.
+全局负载均衡是指使用一个单一的全局权限来决定如何在主机之间分配负载。对于 Envoy，这将由控制平面完成，通过指定各种参数来调整应用于各个端点的负载，例如优先级，位置权重，端点权重和端点健康状况。
 
-A simple example would be to have the control plane assign hosts to different
-:ref:`priorities <arch_overview_load_balancing_priority_levels>` based on network topology
-to ensure that hosts that require fewer network hops are preferred. This is similar to
-zone-aware routing, but is handled by the control plane instead of by Envoy. A benefit of doing
-it in the control plane is that it gets around some of the
-:ref:`limitations <arch_overview_load_balancing_zone_aware_routing_preconditions>` of zone aware routing.
+一个简单的例子就是让控制平面根据网络拓扑将主机分配不同的 :ref:`优先级 <arch_overview_load_balancing_priority_levels>` 以确保需要较少网络跳数的主机是首选。这类似于区域感知路由，但是由控制平面而不是 Envoy 处理。在控制平面中执行此操作的好处是，它可以绕过某些区域感知路由的 :ref:`限制 <arch_overview_load_balancing_zone_aware_routing_preconditions>`。更为复杂的设置可能会将资源使用情况报告给控制平面，从而允许其调整端点或 :ref:`位置 <arch_overview_load_balancing_locality_weighted_lb>` 的权重以解决当前资源使用情况，尝试将新请求路由到空闲主机而不是繁忙主机。
 
-A more complicated setup could have resource usage being reported to the control plane, allowing
-it to adjust the weight of endpoints or :ref:`localities <arch_overview_load_balancing_locality_weighted_lb>`
-to account for the current resource usage, attempting to route new requests to idle hosts over busy ones.
-
-Both Distributed and Global
+同时使用分布式和全局方式
 ---------------------------
 
-Most sophisticated deployments will make use of features from both categories. For instance, global load
-balancing could be used to define the high level routing priorities and weights, while distributed load balancing
-could be used to react to changes in the system (e.g. using active health checking). By combining these you can
-get the best of both worlds: a globally aware authority that can control the flow of traffic on the macro
-level while still having the individual proxies be able to react to changes on the micro level.
-
+大多数复杂的部署都使用这两种特性。例如，全局负载均衡可用于定义高级路由优先级和权重，而分布式负载均衡可用于对系统中的更改做出反应（例如，使用主动健康检查）。通过将它们结合起来，您可以获得两种情况的最佳效果：一个可以在宏级别上控制流量的全局感知权威，同时仍然可以使各个代理对微观级别的更改做出反应。
