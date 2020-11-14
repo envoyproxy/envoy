@@ -19,7 +19,6 @@
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
-#include "test/extensions/common/tap/common.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -242,12 +241,10 @@ TEST_P(RawWriteSslIntegrationTest, HighWatermarkReadResumptionProcessingHeaders)
       testFragmentedRequestWithBufferLimit(request_chunks, 15 * 1024);
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "host");
-  EXPECT_EQ(
-      std::string(14000, 'a'),
-      upstream_headers->get(Envoy::Http::LowerCaseString("key1"))[0]->value().getStringView());
-  EXPECT_EQ(
-      std::string(16000, 'b'),
-      upstream_headers->get(Envoy::Http::LowerCaseString("key2"))[0]->value().getStringView());
+  EXPECT_EQ(std::string(14000, 'a'),
+            upstream_headers->get(Envoy::Http::LowerCaseString("key1"))[0].value().getStringView());
+  EXPECT_EQ(std::string(16000, 'b'),
+            upstream_headers->get(Envoy::Http::LowerCaseString("key2"))[0].value().getStringView());
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/12304
