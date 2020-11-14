@@ -11,9 +11,9 @@ Envoy 的主要目标之一是使网络易于理解。Envoy 根据不同的配�
 
 单个代理场景通常涉及下游和上游统计信息。这两种类型可用于获取该特定网络跃点的详细信息。整体统计网格可以非常详细地描述每个跃点和整个网络的运行状况。发布的统计数据在操作指南中详细记录。
 
-从 v2 API 开始，Envoy 能够支持自定义可插入接收器。:ref:`A Envoy 中包含一些标准的接收器实现<envoy_v3_api_msg_config.metrics.v3.StatsSink>`。一些接收器还支持发出带有标签/维度的统计信息。
+从 v2 API 开始，Envoy 能够支持自定义可插入接收器。:ref:`A Envoy 中包含一些标准的接收器实现<envoy_v3_api_msg_config.metrics.v3.StatsSink>`。一些接收器还支持生成带有标签/维度的统计信息。
 
-在 Envoy 中以及整个文档中，统计信息均由规范字符串标识表示。 这些字符串的动态部分被剥离成为标签。 用户可以通过标签说明符配置 :ref:`Tag Specifier 配置 <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>` 配置此行为。
+在 Envoy 中以及整个文档中，统计信息均由规范字符串标识表示。这些字符串的动态部分被剥离成为标签。用户可以通过标签说明符配置 :ref:`Tag Specifier 配置 <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>` 配置此行为。
 
 Envoy 发出三种类型的值作为统计信息：
 
@@ -23,4 +23,4 @@ Envoy 发出三种类型的值作为统计信息：
 
 在内部，对计数器和计量器进行批处理并定期更新以提高性能。直方图在收到时写入。 注意：以前称为计时器的内容成为直方图，因为两种表示形式之间的唯一区别是单位。
 
-* :ref:`v3 API 参考 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>`.
+* :ref:`v3 API 参考 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>`。
