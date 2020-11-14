@@ -94,10 +94,10 @@ In front of these is an Envoy proxy that listens on https://localhost:10000 and 
 
 This proxy uses the keys and certificates :ref:`you created in step 1 <install_sandboxes_tls_sni_step1>`.
 
-It also starts an Envoy proxy client which listens on http://localhost:20000 and routes three paths -
-``/domain1``, ``/domain2`` and ``/domain3``.
+It also starts an Envoy proxy client which listens on http://localhost:20000.
 
-The client proxy has no ``TLS`` termination but instead proxies to the ``TLS`` endpoints using ``SNI``.
+The client proxy has no ``TLS`` termination but instead proxies three routed paths -
+``/domain1``, ``/domain2`` and ``/domain3`` - to the ``SNI``-enabled proxy.
 
 .. code-block:: console
 
@@ -118,9 +118,9 @@ The client proxy has no ``TLS`` termination but instead proxies to the ``TLS`` e
 Step 2: Query the ``SNI`` endpoints directly with curl
 ******************************************************
 
-We can use curl to query the ``SNI``-routed ``HTTPS`` endpoints of the Envoy proxy directly.
+You can use curl to query the ``SNI``-routed ``HTTPS`` endpoints of the Envoy proxy directly.
 
-To do this we must explicitly tell curl to resolve the ``DNS`` for the endpoints correctly.
+To do this you must explicitly tell curl to resolve the ``DNS`` for the endpoints correctly.
 
 Each endpoint should proxy to the respective ``http-upstream`` service.
 
@@ -141,10 +141,10 @@ Each endpoint should proxy to the respective ``http-upstream`` service.
 	| jq -r '.os.hostname'
    http-upstream3
 
-Step 2: Query the ``SNI`` endpoints via an Envoy proxy client
+Step 3: Query the ``SNI`` endpoints via an Envoy proxy client
 *************************************************************
 
-We can also query the Envoy proxy client paths.
+Next, query the Envoy proxy client using the routed paths.
 
 These route via the ``SNI`` proxy endpoints to the respective ``http-upstream`` services.
 
