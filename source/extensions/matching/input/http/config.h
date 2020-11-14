@@ -115,7 +115,7 @@ public:
   std::string category() const override { return "bkag"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<google::protobuf::Empty>();
+    return std::make_unique<ProtobufWkt::Empty>();
   }
 };
 
