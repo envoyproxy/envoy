@@ -118,7 +118,7 @@ public:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() override {
     transport_wants_read_ = true;
-    ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    file_event_->activate(Event::FileReadyType::Read);
   }
   void flushWriteBuffer() override;
 
