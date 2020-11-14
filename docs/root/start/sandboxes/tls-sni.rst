@@ -1,25 +1,25 @@
 .. _install_sandboxes_tls_sni:
 
-TLS (SNI)
-=========
+Server name indication (``TLS``/``SNI``)
+========================================
 
 .. sidebar:: Requirements
 
-   `openssl <https://www.openssl.org/>`_
+   .. include:: _include/docker-env-setup-link.rst
 
-      Used to create a TLS certificate for the websocket.
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+   :ref:`jq <start_sandboxes_setup_jq>`
+	Parse ``json`` output from the upstream echo servers.
 
 This example demonstrates a server that listens on multiple domains
 and provides separate ``TLS`` termination for each.
 
-It might also include a client example...
-
-.. include:: _include/docker-env-setup.rst
+Step 1: Create keypairs for each of the domain endpoints
+********************************************************
 
 Change directory to ``examples/tls-sni`` in the Envoy repository.
-
-Step 3: Create keypairs for each of the domain endpoints
-********************************************************
 
 This example creates three ``TLS`` endpoints and each will require their own
 keypairs.
@@ -63,7 +63,7 @@ Create self-signed certificates for these endpoints as follows:
    writing new private key to 'certs/domain3.key.pem'
    -----
 
-Step 4: Start the containers
+Step 2: Start the containers
 ****************************
 
 Build and start the containers.
@@ -82,3 +82,27 @@ This will load the required keys and certificates you created into the Envoy pro
    ---------------------------------------------------------------------------------------------------
    tls-sni_proxy_1                     /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
    tls-sni_service-http_1              node ./index.js                Up
+
+Step 2: Query the ``SNI`` endpoints directly with curl
+******************************************************
+
+asdf
+
+
+Step 2: Query the ``SNI`` endpoints via an Envoy proxy client
+*************************************************************
+
+asdf
+
+.. seealso::
+
+   :ref:`Securing Envoy quick start guide <start_quick_start_securing>`
+      Outline of key concepts for securing Envoy.
+
+   :ref:`TLS sandbox <install_sandboxes_tls>`
+      Sandbox featuring examples of how Envoy can be configured to make
+      use of encrypted connections using ``HTTP`` over ``TLS``.
+
+   :ref:`Double proxy sandbox <install_sandboxes_double_proxy>`
+      An example of securing traffic between proxies with validation and
+      mutual authentication using ``mTLS`` with non-``HTTP`` traffic.
