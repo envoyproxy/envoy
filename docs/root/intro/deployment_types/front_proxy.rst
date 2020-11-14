@@ -1,26 +1,18 @@
 .. _deployment_type_front_proxy:
 
-Service to service plus front proxy
+服务间外加前端代理
 -----------------------------------
 
 .. image:: /_static/front_proxy.svg
 
-The above diagram shows the :ref:`service to service <deployment_type_service_to_service>`
-configuration sitting behind an Envoy cluster used as an HTTP L7 edge reverse proxy. The
-reverse proxy provides the following features:
+上图显示了作为 HTTP L7 边缘反向代理 Envoy 群集背后的 :ref:`服务到服务 <deployment_type_service_to_service>` 配置。反向代理提供以下功能：
 
-* Terminates TLS.
-* Supports both HTTP/1.1 and HTTP/2.
-* Full HTTP L7 routing support.
-* Talks to the service to service Envoy clusters via the standard :ref:`ingress port
-  <deployment_type_service_to_service_ingress>` and using the discovery service for host
-  lookup. Thus, the front Envoy hosts work identically to any other Envoy host, other than the
-  fact that they do not run collocated with another service. This means that are operated in the
-  same way and emit the same statistics.
+* 终止 TLS。
+* 支持 HTTP/1.1 和 HTTP/2。
+* HTTP L7 全路由支持。
+* Envoy 集群使用 :ref:`ingress 端口 <deployment_type_service_to_service_ingress>` 标准进行服务到服务的通信，并使用发现服务进行主机查找。因此，前端 Envoy 主机与任何其它 Envoy 主机的工作方式相同，除了其它 Envoy 主机不与别的服务搭配运行。这意味着它们用相同的方式操作，并且数据统计也相同。
 
-Configuration template
+配置模板
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The source distribution includes an example front proxy configuration that is very similar to
-the version that Lyft runs in production. See :ref:`here <install_ref_configs>` for more
-information.
+源代码发行版包含一个与 Lyft 在生产环境中运行的版本非常相似的前端代理配置示例。浏览 :ref:`此处 <install_ref_configs>` 获取更多信息。
