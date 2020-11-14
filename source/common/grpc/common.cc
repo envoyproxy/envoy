@@ -294,7 +294,8 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   MemBlockBuilder<char> header(5);
   header.appendOne(0); // flags
   const uint32_t nsize = htonl(buffer.length());
-  header.appendData(absl::Span<const char>(reinterpret_cast<const char*>(&nsize), sizeof(uint32_t)));
+  header.appendData(
+      absl::Span<const char>(reinterpret_cast<const char*>(&nsize), sizeof(uint32_t)));
   buffer.prepend(absl::string_view(header.releasePointer(), 5));
 }
 
