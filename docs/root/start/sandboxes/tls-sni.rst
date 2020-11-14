@@ -26,7 +26,7 @@ Step 1: Create keypairs for each of the domain endpoints
 
 Change directory to ``examples/tls-sni`` in the Envoy repository.
 
-This example creates three ``TLS`` endpoints and each will require their own
+The example creates three ``TLS`` endpoints and each will require their own
 keypairs.
 
 Create self-signed certificates for these endpoints as follows:
