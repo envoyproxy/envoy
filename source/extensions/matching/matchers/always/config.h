@@ -23,7 +23,7 @@ public:
   std::string category() const override { return "envoy.matcher.matchers"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<google::protobuf::Empty>();
+    return std::make_unique<ProtobufWkt::Empty>();
   }
 };
 
