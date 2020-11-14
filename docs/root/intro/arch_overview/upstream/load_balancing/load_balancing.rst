@@ -1,4 +1,4 @@
-Load Balancing
+负载均衡
 ==============
 
 .. toctree::
