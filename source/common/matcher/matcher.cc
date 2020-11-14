@@ -2,3 +2,5 @@
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"
+
+namespace Envoy {}
