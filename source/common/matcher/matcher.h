@@ -48,7 +48,7 @@ struct DataInputGetResult {
   // could satisfy the match.
   bool more_data_available;
   // The data is available: result of looking up the data. If the lookup failed against partial or
-  // complete data this will remain abls::nullopt.
+  // complete data this will remain absl::nullopt.
   absl::optional<absl::string_view> data_;
 };
 
