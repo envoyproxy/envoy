@@ -23,45 +23,6 @@ namespace Tls {
 
 namespace {
 
-Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfigProvider(
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config) {
-
-  switch (config.session_ticket_keys_type_case()) {
-  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-      SessionTicketKeysTypeCase::kSessionTicketKeys:
-    return factory_context.secretManager().createInlineTlsSessionTicketKeysProvider(
-        config.session_ticket_keys());
-  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-      SessionTicketKeysTypeCase::kSessionTicketKeysSdsSecretConfig: {
-    const auto& sds_secret_config = config.session_ticket_keys_sds_secret_config();
-    if (sds_secret_config.has_sds_config()) {
-      // Fetch dynamic secret.
-      return factory_context.secretManager().findOrCreateTlsSessionTicketKeysContextProvider(
-          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
-    } else {
-      // Load static secret.
-      auto secret_provider =
-          factory_context.secretManager().findStaticTlsSessionTicketKeysContextProvider(
-              sds_secret_config.name());
-      if (!secret_provider) {
-        throw EnvoyException(
-            fmt::format("Unknown tls session ticket keys: {}", sds_secret_config.name()));
-      }
-      return secret_provider;
-    }
-  }
-  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-      SessionTicketKeysTypeCase::kDisableStatelessSessionResumption:
-  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-      SessionTicketKeysTypeCase::SESSION_TICKET_KEYS_TYPE_NOT_SET:
-    return nullptr;
-  default:
-    throw EnvoyException(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
-                                     config.session_ticket_keys_type_case()));
-  }
-}
-
 bool getStatelessSessionResumptionDisabled(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config) {
   if (config.session_ticket_keys_type_case() ==
@@ -167,6 +128,48 @@ CertificateValidationContextConfigProviderFactoryImpl::createFromSds(
   return secret_provider;
 }
 
+TlsSessionTicketKeysConfigProviderFactoryImpl::TlsSessionTicketKeysConfigProviderFactoryImpl(
+    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
+    Server::Configuration::TransportSocketFactoryContext& factory_context)
+    : config_(config), factory_context_(factory_context) {}
+
+Secret::TlsSessionTicketKeysConfigProviderSharedPtr
+TlsSessionTicketKeysConfigProviderFactoryImpl::create() {
+  switch (config_.session_ticket_keys_type_case()) {
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      SessionTicketKeysTypeCase::kSessionTicketKeys:
+    return factory_context_.secretManager().createInlineTlsSessionTicketKeysProvider(
+        config_.session_ticket_keys());
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      SessionTicketKeysTypeCase::kSessionTicketKeysSdsSecretConfig: {
+    const auto& sds_secret_config = config_.session_ticket_keys_sds_secret_config();
+    if (sds_secret_config.has_sds_config()) {
+      // Fetch dynamic secret.
+      return factory_context_.secretManager().findOrCreateTlsSessionTicketKeysContextProvider(
+          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context_);
+    } else {
+      // Load static secret.
+      auto secret_provider =
+          factory_context_.secretManager().findStaticTlsSessionTicketKeysContextProvider(
+              sds_secret_config.name());
+      if (!secret_provider) {
+        throw EnvoyException(
+            fmt::format("Unknown tls session ticket keys: {}", sds_secret_config.name()));
+      }
+      return secret_provider;
+    }
+  }
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      SessionTicketKeysTypeCase::kDisableStatelessSessionResumption:
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      SessionTicketKeysTypeCase::SESSION_TICKET_KEYS_TYPE_NOT_SET:
+    return nullptr;
+  default:
+    throw EnvoyException(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
+                                     config_.session_ticket_keys_type_case()));
+  }
+}
+
 ContextConfigImpl::ContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
@@ -189,7 +192,7 @@ ContextConfigImpl::ContextConfigImpl(
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)) {
   if (certificate_validation_context_provider_ != nullptr) {
-    if (cvc_config_provider_factory_->defaultCvc()) {
+    if (cvc_config_provider_factory_->defaultCertificateValidationContext()) {
       // We need to validate combined certificate validation context.
       // The default certificate validation context and dynamic certificate validation
       // context could only contain partial fields, which is okay to fail the validation.
@@ -205,7 +208,7 @@ ContextConfigImpl::ContextConfigImpl(
     }
     // Load inlined, static or dynamic secret that's already available.
     if (certificate_validation_context_provider_->secret() != nullptr) {
-      if (cvc_config_provider_factory_->defaultCvc()) {
+      if (cvc_config_provider_factory_->defaultCertificateValidationContext()) {
         validation_context_config_ =
             getCombinedValidationContextConfig(*certificate_validation_context_provider_->secret());
       } else {
@@ -247,7 +250,7 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
         dynamic_cvc) {
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext combined_cvc =
-      *cvc_config_provider_factory_->defaultCvc();
+      *cvc_config_provider_factory_->defaultCertificateValidationContext();
   combined_cvc.MergeFrom(dynamic_cvc);
   return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc, api_);
 }
@@ -273,7 +276,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
     if (cvc_update_callback_handle_) {
       cvc_update_callback_handle_->remove();
     }
-    if (cvc_config_provider_factory_->defaultCvc()) {
+    if (cvc_config_provider_factory_->defaultCertificateValidationContext()) {
       // Once certificate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with a combined certificate validation
       // context. The combined certificate validation context is created by merging new secret into
@@ -415,10 +418,12 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                             config.common_tls_context(), factory_context),
                         std::make_unique<CertificateValidationContextConfigProviderFactoryImpl>(
                             config.common_tls_context(), factory_context)),
+      session_ticket_keys_config_provider_factory_(
+          std::make_unique<TlsSessionTicketKeysConfigProviderFactoryImpl>(config, factory_context)),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
-      session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
+      session_ticket_keys_provider_(session_ticket_keys_config_provider_factory_->create()),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
 
   if (session_ticket_keys_provider_ != nullptr) {

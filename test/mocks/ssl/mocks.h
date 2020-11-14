@@ -202,7 +202,7 @@ public:
   MOCK_METHOD(Secret::CertificateValidationContextConfigProviderSharedPtr, create, ());
   MOCK_METHOD(
       std::shared_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>,
-      defaultCvc, (), (const));
+      defaultCertificateValidationContext, (), (const));
 };
 
 } // namespace Ssl

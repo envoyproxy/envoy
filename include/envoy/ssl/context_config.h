@@ -22,13 +22,16 @@ public:
   virtual ~TlsCertificateConfigProvidersFactory() = default;
 
   /**
-   * Create the certificate config providers factory
+   * Create the certificate config providers factories.
    */
   virtual std::vector<Secret::TlsCertificateConfigProviderSharedPtr> create() PURE;
 };
 
 using TlsCertificateConfigProvidersFactoryPtr =
     std::unique_ptr<TlsCertificateConfigProvidersFactory>;
+
+using CertificateValidationContextPtr =
+    std::shared_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>;
 
 class CertificateValidationContextConfigProviderFactory {
 public:
@@ -40,16 +43,27 @@ public:
   virtual Secret::CertificateValidationContextConfigProviderSharedPtr create() PURE;
 
   /**
-   * To get default certificate validation context. This value is nullptr by default except for
-   * validation context type is combined validation context.
+   * Get the default certificate validation context. This value is nullptr by default, except for
+   * when the validation context type is a combined validation context.
    */
-  virtual std::shared_ptr<
-      envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
-  defaultCvc() const PURE;
+  virtual CertificateValidationContextPtr defaultCertificateValidationContext() const PURE;
 };
 
 using CertificateValidationContextConfigProviderFactoryPtr =
     std::unique_ptr<CertificateValidationContextConfigProviderFactory>;
+
+class TlsSessionTicketKeysConfigProviderFactory {
+public:
+  virtual ~TlsSessionTicketKeysConfigProviderFactory() = default;
+
+  /**
+   * Create the tls session ticket keys config provider.
+   */
+  virtual Secret::TlsSessionTicketKeysConfigProviderSharedPtr create() PURE;
+};
+
+using TlsSessionTicketKeysConfigProviderFactoryPtr =
+    std::unique_ptr<TlsSessionTicketKeysConfigProviderFactory>;
 
 /**
  * Supplies the configuration for an SSL context.

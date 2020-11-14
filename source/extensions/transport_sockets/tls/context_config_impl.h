@@ -42,8 +42,7 @@ public:
 
   Secret::CertificateValidationContextConfigProviderSharedPtr create() override;
 
-  std::shared_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
-  defaultCvc() const override {
+  Ssl::CertificateValidationContextPtr defaultCertificateValidationContext() const override {
     return default_cvc_;
   }
 
@@ -57,8 +56,21 @@ private:
   // If certificate validation context type is combined_validation_context. default_cvc_
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.
   // Otherwise, default_cvc_ is nullptr.
-  std::shared_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
-      default_cvc_;
+  Ssl::CertificateValidationContextPtr default_cvc_;
+};
+
+class TlsSessionTicketKeysConfigProviderFactoryImpl
+    : public Ssl::TlsSessionTicketKeysConfigProviderFactory {
+public:
+  TlsSessionTicketKeysConfigProviderFactoryImpl(
+      const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+  Secret::TlsSessionTicketKeysConfigProviderSharedPtr create() override;
+
+private:
+  const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config_;
+  Server::Configuration::TransportSocketFactoryContext& factory_context_;
 };
 
 class ContextConfigImpl : public virtual Ssl::ContextConfig {
@@ -88,7 +100,7 @@ public:
   bool isReady() const override {
     const bool tls_is_ready =
         (tls_certificate_providers_.empty() || !tls_certificate_configs_.empty());
-    const auto default_cvc = cvc_config_provider_factory_->defaultCvc();
+    const auto default_cvc = cvc_config_provider_factory_->defaultCertificateValidationContext();
     const bool combined_cvc_is_ready =
         (default_cvc == nullptr || validation_context_config_ != nullptr);
     const bool cvc_is_ready = (certificate_validation_context_provider_ == nullptr ||
@@ -206,6 +218,7 @@ private:
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_CURVES;
 
+  Ssl::TlsSessionTicketKeysConfigProviderFactoryPtr session_ticket_keys_config_provider_factory_;
   const bool require_client_certificate_;
   const OcspStaplePolicy ocsp_staple_policy_;
   std::vector<SessionTicketKey> session_ticket_keys_;
