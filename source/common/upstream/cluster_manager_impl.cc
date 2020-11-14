@@ -437,7 +437,7 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope,
   return {ALL_CLUSTER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
   */
-  return ClusterManagerStats(factory.statNames(), factory.statNames().prefix_, scope);
+  return ClusterManagerStats(factory.statNames(), factory.statNames().cluster_manager_, scope);
 }
 
 void ClusterManagerImpl::onClusterInit(Cluster& cluster) {

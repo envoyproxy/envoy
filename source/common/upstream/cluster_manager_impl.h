@@ -38,7 +38,7 @@ namespace Upstream {
 /**
  * All cluster manager stats. @see stats_macros.h
  */
-#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE)                                                  \
+#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE, STATNAME)                                        \
   COUNTER(cluster_added)                                                                           \
   COUNTER(cluster_modified)                                                                        \
   COUNTER(cluster_removed)                                                                         \
@@ -47,9 +47,11 @@ namespace Upstream {
   COUNTER(update_merge_cancelled)                                                                  \
   COUNTER(update_out_of_merge_window)                                                              \
   GAUGE(active_clusters, NeverImport)                                                              \
-  GAUGE(warming_clusters, NeverImport)
+  GAUGE(warming_clusters, NeverImport)                                                             \
+  STATNAME(cluster_manager)
 
-struct ClusterManagerStatNames {
+
+/*struct ClusterManagerStatNames {
   ClusterManagerStatNames(Stats::SymbolTable& symbol_table)
       : pool_(symbol_table),
         prefix_(pool_.add("cluster_manager"))
@@ -58,9 +60,9 @@ struct ClusterManagerStatNames {
   Stats::StatNamePool pool_;
   Stats::StatName prefix_;
   ALL_CLUSTER_MANAGER_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)
-};
+  };*/
 
-#define STAT_STRUCT(Stats, StatNames, STAT_MACRO)
+MAKE_STAT_NAMES_STRUCT(ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
 
 MAKE_STATS_STRUCT(ClusterManagerStats, ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
 
@@ -209,9 +211,9 @@ private:
 /**
  * Struct definition for all cluster manager stats. @see stats_macros.h
  */
-struct ClusterManagerStatsOld {
-  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-};
+//struct ClusterManagerStatsOld {
+//  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+//};
 
 /*struct ClusterManagerStats {
   ClusterManagerStats(const ClusterManagerStatNames& stat_names, Stats::Scope& scope);
