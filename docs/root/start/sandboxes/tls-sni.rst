@@ -1,7 +1,7 @@
 .. _install_sandboxes_tls_sni:
 
-``TLS`` Server name indication (``SNI``)
-========================================
+TLS Server name indication (``SNI``)
+====================================
 
 .. sidebar:: Requirements
 
