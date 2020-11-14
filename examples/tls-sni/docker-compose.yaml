@@ -13,22 +13,22 @@ services:
       context: .
       dockerfile: Dockerfile-client
     ports:
-      - "20000:20000"
+      - "20000:10000"
 
-  http-domain1:
+  http-upstream1:
     image: mendhak/http-https-echo
-    hostname: http-domain1
+    hostname: http-upstream1
     environment:
       - HTTPS_PORT=0
 
-  http-domain2:
+  http-upstream2:
     image: mendhak/http-https-echo
-    hostname: http-domain2
+    hostname: http-upstream2
     environment:
       - HTTPS_PORT=0
 
-  http-domain3:
+  http-upstream3:
     image: mendhak/http-https-echo
-    hostname: http-domain3
+    hostname: http-upstream3
     environment:
       - HTTPS_PORT=0

@@ -3,7 +3,7 @@ static_resources:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 20000
+        port_value: 10000
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager

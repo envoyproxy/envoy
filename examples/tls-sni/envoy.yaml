@@ -118,7 +118,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: http-domain1
+                address: http-upstream1
                 port_value: 80
 
   - name: proxy-domain2
@@ -132,7 +132,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: http-domain2
+                address: http-upstream2
                 port_value: 80
 
   - name: proxy-domain3
@@ -146,5 +146,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: http-domain3
+                address: http-upstream3
                 port_value: 80

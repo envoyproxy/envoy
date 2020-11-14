@@ -26,24 +26,24 @@ bring_up_example
 
 run_log "Query domain1 with curl and tls/sni"
 curl -sk --resolve domain1.example.com:10000:127.0.0.1 https://domain1.example.com:10000 \
-    | jq '.os.hostname' | grep http-domain1
+    | jq '.os.hostname' | grep http-upstream1
 
 run_log "Query domain2 with curl and tls/sni"
 curl -sk --resolve domain2.example.com:10000:127.0.0.1 https://domain2.example.com:10000 \
-    | jq '.os.hostname' | grep http-domain2
+    | jq '.os.hostname' | grep http-upstream2
 
 run_log "Query domain3 with curl and tls/sni"
 curl -sk --resolve domain3.example.com:10000:127.0.0.1 https://domain3.example.com:10000 \
-    | jq '.os.hostname' | grep http-domain3
+    | jq '.os.hostname' | grep http-upstream3
 
 run_log "Query domain1 via Envoy sni client"
 curl -s http://localhost:20000/domain1 \
-    | jq '.os.hostname' | grep http-domain1
+    | jq '.os.hostname' | grep http-upstream1
 
 run_log "Query domain2 via Envoy sni client"
 curl -s http://localhost:20000/domain2 \
-    | jq '.os.hostname' | grep http-domain2
+    | jq '.os.hostname' | grep http-upstream2
 
 run_log "Query domain3 via Envoy sni client"
 curl -s http://localhost:20000/domain3 \
-    | jq '.os.hostname' | grep http-domain3
+    | jq '.os.hostname' | grep http-upstream3
