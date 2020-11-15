@@ -632,7 +632,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        cpe = "cpe:2.3:a:webassembly_virtual_machine_project:webassembly_virtual_machine:*",
+        cpe = "N/A",
     ),
     com_github_wasm_c_api = dict(
         project_name = "wasm-c-api",
