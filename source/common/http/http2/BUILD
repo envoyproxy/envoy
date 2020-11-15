@@ -38,6 +38,7 @@ CODEC_LIB_DEPS = [
     "//source/common/common:minimal_logger_lib",
     "//source/common/common:statusor_lib",
     "//source/common/common:utility_lib",
+    "//source/common/common:safe_memcpy_lib",
     "//source/common/http:codec_helper_lib",
     "//source/common/http:codes_lib",
     "//source/common/http:exception_lib",

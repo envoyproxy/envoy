@@ -14,6 +14,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/common/safe_memcpy.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
@@ -754,7 +755,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // was the current time when the ping was sent. This can be useful while debugging
     // to match the ping and ack.
     uint64_t data;
-    SAFE_MEMCPY(&data, &(frame->ping.opaque_data));
+    safe_memcpy<uint64_t, const uint8_t[8]>(&data, &(frame->ping.opaque_data));
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
 
     onKeepaliveResponse();

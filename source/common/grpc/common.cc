@@ -14,6 +14,7 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/mem_block_builder.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -139,7 +140,7 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
   uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
   *current++ = 0; // flags
   const uint32_t nsize = htonl(size);
-  SAFE_MEMCPY(reinterpret_cast<uint32_t*>(current), &nsize);
+  safe_memcpy<uint32_t, const uint32_t>(reinterpret_cast<uint32_t*>(current), &nsize);
   current += sizeof(uint32_t);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
@@ -290,13 +291,11 @@ std::string Common::typeUrl(const std::string& qualified_name) {
 }
 
 void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
-
-  MemBlockBuilder<char> header(5);
-  header.appendOne(0); // flags
+  std::array<char, 5> header;
+  header[0] = 0; // flags
   const uint32_t nsize = htonl(buffer.length());
-  header.appendData(
-      absl::Span<const char>(reinterpret_cast<const char*>(&nsize), sizeof(uint32_t)));
-  buffer.prepend(absl::string_view(header.releasePointer(), 5));
+  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  buffer.prepend(absl::string_view(&header[0], 5));
 }
 
 bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto) {

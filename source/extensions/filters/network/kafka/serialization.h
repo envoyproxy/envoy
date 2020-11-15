@@ -11,6 +11,7 @@
 
 #include "common/common/byte_order.h"
 #include "common/common/fmt.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 
 #include "extensions/filters/network/kafka/kafka_types.h"
@@ -189,7 +190,7 @@ public:
 
       // Read next byte from input.
       uint8_t el;
-      SAFE_MEMCPY(&el, data.data());
+      safe_memcpy<uint8_t, const char>(&el, data.data());
       data = {data.data() + 1, data.size() - 1};
       processed++;
 

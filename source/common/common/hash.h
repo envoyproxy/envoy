@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common/common/macros.h"
+#include "common/common/safe_memcpy.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -60,7 +61,7 @@ public:
 private:
   static inline uint64_t unalignedLoad(const char* p) {
     uint64_t result;
-    SAFE_MEMCPY(&result, reinterpret_cast<const uint64_t*>(p));
+    safe_memcpy<uint64_t, const uint64_t>(&result, reinterpret_cast<const uint64_t*>(p));
     return result;
   }
 
