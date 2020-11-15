@@ -1242,7 +1242,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/starttls:config",
         "//test/test_common:registry_lib",
-        "@envoy_api//envoy/config/transport_socket/raw_buffer/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
 )
 

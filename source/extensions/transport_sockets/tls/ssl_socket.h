@@ -63,10 +63,7 @@ public:
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   // startSecureTransport should not be called for this transport socket.
-  bool startSecureTransport() override {
-    RELEASE_ASSERT(false, "");
-    return false;
-  }
+  bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks

@@ -22,10 +22,7 @@ public:
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   // This method must never be called for RawBufferSocket
-  bool startSecureTransport() override {
-    RELEASE_ASSERT(false, "");
-    return false;
-  }
+  bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   TransportSocketCallbacks* callbacks_{};

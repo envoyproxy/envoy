@@ -1,5 +1,5 @@
-#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.h"
-#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.validate.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
@@ -229,7 +229,7 @@ void StartTlsIntegrationTest::initialize() {
   addStartTlsSwitchFilter(config_helper_);
 
   // Setup factories and contexts for upstream clear-text raw buffer transport socket.
-  auto config = std::make_unique<envoy::config::transport_socket::raw_buffer::v2::RawBuffer>();
+  auto config = std::make_unique<envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer>();
 
   auto factory =
       std::make_unique<Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory>();

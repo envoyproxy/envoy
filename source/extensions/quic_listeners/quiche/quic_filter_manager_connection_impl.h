@@ -89,10 +89,7 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
-  bool startSecureTransport() override {
-    RELEASE_ASSERT(false, "");
-    return false;
-  }
+  bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   std::string transportProtocol() const override { return "quic"; }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
 

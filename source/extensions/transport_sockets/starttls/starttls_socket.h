@@ -16,13 +16,11 @@ namespace StartTls {
 
 class StartTlsSocket : public Network::TransportSocket, Logger::Loggable<Logger::Id::filter> {
 public:
-  StartTlsSocket(const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig& config,
+  StartTlsSocket(const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&,
                  Network::TransportSocketPtr raw_socket, // RawBufferSocket
                  Network::TransportSocketPtr ssl_socket, // SslSocket
                  const Network::TransportSocketOptionsSharedPtr&)
-      : oper_socket_(std::move(raw_socket)), ssl_socket_(std::move(ssl_socket)) {
-    max_cleartext_bytes_ = config.max_cleartext_bytes();
-  }
+      : oper_socket_(std::move(raw_socket)), ssl_socket_(std::move(ssl_socket)) {}
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
     oper_socket_->setTransportSocketCallbacks(callbacks);
@@ -64,8 +62,6 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
 
   bool using_ssl_{false};
-
-  uint32_t max_cleartext_bytes_{};
 };
 
 class ServerStartTlsSocketFactory : public Network::TransportSocketFactory,

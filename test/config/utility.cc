@@ -123,7 +123,6 @@ std::string ConfigHelper::startTlsConfig() {
         name: "starttls"
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
-          max_cleartext_bytes: 100
           cleartext_socket_config:
           tls_socket_config:
             common_tls_context:

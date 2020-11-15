@@ -60,10 +60,7 @@ public:
   bool canFlushClose() override { return handshake_complete_; }
   Envoy::Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   // startSecureTransport method should not be called for this transport socket.
-  bool startSecureTransport() override {
-    RELEASE_ASSERT(false, "");
-    return false;
-  }
+  bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
