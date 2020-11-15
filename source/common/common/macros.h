@@ -42,15 +42,6 @@ namespace Envoy {
   } while (0)
 
 /**
- * @brief Assert memory bounds to avoid copy errors.
- */
-#define SAFE_MEMCPY(dst, src)                                                                      \
-  do {                                                                                             \
-    static_assert(sizeof(*(src)) == sizeof(*(dst)));                                               \
-    memmove(dst, src, sizeof(*(src)));                                                             \
-  } while (0)
-
-/**
  * Have a generic fall-through for different versions of C++
  */
 #if __cplusplus >= 201703L // C++17 and above
