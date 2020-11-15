@@ -49,10 +49,11 @@ public:
                             Secret::SecretManager& secret_manager,
                             ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                             Http::Context& http_context, Grpc::Context& grpc_context,
-                            AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
+                            AccessLog::AccessLogManager& log_manager,
+                            Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
-        api_(api), http_context_(http_context), grpc_context_(grpc_context),
-        admin_(admin), runtime_(runtime), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
+        api_(api), http_context_(http_context), grpc_context_(grpc_context), admin_(admin),
+        runtime_(runtime), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager), stat_names_(stats.symbolTable()) {}
