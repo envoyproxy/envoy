@@ -20,7 +20,7 @@ Istio 一直是服务网格产品中的佼佼者，其数据面的组件—— E
 
 大体的翻译流程如下图所示：
 
-![](https://github.com/lhb008/envoy/blob/zh/docs/root/img/envoy-trans.png)
+![](https://github.com/cloudnativeto/envoy/blob/zh/docs/root/img/envoy-trans.png)
 
 整个翻译的基本流程包括下面几个步骤：
 
