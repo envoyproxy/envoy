@@ -293,7 +293,8 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   std::array<char, 5> header;
   header[0] = 0; // flags
   const uint32_t nsize = htonl(buffer.length());
-  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), // NOLINT(safe-memcpy)
+              sizeof(uint32_t));
   buffer.prepend(absl::string_view(&header[0], 5));
 }
 

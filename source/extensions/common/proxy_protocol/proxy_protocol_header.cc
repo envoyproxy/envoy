@@ -71,7 +71,7 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
         Network::Address::Ipv4Instance(src_addr, src_port).ip()->ipv4()->address();
     const auto net_dst_addr =
         Network::Address::Ipv4Instance(dst_addr, dst_port).ip()->ipv4()->address();
-    memcpy(addrs, &net_src_addr, 4); // NOLINT(safe-memcpy)
+    memcpy(addrs, &net_src_addr, 4);     // NOLINT(safe-memcpy)
     memcpy(&addrs[4], &net_dst_addr, 4); // NOLINT(safe-memcpy)
     out.add(addrs, 8);
     break;
@@ -84,7 +84,7 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
         Network::Address::Ipv6Instance(src_addr, src_port).ip()->ipv6()->address();
     const auto net_dst_addr =
         Network::Address::Ipv6Instance(dst_addr, dst_port).ip()->ipv6()->address();
-    memcpy(addrs, &net_src_addr, 16); // NOLINT(safe-memcpy)
+    memcpy(addrs, &net_src_addr, 16);      // NOLINT(safe-memcpy)
     memcpy(&addrs[16], &net_dst_addr, 16); // NOLINT(safe-memcpy)
     out.add(addrs, 32);
     break;
@@ -94,7 +94,7 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
   uint8_t ports[4];
   const auto net_src_port = htons(static_cast<uint16_t>(src_port));
   const auto net_dst_port = htons(static_cast<uint16_t>(dst_port));
-  memcpy(ports, &net_src_port, 2); // NOLINT(saf-memcpy)
+  memcpy(ports, &net_src_port, 2);     // NOLINT(safe-memcpy)
   memcpy(&ports[2], &net_dst_port, 2); // NOLINT(safe-memcpy)
   out.add(ports, 4);
 }
