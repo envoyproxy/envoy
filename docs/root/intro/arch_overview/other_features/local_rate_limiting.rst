@@ -1,16 +1,10 @@
 .. _arch_overview_local_rate_limit:
 
-Local rate limiting
+本地限速
 ===================
 
-Envoy supports local (non-distributed) rate limiting of L4 connections via the
-:ref:`local rate limit filter <config_network_filters_local_rate_limit>`.
+Envoy 通过 :ref:`本地限速过滤器 <config_network_filters_local_rate_limit>` 支持基于 L4 连接的本地（非分布式）限速。
 
-Envoy additionally supports local rate limiting of HTTP requests via the
-:ref:`HTTP local rate limit filter <config_http_filters_local_rate_limit>`. This can
-be activated globally at the listener level or at a more specific level (e.g.: the virtual
-host or route level).
+Envoy 还通过 :ref:`HTTP 本地限速过滤器 <config_http_filters_local_rate_limit>` 支持基于 HTTP 请求的本地限速。可以在在监听器级别或者其他特定级别（例如，虚机或路由级别）全局激活该功能。
 
-Finally, Envoy also supports :ref:`global rate limiting <arch_overview_global_rate_limit>`. Local
-rate limiting can be used in conjunction with global rate limiting to reduce load on the global
-rate limit service.
+最后，Envoy 还支持 :ref:`全局限速 <arch_overview_global_rate_limit>`。本地限速可与全局限速结合使用，以减少全局限速服务的负载。
