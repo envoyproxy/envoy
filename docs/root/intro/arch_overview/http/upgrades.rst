@@ -16,7 +16,7 @@ HTTP 升级可以根据 :ref:`每个路由 <envoy_v3_api_field_config.route.v3.R
 如下图所示，自定义过滤器链只能基于每个 HttpConnectionManager 进行配置。
 
 +-----------------------+-------------------------+-------------------+
-| *HCM Upgrade Enabled* | *Route Upgrade Enabled* | *Upgrade Enabled* |
+| *启用 HCM 升级*       | *启用路由升级*          | *启用升级*        |
 +=======================+=========================+===================+
 | T (Default)           | T (Default)             | T                 |
 +-----------------------+-------------------------+-------------------+
@@ -44,15 +44,15 @@ HTTP 升级可以根据 :ref:`每个路由 <envoy_v3_api_field_config.route.v3.R
 相同的 Upgrade-CONNECT-Upgrade 转换将会在任意 HTTP1.2 上跳转执行，即假设 HTTP1.1 中请求方法为 GET 。
 非 WebSocket 升级则允许任何有效的 HTTP 方法（例如 POST 请求），当前的升级/降级机制也会丢弃原有的请求方式，最终Envoy 会将请求转换为去往上游的 GET 方法。
 
-注意！HTTP1.2 升级会非常严格的 HTTP1.1 的路径，因此不能使用代理用于WebSocket 升级的请求和响应。
+注意！HTTP1.2 升级会非常严格的 HTTP1.1 的路径，因此不能使用代理用于 WebSocket 升级的请求和响应。
 
 CONNECT 支持
 ^^^^^^^^^^^^^^
 
 默认情况下，Envoy 内部的 CONNECT 支持都是处于关闭状态的（Envoy 会返回403 状态码以响应 CONNECT 请求）。
-因此，可以通过上述的选项来启用 CONNECT 支持，其中将设置特殊关键字为 “ CONNECT ”。
+因此，可以通过上述的选项来启用 CONNECT 支持，其中将设置特殊关键字为 “CONNECT”。
 
-在HTTP1.2 中，CONNECT 请求可能会是一个路径，但是在HTTP1.1 中，CONNECT 请求通常是没有路径的，只能使用 :ref:`connect_matcher <envoy_v3_api_msg_config.route.v3.RouteMatch.ConnectMatcher>` 进行匹配。
+在 HTTP1.2 中，CONNECT 请求可能会是一个路径，但是在 HTTP1.1 中，CONNECT 请求通常是没有路径的，只能使用 :ref:`connect_matcher <envoy_v3_api_msg_config.route.v3.RouteMatch.ConnectMatcher>` 进行匹配。
 
 注意！当对 CONNECT 请求执行非通配符域匹配时，CONNECT 的目标是匹配主机和端口才能成功，而不是匹配 Host 或者授权信息。
 
@@ -77,4 +77,4 @@ Envoy 还支持将原始 TCP 请求转化为 HTTP1.2 CONNECT 请求，这是通�
 [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
 
 如果运行 ``bazel-bin/source/exe/envoy-static –config-path configs/encapsulate_in_connect.yaml –base-id 1 and bazel-bin/source/exe/envoy-static –config-path configs/terminate_connect.yaml`` 则能在示例配置 :repo:`文件 <configs/>` 中找到对应的示例。
-其中将会运行两个 Envoy ，第一个会监听10000 端口 上的 TCP 流量，接着会将其封装为 HTTP1.2 请求；另一个会监听10001 端口上的 HTTP1.2 请求，去掉请求的请求头，接着将原始 TCP 请求转到上游，在本示例中是 google.com。 
+其中将会运行两个 Envoy ，第一个会监听 10000 端口 上的 TCP 流量，接着会将其封装为 HTTP1.2 请求；另一个会监听 10001 端口上的 HTTP1.2 请求，去掉请求的请求头，接着将原始 TCP 请求转到上游，在本示例中是 google.com。 
