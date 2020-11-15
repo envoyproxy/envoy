@@ -36,6 +36,35 @@ namespace Envoy {
  * Finally, when you want to actually instantiate the above struct using a Stats::Pool, you do:
  *   MyCoolStats stats{
  *     MY_COOL_STATS(POOL_COUNTER(...), POOL_GAUGE(...), POOL_HISTOGRAM(...))};
+ *
+ *
+ * The above constructs are the simplest way to declare counters, gauges,
+ * histograms, and text-readouts in your data structures. However they incur
+ * some overhead to symbolize the names every time they are instantiated. For
+ * data structures that are re-instantiated extensively during operation,
+ * e.g. in response to an xDS update, We can separately a StatNameStruct, containing
+ * symbolized names for each stat. That should be instantiated once at startup
+ * and held in some context or factory. Do that with:
+ *
+ *    MAKE_STAT_NAMES_STRUCT(MyStatNames, MY_COOL_STATS);
+ *
+ * This generates a structure definition with a constructor that requires a
+ * Symbol table. So you must, in a context instantiated once, initialize with
+ *
+ *    : my_cool_stat_names_(stat_store.symbolTable())
+ *
+ * Once you have the StatNamesStruct instance declared, you can create a stats
+ * struct efficiently during operation (e.g. in an xDS handler) with
+ *
+ *    MAKE_STATS_STRUCT(MyStats, MyStatNames, MY_COOL_STATS);
+ *
+ * This new structure is constructed with 2 or 3 args:
+ *    1. The stat_names struct created from MAKE_STAT_NAMES_STRUCT
+ *    2. The scope in which to instantiate the stats
+ *    3. An optional prefix, which will be prepended to each stat name.
+ * For example:
+ *
+ *    : my_cool_stats_(context.my_cool_stat_names_, scope, prefix)
  */
 
 // Fully-qualified for use in external callsites.
@@ -48,30 +77,6 @@ namespace Envoy {
 #define FINISH_STAT_DECL_MODE_(X, MODE) #X), Envoy::Stats::Gauge::ImportMode::MODE),
 #define FINISH_STAT_DECL_UNIT_(X, UNIT) #X), Envoy::Stats::Histogram::Unit::UNIT),
 
-#define FINISH_STAT_NAME_DECL_(X) X##_)),
-#define FINISH_STAT_NAME_DECL_MODE_(X, MODE) X##_), Envoy::Stats::Gauge::ImportMode::MODE),
-#define FINISH_STAT_NAME_DECL_UNIT_(X, UNIT) X##_), Envoy::Stats::Histogram::Unit::UNIT),
-
-//#define WITH_STAT_CONTEXT(POOL, STAT_NAMES, PREFIX, EXPR) , EXPR
-//#define STAT_NAME_DECL_(NAME)                                         \
-//  , NAME##_(Envoy::Stats::Utility::counterFromStatNames((POOL), Envoy::statNameJoin(PREFIX,
-//  STAT_NAMES.NAME##_)))
-
-// Used for declaring StatNames in a structure.
-#define GENERATE_STAT_NAME_STRUCT(NAME, ...) Envoy::Stats::StatName NAME##_;
-#define GENERATE_STAT_NAME_INIT(NAME, ...) , NAME##_(pool_.add(#NAME))
-/*#define GENERATE_COUNTER_FROM_STAT_NAME(NAME) ,
-NAME##_(scope.counterFromStatName(stat_names.NAME##_))
-#define GENERATE_COUNTER_PREFIX_FROM_STAT_NAME(POOL, STAT_NAMES, PREFIX) \
-  , Envoy::Stats::Utility::counterFromStatNames((POOL), Envoy::statNameJoin(PREFIX,
-STAT_NAMES.FINISH_STAT_NAME_DECL_
-#define GENERATE_GAUGE_FROM_STAT_NAME(NAME, MODE) \
-  , NAME##_(scope.gaugeFromStatName(stat_names.NAME##_, Envoy::Stats::Gauge::ImportMode::MODE))
-#define GENERATE_GAUGE_PREFIX_FROM_STAT_NAME(POOL, STAT_NAMES, PREFIX)   \
-  , Envoy::Stats::Utility::gaugeFromStatNames((POOL), Envoy::statNameJoin(PREFIX,
-STAT_NAMES.FINISH_STAT_NAME_DECL_MODE_
-*/
-
 static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_view token) {
   if (prefix.empty()) {
     return std::string(token);
@@ -81,37 +86,6 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
   }
   return absl::StrCat(prefix, ".", token);
 }
-
-// Macros for declaring stat-structures using StatNames, for those that must be
-// instantiated during operation, and where speed and scale matters.
-#define MAKE_STATS_STRUCT_COUNTER_HELPER_(NAME)                                                    \
-  , NAME##_(Envoy::Stats::Utility::counterFromStatNames(scope, {prefix, stat_names.NAME##_}))
-#define MAKE_STATS_STRUCT_GAUGE_HELPER_(NAME, MODE)                                                \
-  , NAME##_(Envoy::Stats::Utility::gaugeFromStatNames(scope, {prefix, stat_names.NAME##_},         \
-                                                      Envoy::Stats::Gauge::ImportMode::MODE))
-
-#define MAKE_STAT_NAMES_STRUCT(StatNamesStruct, ALL_STATS)                                         \
-  struct StatNamesStruct {                                                                         \
-    explicit StatNamesStruct(Envoy::Stats::SymbolTable& symbol_table)                              \
-        : pool_(symbol_table) ALL_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT,          \
-                                        GENERATE_STAT_NAME_INIT) {}                                \
-    Envoy::Stats::StatNamePool pool_;                                                              \
-    ALL_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)     \
-  }
-
-#define MAKE_STATS_STRUCT_STATNAME_HELPER_(name)
-#define GENERATE_STATNAME_STRUCT(name)
-
-#define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)                                 \
-  struct StatsStruct {                                                                             \
-    StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::StatName prefix,                  \
-                Envoy::Stats::Scope& scope)                                                        \
-        : scope_(scope)                                                                            \
-              ALL_STATS(MAKE_STATS_STRUCT_COUNTER_HELPER_, MAKE_STATS_STRUCT_GAUGE_HELPER_,        \
-                        MAKE_STATS_STRUCT_STATNAME_HELPER_) {}                                     \
-    Envoy::Stats::Scope& scope_;                                                                   \
-    ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_STATNAME_STRUCT)            \
-  }
 
 #define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counterFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
 #define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gaugeFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
@@ -127,4 +101,45 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define NULL_STAT_DECL_IGNORE_MODE_(X, MODE) std::string(#X)),
 
 #define NULL_POOL_GAUGE(POOL) (POOL).nullGauge(NULL_STAT_DECL_IGNORE_MODE_
+
+// Used for declaring StatNames in a structure.
+#define GENERATE_STAT_NAME_STRUCT(NAME, ...) Envoy::Stats::StatName NAME##_;
+#define GENERATE_STAT_NAME_INIT(NAME, ...) , NAME##_(pool_.add(#NAME))
+
+// Macros for declaring stat-structures using StatNames, for those that must be
+// instantiated during operation, and where speed and scale matters. These
+// macros are not for direct use; they are only for use from
+// MAKE_STAT_NAMES_STRUCT. and MAKE_STAT_STRUCT.
+#define MAKE_STATS_STRUCT_COUNTER_HELPER_(NAME)                                                    \
+  , NAME##_(Envoy::Stats::Utility::counterFromStatNames(scope, {prefix, stat_names.NAME##_}))
+#define MAKE_STATS_STRUCT_GAUGE_HELPER_(NAME, MODE)                                                \
+  , NAME##_(Envoy::Stats::Utility::gaugeFromStatNames(scope, {prefix, stat_names.NAME##_},         \
+                                                      Envoy::Stats::Gauge::ImportMode::MODE))
+#define MAKE_STATS_STRUCT_STATNAME_HELPER_(name)
+#define GENERATE_STATNAME_STRUCT(name)
+
+/**
+ * Generates a struct with StatNames for a subsystem, based on the stats macro
+ * with COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, and STAT_NAME calls.
+ */
+#define MAKE_STAT_NAMES_STRUCT(StatNamesStruct, ALL_STATS)                                         \
+  struct StatNamesStruct {                                                                         \
+    explicit StatNamesStruct(Envoy::Stats::SymbolTable& symbol_table)                              \
+        : pool_(symbol_table) ALL_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT,          \
+                                        GENERATE_STAT_NAME_INIT) {}                                \
+    Envoy::Stats::StatNamePool pool_;                                                              \
+    ALL_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)     \
+  }
+
+#define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)                                 \
+  struct StatsStruct {                                                                             \
+    StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::Scope& scope,                     \
+                Envoy::Stats::StatName prefix = Envoy::Stats::StatName())                          \
+        : scope_(scope)                                                                            \
+              ALL_STATS(MAKE_STATS_STRUCT_COUNTER_HELPER_, MAKE_STATS_STRUCT_GAUGE_HELPER_,        \
+                        MAKE_STATS_STRUCT_STATNAME_HELPER_) {}                                     \
+    Envoy::Stats::Scope& scope_;                                                                   \
+    ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_STATNAME_STRUCT)            \
+  }
+
 } // namespace Envoy

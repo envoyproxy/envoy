@@ -415,29 +415,9 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   }
 }
 
-/*ClusterManagerStats::ClusterManagerStats(
-    const ClusterManagerStatNames& stat_names, Stats::Scope& scope)
-    : scope_(scope)
-      //BLAH(cluster_added) {}
-      WITH_STAT_CONTEXT(stat_names, stat_names.prefix_, scope,
-                        ALL_CLUSTER_MANAGER_STATS(BLAH, BLAB)) {}
-
-      //WITH_STAT_CONTEXT(stat_names, stat_names.prefix_ BLAH(cluster_added) {}
-
-        ALL_CLUSTER_MANAGER_STATS(
-            WITH_STAT_NAME_CONTEXT(scope, stat_names, stat_names.prefix_,
-            GENERATE_GAUGE_PREFIX_FROM_STAT_NAME(scope, stat_names, stat_names.prefix_)) {}
-
-  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-        */
-
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope,
                                                       ClusterManagerFactory& factory) {
-  /*  const std::string final_prefix = "cluster_manager.";
-  return {ALL_CLUSTER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                    POOL_GAUGE_PREFIX(scope, final_prefix))};
-  */
-  return ClusterManagerStats(factory.statNames(), factory.statNames().cluster_manager_, scope);
+  return ClusterManagerStats(factory.statNames(), scope, factory.statNames().cluster_manager_);
 }
 
 void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
