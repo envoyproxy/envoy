@@ -65,8 +65,6 @@ private:
 
   bool using_ssl_{false};
 
-  // Max number of clear-text bytes allowed to be exchanged between a client and StartTlsSocket.
-  // It serves as fuse. If there is misconfiguration, it will stop passing clear-text data.
   uint32_t max_cleartext_bytes_{};
 };
 
