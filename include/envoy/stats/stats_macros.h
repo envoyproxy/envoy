@@ -42,14 +42,15 @@ namespace Envoy {
  * histograms, and text-readouts in your data structures. However they incur
  * some overhead to symbolize the names every time they are instantiated. For
  * data structures that are re-instantiated extensively during operation,
- * e.g. in response to an xDS update, We can separately a StatNameStruct, containing
- * symbolized names for each stat. That should be instantiated once at startup
- * and held in some context or factory. Do that with:
+ * e.g. in response to an xDS update, We can separately instantiate a
+ * StatNameStruct, containing symbolized names for each stat. That should be
+ * instantiated once at startup and held in some context or factory. Do that
+ * with:
  *
  *    MAKE_STAT_NAMES_STRUCT(MyStatNames, MY_COOL_STATS);
  *
  * This generates a structure definition with a constructor that requires a
- * Symbol table. So you must, in a context instantiated once, initialize with
+ * SymbolTable. So you must, in a context instantiated once, initialize with:
  *
  *    : my_cool_stat_names_(stat_store.symbolTable())
  *
@@ -64,7 +65,7 @@ namespace Envoy {
  *    3. An optional prefix, which will be prepended to each stat name.
  * For example:
  *
- *    : my_cool_stats_(context.my_cool_stat_names_, scope, prefix)
+ *    : my_cool_stats_(context.my_cool_stat_names_, scope, opt_prefix)
  */
 
 // Fully-qualified for use in external callsites.
@@ -131,6 +132,10 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
     ALL_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)     \
   }
 
+/**
+ * Instantiates a structure of stats based on a new scope and optional prefix, using
+ * a predefined structure of stat names.
+ */
 #define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)                                 \
   struct StatsStruct {                                                                             \
     StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::Scope& scope,                     \
