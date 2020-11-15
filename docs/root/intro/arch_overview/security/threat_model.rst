@@ -1,115 +1,84 @@
 .. _arch_overview_threat_model:
 
-Threat model
+威胁模型
 ============
 
-Below we articulate the Envoy threat model, which is of relevance to Envoy operators, developers and
-security researchers. We detail our security release process at
-https://github.com/envoyproxy/envoy/security/policy.
+下面我们阐述了 Envoy 威胁模型，该模型涉及到 Envoy 的运维人员、开发人员和
+安全研究人员。 我们在 https://github.com/envoyproxy/envoy/security/policy 
+详细介绍了安全发布流程。
 
-Confidentiality, integrity and availability
+机密性、完整性和可用性
 -------------------------------------------
 
-We consider vulnerabilities leading to the compromise of data confidentiality or integrity to be our
-highest priority concerns. Availability, in particular in areas relating to DoS and resource
-exhaustion, is also a serious security concern for Envoy operators, in particular those utilizing
-Envoy in edge deployments.
+我们非常关心会导致数据机密性或完整性受损的漏洞。 
+对于 Envoy 运维人员，尤其是在边缘部署中使用 Envoy 的运维人员，
+与 DoS 和资源耗尽相关的领域中的可用性，也是一个严重的安全问题。
 
-We will activate the security release process for disclosures that meet the following criteria:
+符合以下条件的泄露，我们将激活安全发布流程：
 
-* All issues that lead to loss of data confidentiality or integrity trigger the security release process.
-* An availability issue, such as Query-of-Death (QoD) or resource exhaustion needs to meet all of the
-  following criteria to trigger the security release process:
+* 所有导致数据机密性或完整性丧失的问题都会触发安全发布流程。
+* 可用性问题，如死亡查询(QoD)或资源耗尽，需要满足如下所有的标准才会触发安全发布流程：
   
-  - A component tagged as hardened is affected (see `Core and extensions`_ for the list of hardened components).
+  - 被标记为硬化的组件受到影响 (查看 `核心和扩展`_ 来获取硬化组件列表).
     
-  - The type of traffic (upstream or downstream) that exhibits the issue matches the component's hardening tag.
-    I.e. component tagged as “hardened to untrusted downstream” is affected by downstream request.
+  - 出问题的流量类型（上游或下游）与组件的硬化标签相匹配。
+    例如：标记为 "hardened to untrusted downstream" 的组件会受到下游请求的影响。
     
-  - A resource exhaustion issue needs to meet these additional criteria:
+  - 资源耗尽的问题还需要满足一些额外的标准:
     
-    + Not covered by an existing timeout or where applying short timeout values is impractical and either
+    + 超过了当前配置的超时时间或者配置了过短的不切实际的超时时间，也可能是：
       
-      + Memory exhaustion, including out of memory conditions, where per-request memory use 100x or more above
-	the configured header or high watermark limit. I.e. 10 KiB client request leading to 1 MiB bytes of
-	memory consumed by Envoy;
-      
-      + Highly asymmetric CPU utilization where Envoy uses 100x or more CPU compared to client.
+      + 内存耗尽，包括内存不足的情况，每个请求的内存占用比配置的 header 或高水位限制多 100 倍或更多。 例如，10 KiB 客户端请求会导致 Envoy 占用 1 MiB 的内存；
 
+      + CPU 使用严重失衡，Envoy 使用比客户端多 100 倍甚至更多的 CPU。
 
-The Envoy availability stance around CPU and memory DoS is still evolving, especially for brute force
-attacks. We acknowledge that brute force (i.e. these with amplification factor less than 100) attacks are
-likely for Envoy deployments as part of cloud infrastructure or with the use of botnets. We will continue
-to iterate and fix well known resource issues in the open, e.g. overload manager and watermark improvements.
-We will activate the security process for brute force disclosures that appear to present a risk to
-existing Envoy deployments.
+围绕 CPU 和内存 DoS 的 Envoy 可用性立场仍在不断发展，特别是针对暴力攻击。
+我们承认，对于作为云基础设施的一部分或使用僵尸网络的 Envoy 部署来说，暴力攻击（即这些放大系数小于 100 的攻击）很可能发生。
+我们将继续在社区中迭代和修复众所周知的资源问题，例如负载管理器和 watermark 改进。对当前 Envoy 部署构成风险的暴力披露问题，我们将启动安全进程。
 
-Note that we do not currently consider the default settings for Envoy to be safe from an availability
-perspective. It is necessary for operators to explicitly :ref:`configure <best_practices_edge>`
-watermarks, the overload manager, circuit breakers and other resource related features in Envoy to
-provide a robust availability story. We will not act on any security disclosure that relates to a
-lack of safe defaults. Over time, we will work towards improved safe-by-default configuration, but
-due to backwards compatibility and performance concerns, this will require following the breaking
-change deprecation policy.
+请注意，从可用性的角度来讲，目前我们并不认为 Envoy 的默认配置是安全的。
+运维人员必须显示地:ref:`配置 <best_practices_edge>` watermarks、负载管理器、断路器和其他一些与 Envoy 资源相关的特性来提供可靠的稳定性。
+对于缺乏安全默认设置的任何安全披露，我们将不采取行动。 随着时间的流逝，我们将努力改进默认的安全配置，但是由于向后兼容性和性能问题，这将需要遵循重大变更弃用策略。
 
-Data and control plane
+数据和控制平面
 ----------------------
 
-We divide our threat model into data and control plane, reflecting the internal division in Envoy of
-these concepts from an architectural perspective. Our highest priority in risk assessment is the
-threat posed by untrusted downstream client traffic on the data plane. This reflects the use of
-Envoy in an edge serving capacity and also the use of Envoy as an inbound destination in a service
-mesh deployment.
+我们将威胁模型分为数据平面和控制平面，从架构的角度反映了 Envoy 内部对这些概念的划分。
+我们在风险评估中最优先考虑的是数据平面上不受信任的下游客户端流量所带来的威胁。这反映了在边缘服务能力中使用 Envoy，也反映了在服务网状部署中使用 Envoy 作为入站目的地。
 
-In addition, we have an evolving position towards any vulnerability that might be exploitable by
-untrusted upstreams. We recognize that these constitute a serious security consideration, given the
-use of Envoy as an egress proxy. We will activate the security release process for disclosures that
-appear to present a risk profile that is significantly greater than the current Envoy upstream
-hardening status quo.
+此外，我们对任何可能被不受信任的上游利用的漏洞的立场也在不断变化。我们认识到，鉴于使用 Envoy 作为出口代理，这些构成了严重的安全考虑。
+我们将启动安全发布程序，以应对似乎比目前 Envoy 上游加固现状更高的风险状况的披露。
 
-The control plane management server is generally trusted. We do not consider wire-level exploits
-against the xDS transport protocol to be a concern as a result. However, the configuration delivered
-to Envoy over xDS may originate from untrusted sources and may not be fully sanitized. An example of
-this might be a service operator that hosts multiple tenants on an Envoy, where tenants may specify
-a regular expression on a header match in `RouteConfiguration`. In this case, we expect that Envoy
-is resilient against the risks posed by malicious configuration from a confidentiality, integrity
-and availability perspective, as described above.
+控制平面管理服务器通常是受信任的。 因此，我们不考虑针对 xDS 传输协议的线级漏洞利用。 但是，通过 xDS 传递给 Envoy 的配置可能来自不受信任的来源，并且可能没有完全清除。
+例如，服务运营商在 Envoy 上托管多个租户，租户可以在 `RouteConfiguration` 中的 header 匹配项上指定正则表达式。 
+在这种情况下，我们期望从机密性、完整性和可用性的角度来看，Envoy 能够抵御恶意配置带来的风险，如上所述。
 
-We generally assume that services utilized for side calls during the request processing, e.g.
-external authorization, credential suppliers, rate limit services, are trusted. When this is not the
-case, an extension will explicitly state this in its documentation.
+我们通常认为在请求处理过程中，用于侧呼的服务是可信的，如外部授权、凭证供应商、速率限制服务。当情况并非如此时，将在文档中的扩展明确说明这一点。
 
-Core and extensions
+核心和扩展
 -------------------
 
-Anything in the Envoy core may be used in both untrusted and trusted deployments. As a consequence,
-it should be hardened with this model in mind. Security issues related to core code will usually
-trigger the security release process as described in this document.
+Envoy 核心中的任何东西都可以用于不受信任和受信任的部署。
+因此，应在考虑到这种模式的情况下对其进行加固。与核心代码有关的安全问题通常会触发本文所述的安全发布流程。
 
-The following extensions are intended to be hardened against untrusted downstream and upstreams:
+强化以下扩展以防止不受信任的下游和上游：
 
 .. include:: secpos_robust_to_untrusted_downstream_and_upstream.rst
 
-The following extensions should not be exposed to data plane attack vectors and hence are intended
-to be robust to untrusted downstreams and upstreams:
+以下扩展不应暴露在数据平面攻击向量中，因此旨在对不受信任的下游和上游进行加固：
 
 .. include:: secpos_data_plane_agnostic.rst
 
-The following extensions are intended to be hardened against untrusted downstreams but assume trusted
-upstreams:
+以下扩展是为了防范不受信任的下游，但假设上游是受信任的：
 
 .. include:: secpos_robust_to_untrusted_downstream.rst
 
-The following extensions should only be used when both the downstream and upstream are trusted:
+以下扩展只有在下游和上游都被信任的情况下才能使用：
 
 .. include:: secpos_requires_trusted_downstream_and_upstream.rst
 
-
-The following extensions have an unknown security posture:
+以下扩展的安全状态未知：
 
 .. include:: secpos_unknown.rst
 
-Envoy currently has two dynamic filter extensions that support loadable code; WASM and Lua. In both
-cases, we assume that the dynamically loaded code is trusted. We expect the runtime for Lua to be
-robust to untrusted data plane traffic with the assumption of a trusted script. WASM is still in
-development, but will eventually have a similar security stance.
+Envoy 目前具有两个支持可加载代码的动态过滤器扩展：WASM 和 Lua。在这两种情况下，我们都假定动态加载的代码是受信任的。我们期望 Lua 的运行时能够在不信任脚本的前提下对不信任的数据平面流量具有鲁棒性, WASM 仍在开发中，但最终将具有类似的安全特征。
