@@ -13,10 +13,10 @@ Envoy 在其代码库和文档中使用以下术语：
 
 * *集群（Cluster）*: Envoy 将请求转发到的一组端点的逻辑服务。
 * *下游（Downstream）*: 连接到 Envoy 的实体。可能是本地应用程序（使用 Sidecar 模型）或网络节点。在非 Sidecar 模型中，是一个远程客户端。
-* *端点（Endpoints）*: 实现逻辑服务的网络节点。它们被按照 Cluster 分组。 Cluster 中的端点在 Envoy 代理的上游。
+* *端点（Endpoints）*: 实现逻辑服务的网络节点。他们组成集群。集群中的端点就是 Envoy 代理的 上游。
 * *过滤器（Filter）*: 在连接或请求处理管道中提供某些方面请求处理的模块。就好比 Unix 是小型实用程序（过滤器）与 Unix 管道（过滤器链）的组合。
 * *过滤器链（Filter chain）*: 一系列的过滤器。
-* *监听器（Listeners）*: Envoy 模块负责绑定到 IP/port ，接受新的 TCP 连接（或 UDP 数据包），并编排面向请求处理的下游。
+* *监听器（Listeners）*: 负责绑定 IP/port、接受新的 TCP 链接（或者 UDP 数据包）以及管理面向请求处理的下游的模块。
 * *上游（Upstream）*: 转发服务请求时，Envoy 连接到的端点（网络节点）。可能是本地应用程序（使用 Sidecar 模型）或网络节点。在非 Sidecar 模型中，对应于远程后端。
 
 网络拓扑结构
@@ -26,11 +26,11 @@ Envoy 在其代码库和文档中使用以下术语：
 我们在下面重点介绍 Envoy 的内部操作，但在本节中我们将简要地介绍下 Envoy 与网络其余部分的关系。
 
 Envoy 最初是作为 `服务网格 <https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc>`_ sidecar 代理，
-从应用中分离了负载平衡，路由，可观察性，安全性和服务发现等功能。在服务网格模型中，请求流经 Envoy 作为网络的网关。
+从应用中分离了负载均衡、路由、可观察性、安全性和服务发现等功能。在服务网格模型中，请求流经 Envoy 作为网络的网关。
 请求通过入口或出口监听器到达 Envoy：
 
-* 入口监听器从服务网格中的其他节点获取请求，并将其转发到本地应用程序。本地应用程序的响应通过 Envoy 流回到下游。
-* 出口监听器从本地应用程序获取请求，并将其转发到网络中的其他节点。这些接收节点通常还将运行 Envoy 并通过其入口监听器接受请求。
+* 入口（Ingress）监听器从服务网格中的其他节点获取请求，并将其转发到本地应用程序。本地应用程序的响应通过 Envoy 流回到下游。
+* 出口（Engress）监听器从本地应用程序获取请求，并将其转发到网络中的其他节点。这些接收节点通常还将运行 Envoy 并通过其入口监听器接受请求。
 
 .. image:: /_static/lor-topology-service-mesh.svg
    :width: 80%
@@ -53,7 +53,7 @@ Envoy 可用于服务网格之外的各种配置。例如它还可以充当内�
    :width: 90%
    :align: center
 
-在实践中，通常混合使用这些方法，在服务网格中，Envoy 同时作为内部负载均衡器以及在边缘上作为代理。请求路径可能会遍历多个 Envoy。
+在服务网格中，通常混合使用这些方法，Envoy 同时作为内部负载均衡器以及在边缘上作为代理。请求路径可能会遍历多个 Envoy。
 
 .. image:: /_static/lor-topology-hybrid.svg
    :width: 90%
@@ -66,17 +66,17 @@ Envoy 可以在多层拓扑中进行配置，以实现可伸缩性和可靠性�
    :align: center
 
 在上述所有情况下，请求将从下游通过 TCP，UDP 或 Unix 域套接字到达特定的 Envoy。 Envoy 将通过 TCP，UDP 或 Unix 
-域套接字向上游转发请求。我们在下面仅关注一个 Envoy 代理。
+域套接字向上游转发请求。我们在下面仅关注单个 Envoy 代理。
 
 配置
 -------------
 
-Envoy是一个易于扩展的平台。这导致可能的请求路径组合爆炸，具体取决于：
+Envoy是一个易于扩展的平台。这导致了请求路径的多种可能，具体取决于：
 
 * L3/4 协议，例如 TCP、UDP、Unix 域套接字。
 * L7 协议，例如 HTTP/1、HTTP/2、HTTP/3、gRPC、Thrift、Dubbo、Kafka、Redis 和各种数据库。
-* socket 套接字，例如纯文本、TLS、ALTS。
-* 连接路由，例如PROXY 协议、原始目的地、动态转发。
+* socket 传输，例如纯文本、TLS、ALTS。
+* 连接路由，例如 PROXY 协议、原始目的地、动态转发。
 * 认证和授权。
 * 熔断机制和异常值检测配置以及激活状态。
 * 网络、HTTP、监听器、访问日志、运行状况检查、跟踪和统计信息扩展的许多其他配置。
@@ -101,7 +101,7 @@ Envoy是一个易于扩展的平台。这导致可能的请求路径组合爆炸
 Envoy 中的请求处理路径包括两个主要部分：
 
 * :ref:`监听器子系统 <arch_overview_listeners>` 对**下游**请求进行处理。它还负责管理下游请求生命周期以及到客户端的响应路径。下游 HTTP/2 编解码器位于此处。
-* :ref:`集群子系统 <arch_overview_cluster_manager>` 负责选择和配置到端点的**上游**连接。这是了解集群和端点运行状况并具有负载平衡和连接池功能。上游 HTTP/2 编解码器位于此处。
+* :ref:`集群子系统 <arch_overview_cluster_manager>` 负责选择和配置到端点的**上游**连接。这是了解集群和端点运行状况并具有负载均衡和连接池功能。上游 HTTP/2 编解码器位于此处。
 
 这两个子系统与 HTTP 路由过滤器桥接，该过滤器将 HTTP 请求从下游转发到上游。
 
@@ -112,7 +112,7 @@ Envoy 中的请求处理路径包括两个主要部分：
 我们使用上面的术语 :ref:`监听器子系统 <arch_overview_listeners>` 和 :ref:`集群子系统 
 <arch_overview_cluster_manager>` 来指代由顶级 `ListenerManager` 和 `ClusterManager` 
 类创建的模块和实例类的组。这些管理系统在请求之前和请求的过程中会实例化许多我们在下面讨论的组件，
-例如监听器，过滤器链，编解码器，连接池和负载均衡等数据结构。
+例如监听器、过滤器链、编解码器、连接池和负载均衡等数据结构。
 
 Envoy 具有 `基于事件的线程模型 <https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310>`_。
 主线程负责服务器的生命周期，配置处理，信息统计等。:ref:`工作线程 <arch_overview_threading>` 负责请求处理。
@@ -132,21 +132,21 @@ UDP过滤器状态被给定的工作线程共享，使用该过滤器可以根�
 
 1. 在 :ref:`工作线程 <arch_overview_threading>` 上运行的 Envoy :ref:`监听器 <arch_overview_listeners>` 接受来自下游的 TCP 连接。
 2. :ref:`监听过滤器 <arch_overview_listener_filters>` 链已创建并运行。 它可以提供 SNI 和 pre-TLS 信息。完成后，
-   监听器将匹配网络过滤器链。每个监听器可能具有多个过滤器链，这些过滤器链是在目标 IP CIDR 范围，SNI，ALPN，源端口等的某种组合上匹配。
-   传输套接字（在我们的情况下为TLS传输套接字）与此过滤器链相关联。
+   监听器将匹配网络过滤器链。每个监听器可能具有多个过滤器链，这些过滤器链是在目标 IP CIDR 范围、SNI、ALPN、源端口等的某种组合上匹配。
+   传输套接字（在我们的情况下为 TLS 传输套接字）与此过滤器链相关联。
 3. 在进行网络读取时， :ref:`TLS <arch_overview_ssl>` 传输套接字将从 TCP 连接读取的数据解密为解密的数据流，以进行进一步处理。
 4. :ref:`网络过滤器 <arch_overview_network_filters>` 链已创建并运行。HTTP 最重要的过滤器是 HTTP 连接管理器，它是链中的最后一个网络过滤器。
 5.  :ref:`HTTP 连接管理器 <arch_overview_http_conn_man>` 中的 HTTP/2 编解码器将解密后的数据流从 TLS 连接解帧并解复用为多个独立的流。每个流只处理一个请求和响应。
 6. 对于每个 HTTP 请求流，都会创建并运行 :ref:`HTTP 过滤器 <arch_overview_http_filters>` 链。该请求首先通过可以读取和修改请求的自定义过滤器。
    路由过滤器是最重要的 HTTP 过滤器，它位于 HTTP 过滤器链的末尾。在路由过滤器上调用 `decodeHeaders` 时，将选择路由和集群。数据流上的请求
    头被转发到该集群中的上游端点。 :ref:`路由 <arch_overview_http_routing>` 过滤器通过从集群管理器中匹配到的集群获取HTTP连接池，以执行操作。
-7. 执行集群特定的 :ref:`负载平衡 <arch_overview_load_balancing>` 以查找端点。通过检查集群的断路器，以确定是否允许新的数据流。如果端点的连接池
+7. 执行集群特定的 :ref:`负载均衡 <arch_overview_load_balancing>` 以查找端点。通过检查集群的断路器，以确定是否允许新的数据流。如果端点的连接池
    为空或容量不足，则会创建到端点的新连接。
 8. 上游端点连接的 HTTP/2 编解码器将请求流与通过单个 TCP 连接流向上游的任何其他流进行多路复用和帧化。
 9. 上游端点连接的 TLS 传输套接字对这些字节进行加密，并将其写入上游连接的 TCP 套接字。
 10. 由请求头，可选的请求体和尾部组成的请求在上游被代理，而响应在下游被代理。响应以与请求 :ref:`逆序 <arch_overview_http_filters_ordering>` 通过 HTTP 过滤器，
     从路由器过滤器开始并通过自定义过滤器，然后再发送到下游。
-11. 当响应完成后，请求流将被销毁。请求后处理程序将更新统计信息，写入访问日志并最终确定跟踪范围。
+11. 当响应完成后，请求流将被销毁。请求后处理程序将更新统计信息，写入访问日志并最终确定追踪 span。
 
 我们将在以下各节中详细介绍每个步骤。
 
@@ -159,7 +159,7 @@ UDP过滤器状态被给定的工作线程共享，使用该过滤器可以根�
 
 *ListenerManager* 负责获取代表 :ref:`监听器 <arch_overview_listeners>` 的配置，并实例化绑定到其各自 IP/ports 的多个监听器实例。监听器可能处于以下三种状态之一：
 
-* *Warming*: 监听器正在等待配置依赖项（例如，路由配置，动态密钥）。监听器尚未准备好接受 TCP 连接。
+* *Warming*: 监听器正在等待配置依赖项（例如路由配置、动态密钥）。监听器尚未准备好接受 TCP 连接。
 * *Active*: 监听器绑定到其 IP/port 并接受 TCP 连接。
 * *Draining*: 监听器不再接受新的 TCP 连接，只允许现有的 TCP 连接继续运行直至结束。
 
@@ -220,7 +220,7 @@ Envoy 通过 :repo:`TransportSocket <include/envoy/network/transport_socket.h>` 
    :align: center
 
 需要特别注意的是，无论是 TLS 握手还是过滤器管道暂停，任何操作都无法真正阻塞。 由于 Envoy 是基于事件的，因此任何需要额外数据处理的情况都会导致事件提前完成，
-并使CPU产生另一个事件。当网络使更多数据可供读取时，读取事件将触发 TLS 握手的恢复。
+并使 CPU 产生另一个事件。当网络使更多数据可供读取时，读取事件将触发 TLS 握手的恢复。
 
 4. 网络过滤器链处理
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -318,7 +318,7 @@ HTTP 过滤器遵循 HTTP 请求的生命周期，而不是对连接缓冲区和
    :width: 80%
    :align: center
 
-虽然响应路径如下所示：
+响应路径如下所示：
 
 .. image:: /_static/lor-http-encode.svg
    :width: 80%
@@ -327,7 +327,7 @@ HTTP 过滤器遵循 HTTP 请求的生命周期，而不是对连接缓冲区和
 当在 :ref:`路由器 <arch_overview_http_routing>` 过滤器上调用 ``decodeHeaders()`` 时，将完成路由选择并选择一个集群（cluster）。HCM 在 HTTP 过滤器链
 执行开始时从其 ``RouteConfiguration`` 中选择一条路由。这称为缓存路由。过滤器可以通过要求 HCM 清除*路由缓存*并请求 HCM 重新评估路由选择来修改标头致使选择新路由。 
 调用路由器过滤器时，路由将最终确定。所选路由的配置将指向上游集群名称。 然后路由器过滤器向 `ClusterManager` 询问群集的 :ref:`connection pool 
-<arch_overview_conn_pool>`。这涉及负载平衡和连接池，将在下一节中讨论。
+<arch_overview_conn_pool>`。这涉及负载均衡和连接池，将在下一节中讨论。
 
 .. image:: /_static/lor-route-config.svg
    :width: 70%
@@ -341,9 +341,8 @@ HTTP 过滤器遵循 HTTP 请求的生命周期，而不是对连接缓冲区和
 7. 负载均衡
 ^^^^^^^^^^^^^^^^^
 
-每个集群都有一个 :ref:`负载均衡器 <arch_overview_load_balancing>` ，当新请求到达时，该负载均衡器会选择一个端点。Envoy 支持多种负载平衡算法，例如加权轮循、
-磁悬浮、最小负荷、随机。 负载平衡器从静态引导程序配置、DNS、动态xDS（CDS和EDS发现服务）以及主动/被动运行状况检查的组合中获得有效分配。:ref:`负载平衡文档 
-<arch_overview_load_balancing>` 中提供了有关 Envoy 中负载平衡的工作方式的更多详细信息。
+每个集群都有一个 :ref:`负载均衡器 <arch_overview_load_balancing>` ，当新请求到达时，该负载均衡器会选择一个端点。Envoy 支持多种负载均衡算法，例如加权轮循（weighted round-robin）、磁悬浮（Maglev）、最小负荷（least-loaded）、随机（random）。负载均衡器从静态引导程序配置、DNS、动态 xDS（CDS 和 EDS 发现服务）以及主动/被动运行状况检查的组合中获得有效分配。:ref:`负载均衡文档 
+<arch_overview_load_balancing>` 中提供了有关 Envoy 中负载均衡的工作方式的更多详细信息。
 
 选择端点后，将使用该端点的 :ref:`连接池 <arch_overview_conn_pool>` 来查找用于转发请求的连接。如果不存在与主机的连接，或者所有连接都处于其最大并发流限制，
 则除非触发连接最大集群的熔断机制，否则将建立新连接并将其放置在连接池中。如果配置并达到了连接的最大生存期流限制，则会在池中分配一个新的连接，并且等待 HTTP/2 
@@ -360,8 +359,7 @@ HTTP 过滤器遵循 HTTP 请求的生命周期，而不是对连接缓冲区和
 所选连接的 HTTP/2 编解码器将请求流与通过单个 TCP 连接流向同一上游的任何其他流进行多路复用。这与 :ref:`HTTP/2 编解码器解码 <life_of_a_request_http2_decoding>`
 相反。
 
-与下游 HTTP/2 编解码器一样，上游编解码器负责获取 Envoy 对 HTTP 的标准抽象，即多个流在单个连接上与请求/响应标头/正文/尾部复用，并将其映射到 HTTP/2 的细节。
-通过生成一系列 HTTP/2 帧。
+与下游 HTTP/2 编解码器一样，上游编解码器负责获取 Envoy 对 HTTP 的标准抽象，即多个流在单个连接上与请求/响应标头/正文/尾部复用，通过生成一系列 HTTP/2 帧来将其映射到指定的 HTTP/2 。
 
 9. TLS 传输套接字加密
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -397,9 +395,9 @@ directions during a request.
 * 熔断机制。
 * 上游资源不可用，例如缺少路由集群。
 * 没有健康的端点。
-* DoS保护。
-* HTTP协议违规。
-* 来自 HCM 或 HTTP 过滤器的本地回复。 例如速率限制 HTTP 过滤器返回429响应。
+* DoS 保护。
+* HTTP 协议违规。
+* 来自 HCM 或 HTTP 过滤器的本地回复。例如速率限制 HTTP 过滤器返回429响应。
 
 如果发生这些情况中的任何一种，Envoy 可能会发送内部生成的响应（如果尚未发送上游响应头），或者将流重置（如果响应头已经转发至下游）。Envoy :ref:`调试常见问题
 解答 <faq_overview_debug>` 提供了有关解释这些早期流终止的更多信息。
@@ -415,4 +413,4 @@ directions during a request.
 
 * :ref:`访问日志 <arch_overview_access_logs>` 将写入访问日志 :ref:`接收器 <arch_overview_access_logs_sinks>`。 在我们的示例中，这是一个文件访问日志。
 
-* :ref:`迹线 <arch_overview_tracing>` 跨度已完成。如果跟踪了我们的示例请求，则描述请求的持续时间和详细信息的跟踪范围将由 HCM 在处理请求标头时创建，然后由 HCM 在请求后处理期间最终确定。
+* :ref:`追踪 <arch_overview_tracing>` span 已完成。如果跟踪了我们的示例请求，则描述请求的持续时间和详细信息的跟踪范围将由 HCM 在处理请求标头时创建，然后由 HCM 在请求后处理期间最终确定。
