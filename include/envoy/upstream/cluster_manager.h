@@ -351,7 +351,15 @@ public:
    */
   virtual Secret::SecretManager& secretManager() PURE;
 
-  virtual ClusterManagerStatNames& statNames() PURE;
+  /**
+   * Returns a struct with all the Stats::StatName objects needed by
+   * ClusterManager. This Helps factor out some relatively heavy name
+   * construction which occur when there is a large CDS update during operation,
+   * relative to recreating all stats from strings on-the-fly.
+   *
+   * @return the stat names.
+   */
+  virtual const ClusterManagerStatNames& statNames() const PURE;
 };
 
 /**

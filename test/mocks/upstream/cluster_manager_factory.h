@@ -2,7 +2,10 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/upstream/stat_names.h"
+
 #include "test/mocks/secret/mocks.h"
+#include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -10,6 +13,7 @@
 namespace Envoy {
 namespace Upstream {
 using ::testing::NiceMock;
+
 class MockClusterManagerFactory : public ClusterManagerFactory {
 public:
   MockClusterManagerFactory();
@@ -37,10 +41,13 @@ public:
   MOCK_METHOD(CdsApiPtr, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm));
 
-  MOCK_METHOD(ClusterManagerStatNames&, statNames, ());
+  const ClusterManagerStatNames& statNames() const override { return stat_names_; }
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
+  Stats::TestSymbolTable symbol_table_;
+  ClusterManagerStatNames stat_names_;
 };
+
 } // namespace Upstream
 } // namespace Envoy

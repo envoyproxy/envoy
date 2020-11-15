@@ -30,52 +30,11 @@
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/priority_conn_pool_map.h"
+#include "common/upstream/stat_names.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
-
-/**
- * All cluster manager stats. @see stats_macros.h
- */
-#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE, STATNAME)                                        \
-  COUNTER(cluster_added)                                                                           \
-  COUNTER(cluster_modified)                                                                        \
-  COUNTER(cluster_removed)                                                                         \
-  COUNTER(cluster_updated)                                                                         \
-  COUNTER(cluster_updated_via_merge)                                                               \
-  COUNTER(update_merge_cancelled)                                                                  \
-  COUNTER(update_out_of_merge_window)                                                              \
-  GAUGE(active_clusters, NeverImport)                                                              \
-  GAUGE(warming_clusters, NeverImport)                                                             \
-  STATNAME(cluster_manager)
-
-
-/*struct ClusterManagerStatNames {
-  ClusterManagerStatNames(Stats::SymbolTable& symbol_table)
-      : pool_(symbol_table),
-        prefix_(pool_.add("cluster_manager"))
-        ALL_CLUSTER_MANAGER_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT) {}
-
-  Stats::StatNamePool pool_;
-  Stats::StatName prefix_;
-  ALL_CLUSTER_MANAGER_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)
-  };*/
-
-MAKE_STAT_NAMES_STRUCT(ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
-
-MAKE_STATS_STRUCT(ClusterManagerStats, ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
-
-/*
-ALL_STATS(BLAH, BLAB) {}
-struct ClusterManagerStats {
-  ClusterManagerStats(const ClusterManagerStatNames& stat_names, Stats::StatName prefix, Stats::Scope& scope)
-      : scope_(scope) ALL_CLUSTER_MANAGER_STATS(BLAH, BLAB) {}
-
-  Stats::Scope& scope_;
-  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-};
-*/
 
 /**
  * Production implementation of ClusterManagerFactory.
@@ -90,11 +49,10 @@ public:
                             Secret::SecretManager& secret_manager,
                             ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                             Http::Context& http_context, Grpc::Context& grpc_context,
-                            AccessLog::AccessLogManager& log_manager,
-                            Singleton::Manager& singleton_manager)
+                            AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
-        api_(api), http_context_(http_context), grpc_context_(grpc_context), admin_(admin),
-        runtime_(runtime), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
+        api_(api), http_context_(http_context), grpc_context_(grpc_context),
+        admin_(admin), runtime_(runtime), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager), stat_names_(stats.symbolTable()) {}
@@ -117,7 +75,7 @@ public:
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  virtual ClusterManagerStatNames& statNames() override { return stat_names_; }
+  const ClusterManagerStatNames& statNames() const override { return stat_names_; }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
@@ -211,16 +169,7 @@ private:
 /**
  * Struct definition for all cluster manager stats. @see stats_macros.h
  */
-//struct ClusterManagerStatsOld {
-//  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-//};
-
-/*struct ClusterManagerStats {
-  ClusterManagerStats(const ClusterManagerStatNames& stat_names, Stats::Scope& scope);
-
-  Stats::Scope& scope_;
-  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-  };*/
+MAKE_STATS_STRUCT(ClusterManagerStats, ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
 
 /**
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central

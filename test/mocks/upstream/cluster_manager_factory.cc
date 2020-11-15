@@ -2,7 +2,7 @@
 
 namespace Envoy {
 namespace Upstream {
-MockClusterManagerFactory::MockClusterManagerFactory() = default;
+MockClusterManagerFactory::MockClusterManagerFactory() : stat_names_(*symbol_table_) {}
 
 MockClusterManagerFactory::~MockClusterManagerFactory() = default;
 } // namespace Upstream
