@@ -13,7 +13,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
-#include "common/common/mem_block_builder.h"
 #include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 #include "common/http/header_utility.h"

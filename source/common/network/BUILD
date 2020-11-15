@@ -41,6 +41,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
