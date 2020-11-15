@@ -1,4 +1,4 @@
-Operations & configuration
+操作与配置
 ==========================
 
 .. toctree::
