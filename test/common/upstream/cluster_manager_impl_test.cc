@@ -839,6 +839,7 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
       .WillOnce(Return(connection));
   create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
+  factory_.dispatcher_.to_delete_.clear();
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
@@ -3966,6 +3967,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
       hosts_added, {}, 100);
+  //cluster_manager_->removeCluster()
 }
 
 TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameStatic) {

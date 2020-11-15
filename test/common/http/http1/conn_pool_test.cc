@@ -116,7 +116,7 @@ public:
   }
 
   void expectEnableUpstreamReady() {
-    EXPECT_CALL(mock_dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb_));
+    EXPECT_CALL(mock_dispatcher_, post(_)).WillOnce(DoAll(SaveArg<0>(&post_cb_), Return(true)));
   }
 
   void expectAndRunUpstreamReady() { post_cb_(); }

@@ -216,17 +216,34 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   }
 }
 
-void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
+void DispatcherImpl::exit() {
+  {
+    Thread::LockGuard lock(post_lock_);
+    exited_ = true;
+    // No more post!
+  }
+  base_scheduler_.loopExit();
+  {
+    FANCY_LOG(debug, "lambdai: running postcallbacks after exit");
+    // TODO(lambdai): runtime key.
+    runPostCallbacks();
+    FANCY_LOG(debug, "lambdai: complete postcallbacks after exit");
+  }
+}
 
 SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
 
-void DispatcherImpl::post(std::function<void()> callback) {
+bool DispatcherImpl::post(std::function<void()> callback) {
   bool do_post;
   {
     Thread::LockGuard lock(post_lock_);
+    // TODO(lambdai): For compatibility we should allow blind post.
+    if (exited_) {
+      return false;
+    }
     do_post = post_callbacks_.empty();
     post_callbacks_.push_back(callback);
   }
@@ -234,6 +251,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
   if (do_post) {
     post_cb_->scheduleCallbackCurrentIteration();
   }
+  return true;
 }
 
 void DispatcherImpl::run(RunType type) {
@@ -244,7 +262,9 @@ void DispatcherImpl::run(RunType type) {
   // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
+  exited_ = false;
   base_scheduler_.run(type);
+  exited_ = true;
 }
 
 MonotonicTime DispatcherImpl::approximateMonotonicTime() const {

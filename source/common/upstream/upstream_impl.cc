@@ -28,6 +28,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/event/deferred_task.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
@@ -900,9 +901,21 @@ ClusterImplBase::ClusterImplBase(
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
-  info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
-                                            runtime, std::move(socket_matcher),
-                                            std::move(stats_scope), added_via_api, factory_context);
+  auto& dispatcher = factory_context.dispatcher();
+  info_ = std::shared_ptr<const ClusterInfoImpl>(
+      new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
+                          std::move(socket_matcher), std::move(stats_scope), added_via_api,
+                          factory_context),
+      [&dispatcher](const ClusterInfoImpl* self) {
+        FANCY_LOG(debug, "lambdai: schedule destroy cluster info {} on this thread", self->name());
+        if (!dispatcher.post([self]() {
+          FANCY_LOG(debug, "lambdai: execute destroy cluster info {} on this thread", self->name());
+          delete self;
+        })) {
+          FANCY_LOG(debug, "lambdai: cannot post. Exited? Executing destroy cluster info {} on this thread", self->name());
+          delete self;
+        }
+      });
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
