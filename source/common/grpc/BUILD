@@ -94,7 +94,6 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:macros",
         "//source/common/common:safe_memcpy_lib",
-        "//source/common/common:mem_block_builder_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http:header_utility_lib",

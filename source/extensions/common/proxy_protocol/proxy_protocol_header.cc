@@ -5,7 +5,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
 
-#include "common/common/mem_block_builder.h"
 #include "common/network/address_impl.h"
 
 namespace Envoy {
@@ -67,41 +66,37 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
   case Network::Address::IpVersion::v4: {
     addr_length[1] = PROXY_PROTO_V2_ADDR_LEN_INET;
     out.add(addr_length, 2);
-
-    MemBlockBuilder<uint8_t> addrs(8);
+    uint8_t addrs[8];
     const auto net_src_addr =
         Network::Address::Ipv4Instance(src_addr, src_port).ip()->ipv4()->address();
     const auto net_dst_addr =
         Network::Address::Ipv4Instance(dst_addr, dst_port).ip()->ipv4()->address();
-    addrs.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_src_addr), 4));
-    addrs.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_dst_addr), 4));
-    out.add(addrs.releasePointer(), 8);
+    memcpy(addrs, &net_src_addr, 4); // NOLINT(safe-memcpy)
+    memcpy(&addrs[4], &net_dst_addr, 4); // NOLINT(safe-memcpy)
+    out.add(addrs, 8);
     break;
   }
   case Network::Address::IpVersion::v6: {
     addr_length[1] = PROXY_PROTO_V2_ADDR_LEN_INET6;
     out.add(addr_length, 2);
-
-    MemBlockBuilder<uint8_t> addrs(32);
+    uint8_t addrs[32];
     const auto net_src_addr =
         Network::Address::Ipv6Instance(src_addr, src_port).ip()->ipv6()->address();
     const auto net_dst_addr =
         Network::Address::Ipv6Instance(dst_addr, dst_port).ip()->ipv6()->address();
-    addrs.appendData(
-        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_src_addr), 16));
-    addrs.appendData(
-        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_dst_addr), 16));
-    out.add(addrs.releasePointer(), 32);
+    memcpy(addrs, &net_src_addr, 16); // NOLINT(safe-memcpy)
+    memcpy(&addrs[16], &net_dst_addr, 16); // NOLINT(safe-memcpy)
+    out.add(addrs, 32);
     break;
   }
   }
 
-  MemBlockBuilder<uint8_t> ports(4);
+  uint8_t ports[4];
   const auto net_src_port = htons(static_cast<uint16_t>(src_port));
   const auto net_dst_port = htons(static_cast<uint16_t>(dst_port));
-  ports.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_src_port), 2));
-  ports.appendData(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&net_dst_port), 2));
-  out.add(ports.releasePointer(), 4);
+  memcpy(ports, &net_src_port, 2); // NOLINT(saf-memcpy)
+  memcpy(&ports[2], &net_dst_port, 2); // NOLINT(safe-memcpy)
+  out.add(ports, 4);
 }
 
 void generateV2Header(const Network::Address::Ip& source_address,
