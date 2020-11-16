@@ -993,6 +993,10 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
 }
 
+TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
+  testEnvoyHandling100Continue(false, "", true);
+}
+
 TEST_P(ProtocolIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
 TEST_P(ProtocolIntegrationTest, EnvoyHandlingDuplicate100Continue) {
