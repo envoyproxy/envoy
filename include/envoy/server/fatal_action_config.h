@@ -23,6 +23,10 @@ public:
    */
   virtual void run(const ScopeTrackedObject* current_object) PURE;
 
+  /**
+   * @return whether the action is async-signal-safe.
+   * See man 7 signal-safety for the definition of async-signal-safe.
+   */
   virtual bool isAsyncSignalSafe() const PURE;
 };
 
