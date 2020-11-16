@@ -45,11 +45,15 @@ refer to filesystem paths. This currently is supported for the following secret 
 * :ref:`TlsCertificate <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`
 * :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
 
-By default, directories containing secrets are watched for filesystem move events. Explicit control over
-the watched directory is possible by specifying a *watched_directory* path in :ref:`TlsCertificate
+By default, directories containing secrets are watched for filesystem move events. For example, a
+key or trusted CA certificates at ``/foo/bar/baz/cert.pem`` will be watched at `/foo/bar/baz`.
+Explicit control over the watched directory is possible by specifying a *watched_directory* path in
+:ref:`TlsCertificate
 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.watched_directory>` and
 :ref:`CertificateValidationContext
 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.watched_directory>`.
+This allows watches to be established at path predecessors, e.g. ``/foo/bar``; this capability is
+useful when implementing common key rotation schemes.
 
 An example of key rotation is provided :ref:`below <xds_certificate_rotation>`.
 
