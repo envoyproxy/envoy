@@ -106,6 +106,21 @@ TEST(StartTlsTest, BasicSwitch) {
   socket->doWrite(buf, true);
 }
 
+// Factory test.
+TEST(StartTls, BasicFactoryTest) {
+  const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig config;
+  NiceMock<Network::MockTransportSocketFactory>* raw_buffer_factory =
+      new NiceMock<Network::MockTransportSocketFactory>;
+  NiceMock<Network::MockTransportSocketFactory>* ssl_factory =
+      new NiceMock<Network::MockTransportSocketFactory>;
+  std::unique_ptr<ServerStartTlsSocketFactory> factory =
+      std::make_unique<ServerStartTlsSocketFactory>(
+          config, Network::TransportSocketFactoryPtr(raw_buffer_factory),
+          Network::TransportSocketFactoryPtr(ssl_factory));
+  ASSERT_FALSE(factory->implementsSecureTransport());
+  ASSERT_FALSE(factory->usesProxyProtocolOptions());
+}
+
 } // namespace StartTls
 } // namespace TransportSockets
 } // namespace Extensions
