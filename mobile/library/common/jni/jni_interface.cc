@@ -79,7 +79,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_filterTemplateString(JNIEnv* en
   return result;
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounter(
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
     JNIEnv* env,
     jclass, // class
     jlong engine, jstring elements, jint count) {
