@@ -171,7 +171,7 @@ envoy_cc_library(
         "//include/envoy/api:api_interface",
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/thread:thread_interface",
-        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/thread_local:thread_local_object",
         "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
@@ -204,5 +204,20 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/config:datasource_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "google_async_client_cache",
+    srcs = ["google_async_client_cache.cc"],
+    hdrs = ["google_async_client_cache.h"],
+    external_deps = [
+        "grpc",
+    ],
+    deps = [
+        "//include/envoy/grpc:async_client_manager_interface",
+        "//include/envoy/server:factory_context_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/thread_local:thread_local_interface",
     ],
 )

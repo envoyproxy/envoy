@@ -1,8 +1,8 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
-    "envoy_select_wasm_all_v8_wavm_none",
     "envoy_select_wasm_v8",
+    "envoy_select_wasm_wasmtime",
     "envoy_select_wasm_wavm",
 )
 
@@ -21,38 +21,23 @@ cc_library(
 cc_library(
     name = "lib",
     # Note that the select cannot appear in the glob.
-    srcs = envoy_select_wasm_all_v8_wavm_none(
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-        ),
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-            exclude = ["src/wavm/*"],
-        ),
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-            exclude = ["src/v8/*"],
-        ),
-        glob(
-            [
-                "src/**/*.h",
-                "src/**/*.cc",
-            ],
-            exclude = [
-                "src/wavm/*",
-                "src/v8/*",
-            ],
-        ),
-    ),
+    srcs = glob(
+        [
+            "src/**/*.h",
+            "src/**/*.cc",
+        ],
+        exclude = [
+            "src/v8/*.cc",
+            "src/wavm/*.cc",
+            "src/wasmtime/*.cc",
+        ],
+    ) + envoy_select_wasm_v8(glob([
+        "src/v8/*.cc",
+    ])) + envoy_select_wasm_wavm(glob([
+        "src/wavm/*.cc",
+    ])) + envoy_select_wasm_wasmtime(glob([
+        "src/wasmtime/*.cc",
+    ])),
     copts = envoy_select_wasm_wavm([
         '-DWAVM_API=""',
         "-Wno-non-virtual-dtor",
@@ -68,9 +53,11 @@ cc_library(
         "//external:zlib",
         "@proxy_wasm_cpp_sdk//:api_lib",
         "@proxy_wasm_cpp_sdk//:common_lib",
-    ] + envoy_select_wasm_wavm([
-        "@envoy//bazel/foreign_cc:wavm",
-    ]) + envoy_select_wasm_v8([
+    ] + envoy_select_wasm_v8([
         "//external:wee8",
+    ]) + envoy_select_wasm_wavm([
+        "@envoy//bazel/foreign_cc:wavm",
+    ]) + envoy_select_wasm_wasmtime([
+        "@com_github_wasm_c_api//:wasmtime_lib",
     ]),
 )

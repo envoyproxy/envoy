@@ -47,6 +47,7 @@ layered_runtime:
     rtds_layer:
       name: some_rtds_layer
       rtds_config:
+        resource_api_version: V3
         api_config_source:
           api_type: {}
           grpc_services:
