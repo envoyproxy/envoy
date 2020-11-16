@@ -41,8 +41,7 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  // TODO(mpuncel) only invoke callback() once secrets are ready.
-  void addReadyCb(std::function<void()> callback) override { callback(); };
+  bool usesProxyProtocolOptions() const override;
 
 private:
   Network::TransportSocketFactoryPtr transport_socket_factory_;

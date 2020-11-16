@@ -21,6 +21,9 @@ public:
 
   void initializeFilter(const std::string& config) {
     config_helper_.addFilter(config);
+    config_helper_.addRuntimeOverride("envoy.deprecated_features.allow_deprecated_gzip_http_filter",
+                                      "true");
+    config_helper_.enableDeprecatedV2Api();
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
@@ -86,7 +89,7 @@ public:
   const std::string full_config{R"EOF(
       name: gzip
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.gzip.v2.Gzip
+        "@type": type.googleapis.com/envoy.extensions.filters.http.gzip.v3.Gzip
         memory_level: 3
         window_bits: 10
         compression_level: best

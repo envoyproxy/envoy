@@ -48,7 +48,7 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               quiche::QuicheOptional<quic::EncryptionLevel> level));
+               absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
 
   absl::string_view requestedServerName() const override {
@@ -92,7 +92,7 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               quiche::QuicheOptional<quic::EncryptionLevel> level));
+               absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
 
   absl::string_view requestedServerName() const override {
@@ -188,7 +188,7 @@ std::string bodyToHttp3StreamPayload(const std::string& body) {
   std::unique_ptr<char[]> data_buffer;
   quic::QuicByteCount data_frame_header_length =
       quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
-  quiche::QuicheStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+  absl::string_view data_frame_header(data_buffer.get(), data_frame_header_length);
   return absl::StrCat(data_frame_header, body);
 }
 

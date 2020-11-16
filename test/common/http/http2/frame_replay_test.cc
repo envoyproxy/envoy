@@ -33,7 +33,7 @@ void setupStream(ClientCodecFrameInjector& codec, TestClientConnectionImplNew& c
   // Setup a single stream to inject frames as a reply to.
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  codec.request_encoder_->encodeHeaders(request_headers, true);
+  codec.request_encoder_->encodeHeaders(request_headers, true).IgnoreError();
 }
 
 // Validate that a simple Huffman encoded request HEADERS frame can be decoded.

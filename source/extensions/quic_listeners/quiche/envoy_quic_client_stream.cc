@@ -20,6 +20,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -46,7 +47,12 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
-void EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) {
+Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
+                                                  bool end_stream) {
+  // Required headers must be present. This can only happen by some erroneous processing after the
+  // downstream codecs decode.
+  RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredHeaders(headers));
+
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   quic::QuicStream* writing_stream =
       quic::VersionUsesHttp3(transport_version())
@@ -60,6 +66,7 @@ void EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
   // IETF QUIC sends HEADER frame on current stream. After writing headers, the
   // buffer may increase.
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
+  return Http::okStatus();
 }
 
 void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -133,8 +140,8 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
   response_decoder_->decodeHeaders(
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list),
-      /*end_stream=*/sequencer()->IsClosed());
-  if (sequencer()->IsClosed()) {
+       /*end_stream=*/fin);
+  if (fin) {
     end_stream_decoded_ = true;
   }
   ConsumeHeaderList();

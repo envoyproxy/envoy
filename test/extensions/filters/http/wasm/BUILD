@@ -24,11 +24,13 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:metadata_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_data_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.filters.http.wasm",
+    shard_count = 50,
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/wasm:wasm_filter_lib",
@@ -47,6 +49,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.filters.http.wasm",
+    shard_count = 50,
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",

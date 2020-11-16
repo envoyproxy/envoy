@@ -85,6 +85,7 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
+  void shutdownBasic();
   bool isThreadSafe() const {
     return callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe();
   }
@@ -108,8 +109,7 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-
-  void addReadyCb(std::function<void()> callback) override;
+  bool usesProxyProtocolOptions() const override { return false; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
@@ -121,7 +121,6 @@ private:
   Envoy::Ssl::ClientContextConfigPtr config_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
-  std::list<std::function<void()>> secrets_ready_callbacks_;
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
@@ -135,8 +134,7 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-
-  void addReadyCb(std::function<void()> callback) override;
+  bool usesProxyProtocolOptions() const override { return false; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
@@ -149,7 +147,6 @@ private:
   const std::vector<std::string> server_names_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
-  std::list<std::function<void()>> secrets_ready_callbacks_;
 };
 
 } // namespace Tls

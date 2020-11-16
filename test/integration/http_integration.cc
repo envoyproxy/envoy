@@ -87,7 +87,7 @@ IntegrationCodecClient::makeHeaderOnlyRequest(const Http::RequestHeaderMap& head
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, true);
+  encoder.encodeHeaders(headers, true).IgnoreError();
   flushWrite();
   return response;
 }
@@ -104,7 +104,7 @@ IntegrationCodecClient::makeRequestWithBody(const Http::RequestHeaderMap& header
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false);
+  encoder.encodeHeaders(headers, false).IgnoreError();
   Buffer::OwnedImpl data(body);
   encoder.encodeData(data, true);
   flushWrite();
@@ -155,7 +155,7 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false);
+  encoder.encodeHeaders(headers, false).IgnoreError();
   flushWrite();
   return {encoder, std::move(response)};
 }
@@ -1413,7 +1413,7 @@ void Http2RawFrameIntegrationTest::beginSession() {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   // set lower outbound frame limits to make tests run faster
-  config_helper_.setOutboundFramesLimits(1000, 100);
+  config_helper_.setDownstreamOutboundFramesLimits(1000, 100);
   initialize();
   // Set up a raw connection to easily send requests without reading responses.
   auto options = std::make_shared<Network::Socket::Options>();

@@ -19,7 +19,8 @@ StatusOr<int> countCdnLoopOccurrences(absl::string_view header, absl::string_vie
     return absl::InvalidArgumentError("cdn_id cannot be empty");
   }
 
-  if (absl::StatusOr<Parser::ParsedCdnInfoList> parsed = Parser::parseCdnInfoList(header); parsed) {
+  if (absl::StatusOr<Parser::ParsedCdnInfoList> parsed = Parser::parseCdnInfoList(header);
+      parsed.ok()) {
     return std::count(parsed->cdnIds().begin(), parsed->cdnIds().end(), cdn_id);
   } else {
     return parsed.status();

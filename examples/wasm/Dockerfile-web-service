@@ -1,1 +1,0 @@
-FROM solsson/http-echo

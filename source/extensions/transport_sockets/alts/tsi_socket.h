@@ -98,11 +98,9 @@ public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 
   bool implementsSecureTransport() const override;
+  bool usesProxyProtocolOptions() const override { return false; }
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
-
-  // TODO(mpuncel) only invoke callback() once secrets are ready.
-  void addReadyCb(std::function<void()> callback) override { callback(); };
 
 private:
   HandshakerFactory handshaker_factory_;

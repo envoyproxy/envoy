@@ -21,8 +21,7 @@ DnsCacheImpl::DnsCacheImpl(
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({}, config.use_tcp_for_dns_lookups())),
-      tls_slot_(tls.allocateSlot()),
-      scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
+      tls_slot_(tls), scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(*scope_, loader, config.name(), config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
@@ -32,7 +31,7 @@ DnsCacheImpl::DnsCacheImpl(
               config, refresh_interval_.count(), random)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
-  tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
+  tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
 }
 
@@ -56,7 +55,7 @@ DnsCacheImpl::LoadDnsCacheEntryResult
 DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                 LoadDnsCacheEntryCallbacks& callbacks) {
   ENVOY_LOG(debug, "thread local lookup for host '{}'", host);
-  auto& tls_host_info = tls_slot_->getTyped<ThreadLocalHostInfo>();
+  ThreadLocalHostInfo& tls_host_info = *tls_slot_;
   auto tls_host = tls_host_info.host_map_->find(host);
   if (tls_host != tls_host_info.host_map_->end()) {
     ENVOY_LOG(debug, "thread local hit for host '{}'", host);
@@ -101,6 +100,25 @@ absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {
     }
   }
   return ret;
+}
+
+absl::optional<const DnsHostInfoSharedPtr> DnsCacheImpl::getHost(absl::string_view host_name) {
+  // Find a host with the given name.
+  auto it = primary_hosts_.find(host_name);
+  if (it == primary_hosts_.end()) {
+    return {};
+  }
+
+  // Extract host info.
+  auto&& host_info = it->second->host_info_;
+
+  // Only include hosts that have ever resolved to an address.
+  if (host_info->address_ == nullptr) {
+    return {};
+  }
+
+  // Return host info.
+  return host_info;
 }
 
 DnsCacheImpl::AddUpdateCallbacksHandlePtr
@@ -257,10 +275,8 @@ void DnsCacheImpl::updateTlsHostsMap() {
     }
   }
 
-  tls_slot_->runOnAllThreads([new_host_map](ThreadLocal::ThreadLocalObjectSharedPtr object)
-                                 -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    object->asType<ThreadLocalHostInfo>().updateHostMap(new_host_map);
-    return object;
+  tls_slot_.runOnAllThreads([new_host_map](OptRef<ThreadLocalHostInfo> local_host_info) {
+    local_host_info->updateHostMap(new_host_map);
   });
 }
 
