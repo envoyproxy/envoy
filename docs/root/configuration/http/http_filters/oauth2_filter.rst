@@ -71,6 +71,8 @@ The following is an example configuring the filter.
         name: hmac
         sds_config:
           path: "/etc/envoy/hmac.yaml"
+    # (Optional): defaults to 'user' scope if not provided
+    auth_scopes = "profile email"
 
 Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
@@ -114,6 +116,8 @@ Below is a complete code example of how we employ the filter as one of
                     name: hmac
                     sds_config:
                       path: "/etc/envoy/hmac.yaml"
+                # (Optional): defaults to 'user' scope is not provided
+                auth_scopes: "profile email"
           - name: envoy.router
           tracing: {}
           codec_type: "AUTO"
