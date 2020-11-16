@@ -869,6 +869,7 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   }
 
   if (disconnect_after_100) {
+    response->waitForContinueHeaders();
     codec_client_->close();
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("100"));
     return;
