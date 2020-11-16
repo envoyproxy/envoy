@@ -73,7 +73,7 @@ WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& s
 
   auto wasm = runtime_factory->createWasmVm();
   wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(
-      scope, runtime_factory->name(), runtime_factory->short_name());
+      scope, runtime_factory->name(), runtime_factory->shortName());
   return wasm;
 }
 
