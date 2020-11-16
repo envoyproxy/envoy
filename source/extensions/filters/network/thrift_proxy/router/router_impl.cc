@@ -262,13 +262,11 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                                         : callbacks_->downstreamProtocolType();
   ASSERT(protocol != ProtocolType::Auto);
 
-  bool enable_passthrough = false;
   if (callbacks_->downstreamTransportType() == TransportType::Framed &&
       transport == TransportType::Framed && callbacks_->downstreamProtocolType() == protocol &&
       protocol != ProtocolType::Twitter) {
-    enable_passthrough = true;
+    passthrough_supported_ = true;
   }
-  enablePassthrough(enable_passthrough);
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
       cluster_name, Upstream::ResourcePriority::Default, this);

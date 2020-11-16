@@ -77,6 +77,7 @@ public:
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
+  bool passthroughEnabled() const override;
 
 private:
   struct ActiveRpc;
@@ -86,7 +87,6 @@ private:
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
           complete_(false), first_reply_field_(false) {
       initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
-      enablePassthrough(parent_.passthroughEnabled());
     }
 
     bool onData(Buffer::Instance& data);
@@ -104,6 +104,7 @@ private:
 
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
+    bool passthroughEnabled() const override;
 
     ActiveRpc& parent_;
     DecoderPtr decoder_;
@@ -182,7 +183,6 @@ private:
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportEnd() override;
-    bool passthroughEnabled() const override;
     FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus messageEnd() override;
@@ -229,6 +229,7 @@ private:
       LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
     }
 
+    bool passthroughSupported();
     FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
     void finalizeRequest();
 
@@ -250,6 +251,7 @@ private:
     MessageType original_msg_type_{MessageType::Call};
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
     absl::any filter_context_;
+    absl::optional<bool> passthrough_supported_{};
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
   };

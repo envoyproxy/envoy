@@ -38,7 +38,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Ins
 
   const auto status = handler_.messageBegin(metadata_);
 
-  if (handler_.passthroughEnabled()) {
+  if (callbacks_.passthroughEnabled()) {
     body_bytes_ = metadata_->frameSize() - (total - buffer.length());
     return {ProtocolState::PassthroughData, status};
   }
@@ -440,7 +440,7 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
     request_ = std::make_unique<ActiveRequest>(callbacks_.newDecoderEventHandler());
     frame_started_ = true;
     state_machine_ =
-        std::make_unique<DecoderStateMachine>(protocol_, metadata_, request_->handler_);
+        std::make_unique<DecoderStateMachine>(protocol_, metadata_, request_->handler_, callbacks_);
 
     if (request_->handler_.transportBegin(metadata_) == FilterStatus::StopIteration) {
       return FilterStatus::StopIteration;

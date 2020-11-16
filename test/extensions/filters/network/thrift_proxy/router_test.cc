@@ -1023,14 +1023,14 @@ TEST_P(ThriftRouterPassthroughTest, PassthroughEnable) {
   startRequest(MessageType::Call, "method", false, downstream_transport_type,
                downstream_protocol_type);
 
-  bool passthrough_enabled = false;
+  bool passthroughSupported = false;
   if (downstream_transport_type == upstream_transport_type &&
       downstream_transport_type == TransportType::Framed &&
       downstream_protocol_type == upstream_protocol_type &&
       downstream_protocol_type != ProtocolType::Twitter) {
-    passthrough_enabled = true;
+    passthroughSupported = true;
   }
-  ASSERT_EQ(passthrough_enabled, router_->passthroughEnabled());
+  ASSERT_EQ(passthroughSupported, router_->passthroughSupported());
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {

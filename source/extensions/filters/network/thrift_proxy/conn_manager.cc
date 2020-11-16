@@ -176,6 +176,15 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
   return **rpcs_.begin();
 }
 
+bool ConnectionManager::passthroughEnabled() const {
+  if (!config_.payloadPassthrough()) {
+    return false;
+  }
+
+  ASSERT(!rpcs_.empty());
+  return (*rpcs_.begin())->passthroughSupported();
+}
+
 bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   upstream_buffer_.move(data);
 
@@ -272,6 +281,10 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   }
 
   return FilterStatus::Continue;
+}
+
+bool ConnectionManager::ResponseDecoder::passthroughEnabled() const {
+  return parent_.parent_.passthroughEnabled();
 }
 
 void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
@@ -398,16 +411,18 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   }
 }
 
-bool ConnectionManager::ActiveRpc::passthroughEnabled() const {
-  if (!parent_.config_.payloadPassthrough()) {
-    return false;
+bool ConnectionManager::ActiveRpc::passthroughSupported() {
+  if (passthrough_supported_.has_value()) {
+    return passthrough_supported_.value();
   }
 
   for (auto& entry : decoder_filters_) {
-    if (entry->handle_->passthroughEnabled() == false) {
+    if (entry->handle_->passthroughSupported() == false) {
+      passthrough_supported_ = false;
       return false;
     }
   }
+  passthrough_supported_ = true;
   return true;
 }
 

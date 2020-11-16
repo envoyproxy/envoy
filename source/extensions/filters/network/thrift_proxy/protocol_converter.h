@@ -24,11 +24,7 @@ public:
     buffer_ = &buffer;
   }
 
-  void enablePassthrough(bool enable) { enable_passthrough_ = enable; }
-
   // DecoderEventHandler
-  bool passthroughEnabled() const override { return enable_passthrough_; }
-
   FilterStatus passthroughData(Buffer::Instance& data) override {
     buffer_->move(data);
     return FilterStatus::Continue;
@@ -134,7 +130,6 @@ public:
 private:
   Protocol* proto_;
   Buffer::Instance* buffer_{};
-  bool enable_passthrough_{};
 };
 
 } // namespace ThriftProxy

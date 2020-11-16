@@ -36,12 +36,6 @@ public:
   virtual FilterStatus transportEnd() PURE;
 
   /**
-   * @return True if payload passthrough is enabled.
-   * Once any filter returns false, the payload passthrough mode is disabled.
-   */
-  virtual bool passthroughEnabled() const PURE;
-
-  /**
    * Indicates raw bytes after metadata in a Thrift transport frame was detected.
    * Filters should not modify data except for the router.
    * @param data data to send as passthrough

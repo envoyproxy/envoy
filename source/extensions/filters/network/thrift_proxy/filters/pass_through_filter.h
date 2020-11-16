@@ -30,7 +30,7 @@ public:
 
   ThriftProxy::FilterStatus transportEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
-  bool passthroughEnabled() const override { return true; }
+  bool passthroughSupported() const override { return true; }
 
   ThriftProxy::FilterStatus passthroughData(Buffer::Instance&) override {
     return ThriftProxy::FilterStatus::Continue;
