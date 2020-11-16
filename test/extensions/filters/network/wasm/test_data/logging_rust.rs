@@ -57,4 +57,12 @@ impl StreamContext for TestStream {
             peer_type as u32,
         );
     }
+
+    fn on_upstream_close(&mut self, peer_type: PeerType) {
+        trace!(
+            "onUpstreamConnectionClose {} {}",
+            self.context_id,
+            peer_type as u32,
+        );
+    }
 }

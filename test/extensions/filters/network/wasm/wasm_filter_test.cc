@@ -133,6 +133,8 @@ TEST_P(WasmNetworkFilterTest, HappyPath) {
   Buffer::OwnedImpl fake_upstream_data("Done");
   EXPECT_CALL(filter(), log_(spdlog::level::trace,
                              Eq(absl::string_view("onUpstreamData 2 len=4 end_stream=1\nDone"))));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::trace, Eq(absl::string_view("onUpstreamConnectionClose 2 0"))));
   EXPECT_EQ(Network::FilterStatus::Continue, filter().onWrite(fake_upstream_data, true));
   filter().onAboveWriteBufferHighWatermark();
   filter().onBelowWriteBufferLowWatermark();
@@ -173,11 +175,14 @@ TEST_P(WasmNetworkFilterTest, CloseStream) {
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))));
   EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
   EXPECT_CALL(filter(),
+              log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 1"))));
+  EXPECT_CALL(filter(),
               log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 2"))));
 
   filter().onEvent(static_cast<Network::ConnectionEvent>(9999)); // Does nothing.
   filter().onEvent(Network::ConnectionEvent::RemoteClose);
   filter().closeStream(proxy_wasm::WasmStreamType::Downstream);
+  filter().closeStream(proxy_wasm::WasmStreamType::Upstream);
 }
 
 TEST_P(WasmNetworkFilterTest, SegvFailOpen) {

@@ -857,7 +857,16 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
 
 void Context::onDownstreamConnectionClose(CloseType close_type) {
   ContextBase::onDownstreamConnectionClose(close_type);
+  downstream_closed_ = true;
   onCloseTCP();
+}
+
+void Context::onUpstreamConnectionClose(CloseType close_type) {
+  ContextBase::onUpstreamConnectionClose(close_type);
+  upstream_closed_ = true;
+  if (downstream_closed_) {
+    onCloseTCP();
+  }
 }
 
 uint32_t Context::nextHttpCallToken() {
@@ -1405,6 +1414,11 @@ Network::FilterStatus Context::onWrite(::Envoy::Buffer::Instance& data, bool end
   auto result = convertNetworkFilterStatus(onUpstreamData(data.length(), end_stream));
   if (result == Network::FilterStatus::Continue) {
     network_upstream_data_buffer_ = nullptr;
+  }
+  if (end_stream) {
+    // This is called when seeing end_stream=true and not on an upstream connection event,
+    // because registering for latter requires replicating the whole TCP proxy extension.
+    onUpstreamConnectionClose(CloseType::Unknown);
   }
   return result;
 }
