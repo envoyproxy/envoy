@@ -179,8 +179,6 @@ TEST_P(WasmNetworkFilterTest, CloseStream) {
 
   filter().onEvent(static_cast<Network::ConnectionEvent>(9999)); // Does nothing.
   filter().onEvent(Network::ConnectionEvent::RemoteClose);
-  filter().closeStream(proxy_wasm::WasmStreamType::Downstream);
-  filter().closeStream(proxy_wasm::WasmStreamType::Upstream);
 }
 
 TEST_P(WasmNetworkFilterTest, SegvFailOpen) {
