@@ -139,9 +139,9 @@ void CodecClient::onData(Buffer::Instance& data) {
     }
   }
 
-  // All data should be consumed at this point.
+  // All data should be consumed at this point if the connection remains open.
   ASSERT(data.length() == 0 || connection_->state() != Network::Connection::State::Open,
-         absl::StrCat("number of bytes ", data.toString()));
+         absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
