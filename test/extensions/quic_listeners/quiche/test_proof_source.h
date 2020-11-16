@@ -36,7 +36,7 @@ protected:
   void signPayload(const quic::QuicSocketAddress& /*server_address*/,
                    const quic::QuicSocketAddress& /*client_address*/,
                    const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
-                   quiche::QuicheStringPiece in,
+                   absl::string_view in,
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
     callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"),
                   std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain_));

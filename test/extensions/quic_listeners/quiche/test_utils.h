@@ -46,7 +46,7 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               quiche::QuicheOptional<quic::EncryptionLevel> level));
+               absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
 
   absl::string_view requestedServerName() const override {
@@ -90,7 +90,7 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               quiche::QuicheOptional<quic::EncryptionLevel> level));
+               absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
 
   absl::string_view requestedServerName() const override {

@@ -20,6 +20,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -48,6 +49,10 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
+  // Required headers must be present. This can only happen by some erroneous processing after the
+  // downstream codecs decode.
+  RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredHeaders(headers));
+
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   quic::QuicStream* writing_stream =
       quic::VersionUsesHttp3(transport_version())

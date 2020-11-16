@@ -28,7 +28,7 @@ protected:
   // quic::ProofSource
   void signPayload(const quic::QuicSocketAddress& server_address,
                    const quic::QuicSocketAddress& client_address, const std::string& hostname,
-                   uint16_t signature_algorithm, quiche::QuicheStringPiece in,
+                   uint16_t signature_algorithm, absl::string_view in,
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
