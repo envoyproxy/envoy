@@ -137,7 +137,6 @@ identifier:
     cluster: cluster_name
     locality:
       zone: zone_name
-    build_version: {}
     user_agent_name: "envoy"
   log_name: foo
 http_logs:
@@ -156,8 +155,7 @@ http_logs:
         value: 404
       response_code_details: "route_not_found"
       response_headers_bytes: 54
-)EOF",
-                                                  VersionInfo::version())));
+)EOF")));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
@@ -210,7 +208,6 @@ identifier:
     cluster: cluster_name
     locality:
       zone: zone_name
-    build_version: {}
     user_agent_name: "envoy"
   log_name: foo
 http_logs:
@@ -229,8 +226,7 @@ http_logs:
         value: 404
       response_code_details: "route_not_found"
       response_headers_bytes: 54
-)EOF",
-                                                  VersionInfo::version())));
+)EOF")));
   cleanup();
 }
 

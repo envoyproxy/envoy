@@ -41,7 +41,7 @@ SlotPtr InstanceImpl::allocateSlot() {
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
-Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb&& cb) {
+Event::PostCb InstanceImpl::SlotImpl::wrapCallback(const Event::PostCb& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the
   // expired check below.
   //
@@ -76,23 +76,13 @@ Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
     // works, but incurs another indirection of lambda at runtime. As the
     // duplicated logic is only an if-statement and a bool function, it doesn't
     // seem worth factoring that out to a helper function.
-    if (still_alive_guard.expired()) {
-      return;
+    if (!still_alive_guard.expired()) {
+      cb(getWorker(index));
     }
-    auto obj = getWorker(index);
-    auto new_obj = cb(obj);
-    // The API definition for runOnAllThreads allows for replacing the object
-    // via the callback return value. However, this never occurs in the codebase
-    // as of Oct 2020, and we plan to remove this API. To avoid PR races, we
-    // will add an assert to ensure such a dependency does not emerge.
-    //
-    // TODO(jmarantz): remove this once we phase out use of the untyped slot
-    // API, rename it, and change all call-sites to use TypedSlot.
-    ASSERT(obj.get() == new_obj.get());
   };
 }
 
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
   parent_.runOnAllThreads(dataCallback(cb), complete_cb);
 }
 
