@@ -73,7 +73,7 @@ public:
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
 };
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 class WasmTest : public WasmTestBase, public testing::TestWithParam<std::string> {
 public:
   void createWasm() { WasmTestBase::createWasm(GetParam()); }
@@ -85,13 +85,20 @@ auto testing_values = testing::Values(
 #if defined(ENVOY_WASM_V8)
     "v8"
 #endif
-#if defined(ENVOY_WASM_V8) && defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8) && (defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME))
     ,
 #endif
 #if defined(ENVOY_WASM_WAVM)
     "wavm"
 #endif
+#if (defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)) && defined(ENVOY_WASM_WASMTIME)
+    ,
+#endif
+#if defined(ENVOY_WASM_WASMTIME)
+    "wasmtime"
+#endif
 );
+
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest, testing_values);
 #endif
 
@@ -118,10 +125,13 @@ auto testing_null_values = testing::Values(
 #if defined(ENVOY_WASM_WAVM)
     "wavm",
 #endif
+#if defined(ENVOY_WASM_WASMTIME)
+    "wasmtime",
+#endif
     "null");
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest, testing_null_values);
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 class WasmTestMatrix : public WasmTestBase,
                        public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
@@ -145,11 +155,17 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
 #if defined(ENVOY_WASM_V8)
                                               "v8"
 #endif
-#if defined(ENVOY_WASM_V8) && defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8) && (defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME))
                                               ,
 #endif
 #if defined(ENVOY_WASM_WAVM)
                                               "wavm"
+#endif
+#if (defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)) && defined(ENVOY_WASM_WASMTIME)
+                                              ,
+#endif
+#if defined(ENVOY_WASM_WASMTIME)
+                                              "wasmtime"
 #endif
                                               ),
                                           testing::Values("cpp", "rust")));
@@ -188,7 +204,7 @@ TEST_P(WasmTestMatrix, Logging) {
 }
 #endif
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 TEST_P(WasmTest, BadSignature) {
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -207,7 +223,7 @@ TEST_P(WasmTest, Segv) {
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before badptr")));
   EXPECT_FALSE(wasm_->configure(context, plugin_));
-  wasm_->isFailed();
+  EXPECT_TRUE(wasm_->isFailed());
 }
 
 TEST_P(WasmTest, DivByZero) {
@@ -219,7 +235,7 @@ TEST_P(WasmTest, DivByZero) {
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before div by zero")));
   context->onLog();
-  wasm_->isFailed();
+  EXPECT_TRUE(wasm_->isFailed());
 }
 
 TEST_P(WasmTest, IntrinsicGlobals) {
