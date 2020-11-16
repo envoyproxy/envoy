@@ -64,7 +64,8 @@ private:
   const std::vector<FieldMatcherPtr<DataType>> matchers_;
 };
 
-template <class DataType> class SingleFieldMatcher : public FieldMatcher<DataType> {
+template <class DataType>
+class SingleFieldMatcher : public FieldMatcher<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
   SingleFieldMatcher(DataInputPtr<DataType>&& data_input, InputMatcherPtr&& input_matcher)
       : data_input_(std::move(data_input)), input_matcher_(std::move(input_matcher)) {}
@@ -72,18 +73,19 @@ public:
   absl::optional<bool> match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
-    ENVOY_LOG_MISC(debug, "Attempting to match {}", input);
+    ENVOY_LOG(debug, "Attempting to match {}", input);
     if (input.not_available_yet) {
       return absl::nullopt;
     }
 
     const auto current_match = input_matcher_->match(input.data_);
-    ENVOY_LOG_MISC(debug, "Match result: {}", current_match);
     if (!current_match && input.more_data_available) {
+      ENVOY_LOG(debug, "No match yet; delaying result as more data might be available.");
       return absl::nullopt;
     }
 
-    // TODO(snowp): Expose the optional so that we can match on not present.
+    ENVOY_LOG(debug, "Match result: {}", current_match);
+
     return current_match;
   }
 

@@ -9,7 +9,8 @@ namespace Matcher {
  * Implementation of a `sublinear` matcher that provides O(1) lookup of exact values,
  * with one OnMatch per result.
  */
-template <class DataType> class ExactMapMatcher : public MatchTree<DataType> {
+template <class DataType>
+class ExactMapMatcher : public MatchTree<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
   ExactMapMatcher(DataInputPtr<DataType>&& data_input,
                   absl::optional<OnMatch<DataType>> on_no_match)
@@ -17,7 +18,7 @@ public:
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
-    ENVOY_LOG_MISC(debug, "Attempting to match {}", input);
+    ENVOY_LOG(debug, "Attempting to match {}", input);
     if (input.not_available_yet) {
       return {false, absl::nullopt};
     }
@@ -26,9 +27,6 @@ public:
       return {true, on_no_match_};
     }
 
-    for (const auto& c : children_) {
-      ENVOY_LOG_MISC(info, c.first);
-    }
     const auto itr = children_.find(*input.data_);
     if (itr != children_.end()) {
       const auto result = itr->second;
