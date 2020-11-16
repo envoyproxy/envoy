@@ -41,10 +41,8 @@ namespace {
 bool anyFilterChain(
     const envoy::config::listener::v3::Listener& config,
     std::function<bool(const envoy::config::listener::v3::FilterChain&)> predicate) {
-  if (config.has_default_filter_chain() && predicate(config.default_filter_chain())) {
-    return true;
-  }
-  return std::any_of(config.filter_chains().begin(), config.filter_chains().end(), predicate);
+  return (config.has_default_filter_chain() && predicate(config.default_filter_chain())) ||
+         std::any_of(config.filter_chains().begin(), config.filter_chains().end(), predicate);
 }
 
 bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
@@ -728,8 +726,7 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
-  // See buildProxyProtocolListenerFilter(). Full listener update guarantees at least 1 filter chain
-  // at tcp listener.
+  // See buildProxyProtocolListenerFilter().
   if (usesProxyProto(config_) ^ usesProxyProto(config)) {
     return false;
   }
