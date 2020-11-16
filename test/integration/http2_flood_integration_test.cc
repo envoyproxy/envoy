@@ -1190,7 +1190,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
 }
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
-TEST_P(Http2FloodMitigationTest, UpstreamZeroLenHeaderAllowed) {
+TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
