@@ -1199,8 +1199,11 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
 }
 
 // Test metadata access including CEL expressions.
-// TODO: re-enable this on Windows if and when the CEL `Antlr` parser compiles on Windows.
 TEST_P(WasmHttpFilterTest, Metadata) {
+#ifdef WIN32
+  // TODO: re-enable this on Windows if and when the CEL `Antlr` parser compiles on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
   setupTest("", "metadata");
   setupFilter();
   envoy::config::core::v3::Node node_data;

@@ -14,7 +14,7 @@ public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createWavmVm(); }
 
   absl::string_view name() override { return "envoy.wasm.runtime.wavm"; }
-  absl::string_view short_name() override { return "wavm"; }
+  absl::string_view shortName() override { return "wavm"; }
 };
 
 #if defined(ENVOY_WASM_WAVM)

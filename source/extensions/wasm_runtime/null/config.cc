@@ -14,7 +14,7 @@ public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createNullVm(); }
 
   absl::string_view name() override { return "envoy.wasm.runtime.null"; }
-  absl::string_view short_name() override { return "null"; }
+  absl::string_view shortName() override { return "null"; }
 };
 
 REGISTER_FACTORY(NullRuntimeFactory, WasmRuntimeFactory);
