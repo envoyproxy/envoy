@@ -445,6 +445,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "watched_directory_lib",
+    srcs = ["watched_directory.cc"],
+    hdrs = ["watched_directory.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/filesystem:watcher_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "well_known_names",
     srcs = ["well_known_names.cc"],
     hdrs = ["well_known_names.h"],
