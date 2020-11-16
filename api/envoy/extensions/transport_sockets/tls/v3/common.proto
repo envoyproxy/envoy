@@ -155,7 +155,8 @@ message TlsCertificate {
   // default the parent directories of the filesystem paths in
   // *certificate_chain* and *private_key* are watched if this field is not
   // specified. This only applies when a *TlsCertificate* is delivered by SDS
-  // with references to filesystem paths.
+  // with references to filesystem paths. See the :ref:`SDS key rotation
+  // <sds_key_rotation>` documentation for further details.
   config.core.v3.WatchedDirectory watched_directory = 7;
 
   // BoringSSL private key method provider. This is an alternative to :ref:`private_key
@@ -265,7 +266,8 @@ message CertificateValidationContext {
   // default the parent directory of the filesystem path in *trusted_ca* is
   // watched if this field is not specified. This only applies when a
   // *CertificateValidationContext* is delivered by SDS with references to
-  // filesystem paths.
+  // filesystem paths. See the :ref:`SDS key rotation <sds_key_rotation>`
+  // documentation for further details.
   config.core.v3.WatchedDirectory watched_directory = 11;
 
   // An optional list of base64-encoded SHA-256 hashes. If specified, Envoy will verify that the
