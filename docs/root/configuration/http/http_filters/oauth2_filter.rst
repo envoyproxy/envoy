@@ -72,7 +72,7 @@ The following is an example configuring the filter.
         sds_config:
           path: "/etc/envoy/hmac.yaml"
     # (Optional): defaults to 'user' scope if not provided
-    auth_scopes = "profile email"
+    auth_scopes: "profile email"
 
 Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
