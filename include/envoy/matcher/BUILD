@@ -16,6 +16,7 @@ envoy_cc_library(
         "abseil_hash",
     ],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
     ],
 )
