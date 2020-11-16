@@ -21,9 +21,9 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   }
 
   const std::string& cluster_name = config.envoy_grpc().cluster_name();
-  auto clusters = cm_.clusters();
-  const auto& it = clusters.find(cluster_name);
-  if (it == clusters.end()) {
+  auto all_clusters = cm_.clusters();
+  const auto& it = all_clusters.active_clusters_.find(cluster_name);
+  if (it == all_clusters.active_clusters_.end()) {
     throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
   }
   if (it->second.get().info()->addedViaApi()) {

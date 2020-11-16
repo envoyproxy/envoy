@@ -3,5 +3,5 @@
 
 FROM envoyproxy/envoy-dev:latest
 RUN apt-get update
-COPY envoyproxy_io_proxy.yaml /etc/envoy.yaml
+COPY envoy-demo.yaml /etc/envoy.yaml
 CMD /usr/local/bin/envoy -c /etc/envoy.yaml
