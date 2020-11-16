@@ -304,7 +304,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
 
   # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
   # integration tests with asan.
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//test/integration/... --config=clang-asan --config=libc++ --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
