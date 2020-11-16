@@ -158,7 +158,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
   request_decoder_->decodeHeaders(
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list),
-       /*end_stream=*/fin);
+      /*end_stream=*/fin);
   if (fin) {
     end_stream_decoded_ = true;
   }

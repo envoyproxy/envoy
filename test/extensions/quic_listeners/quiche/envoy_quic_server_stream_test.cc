@@ -186,14 +186,15 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
                                    /*compressed_header_bytes=*/0);
 
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/!quic::VersionUsesHttp3(quic_version_.transport_version)))
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/!quic::VersionUsesHttp3(
+                                                  quic_version_.transport_version)))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->getMethodValue());
       }));
   if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""),  /*end_stream=*/true));
+    EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
     spdy::SpdyHeaderBlock spdy_headers;
     spdy_headers[":authority"] = host_;
     spdy_headers[":method"] = "GET";
