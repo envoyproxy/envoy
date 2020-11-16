@@ -1,4 +1,5 @@
 #include "common/common/fancy_logger.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -26,6 +27,14 @@ MATCHER(IsInvalidAddress, "") {
 }
 
 MATCHER(IsNotSupportedResult, "") { return arg.errno_ == SOCKET_ERROR_NOT_SUP; }
+
+ABSL_MUST_USE_RESULT std::pair<Buffer::SlicePtr, Buffer::RawSlice> allocateOneSlice(uint64_t size) {
+  auto owned_slice = Buffer::OwnedSlice::create(size);
+  Buffer::RawSlice slice = owned_slice->reserve(size);
+  EXPECT_NE(nullptr, slice.mem_);
+  EXPECT_EQ(size, slice.len_);
+  return {std::move(owned_slice), slice};
+}
 
 class MockFileEventCallback {
 public:
@@ -374,34 +383,57 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
   io_handle_->resetFileEvents();
 }
 
+// Consistent with other IoHandle: allow write empty data when handle is closed.
+TEST_F(BufferedIoSocketHandleTest, TestNoErrorWriteZeroDataToClosedIoHandle) {
+  io_handle_->close();
+  {
+    Buffer::OwnedImpl buf;
+    auto result = io_handle_->write(buf);
+    ASSERT_EQ(0, result.rc_);
+    ASSERT(result.ok());
+  }
+  {
+    Buffer::RawSlice slice{nullptr, 0};
+    auto result = io_handle_->writev(&slice, 1);
+    ASSERT_EQ(0, result.rc_);
+    ASSERT(result.ok());
+  }
+}
+
 TEST_F(BufferedIoSocketHandleTest, TestErrorOnClosedIoHandle) {
   io_handle_->close();
-  auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-
-  Buffer::OwnedImpl buf("0123456789");
-
-  result = io_handle_->read(buf, 10);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-
-  Buffer::RawSlice slice;
-  auto r = buf.reserve(1024, &slice, 1);
-  FANCY_LOG(debug,"r length= ", r);
-  FANCY_LOG(debug, "lambdai: slice.len = {}", slice.len_);
-  result = io_handle_->readv(1024, &slice, 1);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-
-  result = io_handle_->write(buf);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-
-  FANCY_LOG(debug, "lambdai: slice.len = {}", slice.len_);
-  result = io_handle_->writev(&slice, 1);
-  ASSERT(!result.ok());
-  ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  {
+    auto [guard, slice] = allocateOneSlice(1024);
+    auto result = io_handle_->recv(slice.mem_, slice.len_, 0);
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+  {
+    Buffer::OwnedImpl buf;
+    auto result = io_handle_->read(buf, 10);
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+  {
+    auto [guard, slice] = allocateOneSlice(1024);
+    auto result = io_handle_->readv(1024, &slice, 1);
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+  {
+    Buffer::OwnedImpl buf("0123456789");
+    auto result = io_handle_->write(buf);
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+  {
+    Buffer::OwnedImpl buf("0123456789");
+    auto slices = buf.getRawSlices();
+    ASSERT(!slices.empty());
+    auto result = io_handle_->writev(slices.data(), slices.size());
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
 }
 
 // Test that a readable event is raised when peer shutdown write. Also confirm read will return
