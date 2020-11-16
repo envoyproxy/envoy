@@ -13,6 +13,7 @@ namespace Http {
 
 namespace {
 absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
+  // Testing build - delete this
   std::string canonical_path;
   chromium_url::Component in_component(0, original_path.size());
   chromium_url::Component out_component;
