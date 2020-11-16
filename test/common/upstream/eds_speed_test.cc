@@ -25,6 +25,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -124,6 +125,7 @@ public:
 
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url_);
+    response->set_version_info(fmt::format("version-{}", version_++));
     auto* resource = response->mutable_resources()->Add();
     resource->PackFrom(cluster_load_assignment);
     if (v2_config_) {
@@ -138,9 +140,11 @@ public:
            num_hosts);
   }
 
+  TestDeprecatedV2Api _deprecated_v2_api_;
   State& state_;
   const bool v2_config_;
   const std::string type_url_;
+  uint64_t version_{};
   bool initialized_{};
   Stats::IsolatedStoreImpl stats_;
   Config::SubscriptionStats subscription_stats_;

@@ -28,6 +28,15 @@ void FilterManagerImpl::addReadFilter(ReadFilterSharedPtr filter) {
   LinkedList::moveIntoListBack(std::move(new_filter), upstream_filters_);
 }
 
+void FilterManagerImpl::removeReadFilter(ReadFilterSharedPtr filter_to_remove) {
+  // For perf/safety reasons, null this out rather than removing.
+  for (auto& filter : upstream_filters_) {
+    if (filter->filter_ == filter_to_remove) {
+      filter->filter_ = nullptr;
+    }
+  }
+}
+
 bool FilterManagerImpl::initializeReadFilters() {
   if (upstream_filters_.empty()) {
     return false;
@@ -53,6 +62,9 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
   }
 
   for (; entry != upstream_filters_.end(); entry++) {
+    if (!(*entry)->filter_) {
+      continue;
+    }
     if (!(*entry)->initialized_) {
       (*entry)->initialized_ = true;
       FilterStatus status = (*entry)->filter_->onNewConnection();

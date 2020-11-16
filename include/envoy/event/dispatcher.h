@@ -19,6 +19,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
@@ -64,6 +65,15 @@ public:
   virtual const std::string& name() PURE;
 
   /**
+   * Register a watchdog for this dispatcher. The dispatcher is responsible for touching the
+   * watchdog at least once per touch interval. Dispatcher implementations may choose to touch more
+   * often to avoid spurious miss events when processing long callback queues.
+   * @param min_touch_interval Touch interval for the watchdog.
+   */
+  virtual void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                                std::chrono::milliseconds min_touch_interval) PURE;
+
+  /**
    * Returns a time-source to use with this dispatcher.
    */
   virtual TimeSource& timeSource() PURE;
@@ -92,7 +102,7 @@ public:
    * @param stream_info info object for the server connection
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
-  virtual Network::ConnectionPtr
+  virtual Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
                          StreamInfo::StreamInfo& stream_info) PURE;
