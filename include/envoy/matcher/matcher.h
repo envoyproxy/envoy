@@ -69,8 +69,6 @@ using InputMatcherPtr = std::unique_ptr<InputMatcher>;
  */
 class InputMatcherFactory : public Config::TypedFactory {
 public:
-  virtual ~InputMatcherFactory() = default;
-
   virtual InputMatcherPtr createInputMatcher(Protobuf::Message& config) PURE;
 
   std::string category() const override { return "envoy.matching.matcher"; }
@@ -114,8 +112,6 @@ template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataTyp
  */
 template <class DataType> class DataInputFactory : public Config::TypedFactory {
 public:
-  virtual ~DataInputFactory() = default;
-
   virtual DataInputPtr<DataType> createDataInput(const Protobuf::Message& config) PURE;
 
   std::string category() const override { return "envoy.matching.input"; }
