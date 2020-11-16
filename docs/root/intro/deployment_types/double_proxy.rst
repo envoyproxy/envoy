@@ -1,7 +1,7 @@
 .. _deployment_type_double_proxy:
 
 服务间、前端代理和双向代理
--------------------------------------------------
+---------------------
 
 .. image:: /_static/double_proxy.svg
   :width: 70%
@@ -13,6 +13,6 @@
 得在区域 2 中运行的前端 Envoy 代理可以信任普遍不可信的请求元素（如 HTTP 头 x-forwarded-for）。
 
 配置模板
-^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^
 
-源码包含一个双向代理的配置模板。更多信息可以查看 :ref:`这里 <intro_deployment_types>` 。
+源码包含一个双向代理的配置示例。更多信息可以查看 :ref:`这里 <intro_deployment_types>` 。
