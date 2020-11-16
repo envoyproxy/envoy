@@ -149,38 +149,39 @@ TEST_F(OAuth2Test, InvalidCluster) {
                             "specify which cluster to direct OAuth requests to.");
 }
 
-// Verifies that the OAuth config is created with a default value for auth_scopes field when it is not set in proto/yaml.
+// Verifies that the OAuth config is created with a default value for auth_scopes field when it is
+// not set in proto/yaml.
 TEST_F(OAuth2Test, DefaultAuthScope) {
 
-    // Set up proto fields
-    envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
-    auto* endpoint = p.mutable_token_endpoint();
-    endpoint->set_cluster("auth.example.com");
-    endpoint->set_uri("auth.example.com/_oauth");
-    endpoint->mutable_timeout()->set_seconds(1);
-    p.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
-    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
-    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
-    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
-    p.set_forward_bearer_token(true);
-    auto* matcher = p.add_pass_through_matcher();
-    matcher->set_name(":method");
-    matcher->set_exact_match("OPTIONS");
+  // Set up proto fields
+  envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_forward_bearer_token(true);
+  auto* matcher = p.add_pass_through_matcher();
+  matcher->set_name(":method");
+  matcher->set_exact_match("OPTIONS");
 
-    auto credentials = p.mutable_credentials();
-    credentials->set_client_id(TEST_CLIENT_ID);
-    credentials->mutable_token_secret()->set_name("secret");
-    credentials->mutable_hmac_secret()->set_name("hmac");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
 
-    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
-    // Create the OAuth config.
-    auto secret_reader = std::make_shared<MockSecretReader>();
-    FilterConfigSharedPtr test_config_;
-    test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
-                                             scope_, "test.");
+  // Create the OAuth config.
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr test_config_;
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
+                                                scope_, "test.");
 
-    EXPECT_EQ(test_config_->authScopes(), "user");
+  EXPECT_EQ(test_config_->authScopes(), "user");
 }
 
 /**
@@ -275,9 +276,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
-           TEST_CLIENT_ID +
-           "&scope=" +
-           TEST_AUTH_SCOPES +
+           TEST_CLIENT_ID + "&scope=" + TEST_AUTH_SCOPES +
            "&response_type=code&"
            "redirect_uri=http%3A%2F%2Ftraffic.example.com%2F"
            "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
@@ -430,8 +429,8 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
-                                        "&state=blah"},
+      {Http::Headers::get().Path.get(),
+       "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES + "&state=blah"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -465,7 +464,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
-                                        "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+                                            "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -496,7 +495,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
-                                        "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+                                            "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -520,8 +519,9 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
-                                        "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
+      {Http::Headers::get().Path.get(),
+       "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
+           "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -549,8 +549,9 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   Http::TestRequestHeaderMapImpl final_request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
-                                        "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
+      {Http::Headers::get().Path.get(),
+       "/_oauth?code=abcdefxyz123&scope=" + TEST_AUTH_SCOPES +
+           "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -583,9 +584,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
-           TEST_CLIENT_ID +
-           "&scope=" +
-           TEST_AUTH_SCOPES +
+           TEST_CLIENT_ID + "&scope=" + TEST_AUTH_SCOPES +
            "&response_type=code&"
            "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"
            "_oauth&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"

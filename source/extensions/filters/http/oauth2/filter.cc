@@ -90,10 +90,10 @@ FilterConfig::FilterConfig(
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher()),
-      signout_path_(proto_config.signout_path()), 
-      secret_reader_(secret_reader),
+      signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
-      auth_scopes_((!proto_config.auth_scopes().empty()) ? proto_config.auth_scopes() : DEFAULT_AUTH_SCOPE ),
+      auth_scopes_((!proto_config.auth_scopes().empty()) ? proto_config.auth_scopes()
+                                                         : DEFAULT_AUTH_SCOPE),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
   if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
@@ -279,10 +279,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_redirect_uri =
         Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
-    const std::string new_url =
-        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
-                    config_->clientId(), config_->authScopes(),
-                    escaped_redirect_uri, escaped_state);
+    const std::string new_url = fmt::format(
+        AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
+        config_->authScopes(), escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 

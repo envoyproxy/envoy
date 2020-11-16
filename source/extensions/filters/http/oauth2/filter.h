@@ -125,7 +125,6 @@ public:
   FilterStats& stats() { return stats_; }
   const std::string authScopes() const { return auth_scopes_; }
 
-
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
