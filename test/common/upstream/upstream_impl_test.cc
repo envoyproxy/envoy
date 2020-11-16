@@ -2546,21 +2546,52 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
   EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
 
+
   const std::string explicit_timeout = R"EOF(
     common_http_protocol_options:
       idle_timeout: 1s
   )EOF";
 
-  auto cluster2 = makeCluster(yaml + explicit_timeout);
-  ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
-  EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  const std::string explicit_timeout_new = R"EOF(
+    typed_extension_protocol_options:
+      envoy.filters.network.http_connection_manager:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
 
+  {
+    auto cluster2 = makeCluster(yaml + explicit_timeout);
+    ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  }
+  {
+    auto cluster2 = makeCluster(yaml + explicit_timeout_new);
+    ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  }
   const std::string no_timeout = R"EOF(
     common_http_protocol_options:
       idle_timeout: 0s
   )EOF";
+
+  const std::string no_timeout_new = R"EOF(
+    typed_extension_protocol_options:
+      envoy.filters.network.http_connection_manager:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          idle_timeout: 0s
+  )EOF";
+
+ {
   auto cluster3 = makeCluster(yaml + no_timeout);
   EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+ }
+
+ {
+  auto cluster3 = makeCluster(yaml + no_timeout_new);
+  EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+ }
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
