@@ -1521,4 +1521,21 @@ TEST_P(AdsClusterV2Test, XdsBatching) {
   initialize();
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/13681.
+TEST_P(AdsClusterV2Test, TypeUrlAnnotationRegression) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V2);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  auto cluster = buildCluster("cluster_0");
+  auto* bias = cluster.mutable_least_request_lb_config()->mutable_active_request_bias();
+  bias->set_default_value(1.1);
+  bias->set_runtime_key("foo");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {cluster}, {},
+                                                             "1", true);
+
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+}
+
 } // namespace Envoy
