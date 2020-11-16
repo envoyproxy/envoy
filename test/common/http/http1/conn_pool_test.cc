@@ -48,12 +48,19 @@ namespace {
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
  */
-class ConnPoolImplForTest : public ConnPoolImpl {
+class ConnPoolImplForTest : public FixedHttpConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
-                      Upstream::ClusterInfoConstSharedPtr cluster)
-      : ConnPoolImpl(dispatcher, random_, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+                      Upstream::ClusterInfoConstSharedPtr cluster,
+                      Random::RandomGenerator& random_generator)
+      : FixedHttpConnPoolImpl(
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
+            Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr, random_generator,
+            [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
+            [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) {
+              return nullptr; // Not used: createCodecClient overloaded.
+            },
+            std::vector<Protocol>{Protocol::Http11}),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher) {}
 
   ~ConnPoolImplForTest() override {
@@ -116,7 +123,6 @@ public:
 
   Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
-  NiceMock<Random::MockRandomGenerator> random_;
   Event::PostCb post_cb_;
   std::vector<TestCodecClient> test_clients_;
 };
@@ -127,12 +133,13 @@ public:
 class Http1ConnPoolImplTest : public testing::Test {
 public:
   Http1ConnPoolImplTest()
-      : conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_)) {}
+      : conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_)) {}
 
   ~Http1ConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
   }
 
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
@@ -283,7 +290,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
 
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
-  conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_);
+  conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_);
   NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_->expectClientCreate(Protocol::Http11);

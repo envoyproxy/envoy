@@ -52,9 +52,9 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
 
   std::unique_ptr<ActiveClient> new_client;
   if (protocol_ == Http::Protocol::Http11) {
-    new_client = std::make_unique<Http1::ConnPoolImpl::ActiveClient>(*this, data);
+    new_client = std::make_unique<Http1::ActiveClient>(*this, data);
   } else {
-    new_client = std::make_unique<Http2::ConnPoolImpl::ActiveClient>(*this, data);
+    new_client = std::make_unique<Http2::ActiveClient>(*this, data);
   }
   connecting_stream_capacity_ += new_client->effectiveConcurrentStreamLimit();
   new_client->state_ = ActiveClient::State::CONNECTING;

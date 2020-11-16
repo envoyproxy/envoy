@@ -12,28 +12,21 @@ namespace Http {
 namespace Http1 {
 
 /**
- * A connection pool implementation for HTTP/1.1 connections.
- * NOTE: The connection pool does NOT do DNS resolution. It assumes it is being given a numeric IP
- *       address. Higher layer code should handle resolving DNS on error and creating a new pool
- *       bound to a different IP address.
+ * An active client for HTTP/1.1 connections.
  */
-class ConnPoolImpl : public Http::HttpConnPoolImplBase {
+class ActiveClient : public Envoy::Http::ActiveClient {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
-               Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+  ActiveClient(HttpConnPoolImplBase& parent);
+  ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data);
 
-  ~ConnPoolImpl() override;
-
-  // ConnPoolImplBase
-  Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
-
-  class ActiveClient;
+  // ConnPoolImplBase::ActiveClient
+  bool closingWithIncompleteStream() const override;
+  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
   struct StreamWrapper : public RequestEncoderWrapper,
                          public ResponseDecoderWrapper,
-                         public StreamCallbacks {
+                         public StreamCallbacks,
+                         protected Logger::Loggable<Logger::Id::pool> {
     StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent);
     ~StreamWrapper() override;
 
@@ -46,9 +39,7 @@ public:
     void onDecodeComplete() override;
 
     // Http::StreamCallbacks
-    void onResetStream(StreamResetReason, absl::string_view) override {
-      parent_.codec_client_->close();
-    }
+    void onResetStream(StreamResetReason, absl::string_view) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -57,33 +48,9 @@ public:
     bool close_connection_{};
     bool decode_complete_{};
   };
-
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
-  class ActiveClient : public Envoy::Http::ActiveClient {
-  public:
-    ActiveClient(HttpConnPoolImplBase& parent);
-    ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data);
-
-    ConnPoolImpl& parent() { return *static_cast<ConnPoolImpl*>(&parent_); }
-
-    // ConnPoolImplBase::ActiveClient
-    bool closingWithIncompleteStream() const override;
-    RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
-
-    StreamWrapperPtr stream_wrapper_;
-  };
-};
-
-/**
- * Production implementation of the ConnPoolImpl.
- */
-class ProdConnPoolImpl : public ConnPoolImpl {
-public:
-  using ConnPoolImpl::ConnPoolImpl;
-
-  // ConnPoolImpl
-  CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
+  StreamWrapperPtr stream_wrapper_;
 };
 
 ConnectionPool::InstancePtr
