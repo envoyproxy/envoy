@@ -8,7 +8,6 @@
 #include "gtest/gtest.h"
 #include "quiche/spdy/platform/api/spdy_bug_tracker.h"
 #include "quiche/spdy/platform/api/spdy_containers.h"
-#include "quiche/spdy/platform/api/spdy_endianness_util.h"
 #include "quiche/spdy/platform/api/spdy_estimate_memory_usage.h"
 #include "quiche/spdy/platform/api/spdy_flags.h"
 #include "quiche/spdy/platform/api/spdy_logging.h"
@@ -45,11 +44,6 @@ TEST(SpdyPlatformTest, SpdyHashSet) {
       {"foo", "bar"});
   EXPECT_EQ(1, hset.count("bar"));
   EXPECT_EQ(0, hset.count("qux"));
-}
-
-TEST(SpdyPlatformTest, SpdyEndianness) {
-  EXPECT_EQ(0x1234, spdy::SpdyNetToHost16(spdy::SpdyHostToNet16(0x1234)));
-  EXPECT_EQ(0x12345678, spdy::SpdyNetToHost32(spdy::SpdyHostToNet32(0x12345678)));
 }
 
 TEST(SpdyPlatformTest, SpdyEstimateMemoryUsage) {
@@ -92,19 +86,19 @@ TEST(SpdyPlatformTest, SpdyTestHelpers) {
 }
 
 TEST(SpdyPlatformTest, SpdyFlags) {
-  auto& flag_registry = quiche::FlagRegistry::GetInstance();
-  flag_registry.ResetFlags();
+  auto& flag_registry = quiche::FlagRegistry::getInstance();
+  flag_registry.resetFlags();
   EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
 
-  flag_registry.FindFlag("spdy_reloadable_flag_spdy_testonly_default_false")
-      ->SetValueFromString("true");
+  flag_registry.findFlag("FLAGS_quic_reloadable_flag_spdy_testonly_default_false")
+      ->setValueFromString("true");
   EXPECT_TRUE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
 
-  flag_registry.ResetFlags();
-  flag_registry.FindFlag("spdy_restart_flag_spdy_testonly_default_false")
-      ->SetValueFromString("yes");
+  flag_registry.resetFlags();
+  flag_registry.findFlag("FLAGS_quic_restart_flag_spdy_testonly_default_false")
+      ->setValueFromString("yes");
   EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
   EXPECT_TRUE(GetSpdyRestartFlag(spdy_testonly_default_false));
 }
