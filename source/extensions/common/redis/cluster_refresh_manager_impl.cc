@@ -133,9 +133,9 @@ bool ClusterRefreshManagerImpl::onEvent(const std::string& cluster_name, EventTy
       if (post_callback) {
         main_thread_dispatcher_.post([this, cluster_name, info]() {
           // Ensure that cluster is still active before calling callback.
-          auto map = cm_.clusters();
-          auto it = map.find(cluster_name);
-          if (it != map.end()) {
+          auto maps = cm_.clusters();
+          auto it = maps.active_clusters_.find(cluster_name);
+          if (it != maps.active_clusters_.end()) {
             info->cb_();
           }
         });
