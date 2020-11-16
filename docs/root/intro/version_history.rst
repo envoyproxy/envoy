@@ -5,6 +5,7 @@ Version history
 ================
 Changes
 -------
+* listener: fix crash when disabling or re-enabling listeners due to overload while processing LDS updates.
 
 1.13.6 (September 29, 2020)
 ===========================
