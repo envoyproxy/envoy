@@ -117,7 +117,7 @@ makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
                                                              const std::string& url) {
-  return std::make_shared<HostDescription>(
+  return std::make_shared<HostDescriptionImpl>(
       cluster, "", Network::Utility::resolveUrl(url), nullptr,
       envoy::config::core::v3::Locality().default_instance(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0);
