@@ -9,6 +9,7 @@
 
 #include "extensions/transport_sockets/starttls/starttls_socket.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 
 namespace Envoy {
@@ -17,7 +18,6 @@ namespace TransportSockets {
 namespace StartTls {
 
 using testing::_;
-using ::testing::Mock;
 
 class StartTlsTransportSocketMock : public Network::MockTransportSocket {
 public:
@@ -29,13 +29,15 @@ TEST(StartTlsTest, BasicSwitch) {
   const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig config;
   Network::TransportSocketOptionsSharedPtr options =
       std::make_shared<Network::TransportSocketOptionsImpl>();
-  StartTlsTransportSocketMock* raw_socket = new StartTlsTransportSocketMock;
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  NiceMock<StartTlsTransportSocketMock>* raw_socket = new NiceMock<StartTlsTransportSocketMock>;
   Network::MockTransportSocket* ssl_socket = new Network::MockTransportSocket;
   Buffer::OwnedImpl buf;
 
   std::unique_ptr<StartTlsSocket> socket =
       std::make_unique<StartTlsSocket>(config, Network::TransportSocketPtr(raw_socket),
                                        Network::TransportSocketPtr(ssl_socket), options);
+  socket->setTransportSocketCallbacks(transport_callbacks);
 
   // StartTls socket is initial clear-text state. All calls should be forwarded to raw socket.
   ASSERT_THAT(socket->protocol(), TransportProtocolNames::get().StartTls);
