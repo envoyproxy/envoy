@@ -52,12 +52,6 @@ public:
 
   ~BufferedIoSocketHandleTest() override = default;
 
-  void expectAgain() {
-    auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
-    EXPECT_FALSE(result.ok());
-    EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
-  }
-
   Buffer::WatermarkBuffer& getWatermarkBufferHelper(BufferedIoSocketHandleImpl& io_handle) {
     return dynamic_cast<Buffer::WatermarkBuffer&>(*io_handle.getWriteBuffer());
   }
@@ -74,13 +68,88 @@ public:
 
 // Test recv side effects.
 TEST_F(BufferedIoSocketHandleTest, TestBasicRecv) {
-  auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
-  // `EAGAIN`.
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
-  io_handle_->setWriteEnd();
-  result = io_handle_->recv(buf_.data(), buf_.size(), 0);
-  EXPECT_TRUE(result.ok());
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
+  internal_buffer.add("0123456789");
+  {
+    auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+    ASSERT_EQ(10, result.rc_);
+    ASSERT_EQ("0123456789", absl::string_view(buf_.data(), result.rc_));
+  }
+  {
+    auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+    // `EAGAIN`.
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
+  }
+  {
+    io_handle_->setWriteEnd();
+    auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+    EXPECT_TRUE(result.ok());
+  }
+}
+
+// Test recv side effects.
+TEST_F(BufferedIoSocketHandleTest, TestRecvPeek) {
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
+  internal_buffer.add("0123456789");
+  {
+    ::memset(buf_.data(), 1, buf_.size());
+    auto result = io_handle_->recv(buf_.data(), 5, MSG_PEEK);
+    ASSERT_EQ(5, result.rc_);
+    ASSERT_EQ("01234", absl::string_view(buf_.data(), result.rc_));
+    // The data beyond the boundary is untouched.
+    ASSERT_EQ(std::string(buf_.size() - 5, 1), absl::string_view(buf_.data() + 5, buf_.size() - 5));
+  }
+  {
+    auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
+    ASSERT_EQ(10, result.rc_);
+    ASSERT_EQ("0123456789", absl::string_view(buf_.data(), result.rc_));
+  }
+  {
+    // Drain the pending buffer.
+    auto recv_result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+    EXPECT_TRUE(recv_result.ok());
+    EXPECT_EQ(10, recv_result.rc_);
+    ASSERT_EQ("0123456789", absl::string_view(buf_.data(), recv_result.rc_));
+    auto peek_result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+    // `EAGAIN`.
+    EXPECT_FALSE(peek_result.ok());
+    EXPECT_EQ(Api::IoError::IoErrorCode::Again, peek_result.err_->getErrorCode());
+  }
+  {
+    // Peek upon shutdown.
+    io_handle_->setWriteEnd();
+    auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
+    EXPECT_EQ(0, result.rc_);
+    ASSERT(result.ok());
+  }
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestRecvPeekWhenPendingDataButShutdown) {
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
+  internal_buffer.add("0123456789");
+  auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
+  ASSERT_EQ(10, result.rc_);
+  ASSERT_EQ("0123456789", absl::string_view(buf_.data(), result.rc_));
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestMultipleRecvDrain) {
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
+  internal_buffer.add("abcd");
+  {
+    auto result = io_handle_->recv(buf_.data(), 1, 0);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(1, result.rc_);
+    EXPECT_EQ("a", absl::string_view(buf_.data(), 1));
+  }
+  {
+    auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(3, result.rc_);
+
+    EXPECT_EQ("bcd", absl::string_view(buf_.data(), 3));
+    EXPECT_EQ(0, internal_buffer.length());
+  }
 }
 
 // Test read side effects.
@@ -134,28 +203,6 @@ TEST_F(BufferedIoSocketHandleTest, TestBasicReadv) {
   // EOF
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.rc_);
-}
-
-// Test recv side effects.
-TEST_F(BufferedIoSocketHandleTest, TestBasicPeek) {
-  auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
-  // EAGAIN.
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
-  io_handle_->setWriteEnd();
-  result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
-  EXPECT_TRUE(result.ok());
-}
-
-TEST_F(BufferedIoSocketHandleTest, TestRecvDrain) {
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("abcd");
-  auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(4, result.rc_);
-  EXPECT_EQ(absl::string_view(buf_.data(), 4), "abcd");
-  EXPECT_EQ(0, internal_buffer.length());
-  expectAgain();
 }
 
 TEST_F(BufferedIoSocketHandleTest, FlowControl) {
