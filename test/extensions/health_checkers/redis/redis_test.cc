@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::DoAll;
@@ -573,6 +574,7 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
 }
 
 TEST_F(RedisHealthCheckerTest, DEPRECATED_FEATURE_TEST(ExistsDeprecated)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   InSequence s;
   setupExistsHealthcheckDeprecated(false);
 

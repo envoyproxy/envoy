@@ -128,9 +128,9 @@ public:
 
   void createClusterAndCallbacks() {
     // Set cluster.
-    cluster_map_.emplace(cluster1_name_, cluster1_.cluster_);
+    cluster_maps_.active_clusters_.emplace(cluster1_name_, cluster1_.cluster_);
     ON_CALL(server_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_maps_));
 
     ON_CALL(callbacks_, encodeData(_, _)).WillByDefault(Invoke([&](Buffer::Instance& data, bool) {
       // Set callbacks to send data to buffer. This will append to the end of the buffer, so
@@ -141,15 +141,15 @@ public:
 
   void addClusterToMap(const std::string& cluster_name,
                        NiceMock<Upstream::MockClusterMockPrioritySet>& cluster) {
-    cluster_map_.emplace(cluster_name, cluster);
-    // Redefining since cluster_map_ is returned by value.
-    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+    cluster_maps_.active_clusters_.emplace(cluster_name, cluster);
+    // Redefining since cluster_maps_ is returned by value.
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_maps_));
   }
 
   void removeClusterFromMap(const std::string& cluster_name) {
-    cluster_map_.erase(cluster_name);
-    // Redefining since cluster_map_ is returned by value.
-    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+    cluster_maps_.active_clusters_.erase(cluster_name);
+    // Redefining since cluster_maps_ is returned by value.
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_maps_));
   }
 
   void addSecondClusterHelper(Buffer::OwnedImpl& buffer) {
@@ -245,7 +245,7 @@ public:
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_;
-  Upstream::ClusterManager::ClusterInfoMap cluster_map_;
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps_;
   Buffer::OwnedImpl cluster_stats_buffer_;
 
   std::unique_ptr<HystrixSink> sink_;

@@ -68,7 +68,8 @@ def envoy_copts(repository, test = False):
                ],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
                # Allow 'nodiscard' function results values to be discarded for test code only
-               repository + "//bazel:windows_x86_64": ["-wd4834"] if test else [],
+               # TODO: Replace with /Zc:preprocessor for cl.exe versions >= 16.5
+               repository + "//bazel:windows_x86_64": ["-wd4834", "-experimental:preprocessor", "-Wv:19.4"] if test else ["-experimental:preprocessor", "-Wv:19.4"],
                repository + "//bazel:clang_cl_build": ["-Wno-unused-result"] if test else [],
                "//conditions:default": [],
            }) + select({
@@ -77,11 +78,15 @@ def envoy_copts(repository, test = False):
            }) + select({
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                repository + "//bazel:disable_tcmalloc_on_linux_x86_64": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
+               repository + "//bazel:disable_tcmalloc_on_linux_aarch64": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                repository + "//bazel:gperftools_tcmalloc": ["-DGPERFTOOLS_TCMALLOC"],
                repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": ["-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": ["-DGPERFTOOLS_TCMALLOC"],
                repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
                repository + "//bazel:debug_tcmalloc_on_linux_x86_64": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:debug_tcmalloc_on_linux_aarch64": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
                repository + "//bazel:linux_x86_64": ["-DTCMALLOC"],
+               repository + "//bazel:linux_aarch64": ["-DTCMALLOC"],
                "//conditions:default": ["-DGPERFTOOLS_TCMALLOC"],
            }) + select({
                repository + "//bazel:disable_signal_trace": [],
@@ -138,11 +143,15 @@ def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
         repository + "//bazel:disable_tcmalloc_on_linux_x86_64": None,
+        repository + "//bazel:disable_tcmalloc_on_linux_aarch64": None,
         repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("gperftools"),
         repository + "//bazel:debug_tcmalloc_on_linux_x86_64": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": envoy_external_dep_path("gperftools"),
         repository + "//bazel:gperftools_tcmalloc": envoy_external_dep_path("gperftools"),
         repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": envoy_external_dep_path("gperftools"),
         repository + "//bazel:linux_x86_64": envoy_external_dep_path("tcmalloc"),
+        repository + "//bazel:linux_aarch64": envoy_external_dep_path("tcmalloc"),
         "//conditions:default": envoy_external_dep_path("gperftools"),
     })
 
