@@ -93,7 +93,7 @@ message ExternalProcessor {
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the response_headers message.
-  // See the :ref:`attribute documentation <arch_overview_response_attributes>`
+  // See the :ref:`attribute documentation <arch_overview_attributes>`
   // for the list of supported attributes and their types.
   repeated string response_attributes = 6;
 
