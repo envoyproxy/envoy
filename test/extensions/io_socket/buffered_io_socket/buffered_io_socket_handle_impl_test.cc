@@ -775,24 +775,29 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
 TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
   auto& peer_internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
   peer_internal_buffer.setWatermarks(128);
-  std::string big_chunk(256, 'a');
-  peer_internal_buffer.add(big_chunk);
+  // std::string big_chunk(256, 'a');
+  //   peer_internal_buffer.add(big_chunk);
+  Buffer::OwnedImpl buf(std::string(256, 'a'));
+  io_handle_->write(buf);
   EXPECT_FALSE(io_handle_peer_->isWritable());
 
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
-  ENVOY_LOG_MISC(debug, "after {} shutdown write", static_cast<void*>(io_handle_peer_.get()));
+  FANCY_LOG(debug, "after {} shutdown write", static_cast<void*>(io_handle_peer_.get()));
 
-  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb, enabled());
+  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::FileTriggerType::Edge,
+      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read);
-  scheduable_cb_->invokeCallback();
-  EXPECT_FALSE(scheduable_cb_->enabled());
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
+  scheduable_cb->invokeCallback();
+  EXPECT_FALSE(scheduable_cb->enabled_);
 
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
-  peer_internal_buffer.drain(peer_internal_buffer.length());
-  EXPECT_TRUE(scheduable_cb_->enabled());
+  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  auto result = io_handle_peer_->recv(buf_.data(), buf_.size(), 0);
+  EXPECT_EQ(256, result.rc_);
+  EXPECT_TRUE(scheduable_cb->enabled_);
 
   io_handle_->close();
 }
