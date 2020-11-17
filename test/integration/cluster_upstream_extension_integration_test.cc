@@ -53,7 +53,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterUpstreamExtensionIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 // This test verifies that cluster upstream extensions can fulfill the requirement that they rewrite
-// http headers after cluster and host is selected. See
+// http headers after cluster and host are selected. See
 // https://github.com/envoyproxy/envoy/issues/12236 This test case should be rewritten once upstream
 // http filters(https://github.com/envoyproxy/envoy/issues/10455) is landed.
 TEST_P(ClusterUpstreamExtensionIntegrationTest,

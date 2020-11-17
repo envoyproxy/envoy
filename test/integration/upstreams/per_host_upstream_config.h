@@ -16,14 +16,24 @@
 namespace Envoy {
 
 namespace {
+
+/**
+ * A helper to add header into header map from metadata. The added value is `metadata[key1][key2]`.
+ *
+ * @param header_map The mutable header map.
+ * @param header_name The target header entry in the `header_map`.
+ * @param metadata The source of header value.
+ * @param key1 The key to the value in metadata.
+ * @param key2 The second key to the value after `key1` is selected.
+ */
 void addHeader(Envoy::Http::RequestHeaderMap& header_map, absl::string_view header_name,
-               const envoy::config::core::v3::Metadata& metadata, absl::string_view meta_key_0,
-               absl::string_view meta_key_1) {
-  if (auto filter_metadata = metadata.filter_metadata().find(meta_key_0);
+               const envoy::config::core::v3::Metadata& metadata, absl::string_view key1,
+               absl::string_view key2) {
+  if (auto filter_metadata = metadata.filter_metadata().find(key1);
       filter_metadata != metadata.filter_metadata().end()) {
     const ProtobufWkt::Struct& data_struct = filter_metadata->second;
     const auto& fields = data_struct.fields();
-    if (auto iter = fields.find(meta_key_1); iter != fields.end()) {
+    if (auto iter = fields.find(key2); iter != fields.end()) {
       if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
         header_map.setCopy(Envoy::Http::LowerCaseString(std::string(header_name)),
                            iter->second.string_value());
@@ -33,21 +43,14 @@ void addHeader(Envoy::Http::RequestHeaderMap& header_map, absl::string_view head
 }
 } // namespace
 
-class PerHostHttpUpstream : public Router::GenericUpstream {
+// The http upstream to remember the host and encode the host metadata and cluster metadata into
+// upstream http request.
+class PerHostHttpUpstream : public Extensions::Upstreams::Http::Http::HttpUpstream {
 public:
   PerHostHttpUpstream(Router::UpstreamToDownstream& upstream_request,
                       Envoy::Http::RequestEncoder* encoder,
                       Upstream::HostDescriptionConstSharedPtr host)
-      : sub_upstream_(upstream_request, encoder), host_(host) {}
-
-  // GenericUpstream
-  void encodeData(Buffer::Instance& data, bool end_stream) override {
-    sub_upstream_.encodeData(data, end_stream);
-  }
-
-  void encodeMetadata(const Envoy::Http::MetadataMapVector& metadata_map_vector) override {
-    sub_upstream_.encodeMetadata(metadata_map_vector);
-  }
+      : HttpUpstream(upstream_request, encoder), host_(host) {}
 
   Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
                              bool end_stream) override {
@@ -58,19 +61,10 @@ public:
     if (host_->metadata() != nullptr) {
       addHeader(*dup, "X-host-foo", *host_->metadata(), "foo", "bar");
     }
-    return sub_upstream_.encodeHeaders(*dup, end_stream);
+    return HttpUpstream::encodeHeaders(*dup, end_stream);
   }
-
-  void encodeTrailers(const Envoy::Http::RequestTrailerMap& trailers) override {
-    sub_upstream_.encodeTrailers(trailers);
-  }
-
-  void readDisable(bool disable) override { sub_upstream_.readDisable(disable); }
-
-  void resetStream() override { sub_upstream_.resetStream(); }
 
 private:
-  Extensions::Upstreams::Http::Http::HttpUpstream sub_upstream_;
   Upstream::HostDescriptionConstSharedPtr host_;
 };
 
