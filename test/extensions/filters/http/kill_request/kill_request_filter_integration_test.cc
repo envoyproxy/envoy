@@ -10,7 +10,7 @@ namespace {
 
 class KillRequestFilterIntegrationTest : public Event::TestUsingSimulatedTime,
                                          public HttpProtocolIntegrationTest {
- protected:
+protected:
   void initializeFilter(const std::string& filter_config) {
     config_helper_.addFilter(filter_config);
     initialize();
@@ -27,54 +27,46 @@ typed_config:
 };
 
 // Tests should run with all protocols.
-class KillRequestFilterIntegrationTestAllProtocols
-    : public KillRequestFilterIntegrationTest {};
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, KillRequestFilterIntegrationTestAllProtocols,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+class KillRequestFilterIntegrationTestAllProtocols : public KillRequestFilterIntegrationTest {};
+INSTANTIATE_TEST_SUITE_P(Protocols, KillRequestFilterIntegrationTestAllProtocols,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Request abort controlled via header configuration.
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
   initializeFilter(filter_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority", "host"},
-      {"x-envoy-kill-request", "true"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-envoy-kill-request", "true"}};
 
-  EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0,
-                                             default_response_headers_, 1024),
+  EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
                "");
 }
 
-TEST_P(KillRequestFilterIntegrationTestAllProtocols,
-       KillRequestDisabledWhenHeaderIsMissing) {
+TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledWhenHeaderIsMissing) {
   initializeFilter(filter_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  auto response = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, default_response_headers_, 1024);
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 1024);
 }
 
-TEST_P(KillRequestFilterIntegrationTestAllProtocols,
-       KillRequestDisabledWhenHeaderValueIsInvalid) {
+TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledWhenHeaderValueIsInvalid) {
   initializeFilter(filter_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority", "host"},
-      {"x-envoy-kill-request", "invalid"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-envoy-kill-request", "invalid"}};
 
-  auto response = sendRequestAndWaitForResponse(
-      request_headers, 0, default_response_headers_, 1024);
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024);
 }
 
-TEST_P(KillRequestFilterIntegrationTestAllProtocols,
-       KillRequestDisabledByZeroProbability) {
+TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledByZeroProbability) {
   const std::string zero_probability_filter_config =
       R"EOF(
 name: envoy.filters.http.kill_request
@@ -86,19 +78,18 @@ typed_config:
 
   initializeFilter(zero_probability_filter_config);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority", "host"},
-      {"x-envoy-kill-request", "true"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-envoy-kill-request", "true"}};
 
-  auto response = sendRequestAndWaitForResponse(
-      request_headers, 0, default_response_headers_, 1024);
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024);
 }
 
-}  // namespace
-}  // namespace KillRequest
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace
+} // namespace KillRequest
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

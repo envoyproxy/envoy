@@ -11,15 +11,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace KillRequest {
 
-Http::FilterFactoryCb
-KillRequestFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::kill_request::v3::KillRequest&
-        proto_config,
+Http::FilterFactoryCb KillRequestFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  return [proto_config,
-          &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<KillRequestFilter>(
-        proto_config, context.api().randomGenerator()));
+  return [proto_config, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(
+        std::make_shared<KillRequestFilter>(proto_config, context.api().randomGenerator()));
   };
 }
 
@@ -27,10 +24,9 @@ KillRequestFilterFactory::createFilterFactoryFromProtoTyped(
  * Static registration for the KillRequest filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(KillRequestFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory){
-    "envoy.kill_request"};
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.kill_request"};
 
-}  // namespace KillRequest
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace KillRequest
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
