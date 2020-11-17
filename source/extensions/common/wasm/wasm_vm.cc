@@ -6,20 +6,10 @@
 #include "extensions/common/wasm/context.h"
 #include "extensions/common/wasm/ext/envoy_null_vm_wasm_api.h"
 #include "extensions/common/wasm/wasm_extension.h"
+#include "extensions/common/wasm/wasm_runtime_factory.h"
 #include "extensions/common/wasm/well_known_names.h"
 
-#include "include/proxy-wasm/null.h"
 #include "include/proxy-wasm/null_plugin.h"
-
-#if defined(ENVOY_WASM_V8)
-#include "include/proxy-wasm/v8.h"
-#endif
-#if defined(ENVOY_WASM_WAVM)
-#include "include/proxy-wasm/wavm.h"
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-#include "include/proxy-wasm/wasmtime.h"
-#endif
 
 using ContextBase = proxy_wasm::ContextBase;
 using Word = proxy_wasm::Word;
@@ -70,36 +60,21 @@ WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& s
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
                         "Failed to create Wasm VM with unspecified runtime");
     return nullptr;
-  } else if (runtime == WasmRuntimeNames::get().Null) {
-    auto wasm = proxy_wasm::createNullVm();
-    wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "null");
-    return wasm;
-#if defined(ENVOY_WASM_V8)
-  } else if (runtime == WasmRuntimeNames::get().V8) {
-    auto wasm = proxy_wasm::createV8Vm();
-    wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "v8");
-    return wasm;
-#endif
-#if defined(ENVOY_WASM_WAVM)
-  } else if (runtime == WasmRuntimeNames::get().Wavm) {
-    auto wasm = proxy_wasm::createWavmVm();
-    wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "wavm");
-    return wasm;
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-  } else if (runtime == WasmRuntimeNames::get().Wasmtime) {
-    auto wasm = proxy_wasm::createWasmtimeVm();
-    wasm->integration() =
-        getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "wasmtime");
-    return wasm;
-#endif
-  } else {
+  }
+
+  auto runtime_factory = Registry::FactoryRegistry<WasmRuntimeFactory>::getFactory(runtime);
+  if (runtime_factory == nullptr) {
     ENVOY_LOG_TO_LOGGER(
         Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
         "Failed to create Wasm VM using {} runtime. Envoy was compiled without support for it",
         runtime);
     return nullptr;
   }
+
+  auto wasm = runtime_factory->createWasmVm();
+  wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(
+      scope, runtime_factory->name(), runtime_factory->shortName());
+  return wasm;
 }
 
 } // namespace Wasm

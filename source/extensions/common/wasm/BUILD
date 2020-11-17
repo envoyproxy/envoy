@@ -16,6 +16,16 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "wasm_runtime_factory_interface",
+    hdrs = [
+        "wasm_runtime_factory.h",
+    ],
+    deps = [
+        ":wasm_hdr",
+    ],
+)
+
 # NB: Used to break the circular dependency between wasm_lib and null_plugin_lib.
 envoy_cc_library(
     name = "wasm_hdr",
@@ -86,6 +96,7 @@ envoy_cc_library(
     deps = [
         ":wasm_hdr",
         ":wasm_interoperation_lib",
+        ":wasm_runtime_factory_interface",
         "//external:abseil_base",
         "//external:abseil_node_hash_map",
         "//include/envoy/server:lifecycle_notifier_interface",

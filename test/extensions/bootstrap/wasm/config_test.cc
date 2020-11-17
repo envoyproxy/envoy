@@ -6,6 +6,7 @@
 
 #include "extensions/bootstrap/wasm/config.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -67,20 +68,8 @@ protected:
   Server::BootstrapExtensionPtr extension_;
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8",
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm",
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-    "wasmtime",
-#endif
-    "null");
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFactoryTest, testing_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFactoryTest,
+                         Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasm) {
   auto factory = std::make_unique<Bootstrap::Wasm::WasmFactory>();

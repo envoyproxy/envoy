@@ -92,6 +92,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/wasm @PiotrSikora @lizan
 # webassembly common extension
 /*/extensions/common/wasm @PiotrSikora @lizan
+# webassembly runtimes
+/*/extensions/wasm_runtime/ @PiotrSikora @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 # common crypto extension
