@@ -59,7 +59,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
 
   // Owned by BufferedIoSocketHandle.
-  NiceMock<Event::MockSchedulableCallback>* scheduable_cb_;
+  NiceMock<Event::MockSchedulableCallback>* schedulable_cb_;
   MockFileEventCallback cb_;
   std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_;
   std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_peer_;
@@ -396,51 +396,51 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
-  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, enabled());
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
-  scheduable_cb->invokeCallback();
+  schedulable_cb->invokeCallback();
   io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestSetEnabledTriggerEventSchedule) {
-  auto scheduable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   // No data is available to read. Will not schedule read.
   {
     SCOPED_TRACE("enable read but no readable.");
-    EXPECT_CALL(*scheduable_cb, enabled());
-    EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration()).Times(0);
+    EXPECT_CALL(*schedulable_cb, enabled());
+    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(0);
     io_handle_->initializeFileEvent(
         dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
         Event::FileReadyType::Read);
-    testing::Mock::VerifyAndClearExpectations(scheduable_cb);
+    testing::Mock::VerifyAndClearExpectations(schedulable_cb);
   }
   {
     SCOPED_TRACE("enable readwrite but only writable.");
-    EXPECT_CALL(*scheduable_cb, enabled());
-    EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+    EXPECT_CALL(*schedulable_cb, enabled());
+    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
     io_handle_->enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
-    ASSERT_TRUE(scheduable_cb->enabled_);
+    ASSERT_TRUE(schedulable_cb->enabled_);
     EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
-    scheduable_cb->invokeCallback();
-    ASSERT_FALSE(scheduable_cb->enabled_);
-    testing::Mock::VerifyAndClearExpectations(scheduable_cb);
+    schedulable_cb->invokeCallback();
+    ASSERT_FALSE(schedulable_cb->enabled_);
+    testing::Mock::VerifyAndClearExpectations(schedulable_cb);
   }
   {
     SCOPED_TRACE("enable write and writable.");
-    EXPECT_CALL(*scheduable_cb, enabled());
-    EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+    EXPECT_CALL(*schedulable_cb, enabled());
+    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
     io_handle_->enableFileEvents(Event::FileReadyType::Write);
-    ASSERT_TRUE(scheduable_cb->enabled_);
+    ASSERT_TRUE(schedulable_cb->enabled_);
     EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
-    scheduable_cb->invokeCallback();
-    ASSERT_FALSE(scheduable_cb->enabled_);
-    testing::Mock::VerifyAndClearExpectations(scheduable_cb);
+    schedulable_cb->invokeCallback();
+    ASSERT_FALSE(schedulable_cb->enabled_);
+    testing::Mock::VerifyAndClearExpectations(schedulable_cb);
   }
   // Close io_handle_ first to prevent events originated from peer close.
   io_handle_->close();
@@ -448,59 +448,59 @@ TEST_F(BufferedIoSocketHandleTest, TestSetEnabledTriggerEventSchedule) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestReadAndWriteAreEdgeTriggered) {
-  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, enabled());
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
-  scheduable_cb->invokeCallback();
+  schedulable_cb->invokeCallback();
 
   Buffer::OwnedImpl buf("abcd");
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_peer_->write(buf);
 
   EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
-  scheduable_cb->invokeCallback();
+  schedulable_cb->invokeCallback();
 
   // Drain 1 bytes.
   auto result = io_handle_->recv(buf_.data(), 1, 0);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(1, result.rc_);
 
-  ASSERT_FALSE(scheduable_cb->enabled_);
+  ASSERT_FALSE(schedulable_cb->enabled_);
   io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestSetDisabledBlockEventSchedule) {
-  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, enabled());
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Write);
-  ASSERT_TRUE(scheduable_cb->enabled_);
+  ASSERT_TRUE(schedulable_cb->enabled_);
 
   // The write event is cleared and the read event is not ready.
-  EXPECT_CALL(*scheduable_cb, enabled());
-  EXPECT_CALL(*scheduable_cb, cancel());
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, cancel());
   io_handle_->enableFileEvents(Event::FileReadyType::Read);
-  testing::Mock::VerifyAndClearExpectations(scheduable_cb);
+  testing::Mock::VerifyAndClearExpectations(schedulable_cb);
 
-  ASSERT_FALSE(scheduable_cb->enabled_);
+  ASSERT_FALSE(schedulable_cb->enabled_);
   io_handle_->resetFileEvents();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestEventResetClearCallback) {
-  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, enabled());
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Write);
-  ASSERT_TRUE(scheduable_cb->enabled_);
+  ASSERT_TRUE(schedulable_cb->enabled_);
   io_handle_->resetFileEvents();
 }
 
@@ -515,15 +515,15 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
   EXPECT_TRUE(io_handle_->isReadable());
   EXPECT_FALSE(io_handle_->isWritable());
 
-  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, enabled());
+  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb, enabled());
   // No event is available.
-  EXPECT_CALL(*scheduable_cb, cancel());
+  EXPECT_CALL(*schedulable_cb, cancel());
   io_handle_peer_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
   // Neither readable nor writable.
-  ASSERT_FALSE(scheduable_cb->enabled_);
+  ASSERT_FALSE(schedulable_cb->enabled_);
 
   {
     SCOPED_TRACE("drain very few data.");
@@ -532,15 +532,15 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
   }
   {
     SCOPED_TRACE("drain to low watermark.");
-    EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration()).Times(1);
+    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(1);
     auto result = io_handle_->recv(buf_.data(), 232, 0);
     EXPECT_TRUE(io_handle_->isWritable());
     EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
-    scheduable_cb->invokeCallback();
+    schedulable_cb->invokeCallback();
   }
   {
     SCOPED_TRACE("clean up.");
-    EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration()).Times(1);
+    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(1);
     // Important: close before peer.
     io_handle_->close();
   }
@@ -550,8 +550,8 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcd");
   std::string accumulator;
-  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
   io_handle_->initializeFileEvent(
       dispatcher_,
@@ -586,19 +586,19 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
         }
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
-  scheduable_cb_->invokeCallback();
+  schedulable_cb_->invokeCallback();
 
   // Not closed yet.
   ASSERT_FALSE(should_close);
 
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   io_handle_peer_->close();
 
-  ASSERT_TRUE(scheduable_cb_->enabled());
-  scheduable_cb_->invokeCallback();
+  ASSERT_TRUE(schedulable_cb_->enabled());
+  schedulable_cb_->invokeCallback();
   ASSERT_TRUE(should_close);
 
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(0);
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration()).Times(0);
   io_handle_->close();
   EXPECT_EQ(4, accumulator.size());
   io_handle_->resetFileEvents();
@@ -611,8 +611,8 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
   internal_buffer.add("abcd");
 
   std::string accumulator;
-  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
   io_handle_->initializeFileEvent(
       dispatcher_,
@@ -630,16 +630,16 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
         }
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
-  scheduable_cb_->invokeCallback();
+  schedulable_cb_->invokeCallback();
 
   // Not closed yet.
   ASSERT_FALSE(should_close);
 
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
 
-  ASSERT_TRUE(scheduable_cb_->enabled());
-  scheduable_cb_->invokeCallback();
+  ASSERT_TRUE(schedulable_cb_->enabled());
+  schedulable_cb_->invokeCallback();
   ASSERT_FALSE(should_close);
   EXPECT_EQ(4, accumulator.size());
   io_handle_->close();
@@ -648,8 +648,8 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
 
 TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
   std::string accumulator;
-  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
   io_handle_->initializeFileEvent(
       dispatcher_,
@@ -670,16 +670,16 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
         }
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
-  scheduable_cb_->invokeCallback();
-  EXPECT_FALSE(scheduable_cb_->enabled());
+  schedulable_cb_->invokeCallback();
+  EXPECT_FALSE(schedulable_cb_->enabled());
 
   Buffer::OwnedImpl data_to_write("0123456789");
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   io_handle_peer_->write(data_to_write);
   EXPECT_EQ(0, data_to_write.length());
 
-  EXPECT_TRUE(scheduable_cb_->enabled());
-  scheduable_cb_->invokeCallback();
+  EXPECT_TRUE(schedulable_cb_->enabled());
+  schedulable_cb_->invokeCallback();
   EXPECT_EQ("0123456789", accumulator);
   EXPECT_FALSE(should_close);
 
@@ -688,8 +688,8 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
 
 TEST_F(BufferedIoSocketHandleTest, TestWritevScheduleWritableEvent) {
   std::string accumulator;
-  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
   io_handle_->initializeFileEvent(
       dispatcher_,
@@ -710,16 +710,16 @@ TEST_F(BufferedIoSocketHandleTest, TestWritevScheduleWritableEvent) {
         }
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
-  scheduable_cb_->invokeCallback();
-  EXPECT_FALSE(scheduable_cb_->enabled());
+  schedulable_cb_->invokeCallback();
+  EXPECT_FALSE(schedulable_cb_->enabled());
 
   std::string raw_data("0123456789");
   Buffer::RawSlice slice{static_cast<void*>(raw_data.data()), raw_data.size()};
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   io_handle_peer_->writev(&slice, 1);
 
-  EXPECT_TRUE(scheduable_cb_->enabled());
-  scheduable_cb_->invokeCallback();
+  EXPECT_TRUE(schedulable_cb_->enabled());
+  schedulable_cb_->invokeCallback();
   EXPECT_EQ("0123456789", accumulator);
   EXPECT_FALSE(should_close);
 
@@ -730,7 +730,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
   ENVOY_LOG_MISC(debug, "after {} shutdown write ", static_cast<void*>(io_handle_peer_.get()));
   std::string accumulator;
-  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   bool should_close = false;
   io_handle_peer_->initializeFileEvent(
       dispatcher_,
@@ -756,18 +756,18 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
-  EXPECT_FALSE(scheduable_cb_->enabled());
+  EXPECT_FALSE(schedulable_cb_->enabled());
   std::string raw_data("0123456789");
   Buffer::RawSlice slice{static_cast<void*>(raw_data.data()), raw_data.size()};
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   io_handle_->writev(&slice, 1);
-  EXPECT_TRUE(scheduable_cb_->enabled());
+  EXPECT_TRUE(schedulable_cb_->enabled());
 
-  scheduable_cb_->invokeCallback();
-  EXPECT_FALSE(scheduable_cb_->enabled());
+  schedulable_cb_->invokeCallback();
+  EXPECT_FALSE(schedulable_cb_->enabled());
   EXPECT_EQ(raw_data, accumulator);
 
-  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
   io_handle_->close();
   io_handle_->resetFileEvents();
 }
@@ -784,20 +784,20 @@ TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
   FANCY_LOG(debug, "after {} shutdown write", static_cast<void*>(io_handle_peer_.get()));
 
-  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, enabled());
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read);
   EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
-  scheduable_cb->invokeCallback();
-  EXPECT_FALSE(scheduable_cb->enabled_);
+  schedulable_cb->invokeCallback();
+  EXPECT_FALSE(schedulable_cb->enabled_);
 
-  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   auto result = io_handle_peer_->recv(buf_.data(), buf_.size(), 0);
   EXPECT_EQ(256, result.rc_);
-  EXPECT_TRUE(scheduable_cb->enabled_);
+  EXPECT_TRUE(schedulable_cb->enabled_);
 
   io_handle_->close();
 }
@@ -821,13 +821,13 @@ TEST_F(BufferedIoSocketHandleTest, TestConnect) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestActivateEvent) {
-  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_->initializeFileEvent(
       dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read);
-  EXPECT_FALSE(scheduable_cb_->enabled());
+  EXPECT_FALSE(schedulable_cb_->enabled());
   io_handle_->activateFileEvents(Event::FileReadyType::Read);
-  ASSERT_TRUE(scheduable_cb_->enabled());
+  ASSERT_TRUE(schedulable_cb_->enabled());
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestDeathOnActivatingDestroyedEvents) {

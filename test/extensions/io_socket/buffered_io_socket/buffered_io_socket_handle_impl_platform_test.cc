@@ -47,10 +47,10 @@ public:
 };
 
 TEST_F(BufferedIoSocketHandlePlatformTest, TestCreatePlatformDefaultTriggerTypeFailOnWindows) {
-  // scheduable_cb will be destroyed by IoHandle.
-  auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
-  EXPECT_CALL(*scheduable_cb, enabled());
-  EXPECT_CALL(*scheduable_cb, cancel());
+  // schedulable_cb will be destroyed by IoHandle.
+  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, cancel());
   first_io_handle_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
