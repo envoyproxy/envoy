@@ -245,6 +245,59 @@ TEST_F(BufferedIoSocketHandleTest, FlowControl) {
   EXPECT_TRUE(io_handle_->isWritable());
 }
 
+// Consistent with other IoHandle: allow write empty data when handle is closed.
+TEST_F(BufferedIoSocketHandleTest, TestNoErrorWriteZeroDataToClosedIoHandle) {
+  io_handle_->close();
+  {
+    Buffer::OwnedImpl buf;
+    auto result = io_handle_->write(buf);
+    ASSERT_EQ(0, result.rc_);
+    ASSERT(result.ok());
+  }
+  {
+    Buffer::RawSlice slice{nullptr, 0};
+    auto result = io_handle_->writev(&slice, 1);
+    ASSERT_EQ(0, result.rc_);
+    ASSERT(result.ok());
+  }
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestErrorOnClosedIoHandle) {
+  io_handle_->close();
+  {
+    auto [guard, slice] = allocateOneSlice(1024);
+    auto result = io_handle_->recv(slice.mem_, slice.len_, 0);
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+  {
+    Buffer::OwnedImpl buf;
+    auto result = io_handle_->read(buf, 10);
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+  {
+    auto [guard, slice] = allocateOneSlice(1024);
+    auto result = io_handle_->readv(1024, &slice, 1);
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+  {
+    Buffer::OwnedImpl buf("0123456789");
+    auto result = io_handle_->write(buf);
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+  {
+    Buffer::OwnedImpl buf("0123456789");
+    auto slices = buf.getRawSlices();
+    ASSERT(!slices.empty());
+    auto result = io_handle_->writev(slices.data(), slices.size());
+    ASSERT(!result.ok());
+    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  }
+}
+
 TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
   auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*scheduable_cb, enabled());
@@ -450,59 +503,6 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
   io_handle_->close();
   EXPECT_EQ(4, accumulator.size());
   io_handle_->resetFileEvents();
-}
-
-// Consistent with other IoHandle: allow write empty data when handle is closed.
-TEST_F(BufferedIoSocketHandleTest, TestNoErrorWriteZeroDataToClosedIoHandle) {
-  io_handle_->close();
-  {
-    Buffer::OwnedImpl buf;
-    auto result = io_handle_->write(buf);
-    ASSERT_EQ(0, result.rc_);
-    ASSERT(result.ok());
-  }
-  {
-    Buffer::RawSlice slice{nullptr, 0};
-    auto result = io_handle_->writev(&slice, 1);
-    ASSERT_EQ(0, result.rc_);
-    ASSERT(result.ok());
-  }
-}
-
-TEST_F(BufferedIoSocketHandleTest, TestErrorOnClosedIoHandle) {
-  io_handle_->close();
-  {
-    auto [guard, slice] = allocateOneSlice(1024);
-    auto result = io_handle_->recv(slice.mem_, slice.len_, 0);
-    ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-  }
-  {
-    Buffer::OwnedImpl buf;
-    auto result = io_handle_->read(buf, 10);
-    ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-  }
-  {
-    auto [guard, slice] = allocateOneSlice(1024);
-    auto result = io_handle_->readv(1024, &slice, 1);
-    ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-  }
-  {
-    Buffer::OwnedImpl buf("0123456789");
-    auto result = io_handle_->write(buf);
-    ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-  }
-  {
-    Buffer::OwnedImpl buf("0123456789");
-    auto slices = buf.getRawSlices();
-    ASSERT(!slices.empty());
-    auto result = io_handle_->writev(slices.data(), slices.size());
-    ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
-  }
 }
 
 // Test that a readable event is raised when peer shutdown write. Also confirm read will return
