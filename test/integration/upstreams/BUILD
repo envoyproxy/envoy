@@ -14,18 +14,6 @@ envoy_cc_library(
         "per_host_upstream_config.h",
     ],
     deps = [
-        ":per_host_upstream_request_lib",
-        "//source/extensions/upstreams/http/http:upstream_request_lib",
-        "//source/extensions/upstreams/http/tcp:upstream_request_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "per_host_upstream_request_lib",
-    hdrs = [
-        "per_host_upstream_request.h",
-    ],
-    deps = [
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:filter_interface",
@@ -37,5 +25,6 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/upstreams/http/http:upstream_request_lib",
+        "//source/extensions/upstreams/http/tcp:upstream_request_lib",
     ],
 )

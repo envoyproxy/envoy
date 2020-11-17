@@ -5,10 +5,10 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/upstreams/per_host_upstream_config.h"
 #include "test/test_common/registry.h"
-#include "test/integration/fake_upstream.h"
 
 #include "gtest/gtest.h"
 
