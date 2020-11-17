@@ -295,7 +295,7 @@ void DecoderImpl::decodeBackendStatements() {
   // try to find for the null terminator character (\0).
   std::size_t position = message_.find(' ');
   if (position == std::string::npos) {
-    // If the null terminator character (\0) cannot befound then
+    // If the null terminator character (\0) cannot be found then
     // take the whole message.
     position = message_.find('\0');
   }
