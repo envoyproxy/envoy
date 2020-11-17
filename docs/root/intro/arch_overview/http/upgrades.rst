@@ -121,4 +121,4 @@ Examples of such a set up can be found in the Envoy example config :repo:`direct
 If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
 you will be running Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP/1.1
 CONNECT addressed to an HTTP proxy running on localhost and listenig on port
-10001, having as a final destination host.com on port 10002.
+10001, having as a final destination host.com on port 443.

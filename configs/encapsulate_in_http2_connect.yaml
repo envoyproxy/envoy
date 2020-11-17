@@ -26,7 +26,7 @@ static_resources:
           stat_prefix: tcp_stats
           cluster: "cluster_0"
           tunneling_config:
-            hostname: host.com:10002
+            hostname: host.com:443
   clusters:
     - name: cluster_0
       connect_timeout: 5s
