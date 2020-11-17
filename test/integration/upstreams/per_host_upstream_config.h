@@ -2,6 +2,8 @@
 
 #include "envoy/router/router.h"
 
+#include "test/integration/upstreams/per_host_upstream_request.h"
+
 namespace Envoy {
 
 /**
@@ -15,10 +17,19 @@ public:
   createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
                         const Router::RouteEntry& route_entry,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx) const override;
+                        Upstream::LoadBalancerContext* ctx) const override {
+    if (is_connect) {
+      // This example factory doesn't support terminating CONNECT stream.
+      return nullptr;
+    }
+    auto upstream_http_conn_pool = std::make_unique<PerHostHttpConnPool>(
+        cm, is_connect, route_entry, downstream_protocol, ctx);
+    return (upstream_http_conn_pool->valid() ? std::move(upstream_http_conn_pool) : nullptr);
+  }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();
   }
 };
+
 } // namespace Envoy
