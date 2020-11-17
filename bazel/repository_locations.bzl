@@ -600,9 +600,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/WAVM/WAVM/archive/{version}.tar.gz"],
         release_date = "2020-09-17",
         use_category = ["dataplane_ext"],
-        extensions = [
-            "envoy.wasm.runtime.wavm",
-        ],
+        extensions = ["envoy.wasm.runtime.wavm"],
         cpe = "cpe:2.3:a:webassembly_virtual_machine_project:webassembly_virtual_machine:*",
     ),
     com_github_wasmtime = dict(
