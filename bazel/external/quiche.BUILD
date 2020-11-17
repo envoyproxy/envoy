@@ -3655,6 +3655,35 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_test_tools_qpack_qpack_encoder_test_utils_lib",
+    srcs = ["quiche/quic/test_tools/qpack/qpack_encoder_test_utils.cc"],
+    hdrs = ["quiche/quic/test_tools/qpack/qpack_encoder_test_utils.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_qpack_qpack_encoder_lib",
+        ":quic_platform_test",
+        ":quic_test_tools_qpack_qpack_test_utils_lib",
+        ":spdy_core_header_block_lib",
+        ":spdy_core_hpack_hpack_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_qpack_qpack_test_utils_lib",
+    srcs = ["quiche/quic/test_tools/qpack/qpack_test_utils.cc"],
+    hdrs = ["quiche/quic/test_tools/qpack/qpack_test_utils.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_qpack_qpack_stream_sender_delegate_lib",
+        ":quic_platform_test",
+    ],
+)
+
+envoy_cc_test_library(
     name = "quic_test_tools_sent_packet_manager_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_sent_packet_manager_peer.cc"],
     hdrs = ["quiche/quic/test_tools/quic_sent_packet_manager_peer.h"],
