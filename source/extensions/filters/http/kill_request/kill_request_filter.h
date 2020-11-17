@@ -14,7 +14,7 @@ namespace KillRequest {
 
 /**
  * A filter that will crash Envoy if IsKillRequestEnabled() returns true and
- * incoming request contains HTTP header "x-envoy-kill-request" with values in
+ * incoming request contains HTTP KillRequest header with values in
  * one of (case-insensitive) ["true", "t", "yes", "y", "1"].
  */
 class KillRequestFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
