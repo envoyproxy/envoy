@@ -57,7 +57,6 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.always_apply_route_header_rules",
-    "envoy.reloadable_features.activate_fds_next_event_loop",
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_prefetch",
