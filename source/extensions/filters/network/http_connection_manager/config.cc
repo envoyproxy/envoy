@@ -126,7 +126,6 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       if (options.use_downstream_protocol_config().has_http2_protocol_options()) {
         use_http2_ = true;
       }
-      std::cerr << "Use downstream protocol\n";
       use_downstream_protocol_ = true;
     }
     if (options.has_alpn_config()) {

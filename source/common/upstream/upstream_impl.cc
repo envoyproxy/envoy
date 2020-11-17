@@ -85,7 +85,6 @@ uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config,
       features |= ClusterInfoImpl::Features::HTTP2;
     }
     if (options->use_downstream_protocol_) {
-      std::cerr << "Use downstream protcol\n";
       features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
     }
     if (options->use_alpn_) {
@@ -695,10 +694,8 @@ const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> crea
     const envoy::config::cluster::v3::Cluster& config,
     const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options) {
   if (options) {
-    std::cerr << "Passing on new style options\n";
     return std::move(options);
   }
-  std::cerr << "Using old style options because " << options.get() << "\n";
   return  std::make_shared<ClusterInfoImpl::HttpProtocolOptionsConfigImpl>(
      config.http_protocol_options(),
      config.http2_protocol_options(),
@@ -822,14 +819,12 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   if (http_protocol_options_->common_http_protocol_options_.has_idle_timeout()) {
-    std::cerr << "Using timeout\n";
     idle_timeout_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(http_protocol_options_->common_http_protocol_options_.idle_timeout()));
     if (idle_timeout_.value().count() == 0) {
       idle_timeout_ = absl::nullopt;
     }
   } else {
-    std::cerr << "Using default timeout\n";
     idle_timeout_ = std::chrono::hours(1);
   }
 
