@@ -1565,4 +1565,42 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Tests upstream sending a metadata frame after ending a stream.
+TEST_P(Http2FrameIntegrationTest, UpstreamMetadataAfterEndStream) {
+  // Allow metadata usage.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_http2_protocol_options()->set_allow_metadata(true);
+  });
+
+  beginSession();
+  FakeHttpConnectionPtr fake_upstream_connection;
+  FakeStreamPtr fake_upstream_request;
+
+  const uint32_t client_stream_idx = Http2Frame::makeClientStreamId(0);
+  // Send request without ending the stream.
+  const Http2Frame request =
+      Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url");
+  sendFrame(request);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, fake_upstream_request));
+  ASSERT_TRUE(fake_upstream_request->waitForHeadersComplete());
+
+  // Upstream sends headers and ends stream.
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  fake_upstream_request->encodeHeaders(response_headers, true);
+
+  // Upstream sends metadata.
+  const Http::MetadataMap response_metadata_map = {{"resp_key1", "resp_value1"}};
+  Http::MetadataMapPtr metadata_map_ptr =
+      std::make_unique<Http::MetadataMap>(response_metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  fake_upstream_request->encodeMetadata(metadata_map_vector);
+
+  // Cleanup.
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client_->close();
+}
 } // namespace Envoy
