@@ -69,7 +69,7 @@ public:
   virtual bool isPeerShutDownWrite() const PURE;
 
   /**
-    * @return true if the pending receive buffer is not empty or read_end is set.
+   * @return true if the pending receive buffer is not empty or read_end is set.
    */
   virtual bool isReadable() const PURE;
 };

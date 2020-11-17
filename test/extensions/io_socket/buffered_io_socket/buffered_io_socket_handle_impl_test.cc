@@ -1,8 +1,8 @@
-#include "common/common/fancy_logger.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/fancy_logger.h"
 #include "common/network/address_impl.h"
 
 #include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"

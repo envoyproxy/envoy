@@ -43,6 +43,7 @@ public:
   MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
   MOCK_METHOD(bool, isReadable, (), (const));
 };
+
 class UserSpaceFileEventImplTest : public testing::Test {
 public:
   UserSpaceFileEventImplTest()
@@ -83,6 +84,13 @@ TEST_F(UserSpaceFileEventImplTest, TestRescheduleAfterTriggered) {
     EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+  {
+    SCOPED_TRACE("merge events");
+    user_file_event_->activate(Event::FileReadyType::Read);
+    user_file_event_->activate(Event::FileReadyType::Write);
+    EXPECT_CALL(ready_cb_, called(event_rw));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestRescheduleIsDeduplicated) {
@@ -105,43 +113,19 @@ TEST_F(UserSpaceFileEventImplTest, TestRescheduleIsDeduplicated) {
 }
 
 TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents) {
-  {
-    auto current_event = Event::FileReadyType::Read;
+  for (const auto current_event : {Event::FileReadyType::Read, Event::FileReadyType::Write,
+                                   Event::FileReadyType::Read | Event::FileReadyType::Write}) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
-    EXPECT_CALL(io_source_, isReadable()).WillOnce(Return(true)).RetiresOnSaturation();
-    EXPECT_CALL(io_source_, isPeerWritable()).WillOnce(Return(false)).RetiresOnSaturation();
-    user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+    EXPECT_CALL(io_source_, isReadable())
+        .WillOnce(Return((current_event & Event::FileReadyType::Read) != 0))
+        .RetiresOnSaturation();
+    EXPECT_CALL(io_source_, isPeerWritable())
+        .WillOnce(Return((current_event & Event::FileReadyType::Write) != 0))
+        .RetiresOnSaturation();
+    auto user_file_event = std::make_unique<UserSpaceFileEventImpl>(
         *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
-    // user_file_event_->activate(e);
     EXPECT_CALL(ready_cb_, called(current_event));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    user_file_event_.reset();
-  }
-
-  {
-    auto current_event = Event::FileReadyType::Write;
-    SCOPED_TRACE(absl::StrCat("current event:", current_event));
-    EXPECT_CALL(io_source_, isReadable()).WillOnce(Return(false)).RetiresOnSaturation();
-    EXPECT_CALL(io_source_, isPeerWritable()).WillOnce(Return(true)).RetiresOnSaturation();
-    user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
-        *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
-    // user_file_event_->activate(e);
-    EXPECT_CALL(ready_cb_, called(current_event));
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    user_file_event_.reset();
-  }
-
-  {
-    auto current_event = event_rw;
-    SCOPED_TRACE(absl::StrCat("current event:", current_event));
-    EXPECT_CALL(io_source_, isReadable()).WillOnce(Return(true)).RetiresOnSaturation();
-    EXPECT_CALL(io_source_, isPeerWritable()).WillOnce(Return(true)).RetiresOnSaturation();
-    user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
-        *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
-    // user_file_event_->activate(e);
-    EXPECT_CALL(ready_cb_, called(current_event));
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    user_file_event_.reset();
   }
 }
 
@@ -196,12 +180,19 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  // Ensure both events are pending so that any enabled event will be immediately delivered.
+  setWritable();
+  setReadable();
   {
-    setWritable();
-    setReadable();
     user_file_event_->activate(Event::FileReadyType::Read);
     user_file_event_->setEnabled(Event::FileReadyType::Write);
     EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write)).Times(1);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  {
+    user_file_event_->activate(Event::FileReadyType::Write);
+    user_file_event_->setEnabled(Event::FileReadyType::Read);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read)).Times(1);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
@@ -220,8 +211,6 @@ TEST_F(UserSpaceFileEventImplTest, TestEventClosedIsNotTriggeredUnlessManullyAct
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
-    setWritable();
-    setReadable();
     user_file_event_->activate(Event::FileReadyType::Closed);
     // Activate could deliver Closed event bit.
     EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Closed)).Times(1);
