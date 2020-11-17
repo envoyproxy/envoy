@@ -298,6 +298,103 @@ TEST_F(BufferedIoSocketHandleTest, TestErrorOnClosedIoHandle) {
   }
 }
 
+TEST_F(BufferedIoSocketHandleTest, TestRepeatedShutdownWR) {
+  EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
+  EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestShutDownOptionsNotSupported) {
+  ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RD), "");
+  ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
+  Buffer::OwnedImpl buf("0123456789");
+  auto result = io_handle_peer_->write(buf);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(10, result.rc_);
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
+  EXPECT_EQ("0123456789", internal_buffer.toString());
+  EXPECT_EQ(0, buf.length());
+}
+
+// Test write return error code. Ignoring the side effect of event scheduling.
+TEST_F(BufferedIoSocketHandleTest, TestWriteAgain) {
+  Buffer::OwnedImpl buf("0123456789");
+
+  // Populate write destination with massive data so as to not writable.
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
+  internal_buffer.setWatermarks(1024);
+  internal_buffer.add(std::string(2048, ' '));
+
+  auto result = io_handle_->write(buf);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+  EXPECT_EQ(10, buf.length());
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWriteErrorAfterShutdown) {
+  Buffer::OwnedImpl buf("0123456789");
+  // Write after shutdown.
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+  auto result = io_handle_->write(buf);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  EXPECT_EQ(10, buf.length());
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWriteErrorAfterClose) {
+  Buffer::OwnedImpl buf("0123456789");
+  io_handle_peer_->close();
+  EXPECT_TRUE(io_handle_->isOpen());
+  auto result = io_handle_->write(buf);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+}
+
+// Test writev return error code. Ignoring the side effect of event scheduling.
+TEST_F(BufferedIoSocketHandleTest, TestWritevAgain) {
+  auto [guard, slice] = allocateOneSlice(128);
+  // Populate write destination with massive data so as to not writable.
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
+  internal_buffer.setWatermarks(128);
+  internal_buffer.add(std::string(256, ' '));
+  auto result = io_handle_->writev(&slice, 1);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWritevErrorAfterShutdown) {
+  auto [guard, slice] = allocateOneSlice(128);
+  // Writev after shutdown.
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+  auto result = io_handle_->writev(&slice, 1);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWritevErrorAfterClose) {
+  auto [guard, slice] = allocateOneSlice(1024);
+  // Close the peer.
+  io_handle_peer_->close();
+  EXPECT_TRUE(io_handle_->isOpen());
+  auto result = io_handle_->writev(&slice, 1);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
+  std::string raw_data("0123456789");
+  absl::InlinedVector<Buffer::RawSlice, 4> slices{
+      // Contains 1 byte.
+      Buffer::RawSlice{static_cast<void*>(raw_data.data()), 1},
+      // Contains 0 byte.
+      Buffer::RawSlice{nullptr, 1},
+      // Contains 0 byte.
+      Buffer::RawSlice{raw_data.data() + 1, 0},
+      // Contains 2 byte.
+      Buffer::RawSlice{raw_data.data() + 1, 2},
+  };
+  io_handle_peer_->writev(slices.data(), slices.size());
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
+  EXPECT_EQ(3, internal_buffer.length());
+  EXPECT_EQ("012", internal_buffer.toString());
+}
+
 TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
   auto scheduable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*scheduable_cb, enabled());
@@ -361,12 +458,14 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAndWriteAreEdgeTriggered) {
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
   scheduable_cb->invokeCallback();
 
-  // Neither read nor write triggers self readiness.
-  EXPECT_CALL(cb_, called(_)).Times(0);
+  Buffer::OwnedImpl buf("abcd");
+  EXPECT_CALL(*scheduable_cb, scheduleCallbackNextIteration());
+  io_handle_peer_->write(buf);
+
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
+  scheduable_cb->invokeCallback();
 
   // Drain 1 bytes.
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("abcd");
   auto result = io_handle_->recv(buf_.data(), 1, 0);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(1, result.rc_);
@@ -545,105 +644,6 @@ TEST_F(BufferedIoSocketHandleTest, TestShutDownRaiseEvent) {
   EXPECT_EQ(4, accumulator.size());
   io_handle_->close();
   io_handle_->resetFileEvents();
-}
-
-TEST_F(BufferedIoSocketHandleTest, TestRepeatedShutdownWR) {
-  EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
-  EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
-}
-
-TEST_F(BufferedIoSocketHandleTest, TestShutDownOptionsNotSupported) {
-  ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RD), "");
-  ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
-}
-
-TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
-  Buffer::OwnedImpl buf("0123456789");
-  auto result = io_handle_peer_->write(buf);
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(10, result.rc_);
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  EXPECT_EQ("0123456789", internal_buffer.toString());
-  EXPECT_EQ(0, buf.length());
-}
-
-// Test write return error code. Ignoring the side effect of event scheduling.
-TEST_F(BufferedIoSocketHandleTest, TestWriteErrorCode) {
-  Buffer::OwnedImpl buf("0123456789");
-
-  {
-    // Populate write destination with massive data so as to not writable.
-    auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
-    internal_buffer.setWatermarks(1024);
-    internal_buffer.add(std::string(2048, ' '));
-
-    auto result = io_handle_->write(buf);
-    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
-    EXPECT_EQ(10, buf.length());
-  }
-
-  {
-    // Write after shutdown.
-    io_handle_->shutdown(ENVOY_SHUT_WR);
-    auto result = io_handle_->write(buf);
-    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
-    EXPECT_EQ(10, buf.length());
-  }
-
-  {
-    io_handle_peer_->close();
-    EXPECT_TRUE(io_handle_->isOpen());
-    auto result = io_handle_->write(buf);
-    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
-  }
-}
-
-// Test writev return error code. Ignoring the side effect of event scheduling.
-TEST_F(BufferedIoSocketHandleTest, TestWritevErrorCode) {
-  std::string buf(10, 'a');
-  Buffer::RawSlice slice{static_cast<void*>(buf.data()), 10};
-
-  {
-    // Populate write destination with massive data so as to not writable.
-    auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
-    internal_buffer.setWatermarks(1024);
-    internal_buffer.add(std::string(2048, ' '));
-    auto result = io_handle_->writev(&slice, 1);
-    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
-  }
-
-  {
-    // Writev after shutdown.
-    io_handle_->shutdown(ENVOY_SHUT_WR);
-    auto result = io_handle_->writev(&slice, 1);
-    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
-  }
-
-  {
-    // Close the peer.
-    io_handle_peer_->close();
-    EXPECT_TRUE(io_handle_->isOpen());
-    auto result = io_handle_->writev(&slice, 1);
-    ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
-  }
-}
-
-TEST_F(BufferedIoSocketHandleTest, TestWritevToPeer) {
-  std::string raw_data("0123456789");
-  absl::InlinedVector<Buffer::RawSlice, 4> slices{
-      // Contains 1 byte.
-      Buffer::RawSlice{static_cast<void*>(raw_data.data()), 1},
-      // Contains 0 byte.
-      Buffer::RawSlice{nullptr, 1},
-      // Contains 0 byte.
-      Buffer::RawSlice{raw_data.data() + 1, 0},
-      // Contains 2 byte.
-      Buffer::RawSlice{raw_data.data() + 1, 2},
-  };
-  io_handle_peer_->writev(slices.data(), slices.size());
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  EXPECT_EQ(3, internal_buffer.length());
-  EXPECT_EQ("012", internal_buffer.toString());
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
