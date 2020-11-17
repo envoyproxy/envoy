@@ -102,7 +102,7 @@ void DecoderImpl::initialize() {
     session_.setInTransaction(true);
   };
   BE_statements_["ROLLBACK"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatements(DecoderCallbacks::StatementType::Noop);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     callbacks_->incTransactionsRollback();
     session_.setInTransaction(false);
   };
@@ -112,7 +112,7 @@ void DecoderImpl::initialize() {
     session_.setInTransaction(true);
   };
   BE_statements_["COMMIT"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatements(DecoderCallbacks::StatementType::Noop);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     session_.setInTransaction(false);
     callbacks_->incTransactionsCommit();
   };
@@ -292,13 +292,23 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 void DecoderImpl::decodeBackendStatements() {
   // The message_ contains the statement. Find space character
   // and the statement is the first word. If space cannot be found
-  // take the whole message.
-  std::string statement = message_.substr(0, message_.find(' '));
+  // try to find for the null terminator character (\0).
+  std::size_t position = message_.find(' ');
+  if (position == std::string::npos) {
+    // If the null terminator character (\0) cannot befound then
+    // take the whole message.
+    position = message_.find('\0');
+  }
+  std::string statement = message_.substr(0, position);
+
+  ENVOY_LOG(debug, "statement = {} {}", statement, statement.length());
 
   auto it = BE_statements_.find(statement);
   if (it != BE_statements_.end()) {
+    ENVOY_LOG(debug, "FOUND statement", statement);
     (*it).second(this);
   } else {
+    ENVOY_LOG(debug, "NOT FOUND statement", statement);
     callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
