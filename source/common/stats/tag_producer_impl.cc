@@ -34,11 +34,11 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& 
               "No regex specified for tag specifier and no default regex for name: '{}'", name));
         }
       } else {
-        addExtractor(Stats::TagExtractorImpl::createTagExtractor(name, tag_specifier.regex()));
+        addExtractor(TagExtractorImplBase::createTagExtractor(name, tag_specifier.regex()));
       }
     } else if (tag_specifier.tag_value_case() ==
                envoy::config::metrics::v3::TagSpecifier::TagValueCase::kFixedValue) {
-      default_tags_.emplace_back(Stats::Tag{name, tag_specifier.fixed_value()});
+      default_tags_.emplace_back(Tag{name, tag_specifier.fixed_value()});
     }
   }
 }
@@ -47,8 +47,8 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   int num_found = 0;
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     if (desc.name_ == name) {
-      addExtractor(
-          Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_, desc.substr_));
+      addExtractor(TagExtractorImplBase::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
+                                                            desc.re_type_));
       ++num_found;
     }
   }
@@ -103,8 +103,8 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsCon
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
       names.emplace(desc.name_);
-      addExtractor(
-          Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_, desc.substr_));
+      addExtractor(TagExtractorImplBase::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
+                                                            desc.re_type_));
     }
   }
   return names;

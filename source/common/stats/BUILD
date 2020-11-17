@@ -195,6 +195,7 @@ envoy_cc_library(
     hdrs = ["tag_extractor_impl.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/common:regex_lib",
     ],

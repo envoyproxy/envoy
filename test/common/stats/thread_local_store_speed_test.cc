@@ -79,6 +79,7 @@ private:
 
 // Tests the single-threaded performance of the thread-local-store stats caches
 // without having initialized tls.
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StatsNoTls(benchmark::State& state) {
   Envoy::ThreadLocalStorePerf context;
 
@@ -91,6 +92,7 @@ BENCHMARK(BM_StatsNoTls);
 // Tests the single-threaded performance of the thread-local-store stats caches
 // with tls. Note that this test is still single-threaded, and so there's only
 // one replica of the tls cache.
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StatsWithTls(benchmark::State& state) {
   Envoy::ThreadLocalStorePerf context;
   context.initThreading();

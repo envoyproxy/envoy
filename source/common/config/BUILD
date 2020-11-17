@@ -461,6 +461,7 @@ envoy_cc_library(
     hdrs = ["well_known_names.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/common:regex_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
