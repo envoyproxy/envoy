@@ -207,22 +207,26 @@ TEST_F(BufferedIoSocketHandleTest, TestBasicReadv) {
 
 TEST_F(BufferedIoSocketHandleTest, FlowControl) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  WritablePeer* handle_as_peer = io_handle_.get();
+  // TODO(lambdai): Make it an IoHandle method.
   internal_buffer.setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
-  EXPECT_TRUE(io_handle_peer_->isWritable());
+  EXPECT_TRUE(io_handle_->isWritable());
 
-  std::string big_chunk(256, 'a');
-  internal_buffer.add(big_chunk);
+  // Populate the data for io_handle_.
+  Buffer::OwnedImpl buffer(std::string(256, 'a'));
+  io_handle_peer_->write(buffer);
+
   EXPECT_TRUE(io_handle_->isReadable());
-  EXPECT_FALSE(handle_as_peer->isWritable());
+  EXPECT_FALSE(io_handle_->isWritable());
 
   bool writable_flipped = false;
   // During the repeated recv, the writable flag must switch to true.
   while (internal_buffer.length() > 0) {
     SCOPED_TRACE(internal_buffer.length());
+    FANCY_LOG(debug, "internal buffer length = {}", internal_buffer.length());
     EXPECT_TRUE(io_handle_->isReadable());
-    bool writable = handle_as_peer->isWritable();
+    bool writable = io_handle_->isWritable();
+    FANCY_LOG(debug, "internal buffer length = {}, writable = {}", internal_buffer.length(), writable);
     if (writable) {
       writable_flipped = true;
     } else {
@@ -237,7 +241,7 @@ TEST_F(BufferedIoSocketHandleTest, FlowControl) {
 
   // Finally the buffer is empty.
   EXPECT_FALSE(io_handle_->isReadable());
-  EXPECT_TRUE(handle_as_peer->isWritable());
+  EXPECT_TRUE(io_handle_->isWritable());
 }
 
 TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
