@@ -18,7 +18,6 @@ proto_library(
         "//envoy/config/endpoint/v3:pkg",
         "//envoy/config/filter/thrift/router/v2alpha1:pkg",
         "//envoy/config/grpc_credential/v3:pkg",
-        "//envoy/config/health_checker/redis/v2:pkg",
         "//envoy/config/health_checker/redis/v3:pkg",
         "//envoy/config/listener/v3:pkg",
         "//envoy/config/metrics/v3:pkg",
