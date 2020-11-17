@@ -8,8 +8,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.resource_monitor.fixed_heap.v2alpha";
 option java_outer_classname = "FixedHeapProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = FROZEN;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.resource_monitors.fixed_heap.v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Fixed heap]
 // [#extension: envoy.resource_monitors.fixed_heap]
