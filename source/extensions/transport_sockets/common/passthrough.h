@@ -23,7 +23,7 @@ public:
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   // startSecureTransport method should not be called for this transport socket.
-  bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  bool startSecureTransport() override { return false; }
 
 protected:
   Network::TransportSocketPtr transport_socket_;
