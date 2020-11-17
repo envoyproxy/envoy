@@ -33,15 +33,15 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
 
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {}
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override {}
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
@@ -52,7 +52,7 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -64,7 +64,7 @@ public:
     return Http::FilterMetadataStatus::Continue;
   }
 
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {}
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 
 private:
   // Return a random boolean value, with probability configured in KillRequest
