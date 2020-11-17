@@ -1,10 +1,11 @@
 .. _arch_overview_compression_libraries:
 
 压缩库
-======
+=======
 
-基础实现
--------------------------
+底层实现
+---------
+
 
 目前 Envoy 在使用 `zlib <http://zlib.net>`_ 作为压缩库。
 
