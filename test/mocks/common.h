@@ -113,6 +113,7 @@ public:
 
   MOCK_METHOD(uint64_t, random, ());
   MOCK_METHOD(std::string, uuid, ());
+  MOCK_METHOD(bool, bernoulli, (float));
 
   const std::string uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
 };
