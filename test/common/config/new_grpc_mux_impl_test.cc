@@ -101,7 +101,7 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
     response->set_system_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(load_assignment));
+    response->add_resources()->mutable_resource()->PackFrom(load_assignment);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
                                             const Protobuf::RepeatedPtrField<std::string>&,
@@ -204,7 +204,7 @@ TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
     envoy::config::cluster::v3::Cluster cluster;
     unexpected_response->set_type_url(Config::TypeUrl::get().Cluster);
     unexpected_response->set_system_version_info("0");
-    unexpected_response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(cluster));
+    unexpected_response->add_resources()->mutable_resource()->PackFrom(cluster);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
     grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
   }
@@ -252,7 +252,7 @@ TEST_F(NewGrpcMuxImplTest, V2ResourceResponseV3ResourceWatch) {
     response->set_system_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(load_assignment));
+    response->add_resources()->mutable_resource()->PackFrom(load_assignment);
     // Send response that contains resource with v3 type url.
     response->set_type_url(v2_type_url);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
