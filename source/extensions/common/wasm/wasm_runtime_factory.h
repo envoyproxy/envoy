@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "include/proxy-wasm/wasm_vm.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
