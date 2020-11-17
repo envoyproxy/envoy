@@ -31,6 +31,7 @@ using proxy_wasm::ContextBase;
 using proxy_wasm::Pairs;
 using proxy_wasm::PairsWithStringValues;
 using proxy_wasm::PluginBase;
+using proxy_wasm::PluginHandleBase;
 using proxy_wasm::SharedQueueDequeueToken;
 using proxy_wasm::SharedQueueEnqueueToken;
 using proxy_wasm::WasmBase;
@@ -45,6 +46,7 @@ using GrpcService = envoy::config::core::v3::GrpcService;
 
 class Wasm;
 
+using PluginHandleBaseSharedPtr = std::shared_ptr<PluginHandleBase>;
 using WasmHandleBaseSharedPtr = std::shared_ptr<WasmHandleBase>;
 
 // Opaque context object.

@@ -26,7 +26,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -158,7 +158,6 @@ private:
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
     void completeRequest();
 
-    void chargeStats(const ResponseHeaderMap& headers);
     const Network::Connection* connection();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -228,6 +227,7 @@ private:
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
       response_trailers_ = std::move(response_trailers);
     }
+    void chargeStats(const ResponseHeaderMap& headers) override;
 
     // TODO(snowp): Create shared OptRef/OptConstRef helpers
     Http::RequestHeaderMapOptRef requestHeaders() override {
