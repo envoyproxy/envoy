@@ -1,0 +1,41 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
+
+envoy_cc_library(
+    name = "kill_request_filter_lib",
+    srcs = ["kill_request_filter.cc"],
+    hdrs = ["kill_request_filter.h"],
+    deps = [
+        "//include/envoy/common:random_generator_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/http:header_map_interface",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http:headers_lib",
+        "//source/extensions/filters/common/fault:fault_config_lib",
+        "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_extension(
+    name = "kill_request_config",
+    srcs = ["kill_request_config.cc"],
+    hdrs = ["kill_request_config.h"],
+    security_posture = "robust_to_untrusted_downstream",
+    deps = [
+        "//include/envoy/registry",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/kill_request:kill_request_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",
+    ],
+)

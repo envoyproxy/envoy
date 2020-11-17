@@ -31,6 +31,7 @@ public:
       absl::StrCat(prefix(), "-fault-throughput-response")};
   const Http::LowerCaseString ThroughputResponsePercentage{
       absl::StrCat(prefix(), "-fault-throughput-response-percentage")};
+  const Http::LowerCaseString KillRequest{absl::StrCat(prefix(), "-kill-request")};
 };
 
 using HeaderNames = ConstSingleton<HeaderNameValues>;
