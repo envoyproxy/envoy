@@ -50,8 +50,9 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
     // to exit the process.
     std::cerr << "Our FatalActions triggered a fatal signal.\n";
     break;
-  default:
-    // All the cases runSafeActions() returns have been covered.
+  case FatalAction::Status::SafeActionsNotYetRan:
+    // This should not be reachable as runSafeActions does not return this
+    // value.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
