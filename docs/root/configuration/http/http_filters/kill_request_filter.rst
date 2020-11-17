@@ -9,7 +9,6 @@ and measure the blast radius. The KillRequest filter is disabled at build time b
 Configuration
 -------------
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.kill_request.v3.KillRequest>`
 * This filter should be configured with the name *envoy.filters.http.kill_request*.
 
 .. _config_http_filters_kill_request_http_header:
@@ -20,7 +19,7 @@ Enable Kill Request via HTTP header
 The KillRequest filter requires the following header in the request:
 
 x-envoy-kill-request
-  whether the request is a Kill request. 
+  whether the request is a Kill request.
   The header value must be one of (case-insensitive) ["true", "t", "yes", "y", "1"]
   in order for the request to be a Kill request.
 
@@ -37,3 +36,4 @@ The following is an example configuration:
     "@type": type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest
     probability:
       numerator: 100
+
