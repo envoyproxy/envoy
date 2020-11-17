@@ -33,7 +33,6 @@ using testing::DoubleNear;
 using testing::Eq;
 using testing::Invoke;
 using testing::Mock;
-using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
