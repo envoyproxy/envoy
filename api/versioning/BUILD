@@ -272,4 +272,3 @@ proto_library(
         "//envoy/type/tracing/v2:pkg",
     ],
 )
-
