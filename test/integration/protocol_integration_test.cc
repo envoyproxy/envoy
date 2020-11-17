@@ -993,6 +993,14 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
 }
 
+// The downstream connection is closed when it is read disabled, and on OSX the
+// connection error is not detected under these circumstances.
+#if !defined(__APPLE__)
+TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
+  testEnvoyHandling100Continue(false, "", true);
+}
+#endif
+
 TEST_P(ProtocolIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
 TEST_P(ProtocolIntegrationTest, EnvoyHandlingDuplicate100Continue) {
