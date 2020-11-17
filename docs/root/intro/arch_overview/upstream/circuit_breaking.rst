@@ -1,80 +1,25 @@
 .. _arch_overview_circuit_break:
 
-Circuit breaking
+断路
 ================
 
-Circuit breaking is a critical component of distributed systems. It’s nearly always better to fail
-quickly and apply back pressure downstream as soon as possible. One of the main benefits of an Envoy
-mesh is that Envoy enforces circuit breaking limits at the network level as opposed to having to
-configure and code each application independently. Envoy supports various types of fully distributed
-(not coordinated) circuit breaking:
+断路是分布式系统的重要组成部分。在分布式系统中最好是迅速失败，并尽快向下游施加反压。 Envoy 网络的主要好处之一是，Envoy 在网络级别强制执行断路限制，而不是必须独立给每个应用程序配置和编码。Envoy 支持各种类型的全分布式（非协调）断路：
 
 .. _arch_overview_circuit_break_cluster_maximum_connections:
 
-* **Cluster maximum connections**: The maximum number of connections that Envoy will establish to
-  all hosts in an upstream cluster. If this circuit breaker overflows the :ref:`upstream_cx_overflow
-  <config_cluster_manager_cluster_stats>` counter for the cluster will increment. All connections,
-  whether active or draining, count against this limit. Even if this circuit breaker has overflowed,
-  Envoy will ensure that a host selected by cluster load balancing has at least one connection
-  allocated. This has the implication that the :ref:`upstream_cx_active
-  <config_cluster_manager_cluster_stats>` count for a cluster may be higher than the cluster maximum
-  connection circuit breaker, with an upper bound of
-  `cluster maximum connections + (number of endpoints in a cluster) * (connection pools for the
-  cluster)`. This bound applies to the sum of connections across all workers threads. See
-  :ref:`connection pooling <arch_overview_conn_pool_how_many>` for details on how many connection
-  pools a cluster may have.
-* **Cluster maximum pending requests**: The maximum number of requests that will be queued while
-  waiting for a ready connection pool connection. Requests are added to the list
-  of pending requests whenever there aren't enough upstream connections available to immediately dispatch
-  the request. For HTTP/2 connections, if :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>`
-  and :ref:`max requests per connection <envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>` are not
-  configured, all requests will be multiplexed over the same connection so this circuit breaker
-  will only be hit when no connection is already established. If this circuit breaker overflows the
-  :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
-  increment.
-* **Cluster maximum requests**: The maximum number of requests that can be outstanding to all hosts
-  in a cluster at any given time. If this circuit breaker overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
-  counter for the cluster will increment.
-* **Cluster maximum active retries**: The maximum number of retries that can be outstanding to all
-  hosts in a cluster at any given time. In general we recommend using :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`; however, if static circuit breaking is preferred it should aggressively circuit break
-  retries. This is so that retries for sporadic failures are allowed, but the overall retry volume cannot
-  explode and cause large scale cascading failure. If this circuit breaker overflows the
-  :ref:`upstream_rq_retry_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
-  will increment.
+* **群集最大连接数**：Envoy 和上游集群中所有主机建立的最大连接数。如果该断路器溢出，集群的 :ref:`upstream_cx_overflow <config_cluster_manager_cluster_stats>` 计数器将增加。所有的连接，不管是活动的还是空闲的，都会计入这个计数器并由它来限制。即使这个断路器已经溢出，Envoy 也会确保群集负载均衡选择的主机至少有一个连接分配。这就意味着：集群的 :ref:`upstream_cx_active <config_cluster_manager_cluster_stats>` 计数可能会高于集群最大连接断路器，其上限为`集群最大连接数 +（集群的端点数）*（集群的连接池）`。这个边界适用于所有工作者线程的连接数之和。参见 :ref:`连接池 <arch_overview_conn_pool_how_many>`，了解一个集群可能有多少个连接池。
+* **集群最大待处理请求**：在等待就绪连接池连接时排队的最大请求数。每当没有足够的上游连接可用来立即调度请求时，请求就会被添加到待处理请求列表中。对于 HTTP/2 连接，如果 :ref:`最大并发流<envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>` 和 :ref:`每个连接的最大请求数 <envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>` 没有配置，所有的请求都会在同一个连接上被复用，所以只有在还没有建立连接的时候，才会触发这个断路器。如果这个断路器溢出，集群的 :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` 计数器将递增。
+* **群集最大请求量**：在任何特定时间对集群中所有主机的最大请求数。如果该断路器溢出，集群的 :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` 计数器将增加。
+* **群集最大有效重试**：集群中ß所有主机在任何特定时间内都可以进行的最大重试次数。一般来说，我们建议使用 :ref:`重试预算 <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`；但是，如果静态断路是首选项，则应该积极断路重试。这样可以允许零星故障的重试，但总体重试量不能爆炸，不能造成大规模的级联故障。如果这个断路器溢出，集群的 :ref:`upstream_rq_retry_overflow <config_cluster_manager_cluster_stats>` 计数器会递增。
 
   .. _arch_overview_circuit_break_cluster_maximum_connection_pools:
 
-* **Cluster maximum concurrent connection pools**: The maximum number of connection pools that can be
-  concurrently instantiated. Some features, such as the
-  :ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`, can
-  create an unbounded number of connection pools. When a cluster has exhausted its concurrent
-  connection pools, it will attempt to reclaim an idle one. If it cannot, then the circuit breaker
-  will overflow. This differs from
-  :ref:`Cluster maximum connections <arch_overview_circuit_break_cluster_maximum_connections>` in that
-  connection pools never time out, whereas connections typically will. Connections automatically
-  clean up; connection pools do not. Note that in order for a connection pool to function it needs
-  at least one upstream connection, so this value should likely be no greater than
-  :ref:`Cluster maximum connections <arch_overview_circuit_break_cluster_maximum_connections>`.
-  If this circuit breaker overflows the
-  :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
-  will increment.
+* **集群最大并发连接池**：可并发实例化的最大连接池数量。有些功能，如 :ref:`源监听器过滤器 <arch_overview_ip_transparency_original_src_listener>`，可以创建无限制数量的连接池。当一个集群用尽了它的并发连接池，它将尝试回收一个空闲的连接池。如果不能，那么断路器将溢出。这与 :ref:`集群最大连接数 <arch_overview_circuit_break_cluster_maximum_connections>` 不同的是，连接池永远不会超时，而连接通常会超时。连接会自动清理，而连接池不会。需要注意的是，为了让连接池发挥作用，它至少需要一个上游连接，所以这个值很可能不应该大于 :ref:`集群最大连接数 <arch_overview_circuit_break_cluster_maximum_connections>`。如果这个断路器溢出，集群的 :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` 计数器将递增。
 
+每个断路器的限制是 :ref:`可配置的 <config_cluster_manager_cluster_circuit_breakers>`，并按每个上游集群和每个优先级进行跟踪。这使得分布式系统的不同组件可以独立调整，并有不同的限制。可以通过 :ref:`统计信息 <config_cluster_manager_cluster_stats_circuit_breakers>` 来观察这些断路器的实时状态，包括在断路器打开之前剩余的资源数量。
 
-Each circuit breaking limit is :ref:`configurable <config_cluster_manager_cluster_circuit_breakers>`
-and tracked on a per upstream cluster and per priority basis. This allows different components of
-the distributed system to be tuned independently and have different limits. The live state of these
-circuit breakers, including the number of resources remaining until a circuit breaker opens, can
-be observed via :ref:`statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
+工作线程共享断路器限制，即如果活动连接阈值为 500，工作线程 1 有 498 个活动连接，那么工作线程 2 只能再分配 2 个连接。由于实现最终是一致的，线程之间的竞赛可能会让限制可能超出。
 
-Workers threads share circuit breaker limits, i.e. if the active connection threshold is 500, worker
-thread 1 has 498 connections active, then worker thread 2 can only allocate 2 more connections.
-Since the implementation is eventually consistent, races between threads may allow limits to be
-potentially exceeded.
+断路器是默认启用的，并且有适度的默认值，例如每个集群有 1024 个连接。要禁用断路器，请将其 :ref:`阈值 <faq_disable_circuit_breaking>` 设置为允许的最高值。
 
-Circuit breakers are enabled by default and have modest default values, e.g. 1024 connections per
-cluster. To disable circuit breakers, set the :ref:`thresholds <faq_disable_circuit_breaking>` to
-the highest allowed values.
-
-Note that circuit breaking will cause the :ref:`x-envoy-overloaded
-<config_http_filters_router_x-envoy-overloaded_set>` header to be set by the router filter in the
-case of HTTP requests.
+需要注意的是，在 HTTP 请求中，断路会导致 :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>` 头被路由器过滤器设置。

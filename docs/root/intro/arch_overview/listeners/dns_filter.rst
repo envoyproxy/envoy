@@ -1,11 +1,8 @@
-DNS Filter
+DNS 过滤器
 ==========
 
-Envoy supports responding to DNS requests by configuring a :ref:`UDP listener DNS Filter
-<config_udp_listener_filters_dns_filter>`.
+Envoy 支持通过配置 :ref:`UDP 监听 DNS 过滤器 <config_udp_listener_filters_dns_filter>` 来响应 DNS 请求。
 
-The DNS filter supports responding to forward queries for A and AAAA records. The answers are
-discovered from statically configured resources, clusters, or external DNS servers. The filter
-will return DNS responses up to to 512 bytes. If domains are configured with multiple addresses,
-or clusters with multiple endpoints, Envoy will return each discovered address up to the
-aforementioned size limit.
+DNS 过滤器支持响应对 A 和 AAAA 记录的转发查询。从静态配置的资源、集群或外部 DNS 服务器中找到查询结果。
+过滤器将返回不超过 512 个字节的 DNS 响应。如果为域名配置了多个地址，或者集群的多个端点，Envoy 
+将按照不超过上面提到的最大限制返回查找到的每个地址。

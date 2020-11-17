@@ -1,4 +1,4 @@
-Architecture overview
+架构概览
 =====================
 
 .. toctree::

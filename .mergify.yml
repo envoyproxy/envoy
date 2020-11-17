@@ -2,7 +2,7 @@ pull_request_rules:
   - name: Automatic merge when approved by Jimmy
     conditions:
       - "approved-reviews-by=rootsongjc"
-      - "#approved-reviews-by>=1"
+      - "#approved-reviews-by>=2"
       - base=zh
     actions:
       merge:
@@ -10,15 +10,31 @@ pull_request_rules:
   - name: Automatic merge on approval by xuzhenwen
     conditions:
       - "approved-reviews-by=helight"
-      - "#approved-reviews-by>=1"
+      - "#approved-reviews-by>=2"
       - base=zh
     actions:
       merge:
         method: merge
   - name: Automatic merge when approved by majinghe
     conditions:
-      - "approved-reviews-by=lhb008"
-      - "#approved-reviews-by>=1"
+      - "approved-reviews-by=majinghe"
+      - "#approved-reviews-by>=2"
+      - base=zh
+    actions:
+      merge:
+        method: merge
+  - name: Automatic merge when approved by liujinxin
+    conditions:
+      - "approved-reviews-by=scilla0531"
+      - "#approved-reviews-by>=2"
+      - base=zh
+    actions:
+      merge:
+        method: merge
+  - name: Automatic merge when approved by zhanghaili
+    conditions:
+      - "approved-reviews-by=webup"
+      - "#approved-reviews-by>=2"
       - base=zh
     actions:
       merge:
@@ -26,7 +42,7 @@ pull_request_rules:
   - name: Automatic merge when approved by zhangxiaohui
     conditions:
       - "approved-reviews-by=addozhang"
-      - "#approved-reviews-by>=1"
+      - "#approved-reviews-by>=2"
       - base=zh
     actions:
       merge:

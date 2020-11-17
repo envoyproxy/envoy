@@ -1,16 +1,10 @@
 .. _arch_overview_runtime:
 
-Runtime configuration
+运行时配置
 =====================
 
-Envoy supports “runtime” configuration (also known as "feature flags" and "decider"). Configuration
-settings can be altered that will affect operation without needing to restart Envoy or change the
-primary configuration. The currently supported implementation uses a tree of file system files.
-Envoy watches for a symbolic link swap in a configured directory and reloads the tree when that
-happens. This type of system is very commonly deployed in large distributed systems. Other
-implementations would not be difficult to implement. Supported runtime configuration settings are
-documented in the relevant sections of the operations guide. Envoy will operate correctly with
-default runtime values and a “null” provider so it is not required that such a system exists to run
-Envoy.
-
-Runtime :ref:`configuration <config_runtime>`.
+Envoy 支持“运行时”配置（也称为“功能标志”和“决策器”）。可以通过更改配置影响操作，而无需重新启动 Envoy 或更改主要配置。
+当前支持的实现使用文件系统文件树。Envoy 会观察配置目录中的符号链接交换，并在发生这种情况时重新加载树。
+这种类型的系统通常部署在大型分布式系统中。其他实现也不难实现。
+支持的运行时配置的相关设置在操作指南的相关章节中进行了说明。Envoy 能使用默认的运行时值和“null”提供程序正常运行，因此不需要这样的系统也可以运行 Envoy。
+运行时 :ref:`配置 <config_runtime>` 。
