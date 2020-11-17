@@ -671,11 +671,14 @@ AssertionResult FakeRawConnection::write(const std::string& data, bool end_strea
 
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
                                                             bool end_stream) {
-  absl::MutexLock lock(&parent_.lock_);
-  ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
-  parent_.data_.append(data.toString());
-  parent_.half_closed_ = end_stream;
-  data.drain(data.length());
+  if (auto maybe_parent = parent_.lock(); maybe_parent != nullptr) {
+    FakeRawConnection& parent = maybe_parent->get();
+    absl::MutexLock lock(&parent.lock_);
+    ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
+    parent.data_.append(data.toString());
+    parent.half_closed_ = end_stream;
+    data.drain(data.length());
+  }
   return Network::FilterStatus::StopIteration;
 }
 } // namespace Envoy

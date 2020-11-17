@@ -496,7 +496,7 @@ public:
   testing::AssertionResult initialize() override {
     testing::AssertionResult result =
         shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
-          connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+          connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(proxy_)});
         });
     if (!result) {
       return result;
@@ -520,16 +520,19 @@ public:
   }
 
 private:
+  using WeakReference = std::weak_ptr<std::reference_wrapper<FakeRawConnection>>;
   struct ReadFilter : public Network::ReadFilterBaseImpl {
-    ReadFilter(FakeRawConnection& parent) : parent_(parent) {}
+    ReadFilter(WeakReference parent) : parent_(std::move(parent)) {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override;
 
-    FakeRawConnection& parent_;
+    WeakReference parent_;
   };
 
   std::string data_ ABSL_GUARDED_BY(lock_);
+  std::shared_ptr<std::reference_wrapper<FakeRawConnection>> proxy_{
+      std::make_shared<std::reference_wrapper<FakeRawConnection>>(*this)};
 };
 
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
