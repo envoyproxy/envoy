@@ -83,14 +83,19 @@ message ExternalProcessor {
   // for a reply.
   bool async_mode = 4;
 
-  // For each property name, select a matching property value to attach to the
-  // request message. Property names are the same ones supported in the WebAssembly
-  // runtime.
-  repeated string request_properties = 5;
+  // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
+  // for expressive policies. Each attribute name provided in this field will be
+  // matched against that list and populated in the request_headers message.
+  // See the :ref:`attribute documentation <arch_overview_request_attributes>`
+  // for the list of supported attributes and their types.
+  repeated string request_attributes = 5;
 
-  // For each property name, select a matching property value to attach to the
-  // response message.
-  repeated string response_properties = 6;
+  // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
+  // for expressive policies. Each attribute name provided in this field will be
+  // matched against that list and populated in the response_headers message.
+  // See the :ref:`attribute documentation <arch_overview_response_attributes>`
+  // for the list of supported attributes and their types.
+  repeated string response_attributes = 6;
 
   // Specifies the timeout for each individual message sent on the stream and
   // when the filter is running in synchronous mode. Whenever

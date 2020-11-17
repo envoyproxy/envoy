@@ -163,10 +163,12 @@ message HttpHeaders {
   // lower-cased, because HTTP header keys are case-insensitive.
   config.core.v3.HeaderMap headers = 1;
 
-  // The values of properties selected by the "request_properties"
-  // list in the configuration. Each entry in the map is the
-  // value of the specified property.
-  map<string, google.protobuf.Struct> properties = 2;
+  // The values of properties selected by the "request_attributes"
+  // or "response_attributes" list in the configuration. Each entry
+  // in the list is populated
+  // from the standard :ref:`attributes <arch_overview_attributes>`
+  // supported across Envoy.
+  map<string, google.protobuf.Struct> attributes = 2;
 
   // If true, then there is no message body associated with this
   // request or response.
