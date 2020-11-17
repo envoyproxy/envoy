@@ -41,16 +41,16 @@ struct AbsoluteMinimum {
  * Class that describes how to compute a minimum timeout given a maximum timeout value. It wraps
  * ScaledMinimum and AbsoluteMinimum and provides a single computeMinimum() method.
  */
-class ScaledTimerMinimum : private absl::variant<ScaledMinimum, AbsoluteMinimum> {
+class ScaledTimerMinimum {
 public:
-  // Use base class constructor.
-  using absl::variant<ScaledMinimum, AbsoluteMinimum>::variant;
+  // Forward arguments to impl_'s constructor.
+  template <typename T> constexpr ScaledTimerMinimum(T arg) : impl_(arg) {}
 
   // Computes the minimum value for a given maximum timeout. If this object was constructed with a
   // - ScaledMinimum value:
-  //     the return value is the scale factor applied to the provided maximum.
+  //   the return value is the scale factor applied to the provided maximum.
   // - AbsoluteMinimum:
-  //     the return value is that minimum, and the provided maximum is ignored.
+  //   the return value is that minimum, and the provided maximum is ignored.
   std::chrono::milliseconds computeMinimum(std::chrono::milliseconds maximum) const {
     struct Visitor {
       explicit Visitor(std::chrono::milliseconds value) : value_(value) {}
@@ -63,20 +63,18 @@ public:
       }
       const std::chrono::milliseconds value_;
     };
-    return absl::visit<Visitor, const absl::variant<ScaledMinimum, AbsoluteMinimum>&>(
-        Visitor(maximum), *this);
+    return absl::visit(Visitor(maximum), impl_);
   }
 
-  inline bool operator==(const ScaledTimerMinimum& other) const {
-    using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
-    return static_cast<const Variant&>(*this) == static_cast<const Variant>(other);
-  }
+  inline bool operator==(const ScaledTimerMinimum& other) const { return impl_ == other.impl_; }
 
   inline friend std::ostream& operator<<(std::ostream& output, const ScaledTimerMinimum& minimum) {
-    using Variant = absl::variant<ScaledMinimum, AbsoluteMinimum>;
     return absl::visit([&](const auto& minimum) -> std::ostream& { return output << minimum; },
-                       static_cast<const Variant&>(minimum));
+                       minimum.impl_);
   }
+
+private:
+  absl::variant<ScaledMinimum, AbsoluteMinimum> impl_;
 };
 
 /**
