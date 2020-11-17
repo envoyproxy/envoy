@@ -48,6 +48,16 @@ in_addr addressFromMessage(const cmsghdr& cmsg) {
 #endif
 }
 
+constexpr int messageTruncatedOption() {
+#if defined(__APPLE__)
+  // OSX does not support passing `MSG_TRUNC` to recvmsg and recvmmsg. This does not effect
+  // functionality and it primarily used for logging.
+  return 0;
+#else
+  return MSG_TRUNC;
+#endif
+}
+
 } // namespace
 
 namespace Network {
@@ -296,7 +306,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_flags = 0;
   hdr.msg_control = cbuf.begin();
   hdr.msg_controllen = cmsg_space_;
-  Api::SysCallSizeResult result = Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, MSG_TRUNC);
+  Api::SysCallSizeResult result =
+      Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, messageTruncatedOption());
   if (result.rc_ < 0) {
     return sysCallResultToIoCallResult(result);
   }
@@ -384,8 +395,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   // Set MSG_WAITFORONE so that recvmmsg will not waiting for
   // |num_packets_per_mmsg_call| packets to arrive before returning when the
   // socket is a blocking socket.
-  const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().recvmmsg(
-      fd_, mmsg_hdr.data(), num_packets_per_mmsg_call, MSG_TRUNC | MSG_WAITFORONE, nullptr);
+  const Api::SysCallIntResult result =
+      Api::OsSysCallsSingleton::get().recvmmsg(fd_, mmsg_hdr.data(), num_packets_per_mmsg_call,
+                                               messageTruncatedOption() | MSG_WAITFORONE, nullptr);
 
   if (result.rc_ <= 0) {
     return sysCallResultToIoCallResult(result);
