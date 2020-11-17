@@ -526,9 +526,6 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
   Http::Status status = ConnectionImpl::dispatch(data);
   if (status.ok() && data.length() > 0) {
     // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data

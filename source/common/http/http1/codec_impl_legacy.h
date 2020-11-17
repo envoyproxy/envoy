@@ -234,15 +234,6 @@ protected:
                  const uint32_t max_headers_count,
                  Http::Http1::HeaderKeyFormatterPtr&& header_key_formatter);
 
-  /**
-   * An inner dispatch call that executes the dispatching logic. While exception removal is in
-   * migration (#10878), this function may either throw an exception or return an error status.
-   * Exceptions are caught and translated to their corresponding statuses in the outer level
-   * dispatch.
-   * TODO(#10878): Remove this when exception removal is complete.
-   */
-  Http::Status innerDispatch(Buffer::Instance& data);
-
   bool resetStreamCalled() { return reset_stream_called_; }
   void onMessageBeginBase();
 
@@ -301,6 +292,15 @@ private:
   virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
     return false;
   }
+
+  /**
+   * An inner dispatch call that executes the dispatching logic. While exception removal is in
+   * migration (#10878), this function may either throw an exception or return an error status.
+   * Exceptions are caught and translated to their corresponding statuses in the outer level
+   * dispatch.
+   * TODO(#10878): Remove this when exception removal is complete.
+   */
+  Http::Status innerDispatch(Buffer::Instance& data);
 
   /**
    * Dispatch a memory span.
