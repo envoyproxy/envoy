@@ -8,8 +8,8 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/upstreams/per_host_upstream_config.h"
 #include "test/test_common/registry.h"
+#include "test/integration/fake_upstream.h"
 
-#include "fake_upstream.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -22,18 +22,13 @@ public:
   ClusterUpstreamExtensionIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
-  }
-
-  void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata, const std::string& k1,
-                                const std::string& k2, const std::string& value) {
+  void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata,
+                                const std::string& key1, const std::string& key2,
+                                const std::string& value) {
 
     ProtobufWkt::Struct struct_obj;
-    (*struct_obj.mutable_fields())[k2] = ValueUtil::stringValue(value);
-
-    (*metadata.mutable_filter_metadata())[k1] = struct_obj;
+    (*struct_obj.mutable_fields())[key2] = ValueUtil::stringValue(value);
+    (*metadata.mutable_filter_metadata())[key1] = struct_obj;
   }
 
   void initialize() override {
@@ -57,22 +52,18 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterUpstreamExtensionIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// This test verify that cluster upstream extensions can fulfill the requirement that rewrite http
-// headers after cluster and host is selected. See https://github.com/envoyproxy/envoy/issues/12236
-// This test case should be rewritten once upstream http
-// filters(https://github.com/envoyproxy/envoy/issues/10455) is landed.
+// This test verifies that cluster upstream extensions can fulfill the requirement that they rewrite
+// http headers after cluster and host is selected. See
+// https://github.com/envoyproxy/envoy/issues/12236 This test case should be rewritten once upstream
+// http filters(https://github.com/envoyproxy/envoy/issues/10455) is landed.
 TEST_P(ClusterUpstreamExtensionIntegrationTest,
        VerifyRequestHeadersAreRewrittenByClusterAndHostMetadata) {
   initialize();
   Registry::InjectFactory<Router::GenericConnPoolFactory> registration(per_host_upstream_factory_);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, 0, Http::TestResponseHeaderMapImpl{{":status", "200"}}, 0);
   EXPECT_TRUE(upstream_request_->complete());
 
   {
