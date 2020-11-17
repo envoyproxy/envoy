@@ -44,6 +44,10 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
       proto_config, context.scope(), context.drainDecision(), context.runtime(), context.api()));
 
+  Common::Redis::SupportedCommandsSharedPtr supported_commands =
+      std::make_shared<Common::Redis::SupportedCommands>();
+  supported_commands->addModules(proto_config);
+
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
 
@@ -69,8 +73,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   }
   addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
-  auto redis_command_stats =
-      Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
+  auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
+      context.scope().symbolTable(), supported_commands);
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
@@ -79,13 +83,13 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, context.clusterManager(), Common::Redis::Client::ClientFactoryImpl::instance_,
         context.threadLocal(), proto_config.settings(), context.api(), std::move(stats_scope),
-        redis_command_stats, refresh_manager);
+        redis_command_stats, refresh_manager, supported_commands);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }
 
-  auto router =
-      std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
+  auto router = std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams),
+                                               context.runtime(), supported_commands);
 
   auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(
       context.api().randomGenerator(), context.runtime(), proto_config.faults());
@@ -93,7 +97,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(
           std::move(router), context.scope(), filter_config->stat_prefix_, context.timeSource(),
-          proto_config.latency_in_micros(), std::move(fault_manager));
+          proto_config.latency_in_micros(), std::move(fault_manager), supported_commands);
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(

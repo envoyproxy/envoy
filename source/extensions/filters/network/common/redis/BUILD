@@ -40,6 +40,7 @@ envoy_cc_library(
     hdrs = ["supported_commands.h"],
     deps = [
         "//source/common/common:macros",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
 

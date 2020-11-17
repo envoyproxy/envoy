@@ -63,7 +63,8 @@ public:
           config,
       Api::Api& api, Stats::ScopePtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
-      Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager);
+      Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
+      Common::Redis::SupportedCommandsSharedPtr supported_commands);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, RespVariant&& request,
                                                   PoolCallbacks& callbacks) override;
@@ -178,6 +179,7 @@ private:
     Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
     RedisClusterStats redis_cluster_stats_;
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
+    Common::Redis::SupportedCommandsSharedPtr supported_commands_;
   };
 
   const std::string cluster_name_;
@@ -190,6 +192,7 @@ private:
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   RedisClusterStats redis_cluster_stats_;
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
+  Common::Redis::SupportedCommandsSharedPtr supported_commands_;
 };
 
 } // namespace ConnPool

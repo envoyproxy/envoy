@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -207,6 +207,28 @@ message RedisProxy {
     repeated string commands = 4;
   }
 
+  // RedisModule defines modules with custom commands.
+  // [#next-free-field: 7]
+  message RedisModule {
+    // Name of the module.
+    string name = 1;
+
+    // Simple commands that hash to a single server on the first argument.
+    repeated string simple = 2;
+
+    // mget style commands.
+    repeated string mget = 3;
+
+    // mset style commands.
+    repeated string mset = 4;
+
+    // Commands that are hashed to multiple servers and the response coalesced by summing.
+    repeated string multi_sum = 5;
+
+    // Commands which alter the state of the redis.
+    repeated string write = 6;
+  }
+
   // The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -284,6 +306,24 @@ message RedisProxy {
   // See the :ref:`fault injection section
   // <config_network_filters_redis_proxy_fault_injection>` for more information on how to configure this.
   repeated RedisFault faults = 8;
+
+  // Add routing support to custom redis modules. Specify the additional commands with the type of command
+  // handler it should map to.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //  modules:
+  //  - name: cas
+  //    simple:
+  //    - cas.get
+  //    - cas.set
+  //    mget: cas.mget
+  //    write:
+  //    - cas.set
+  //
+  repeated RedisModule modules = 9;
 
   // If a username is provided an ACL style AUTH command will be required with a username and password.
   // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis

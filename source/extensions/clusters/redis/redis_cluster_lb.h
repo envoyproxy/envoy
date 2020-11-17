@@ -76,13 +76,15 @@ public:
    * @param is_redis_cluster specify whether this is a request for redis cluster, if true the key
    * will be hashed using crc16.
    * @param request specify the Redis request.
+   * @param supported_commands specify the commands supported by the upstream Redis server.
    * @param read_policy specify the read policy.
    */
-  RedisLoadBalancerContextImpl(const std::string& key, bool enabled_hashtagging,
-                               bool is_redis_cluster,
-                               const NetworkFilters::Common::Redis::RespValue& request,
-                               NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
-                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+  RedisLoadBalancerContextImpl(
+      const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
+      const NetworkFilters::Common::Redis::RespValue& request,
+      NetworkFilters::Common::Redis::SupportedCommandsSharedPtr supported_commands,
+      NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
+          NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   // Upstream::LoadBalancerContextBase
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
@@ -95,10 +97,10 @@ public:
 
 private:
   absl::string_view hashtag(absl::string_view v, bool enabled);
-
-  static bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request);
+  bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request);
 
   const absl::optional<uint64_t> hash_key_;
+  NetworkFilters::Common::Redis::SupportedCommandsSharedPtr supported_commands_;
   const bool is_read_;
   const NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
 };

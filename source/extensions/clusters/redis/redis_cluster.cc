@@ -202,7 +202,8 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
       client_factory_(client_factory), buffer_timeout_(0),
       redis_command_stats_(
           NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
-              parent_.info()->statsScope().symbolTable())) {}
+              parent_.info()->statsScope().symbolTable(),
+              std::make_shared<NetworkFilters::Common::Redis::SupportedCommands>())) {}
 
 // Convert the cluster slot IP/Port response to and address, return null if the response
 // does not match the expected type.

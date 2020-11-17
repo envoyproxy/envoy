@@ -28,7 +28,8 @@ class MirrorPolicyImpl : public MirrorPolicy {
 public:
   MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
                        PrefixRoutes::Route::RequestMirrorPolicy&,
-                   const ConnPool::InstanceSharedPtr, Runtime::Loader& runtime);
+                   const ConnPool::InstanceSharedPtr, Runtime::Loader& runtime,
+                   Common::Redis::SupportedCommandsSharedPtr supported_commands);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; };
 
@@ -40,13 +41,15 @@ private:
   const bool exclude_read_commands_;
   ConnPool::InstanceSharedPtr upstream_;
   Runtime::Loader& runtime_;
+  Common::Redis::SupportedCommandsSharedPtr supported_commands_;
 };
 
 class Prefix : public Route {
 public:
   Prefix(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route
              route,
-         Upstreams& upstreams, Runtime::Loader& runtime);
+         Upstreams& upstreams, Runtime::Loader& runtime,
+         Common::Redis::SupportedCommandsSharedPtr supported_commands);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; }
   const MirrorPolicies& mirrorPolicies() const override { return mirror_policies_; };
@@ -66,7 +69,8 @@ class PrefixRoutes : public Router {
 public:
   PrefixRoutes(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes&
                    prefix_routes,
-               Upstreams&& upstreams, Runtime::Loader& runtime);
+               Upstreams&& upstreams, Runtime::Loader& runtime,
+               Common::Redis::SupportedCommandsSharedPtr supported_commands);
 
   RouteSharedPtr upstreamPool(std::string& key) override;
 

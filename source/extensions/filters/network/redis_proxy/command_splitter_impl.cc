@@ -431,30 +431,32 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                            TimeSource& time_source, bool latency_in_micros,
-                           Common::Redis::FaultManagerPtr&& fault_manager)
+                           Common::Redis::FaultManagerPtr&& fault_manager,
+                           Common::Redis::SupportedCommandsSharedPtr supported_commands)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)) {
-  for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
+  for (const std::string& command : supported_commands->simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
 
-  for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
+  for (const std::string& command : supported_commands->evalCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, eval_command_handler_);
   }
 
-  for (const std::string& command :
-       Common::Redis::SupportedCommands::hashMultipleSumResultCommands()) {
+  for (const std::string& command : supported_commands->hashMultipleSumResultCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, split_keys_sum_result_handler_);
   }
 
-  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mget(), latency_in_micros,
-             mget_handler_);
+  for (const std::string& command : supported_commands->mget()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, mget_handler_);
+  }
 
-  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), latency_in_micros,
-             mset_handler_);
+  for (const std::string& command : supported_commands->mset()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, mset_handler_);
+  }
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,

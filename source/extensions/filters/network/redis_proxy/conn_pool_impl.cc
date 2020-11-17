@@ -42,13 +42,14 @@ InstanceImpl::InstanceImpl(
         config,
     Api::Api& api, Stats::ScopePtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
-    Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager)
+    Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
+    Common::Redis::SupportedCommandsSharedPtr supported_commands)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
       stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)) {}
+      refresh_manager_(std::move(refresh_manager)), supported_commands_(supported_commands) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
@@ -89,7 +90,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::shared_ptr<InstanceImpl> par
       is_redis_cluster_(false), client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
-      refresh_manager_(parent->refresh_manager_) {
+      refresh_manager_(parent->refresh_manager_), supported_commands_(parent->supported_commands_) {
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
@@ -256,9 +257,9 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, config_->enableHashtagging(),
-                                                           is_redis_cluster_, getRequest(request),
-                                                           config_->readPolicy());
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
+      key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
+      supported_commands_, config_->readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;

@@ -177,16 +177,18 @@ bool RedisLoadBalancerContextImpl::isReadRequest(
     return false;
   }
   std::string to_lower_string = absl::AsciiStrToLower(command->asString());
-  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(to_lower_string);
+  return supported_commands_->isReadCommand(to_lower_string);
 }
 
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
     const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
     const NetworkFilters::Common::Redis::RespValue& request,
+    NetworkFilters::Common::Redis::SupportedCommandsSharedPtr supported_commands,
     NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
     : hash_key_(is_redis_cluster ? Crc16::crc16(hashtag(key, true))
                                  : MurmurHash::murmurHash2(hashtag(key, enabled_hashtagging))),
-      is_read_(isReadRequest(request)), read_policy_(read_policy) {}
+      supported_commands_(supported_commands), is_read_(isReadRequest(request)),
+      read_policy_(read_policy) {}
 
 // Inspired by the redis-cluster hashtagging algorithm
 // https://redis.io/topics/cluster-spec#keys-hash-tags

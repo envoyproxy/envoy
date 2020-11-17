@@ -3,15 +3,15 @@
 #include "common/stats/timespan_impl.h"
 #include "common/stats/utility.h"
 
-#include "extensions/filters/network/common/redis/supported_commands.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix)
+RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table,
+                                     SupportedCommandsSharedPtr supported_commands,
+                                     const std::string& prefix)
     : symbol_table_(symbol_table), stat_name_set_(symbol_table_.makeSet("Redis")),
       prefix_(stat_name_set_->add(prefix)),
       upstream_rq_time_(stat_name_set_->add("upstream_rq_time")),
@@ -21,16 +21,11 @@ RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std
       unknown_metric_(stat_name_set_->add("unknown")) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
   // Create StatName for each Redis command. Note that we don't include Auth or Ping.
-  stat_name_set_->rememberBuiltins(
-      Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands());
-  stat_name_set_->rememberBuiltins(
-      Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands());
-  stat_name_set_->rememberBuiltins(Extensions::NetworkFilters::Common::Redis::SupportedCommands::
-                                       hashMultipleSumResultCommands());
-  stat_name_set_->rememberBuiltin(
-      Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
-  stat_name_set_->rememberBuiltin(
-      Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
+  stat_name_set_->rememberBuiltins(supported_commands->simpleCommands());
+  stat_name_set_->rememberBuiltins(supported_commands->evalCommands());
+  stat_name_set_->rememberBuiltins(supported_commands->hashMultipleSumResultCommands());
+  stat_name_set_->rememberBuiltins(supported_commands->mget());
+  stat_name_set_->rememberBuiltins(supported_commands->mset());
 }
 
 Stats::TimespanPtr RedisCommandStats::createCommandTimer(Stats::Scope& scope,

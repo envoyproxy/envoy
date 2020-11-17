@@ -81,15 +81,16 @@ public:
       max_upstream_unknown_connections_reached_.value_++;
     }));
 
+    auto supported_commands = std::make_shared<Common::Redis::SupportedCommands>();
     cluster_refresh_manager_ =
         std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
-    auto redis_command_stats =
-        Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
+    auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
+        store->symbolTable(), supported_commands);
     std::shared_ptr<InstanceImpl> conn_pool_impl = std::make_shared<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_),
-        api_, std::move(store), redis_command_stats, cluster_refresh_manager_);
+        api_, std::move(store), redis_command_stats, cluster_refresh_manager_, supported_commands);
     conn_pool_impl->init();
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_ = auth_username_;
@@ -1175,16 +1176,17 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
 TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   cm_.initializeThreadLocalClusters({"fake_cluster"});
   tls_.defer_delete_ = true;
+  auto supported_commands = std::make_shared<Common::Redis::SupportedCommands>();
   std::unique_ptr<NiceMock<Stats::MockStore>> store =
       std::make_unique<NiceMock<Stats::MockStore>>();
   cluster_refresh_manager_ =
       std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
-  auto redis_command_stats =
-      Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
+  auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
+      store->symbolTable(), supported_commands);
   conn_pool_ = std::make_shared<InstanceImpl>(
       cluster_name_, cm_, *this, tls_,
       Common::Redis::Client::createConnPoolSettings(20, true, true, 100, read_policy_), api_,
-      std::move(store), redis_command_stats, cluster_refresh_manager_);
+      std::move(store), redis_command_stats, cluster_refresh_manager_, supported_commands);
   conn_pool_->init();
 
   auto& local_pool = threadLocalPool();

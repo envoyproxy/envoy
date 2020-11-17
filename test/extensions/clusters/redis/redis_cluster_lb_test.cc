@@ -82,6 +82,12 @@ public:
 
 class RedisLoadBalancerContextImplTest : public testing::Test {
 public:
+  RedisLoadBalancerContextImplTest() = default;
+
+  void init() {
+    supported_commands_ = std::make_shared<NetworkFilters::Common::Redis::SupportedCommands>();
+  }
+
   void makeBulkStringArray(NetworkFilters::Common::Redis::RespValue& value,
                            const std::vector<std::string>& strings) {
     std::vector<NetworkFilters::Common::Redis::RespValue> values(strings.size());
@@ -93,6 +99,8 @@ public:
     value.type(NetworkFilters::Common::Redis::RespType::Array);
     value.asArray().swap(values);
   }
+
+  NetworkFilters::Common::Redis::SupportedCommandsSharedPtr supported_commands_;
 };
 
 // Works correctly without any hosts.
@@ -393,8 +401,9 @@ TEST_F(RedisLoadBalancerContextImplTest, Basic) {
   NetworkFilters::Common::Redis::RespValue get_request;
   get_request.type(NetworkFilters::Common::Redis::RespType::Array);
   get_request.asArray().swap(get_foo);
+  init();
 
-  RedisLoadBalancerContextImpl context1("foo", true, true, get_request,
+  RedisLoadBalancerContextImpl context1("foo", true, true, get_request, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
@@ -414,7 +423,7 @@ TEST_F(RedisLoadBalancerContextImplTest, Basic) {
   set_request.type(NetworkFilters::Common::Redis::RespType::Array);
   set_request.asArray().swap(set_foo);
 
-  RedisLoadBalancerContextImpl context2("foo", true, true, set_request,
+  RedisLoadBalancerContextImpl context2("foo", true, true, set_request, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
@@ -435,15 +444,16 @@ TEST_F(RedisLoadBalancerContextImplTest, CompositeArray) {
 
   NetworkFilters::Common::Redis::RespValue get_request1{base, get_command, 1, 1};
   NetworkFilters::Common::Redis::RespValue get_request2{base, get_command, 2, 2};
+  init();
 
-  RedisLoadBalancerContextImpl context1("foo", true, true, get_request1,
+  RedisLoadBalancerContextImpl context1("foo", true, true, get_request1, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
   EXPECT_EQ(true, context1.isReadCommand());
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 
-  RedisLoadBalancerContextImpl context2("bar", true, true, get_request2,
+  RedisLoadBalancerContextImpl context2("bar", true, true, get_request2, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(37829), context2.computeHashKey());
@@ -456,7 +466,7 @@ TEST_F(RedisLoadBalancerContextImplTest, CompositeArray) {
   set_command.asString() = "set";
 
   NetworkFilters::Common::Redis::RespValue set_request{base, set_command, 1, 2};
-  RedisLoadBalancerContextImpl context3("foo", true, true, set_request,
+  RedisLoadBalancerContextImpl context3("foo", true, true, set_request, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context3.computeHashKey());
@@ -475,8 +485,9 @@ TEST_F(RedisLoadBalancerContextImplTest, UpperCaseCommand) {
   NetworkFilters::Common::Redis::RespValue get_request;
   get_request.type(NetworkFilters::Common::Redis::RespType::Array);
   get_request.asArray().swap(get_foo);
+  init();
 
-  RedisLoadBalancerContextImpl context1("foo", true, true, get_request,
+  RedisLoadBalancerContextImpl context1("foo", true, true, get_request, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
@@ -496,7 +507,7 @@ TEST_F(RedisLoadBalancerContextImplTest, UpperCaseCommand) {
   set_request.type(NetworkFilters::Common::Redis::RespType::Array);
   set_request.asArray().swap(set_foo);
 
-  RedisLoadBalancerContextImpl context2("foo", true, true, set_request,
+  RedisLoadBalancerContextImpl context2("foo", true, true, set_request, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
@@ -511,13 +522,14 @@ TEST_F(RedisLoadBalancerContextImplTest, UnsupportedCommand) {
   NetworkFilters::Common::Redis::RespValue unknown_request;
   unknown_request.type(NetworkFilters::Common::Redis::RespType::Array);
   unknown_request.asArray().swap(unknown);
+  init();
 
-  RedisLoadBalancerContextImpl context3("foo", true, true, unknown_request,
+  RedisLoadBalancerContextImpl context1("foo", true, true, unknown_request, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context3.computeHashKey());
-  EXPECT_EQ(false, context3.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context3.readPolicy());
+  EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
+  EXPECT_EQ(false, context1.isReadCommand());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 }
 
 TEST_F(RedisLoadBalancerContextImplTest, EnforceHashTag) {
@@ -532,15 +544,16 @@ TEST_F(RedisLoadBalancerContextImplTest, EnforceHashTag) {
   NetworkFilters::Common::Redis::RespValue set_request;
   set_request.type(NetworkFilters::Common::Redis::RespType::Array);
   set_request.asArray().swap(set_foo);
+  init();
 
   // Enable_hash tagging should be override when is_redis_cluster is true. This is treated like
   // "foo"
-  RedisLoadBalancerContextImpl context2("{foo}bar", false, true, set_request,
+  RedisLoadBalancerContextImpl context1("{foo}bar", false, true, set_request, supported_commands_,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
-  EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
-  EXPECT_EQ(false, context2.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
+  EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
+  EXPECT_EQ(false, context1.isReadCommand());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 }
 
 } // namespace Redis

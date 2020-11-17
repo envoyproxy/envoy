@@ -78,7 +78,8 @@ public:
                          "redis.foo.",
                          time_system_,
                          latency_in_micros_,
-                         std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
+                         std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
+                         std::make_shared<Common::Redis::SupportedCommands>()};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -370,7 +371,7 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
 };
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::ValuesIn(Common::Redis::SupportedCommands().simpleCommands()));
 
 INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                          RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
@@ -982,7 +983,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
 
 INSTANTIATE_TEST_SUITE_P(
     RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
-    testing::ValuesIn(Common::Redis::SupportedCommands::hashMultipleSumResultCommands()));
+    testing::ValuesIn(Common::Redis::SupportedCommands().hashMultipleSumResultCommands()));
 
 class RedisSingleServerRequestWithLatencyMicrosTest : public RedisSingleServerRequestTest {
 public:
@@ -1013,7 +1014,7 @@ TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithLatencyMicrosTest,
                          RedisSingleServerRequestWithLatencyMicrosTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::ValuesIn(Common::Redis::SupportedCommands().simpleCommands()));
 
 // In subclasses of fault test, we mock the expected faults in the constructor, as the
 // fault manager is owned by the splitter, which is also generated later in construction
@@ -1068,7 +1069,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithErrorFaultTest,
                          RedisSingleServerRequestWithErrorFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::ValuesIn(Common::Redis::SupportedCommands().simpleCommands()));
 
 TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
   InSequence s;
@@ -1102,7 +1103,7 @@ TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithErrorWithDelayFaultTest,
                          RedisSingleServerRequestWithErrorWithDelayFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::ValuesIn(Common::Redis::SupportedCommands().simpleCommands()));
 
 class RedisSingleServerRequestWithDelayFaultTest : public RedisSingleServerRequestWithFaultTest {
 public:
@@ -1154,7 +1155,7 @@ TEST_P(RedisSingleServerRequestWithDelayFaultTest, Fault) {
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithDelayFaultTest,
                          RedisSingleServerRequestWithDelayFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::ValuesIn(Common::Redis::SupportedCommands().simpleCommands()));
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

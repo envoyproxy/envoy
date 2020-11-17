@@ -206,6 +206,39 @@ settings:
   cb(connection);
 }
 
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyModulesProto) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+modules:
+- name: cas
+  simple:
+  - cas.get
+  - cas.set
+  mget: cas.mget
+  mset: cas.mset
+  multi_sum: 
+  - cas.del
+  write:
+  - cas.set
+  - cas.del
+settings:
+  op_timeout: 0.02s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  EXPECT_TRUE(factory.isTerminalFilter());
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
 // Test that the deprecated extension name still functions.
 TEST(RedisProxyFilterConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.redis_proxy";

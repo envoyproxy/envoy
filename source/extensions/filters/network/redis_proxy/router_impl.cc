@@ -11,14 +11,15 @@ namespace RedisProxy {
 MirrorPolicyImpl::MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3::
                                        RedisProxy::PrefixRoutes::Route::RequestMirrorPolicy& config,
                                    const ConnPool::InstanceSharedPtr upstream,
-                                   Runtime::Loader& runtime)
+                                   Runtime::Loader& runtime,
+                                   Common::Redis::SupportedCommandsSharedPtr supported_commands)
     : runtime_key_(config.runtime_fraction().runtime_key()),
       default_value_(config.has_runtime_fraction()
                          ? absl::optional<envoy::type::v3::FractionalPercent>(
                                config.runtime_fraction().default_value())
                          : absl::nullopt),
       exclude_read_commands_(config.exclude_read_commands()), upstream_(upstream),
-      runtime_(runtime) {}
+      runtime_(runtime), supported_commands_(supported_commands) {}
 
 bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
   if (!upstream_) {
@@ -27,7 +28,7 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
 
   std::string to_lower_string = absl::AsciiStrToLower(command);
 
-  if (exclude_read_commands_ && Common::Redis::SupportedCommands::isReadCommand(to_lower_string)) {
+  if (exclude_read_commands_ && supported_commands_->isReadCommand(to_lower_string)) {
     return false;
   }
 
@@ -41,21 +42,24 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
 Prefix::Prefix(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route
         route,
-    Upstreams& upstreams, Runtime::Loader& runtime)
+    Upstreams& upstreams, Runtime::Loader& runtime,
+    Common::Redis::SupportedCommandsSharedPtr supported_commands)
     : prefix_(route.prefix()), remove_prefix_(route.remove_prefix()),
       upstream_(upstreams.at(route.cluster())) {
   for (auto const& mirror_policy : route.request_mirror_policy()) {
     mirror_policies_.emplace_back(std::make_shared<MirrorPolicyImpl>(
-        mirror_policy, upstreams.at(mirror_policy.cluster()), runtime));
+        mirror_policy, upstreams.at(mirror_policy.cluster()), runtime, supported_commands));
   }
 }
 
 PrefixRoutes::PrefixRoutes(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes& config,
-    Upstreams&& upstreams, Runtime::Loader& runtime)
+    Upstreams&& upstreams, Runtime::Loader& runtime,
+    Common::Redis::SupportedCommandsSharedPtr supported_commands)
     : case_insensitive_(config.case_insensitive()), upstreams_(std::move(upstreams)),
       catch_all_route_(config.has_catch_all_route()
-                           ? std::make_shared<Prefix>(config.catch_all_route(), upstreams_, runtime)
+                           ? std::make_shared<Prefix>(config.catch_all_route(), upstreams_, runtime,
+                                                      supported_commands)
                            : nullptr) {
 
   for (auto const& route : config.routes()) {
@@ -66,7 +70,8 @@ PrefixRoutes::PrefixRoutes(
     }
 
     auto success = prefix_lookup_table_.add(
-        copy.c_str(), std::make_shared<Prefix>(route, upstreams_, runtime), false);
+        copy.c_str(), std::make_shared<Prefix>(route, upstreams_, runtime, supported_commands),
+        false);
     if (!success) {
       throw EnvoyException(fmt::format("prefix `{}` already exists.", route.prefix()));
     }

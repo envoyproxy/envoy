@@ -9,6 +9,7 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/network/common/redis/codec.h"
+#include "extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,14 +19,17 @@ namespace Redis {
 
 class RedisCommandStats {
 public:
-  RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix);
+  RedisCommandStats(Stats::SymbolTable& symbol_table, SupportedCommandsSharedPtr supported_commands,
+                    const std::string& prefix);
 
   // TODO (@FAYiEKcbD0XFqF2QK2E4viAHg8rMm2VbjYKdjTg): Use Singleton to manage a single
   // RedisCommandStats on the client factory so that it can be used for proxy filter, discovery and
   // health check.
   static std::shared_ptr<RedisCommandStats>
-  createRedisCommandStats(Stats::SymbolTable& symbol_table) {
-    return std::make_shared<Common::Redis::RedisCommandStats>(symbol_table, "upstream_commands");
+  createRedisCommandStats(Stats::SymbolTable& symbol_table,
+                          SupportedCommandsSharedPtr supported_commands) {
+    return std::make_shared<Common::Redis::RedisCommandStats>(symbol_table, supported_commands,
+                                                              "upstream_commands");
   }
 
   Stats::TimespanPtr createCommandTimer(Stats::Scope& scope, Stats::StatName command,
