@@ -22,9 +22,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "per_host_upstream_request_lib",
-    srcs = [
-        "per_host_upstream_request.cc",
-    ],
     hdrs = [
         "per_host_upstream_request.h",
     ],

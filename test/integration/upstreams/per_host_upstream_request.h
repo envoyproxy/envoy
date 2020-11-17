@@ -7,6 +7,7 @@
 #include "envoy/http/protocol.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/host_description.h"
+#include "common/router/router.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/router/upstream_request.h"
@@ -32,40 +33,6 @@ void addHeader(Envoy::Http::RequestHeaderMap& header_map, absl::string_view head
   }
 }
 } // namespace
-class PerHostHttpConnPool : public Router::GenericConnPool,
-                            public Envoy::Http::ConnectionPool::Callbacks {
-public:
-  // GenericConnPool
-  PerHostHttpConnPool(Upstream::ClusterManager& cm, bool is_connect,
-                      const Router::RouteEntry& route_entry,
-                      absl::optional<Envoy::Http::Protocol> downstream_protocol,
-                      Upstream::LoadBalancerContext* ctx) {
-    ASSERT(!is_connect);
-    conn_pool_ = cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(),
-                                           downstream_protocol, ctx);
-  }
-  void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
-  bool cancelAnyPendingStream() override;
-  absl::optional<Envoy::Http::Protocol> protocol() const override;
-
-  // Http::ConnectionPool::Callbacks
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                     absl::string_view transport_failure_reason,
-                     Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo& info) override;
-  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
-
-  bool valid() { return conn_pool_ != nullptr; }
-
-private:
-  // Points to the actual connection pool to create streams from.
-  Envoy::Http::ConnectionPool::Instance* conn_pool_{};
-  // The handle to the upstream request. Non-null if there is pending stream to create.
-  Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
-  Router::GenericConnectionPoolCallbacks* callbacks_{};
-};
 
 class PerHostHttpUpstream : public Router::GenericUpstream {
 public:
@@ -106,6 +73,25 @@ public:
 private:
   Extensions::Upstreams::Http::Http::HttpUpstream sub_upstream_;
   Upstream::HostDescriptionConstSharedPtr host_;
+};
+
+class PerHostHttpConnPool : public Extensions::Upstreams::Http::Http::HttpConnPool {
+public:
+  PerHostHttpConnPool(Upstream::ClusterManager& cm, bool is_connect,
+                      const Router::RouteEntry& route_entry,
+                      absl::optional<Envoy::Http::Protocol> downstream_protocol,
+                      Upstream::LoadBalancerContext* ctx)
+      : HttpConnPool(cm, is_connect, route_entry, downstream_protocol, ctx) {}
+
+  void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
+                   Upstream::HostDescriptionConstSharedPtr host,
+                   const StreamInfo::StreamInfo& info) override {
+    conn_pool_stream_handle_ = nullptr;
+    auto upstream = std::make_unique<PerHostHttpUpstream>(callbacks_->upstreamToDownstream(),
+                                                          &callbacks_encoder, host);
+    callbacks_->onPoolReady(std::move(upstream), host,
+                            callbacks_encoder.getStream().connectionLocalAddress(), info);
+  }
 };
 
 } // namespace Envoy
