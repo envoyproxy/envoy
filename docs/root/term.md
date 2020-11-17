@@ -11,6 +11,8 @@
 
 - listener：监听器
 - filter: 过滤器
+- network filter: 网络层过滤器
+- HTTP filter: HTTP 过滤器
 - application：应用/应用程序
 - architecture：架构
 - authentication：认证
@@ -53,7 +55,9 @@
 - policy：策略
 - prerequisites：前提条件
 - proxy：代理
-- rate limiting：速率限制
+- rate limiting：限流
+- global rate limiting: 全局限流
+- local rate limiting: 本地限流 
 - remote：远程
 - resilience：弹性
 - retry quota/budget：重试配额/预算
@@ -94,4 +98,8 @@
 - TLS / mTLS
 - Virtual service
 - webhook
+- Ingress
+- Engress
+- session
+
 
