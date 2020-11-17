@@ -22,7 +22,6 @@ envoy_cc_library(
         "wasm_runtime_factory.h",
     ],
     deps = [
-        "//source/common/common:macros",
         "@proxy_wasm_cpp_host//:include",
     ],
 )

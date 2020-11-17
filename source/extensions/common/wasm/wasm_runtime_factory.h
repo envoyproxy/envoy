@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/common/macros.h"
+#include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
 #include "include/proxy-wasm/wasm_vm.h"
