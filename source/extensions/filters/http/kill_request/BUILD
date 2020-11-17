@@ -22,7 +22,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/extensions/filters/common/fault:fault_config_lib",
         "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 

@@ -17,21 +17,18 @@ bool KillRequestFilter::IsKillRequestEnabled() {
     denominator = 1000000.0;
   }
 
-  return random_generator_.bernoulli(
-      static_cast<float>(kill_request_.probability().numerator()) /
-      denominator);
+  return random_generator_.bernoulli(static_cast<float>(kill_request_.probability().numerator()) /
+                                     denominator);
 }
 
-Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(
-    Http::RequestHeaderMap& headers, bool) {
+Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto kill_request_header =
       headers.get(Filters::Common::Fault::HeaderNames::get().KillRequest);
   bool is_kill_request = false;
   // This is an implicitly untrusted header, so per the API documentation only
   // the first value is used.
   if (kill_request_header.empty() ||
-      !absl::SimpleAtob(kill_request_header[0]->value().getStringView(),
-                        &is_kill_request)) {
+      !absl::SimpleAtob(kill_request_header[0]->value().getStringView(), &is_kill_request)) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -43,7 +40,7 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(
   return Http::FilterHeadersStatus::Continue;
 }
 
-}  // namespace KillRequest
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace KillRequest
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

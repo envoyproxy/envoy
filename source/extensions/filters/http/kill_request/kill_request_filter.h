@@ -17,12 +17,10 @@ namespace KillRequest {
  * incoming request contains HTTP header "x-envoy-kill-request" with values in
  * one of (case-insensitive) ["true", "t", "yes", "y", "1"].
  */
-class KillRequestFilter : public Http::StreamFilter,
-                          Logger::Loggable<Logger::Id::filter> {
- public:
+class KillRequestFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
+public:
   KillRequestFilter(
-      const envoy::extensions::filters::http::kill_request::v3::KillRequest&
-          kill_request,
+      const envoy::extensions::filters::http::kill_request::v3::KillRequest& kill_request,
       Random::RandomGenerator& random_generator)
       : kill_request_(kill_request), random_generator_(random_generator) {}
 
@@ -35,37 +33,30 @@ class KillRequestFilter : public Http::StreamFilter,
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
-  Http::FilterDataStatus decodeData(Buffer::Instance& data,
-                                    bool end_stream) override {
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(
-      Http::RequestTrailerMap& trailers) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override {
     return Http::FilterTrailersStatus::Continue;
   }
 
-  void setDecoderFilterCallbacks(
-      Http::StreamDecoderFilterCallbacks& callbacks) override {}
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {}
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(
-      Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&,
-                                          bool) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterDataStatus encodeData(Buffer::Instance& data,
-                                    bool end_stream) override {
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus encodeTrailers(
-      Http::ResponseTrailerMap&) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
 
@@ -73,20 +64,18 @@ class KillRequestFilter : public Http::StreamFilter,
     return Http::FilterMetadataStatus::Continue;
   }
 
-  void setEncoderFilterCallbacks(
-      Http::StreamEncoderFilterCallbacks& callbacks) override {}
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {}
 
- private:
+private:
   // Return a random boolean value, with probability configured in KillRequest
   // equaling true.
   bool IsKillRequestEnabled();
 
-  const envoy::extensions::filters::http::kill_request::v3::KillRequest
-      kill_request_;
+  const envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request_;
   Random::RandomGenerator& random_generator_;
 };
 
-}  // namespace KillRequest
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace KillRequest
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
