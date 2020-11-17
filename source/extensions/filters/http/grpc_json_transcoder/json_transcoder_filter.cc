@@ -188,6 +188,24 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
   }
 
+  switch (proto_config.url_unescape_spec()) {
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS_EXCEPT_RESERVED:
+    pmb.SetUrlUnescapeSpec(
+        google::grpc::transcoding::UrlUnescapeSpec::kAllCharactersExceptReserved);
+    break;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS_EXCEPT_SLASH:
+    pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharactersExceptSlash);
+    break;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS:
+    pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharacters);
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
   path_matcher_ = pmb.Build();
 
   const auto& print_config = proto_config.print_options();
