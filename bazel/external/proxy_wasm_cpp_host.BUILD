@@ -75,6 +75,7 @@ cc_library(
 cc_library(
     name = "wasmtime_lib",
     srcs = glob([
+        "src/wasmtime/*.h",
         "src/wasmtime/*.cc",
     ]),
     deps = [

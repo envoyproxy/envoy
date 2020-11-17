@@ -1,7 +1,6 @@
 #pragma once
 
-#include <string_view>
-
+#include "absl/strings/string_view.h"
 #include "include/proxy-wasm/wasm_vm.h"
 
 namespace Envoy {
