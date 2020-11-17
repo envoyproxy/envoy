@@ -37,21 +37,23 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
- public:
-    ProtocolOptionsConfigImpl(
-                    const envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions& options);
-    // Constructor for legacy (deprecated) config.
-    ProtocolOptionsConfigImpl(const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
-                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                            const envoy::config::core::v3::HttpProtocolOptions& common_options,
-                            const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
-                            bool use_alpn, bool use_downstream_protocol, bool use_http2);
+public:
+  ProtocolOptionsConfigImpl(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions&
+          options);
+  // Constructor for legacy (deprecated) config.
+  ProtocolOptionsConfigImpl(
+      const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
+      const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+      const envoy::config::core::v3::HttpProtocolOptions& common_options,
+      const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
+      bool use_alpn, bool use_downstream_protocol, bool use_http2);
 
   const Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
-            upstream_http_protocol_options_;
+      upstream_http_protocol_options_;
 
   bool use_alpn_{};
   bool use_downstream_protocol_{};
@@ -77,11 +79,11 @@ private:
       Server::Configuration::FactoryContext& context) override;
 
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
-      const envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions& proto_config,
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions&
+          proto_config,
       Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
-
 };
 
 DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);

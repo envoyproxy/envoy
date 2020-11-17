@@ -187,11 +187,12 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
 
 TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
-    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_common_http_protocol_options()
+        ->mutable_max_stream_duration()
+        ->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
 
   initialize();
@@ -378,10 +379,11 @@ TEST_P(TcpTunnelingIntegrationTest, Basic) {
 // to tunnel the data.
 TEST_P(TcpTunnelingIntegrationTest, InvalidCluster) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    bootstrap.mutable_static_resources()
-        ->mutable_clusters()
-        ->Mutable(0)
-        ->clear_http2_protocol_options();
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    (*cluster->mutable_typed_extension_protocol_options())
+        ["envoy.filters.network.http_connection_manager"]
+            .PackFrom(protocol_options);
   });
   initialize();
 

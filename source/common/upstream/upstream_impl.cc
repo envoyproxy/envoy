@@ -76,8 +76,9 @@ getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
   return nullptr;
 }
 
-uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config,
-                       std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
+uint64_t
+parseFeatures(const envoy::config::cluster::v3::Cluster& config,
+              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
   uint64_t features = 0;
 
   if (options) {
@@ -94,7 +95,8 @@ uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config,
     if (config.has_http2_protocol_options()) {
       features |= ClusterInfoImpl::Features::HTTP2;
     }
-    if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
+    if (config.protocol_selection() ==
+        envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
       features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
     } else {
       if (config.has_http2_protocol_options() && config.has_http_protocol_options()) {
@@ -696,17 +698,16 @@ const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> crea
   if (options) {
     return std::move(options);
   }
-  return  std::make_shared<ClusterInfoImpl::HttpProtocolOptionsConfigImpl>(
-     config.http_protocol_options(),
-     config.http2_protocol_options(),
-     config.common_http_protocol_options(),
-     (config.has_upstream_http_protocol_options()
-      ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
-             config.upstream_http_protocol_options())
-      : absl::nullopt),
-     config.has_http2_protocol_options() && config.has_http_protocol_options(),
-     config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-     config.has_http2_protocol_options());
+  return std::make_shared<ClusterInfoImpl::HttpProtocolOptionsConfigImpl>(
+      config.http_protocol_options(), config.http2_protocol_options(),
+      config.common_http_protocol_options(),
+      (config.has_upstream_http_protocol_options()
+           ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
+                 config.upstream_http_protocol_options())
+           : absl::nullopt),
+      config.has_http2_protocol_options() && config.has_http_protocol_options(),
+      config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
+      config.has_http2_protocol_options());
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
@@ -716,7 +717,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
-      http_protocol_options_(createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>("envoy.filters.network.http_connection_manager"))),
+      http_protocol_options_(
+          createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
+                                    "envoy.filters.network.http_connection_manager"))),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -819,8 +822,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   if (http_protocol_options_->common_http_protocol_options_.has_idle_timeout()) {
-    idle_timeout_ = std::chrono::milliseconds(
-        DurationUtil::durationToMilliseconds(http_protocol_options_->common_http_protocol_options_.idle_timeout()));
+    idle_timeout_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        http_protocol_options_->common_http_protocol_options_.idle_timeout()));
     if (idle_timeout_.value().count() == 0) {
       idle_timeout_ = absl::nullopt;
     }

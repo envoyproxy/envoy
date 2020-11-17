@@ -22,7 +22,8 @@ namespace NetworkFilters {
 namespace SniDynamicForwardProxy {
 namespace {
 
-using LoadDnsCacheEntryStatus = Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
+using LoadDnsCacheEntryStatus =
+    Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 using MockLoadDnsCacheEntryResult =
     Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult;
 

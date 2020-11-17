@@ -263,6 +263,12 @@ public:
   // Set new codecs to use for upstream and downstream codecs.
   void setNewCodecs();
 
+  using HttpProtocolOptions =
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions;
+  static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
+                                 HttpProtocolOptions& protocol_options);
+  static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
+
 private:
   static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
     return api_version == envoy::config::core::v3::ApiVersion::V2;

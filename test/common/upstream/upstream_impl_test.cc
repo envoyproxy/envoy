@@ -2549,7 +2549,6 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
   EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
 
-
   const std::string explicit_timeout = R"EOF(
     common_http_protocol_options:
       idle_timeout: 1s
@@ -2586,15 +2585,15 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
           idle_timeout: 0s
   )EOF";
 
- {
-  auto cluster3 = makeCluster(yaml + no_timeout);
-  EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
- }
+  {
+    auto cluster3 = makeCluster(yaml + no_timeout);
+    EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+  }
 
- {
-  auto cluster3 = makeCluster(yaml + no_timeout_new);
-  EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
- }
+  {
+    auto cluster3 = makeCluster(yaml + no_timeout_new);
+    EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+  }
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {

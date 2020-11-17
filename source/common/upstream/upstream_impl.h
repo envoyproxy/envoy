@@ -52,9 +52,9 @@
 #include "common/upstream/resource_manager_impl.h"
 #include "common/upstream/transport_socket_match_impl.h"
 
-#include "extensions/filters/network/http_connection_manager/config.h"
-
 #include "server/transport_socket_config_impl.h"
+
+#include "extensions/filters/network/http_connection_manager/config.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
@@ -515,7 +515,8 @@ private:
  */
 class ClusterInfoImpl : public ClusterInfo, protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  using HttpProtocolOptionsConfigImpl = Envoy::Extensions::NetworkFilters::HttpConnectionManager::ProtocolOptionsConfigImpl;
+  using HttpProtocolOptionsConfigImpl =
+      Envoy::Extensions::NetworkFilters::HttpConnectionManager::ProtocolOptionsConfigImpl;
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
@@ -544,7 +545,9 @@ public:
     return per_connection_buffer_limit_bytes_;
   }
   uint64_t features() const override { return features_; }
-  const Http::Http1Settings& http1Settings() const override { return http_protocol_options_->http1_settings_; }
+  const Http::Http1Settings& http1Settings() const override {
+    return http_protocol_options_->http1_settings_;
+  }
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
     return http_protocol_options_->http2_options_;
   }

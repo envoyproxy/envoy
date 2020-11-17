@@ -96,8 +96,7 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
-ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
-                                         Upstream::Host::CreateConnectionData& data)
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data)
     : Envoy::Http::ActiveClient(
           parent, parent.host()->cluster().maxRequestsPerConnection(),
           1, // HTTP1 always has a concurrent-request-limit of 1 per connection.
