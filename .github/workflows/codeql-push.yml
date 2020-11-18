@@ -59,7 +59,7 @@ jobs:
     - name: Clean Artifacts
       run: |
         git clean -xdf
-
+       
     - name: Perform CodeQL Analysis
       if: env.BUILD_TARGETS != ''
       uses: github/codeql-action/analyze@v1
