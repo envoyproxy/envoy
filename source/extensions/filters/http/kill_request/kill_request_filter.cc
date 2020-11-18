@@ -1,5 +1,7 @@
 #include "extensions/filters/http/kill_request/kill_request_filter.h"
 
+#include <csignal>
+
 #include "extensions/filters/common/fault/fault_config.h"
 
 namespace Envoy {
