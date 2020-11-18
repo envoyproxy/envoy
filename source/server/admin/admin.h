@@ -258,7 +258,8 @@ private:
       Event::TimerPtr createScaledTimer(OverloadTimerType, Event::TimerCb callback) override {
         return dispatcher_.createTimer(callback);
       }
-      Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum, Event::TimerCb callback) override {
+      Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum,
+                                        Event::TimerCb callback) override {
         return dispatcher_.createTimer(callback);
       }
 
