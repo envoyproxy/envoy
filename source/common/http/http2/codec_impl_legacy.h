@@ -105,7 +105,7 @@ public:
   void goAway() override;
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
-  void protocolError(); // Used in tests to simulate errors.
+  void protocolErrorForTest(); // Used in tests to simulate errors.
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {

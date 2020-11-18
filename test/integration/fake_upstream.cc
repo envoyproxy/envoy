@@ -344,13 +344,13 @@ void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
   ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", code);
 }
 
-void FakeHttpConnection::raiseGoAway() {
+void FakeHttpConnection::encodeGoAway() {
   ASSERT(type_ == Type::HTTP2);
 
-  codec_->goAway();
+  shared_connection_.connection().dispatcher().post([this]() { codec_->goAway(); });
 }
 
-void FakeHttpConnection::raiseProtocolError() {
+void FakeHttpConnection::encodeProtocolError() {
   ASSERT(type_ == Type::HTTP2);
 
   Http::Legacy::Http2::ServerConnectionImpl* codec =
@@ -358,7 +358,7 @@ void FakeHttpConnection::raiseProtocolError() {
 
   ASSERT(codec != nullptr);
 
-  codec->protocolError();
+  shared_connection_.connection().dispatcher().post([codec]() { codec->protocolErrorForTest(); });
 }
 
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {

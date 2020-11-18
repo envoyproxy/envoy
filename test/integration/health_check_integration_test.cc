@@ -267,12 +267,32 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
 
   // Send a GOAWAY with NO_ERROR and then a 200. The health checker should allow the request
   // to finish despite the GOAWAY.
-  clusters_[cluster_idx].host_fake_connection_->raiseGoAway();
+  clusters_[cluster_idx].host_fake_connection_->encodeGoAway();
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  // Advance time to cause another health check.
+  timeSystem().advanceTimeWait(std::chrono::seconds(1));
+
+  ASSERT_TRUE(clusters_[cluster_idx].host_upstream_->waitForHttpConnection(
+      *dispatcher_, clusters_[cluster_idx].host_fake_connection_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+            clusters_[cluster_idx].name_);
+
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
@@ -290,9 +310,8 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayErrorAndReset) {
 
   // Send a GOAWAY with an error. The health checker should treat this as an
   // error and cancel the request.
-  clusters_[cluster_idx].host_fake_connection_->raiseProtocolError();
-  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect(
-      std::chrono::milliseconds(1000)));
+  clusters_[cluster_idx].host_fake_connection_->encodeProtocolError();
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
