@@ -696,8 +696,6 @@ void ConnectionImpl::protocolError() {
                                  nghttp2_session_get_last_proc_stream_id(session_),
                                  NGHTTP2_PROTOCOL_ERROR, nullptr, 0);
   ASSERT(rc == 0);
-
-  // sendPendingFrames();
 }
 
 int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
