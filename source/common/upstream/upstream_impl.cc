@@ -698,6 +698,7 @@ const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> crea
   if (options) {
     return std::move(options);
   }
+  bool use_downstream_protocol = config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL;
   return std::make_shared<ClusterInfoImpl::HttpProtocolOptionsConfigImpl>(
       config.http_protocol_options(), config.http2_protocol_options(),
       config.common_http_protocol_options(),
@@ -705,9 +706,8 @@ const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> crea
            ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
                  config.upstream_http_protocol_options())
            : absl::nullopt),
-      config.has_http2_protocol_options() && config.has_http_protocol_options(),
-      config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-      config.has_http2_protocol_options());
+      config.has_http2_protocol_options() && config.has_http_protocol_options() && (!use_downstream_protocol),
+      use_downstream_protocol, config.has_http2_protocol_options());
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
@@ -926,11 +926,19 @@ ClusterImplBase::ClusterImplBase(
           factory_context.singletonManager(), factory_context.dispatcher())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
+  auto* raw_factory_pointer = socket_factory.get();
+
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
                                             runtime, std::move(socket_matcher),
                                             std::move(stats_scope), added_via_api, factory_context);
+
+  if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) && !raw_factory_pointer->supportsAlpn()) {
+    throw EnvoyException(fmt::format("ALPN configured for a cluster which has a non-ALPN transport socket: {}",
+                                     cluster.DebugString()));
+  }
+
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);

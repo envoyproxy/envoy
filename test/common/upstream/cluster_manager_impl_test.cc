@@ -4,6 +4,9 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/network/raw_buffer_socket.h"
+#include "extensions/transport_sockets/raw_buffer/config.h"
+
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
@@ -156,6 +159,24 @@ static_resources:
   return parseBootstrapFromV3Yaml(yaml);
 }
 
+class AlpnSocketFactory : public Network::RawBufferSocketFactory {
+public:
+  bool supportsAlpn() const override { return true; }
+};
+
+class AlpnTestConfigFactory : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
+public:
+  std::string name() const override { return "envoy.transport_sockets.alpn"; }
+  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+      const Protobuf::Message&,
+      Server::Configuration::TransportSocketFactoryContext&) override {
+    return std::make_unique<AlpnSocketFactory>();
+  }
+};
+
+REGISTER_FACTORY(AlpnTestConfigFactory,
+Server::Configuration::UpstreamTransportSocketConfigFactory);
+
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -165,6 +186,8 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
       http_protocol_options: {}
+      transport_socket:
+        name: envoy.transport_sockets.alpn
   )EOF";
   create(parseBootstrapFromV3Yaml(yaml));
 }
