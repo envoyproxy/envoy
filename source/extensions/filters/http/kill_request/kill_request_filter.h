@@ -24,7 +24,7 @@ public:
 using KillRequestHeaders = ConstSingleton<KillRequestHeaderNameValues>;
 
 /**
- * A filter that will crash Envoy if IsKillRequestEnabled() returns true and
+ * A filter that will crash Envoy if IsKillRequestEnabled() return true and
  * incoming request contains HTTP KillRequest header with values in
  * one of (case-insensitive) ["true", "t", "yes", "y", "1"].
  */
