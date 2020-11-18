@@ -105,20 +105,21 @@ An example set up proxying SMTP would look something like this:
 
 [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
 
-Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
-If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1`
-and `bazel-bin/source/exe/envoy-static --config-path  configs/terminate_connect.yaml`
-you will be running two Envoys, the first listening for TCP traffic on port 10000 and encapsulating it in an HTTP/2
-CONNECT request, and the second listening for HTTP/2 on 10001, stripping the CONNECT headers, and forwarding the
-original TCP upstream, in this case to google.com.
-
 HTTP/1.1 CONNECT can be used to have TCP client connecting to its own
-destination passing through an HTTP proxy server (e.g. corporate proxy):
+destination passing through an HTTP proxy server (e.g. corporate proxy not
+supporting HTTP/2):
 
-[HTTP Server] --- raw HTTP --- [Upstream HTTP Proxy]  --- HTTP tunneled over HTTP/1.1  --- [Envoy]  --- raw HTTP  --- [HTTP Client]
+[HTTP Server] --- raw HTTP --- [L2 Envoy]  --- HTTP tunneled over HTTP/1.1  --- [L1 Envoy]  --- raw HTTP  --- [HTTP Client]
+
+Note that when using HTTP/1 CONNECT you will end up having a TCP connection
+bewteen L1 and L2 Envoy for each TCP client connection, it is preferable to use
+HTTP/2 when you have the choice.
 
 Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
-If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
-you will be running Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP/1.1
-CONNECT addressed to an HTTP proxy running on localhost and listenig on port
-10001, having as a final destination host.com on port 443.
+For HTTP/1.1 run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
+and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http1_connect.yaml`.
+For HTTP/2 run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1`
+and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_connect.yaml`.
+In both cases you will be running a first Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP
+CONNECT request, and a second one listening on 1001, stripping the CONNECT headers, and forwarding the 
+original TCP upstream, in this case to google.com.
