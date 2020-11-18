@@ -13,6 +13,16 @@ envoy_mobile_kt_test(
 )
 
 envoy_mobile_kt_test(
+    name = "envoy_native_resource_registry_test",
+    srcs = [
+        "EnvoyNativeResourceRegistryTest.kt",
+    ],
+    deps = [
+        "//library/java/src/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+    ],
+)
+
+envoy_mobile_kt_test(
     name = "jvm_bridge_utility_test",
     srcs = [
         "JvmBridgeUtilityTest.kt",
