@@ -526,6 +526,16 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
       [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
 }
 
+Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
+  Http::Status status = ConnectionImpl::dispatch(data);
+  if (status.ok() && data.length() > 0) {
+    // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
+    // after a response is complete indicates an error.
+    return codecProtocolError("http/1.1 protocol error: extraneous data after response complete");
+  }
+  return status;
+}
+
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   ASSERT(buffered_body_.length() == 0);

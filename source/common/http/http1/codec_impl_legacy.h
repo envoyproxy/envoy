@@ -555,6 +555,7 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

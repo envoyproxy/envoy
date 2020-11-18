@@ -138,6 +138,10 @@ void CodecClient::onData(Buffer::Instance& data) {
       host_->cluster().stats().upstream_cx_protocol_error_.inc();
     }
   }
+
+  // All data should be consumed at this point if the connection remains open.
+  ASSERT(data.length() == 0 || connection_->state() != Network::Connection::State::Open,
+         absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
