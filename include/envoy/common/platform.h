@@ -152,10 +152,7 @@ struct msghdr {
 #define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
 
-#define ENVOY_SIGINIT CTRL_C_EVENT
-#define ENVOY_SIGTERM CTRL_CLOSE_EVENT
-#define ENVOY_SIGUSR1 -1
-#define ENVOY_SIGHUP -1
+#define ENVOY_WIN32_SIGTERM 1
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"NUL"};
@@ -251,11 +248,6 @@ typedef int signal_t;           // NOLINT(modernize-use-using)
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES
 #define HANDLE_ERROR_INVALID EBADF
-
-#define ENVOY_SIGTERM SIGTERM
-#define ENVOY_SIGINIT SIGINT
-#define ENVOY_SIGUSR1 SIGUSR1
-#define ENVOY_SIGHUP SIGHUP
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"/dev/null"};

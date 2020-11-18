@@ -4,7 +4,6 @@ load(
     "envoy_package",
     "envoy_sh_test",
 )
-load("@rules_python//python:defs.bzl", "@rules_python//python/runfiles", "py_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -83,16 +82,23 @@ envoy_cc_test(
     ],
 )
 
-py_test(
-    name = "outofproc_main_test",
-    srcs = [
-        "outofproc_main_test.py",
-    ],
+# Due to the limitiations of how Windows signals work
+# this test cannot be executed through bazel and it must
+# be executed as a standalone executable.
+# e.g.: `./bazel-bin/test/exe/win32_outofproc_main_test.exe`
+envoy_cc_test(
+    name = "win32_outofproc_main_test",
+    srcs = ["win32_outofproc_main_test.cc"],
+    tags = ["manual"],
     data = [
         "//source/exe:envoy-static",
-        "//test/config/integration:google_com_proxy_port_0",
-        "@rules_python//python/runfiles",
+        "//test/config/integration:google_com_proxy_port_0"
     ],
-    python_version = "PY3",
-    srcs_version = "PY3",
+    deps = [
+        "//source/common/api:api_lib",
+        "//source/exe:main_common_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:contention_lib",
+        "//test/test_common:environment_lib",
+    ],
 )
