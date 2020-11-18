@@ -107,9 +107,7 @@ public:
    *
    * @return the transferred storage.
    */
-  T* releasePointer() {
-    return this->release().release();
-  }
+  T* releasePointer() { return this->release().release(); }
 
   /**
    * @return the populated data as an absl::Span.
