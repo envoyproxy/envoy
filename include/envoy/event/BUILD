@@ -46,6 +46,7 @@ envoy_cc_library(
     hdrs = ["scaled_range_timer_manager.h"],
     deps = [
         ":timer_interface",
+        "//source/common/common:interval_value",
     ],
 )
 

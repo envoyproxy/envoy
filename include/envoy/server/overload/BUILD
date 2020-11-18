@@ -25,5 +25,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:timer_interface",
         "//include/envoy/thread_local:thread_local_object",
+        "//source/common/common:interval_value",
     ],
 )
