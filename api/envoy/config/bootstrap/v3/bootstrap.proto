@@ -40,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -174,6 +174,8 @@ message Bootstrap {
     lt {seconds: 300}
     gte {nanos: 1000000}
   }];
+
+  bool merge_histograms_on_admin_access = 28;
 
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
