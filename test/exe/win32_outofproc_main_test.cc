@@ -41,14 +41,14 @@ protected:
     ENVOY_LOG_MISC(warn, commandLine);
     BOOL bSuccess = CreateProcessA(NULL,
                                    const_cast<char*>(commandLine.c_str()), // command line
-                                   NULL,          // process security attributes
-                                   NULL,          // primary thread security attributes
-                                   1,             // handles are inherited
-                                   CREATE_NEW_PROCESS_GROUP,             // creation flags
-                                   NULL,          // use parent's environment
-                                   NULL,          // use parent's current directory
-                                   &siStartInfo,  // STARTUPINFO pointer
-                                   &piProcInfo_); // receives PROCESS_INFORMATION
+                                   NULL,                     // process security attributes
+                                   NULL,                     // primary thread security attributes
+                                   1,                        // handles are inherited
+                                   CREATE_NEW_PROCESS_GROUP, // creation flags
+                                   NULL,                     // use parent's environment
+                                   NULL,                     // use parent's current directory
+                                   &siStartInfo,             // `STARTUPINFO` pointer
+                                   &piProcInfo_);            // receives `PROCESS_INFORMATION`
     EXPECT_TRUE(bSuccess) << fmt::format("Failed to create Envoy process, error {}",
                                          GetLastError());
   }

@@ -89,11 +89,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "win32_outofproc_main_test",
     srcs = ["win32_outofproc_main_test.cc"],
-    tags = ["manual"],
     data = [
         "//source/exe:envoy-static",
-        "//test/config/integration:google_com_proxy_port_0"
+        "//test/config/integration:google_com_proxy_port_0",
     ],
+    tags = ["manual"],
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:main_common_lib",

@@ -18,7 +18,7 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
     return 0;
   }
   shutdown_pending = true;
-  
+
   auto eventBridgeHandlers = Event::eventBridgeHandlersSingleton::get();
   auto handler_it = eventBridgeHandlers.find(ENVOY_WIN32_SIGTERM);
   if (handler_it == eventBridgeHandlers.end() || !handler_it->second) {
@@ -30,9 +30,9 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   auto result = handler_it->second->write(buffer);
   RELEASE_ASSERT(result.rc_ == 1,
                  fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
-  
-  if (fdwCtrlType == CTRL_LOGOFF_EVENT || fdwCtrlType == CTRL_SHUTDOWN_EVENT ) {
-    // These events terminate the process immediatelly so we want to give a couple of seconds
+
+  if (fdwCtrlType == CTRL_LOGOFF_EVENT || fdwCtrlType == CTRL_SHUTDOWN_EVENT) {
+    // These events terminate the process immediately so we want to give a couple of seconds
     // to the dispatcher to shutdown the server.
     constexpr size_t delay = 3;
     std::chrono::seconds sec(delay);
