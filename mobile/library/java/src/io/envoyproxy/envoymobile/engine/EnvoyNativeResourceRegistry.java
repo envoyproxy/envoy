@@ -13,7 +13,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyNativeResourceWrapper;
  * unreachable by the garbage collector.
  */
 public enum EnvoyNativeResourceRegistry {
-  SINGLETON;
+  SINGLETON();
 
   // References are automatically enqueued when the gc flags them as unreachable.
   private ReferenceQueue<EnvoyNativeResourceWrapper> refQueue;
@@ -47,13 +47,16 @@ public enum EnvoyNativeResourceRegistry {
       super(owner, refQueue);
       this.nativeHandle = nativeHandle;
       this.releaser = releaser;
-      refQueue = new ReferenceQueue<>();
-      refQueueThread = new RefQueueThread();
-      refMaintainer = new ConcurrentHashMap().newKeySet();
-      refQueueThread.start();
     }
 
     void releaseResource() { releaser.release(nativeHandle); }
+  }
+
+  private EnvoyNativeResourceRegistry() {
+    refQueue = new ReferenceQueue<>();
+    refQueueThread = new RefQueueThread();
+    refMaintainer = new ConcurrentHashMap().newKeySet();
+    refQueueThread.start();
   }
 
   /**
