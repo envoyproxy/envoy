@@ -53,9 +53,6 @@
 #include "server/listener_hooks.h"
 #include "server/ssl_context_manager.h"
 
-namespace {
-constexpr bool platformSupportsSignal(signal_t signal_num) { return signal_num != -1; }
-} // namespace
 namespace Envoy {
 namespace Server {
 
@@ -623,22 +620,22 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       instance.shutdown();
     });
 #else
-    sigterm_ = dispatcher.listenForSignal(ENVOY_SIGTERM, [&instance]() {
-      ENVOY_LOG(warn, "caught ENVOY_SIGTERM");
+    sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
+      ENVOY_LOG(warn, "caught SIGTERM");
       instance.shutdown();
     });
 
-    sigint_ = dispatcher.listenForSignal(ENVOY_SIGINIT, [&instance]() {
+    sigint_ = dispatcher.listenForSignal(SIGINIT, [&instance]() {
       ENVOY_LOG(warn, "caught SIGINT");
       instance.shutdown();
     });
 
-    sig_usr_1_ = dispatcher.listenForSignal(ENVOY_SIGUSR1, [&access_log_manager]() {
+    sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
       ENVOY_LOG(info, "caught SIGUSR1. Reopening access logs.");
       access_log_manager.reopen();
     });
 
-    sig_hup_ = dispatcher.listenForSignal(ENVOY_SIGHUP, []() {
+    sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
       ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
     });
 #endif
