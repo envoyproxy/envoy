@@ -43,8 +43,6 @@ namespace Event {
 // The same mechanism implements both of these operations, so they are invoked as a group.
 // - Event::SchedulableCallback::scheduleCallbackCurrentIteration(). Each of these callbacks is
 // scheduled and invoked independently.
-// - Event::FileEvent::activate() if "envoy.reloadable_features.activate_fds_next_event_loop"
-// runtime feature is disabled.
 // - Event::Timer::enableTimer(0) if "envoy.reloadable_features.activate_timers_next_event_loop"
 // runtime feature is disabled.
 //
