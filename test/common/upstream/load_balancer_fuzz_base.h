@@ -10,14 +10,13 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
-#include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
 namespace Upstream {
 
 // This class implements replay logic, and also handles the initial setup of static host sets and
 // the subsequent updates to those sets.
-class LoadBalancerFuzzBase : Event::TestUsingSimulatedTime {
+class LoadBalancerFuzzBase {
 public:
   LoadBalancerFuzzBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)){};
 
