@@ -108,16 +108,16 @@ LoadBalancerBase::LoadBalancerBase(
       priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
-                                per_priority_health_, per_priority_degraded_, total_healthy_hosts_);
+                                per_priority_health_, per_priority_degraded_);
   }
   // Recalculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
-  priority_set_.addPriorityUpdateCb([this](uint32_t priority, const HostVector&,
-                                           const HostVector&) -> void {
-    recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_,
-                                per_priority_degraded_, total_healthy_hosts_);
-  });
+  priority_set_.addPriorityUpdateCb(
+      [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
+        recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
+                                    per_priority_health_, per_priority_degraded_);
+      });
 
   priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
@@ -146,8 +146,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
                                                    HealthyAndDegradedLoad& per_priority_load,
                                                    HealthyAvailability& per_priority_health,
-                                                   DegradedAvailability& per_priority_degraded,
-                                                   uint32_t& total_healthy_hosts) {
+                                                   DegradedAvailability& per_priority_degraded) {
   per_priority_load.healthy_priority_load_.get().resize(priority_set.hostSetsPerPriority().size());
   per_priority_load.degraded_priority_load_.get().resize(priority_set.hostSetsPerPriority().size());
   per_priority_health.get().resize(priority_set.hostSetsPerPriority().size());
@@ -233,11 +232,6 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                 per_priority_load.healthy_priority_load_.get().end(), 0) +
                     std::accumulate(per_priority_load.degraded_priority_load_.get().begin(),
                                     per_priority_load.degraded_priority_load_.get().end(), 0));
-
-  total_healthy_hosts = 0;
-  for (auto& host_set : priority_set.hostSetsPerPriority()) {
-    total_healthy_hosts += host_set->healthyHosts().size();
-  }
 }
 
 // Method iterates through priority levels and turns on/off panic mode.
@@ -780,10 +774,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
-  if (stashed_random_.size() > total_healthy_hosts_) {
-    return nullptr;
-  }
-
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
   if (!hosts_source) {
     return nullptr;
@@ -869,9 +859,6 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
-  if (stashed_random_.size() > total_healthy_hosts_) {
-    return nullptr;
-  }
   return peekOrChoose(context, true);
 }
 
