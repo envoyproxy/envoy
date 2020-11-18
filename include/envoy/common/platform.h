@@ -151,10 +151,6 @@ struct msghdr {
 #define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
 
-// Optimized level events flags
-#define FORCE_LEVEL_EVENTS
-#define OPTIMIZE_LEVEL_EVENTS
-
 namespace Platform {
 constexpr absl::string_view null_device_path{"NUL"};
 }
