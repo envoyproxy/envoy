@@ -300,8 +300,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
     Http::GoAwayErrorCode error_code) {
-  ENVOY_CONN_LOG(debug, "connection going away health_flags={}", *client_,
-                 HostUtility::healthFlagsToString(*host_));
+  ENVOY_CONN_LOG(debug, "connection going away goaway_code={}, health_flags={}", *client_,
+                 error_code, HostUtility::healthFlagsToString(*host_));
 
   // Runtime guard around graceful handling of NO_ERROR GOAWAY handling. The old behavior is to
   // ignore GOAWAY completely.
