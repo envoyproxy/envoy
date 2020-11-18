@@ -1566,30 +1566,22 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 // Tests upstream sending a metadata frame after ending a stream.
-TEST_P(Http2FrameIntegrationTest, UpstreamMetadataAfterEndStream) {
-  // Allow metadata usage.
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_http2_protocol_options()->set_allow_metadata(true);
-  });
+TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  beginSession();
-  FakeHttpConnectionPtr fake_upstream_connection;
-  FakeStreamPtr fake_upstream_request;
+  // Sends the first request.
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
 
-  const uint32_t client_stream_idx = Http2Frame::makeClientStreamId(0);
-  // Send request without ending the stream.
-  const Http2Frame request =
-      Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url");
-  sendFrame(request);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, fake_upstream_request));
-  ASSERT_TRUE(fake_upstream_request->waitForHeadersComplete());
+  // Wait for upstream to receive the request
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
   // Upstream sends headers and ends stream.
   const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  fake_upstream_request->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(response_headers, true);
 
   // Upstream sends metadata.
   const Http::MetadataMap response_metadata_map = {{"resp_key1", "resp_value1"}};
@@ -1597,10 +1589,13 @@ TEST_P(Http2FrameIntegrationTest, UpstreamMetadataAfterEndStream) {
       std::make_unique<Http::MetadataMap>(response_metadata_map);
   Http::MetadataMapVector metadata_map_vector;
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
-  fake_upstream_request->encodeMetadata(metadata_map_vector);
+  upstream_request_->encodeMetadata(metadata_map_vector);
 
   // Cleanup.
-  ASSERT_TRUE(fake_upstream_connection->close());
-  tcp_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
+
 } // namespace Envoy
