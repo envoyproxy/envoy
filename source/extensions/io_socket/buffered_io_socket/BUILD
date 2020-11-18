@@ -21,19 +21,33 @@ envoy_cc_extension(
 )
 
 envoy_cc_extension(
-    name = "buffered_io_socket_handle_lib",
+    name = "users_space_file_event_lib",
     srcs = [
-        "buffered_io_socket_handle_impl.cc",
         "user_space_file_event_impl.cc",
     ],
     hdrs = [
-        "buffered_io_socket_handle_impl.h",
         "user_space_file_event_impl.h",
     ],
     security_posture = "unknown",
     status = "alpha",
     deps = [
         ":peer_buffer_lib",
+        "//source/common/event:dispatcher_includes",
+    ],
+)
+envoy_cc_extension(
+    name = "buffered_io_socket_handle_lib",
+    srcs = [
+        "buffered_io_socket_handle_impl.cc",
+    ],
+    hdrs = [
+        "buffered_io_socket_handle_impl.h",
+    ],
+    security_posture = "unknown",
+    status = "alpha",
+    deps = [
+        ":peer_buffer_lib",
+        ":users_space_file_event_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/network:default_socket_interface_lib",
     ],

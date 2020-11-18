@@ -81,8 +81,23 @@ public:
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
 
+  void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }
+  void onBelowLowWatermark() {
+    if (writable_peer_) {
+      ENVOY_LOG(debug, "Socket {} switches to low watermark. Notify {}.", static_cast<void*>(this),
+                static_cast<void*>(writable_peer_));
+      writable_peer_->onPeerBufferLowWatermark();
+    }
+  }
+  void onAboveHighWatermark() {
+    // Low to high is checked by peer after peer writes data.
+  }
+
   // WritablePeer
-  void setWriteEnd() override { read_end_stream_ = true; }
+  void setWriteEnd() override {
+    read_end_stream_ = true;
+    setNewDataAvailable();
+  }
   bool isWriteEndSet() override { return read_end_stream_; }
   void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));

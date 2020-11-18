@@ -25,18 +25,8 @@ Api::SysCallIntResult makeInvalidSyscallResult() {
 } // namespace
 
 BufferedIoSocketHandleImpl::BufferedIoSocketHandleImpl()
-    : pending_received_data_(
-          [this]() -> void {
-            if (writable_peer_) {
-              ENVOY_LOG(debug, "Socket {} switches to low watermark. Notify {}.",
-                        static_cast<void*>(this), static_cast<void*>(writable_peer_));
-              writable_peer_->onPeerBufferLowWatermark();
-            }
-          },
-          []() -> void {
-            // Low to high is checked by peer after peer writes data.
-          },
-          []() -> void {}) {}
+    : pending_received_data_([&]() -> void { this->onBelowLowWatermark(); },
+                             [&]() -> void { this->onAboveHighWatermark(); }, []() -> void {}) {}
 
 BufferedIoSocketHandleImpl::~BufferedIoSocketHandleImpl() {
   if (!closed_) {
@@ -52,7 +42,6 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
                 static_cast<void*>(writable_peer_));
       // Notify the peer we won't write more data. shutdown(WRITE).
       writable_peer_->setWriteEnd();
-      writable_peer_->setNewDataAvailable();
       // Notify the peer that we no longer accept data. shutdown(RD).
       writable_peer_->onPeerDestroy();
       writable_peer_ = nullptr;
@@ -321,7 +310,6 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
     ASSERT(writable_peer_);
     // Notify the peer we won't write more data.
     writable_peer_->setWriteEnd();
-    writable_peer_->setNewDataAvailable();
     write_shutdown_ = true;
   }
   return {0, 0};

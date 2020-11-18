@@ -161,6 +161,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadEmpty) {
   io_handle_->setWriteEnd();
   result = io_handle_->read(buf, 10);
   EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.rc_);
 }
 
 // Test read side effects.
@@ -206,9 +207,7 @@ TEST_F(BufferedIoSocketHandleTest, TestBasicReadv) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, FlowControl) {
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  // TODO(lambdai): Make it an IoHandle method.
-  internal_buffer.setWatermarks(128);
+  io_handle_->setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
   EXPECT_TRUE(io_handle_->isWritable());
 
@@ -221,6 +220,7 @@ TEST_F(BufferedIoSocketHandleTest, FlowControl) {
 
   bool writable_flipped = false;
   // During the repeated recv, the writable flag must switch to true.
+  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   while (internal_buffer.length() > 0) {
     SCOPED_TRACE(internal_buffer.length());
     FANCY_LOG(debug, "internal buffer length = {}", internal_buffer.length());
@@ -320,13 +320,13 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteByMove) {
 
 // Test write return error code. Ignoring the side effect of event scheduling.
 TEST_F(BufferedIoSocketHandleTest, TestWriteAgain) {
-  Buffer::OwnedImpl buf("0123456789");
-
   // Populate write destination with massive data so as to not writable.
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
-  internal_buffer.setWatermarks(1024);
-  internal_buffer.add(std::string(2048, ' '));
+  io_handle_peer_->setWatermarks(128);
+  Buffer::OwnedImpl pending_data(std::string(256, 'a'));
+  io_handle_->write(pending_data);
+  EXPECT_FALSE(!io_handle_peer_->isWritable());
 
+  Buffer::OwnedImpl buf("0123456789");
   auto result = io_handle_->write(buf);
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
   EXPECT_EQ(10, buf.length());
@@ -353,8 +353,8 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteErrorAfterClose) {
 TEST_F(BufferedIoSocketHandleTest, TestWritevAgain) {
   auto [guard, slice] = allocateOneSlice(128);
   // Populate write destination with massive data so as to not writable.
+  io_handle_peer_->setWatermarks(128);
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
-  internal_buffer.setWatermarks(128);
   internal_buffer.add(std::string(256, ' '));
   auto result = io_handle_->writev(&slice, 1);
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
@@ -505,8 +505,9 @@ TEST_F(BufferedIoSocketHandleTest, TestEventResetClearCallback) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
+  io_handle_->setWatermarks(128);
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.setWatermarks(128);
+
   EXPECT_FALSE(io_handle_->isReadable());
   EXPECT_TRUE(io_handle_peer_->isWritable());
 
@@ -773,10 +774,8 @@ TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
-  auto& peer_internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
-  peer_internal_buffer.setWatermarks(128);
-  // std::string big_chunk(256, 'a');
-  //   peer_internal_buffer.add(big_chunk);
+  io_handle_peer_->setWatermarks(128);
+
   Buffer::OwnedImpl buf(std::string(256, 'a'));
   io_handle_->write(buf);
   EXPECT_FALSE(io_handle_peer_->isWritable());
