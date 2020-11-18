@@ -109,7 +109,7 @@ bool ConnPoolImplBase::tryCreateNewConnection(float global_prefetch_ratio) {
            client->effectiveConcurrentStreamLimit());
     ASSERT(client->real_host_description_);
     // Increase the connecting capacity to reflect the streams this connection can serve.
-    state_.incrConnectingCapacity(client->effectiveConcurrentStreamLimit());
+    state_.incrConnectingStreamCapacity(client->effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
     LinkedList::moveIntoList(std::move(client), owningList(client->state_));
   }
@@ -139,7 +139,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
     }
 
     // Decrement the capacity, as there's one less stream available for serving.
-    state_.decrConnectingCapacity(1);
+    state_.decrConnectingStreamCapacity(1);
     // Track the new active stream.
     state_.incrActiveStreams(1);
     num_active_streams_++;
@@ -167,7 +167,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // If the effective client capacity was limited by max total streams, this will not result in an
   // increment as no capacity is freed up.
   if (client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1) {
-    state_.incrConnectingCapacity(1);
+    state_.incrConnectingStreamCapacity(1);
   }
   if (client.state_ == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
@@ -326,7 +326,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    state_.decrConnectingCapacity(client.currentUnusedCapacity());
+    state_.decrConnectingStreamCapacity(client.currentUnusedCapacity());
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
     // The client died.

@@ -841,13 +841,8 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
 }
 
 void ClusterManagerImpl::maybePrefetch(
-    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry, const ClusterConnectivityState&,
+    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
     std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
-  auto peekahead_ratio = cluster_entry->cluster_info_->peekaheadRatio();
-  if (peekahead_ratio <= 1.0) {
-    return;
-  }
-
   // TODO(alyssawilk) As currently implemented, this will always just prefetch
   // one connection ahead of actually needed connections.
   //
@@ -862,9 +857,11 @@ void ClusterManagerImpl::maybePrefetch(
   //  per-upstream prefetch.
   //
   //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
-  ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
-  if (prefetch_pool) {
-    prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
+  if (cluster_entry->cluster_info_->peekaheadRatio() > 1.0) {
+    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
+    if (prefetch_pool) {
+      prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
+    }
   }
 }
 
@@ -888,10 +885,9 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  maybePrefetch(entry->second, cluster_manager.cluster_manager_state_,
-                [&entry, &priority, &protocol, &context]() {
-                  return entry->second->connPool(priority, protocol, context, true);
-                });
+  maybePrefetch(entry->second, [&entry, &priority, &protocol, &context]() {
+    return entry->second->connPool(priority, protocol, context, true);
+  });
 
   return ret;
 }
@@ -915,10 +911,9 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
   // Now see if another host should be prefetched.
-  maybePrefetch(entry->second, cluster_manager.cluster_manager_state_,
-                [&entry, &priority, &context]() {
-                  return entry->second->tcpConnPool(priority, context, true);
-                });
+  maybePrefetch(entry->second, [&entry, &priority, &context]() {
+    return entry->second->tcpConnPool(priority, context, true);
+  });
 
   return ret;
 }
@@ -1363,10 +1358,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
-    if (!peek) {
-      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-      cluster_info_->stats().upstream_cx_none_healthy_.inc();
-    }
+    ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
+    cluster_info_->stats().upstream_cx_none_healthy_.inc();
     return nullptr;
   }
 

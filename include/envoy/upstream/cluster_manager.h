@@ -78,7 +78,7 @@ struct ClusterConnectivityState {
   ~ClusterConnectivityState() {
     ASSERT(pending_streams_ == 0);
     ASSERT(active_streams_ == 0);
-    ASSERT(connecting_capacity_ == 0);
+    ASSERT(connecting_stream_capacity_ == 0);
   }
 
   template <class T> void checkAndDecrement(T& value, uint32_t delta) {
@@ -93,11 +93,11 @@ struct ClusterConnectivityState {
 
   void incrPendingStreams(uint32_t delta) { checkAndIncrement<uint32_t>(pending_streams_, delta); }
   void decrPendingStreams(uint32_t delta) { checkAndDecrement<uint32_t>(pending_streams_, delta); }
-  void incrConnectingCapacity(uint32_t delta) {
-    checkAndIncrement<uint64_t>(connecting_capacity_, delta);
+  void incrConnectingStreamCapacity(uint32_t delta) {
+    checkAndIncrement<uint64_t>(connecting_stream_capacity_, delta);
   }
-  void decrConnectingCapacity(uint32_t delta) {
-    checkAndDecrement<uint64_t>(connecting_capacity_, delta);
+  void decrConnectingStreamCapacity(uint32_t delta) {
+    checkAndDecrement<uint64_t>(connecting_stream_capacity_, delta);
   }
   void incrActiveStreams(uint32_t delta) { checkAndIncrement<uint32_t>(active_streams_, delta); }
   void decrActiveStreams(uint32_t delta) { checkAndDecrement<uint32_t>(active_streams_, delta); }
@@ -106,9 +106,12 @@ struct ClusterConnectivityState {
   uint32_t pending_streams_{};
   // Tracks the number of active streams for this ClusterManager.
   uint32_t active_streams_{};
-  // Tracks the stream capacity if all connecting connections were connected but
-  // excluding streams which are in use.
-  uint64_t connecting_capacity_{};
+  // Tracks the available stream capacity if all connecting connections were connected.
+  //
+  // For example, if an H2 connection is started with concurrent stream limit of 100, this
+  // goes up by 100. If the connection is established and 2 streams are in use, it
+  // would be reduced to 98 (as 2 of the 100 are not available).
+  uint64_t connecting_stream_capacity_{};
 };
 
 /**

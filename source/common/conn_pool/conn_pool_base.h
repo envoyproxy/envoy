@@ -212,7 +212,7 @@ protected:
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
   void decrConnectingStreamCapacity(int32_t delta) {
-    state_.decrConnectingCapacity(delta);
+    state_.decrConnectingStreamCapacity(delta);
     connecting_stream_capacity_ -= delta;
   }
 
