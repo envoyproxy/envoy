@@ -35,8 +35,7 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
     // These events terminate the process immediately so we want to give a couple of seconds
     // to the dispatcher to shutdown the server.
     constexpr size_t delay = 3;
-    std::chrono::seconds sec(delay);
-    std::this_thread::sleep_for(sec);
+    absl::SleepFor(absl::Seconds(delay));
   }
   return 1;
 }
