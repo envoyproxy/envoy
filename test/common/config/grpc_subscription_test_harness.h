@@ -44,7 +44,7 @@ public:
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()) {
     node_.set_id("fo0");
-    EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
+    EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
