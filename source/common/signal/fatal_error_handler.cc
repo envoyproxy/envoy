@@ -43,7 +43,7 @@ ABSL_CONST_INIT std::atomic<int64_t> failure_tid{-1};
 void runFatalActionsInternal(const FatalAction::FatalActionPtrList& actions) {
   // Exchange the fatal_error_handlers pointer so other functions cannot
   // concurrently access the list.
-  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_seq_cst);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr);
   if (list == nullptr) {
     return;
   }
@@ -55,7 +55,7 @@ void runFatalActionsInternal(const FatalAction::FatalActionPtrList& actions) {
 
   // Restore the fatal_error_handlers pointer so subsequent calls using the list
   // can succeed.
-  fatal_error_handlers.store(list, std::memory_order_seq_cst);
+  fatal_error_handlers.store(list);
 }
 
 // Helper function to run exclusively either safe or unsafe actions depending on
@@ -64,8 +64,7 @@ void runFatalActionsInternal(const FatalAction::FatalActionPtrList& actions) {
 // action_type.
 FatalAction::Status runFatalActions(FatalActionType action_type) {
   // Check that registerFatalActions has already been called.
-  FatalAction::FatalActionManager* action_manager =
-      fatal_action_manager.load(std::memory_order_seq_cst);
+  FatalAction::FatalActionManager* action_manager = fatal_action_manager.load();
 
   if (action_manager == nullptr) {
     return FatalAction::Status::ActionManangerUnset;
@@ -77,7 +76,7 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
     // Try to run safe actions
     int64_t expected_tid = -1;
 
-    if (failure_tid.compare_exchange_strong(expected_tid, my_tid, std::memory_order_seq_cst)) {
+    if (failure_tid.compare_exchange_strong(expected_tid, my_tid)) {
       // Run the actions
       runFatalActionsInternal(action_manager->getSafeActions());
       return FatalAction::Status::Success;
@@ -87,7 +86,7 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
 
   } else {
     // Try to run unsafe actions
-    int64_t failing_tid = failure_tid.load(std::memory_order_seq_cst);
+    int64_t failing_tid = failure_tid.load();
 
     ASSERT(failing_tid != -1);
 
@@ -105,13 +104,13 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
 void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 #ifdef ENVOY_OBJECT_TRACE_ON_DUMP
   absl::MutexLock l(&failure_mutex);
-  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_seq_cst);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr);
   if (list == nullptr) {
     list = new FailureFunctionList;
   }
   list->push_back(&handler);
   // Store the fatal_error_handlers pointer now that the list is updated.
-  fatal_error_handlers.store(list, std::memory_order_seq_cst);
+  fatal_error_handlers.store(list);
 #else
   UNREFERENCED_PARAMETER(handler);
 #endif
@@ -120,7 +119,7 @@ void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 #ifdef ENVOY_OBJECT_TRACE_ON_DUMP
   absl::MutexLock l(&failure_mutex);
-  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_seq_cst);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr);
   if (list == nullptr) {
     // removeFatalErrorHandler() may see an empty list of fatal error handlers
     // if it's called at the same time as callFatalErrorHandlers(). In that case
@@ -132,7 +131,7 @@ void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
   if (list->empty()) {
     delete list;
   } else {
-    fatal_error_handlers.store(list, std::memory_order_seq_cst);
+    fatal_error_handlers.store(list);
   }
 #else
   UNREFERENCED_PARAMETER(handler);
@@ -140,13 +139,13 @@ void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 }
 
 void callFatalErrorHandlers(std::ostream& os) {
-  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_seq_cst);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr);
   if (list != nullptr) {
     for (const auto* handler : *list) {
       handler->onFatalError(os);
     }
 
-    fatal_error_handlers.store(list, std::memory_order_seq_cst);
+    fatal_error_handlers.store(list);
   }
 }
 
@@ -154,10 +153,9 @@ void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
                           FatalAction::FatalActionPtrList unsafe_actions,
                           Thread::ThreadFactory& thread_factory) {
   // Create a FatalActionManager and store it.
-  FatalAction::FatalActionManager* previous_manager = fatal_action_manager.exchange(
-      new FatalAction::FatalActionManager(std::move(safe_actions), std::move(unsafe_actions),
-                                          thread_factory),
-      std::memory_order_seq_cst);
+  FatalAction::FatalActionManager* previous_manager =
+      fatal_action_manager.exchange(new FatalAction::FatalActionManager(
+          std::move(safe_actions), std::move(unsafe_actions), thread_factory));
 
   // Previous manager should be NULL.
   ASSERT(!previous_manager);
@@ -168,7 +166,7 @@ FatalAction::Status runSafeActions() { return runFatalActions(FatalActionType::S
 FatalAction::Status runUnsafeActions() { return runFatalActions(FatalActionType::Unsafe); }
 
 void clearFatalActionsOnTerminate() {
-  auto* raw_ptr = fatal_action_manager.exchange(nullptr, std::memory_order_seq_cst);
+  auto* raw_ptr = fatal_action_manager.exchange(nullptr);
   if (raw_ptr != nullptr) {
     delete raw_ptr;
   }
@@ -180,11 +178,11 @@ void clearFatalActionsOnTerminate() {
 void resetFatalActionStateForTest() {
   // Free the memory of the Fatal Action, since it's not managed by a smart
   // pointer. This prevents memory leaks in tests.
-  auto* raw_ptr = fatal_action_manager.exchange(nullptr, std::memory_order_seq_cst);
+  auto* raw_ptr = fatal_action_manager.exchange(nullptr);
   if (raw_ptr != nullptr) {
     delete raw_ptr;
   }
-  failure_tid.store(-1, std::memory_order_seq_cst);
+  failure_tid.store(-1);
 }
 
 } // namespace FatalErrorHandler
