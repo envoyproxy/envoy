@@ -13,6 +13,8 @@ envoy_cc_library(
     srcs = ["fatal_error_handler.cc"],
     hdrs = ["fatal_error_handler.h"],
     deps = [
+        ":fatal_action_lib",
+        "//include/envoy/event:dispatcher_interface",
         "//source/common/common:macros",
     ],
 )
@@ -28,5 +30,14 @@ envoy_cc_library(
         "//source/common/common:non_copyable",
         "//source/common/singleton:threadsafe_singleton",
         "//source/server:backtrace_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "fatal_action_lib",
+    hdrs = ["fatal_action.h"],
+    deps = [
+        "//include/envoy/server:fatal_action_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )

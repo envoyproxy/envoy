@@ -20,6 +20,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -40,6 +41,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/signal/fatal_error_handler.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
@@ -420,6 +422,26 @@ void InstanceImpl::initialize(const Options& options,
         factory.createBootstrapExtension(*config, serverFactoryContext()));
   }
 
+  // Register the fatal actions.
+  {
+    FatalAction::FatalActionPtrList safe_actions;
+    FatalAction::FatalActionPtrList unsafe_actions;
+    for (const auto& action_config : bootstrap_.fatal_actions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::FatalActionFactory>(
+              action_config.config());
+      auto action = factory.createFatalActionFromProto(action_config, this);
+
+      if (action->isAsyncSignalSafe()) {
+        safe_actions.push_back(std::move(action));
+      } else {
+        unsafe_actions.push_back(std::move(action));
+      }
+    }
+    Envoy::FatalErrorHandler::registerFatalActions(
+        std::move(safe_actions), std::move(unsafe_actions), api_->threadFactory());
+  }
+
   if (!bootstrap_.default_socket_interface().empty()) {
     auto& sock_name = bootstrap_.default_socket_interface();
     auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
@@ -733,6 +755,7 @@ void InstanceImpl::terminate() {
   restarter_.shutdown();
   ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
+  FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }

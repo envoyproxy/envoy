@@ -458,6 +458,51 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
   EXPECT_FALSE(dispatcher_->isThreadSafe());
 }
 
+class TestFatalAction : public Server::Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran_; }
+  bool isAsyncSignalSafe() const override { return true; }
+  int getNumTimesRan() { return times_ran_; }
+
+private:
+  int times_ran_ = 0;
+};
+
+TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
+  FatalAction::FatalActionPtrList actions;
+  actions.emplace_back(std::make_unique<TestFatalAction>());
+  auto* action = dynamic_cast<TestFatalAction*>(actions.front().get());
+
+  ASSERT_EQ(action->getNumTimesRan(), 0);
+
+  // Should not run as dispatcher isn't running yet
+  auto non_running_dispatcher = api_->allocateDispatcher("non_running_thread");
+  static_cast<DispatcherImpl*>(non_running_dispatcher.get())
+      ->runFatalActionsOnTrackedObject(actions);
+  ASSERT_EQ(action->getNumTimesRan(), 0);
+
+  // Should not run when not on same thread
+  static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
+  ASSERT_EQ(action->getNumTimesRan(), 0);
+
+  // Should run since on same thread as dispatcher
+  dispatcher_->post([this, &actions]() {
+    {
+      Thread::LockGuard lock(mu_);
+      static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
+      work_finished_ = true;
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  EXPECT_EQ(action->getNumTimesRan(), 1);
+}
+
 class NotStartedDispatcherImplTest : public testing::Test {
 protected:
   NotStartedDispatcherImplTest()

@@ -329,3 +329,15 @@ envoy_cc_library(
         "//include/envoy/config:typed_config_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "fatal_action_interface",
+    hdrs = ["fatal_action_config.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/server:instance_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)

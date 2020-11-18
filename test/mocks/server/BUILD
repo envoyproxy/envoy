@@ -38,6 +38,14 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "fatal_action_factory_mocks",
+    hdrs = ["fatal_action_factory.h"],
+    deps = [
+        "//include/envoy/server:fatal_action_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "options_mocks",
     srcs = ["options.cc"],
     hdrs = ["options.h"],
@@ -306,6 +314,7 @@ envoy_cc_mock(
         "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:filter_chain_factory_context_mocks",
         "//test/mocks/server:guard_dog_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",

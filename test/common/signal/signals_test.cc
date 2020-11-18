@@ -8,8 +8,6 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
-
 namespace Envoy {
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
@@ -21,10 +19,41 @@ namespace Envoy {
 #define ASANITIZED /* Sanitized by GCC */
 #endif
 
+namespace FatalErrorHandler {
+
+extern void resetFatalActionStateForTest();
+
+} // namespace FatalErrorHandler
+
 // Use this test handler instead of a mock, because fatal error handlers must be
 // signal-safe and a mock might allocate memory.
 class TestFatalErrorHandler : public FatalErrorHandlerInterface {
   void onFatalError(std::ostream& os) const override { os << "HERE!"; }
+  void
+  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override {
+    // Run the actions
+    for (const auto& action : actions) {
+      action->run(nullptr);
+    }
+  }
+};
+
+// Use this to test fatal actions get called, as well as the order they run.
+class EchoFatalAction : public Server::Configuration::FatalAction {
+public:
+  EchoFatalAction(absl::string_view echo_msg) : echo_msg_(echo_msg) {}
+  void run(const ScopeTrackedObject* /*current_object*/) override { std::cerr << echo_msg_; }
+  bool isAsyncSignalSafe() const override { return true; }
+
+private:
+  const std::string echo_msg_;
+};
+
+// Use this to test failing while in a signal handler.
+class SegfaultFatalAction : public Server::Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) override { raise(SIGSEGV); }
+  bool isAsyncSignalSafe() const override { return false; }
 };
 
 // Death tests that expect a particular output are disabled under address sanitizer.
@@ -46,6 +75,7 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
   TestFatalErrorHandler handler;
   FatalErrorHandler::registerFatalErrorHandler(handler);
+
   SignalAction actions;
   // Make sure the fatal error log "HERE" registered above is logged on fatal error.
   EXPECT_DEATH(
@@ -115,6 +145,39 @@ TEST(SignalsDeathTest, RestoredPreviousHandlerDeathTest) {
   EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 
+TEST(SignalsDeathTest, CanRunAllFatalActions) {
+  SignalAction actions;
+  TestFatalErrorHandler handler;
+  FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  FatalAction::FatalActionPtrList safe_actions;
+  FatalAction::FatalActionPtrList unsafe_actions;
+
+  safe_actions.emplace_back(std::make_unique<EchoFatalAction>("Safe Action!"));
+  unsafe_actions.emplace_back(std::make_unique<EchoFatalAction>("Unsafe Action!"));
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
+                                          Thread::threadFactoryForTest());
+  EXPECT_DEATH([]() -> void { raise(SIGSEGV); }(), "Safe Action!.*HERE.*Unsafe Action!");
+  FatalErrorHandler::removeFatalErrorHandler(handler);
+  FatalErrorHandler::resetFatalActionStateForTest();
+}
+
+TEST(SignalsDeathTest, ShouldJustExitIfFatalActionsRaiseAnotherSignal) {
+  SignalAction actions;
+  TestFatalErrorHandler handler;
+  FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  FatalAction::FatalActionPtrList safe_actions;
+  FatalAction::FatalActionPtrList unsafe_actions;
+
+  unsafe_actions.emplace_back(std::make_unique<SegfaultFatalAction>());
+  FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
+                                          Thread::threadFactoryForTest());
+
+  EXPECT_DEATH([]() -> void { raise(SIGABRT); }(), "Our FatalActions triggered a fatal signal.");
+  FatalErrorHandler::removeFatalErrorHandler(handler);
+  FatalErrorHandler::resetFatalActionStateForTest();
+}
 #endif
 
 TEST(SignalsDeathTest, IllegalStackAccessDeathTest) {
@@ -178,6 +241,9 @@ public:
     UNREFERENCED_PARAMETER(os);
     allocated_after_call_ = memory_test_.consumedBytes();
   }
+
+  void runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList&
+                                      /*actions*/) const override {}
 
 private:
   const Stats::TestUtil::MemoryTest& memory_test_;

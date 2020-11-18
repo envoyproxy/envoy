@@ -278,6 +278,19 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
+void DispatcherImpl::runFatalActionsOnTrackedObject(
+    const FatalAction::FatalActionPtrList& actions) const {
+  // Only run if this is the dispatcher of the current thread and
+  // DispatcherImpl::Run has been called.
+  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+    return;
+  }
+
+  for (const auto& action : actions) {
+    action->run(current_object_);
+  }
+}
+
 void DispatcherImpl::touchWatchdog() {
   if (watchdog_registration_) {
     watchdog_registration_->touchWatchdog();
