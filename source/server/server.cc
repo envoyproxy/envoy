@@ -625,7 +625,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       instance.shutdown();
     });
 
-    sigint_ = dispatcher.listenForSignal(SIGINIT, [&instance]() {
+    sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
       ENVOY_LOG(warn, "caught SIGINT");
       instance.shutdown();
     });
