@@ -14,6 +14,7 @@ namespace {
 
 class SniDynamicProxyFilterIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
+      public Event::TestUsingSimulatedTime,
       public HttpIntegrationTest {
 public:
   // This test is using HTTP integration test to use the utilities to pass SNI from downstream

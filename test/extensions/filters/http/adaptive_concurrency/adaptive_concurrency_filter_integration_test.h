@@ -1,4 +1,5 @@
 #include "test/integration/http_integration.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -30,6 +31,7 @@ const std::string MIN_RTT_GAUGE_NAME =
 
 class AdaptiveConcurrencyIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
+      public Event::TestUsingSimulatedTime,
       public HttpIntegrationTest {
 public:
   AdaptiveConcurrencyIntegrationTest()
