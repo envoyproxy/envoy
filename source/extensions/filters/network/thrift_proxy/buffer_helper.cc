@@ -22,7 +22,7 @@ double BufferHelper::drainBEDouble(Buffer::Instance& buffer) {
   // 4. Implementation of last resort is to manually copy from i to d via unsigned char*.
   uint64_t i = buffer.drainBEInt<uint64_t>();
   double d;
-  safe_memcpy<double, uint64_t>(&d, &i);
+  safe_memcpy(&d, &i);
   return d;
 }
 
@@ -122,7 +122,7 @@ void BufferHelper::writeBEDouble(Buffer::Instance& buffer, double value) {
 
   // See drainDouble for implementation details.
   uint64_t i;
-  safe_memcpy<uint64_t, double>(&i, &value);
+  safe_memcpy(&i, &value);
   buffer.writeBEInt<uint64_t>(i);
 }
 

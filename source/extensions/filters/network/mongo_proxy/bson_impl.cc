@@ -8,7 +8,7 @@
 #include "common/common/byte_order.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
-#include "common/common/mem_block_builder.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 
 namespace Envoy {
@@ -90,7 +90,7 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
 
   int64_t val;
   void* mem = data.linearize(sizeof(int64_t));
-  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int64_t)); // NOLINT(safe-memcpy)
+  safe_memcpy(&val, reinterpret_cast<const uint64_t*>(mem));
   data.drain(sizeof(int64_t));
   return le64toh(val);
 }

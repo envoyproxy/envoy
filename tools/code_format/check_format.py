@@ -801,6 +801,7 @@ class FormatChecker:
 
     if not self.whitelistedForMemcpy(file_path) and \
        not ("test/" in file_path) and \
+       not ("safe_memcpy(" in line) and \
        ("memcpy(" in line) and \
        not ("NOLINT(safe-memcpy)" in line):
       reportError("Don't call memcpy() directly; use safe_memcpy or MemBlockBuilder instead.")

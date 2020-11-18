@@ -108,8 +108,7 @@ public:
    * @return the transferred storage.
    */
   T* releasePointer() {
-    write_span_ = absl::MakeSpan(static_cast<T*>(nullptr), 0);
-    return data_.release();
+    return this->release().release();
   }
 
   /**

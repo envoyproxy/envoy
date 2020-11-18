@@ -139,7 +139,7 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
   uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
   *current++ = 0; // flags
   const uint32_t nsize = htonl(size);
-  safe_memcpy<uint32_t, const uint32_t>(reinterpret_cast<uint32_t*>(current), &nsize);
+  safe_memcpy(reinterpret_cast<uint32_t*>(current), &nsize);
   current += sizeof(uint32_t);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
