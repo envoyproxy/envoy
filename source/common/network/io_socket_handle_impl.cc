@@ -89,7 +89,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
 
   // Emulated edge events need to registered if the socket operation did not complete
   // because the socket would block.
-  if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     // Some tests try to read without initializing the file_event.
     if (result.wouldBlock() && file_event_) {
       file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
@@ -116,7 +116,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint6
 
   // Emulated edge events need to registered if the socket operation did not complete
   // because the socket would block.
-  if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     // Some tests try to read without initializing the file_event.
     if (result.wouldBlock() && file_event_) {
       file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
@@ -339,7 +339,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     auto io_result = sysCallResultToIoCallResult(result);
     // Emulated edge events need to registered if the socket operation did not complete
     // because the socket would block.
-    if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
       if (io_result.wouldBlock() && file_event_) {
         file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
       }
@@ -430,7 +430,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     auto io_result = sysCallResultToIoCallResult(result);
     // Emulated edge events need to registered if the socket operation did not complete
     // because the socket would block.
-    if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
       if (io_result.wouldBlock() && file_event_) {
         file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
       }
@@ -492,7 +492,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, in
   auto io_result = sysCallResultToIoCallResult(result);
   // Emulated edge events need to registered if the socket operation did not complete
   // because the socket would block.
-  if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     if (io_result.wouldBlock() && file_event_) {
       file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
     }

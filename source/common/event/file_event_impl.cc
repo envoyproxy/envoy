@@ -12,25 +12,11 @@ namespace Event {
 
 FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
-<<<<<<< HEAD
     : cb_(cb), fd_(fd), trigger_(trigger), enabled_events_(events),
-      activate_fd_events_next_event_loop_(
-          // Only read the runtime feature if the runtime loader singleton has already been created.
-          // Attempts to access runtime features too early in the initialization sequence triggers
-          // some spurious, scary-looking logs about not being able to read runtime feature config
-          // from the singleton. These warnings are caused by creation of filesystem watchers as
-          // part of the process of loading the runtime configuration from disk.
-          Runtime::LoaderSingleton::getExisting()
-              ? Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.activate_fds_next_event_loop")
-              : true) {
-=======
-    : cb_(cb), fd_(fd), trigger_(trigger),
       activation_cb_(dispatcher.createSchedulableCallback([this]() {
         ASSERT(injected_activation_events_ != 0);
         mergeInjectedEventsAndRunCb(0);
       })) {
->>>>>>> upstream/master
   // Treat the lack of a valid fd (which in practice should only happen if we run out of FDs) as
   // an OOM condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(fd), "");
@@ -147,8 +133,7 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
     // TODO(antoniovicente) remove this adjustment to activation events once ConnectionImpl can
     // handle Read and Close events delivered together.
     if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
-      if (events & FileReadyType::Closed &&
-          injected_activation_events_ & FileReadyType::Read) {
+      if (events & FileReadyType::Closed && injected_activation_events_ & FileReadyType::Read) {
         // We never ask for both early close and read at the same time. If close is requested
         // keep that instead.
         injected_activation_events_ = injected_activation_events_ & ~FileReadyType::Read;
