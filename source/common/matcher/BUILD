@@ -28,6 +28,7 @@ envoy_cc_library(
     name = "list_matcher_lib",
     hdrs = ["list_matcher.h"],
     deps = [
+        ":field_matcher_lib",
         "//include/envoy/matcher:matcher_interface",
     ],
 )
