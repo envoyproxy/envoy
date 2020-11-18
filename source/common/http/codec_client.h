@@ -28,6 +28,9 @@ class CodecClientCallbacks {
 public:
   virtual ~CodecClientCallbacks() = default;
 
+  // Called in onPreDecodeComplete
+  virtual void onStreamPreDecodeComplete() {}
+
   /**
    * Called every time an owned stream is destroyed, whether complete or not.
    */
@@ -201,7 +204,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     // StreamDecoderWrapper
-    void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
+    void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
     RequestEncoder* encoder_{};
@@ -214,7 +217,7 @@ private:
    * Called when a response finishes decoding. This is called *before* forwarding on to the
    * wrapped decoder.
    */
-  void responseDecodeComplete(ActiveRequest& request);
+  void responsePreDecodeComplete(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);

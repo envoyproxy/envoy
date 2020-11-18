@@ -105,8 +105,11 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void CodecClient::responseDecodeComplete(ActiveRequest& request) {
+void CodecClient::responsePreDecodeComplete(ActiveRequest& request) {
   ENVOY_CONN_LOG(debug, "response complete", *connection_);
+  if (codec_client_callbacks_) {
+    codec_client_callbacks_->onStreamPreDecodeComplete();
+  }
   deleteRequest(request);
 
   // HTTP/2 can send us a reset after a complete response if the request was not complete. Users

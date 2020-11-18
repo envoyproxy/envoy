@@ -50,10 +50,11 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-    Random::RandomGenerator& random_generator, std::vector<Http::Protocol> protocols)
+    Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+    std::vector<Http::Protocol> protocols)
     : Envoy::ConnectionPool::ConnPoolImplBase(
           host, priority, dispatcher, options,
-          wrapTransportSocketOptions(transport_socket_options, protocols)),
+          wrapTransportSocketOptions(transport_socket_options, protocols), state),
       random_generator_(random_generator) {
   ASSERT(!protocols.empty());
   // TODO(alyssawilk) the protocol function should probably be an optional and
@@ -73,7 +74,7 @@ HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {
-  return (!pending_streams_.empty() || (num_active_streams_ > 0));
+  return (hasPendingStreams() || (hasActiveStreams()));
 }
 
 ConnectionPool::Cancellable*
@@ -83,8 +84,7 @@ HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& con
   ENVOY_LOG(debug, "queueing stream due to no available connections");
   Envoy::ConnectionPool::PendingStreamPtr pending_stream(
       new HttpPendingStream(*this, decoder, callbacks));
-  LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
-  return pending_streams_.front().get();
+  return addPendingStream(std::move(pending_stream));
 }
 
 void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
