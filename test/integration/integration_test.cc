@@ -1697,4 +1697,61 @@ TEST_P(IntegrationTest, ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverride
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+TEST_P(IntegrationTest, RandomPrefetch) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_prefetch_policy()
+        ->mutable_predictive_prefetch_ratio()
+        ->set_value(1.5);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
+    for (int i = 0; i < 5; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+    }
+  });
+
+  setUpstreamCount(5);
+  TestRandomGenerator rand;
+  autonomous_upstream_ = true;
+  initialize();
+
+  std::list<IntegrationCodecClientPtr> clients;
+  std::list<Http::RequestEncoder*> encoders;
+  std::list<IntegrationStreamDecoderPtr> responses;
+  const uint32_t num_requests = 50;
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    if (rand.random() % 5 <= 3) { // Bias slightly towards more connections
+      // Start a new request.
+      clients.push_back(makeHttpConnection(lookupPort("http")));
+      auto encoder_decoder = clients.back()->startRequest(default_request_headers_);
+      encoders.push_back(&encoder_decoder.first);
+      responses.push_back(std::move(encoder_decoder.second));
+    } else if (!clients.empty()) {
+      // Finish up a request.
+      clients.front()->sendData(*encoders.front(), 0, true);
+      encoders.pop_front();
+      responses.front()->waitForEndStream();
+      responses.pop_front();
+      clients.front()->close();
+      clients.pop_front();
+    }
+  }
+  // Clean up.
+  while (!clients.empty()) {
+    clients.front()->sendData(*encoders.front(), 0, true);
+    encoders.pop_front();
+    responses.front()->waitForEndStream();
+    responses.pop_front();
+    clients.front()->close();
+    clients.pop_front();
+  }
+}
+
 } // namespace Envoy

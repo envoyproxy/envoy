@@ -596,7 +596,6 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  // [#not-implemented-hide:]
   message PrefetchPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.cluster.v3.Cluster.PrefetchPolicy";
@@ -649,6 +648,7 @@ message Cluster {
     //
     // If both this and prefetch_ratio are set, Envoy will make sure both predicted needs are met,
     // basically prefetching max(predictive-prefetch, per-upstream-prefetch), for each upstream.
+    // FIXME (alyssawilk do not land this without a plan for mobile.
     // TODO(alyssawilk) per LB docs and LB overview docs when unhiding.
     google.protobuf.DoubleValue predictive_prefetch_ratio = 2
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
@@ -1008,7 +1008,6 @@ message Cluster {
   // Configuration to track optional cluster stats.
   TrackClusterStats track_cluster_stats = 49;
 
-  // [#not-implemented-hide:]
   // Prefetch configuration for this cluster.
   PrefetchPolicy prefetch_policy = 50;
 

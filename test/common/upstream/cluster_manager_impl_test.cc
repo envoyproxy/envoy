@@ -23,6 +23,7 @@ using ::testing::DoAll;
 using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Invoke;
+using ::testing::InvokeWithoutArgs;
 using ::testing::Mock;
 using ::testing::NiceMock;
 using ::testing::Return;
@@ -4158,8 +4159,10 @@ public:
     // Set up the HostSet.
     host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
     host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host3_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host4_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
 
-    HostVector hosts{host1_, host2_};
+    HostVector hosts{host1_, host2_, host3_, host4_};
     auto hosts_ptr = std::make_shared<HostVector>(hosts);
 
     // Sending non-mergeable updates.
@@ -4171,6 +4174,8 @@ public:
   Cluster* cluster_{};
   HostSharedPtr host1_;
   HostSharedPtr host2_;
+  HostSharedPtr host3_;
+  HostSharedPtr host4_;
 };
 
 TEST_F(PrefetchTest, PrefetchOff) {
@@ -4204,6 +4209,95 @@ TEST_F(PrefetchTest, PrefetchOn) {
       .Times(2)
       .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
   cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default, nullptr);
+}
+
+TEST_F(PrefetchTest, PrefetchHighHttp) {
+  // With prefetch set to 3, the first request will kick off 3 prefetch attempts.
+  initialize(3);
+  int http_prefetch = 0;
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
+      .Times(4)
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+        auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
+        ON_CALL(*ret, maybePrefetch(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+          ++http_prefetch;
+          return true;
+        }));
+        return ret;
+      }));
+  cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                           Http::Protocol::Http11, nullptr);
+  // Expect prefetch to be called 3 times across the two hosts.
+  EXPECT_EQ(3, http_prefetch);
+}
+
+TEST_F(PrefetchTest, PrefetchHighTcp) {
+  // With prefetch set to 3, the first request will kick off 3 prefetch attempts.
+  initialize(3);
+  int tcp_prefetch = 0;
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .Times(4)
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Tcp::ConnectionPool::Instance* {
+        auto* ret = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+        ON_CALL(*ret, maybePrefetch(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+          ++tcp_prefetch;
+          return true;
+        }));
+        return ret;
+      }));
+  cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default, nullptr);
+  // Expect prefetch to be called 3 times across the two hosts.
+  EXPECT_EQ(3, tcp_prefetch);
+}
+
+TEST_F(PrefetchTest, PrefetchCappedAt3) {
+  // With prefetch set to 20, no more than 3 connections will be prefetched.
+  initialize(20);
+  int http_prefetch = 0;
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
+      .Times(4)
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+        auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
+        ON_CALL(*ret, maybePrefetch(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+          ++http_prefetch;
+          return true;
+        }));
+        return ret;
+      }));
+  cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                           Http::Protocol::Http11, nullptr);
+  // Expect prefetch to be called 3 times across the two hosts.
+  EXPECT_EQ(3, http_prefetch);
+
+  // A subsequent call to get a connection will consume one of the prefetched
+  // connections, leaving two in queue, and kick off 2 more. This time we won't
+  // do the full 3 as the number of outstanding prefetches is limited by the
+  // number of healthy hosts.
+  http_prefetch = 0;
+  cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                           Http::Protocol::Http11, nullptr);
+  EXPECT_EQ(2, http_prefetch);
+}
+
+TEST_F(PrefetchTest, PrefetchCappedByMaybePrefetch) {
+  // Set prefetch high, and verify prefetching stops when maybePrefetch returns false.
+  initialize(20);
+  int http_prefetch_calls = 0;
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
+      .Times(2)
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+        auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
+        ON_CALL(*ret, maybePrefetch(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+          ++http_prefetch_calls;
+          // Force maybe prefetch to fail.
+          return false;
+        }));
+        return ret;
+      }));
+  cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                           Http::Protocol::Http11, nullptr);
+  // Expect prefetch to be called once and then prefetching is stopped.
+  EXPECT_EQ(1, http_prefetch_calls);
 }
 
 } // namespace
