@@ -864,7 +864,7 @@ message ExplicitHttpConfig {
 }
 
 // If this is used, the cluster can use either of the configured protocols, and
-// will use whichecer protocol was used by the downstream connection.
+// will use whichever protocol was used by the downstream connection.
 message UseDownstreamHttpConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.UseDownstreamHttpConfig";
@@ -887,23 +887,37 @@ message AlpnHttpConfig {
 // HttpProtocolOptions specifies Http upstream protocol options. This object
 // is used in
 // :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v4alpha.Cluster.typed_extension_protocol_options>`,
-// // keyed by the name `envoy.filters.network.http_connection_manager`.
+// keyed by the name `envoy.filters.network.http_connection_manager`.
 //
-// This controls what protocol should be used for upstream.
+// This controls what protocol(s) should be used for upstream and how said protocol(s) are configured.
 // [#next-free-field: 6]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions";
 
+  // This contains options common across HTTP/1 and HTTP/2
   config.core.v4alpha.HttpProtocolOptions common_http_protocol_options = 1;
 
+  // This contains common protocol options which are only applied upstream.
   config.core.v4alpha.UpstreamHttpProtocolOptions upstream_http_protocol_options = 2;
 
+  // This controls the actual protocol to be used upstream.
+  //
   oneof upstream_protocol_options {
+    // To explicitly configure either HTTP/1 or HTTP/2 (but not both!) use explicit_http_config.
+    // If the explicit_http_config is empty, HTTP/1.1 is used.
     ExplicitHttpConfig explicit_http_config = 3;
 
+    // This allows switching on protocol based on what protocol the downstream
+    // connection used.
     UseDownstreamHttpConfig use_downstream_protocol_config = 4;
 
+    // Finally to allow HTTP/2 and HTTP/1 based on what the upstream supports,
+    // use the AlpnHttpConfig. This must only be configured with a transport
+    // socket which supports ALPN negotiation (e.g. TLS).
+    // Both HTTP/1 and HTTP/2 will always be used based on the ALPN negotiation,
+    // even if not explicitly configured.
+    // If ALPN negotiation fails, HTTP/1 will be used.
     AlpnHttpConfig alpn_config = 5;
   }
 }

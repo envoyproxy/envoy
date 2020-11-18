@@ -864,7 +864,7 @@ message ExplicitHttpConfig {
 }
 
 // If this is used, the cluster can use either of the configured protocols, and
-// will use whichecer protocol was used by the downstream connection.
+// will use whichever protocol was used by the downstream connection.
 message UseDownstreamHttpConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.UseDownstreamHttpConfig";
