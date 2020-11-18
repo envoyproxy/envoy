@@ -1175,8 +1175,8 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
 
   // Send an upstream reply.
   auto* upstream = fake_upstreams_.front().get();
-  auto buf = Http2Frame::makeMalformedRequestWithZerolenHeader(Http2Frame::makeClientStreamId(0),
-                                                               "host", "/");
+  const auto buf =
+      Http2Frame::makeMalformedResponseWithZerolenHeader(Http2Frame::makeClientStreamId(0));
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
 
   response->waitForEndStream();
@@ -1210,8 +1210,8 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
 
   // Send an upstream reply.
   auto* upstream = fake_upstreams_.front().get();
-  const auto buf = Http2Frame::makeMalformedRequestWithZerolenHeader(
-      Http2Frame::makeClientStreamId(0), "host", "/");
+  const auto buf =
+      Http2Frame::makeMalformedResponseWithZerolenHeader(Http2Frame::makeClientStreamId(0));
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
 
   // Make sure upstream and downstream got RST_STREAM from the server.
