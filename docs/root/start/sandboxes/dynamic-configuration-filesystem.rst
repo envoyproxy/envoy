@@ -115,7 +115,7 @@ the ``example_proxy_cluster`` should now be configured to proxy to ``service2``:
 
 .. code-block:: console
 
-   $ curl -s http://localhost:19000/config_dump jq -r '.configs[1].dynamic_active_clusters'
+   $ curl -s http://localhost:19000/config_dump | jq -r '.configs[1].dynamic_active_clusters'
 
 .. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters-updated.json
    :language: json
