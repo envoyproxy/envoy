@@ -6,6 +6,7 @@ MANUAL="${MANUAL:-}"
 NAME="${NAME:-}"
 PATHS="${PATHS:-.}"
 UPARGS="${UPARGS:-}"
+EXTRA_CURL_ARGS="${EXTRA_CURL_ARGS:-}"
 
 
 run_log () {
@@ -72,7 +73,7 @@ cleanup () {
 
 _curl () {
     local arg curl_command
-    curl_command=(curl -s)
+    curl_command=(curl -s "${EXTRA_CURL_ARGS[@]}")
     if [[ ! "$*" =~ "-X" ]]; then
         curl_command+=(-X GET)
     fi
