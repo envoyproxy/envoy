@@ -1,50 +1,39 @@
 .. _arch_overview_aggregate_cluster:
 
-Aggregate Cluster
+聚合集群
 =================
 
-Aggregate cluster is used for failover between clusters with different configuration, e.g., from EDS
-upstream cluster to STRICT_DNS upstream cluster, from cluster using ROUND_ROBIN load balancing 
-policy to cluster using MAGLEV, from cluster with 0.1s connection timeout to cluster with 1s 
-connection timeout, etc. Aggregate cluster loosely couples multiple clusters by referencing their 
-name in the :ref:`configuration <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`. The
-fallback priority is defined implicitly by the ordering in the :ref:`clusters list <envoy_v3_api_field_extensions.clusters.aggregate.v3.ClusterConfig.clusters>`.
-Aggregate cluster uses tiered load balancing. The load balancer chooses cluster and priority first 
-and then delegates the load balancing to the load balancer of the selected cluster. The top level 
-load balancer reuses the existing load balancing algorithm by linearizing the priority set of 
-multiple clusters into one. 
+聚合集群用于不同配置的集群之间的故障切换，例如，从 EDS 上游集群到 STRICT_DNS 上游集群，从使用 ROUND_ROBIN 负载均衡策略的集群到使用 MAGLEV 的集群，从连接超时 0.1s 的集群到连接超时 1s 的集群等。聚合集群通过在 :ref:`配置 <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>` 中引用它们的名称松散地耦合多个集群。降级优先级由 :ref:`集群列表 <envoy_v3_api_field_extensions.clusters.aggregate.v3.ClusterConfig.clusters>` 中的排序隐式定义。
 
-Linearize Priority Set
+聚合集群使用分层负载均衡。负载均衡器首先选择集群和优先级，然后将负载均衡委托给所选集群的负载均衡器。顶层负载均衡器通过将多个集群的优先级集线性化为一个集群，重用现有的负载均衡算法。
+
+线性化优先级设置
 ----------------------
 
-Upstream hosts are divided into multiple :ref:`priority levels <arch_overview_load_balancing_priority_levels>` 
-and each priority level contains a list of healthy, degraded and unhealthy hosts. Linearization is 
-used to simplify the host selection during load balancing by merging priority levels from multiple 
-clusters. For example, primary cluster has 3 priority levels, secondary has 2 and tertiary has 2 and
-the failover ordering is primary, secondary, tertiary. 
+上游主机被划分为多个 :ref:`优先级 <arch_overview_load_balancing_priority_levels>`，每个优先级包含健康、降级和不健康的主机列表。线性化是通过合并多个集群的优先级来简化负载均衡过程中的主机选择。例如，一级集群有 3 个优先级，二级有 2 个，三级有 2 个，故障切换顺序按一级、二级、三级集群先后展开。 
 
-+-----------+----------------+-------------------------------------+
-| Cluster   | Priority Level |  Priority Level after Linearization |
-+===========+================+=====================================+
-| Primary   | 0              |  0                                  |
-+-----------+----------------+-------------------------------------+
-| Primary   | 1              |  1                                  |
-+-----------+----------------+-------------------------------------+
-| Primary   | 2              |  2                                  |
-+-----------+----------------+-------------------------------------+
-| Secondary | 0              |  3                                  |
-+-----------+----------------+-------------------------------------+
-| Secondary | 1              |  4                                  |
-+-----------+----------------+-------------------------------------+
-| Tertiary  | 0              |  5                                  |
-+-----------+----------------+-------------------------------------+
-| Tertiary  | 1              |  6                                  |
-+-----------+----------------+-------------------------------------+
++----------+--------+------------------+
+|   集群   | 优先级 | 线性化后的优先级 |
++==========+========+==================+
+| 一级集群 | 0      | 0                |
++----------+--------+------------------+
+| 一级集群 | 1      | 1                |
++----------+--------+------------------+
+| 一级集群 | 2      | 2                |
++----------+--------+------------------+
+| 二级集群 | 0      | 3                |
++----------+--------+------------------+
+| 二级集群 | 1      | 4                |
++----------+--------+------------------+
+| 三级集群 | 0      | 5                |
++----------+--------+------------------+
+| 三级集群 | 1      | 6                |
++----------+--------+------------------+
 
-Example
+示例
 -------
 
-A sample aggregate cluster configuration could be:
+一个聚合集群配置的示例如下所示：
 
 .. code-block:: yaml
 
@@ -61,25 +50,20 @@ A sample aggregate cluster configuration could be:
       - secondary
       - tertiary
 
-Note: :ref:`PriorityLoad retry plugins <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` won't 
-work for aggregate cluster because the aggregate load balancer will override the *PriorityLoad* 
-during load balancing.
+注意：:ref:`PriorityLoad 重试插件 <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` 对于聚合集群来说是不起作用的，因为聚合负载均衡器在负载均衡过程中会覆盖 *PriorityLoad*。
 
 
-Load Balancing Example
+负载均衡示例
 ----------------------
 
-Aggregate cluster uses tiered load balancing algorithm and the top tier is distributing traffic to 
-different clusters according to the health score across all :ref:`priorities <arch_overview_load_balancing_priority_levels>` 
-in each cluster. The aggregate cluster in this section includes two clusters which is different from
-what the above configuration describes.
- 
+聚合集群采用分层负载均衡算法，顶层根据每个集群中所有 :ref:`优先级 <arch_overview_load_balancing_priority_levels>` 的健康评分将流量分配到不同集群。本节中的聚合集群包括两个集群，与上面的配置描述不同。
+
 +-----------------------------------------------------------------------------------------------------------------------+--------------------+----------------------+
-| Cluster                                                                                                               | Traffic to Primary | Traffic to Secondary |                                                
+| 集群                                                                                                                  | 到一级集群的流量   | 到二级集群的流量     |                                                
 +=======================================================================+===============================================+====================+======================+
-| Primary                                                               | Secondary                                     |                                           |
+| 一级集群                                                              | 二级集群                                      |                                           |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+                                           +
-| P=0 Healthy Endpoints | P=1 Healthy Endpoints | P=2 Healthy Endpoints | P=0 Healthy Endpoints | P=1 Healthy Endpoints |                                           |
+| P=0 健康端点          | P=1 健康端点          | P=2 健康端点          | P=0 健康端点          | P=1 健康端点          |                                           |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 | 100%                  | 100%                  | 100%                  | 100%                  | 100%                  | 100%               | 0%                   |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
@@ -100,31 +84,13 @@ what the above configuration describes.
 | 0%                    | 0%                    | 0%                    | 72%                   | 0%                    | 0%                 | 100%                 |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 
-Note: The above load balancing uses default :ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>` 
-which is 1.4 which means if 80% of the endpoints in a priority level are healthy, that level is 
-still considered fully healthy because 80 * 1.4 > 100.
+注意：上面的负载均衡使用默认的 :ref:`超额供给系数 <arch_overview_load_balancing_overprovisioning_factor>`，即 1.4，这意味着如果一个优先级中 80% 的端点是健康的，那么这个级别仍然被认为是完全健康的，因为 80 * 1.4 > 100。
 
-The example shows how the aggregate cluster level load balancer selects the cluster. E.g., healths 
-of {{20, 20, 10}, {25, 25}} would result in a priority load of {{28%, 28%, 14%}, {30%, 0%}} of 
-traffic. When normalized total health drops below 100, traffic is distributed after normalizing the 
-levels' health scores to that sub-100 total. E.g. healths of {{20, 0, 0}, {20, 0}} (yielding a 
-normalized total health of 56) would be normalized and each cluster will receive 20 * 1.4 / 56 = 50%
-of the traffic which results in a priority load of {{50%, 0%, 0%}, {50%, 0%, 0%}} of traffic.
+该示例展示了聚合集群级负载均衡器如何选择集群。例如，健康度为 {{20，20，10}，{25，25}} 将导致优先负载为 {{28%，28%，14%}，{30%，0%}} 的流量分配。当归一化后的总健康度降到 100 以下时，将各等级的健康度分数归一化到 100 以下的总健康度后进行流量分配。如：健康指数为 {{20，0，0}，{20，0}}。产生的归一化总健康度为 56）将归一化，每个集群将收到 20 * 1.4 / 56 = 50% 的流量，这导致优先负载为 {{50%，0%，0%}，{50%，0%，0%}} 的流量。
 
-The load balancer reuses priority level logic to help with the cluster selection. The priority level
-logic works with integer health scores. The health score of a level is (percent of healthy hosts in 
-the level) * (overprovisioning factor), capped at 100%. P=0 endpoints receive level 0's health 
-score percent of the traffic, with the rest flowing to P=1 (assuming P=1 is 100% healthy - more on 
-that later). The integer percents of traffic that each cluster receives are collectively called the 
-system's "cluster priority load". For instance, for primary cluster, when 20% of P=0 endpoints are 
-healthy, 20% of P=1 endpoints are healthy, and 10% of P=2 endpoints are healthy; for secondary, when
-25% of P=0 endpoints are healthy and 25% of P=1 endpoints are healthy. The primary cluster will 
-receive 20% * 1.4 + 20% * 1.4 + 10% * 1.4 = 70% of the traffic. The secondary cluster will receive 
-min(100 - 70, 25% * 1.4 + 25% * 1.4) = 30% of the traffic. The traffic to all clusters sum up to 
-100. The normalized health score and priority load are pre-computed before selecting the cluster and 
-priority. 
+负载均衡器复用优先级逻辑来帮助选择集群。优先级逻辑使用整数健康分数。一个级别的健康分数是（该级别中健康主机的百分比）*（超额供给系数），上限为 100%。P=0 的端点收到 0 级的健康分数百分比的流量，其余的流量流向 P=1（假设 P=1 是 100% 健康的 — 后面会详细介绍）。每个集群收到的流量的整数百分比，统称为系统的“集群优先级负载”。例如，对于一级集群，当 20% 的 P=0 健康端点，20% 的 P=1 健康端点，10% 的 P=2 健康端点；对于二级集群，当 25% 的 P=0 健康端点，25% 的 P=1 健康端点。一级群将收到 20% * 1.4 + 20% * 1.4 + 10% * 1.4 = 70% 的流量。二级集群将收到 min(100 - 70，25% * 1.4 + 25% * 1.4) = 30% 的流量。所有集群的流量之和为 100%。在选择集群和优先级之前，会预先计算出归一化健康评分和优先级负载。
 
-To sum this up in pseudo algorithms:
+用伪代码来总结一下以上算法：
 
 ::
 
@@ -141,5 +107,4 @@ To sum this up in pseudo algorithms:
     ^       ^          ^       ^
     cluster C_0        cluster C_X
 
-The second tier is delegating the load balancing to the cluster selected in the first step and the 
-cluster could use any load balancing algorithms specified by :ref:`load balancer type <arch_overview_load_balancing_types>`.
+第二层是将负载均衡委托给第一步选择的集群，集群可以使用 :ref:`负载均衡器类型 <arch_overview_load_balancing_types>` 指定的任何负载均衡算法。
