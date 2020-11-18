@@ -296,8 +296,8 @@ void SslSocket::shutdownSsl() {
     if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
       // Windows operate under `EmulatedEdge`. These are level events that are artificially
       // made to behave like edge events. And if the rc is 0 then in that case we want read
-      // activation resumption. This code is protected with an `constexpr` if, to minimize the tax on
-      // POSIX systems that operate in Edge events.
+      // activation resumption. This code is protected with an `constexpr` if, to minimize the tax
+      // on POSIX systems that operate in Edge events.
       if (rc == 0) {
         // See https://www.openssl.org/docs/manmaster/man3/SSL_shutdown.html
         // if return value is 0,  Call SSL_read() to do a bidirectional shutdown.
