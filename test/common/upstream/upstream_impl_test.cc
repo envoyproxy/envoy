@@ -2143,7 +2143,7 @@ TEST(PrioritySet, Extend) {
 
   // Now add hosts for priority 1, and ensure they're added and subscribers are notified.
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-  auto time_source = new NiceMock<MockTimeSystem>();
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   HostVectorSharedPtr hosts(
       new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", *time_source)}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
@@ -3255,7 +3255,7 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
                                             const uint32_t pick_0, const uint32_t pick_1) {
     HostSetImpl host_set(0, overprovisioning_factor);
     std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
-    auto time_source = new NiceMock<MockTimeSystem>();
+    auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
     HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80", *time_source),
                      makeTestHost(cluster_info, "tcp://127.0.0.1:81", *time_source),
                      makeTestHost(cluster_info, "tcp://127.0.0.1:82", *time_source)};
@@ -3297,7 +3297,7 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
 // Verifies that partitionHosts correctly splits hosts based on their health flags.
 TEST(HostPartitionTest, PartitionHosts) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-  auto time_source = new NiceMock<MockTimeSystem>();
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", *time_source),
                    makeTestHost(info, "tcp://127.0.0.1:81", *time_source),
                    makeTestHost(info, "tcp://127.0.0.1:82", *time_source),
