@@ -316,9 +316,9 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
   setEndpoints(4, 4, 0);
   auto get_and_compare = [this](const uint32_t expected_factor) {
     const auto& cluster_map = test_server_->server().clusterManager().clusters();
-    EXPECT_EQ(1, cluster_map.size());
-    EXPECT_EQ(1, cluster_map.count("cluster_0"));
-    const auto& cluster_ref = cluster_map.find("cluster_0")->second;
+    EXPECT_EQ(1, cluster_map.active_clusters_.size());
+    EXPECT_EQ(1, cluster_map.active_clusters_.count("cluster_0"));
+    const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
     const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
     EXPECT_EQ(1, hostset_per_priority.size());
     const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
@@ -340,7 +340,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
   auto& priority_set = test_server_->server()
                            .clusterManager()
                            .clusters()
-                           .find("cluster_0")
+                           .active_clusters_.find("cluster_0")
                            ->second.get()
                            .prioritySet();
 

@@ -1,22 +1,28 @@
 .. _install_sandboxes_wasm_filter:
 
-WASM C++ filter
+Wasm C++ filter
 ===============
 
-This sandbox demonstrates a basic C++ Wasm filter which injects content into the body of an ``HTTP`` response, and adds
-and updates some headers.
+.. sidebar:: Requirements
 
-It also takes you through the steps required to build your own C++ Wasm filter, and run it with Envoy.
+   .. include:: _include/docker-env-setup-link.rst
 
-.. include:: _include/docker-env-setup.rst
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
 
-Step 3: Start all of our containers
-***********************************
-
-.. note::
+.. sidebar:: Compatibility
 
    The provided Wasm binary was compiled for the ``x86_64`` architecture. If you would like to use this sandbox
-   with the ``arm64`` architecture, skip to Step 5.
+   with the ``arm64`` architecture, change directory to ``examples/wasm-cc`` and skip to Step 3.
+
+This sandbox demonstrates a basic :ref:`Envoy Wasm filter <config_http_filters_wasm>` written in C++ which injects
+content into the body of an ``HTTP`` response, and adds and updates some headers.
+
+It also takes you through the steps required to build your own C++ :ref:`Wasm filter <config_http_filters_wasm>`,
+and run it with Envoy.
+
+Step 1: Start all of our containers
+***********************************
 
 First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a backend which echos back our request.
 
@@ -35,7 +41,7 @@ Change to the ``examples/wasm-cc`` folder in the Envoy repo, and start the compo
     wasm_proxy_1         /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
     wasm_web_service_1   node ./index.js                Up
 
-Step 4: Check web response
+Step 2: Check web response
 **************************
 
 The Wasm filter should inject "Hello, world" at the end of the response body when you make a request to the proxy.
@@ -55,7 +61,7 @@ The filter also sets the ``content-type`` header to ``text/plain``, and adds a c
    $ curl -v http://localhost:8000 | grep "x-wasm-custom: "
    x-wasm-custom: FOO
 
-Step 5: Compile the updated filter
+Step 3: Compile the updated filter
 **********************************
 
 There are two source code files provided for the Wasm filter.
@@ -93,10 +99,10 @@ The compiled binary should now be in the ``lib`` folder.
    -r-xr-xr-x 1 root root 59641 Oct 20 00:00 envoy_filter_http_wasm_example.wasm
    -r-xr-xr-x 1 root root 59653 Oct 20 10:16 envoy_filter_http_wasm_updated_example.wasm
 
-Step 6: Edit the Dockerfile and restart the proxy
+Step 4: Edit the Dockerfile and restart the proxy
 *************************************************
 
-Edit the ``Dockerfile-proxy`` recipe provided in the example to use the updated binary you created in step 5.
+Edit the ``Dockerfile-proxy`` recipe provided in the example to use the updated binary you created in step 3.
 
 Find the ``COPY`` line that adds the Wasm binary to the image:
 
@@ -117,7 +123,7 @@ Now, rebuild and start the proxy container.
 
    $ docker-compose up --build -d proxy
 
-Step 7: Check the proxy has been updated
+Step 5: Check the proxy has been updated
 ****************************************
 
 The Wasm filter should instead inject "Hello, Wasm world" at the end of the response body.
@@ -136,3 +142,14 @@ The ``content-type`` and ``x-wasm-custom`` headers should also have changed
 
    $ curl -v http://localhost:8000 | grep "x-wasm-custom: "
    x-wasm-custom: BAR
+
+.. seealso::
+
+   :ref:`Envoy Wasm filter <config_http_filters_wasm>`
+      Further information about the Envoy Wasm filter.
+
+   :ref:`Envoy Wasm API(V3) <envoy_v3_api_msg_extensions.filters.http.wasm.v3.Wasm>`
+      The Envoy Wasm API - version 3.
+
+   `Proxy Wasm C++ SDK <https://github.com/proxy-wasm/proxy-wasm-cpp-sdk>`_
+      WebAssembly for proxies (C++ SDK)
