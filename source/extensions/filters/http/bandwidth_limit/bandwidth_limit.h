@@ -12,6 +12,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/assert.h"
+#include "common/common/token_bucket_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/router/header_parser.h"
 #include "common/runtime/runtime_protos.h"
@@ -41,20 +42,23 @@ struct BandwidthLimitStats {
 };
 
 /**
- * Global configuration for the HTTP bandwidth limit filter.
+ * Configuration for the HTTP bandwidth limit filter.
  */
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
                Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
-               bool per_route = false);
+               TimeSource& time_source, bool per_route = false);
   ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
-  bool requestAllowed() const;
-  bool enabled() const;
-  bool enforced() const;
   BandwidthLimitStats& stats() const { return stats_; }
-  const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
+  Stats::Scope& scope() { return scope_; }
+  TimeSource& timeSource() { return time_source_; }
+  // Must call enabled() before calling limit().
+  uint64_t limit() { return limit_kbps.value(); }
+  envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit::EnableMode enable_mode() const;
+  std::shared_ptr<TokenBucketImpl> tokenBucket() { return token_bucket_; }
+  uint64_t fill_rate() { return fill_rate_; }
 
 private:
   friend class FilterTest;
@@ -62,11 +66,15 @@ private:
   static BandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   mutable BandwidthLimitStats stats_;
-  Filters::Common::BandwidthLimit::BandwidthLimiterImpl rate_limiter_;
   Runtime::Loader& runtime_;
-  Filters::BandwidthLimit::Enable_Mode enable_mode_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
-  Router::HeaderParserPtr response_headers_parser_;
+  Stats::Scope& scope_;
+  TimeSource& time_source_;
+  const absl::optional<uint64_t> limit_kbps_;
+  const Filters::BandwidthLimit::Enable_Mode enable_mode_;
+  const absl::optional<uint64_t> enforce_threshold_Kbps_;
+  const uint64_t fill_rate_;
+  // Filter chain's shared token bucket
+  std::shared_ptr<TokenBucketImpl> token_bucket_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -80,15 +88,44 @@ public:
   BandwidthFilter(FilterConfigSharedPtr config) : config_(config) {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
+
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
+
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
+
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
+
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+    encoder_callbacks_ = &callbacks;
+  }
 
 private:
   friend class FilterTest;
-  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> stream_limiter_;
   const FilterConfig* getConfig() const;
 
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   FilterConfigSharedPtr config_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> downstream_limiter_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> upstream_limiter_;
 };
 
 } // namespace BandwidthLimitFilter

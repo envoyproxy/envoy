@@ -11,7 +11,7 @@ namespace HttpFilters {
 namespace BandwidthLimitFilter {
 
 /**
- * Config registration for the local rate limit filter. @see NamedHttpFilterConfigFactory.
+ * Config registration for the bandwidth limit filter. @see NamedHttpFilterConfigFactory.
  */
 class BandwidthLimitFilterConfig
     : public Common::FactoryBase<

@@ -4,11 +4,12 @@
 #include "envoy/common/token_bucket.h"
 
 #include "common/common/utility.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 
 /**
- * A class that implements token bucket interface (not thread-safe).
+ * A class that implements token bucket interface.
  */
 class TokenBucketImpl : public TokenBucket {
 public:
@@ -18,7 +19,8 @@ public:
    * @param fill_rate supplies the number of tokens that will return to the bucket on each second.
    * The default is 1.
    */
-  explicit TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate = 1);
+  explicit TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate = 1,
+                           bool allow_multiple_resets = false)
 
   // TokenBucket
   uint64_t consume(uint64_t tokens, bool allow_partial) override;
@@ -29,8 +31,10 @@ private:
   const double max_tokens_;
   const double fill_rate_;
   double tokens_;
+  const absl::optional<bool> has_reset_;
   MonotonicTime last_fill_;
   TimeSource& time_source_;
+  absl::Mutex mutex_;
 };
 
 } // namespace Envoy
