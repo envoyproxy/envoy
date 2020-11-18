@@ -176,6 +176,30 @@ TEST(HessianUtilsTest, peekLong) {
   // Single octet longs
   {
     Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xeb'}));
+    size_t size;
+    EXPECT_EQ(11, HessianUtils::peekLong(buffer, &size));
+    EXPECT_EQ(1, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xec'}));
+    size_t size;
+    EXPECT_EQ(12, HessianUtils::peekLong(buffer, &size));
+    EXPECT_EQ(1, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xed'}));
+    size_t size;
+    EXPECT_EQ(13, HessianUtils::peekLong(buffer, &size));
+    EXPECT_EQ(1, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xef'}));
     size_t size;
     EXPECT_EQ(15, HessianUtils::peekLong(buffer, &size));
@@ -220,6 +244,38 @@ TEST(HessianUtilsTest, peekLong) {
     buffer.add(std::string({'\xf7', 0x00}));
     size_t size;
     EXPECT_EQ(-256, HessianUtils::peekLong(buffer, &size));
+    EXPECT_EQ(2, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xfc', 0x00}));
+    size_t size;
+    EXPECT_EQ(1024, HessianUtils::peekLong(buffer, &size));
+    EXPECT_EQ(2, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xfc', '\xff'}));
+    size_t size;
+    EXPECT_EQ(1279, HessianUtils::peekLong(buffer, &size));
+    EXPECT_EQ(2, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xfd', 0x00}));
+    size_t size;
+    EXPECT_EQ(1280, HessianUtils::peekLong(buffer, &size));
+    EXPECT_EQ(2, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xfd', '\xff'}));
+    size_t size;
+    EXPECT_EQ(1535, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(2, size);
   }
 
@@ -406,6 +462,22 @@ TEST(HessianUtilsTest, peekInt) {
     buffer.add(std::string({'\xc7', 0x00}));
     size_t size;
     EXPECT_EQ(-256, HessianUtils::peekInt(buffer, &size));
+    EXPECT_EQ(2, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xcc', 0x00}));
+    size_t size;
+    EXPECT_EQ(1024, HessianUtils::peekInt(buffer, &size));
+    EXPECT_EQ(2, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xcc', '\xff'}));
+    size_t size;
+    EXPECT_EQ(1279, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(2, size);
   }
 

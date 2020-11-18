@@ -134,6 +134,11 @@ service Bookstore {
       get: "/bigbook"
     };
   }
+  rpc PostWildcard(EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/wildcard/{arg=**}"
+    };
+  }
 }
 
 service ServiceWithResponseBody {

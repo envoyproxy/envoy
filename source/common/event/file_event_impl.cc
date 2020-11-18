@@ -4,7 +4,6 @@
 
 #include "common/common/assert.h"
 #include "common/event/dispatcher_impl.h"
-#include "common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
@@ -13,6 +12,7 @@ namespace Event {
 
 FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
+<<<<<<< HEAD
     : cb_(cb), fd_(fd), trigger_(trigger), enabled_events_(events),
       activate_fd_events_next_event_loop_(
           // Only read the runtime feature if the runtime loader singleton has already been created.
@@ -24,6 +24,13 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
               ? Runtime::runtimeFeatureEnabled(
                     "envoy.reloadable_features.activate_fds_next_event_loop")
               : true) {
+=======
+    : cb_(cb), fd_(fd), trigger_(trigger),
+      activation_cb_(dispatcher.createSchedulableCallback([this]() {
+        ASSERT(injected_activation_events_ != 0);
+        mergeInjectedEventsAndRunCb(0);
+      })) {
+>>>>>>> upstream/master
   // Treat the lack of a valid fd (which in practice should only happen if we run out of FDs) as
   // an OOM condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(fd), "");
@@ -37,12 +44,6 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
 
   assignEvents(events, &dispatcher.base());
   event_add(&raw_event_, nullptr);
-  if (activate_fd_events_next_event_loop_) {
-    activation_cb_ = dispatcher.createSchedulableCallback([this]() {
-      ASSERT(injected_activation_events_ != 0);
-      mergeInjectedEventsAndRunCb(0);
-    });
-  }
 }
 
 void FileEventImpl::activate(uint32_t events) {
@@ -50,26 +51,6 @@ void FileEventImpl::activate(uint32_t events) {
   ASSERT(events != 0);
   // Only supported event types are set.
   ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
-
-  if (!activate_fd_events_next_event_loop_) {
-    // Legacy implementation
-    int libevent_events = 0;
-    if (events & FileReadyType::Read) {
-      libevent_events |= EV_READ;
-    }
-
-    if (events & FileReadyType::Write) {
-      libevent_events |= EV_WRITE;
-    }
-
-    if (events & FileReadyType::Closed) {
-      libevent_events |= EV_CLOSED;
-    }
-
-    ASSERT(libevent_events);
-    event_active(&raw_event_, libevent_events, 0);
-    return;
-  }
 
   // Schedule the activation callback so it runs as part of the next loop iteration if it is not
   // already scheduled.
@@ -124,7 +105,7 @@ void FileEventImpl::updateEvents(uint32_t events) {
 }
 
 void FileEventImpl::setEnabled(uint32_t events) {
-  if (activate_fd_events_next_event_loop_ && injected_activation_events_ != 0) {
+  if (injected_activation_events_ != 0) {
     // Clear pending events on updates to the fd event mask to avoid delivering events that are no
     // longer relevant. Updating the event mask will reset the fd edge trigger state so the proxy
     // will be able to determine the fd read/write state without need for the injected activation
@@ -162,12 +143,12 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
 }
 
 void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
-  if (activate_fd_events_next_event_loop_ && injected_activation_events_ != 0) {
+  if (injected_activation_events_ != 0) {
     // TODO(antoniovicente) remove this adjustment to activation events once ConnectionImpl can
     // handle Read and Close events delivered together.
     if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
       if (events & FileReadyType::Closed &&
-          activate_fd_events_next_event_loop_ & FileReadyType::Read) {
+          injected_activation_events_ & FileReadyType::Read) {
         // We never ask for both early close and read at the same time. If close is requested
         // keep that instead.
         injected_activation_events_ = injected_activation_events_ & ~FileReadyType::Read;
