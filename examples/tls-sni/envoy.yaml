@@ -95,16 +95,6 @@ static_resources:
                   cluster: proxy-domain3
           http_filters:
           - name: envoy.filters.http.router
-      transport_socket:
-        name: envoy.transport_sockets.tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-          common_tls_context:
-            tls_certificates:
-              certificate_chain:
-                filename: certs/domain3.crt.pem
-              private_key:
-                filename: certs/domain3.key.pem
 
   clusters:
   - name: proxy-domain1
@@ -147,4 +137,4 @@ static_resources:
             address:
               socket_address:
                 address: http-upstream3
-                port_value: 80
+                port_value: 443

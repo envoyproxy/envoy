@@ -31,4 +31,4 @@ services:
     image: mendhak/http-https-echo
     hostname: http-upstream3
     environment:
-      - HTTPS_PORT=0
+      - HTTP_PORT=0
