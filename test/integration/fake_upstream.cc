@@ -344,6 +344,23 @@ void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
   ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", code);
 }
 
+void FakeHttpConnection::raiseGoAway() {
+  ASSERT(type_ == Type::HTTP2);
+
+  codec_->goAway();
+}
+
+void FakeHttpConnection::raiseProtocolError() {
+  ASSERT(type_ == Type::HTTP2);
+
+  Http::Legacy::Http2::ServerConnectionImpl* codec =
+      dynamic_cast<Http::Legacy::Http2::ServerConnectionImpl*>(codec_.get());
+
+  ASSERT(codec != nullptr);
+
+  codec->protocolError();
+}
+
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase waiting for disconnect");
   absl::MutexLock lock(&lock_);

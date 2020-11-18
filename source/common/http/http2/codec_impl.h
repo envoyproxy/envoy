@@ -105,6 +105,11 @@ public:
   void goAway() override;
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
+
+  // Send a GOAWAY frame with the PROTOCOL_ERROR code. This is used for
+  // integration testing and is not on the public interface.
+  void protocolError();
+
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
