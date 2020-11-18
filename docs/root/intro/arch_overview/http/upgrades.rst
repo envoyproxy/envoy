@@ -112,7 +112,7 @@ supporting HTTP/2):
 [HTTP Server] --- raw HTTP --- [L2 Envoy]  --- HTTP tunneled over HTTP/1.1  --- [L1 Envoy]  --- raw HTTP  --- [HTTP Client]
 
 Note that when using HTTP/1 CONNECT you will end up having a TCP connection
-bewteen L1 and L2 Envoy for each TCP client connection, it is preferable to use
+between L1 and L2 Envoy for each TCP client connection, it is preferable to use
 HTTP/2 when you have the choice.
 
 Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
