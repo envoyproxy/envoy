@@ -1,8 +1,9 @@
+#include <stdio.h>
+
 #include "test/test_common/utility.h"
 #include "test/test_common/environment.h"
-#include "gtest/gtest.h"
 
-#include <stdio.h>
+#include "gtest/gtest.h"
 
 namespace Envoy {
 
