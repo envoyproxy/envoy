@@ -4,11 +4,16 @@
 
 namespace Envoy {
 
-TokenBucketImpl::TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate)
+TokenBucketImpl::TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate,
+                                 bool allow_multiple_resets)
     : max_tokens_(max_tokens), fill_rate_(std::abs(fill_rate)), tokens_(max_tokens),
-      last_fill_(time_source.monotonicTime()), time_source_(time_source) {}
+      last_fill_(time_source.monotonicTime()), time_source_(time_source) {
+  if (!allow_multiple_resets)
+    has_reset_ = absl::optional<bool>(false);
+}
 
 uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
+  absl::WriterMutexLock lock(&mutex_);
   if (tokens_ < max_tokens_) {
     const auto time_now = time_source_.monotonicTime();
     tokens_ = std::min((std::chrono::duration<double>(time_now - last_fill_).count() * fill_rate_) +
@@ -31,6 +36,7 @@ uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
 
 std::chrono::milliseconds TokenBucketImpl::nextTokenAvailable() {
   // If there are tokens available, return immediately.
+  absl::ReaderMutexLock lock(&mutex_);
   if (tokens_ >= 1) {
     return std::chrono::milliseconds(0);
   }
@@ -40,8 +46,13 @@ std::chrono::milliseconds TokenBucketImpl::nextTokenAvailable() {
 
 void TokenBucketImpl::reset(uint64_t num_tokens) {
   ASSERT(num_tokens <= max_tokens_);
+  absl::WriterMutexLock lock(&mutex_);
+  if (has_reset_.has_value() && has_reset_.value()) {
+    return;
+  }
   tokens_ = num_tokens;
   last_fill_ = time_source_.monotonicTime();
+  has_reset_ = absl::optional<bool>(true);
 }
 
 } // namespace Envoy

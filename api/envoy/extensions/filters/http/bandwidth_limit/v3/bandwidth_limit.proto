@@ -21,20 +21,25 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 6]
 message BandwidthLimit {
-  // Defines the mode for the bandwidth limit filter. 
-  enum Enable_Mode {
+  // Defines the mode for the bandwidth limit filter.
+  // Values represent bitmasks.
+  enum EnableMode {
       // Filter is disabled.
       Disabled = 0;
-      // Filter enabled for Ingress traffic only.
-      IngressOnly = 1;
-      // Filter enabled for Egress traffic only.
-      EgressOnly = 2;
+      // Filter enabled only for Ingress traffic.
+      Ingress = 1;
+      // Filter enabled only for Egress traffic.
+      Egress = 2;
       // Filter enabled for both Ingress and Egress traffic.
-      IngressAndEgress = 3;
+      IngressAndEgress = 4;
   }
 
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The enable mode for the bandwidth limit filter.
+  // Default is Disabled.
+  EnableMode enable_mode = 2 [(validate.rules).enum = {defined_only: true}];;
 
   // The limit supplied in KiB/s.
   //
@@ -46,16 +51,12 @@ message BandwidthLimit {
   // .. note::
   //   When using per route configuration, the limit becomes unique to that route.
   //
-  uint64 limit_kbps = 2 [(validate.rules).uint64 = {gte: 1}];
+  uint64 limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
 
-  // Optional key to use for tokenizing per route/vhost. If not specified, a default value will be used.
-  string token_key = 3 [(validate.rules).string = {min_len: 1}];
+  // Optional fill_rate for the token buckets (per second). Defaults to 64.
+  uint64 fill_rate = 4 [(validate.rules).uint64 = {gte: 1}];
 
   // If set, the bandwidth limit will be applied only when total dataplane bandwidth usage crosses this
   // value. Defaults to 0 means disable limits are always applied.
-  uint64 enable_threshold_kbps = 4 [(validate.rules).uint64 = {gte: 1}];
-
-  // The enable mode for the bandwidth limit filter.
-  // Default is Disabled.
-  Enable_Mode enable_mode = 5 [(validate.rules).enum = {defined_only: true}];;
+  uint64 enable_threshold_kbps = 5 [(validate.rules).uint64 = {gte: 1}];
 }

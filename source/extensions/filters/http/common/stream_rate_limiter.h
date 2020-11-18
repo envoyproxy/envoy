@@ -19,6 +19,11 @@ namespace Common {
  */
 class StreamRateLimiter : Logger::Loggable<Logger::Id::filter> {
 public:
+  // We currently divide each second into 64 segments for the token bucket. Thus, the rate limit is
+  // KiB per second, divided into 16 segments, ~16ms apart. 64 is used because it divides into 1024
+  // evenly.
+  static constexpr uint64_t DefaultFillRate = 64;
+
   /**
    * @param max_kbps maximum rate in KiB/s.
    * @param max_buffered_data maximum data to buffer before invoking the pause callback.
@@ -31,11 +36,13 @@ public:
    * @param dispatcher the stream's dispatcher to use for creating timers.
    * @param scope the stream's scope
    */
-  StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
+  StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,                    
                     std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope);
+                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
+                    std::shared_ptr<TokenBucketImpl> token_bucket = nullptr,
+                    uint64_t fill_rate = DefaultFillRate);
 
   /**
    * Called by the stream to write data. All data writes happen asynchronously, the stream should
@@ -59,16 +66,11 @@ public:
 private:
   void onTokenTimer();
 
-  // We currently divide each second into 16 segments for the token bucket. Thus, the rate limit is
-  // KiB per second, divided into 16 segments, ~63ms apart. 16 is used because it divides into 1024
-  // evenly.
-  static constexpr uint64_t SecondDivisor = 16;
-
   const uint64_t bytes_per_time_slice_;
+  const uint64_t second_divisor_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
   const ScopeTrackedObject& scope_;
-  TokenBucketImpl token_bucket_;
   Event::TimerPtr token_timer_;
   bool saw_data_{};
   bool saw_end_stream_{};
