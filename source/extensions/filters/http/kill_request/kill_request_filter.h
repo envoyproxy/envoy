@@ -35,7 +35,7 @@ public:
       Random::RandomGenerator& random_generator)
       : kill_request_(kill_request), random_generator_(random_generator) {}
 
-  ~KillRequestFilter() override {}
+  ~KillRequestFilter() override = default;
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -80,7 +80,7 @@ public:
 private:
   // Return a random boolean value, with probability configured in KillRequest
   // equaling true.
-  bool IsKillRequestEnabled();
+  bool isKillRequestEnabled();
 
   const envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request_;
   Random::RandomGenerator& random_generator_;

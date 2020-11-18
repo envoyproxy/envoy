@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace KillRequest {
 
-bool KillRequestFilter::IsKillRequestEnabled() {
+bool KillRequestFilter::isKillRequestEnabled() {
   uint32_t denominator = 100;
   if (kill_request_.probability().denominator() ==
       envoy::type::v3::FractionalPercent::TEN_THOUSAND) {
@@ -32,7 +32,7 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (is_kill_request && IsKillRequestEnabled()) {
+  if (is_kill_request && isKillRequestEnabled()) {
     // Crash Envoy.
     raise(SIGABRT);
   }
