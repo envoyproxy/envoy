@@ -100,9 +100,6 @@ TEST_F(FatalActionTest, ShouldOnlyBeAbleToRunUnsafeActionsFromThreadThatRanSafeA
   FatalErrorHandler::registerFatalActions(std::move(safe_actions_), std::move(unsafe_actions_),
                                           Thread::threadFactoryForTest());
 
-  // Jump to run unsafe actions, without running safe actions.
-  ASSERT_EQ(FatalErrorHandler::runUnsafeActions(), Status::SafeActionsNotYetRan);
-
   absl::Notification run_unsafe_actions;
   absl::Notification ran_safe_actions;
   auto fatal_action_thread =

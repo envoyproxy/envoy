@@ -44,16 +44,9 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
     break;
   }
   case FatalAction::Status::AlreadyRanOnThisThread:
-    // We caused a different fatal signal to be raised.
-    // It can't be the the same signal since the bit would be saturated and when
-    // we return from the handler we'll have restored the default signal handler
-    // to exit the process.
+    // We caused another fatal signal to be raised.
     std::cerr << "Our FatalActions triggered a fatal signal.\n";
     break;
-  case FatalAction::Status::SafeActionsNotYetRan:
-    // This should not be reachable as runSafeActions does not return this
-    // value.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   signal(sig, SIG_DFL);

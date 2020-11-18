@@ -24,10 +24,6 @@ enum class Status {
 
   // We have already ran those actions on this thread.
   AlreadyRanOnThisThread,
-
-  // We haven't yet ran safe actions. Safe Actions must run before Unsafe
-  // Actions run.
-  SafeActionsNotYetRan,
 };
 
 // A simple class which manages the Fatal Actions registered via the

@@ -42,9 +42,8 @@ ABSL_CONST_INIT std::atomic<int64_t> failure_tid{-1};
 // Executes the Fatal Actions provided.
 void runFatalActionsInternal(const FatalAction::FatalActionPtrList& actions) {
   // Exchange the fatal_error_handlers pointer so other functions cannot
-  // concurrently access the list. Use memory order acquire_release since
-  // exchange is a read-modify-write operation.
-  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_acq_rel);
+  // concurrently access the list.
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_seq_cst);
   if (list == nullptr) {
     return;
   }
@@ -56,7 +55,7 @@ void runFatalActionsInternal(const FatalAction::FatalActionPtrList& actions) {
 
   // Restore the fatal_error_handlers pointer so subsequent calls using the list
   // can succeed.
-  fatal_error_handlers.store(list, std::memory_order_release);
+  fatal_error_handlers.store(list, std::memory_order_seq_cst);
 }
 
 // Helper function to run exclusively either safe or unsafe actions depending on
@@ -66,7 +65,7 @@ void runFatalActionsInternal(const FatalAction::FatalActionPtrList& actions) {
 FatalAction::Status runFatalActions(FatalActionType action_type) {
   // Check that registerFatalActions has already been called.
   FatalAction::FatalActionManager* action_manager =
-      fatal_action_manager.load(std::memory_order_acquire);
+      fatal_action_manager.load(std::memory_order_seq_cst);
 
   if (action_manager == nullptr) {
     return FatalAction::Status::ActionManangerUnset;
@@ -78,8 +77,7 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
     // Try to run safe actions
     int64_t expected_tid = -1;
 
-    if (failure_tid.compare_exchange_strong(expected_tid, my_tid, std::memory_order_acq_rel,
-                                            std::memory_order_acquire)) {
+    if (failure_tid.compare_exchange_strong(expected_tid, my_tid, std::memory_order_seq_cst)) {
       // Run the actions
       runFatalActionsInternal(action_manager->getSafeActions());
       return FatalAction::Status::Success;
@@ -89,14 +87,13 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
 
   } else {
     // Try to run unsafe actions
-    int64_t failing_tid = failure_tid.load(std::memory_order_acquire);
+    int64_t failing_tid = failure_tid.load(std::memory_order_seq_cst);
+
+    ASSERT(failing_tid != -1);
 
     if (my_tid == failing_tid) {
       runFatalActionsInternal(action_manager->getUnsafeActions());
       return FatalAction::Status::Success;
-    } else if (failing_tid == -1) {
-      // This shouldn't occur unless the module is being used incorrectly.
-      return FatalAction::Status::SafeActionsNotYetRan;
     }
   }
 
@@ -108,18 +105,13 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
 void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 #ifdef ENVOY_OBJECT_TRACE_ON_DUMP
   absl::MutexLock l(&failure_mutex);
-  // Using memory_order_relaxed should be okay since calls to this function only
-  // occur when we allocate dispatchers, which only happens in the main thread
-  // at startup.
-  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_seq_cst);
   if (list == nullptr) {
     list = new FailureFunctionList;
   }
   list->push_back(&handler);
-  // Store the fatal_error_handlers pointer now that the list is updated. Using
-  // memory_order_release should work since all accesses to the list apart from the one
-  // above use at least std::memory_order_acquire.
-  fatal_error_handlers.store(list, std::memory_order_release);
+  // Store the fatal_error_handlers pointer now that the list is updated.
+  fatal_error_handlers.store(list, std::memory_order_seq_cst);
 #else
   UNREFERENCED_PARAMETER(handler);
 #endif
@@ -128,8 +120,7 @@ void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 #ifdef ENVOY_OBJECT_TRACE_ON_DUMP
   absl::MutexLock l(&failure_mutex);
-  // Use memory order acquire_release since exchange is a read-modify-write operation.
-  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_acq_rel);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_seq_cst);
   if (list == nullptr) {
     // removeFatalErrorHandler() may see an empty list of fatal error handlers
     // if it's called at the same time as callFatalErrorHandlers(). In that case
@@ -141,8 +132,7 @@ void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
   if (list->empty()) {
     delete list;
   } else {
-    // Use memory_order_release, other accesses use at least acquire semantics.
-    fatal_error_handlers.store(list, std::memory_order_release);
+    fatal_error_handlers.store(list, std::memory_order_seq_cst);
   }
 #else
   UNREFERENCED_PARAMETER(handler);
@@ -150,35 +140,27 @@ void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 }
 
 void callFatalErrorHandlers(std::ostream& os) {
-  // Use memory order acquire_release since exchange is a read-modify-write operation.
-  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_acq_rel);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_seq_cst);
   if (list != nullptr) {
     for (const auto* handler : *list) {
       handler->onFatalError(os);
     }
 
-    // Use memory_order_release, other accesses use at least acquire semantics.
-    fatal_error_handlers.store(list, std::memory_order_release);
+    fatal_error_handlers.store(list, std::memory_order_seq_cst);
   }
 }
 
 void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
                           FatalAction::FatalActionPtrList unsafe_actions,
                           Thread::ThreadFactory& thread_factory) {
-  // Create a FatalActionManager and try to store it. If we fail to store
-  // our manager, it'll be deleted due to the unique_ptr.
-  auto manager = std::make_unique<FatalAction::FatalActionManager>(
-      std::move(safe_actions), std::move(unsafe_actions), thread_factory);
-  FatalAction::FatalActionManager* unset_manager = nullptr;
+  // Create a FatalActionManager and store it.
+  FatalAction::FatalActionManager* previous_manager = fatal_action_manager.exchange(
+      new FatalAction::FatalActionManager(std::move(safe_actions), std::move(unsafe_actions),
+                                          thread_factory),
+      std::memory_order_seq_cst);
 
-  if (fatal_action_manager.compare_exchange_strong(unset_manager, manager.get(),
-                                                   std::memory_order_acq_rel)) {
-    // Our manager is the system's singleton, ensure that the unique_ptr does not
-    // delete the instance.
-    manager.release();
-  } else {
-    ENVOY_BUG(false, "Fatal Actions have already been registered.");
-  }
+  // Previous manager should be NULL.
+  ASSERT(!previous_manager);
 }
 
 FatalAction::Status runSafeActions() { return runFatalActions(FatalActionType::Safe); }
@@ -202,7 +184,7 @@ void resetFatalActionStateForTest() {
   if (raw_ptr != nullptr) {
     delete raw_ptr;
   }
-  failure_tid.store(-1, std::memory_order_release);
+  failure_tid.store(-1, std::memory_order_seq_cst);
 }
 
 } // namespace FatalErrorHandler
