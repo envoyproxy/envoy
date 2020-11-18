@@ -63,7 +63,7 @@ Http::FilterHeadersStatus BandwidthFilter::decodeHeaders(Http::RequestHeaderMap&
 
   config->stats().enabled_.inc();
 
-  if (mode && EnableMode::Ingress) {
+  if (mode & EnableMode::Ingress) {
     downstream_limiter_ =
         std::make_unique<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>(
             rate_kbps.value(), decoder_callbacks_->decoderBufferLimit(),
@@ -77,7 +77,7 @@ Http::FilterHeadersStatus BandwidthFilter::decodeHeaders(Http::RequestHeaderMap&
             config_->fill_rate());
   }
 
-  if (mode && EnableMode::Egress) {
+  if (mode & EnableMode::Egress) {
     upstream_limiter_ = std::make_unique<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>(
         rate_kbps.value(), encoder_callbacks_->encoderBufferLimit(),
         [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
