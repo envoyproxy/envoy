@@ -1346,18 +1346,24 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
 
 // Some v2 ADS integration tests, these validate basic v2 support but are not complete, they reflect
 // tests that have historically been worth validating on both v2 and v3. They will be removed in Q1.
-// Getting these to not use the new upstream config is a bunch of work. Can we
-// sunset these tests early?
-class DISABLED_AdsClusterV2Test : public AdsIntegrationTest {
+class AdsClusterV2Test : public AdsIntegrationTest {
 public:
-  DISABLED_AdsClusterV2Test() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2) {}
+  AdsClusterV2Test() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2) {}
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster0->mutable_typed_extension_protocol_options()->clear();
+      cluster0->mutable_http2_protocol_options();
+    });
+    AdsIntegrationTest::initialize();
+  }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, DISABLED_AdsClusterV2Test,
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterV2Test,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Basic CDS/EDS update that warms and makes active a single cluster (v2 API).
-TEST_P(DISABLED_AdsClusterV2Test, BasicClusterInitialWarming) {
+TEST_P(AdsClusterV2Test, BasicClusterInitialWarming) {
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
       envoy::config::core::v3::ApiVersion::V2);
@@ -1378,9 +1384,7 @@ TEST_P(DISABLED_AdsClusterV2Test, BasicClusterInitialWarming) {
 }
 
 // If we attempt to use v2 APIs by default, the configuration should be rejected.
-// These tests no longer work without some extra work to downgrade the new
-// cluster options. Can we just remove them?
-TEST_P(DISABLED_AdsClusterV2Test, RejectV2ConfigByDefault) {
+TEST_P(AdsClusterV2Test, RejectV2ConfigByDefault) {
   fatal_by_default_v2_override_ = true;
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
@@ -1393,7 +1397,7 @@ TEST_P(DISABLED_AdsClusterV2Test, RejectV2ConfigByDefault) {
 }
 
 // Verify CDS is paused during cluster warming.
-TEST_P(DISABLED_AdsClusterV2Test, CdsPausedDuringWarming) {
+TEST_P(AdsClusterV2Test, CdsPausedDuringWarming) {
   initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
@@ -1479,7 +1483,7 @@ TEST_P(DISABLED_AdsClusterV2Test, CdsPausedDuringWarming) {
 }
 
 // Validates that the initial xDS request batches all resources referred to in static config
-TEST_P(DISABLED_AdsClusterV2Test, XdsBatching) {
+TEST_P(AdsClusterV2Test, XdsBatching) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
     bootstrap.mutable_dynamic_resources()->clear_lds_config();
@@ -1526,7 +1530,7 @@ TEST_P(DISABLED_AdsClusterV2Test, XdsBatching) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13681.
-TEST_P(DISABLED_AdsClusterV2Test, TypeUrlAnnotationRegression) {
+TEST_P(AdsClusterV2Test, TypeUrlAnnotationRegression) {
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
       envoy::config::core::v3::ApiVersion::V2);
