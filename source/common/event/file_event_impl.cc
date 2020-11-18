@@ -28,12 +28,11 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
   // an OOM condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(fd), "");
 #ifdef WIN32
-  RELEASE_ASSERT(trigger_ != FileTriggerType::Edge,
-                 "libevent does not support edge triggers on Windows");
+  ASSERT(trigger_ != FileTriggerType::Edge, "libevent does not support edge triggers on Windows");
 #endif
   if constexpr (PlatformDefaultTriggerType != FileTriggerType::EmulatedEdge) {
-    RELEASE_ASSERT(trigger_ != FileTriggerType::EmulatedEdge,
-                   "Cannot use EmulatedEdge events if they are not the default platform type");
+    ASSERT(trigger_ != FileTriggerType::EmulatedEdge,
+           "Cannot use EmulatedEdge events if they are not the default platform type");
   }
 
   assignEvents(events, &dispatcher.base());

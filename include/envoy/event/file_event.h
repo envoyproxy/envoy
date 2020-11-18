@@ -20,17 +20,19 @@ struct FileReadyType {
 
 enum class FileTriggerType { Level, Edge, EmulatedEdge };
 
-static constexpr bool optimizeLevelEvents = true;
-
 // For POSIX developers to get the Windows behavior of file events
-// add `#define FORCE_LEVEL_EVENTS` and recompile.
+// you need to add the following definitions:
+// 1. `FORCE_LEVEL_EVENTS`
+// 2. `OPTIMIZE_LEVEL_EVENTS`.
+// You can do this with bazel if you add the following build/test options
+// `--copt="-DFORCE_LEVEL_EVENTS" --copt="-DOPTIMIZE_LEVEL_EVENTS"`
 constexpr FileTriggerType determinePlatformPreferredEventType() {
 #if defined(WIN32) || defined(FORCE_LEVEL_EVENTS)
-  if constexpr (optimizeLevelEvents) {
-    return FileTriggerType::EmulatedEdge;
-  } else {
-    return FileTriggerType::Level;
-  }
+#ifdef OPTIMIZE_LEVEL_EVENTS
+  return FileTriggerType::EmulatedEdge;
+#else
+  return FileTriggerType::Level;
+#endif
 #else
   return FileTriggerType::Edge;
 #endif
