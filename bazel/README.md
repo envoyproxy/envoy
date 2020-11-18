@@ -83,10 +83,15 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
-    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed. These are typically
-    available via a package manager, but may not be available in default repositories depending on
-    OS version. To build against `libc++` build with the `--config=libc++` instead of the
-    `--config=clang` flag.
+    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
+    
+    #### Config Flag Choices
+    Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:   
+    
+    - `--config=libc++` means using `clang` + `libc++`
+    - `--config=clang` means using `clang` + `libstdc++`
+    - no config flag means using `gcc` + `libstdc++`
+  
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
@@ -615,7 +620,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
-  tcmalloc with `--define tcmalloc=gperftools` which is the default for non-x86 builds.
+  tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
 
 

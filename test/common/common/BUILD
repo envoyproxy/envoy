@@ -188,6 +188,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "optref_test",
+    srcs = ["optref_test.cc"],
+)
+
+envoy_cc_test(
     name = "random_generator_test",
     srcs = ["random_generator_test.cc"],
     deps = [
@@ -262,6 +267,17 @@ envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
+)
+
+envoy_cc_benchmark_binary(
+    name = "re_speed_test",
+    srcs = ["re_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "@com_googlesource_code_re2//:re2",
+    ],
 )
 
 envoy_cc_benchmark_binary(

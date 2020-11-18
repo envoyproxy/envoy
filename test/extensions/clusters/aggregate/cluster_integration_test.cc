@@ -38,6 +38,7 @@ admin:
       port_value: 0
 dynamic_resources:
   cds_config:
+    resource_api_version: V3
     api_config_source:
       api_type: GRPC
       grpc_services:
@@ -64,7 +65,7 @@ static_resources:
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
         clusters:
         - cluster_1
         - cluster_2
@@ -78,7 +79,7 @@ static_resources:
       filters:
         name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.filters.http.router
@@ -227,7 +228,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster2_}, {}, {FirstClusterName}, "42");
+      Config::TypeUrl::get().Cluster, {cluster2_}, {}, {FirstClusterName}, "43");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
@@ -237,7 +238,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "43", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
 

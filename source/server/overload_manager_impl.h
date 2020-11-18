@@ -8,7 +8,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -100,6 +100,8 @@ private:
   std::vector<std::string> names_;
 };
 
+class ThreadLocalOverloadStateImpl;
+
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
@@ -161,7 +163,7 @@ private:
 
   bool started_;
   Event::Dispatcher& dispatcher_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ThreadLocalOverloadStateImpl> tls_;
   NamedOverloadActionSymbolTable action_symbol_table_;
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;

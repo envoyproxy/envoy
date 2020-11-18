@@ -3,6 +3,7 @@
 #include "envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/event/deferred_task.h"
 #include "common/event/dispatcher_impl.h"
@@ -10,6 +11,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/server/watch_dog.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -1145,6 +1147,75 @@ TEST_F(TimerUtilsTest, TimerValueConversion) {
 
   // Some arbitrary tests for good measure.
   checkConversion(std::chrono::milliseconds(600014), 600, 14000);
+}
+
+class DispatcherWithWatchdogTest : public testing::Test {
+protected:
+  DispatcherWithWatchdogTest()
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
+        os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+    dispatcher_->registerWatchdog(watchdog_, min_touch_interval_);
+  }
+
+  Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+  Api::OsSysCalls& os_sys_calls_;
+  std::shared_ptr<Server::MockWatchDog> watchdog_ = std::make_shared<Server::MockWatchDog>();
+  std::chrono::milliseconds min_touch_interval_ = std::chrono::seconds(10);
+};
+
+// The dispatcher creates a periodic touch timer for each registered watchdog.
+TEST_F(DispatcherWithWatchdogTest, PeriodicTouchTimer) {
+  // Advance by min_touch_interval_, verify that watchdog_ is touched.
+  EXPECT_CALL(*watchdog_, touch());
+  time_system_.advanceTimeAndRun(min_touch_interval_, *dispatcher_, Dispatcher::RunType::NonBlock);
+
+  // Advance by min_touch_interval_ again, verify that watchdog_ is touched.
+  EXPECT_CALL(*watchdog_, touch());
+  time_system_.advanceTimeAndRun(min_touch_interval_, *dispatcher_, Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeSchedulableCallback) {
+  ReadyWatcher watcher;
+
+  auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
+  cb->scheduleCallbackCurrentIteration();
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeTimer) {
+  ReadyWatcher watcher;
+
+  auto timer = dispatcher_->createTimer([&]() { watcher.ready(); });
+  timer->enableTimer(std::chrono::milliseconds(0));
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
+  os_fd_t fd = os_sys_calls_.socket(AF_INET6, SOCK_STREAM, 0).rc_;
+  ASSERT_TRUE(SOCKET_VALID(fd));
+
+  ReadyWatcher watcher;
+
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  Event::FileEventPtr file_event = dispatcher_->createFileEvent(
+      fd, [&](uint32_t) -> void { watcher.ready(); }, trigger, FileReadyType::Read);
+  file_event->activate(FileReadyType::Read);
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
 } // namespace

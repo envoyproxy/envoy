@@ -364,10 +364,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         ASSERT(rsa_public_key != nullptr);
         const unsigned rsa_key_length = RSA_size(rsa_public_key);
 #ifdef BORINGSSL_FIPS
-        if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
+        if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8 &&
+            rsa_key_length != 4096 / 8) {
           throw EnvoyException(
               fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
-                          "2048-bit or 3072-bit keys are supported in FIPS mode",
+                          "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
                           ctx.cert_chain_file_path_));
         }
 #else
@@ -416,9 +417,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                                     !tls_certificate.password().empty()
                                         ? const_cast<char*>(tls_certificate.password().c_str())
                                         : nullptr));
+
         if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
-          throw EnvoyException(
-              absl::StrCat("Failed to load private key from ", tls_certificate.privateKeyPath()));
+          throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}",
+                                           tls_certificate.privateKeyPath(),
+                                           Utility::getLastCryptoError().value_or("unknown")));
         }
 
 #ifdef BORINGSSL_FIPS
@@ -962,9 +965,9 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con);
   }
 
-  if (options && !has_alpn_defined && options->applicationProtocolFallback().has_value()) {
+  if (options && !has_alpn_defined && !options->applicationProtocolFallback().empty()) {
     // If ALPN hasn't already been set (either through TLS context or override), use the fallback.
-    parseAndSetAlpn({*options->applicationProtocolFallback()}, *ssl_con);
+    parseAndSetAlpn(options->applicationProtocolFallback(), *ssl_con);
   }
 
   if (allow_renegotiation_) {

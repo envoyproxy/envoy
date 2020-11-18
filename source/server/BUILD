@@ -113,6 +113,7 @@ envoy_cc_library(
         ":watchdog_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/common:time_interface",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_config_interface",
@@ -253,7 +254,7 @@ envoy_cc_library(
     srcs = ["overload_manager_impl.cc"],
     hdrs = ["overload_manager_impl.h"],
     deps = [
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:logger_lib",
@@ -473,11 +474,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "watchdog_lib",
-    srcs = ["watchdog_impl.cc"],
     hdrs = ["watchdog_impl.h"],
     deps = [
         "//include/envoy/common:time_interface",
-        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:watchdog_interface",
         "//source/common/common:assert_lib",
     ],
