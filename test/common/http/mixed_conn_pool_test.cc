@@ -23,14 +23,13 @@ namespace Envoy {
 namespace Http {
 namespace {
 
-// TODO(alyssawilk) replace this with the MixedConnectionPool once it lands.
 class ConnPoolImplForTest : public HttpConnPoolImplMixed {
 public:
-  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Random::RandomGenerator& random,
+  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterConnectivityState& state, Random::RandomGenerator& random,
                       Upstream::ClusterInfoConstSharedPtr cluster)
       : HttpConnPoolImplMixed(dispatcher, random,
                               Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                              Upstream::ResourcePriority::Default, nullptr, nullptr) {}
+                              Upstream::ResourcePriority::Default, nullptr, nullptr, state) {}
 };
 
 /**
@@ -39,12 +38,13 @@ public:
 class MixedConnPoolImplTest : public testing::Test {
 public:
   MixedConnPoolImplTest()
-      : conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, random_, cluster_)) {}
+      : conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, state_, random_, cluster_)) {}
 
   ~MixedConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
   }
 
+  Upstream::ClusterConnectivityState state_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;

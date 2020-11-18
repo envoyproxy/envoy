@@ -24,12 +24,13 @@ public:
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                std::vector<Http::Protocol>& protocol,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options));
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+               ClusterConnectivityState& state));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr));
+               Network::TransportSocketOptionsSharedPtr, ClusterConnectivityState& state));
 
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>), clusterFromProto,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,

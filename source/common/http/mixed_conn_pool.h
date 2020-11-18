@@ -11,9 +11,10 @@ public:
   HttpConnPoolImplMixed(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                         Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                         const Network::ConnectionSocket::OptionsSharedPtr& options,
-                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                        Upstream::ClusterConnectivityState& state)
       : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                             transport_socket_options, random_generator,
+                             transport_socket_options, random_generator, state,
                              {Protocol::Http2, Protocol::Http11}) {}
 
   Http::Protocol protocol() const override {

@@ -388,6 +388,7 @@ TEST_P(CodecNetworkTest, SendData) {
   upstream_connection_->write(data, false);
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     EXPECT_EQ(full_data, data.toString());
+    data.drain(data.length());
     dispatcher_->exit();
     return Http::okStatus();
   }));
@@ -411,10 +412,12 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
       .Times(2)
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ("", data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }));
   // Because the headers are not complete, the disconnect will reset the stream.
@@ -449,6 +452,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
       .Times(2)
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {

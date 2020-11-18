@@ -1,7 +1,7 @@
-diff --git a/eval/eval/field_backed_map_impl.cc b/eval/eval/field_backed_map_impl.cc
+diff --git a/eval/public/containers/field_backed_map_impl.cc b/eval/public/containers/field_backed_map_impl.cc
 index cd56f51..4d2a546 100644
---- a/eval/eval/field_backed_map_impl.cc
-+++ b/eval/eval/field_backed_map_impl.cc
+--- a/eval/public/containers/field_backed_map_impl.cc
++++ b/eval/public/containers/field_backed_map_impl.cc
 @@ -117,7 +117,9 @@ int FieldBackedMapImpl::size() const {
  const CelList* FieldBackedMapImpl::ListKeys() const { return key_list_.get(); }
  

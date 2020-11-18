@@ -1,12 +1,17 @@
 .. _install_sandboxes_tls:
 
-TLS
-===
+Transport layer security (``TLS``)
+==================================
 
 .. sidebar:: Requirements
 
-   `jq <https://stedolan.github.io/jq/>`_
-      Used to parse ``json`` output from the upstream echo servers.
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+   :ref:`jq <start_sandboxes_setup_jq>`
+	Parse ``json`` output from the upstream echo servers.
 
 This example walks through some of the ways that Envoy can be configured to make
 use of encrypted connections using ``HTTP`` over ``TLS``.
@@ -32,12 +37,10 @@ configured with Envoy, please see the :ref:`securing Envoy quick start guide <st
    You should also :ref:`authenticate clients <start_quick_start_securing_mtls>`
    where you control both sides of the connection, or relevant protocols are available.
 
-.. include:: _include/docker-env-setup.rst
+Step 1: Build the sandbox
+*************************
 
 Change directory to ``examples/tls`` in the Envoy repository.
-
-Step 3: Build the sandbox
-*************************
 
 This starts four proxies listening on ``localhost`` ports ``10000-10003``.
 
@@ -63,7 +66,7 @@ The upstream services listen on the internal Docker network on ports ``80`` and 
   tls_service-http_1              node ./index.js                Up
   tls_service-https_1             node ./index.js                Up
 
-Step 4: Test proxying ``https`` -> ``http``
+Step 2: Test proxying ``https`` -> ``http``
 *******************************************
 
 The Envoy proxy listening on https://localhost:10000 terminates ``HTTPS`` and proxies to the upstream ``HTTP`` service.
@@ -87,7 +90,7 @@ The upstream ``service-http`` handles the request.
    $ curl -sk https://localhost:10000  | jq -r '.os.hostname'
    service-http
 
-Step 5: Test proxying ``https`` -> ``https``
+Step 3: Test proxying ``https`` -> ``https``
 ********************************************
 
 The Envoy proxy listening on https://localhost:10001 terminates ``HTTPS`` and proxies to the upstream ``HTTPS`` service.
@@ -112,7 +115,7 @@ The upstream ``service-https`` handles the request.
    $ curl -sk https://localhost:10001  | jq -r '.os.hostname'
    service-https
 
-Step 6: Test proxying ``http`` -> ``https``
+Step 4: Test proxying ``http`` -> ``https``
 *******************************************
 
 The Envoy proxy listening on http://localhost:10002 terminates ``HTTP`` and proxies to the upstream ``HTTPS`` service.
@@ -121,7 +124,7 @@ The :download:`http -> https configuration <_include/tls/envoy-http-https.yaml>`
 :ref:`transport_socket <extension_envoy.transport_sockets.tls>` to the
 :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 
-Querying the service at port ``10001`` you should see an ``x-forwarded-proto`` header of ``http`` has
+Querying the service at port ``10002`` you should see an ``x-forwarded-proto`` header of ``http`` has
 been added:
 
 .. code-block:: console
@@ -137,7 +140,7 @@ The upstream ``service-https`` handles the request.
    service-https
 
 
-Step 7: Test proxying ``https`` passthrough
+Step 5: Test proxying ``https`` passthrough
 *******************************************
 
 The Envoy proxy listening on https://localhost:10003 proxies directly to the upstream ``HTTPS`` service which

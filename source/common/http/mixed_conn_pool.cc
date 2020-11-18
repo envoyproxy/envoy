@@ -56,7 +56,16 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   } else {
     new_client = std::make_unique<Http2::ActiveClient>(*this, data);
   }
+  // When we switch from TCP to HTTP clients, the base class onConnectionEvent
+  // will be called for both, so add to the connecting stream capacity to
+  // balance it being decremented.
   connecting_stream_capacity_ += new_client->effectiveConcurrentStreamLimit();
+  // The global capacity is not adjusted in onConnectionEvent, so simply update
+  // it to reflect any difference between the TCP stream limits and HTTP/2
+  // stream limits.
+  if (new_client->effectiveConcurrentStreamLimit() > 1) {
+    state_.incrConnectingStreamCapacity(new_client->effectiveConcurrentStreamLimit() - 1);
+  }
   new_client->state_ = ActiveClient::State::CONNECTING;
   LinkedList::moveIntoList(std::move(new_client), owningList(new_client->state_));
 }
