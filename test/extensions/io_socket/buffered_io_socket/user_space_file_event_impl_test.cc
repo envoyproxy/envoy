@@ -51,6 +51,7 @@ public:
 
   void setWritable() { EXPECT_CALL(io_source_, isPeerWritable()).WillRepeatedly(Return(true)); }
   void setReadable() { EXPECT_CALL(io_source_, isReadable()).WillRepeatedly(Return(true)); }
+  void clearWriteReable() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
 
 protected:
   NiceMock<MockReadWritable> io_source_;
@@ -61,10 +62,37 @@ protected:
 };
 
 TEST_F(UserSpaceFileEventImplTest, TestEnabledEventsTriggeredAfterCreate) {
+  for (const auto current_event : {Event::FileReadyType::Read, Event::FileReadyType::Write,
+                                   Event::FileReadyType::Read | Event::FileReadyType::Write}) {
+    SCOPED_TRACE(absl::StrCat("current event:", current_event));
+    clearWriteReable();
+    if (current_event | Event::FileReadyType::Read) {
+      setReadable();
+    }
+    if (current_event | Event::FileReadyType::Write) {
+      setWritable();
+    }
+    MockReadyCb ready_cb;
+    auto user_file_event = std::make_unique<UserSpaceFileEventImpl>(
+        *dispatcher_, [&ready_cb](uint32_t arg) { ready_cb.called(arg); }, current_event,
+        io_source_);
+    EXPECT_CALL(ready_cb, called(current_event));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    testing::Mock::VerifyAndClearExpectations(&ready_cb);
+  }
+}
+
+TEST_F(UserSpaceFileEventImplTest, TestReadEventNotDeliveredAfterDisabledRead) {
   setWritable();
+  setReadable();
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
-  EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write));
+  // The above should deliver both Read and Write during the poll. It is not tested here but in
+  // other test case.
+
+  // Now disable Read.
+  user_file_event_->setEnabled(Event::FileReadyType::Write);
+  EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write)).Times(1);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
@@ -183,6 +211,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
   // Ensure both events are pending so that any enabled event will be immediately delivered.
   setWritable();
   setReadable();
+  // The enabled event are delivered but not the other.
   {
     user_file_event_->activate(Event::FileReadyType::Read);
     user_file_event_->setEnabled(Event::FileReadyType::Write);
@@ -193,6 +222,24 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
     user_file_event_->activate(Event::FileReadyType::Write);
     user_file_event_->setEnabled(Event::FileReadyType::Read);
     EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read)).Times(1);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  // No event is delivered since it's either user disabled or io_handle doesn't provide pending
+  // data.
+  {
+    clearWriteReable();
+    setReadable();
+    user_file_event_->activate(Event::FileReadyType::Read);
+    user_file_event_->setEnabled(Event::FileReadyType::Write);
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  {
+    clearWriteReable();
+    setWritable();
+    user_file_event_->activate(Event::FileReadyType::Write);
+    user_file_event_->setEnabled(Event::FileReadyType::Read);
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
@@ -221,7 +268,6 @@ TEST_F(UserSpaceFileEventImplTest, TestEventClosedIsNotTriggeredUnlessManullyAct
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
-
 } // namespace
 } // namespace BufferedIoSocket
 } // namespace IoSocket

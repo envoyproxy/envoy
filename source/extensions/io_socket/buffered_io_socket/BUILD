@@ -35,6 +35,7 @@ envoy_cc_extension(
         "//source/common/event:dispatcher_includes",
     ],
 )
+
 envoy_cc_extension(
     name = "buffered_io_socket_handle_lib",
     srcs = [

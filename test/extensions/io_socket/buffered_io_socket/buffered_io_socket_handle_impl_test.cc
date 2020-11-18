@@ -324,7 +324,7 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteAgain) {
   io_handle_peer_->setWatermarks(128);
   Buffer::OwnedImpl pending_data(std::string(256, 'a'));
   io_handle_->write(pending_data);
-  EXPECT_FALSE(!io_handle_peer_->isWritable());
+  EXPECT_FALSE(io_handle_peer_->isWritable());
 
   Buffer::OwnedImpl buf("0123456789");
   auto result = io_handle_->write(buf);
