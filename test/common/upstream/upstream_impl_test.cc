@@ -2554,16 +2554,46 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
       idle_timeout: 1s
   )EOF";
 
-  auto cluster2 = makeCluster(yaml + explicit_timeout);
-  ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
-  EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  const std::string explicit_timeout_new = R"EOF(
+    typed_extension_protocol_options:
+      envoy.filters.network.http_connection_manager:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
 
+  {
+    auto cluster2 = makeCluster(yaml + explicit_timeout);
+    ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  }
+  {
+    auto cluster2 = makeCluster(yaml + explicit_timeout_new);
+    ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  }
   const std::string no_timeout = R"EOF(
     common_http_protocol_options:
       idle_timeout: 0s
   )EOF";
-  auto cluster3 = makeCluster(yaml + no_timeout);
-  EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+
+  const std::string no_timeout_new = R"EOF(
+    typed_extension_protocol_options:
+      envoy.filters.network.http_connection_manager:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          idle_timeout: 0s
+  )EOF";
+
+  {
+    auto cluster3 = makeCluster(yaml + no_timeout);
+    EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+  }
+
+  {
+    auto cluster3 = makeCluster(yaml + no_timeout_new);
+    EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+  }
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
@@ -2950,11 +2980,9 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocol) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http10,
-            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
-  EXPECT_EQ(Http::Protocol::Http11,
-            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+  EXPECT_EQ(Http::Protocol::Http10, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http10));
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http11));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http2));
 }
 
 TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
@@ -2969,9 +2997,9 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
   auto cluster = makeCluster(yaml);
 
   EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http10));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http11));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http2));
 }
 
 TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
@@ -2985,11 +3013,9 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
   auto cluster = makeCluster(yaml);
 
   EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt));
-  EXPECT_EQ(Http::Protocol::Http11,
-            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
-  EXPECT_EQ(Http::Protocol::Http11,
-            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http10));
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http11));
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http2));
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.

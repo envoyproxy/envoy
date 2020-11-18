@@ -594,6 +594,7 @@ envoy_cc_test(
         "//source/common/upstream:static_cluster_lib",
         "//source/common/upstream:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",

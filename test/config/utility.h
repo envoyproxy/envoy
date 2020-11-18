@@ -235,6 +235,9 @@ public:
   // Allow a finalized configuration to be edited for generating xDS responses
   void applyConfigModifiers();
 
+  // Configure Envoy to do TLS to upstream.
+  void configureUpstreamTls();
+
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
@@ -259,6 +262,12 @@ public:
 
   // Set new codecs to use for upstream and downstream codecs.
   void setNewCodecs();
+
+  using HttpProtocolOptions =
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions;
+  static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
+                                 HttpProtocolOptions& protocol_options);
+  static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
 
 private:
   static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {

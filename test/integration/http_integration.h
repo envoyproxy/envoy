@@ -108,7 +108,6 @@ public:
 protected:
   void useAccessLog(absl::string_view format = "");
 
-  Network::TransportSocketFactoryPtr createUpstreamTlsContext();
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
