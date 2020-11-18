@@ -20,7 +20,7 @@ public:
    * The default is 1.
    */
   explicit TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate = 1,
-                           bool allow_multiple_resets = false)
+                           bool allow_multiple_resets = false);
 
   // TokenBucket
   uint64_t consume(uint64_t tokens, bool allow_partial) override;
@@ -31,7 +31,7 @@ private:
   const double max_tokens_;
   const double fill_rate_;
   double tokens_;
-  const absl::optional<bool> has_reset_;
+  absl::optional<bool> reset_once_;
   MonotonicTime last_fill_;
   TimeSource& time_source_;
   absl::Mutex mutex_;

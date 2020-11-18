@@ -20,7 +20,7 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
                                      std::shared_ptr<TokenBucketImpl> token_bucket,
                                      uint64_t fill_rate)
     : // bytes_per_time_slice is KiB converted to bytes divided by the number of ticks per second.
-      bytes_per_time_slice_((max_kbps * 1024) / second_divisor), write_data_cb_(write_data_cb),
+      bytes_per_time_slice_((max_kbps * 1024) / fill_rate), write_data_cb_(write_data_cb),
       continue_cb_(continue_cb), scope_(scope), token_bucket_(std::move(token_bucket)),
       token_timer_(dispatcher.createTimer([this] { onTokenTimer(); })),
       buffer_(resume_data_cb, pause_data_cb,
@@ -32,7 +32,7 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
     // The token bucket is configured with a max token count of the number of ticks per second,
     // and refills at the same rate, so that we have a per second limit which refills gradually in
     // 1/fill_rate intervals.
-    token_bucket_ = std::make_shared<TokenBucketImpl>(fill_rate, time_source, fill_rate),
+    token_bucket_ = std::make_shared<TokenBucketImpl>(fill_rate, time_source, fill_rate);
   }
   buffer_.setWatermarks(max_buffered_data);
 }
@@ -49,7 +49,7 @@ void StreamRateLimiter::onTokenTimer() {
     // have enough data to span more than 1s of rate allowance). Once we reset, we will subsequently
     // allow for bursting within the second to account for our data provider being bursty.
     // The shared token bucket will reset only first time even when called reset from multiple streams.
-    token_bucket_.reset(1);
+    token_bucket_->reset(1);
     saw_data_ = true;
   }
 
@@ -57,7 +57,7 @@ void StreamRateLimiter::onTokenTimer() {
   // figure out how many bytes to write given the number of tokens we actually got.
   const uint64_t tokens_needed =
       (buffer_.length() + bytes_per_time_slice_ - 1) / bytes_per_time_slice_;
-  const uint64_t tokens_obtained = token_bucket_.consume(tokens_needed, true);
+  const uint64_t tokens_obtained = token_bucket_->consume(tokens_needed, true);
   const uint64_t bytes_to_write =
       std::min(tokens_obtained * bytes_per_time_slice_, buffer_.length());
   ENVOY_LOG(trace, "stream limiter: tokens_needed={} tokens_obtained={} to_write={}", tokens_needed,
@@ -72,7 +72,7 @@ void StreamRateLimiter::onTokenTimer() {
   // In case of a shared token bucket, this algorithm will prioritize one stream at a time.
   // TODO(nitgoy): add round-robin and other policies for rationing bandwidth.
   if (buffer_.length() > 0) {
-    const std::chrono::milliseconds ms = token_bucket_.nextTokenAvailable();
+    const std::chrono::milliseconds ms = token_bucket_->nextTokenAvailable();
     if (ms.count() > 0) {
       ENVOY_LOG(trace, "stream limiter: scheduling wakeup for {}ms", ms.count());
       token_timer_->enableTimer(ms, &scope_);
