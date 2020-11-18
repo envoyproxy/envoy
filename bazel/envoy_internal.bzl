@@ -63,6 +63,8 @@ def envoy_copts(repository, test = False):
            }) + select({
                repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions", "-Wrange-loop-analysis"],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
+               # TODO: Replace with /Zc:preprocessor for cl.exe versions >= 16.5
+               repository + "//bazel:windows_x86_64": ["-experimental:preprocessor", "-Wv:19.4"],
                "//conditions:default": [],
            }) + select({
                repository + "//bazel:no_debug_info": ["-g0"],

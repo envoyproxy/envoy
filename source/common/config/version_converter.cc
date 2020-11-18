@@ -78,20 +78,28 @@ void VersionConverter::annotateWithOriginalType(const Protobuf::Descriptor& prev
     void onMessage(Protobuf::Message& message, const void* ctxt) override {
       const Protobuf::Descriptor* descriptor = message.GetDescriptor();
       const Protobuf::Reflection* reflection = message.GetReflection();
-      const Protobuf::Descriptor& prev_descriptor = *static_cast<const Protobuf::Descriptor*>(ctxt);
+      const Protobuf::Descriptor* prev_descriptor = static_cast<const Protobuf::Descriptor*>(ctxt);
+      // If there is no previous descriptor for this message, we don't need to annotate anything.
+      if (prev_descriptor == nullptr) {
+        return;
+      }
       // If they are the same type, there's no possibility of any different type
       // further down, so we're done.
-      if (descriptor->full_name() == prev_descriptor.full_name()) {
+      if (descriptor->full_name() == prev_descriptor->full_name()) {
         return;
       }
       auto* unknown_field_set = reflection->MutableUnknownFields(&message);
       unknown_field_set->AddLengthDelimited(ProtobufWellKnown::OriginalTypeFieldNumber,
-                                            prev_descriptor.full_name());
+                                            prev_descriptor->full_name());
     }
 
     const void* onField(Protobuf::Message&, const Protobuf::FieldDescriptor& field,
                         const void* ctxt) override {
-      const Protobuf::Descriptor& prev_descriptor = *static_cast<const Protobuf::Descriptor*>(ctxt);
+      const Protobuf::Descriptor* prev_descriptor = static_cast<const Protobuf::Descriptor*>(ctxt);
+      // If there is no previous descriptor for this field, we don't need to annotate anything.
+      if (prev_descriptor == nullptr) {
+        return nullptr;
+      }
       // TODO(htuch): This is a terrible hack, there should be no per-resource
       // business logic in this file. The reason this is required is that
       // endpoints, when captured in configuration such as inlined hosts in
@@ -101,13 +109,13 @@ void VersionConverter::annotateWithOriginalType(const Protobuf::Descriptor& prev
       // In theory, we should be able to just clean up these annotations in
       // ClusterManagerImpl with type erasure, but protobuf doesn't free up memory
       // as expected, we probably need some arena level trick to address this.
-      if (prev_descriptor.full_name() == "envoy.api.v2.Cluster" &&
+      if (prev_descriptor->full_name() == "envoy.api.v2.Cluster" &&
           (field.name() == "hidden_envoy_deprecated_hosts" || field.name() == "load_assignment")) {
         // This will cause the sub-message visit to abort early.
         return field.message_type();
       }
       const Protobuf::FieldDescriptor* prev_field =
-          prev_descriptor.FindFieldByNumber(field.number());
+          prev_descriptor->FindFieldByNumber(field.number());
       return prev_field != nullptr ? prev_field->message_type() : nullptr;
     }
   };
