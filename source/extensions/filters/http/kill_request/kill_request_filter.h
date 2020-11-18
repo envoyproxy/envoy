@@ -7,10 +7,21 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
+#include "common/http/headers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace KillRequest {
+
+class KillRequestHeaderNameValues {
+public:
+  const char* prefix() const { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
+
+  const Http::LowerCaseString KillRequest{absl::StrCat(prefix(), "-kill-request")};
+};
+
+using KillRequestHeaders = ConstSingleton<KillRequestHeaderNameValues>;
 
 /**
  * A filter that will crash Envoy if IsKillRequestEnabled() returns true and

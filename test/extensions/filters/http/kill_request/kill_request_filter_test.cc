@@ -36,7 +36,7 @@ TEST_F(KillRequestFilterTest, KillRequestCrashEnvoy) {
   SetUpTest(kill_request);
   request_headers_.addCopy("x-envoy-kill-request", "true");
 
-  ON_CALL(random_generator_, bernoulli(0.01f)).WillByDefault(Return(true));
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
 
@@ -47,17 +47,17 @@ TEST_F(KillRequestFilterTest, KillRequestWithMillionDenominatorCrashEnvoy) {
   SetUpTest(kill_request);
   request_headers_.addCopy("x-envoy-kill-request", "yes");
 
-  ON_CALL(random_generator_, bernoulli(0.000001f)).WillByDefault(Return(true));
+  ON_CALL(random_generator_, random()).WillByDefault(Return(1000000));
   EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
 
-TEST_F(KillRequestFilterTest, KillRequestDisabledWhenRandomGeneratorReturnsFalse) {
+TEST_F(KillRequestFilterTest, KillRequestDisabledWhenIsKillRequestEnabledReturnsFalse) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(100);
   SetUpTest(kill_request);
   request_headers_.addCopy("x-envoy-kill-request", "true");
 
-  ON_CALL(random_generator_, bernoulli(1.0f)).WillByDefault(Return(false));
+  ON_CALL(random_generator_, random()).WillByDefault(Return(99));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -66,7 +66,7 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledWhenHeaderIsMissing) {
   kill_request.mutable_probability()->set_numerator(100);
   SetUpTest(kill_request);
 
-  ON_CALL(random_generator_, bernoulli(1.0f)).WillByDefault(Return(true));
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -76,7 +76,7 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledWhenHeaderValueIsInvalid) {
   SetUpTest(kill_request);
   request_headers_.addCopy("x-envoy-kill-request", "invalid");
 
-  ON_CALL(random_generator_, bernoulli(1.0f)).WillByDefault(Return(true));
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
