@@ -235,7 +235,7 @@ protected:
   std::vector<std::string> getDataSourceFilenames() override;
 
 private:
-  CertificateValidationContextPtr certificate_validation_context_secrets_;
+  CertificateValidationContextSharedPtr certificate_validation_context_secrets_;
   Common::CallbackManager<
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&>
       validation_callback_manager_;

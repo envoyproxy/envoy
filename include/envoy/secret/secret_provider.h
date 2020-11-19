@@ -45,7 +45,7 @@ public:
 
 using TlsCertificatePtr =
     std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>;
-using CertificateValidationContextPtr =
+using CertificateValidationContextSharedPtr =
     std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>;
 using TlsSessionTicketKeysPtr =
     std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys>;

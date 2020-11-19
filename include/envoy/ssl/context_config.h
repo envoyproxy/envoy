@@ -30,7 +30,7 @@ public:
 using TlsCertificateConfigProvidersFactoryPtr =
     std::unique_ptr<TlsCertificateConfigProvidersFactory>;
 
-using CertificateValidationContextPtr =
+using CertificateValidationContextSharedPtr =
     std::shared_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>;
 
 class CertificateValidationContextConfigProviderFactory {
@@ -46,7 +46,7 @@ public:
    * Get the default certificate validation context. This value is nullptr by default, except for
    * when the validation context type is a combined validation context.
    */
-  virtual CertificateValidationContextPtr defaultCertificateValidationContext() const PURE;
+  virtual CertificateValidationContextSharedPtr defaultCertificateValidationContext() const PURE;
 };
 
 using CertificateValidationContextConfigProviderFactoryPtr =

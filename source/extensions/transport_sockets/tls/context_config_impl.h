@@ -42,7 +42,7 @@ public:
 
   Secret::CertificateValidationContextConfigProviderSharedPtr create() override;
 
-  Ssl::CertificateValidationContextPtr defaultCertificateValidationContext() const override {
+  Ssl::CertificateValidationContextSharedPtr defaultCertificateValidationContext() const override {
     return default_cvc_;
   }
 
@@ -56,7 +56,7 @@ private:
   // If certificate validation context type is combined_validation_context. default_cvc_
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.
   // Otherwise, default_cvc_ is nullptr.
-  Ssl::CertificateValidationContextPtr default_cvc_;
+  Ssl::CertificateValidationContextSharedPtr default_cvc_;
 };
 
 class TlsSessionTicketKeysConfigProviderFactoryImpl

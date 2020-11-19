@@ -53,7 +53,7 @@ public:
   Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
 
 private:
-  Secret::CertificateValidationContextPtr certificate_validation_context_;
+  Secret::CertificateValidationContextSharedPtr certificate_validation_context_;
 };
 
 class TlsSessionTicketKeysConfigProviderImpl : public TlsSessionTicketKeysConfigProvider {
