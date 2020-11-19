@@ -43,31 +43,6 @@
   } while (false)
 
 /**
- * Initiates a duration measurement which can be finished in a different scope.
- * Please note that this kind of measurements makes sense only in a strictly
- * sequential flow, i.e. when a new stream isn't created until the current one
- * is destroyed.
- */
-#define PERF_BEGIN(category, description)                                                          \
-  do {                                                                                             \
-    PerfAnnotationContext* context = PerfAnnotationContext::getOrCreate();                         \
-    context->begin(category, description);                                                         \
-  } while (false)
-
-/**
- * Ends a duration measurement initiated with PERF_BEGIN and records performance
- * data. The category and description must be identical to the values used with
- * the corresponding PERF_BEGIN. They are joined within the library, but only if
- * perf is enabled. This way, any concatenation overhead is skipped when
- * perf-annotation is disabled.
- */
-#define PERF_END(category, description)                                                            \
-  do {                                                                                             \
-    PerfAnnotationContext* context = PerfAnnotationContext::getOrCreate();                         \
-    context->end(category, description);                                                           \
-  } while (false)
-
-/**
  * Dumps recorded performance data to stdout. Expands to nothing if not enabled.
  */
 #define PERF_DUMP() Envoy::PerfAnnotationContext::dump()
@@ -110,30 +85,6 @@ public:
    */
   void record(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
-
-  /**
-   * Starts duration measurement for a category and description, which are shown
-   * as separate columns in the generated output table. The measurement is
-   * stopped and recorded with a corresponding end() call. The measurement can
-   * be started and stopped in different scopes, but the flow of these start and
-   * stop points for the same category and description must be strictly sequential.
-   *
-   * @param category the name of a category for the recording.
-   * @param description the name of description for the recording.
-   */
-  void begin(absl::string_view category, absl::string_view description);
-
-  /**
-   * Ends and records duration measurement for a category and description, which are
-   * shown as separate columns in the generated output table. Before ending the
-   * measurement must be started first with a begin() call. The measurement can
-   * be started and ended in different scopes, but the flow of these start and
-   * stop points for the same category and description must be strictly sequential.
-   *
-   * @param category the name of a category for the recording.
-   * @param description the name of description for the recording.
-   */
-  void end(absl::string_view category, absl::string_view description);
 
   /** @return MonotonicTime the current time */
   MonotonicTime currentTime() { return time_source_.monotonicTime(); }
@@ -189,7 +140,6 @@ private:
   };
 
   using DurationStatsMap = absl::node_hash_map<CategoryDescription, DurationStats, Hash>;
-  using TimestampsMap = absl::node_hash_map<CategoryDescription, MonotonicTime, Hash>;
 
   // Maps {category, description} to DurationStats.
 #if PERF_THREAD_SAFE
@@ -198,7 +148,6 @@ private:
 #else
   DurationStatsMap duration_stats_map_;
 #endif
-  TimestampsMap timestamps_map_;
   RealTimeSource time_source_;
 };
 
@@ -235,12 +184,6 @@ private:
 // Macros that expand to nothing when performance collection is disabled. These are contrived to
 // work syntactically as a C++ statement (e.g. if (foo) PERF_RECORD(...) else PERF_RECORD(...)).
 
-#define PERF_BEGIN(category, description)                                                          \
-  do {                                                                                             \
-  } while (false)
-#define PERF_END(category, description)                                                            \
-  do {                                                                                             \
-  } while (false)
 #define PERF_OPERATION(perf_var)                                                                   \
   do {                                                                                             \
   } while (false)
