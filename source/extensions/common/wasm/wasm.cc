@@ -100,7 +100,7 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
 }
 
 Wasm::Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
-           absl::string_view vm_key, std::unordered_set<std::string> allowed_abi_functions,
+           absl::string_view vm_key, absl::flat_hash_set<std::string> allowed_abi_functions,
            const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
            Event::Dispatcher& dispatcher)
     : WasmBase(createWasmVm(runtime, scope), vm_id, vm_configuration, vm_key,

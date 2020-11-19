@@ -104,7 +104,7 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       "", "", "", GetParam(), "", false, envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
       local_info, nullptr);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_shared<WasmHandle>(std::make_unique<Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), "", "vm_configuration", "",
       allowed_abi_functions, scope, cluster_manager, *dispatcher));
@@ -183,7 +183,7 @@ TEST_P(WasmCommonTest, Logging) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -255,7 +255,7 @@ TEST_P(WasmCommonTest, BadSignature) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -285,7 +285,7 @@ TEST_P(WasmCommonTest, Segv) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -329,7 +329,7 @@ TEST_P(WasmCommonTest, DivByZero) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -370,7 +370,7 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -411,7 +411,7 @@ TEST_P(WasmCommonTest, Utilities) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -477,7 +477,7 @@ TEST_P(WasmCommonTest, Stats) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -514,7 +514,7 @@ TEST_P(WasmCommonTest, Foreign) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -560,7 +560,7 @@ TEST_P(WasmCommonTest, OnForeign) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -608,7 +608,7 @@ TEST_P(WasmCommonTest, WASI) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -972,7 +972,7 @@ TEST_P(WasmCommonTest, RestrictABIFunctions) {
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
 
   // restriction enforced if allowed_abi_functions is non-empty
-  std::unordered_set<std::string> allowed_abi_functions{"foo"};
+  absl::flat_hash_set<std::string> allowed_abi_functions{"foo"};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -1020,7 +1020,7 @@ TEST_P(WasmCommonTest, AllowModuleImplementedABIFunctions) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions{"proxy_on_vm_start"};
+  absl::flat_hash_set<std::string> allowed_abi_functions{"proxy_on_vm_start"};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -1068,7 +1068,7 @@ TEST_P(WasmCommonTest, AllowABIFunctions) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions{"proxy_on_vm_start", "proxy_log"};
+  absl::flat_hash_set<std::string> allowed_abi_functions{"proxy_on_vm_start", "proxy_log"};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
@@ -1116,7 +1116,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  std::unordered_set<std::string> allowed_abi_functions{"proxy_on_vm_start"};
+  absl::flat_hash_set<std::string> allowed_abi_functions{"proxy_on_vm_start"};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);

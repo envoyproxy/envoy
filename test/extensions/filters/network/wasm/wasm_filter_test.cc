@@ -46,7 +46,7 @@ public:
   ~WasmNetworkFilterTest() override = default;
 
   void setupConfig(const std::string& code, std::string vm_configuration, bool fail_open = false,
-                   std::unordered_set<std::string> allowed_abi_functions = {}) {
+                   absl::flat_hash_set<std::string> allowed_abi_functions = {}) {
     if (code.empty()) {
       setupWasmCode(vm_configuration);
     } else {
@@ -200,7 +200,7 @@ TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  std::unordered_set<std::string> allowed_abi_functions = {
+  absl::flat_hash_set<std::string> allowed_abi_functions = {
       "proxy_on_context_create", "proxy_get_property", "proxy_log", "proxy_on_new_connection"};
   setupConfig("", "logging", false, allowed_abi_functions);
   setupFilter();
@@ -223,7 +223,7 @@ TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  std::unordered_set<std::string> allowed_abi_functions = {"proxy_on_context_create",
+  absl::flat_hash_set<std::string> allowed_abi_functions = {"proxy_on_context_create",
                                                            "proxy_get_property", "proxy_log",
                                                            "proxy_on_downstream_connection_close"};
   setupConfig("", "logging", false, allowed_abi_functions);
@@ -247,7 +247,7 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  std::unordered_set<std::string> allowed_abi_functions = {
+  absl::flat_hash_set<std::string> allowed_abi_functions = {
       "proxy_on_context_create", "proxy_get_property", "proxy_on_new_connection",
       "proxy_on_downstream_connection_close"};
   setupConfig("", "logging", false, allowed_abi_functions);

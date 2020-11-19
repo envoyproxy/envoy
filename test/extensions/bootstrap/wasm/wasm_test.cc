@@ -69,7 +69,7 @@ public:
   std::string vm_id_;
   std::string vm_configuration_;
   std::string vm_key_;
-  std::unordered_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_abi_functions;
   std::string plugin_configuration_;
   std::shared_ptr<Extensions::Common::Wasm::Plugin> plugin_;
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
