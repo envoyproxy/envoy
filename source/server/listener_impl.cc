@@ -64,8 +64,10 @@ bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
 }
 
 bool usesProxyProto(const envoy::config::listener::v3::Listener& config) {
+  // TODO(#14085): `use_proxy_proto` should be deprecated.
+  // Checking only the first or default filter chain is done for backwards compatibility.
   return PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config.has_default_filter_chain() ? config.default_filter_chain() : config.filter_chains()[0],
+      config.filter_chains().empty() ? config.default_filter_chain() : config.filter_chains()[0],
       use_proxy_proto, false);
 }
 } // namespace
