@@ -41,6 +41,7 @@ envoy_extension_cc_test(
     name = "wasm_filter_test",
     srcs = ["wasm_filter_test.cc"],
     data = envoy_select_wasm([
+        "//test/extensions/filters/network/wasm/test_data:logging_rust.wasm",
         "//test/extensions/filters/network/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.filters.network.wasm",
