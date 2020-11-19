@@ -1,7 +1,6 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/service/auth/v2alpha/external_auth.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "common/common/assert.h"
@@ -19,13 +18,11 @@ namespace ExtAuthz {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
-                               envoy::config::core::v3::ApiVersion transport_api_version,
-                               bool use_alpha)
+                               envoy::config::core::v3::ApiVersion transport_api_version)
     : async_client_(async_client), timeout_(timeout),
       service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
-                                             "envoy.service.auth.v2.Authorization.Check",
-                                             "envoy.service.auth.v2alpha.Authorization.Check")
-                          .getMethodDescriptorForVersion(transport_api_version, use_alpha)),
+                                             "envoy.service.auth.v2.Authorization.Check")
+                          .getMethodDescriptorForVersion(transport_api_version)),
       transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
@@ -143,23 +140,6 @@ void GrpcClientImpl::toAuthzResponseHeader(
                                             header.header().value());
     }
   }
-}
-
-const Grpc::RawAsyncClientSharedPtr AsyncClientCache::getOrCreateAsyncClient(
-    const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
-  // The cache stores Google gRPC client, so channel is not created for each request.
-  ASSERT(proto_config.has_grpc_service() && proto_config.grpc_service().has_google_grpc());
-  auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
-  const std::size_t cache_key = MessageUtil::hash(proto_config.grpc_service().google_grpc());
-  const auto it = cache.async_clients_.find(cache_key);
-  if (it != cache.async_clients_.end()) {
-    return it->second;
-  }
-  const Grpc::AsyncClientFactoryPtr factory =
-      async_client_manager_.factoryForGrpcService(proto_config.grpc_service(), scope_, true);
-  const Grpc::RawAsyncClientSharedPtr async_client = factory->create();
-  cache.async_clients_.emplace(cache_key, async_client);
-  return async_client;
 }
 
 } // namespace ExtAuthz

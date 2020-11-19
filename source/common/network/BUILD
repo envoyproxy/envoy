@@ -106,9 +106,12 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
+        "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:backoff_lib",
         "//source/common/common:linked_object",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
@@ -261,6 +264,7 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
+        ":default_socket_interface_lib",
         ":listen_socket_lib",
         ":udp_default_writer_config",
         "//include/envoy/event:dispatcher_interface",

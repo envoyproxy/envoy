@@ -82,8 +82,8 @@ protected:
 
   // Read in key.pem and return a new private key.
   bssl::UniquePtr<EVP_PKEY> makeKey() {
-    std::string file = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+    std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"));
     std::string passphrase = "";
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
 
@@ -97,8 +97,8 @@ protected:
 
   // Read in cert.pem and return a certificate.
   bssl::UniquePtr<CRYPTO_BUFFER> makeCert() {
-    std::string file = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+    std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"));
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
 
     uint8_t* data = nullptr;

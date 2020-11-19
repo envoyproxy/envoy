@@ -309,6 +309,28 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, ConnectionDurationResponseFlag) {
+  // Not used in the test.
+  delete codec_;
+
+  max_connection_duration_ = (std::chrono::milliseconds(10));
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
+  setup(false, "");
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  filter_callbacks_.connection_.streamInfo().setResponseFlag(
+      StreamInfo::ResponseFlag::DurationTimeout);
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_TRUE(filter_callbacks_.connection_.streamInfo().hasResponseFlag(
+      StreamInfo::ResponseFlag::DurationTimeout));
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoCodec) {
   // Not used in the test.
   delete codec_;
@@ -499,7 +521,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
   EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
       .WillOnce(Invoke([&](Http::HeaderMap& trailers) -> FilterTrailersStatus {
         Http::LowerCaseString key("foo");
-        EXPECT_EQ(trailers.get(key), nullptr);
+        EXPECT_TRUE(trailers.get(key).empty());
         return FilterTrailersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
@@ -539,7 +561,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
       .WillOnce(Invoke([&](Http::HeaderMap& trailers) -> FilterTrailersStatus {
         // assert that the trailers set in the previous filter was ignored
         Http::LowerCaseString key("foo");
-        EXPECT_EQ(trailers.get(key), nullptr);
+        EXPECT_TRUE(trailers.get(key).empty());
         return FilterTrailersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
@@ -577,8 +599,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
     // ensure that we see the trailers set in decodeData
     Http::LowerCaseString key("foo");
     auto t = trailers.get(key);
-    ASSERT(t);
-    EXPECT_EQ(t->value(), trailers_data.c_str());
+    ASSERT(!t.empty());
+    EXPECT_EQ(t[0]->value(), trailers_data.c_str());
     return FilterTrailersStatus::Continue;
   }));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
@@ -616,7 +638,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
     // ensure that we see the trailers set in decodeData
     Http::LowerCaseString key("foo");
     auto t = trailers.get(key);
-    EXPECT_EQ(t->value(), trailers_data.c_str());
+    EXPECT_EQ(t[0]->value(), trailers_data.c_str());
     return FilterTrailersStatus::Continue;
   }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
@@ -2908,7 +2930,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
 
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
-  decoder_filters_[0]->callbacks_->recreateStream();
+  decoder_filters_[0]->callbacks_->recreateStream(nullptr);
   conn_manager_->onData(fake_input, false);
 
   // The connection life time data should have been written to the connection filter state.

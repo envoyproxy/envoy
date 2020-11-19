@@ -184,7 +184,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void setDecoderBufferLimit(uint32_t limit) override;
   uint32_t decoderBufferLimit() override;
-  bool recreateStream() override;
+  bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
@@ -330,6 +330,11 @@ public:
    * in the case of multiple upstream calls.
    */
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
+
+  /**
+   * Updates response code stats based on the details in the headers.
+   */
+  virtual void chargeStats(const ResponseHeaderMap& headers) PURE;
 
   // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
   // callbacks instead of via the encode/decode callbacks on the filters.

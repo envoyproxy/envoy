@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include "test/common/config/delta_subscription_test_harness.h"
@@ -23,6 +24,10 @@ class SubscriptionImplTest : public testing::TestWithParam<SubscriptionType> {
 public:
   SubscriptionImplTest() : SubscriptionImplTest(std::chrono::milliseconds(0)) {}
   SubscriptionImplTest(std::chrono::milliseconds init_fetch_timeout) {
+    initialize(init_fetch_timeout);
+  }
+
+  void initialize(std::chrono::milliseconds init_fetch_timeout = std::chrono::milliseconds(0)) {
     switch (GetParam()) {
     case SubscriptionType::Grpc:
       test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);

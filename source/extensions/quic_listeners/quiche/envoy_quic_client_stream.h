@@ -37,7 +37,7 @@ public:
   }
 
   // Http::RequestEncoder
-  void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) override;
+  Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const Http::RequestTrailerMap& trailers) override;
 
   // Http::Stream
@@ -46,6 +46,7 @@ public:
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
+  void Reset(quic::QuicRstStreamErrorCode error) override;
   void OnClose() override;
   void OnCanWrite() override;
   // quic::Stream
@@ -66,6 +67,9 @@ protected:
 
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
+
+  // Deliver awaiting trailers if body has been delivered.
+  void maybeDecodeTrailers();
 
   Http::ResponseDecoder* response_decoder_{nullptr};
 };

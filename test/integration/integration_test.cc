@@ -179,7 +179,7 @@ TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("example-value", response->headers()
-                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))[0]
                                  ->value()
                                  .getStringView());
   EXPECT_EQ("text/html", response->headers().getContentTypeValue());
@@ -189,9 +189,11 @@ TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
 }
 
 TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
+  useAccessLog("%ROUTE_NAME%");
   static const std::string domain("direct.example.com");
   static const std::string prefix("/");
   static const Http::Code status(Http::Code::OK);
+  static const std::string route_name("direct_response_route");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -215,6 +217,7 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
         virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
         virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
             static_cast<uint32_t>(status));
+        virtual_host->mutable_routes(0)->set_name(route_name);
       });
   initialize();
 
@@ -223,13 +226,16 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("example-value", response->headers()
-                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))[0]
                                  ->value()
                                  .getStringView());
   // Content-type header is removed.
   EXPECT_EQ(nullptr, response->headers().ContentType());
   // Content-length header is correct.
   EXPECT_EQ("0", response->headers().getContentLengthValue());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr(route_name));
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
@@ -477,6 +483,38 @@ TEST_P(IntegrationTest, TestSmuggling) {
   }
 }
 
+TEST_P(IntegrationTest, TestPipelinedResponses) {
+  initialize();
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+
+  ASSERT_TRUE(tcp_client->write(
+      "POST /test/long/url HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked\r\n\r\n"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+  ASSERT_THAT(data, HasSubstr("POST"));
+
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"));
+
+  tcp_client->waitForData("0\r\n\r\n", false);
+  std::string response = tcp_client->data();
+
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
+  EXPECT_THAT(response, EndsWith("0\r\n\r\n"));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->close();
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value(), 1);
+}
+
 TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -709,12 +747,12 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
   EXPECT_EQ(upstream_headers->get_("User-Agent"), "public,123");
-  ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")) != nullptr);
+  ASSERT_FALSE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")).empty());
   EXPECT_EQ("bar",
-            upstream_headers->get(Envoy::Http::LowerCaseString("foo"))->value().getStringView());
-  ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("eep")) != nullptr);
+            upstream_headers->get(Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
+  ASSERT_FALSE(upstream_headers->get(Envoy::Http::LowerCaseString("eep")).empty());
   EXPECT_EQ("baz",
-            upstream_headers->get(Envoy::Http::LowerCaseString("eep"))->value().getStringView());
+            upstream_headers->get(Envoy::Http::LowerCaseString("eep"))[0]->value().getStringView());
 }
 
 // Verify for HTTP/1.0 a keep-alive header results in no connection: close.
@@ -902,6 +940,41 @@ TEST_P(IntegrationTest, AbsolutePath) {
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
+// Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
+TEST_P(IntegrationTest, TestHostWithAddress) {
+  useAccessLog("%REQ(Host)%\n");
+  std::string address_string;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    address_string = TestUtility::getIpv4Loopback();
+  } else {
+    address_string = "[::1]";
+  }
+
+  auto host = config_helper_.createVirtualHost(address_string.c_str(), "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+
+  // Test absolute URL with ipv6.
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), absl::StrCat("GET http://", address_string, " HTTP/1.1\r\n\r\n").c_str(),
+      &response, true);
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  EXPECT_TRUE(response.find("301") != std::string::npos);
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr(address_string));
+
+  // Test normal IPv6 request as well.
+  response.clear();
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"),
+      absl::StrCat("GET / HTTP/1.1\r\nHost: ", address_string, "\r\n\r\n").c_str(), &response,
+      true);
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  EXPECT_TRUE(response.find("301") != std::string::npos);
+}
+
 TEST_P(IntegrationTest, AbsolutePathWithPort) {
   // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
   // encountered via absolute URL with a port.
@@ -914,6 +987,7 @@ TEST_P(IntegrationTest, AbsolutePathWithPort) {
       lookupPort("http"), "GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
       &response, true);
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  EXPECT_TRUE(response.find("301") != std::string::npos);
 }
 
 TEST_P(IntegrationTest, AbsolutePathWithoutPort) {

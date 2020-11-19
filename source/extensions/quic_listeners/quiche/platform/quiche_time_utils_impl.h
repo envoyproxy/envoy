@@ -10,12 +10,12 @@
 
 #include "absl/time/civil_time.h"
 #include "absl/time/time.h"
-#include "quiche/common/platform/api/quiche_optional.h"
+#include "absl/types/optional.h"
 
 namespace quiche {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day, int hour,
+absl::optional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day, int hour,
                                                            int minute, int second);
 
 } // namespace quiche

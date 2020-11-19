@@ -15,6 +15,7 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "absl/strings/str_join.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -77,7 +78,6 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->ne
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
-  ASSERT(file_event_ == nullptr);
   cb_ = &cb;
 
   ParseState parse_state = onRead();
@@ -92,7 +92,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
     // do nothing but create the event
-    file_event_ = socket.ioHandle().createFileEvent(
+    socket.ioHandle().initializeFileEvent(
         cb.dispatcher(),
         [this](uint32_t events) {
           if (events & Event::FileReadyType::Closed) {
@@ -138,6 +138,7 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
     }
     protocols.emplace_back(reinterpret_cast<const char*>(CBS_data(&name)), CBS_len(&name));
   }
+  ENVOY_LOG(trace, "tls:onALPN(), ALPN: {}", absl::StrJoin(protocols, ","));
   cb_->socket().setRequestedApplicationProtocols(protocols);
   alpn_found_ = true;
 }
@@ -158,7 +159,7 @@ ParseState Filter::onRead() {
   // there is no way for a listener-filter to pass payload data to the ConnectionImpl and filters
   // that get created later.
   //
-  // The file_event_ in this class gets events every time new data is available on the socket,
+  // We request from the file descriptor to get events every time new data is available,
   // even if previous data has not been read, which is always the case due to MSG_PEEK. When
   // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
   // socket, so that new event is immediately signaled as readable because it is new and the socket
@@ -190,7 +191,7 @@ ParseState Filter::onRead() {
 
 void Filter::done(bool success) {
   ENVOY_LOG(trace, "tls inspector: done: {}", success);
-  file_event_.reset();
+  cb_->socket().ioHandle().resetFileEvents();
   cb_->continueFilterChain(success);
 }
 

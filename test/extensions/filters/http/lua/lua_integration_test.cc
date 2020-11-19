@@ -115,6 +115,8 @@ public:
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           hcm.mutable_rds()->set_route_config_name(route_config_name);
+          hcm.mutable_rds()->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               hcm.mutable_rds()->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -169,9 +171,10 @@ public:
 
     response->waitForEndStream();
 
-    EXPECT_EQ(
-        "2",
-        response->headers().get(Http::LowerCaseString("content-length"))->value().getStringView());
+    EXPECT_EQ("2", response->headers()
+                       .get(Http::LowerCaseString("content-length"))[0]
+                       ->value()
+                       .getStringView());
     EXPECT_EQ("ok", response->body());
     cleanup();
   }
@@ -214,7 +217,7 @@ TEST_P(LuaIntegrationTest, CallMetadataDuringLocalReply) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       local metadata = response_handle:metadata():get("foo.bar")
@@ -239,7 +242,7 @@ TEST_P(LuaIntegrationTest, RequestAndResponse) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:logTrace("log test")
@@ -265,6 +268,10 @@ typed_config:
       end
       request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
       request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
+      request_handle:headers():add("request_downstream_local_address_value", 
+        request_handle:streamInfo():downstreamLocalAddress())
+      request_handle:headers():add("request_downstream_directremote_address_value", 
+        request_handle:streamInfo():downstreamDirectRemoteAddress())
     end
 
     function envoy_on_response(response_handle)
@@ -296,33 +303,47 @@ typed_config:
 
   waitForNextUpstreamRequest();
   EXPECT_EQ("10", upstream_request_->headers()
-                      .get(Http::LowerCaseString("request_body_size"))
+                      .get(Http::LowerCaseString("request_body_size"))[0]
                       ->value()
                       .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_metadata_foo"))
+                       .get(Http::LowerCaseString("request_metadata_foo"))[0]
                        ->value()
                        .getStringView());
 
   EXPECT_EQ("bat", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_metadata_baz"))
+                       .get(Http::LowerCaseString("request_metadata_baz"))[0]
                        ->value()
                        .getStringView());
   EXPECT_EQ("false", upstream_request_->headers()
-                         .get(Http::LowerCaseString("request_secure"))
+                         .get(Http::LowerCaseString("request_secure"))[0]
                          ->value()
                          .getStringView());
 
   EXPECT_EQ("HTTP/1.1", upstream_request_->headers()
-                            .get(Http::LowerCaseString("request_protocol"))
+                            .get(Http::LowerCaseString("request_protocol"))[0]
                             ->value()
                             .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_dynamic_metadata_value"))
+                       .get(Http::LowerCaseString("request_dynamic_metadata_value"))[0]
                        ->value()
                        .getStringView());
+
+  EXPECT_TRUE(
+      absl::StrContains(upstream_request_->headers()
+                            .get(Http::LowerCaseString("request_downstream_local_address_value"))[0]
+                            ->value()
+                            .getStringView(),
+                        GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+  EXPECT_TRUE(absl::StrContains(
+      upstream_request_->headers()
+          .get(Http::LowerCaseString("request_downstream_directremote_address_value"))[0]
+          ->value()
+          .getStringView(),
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
@@ -334,21 +355,22 @@ typed_config:
   response->waitForEndStream();
 
   EXPECT_EQ("7", response->headers()
-                     .get(Http::LowerCaseString("response_body_size"))
+                     .get(Http::LowerCaseString("response_body_size"))[0]
                      ->value()
                      .getStringView());
   EXPECT_EQ("bar", response->headers()
-                       .get(Http::LowerCaseString("response_metadata_foo"))
+                       .get(Http::LowerCaseString("response_metadata_foo"))[0]
                        ->value()
                        .getStringView());
   EXPECT_EQ("bat", response->headers()
-                       .get(Http::LowerCaseString("response_metadata_baz"))
+                       .get(Http::LowerCaseString("response_metadata_baz"))[0]
                        ->value()
                        .getStringView());
-  EXPECT_EQ(
-      "HTTP/1.1",
-      response->headers().get(Http::LowerCaseString("request_protocol"))->value().getStringView());
-  EXPECT_EQ(nullptr, response->headers().get(Http::LowerCaseString("foo")));
+  EXPECT_EQ("HTTP/1.1", response->headers()
+                            .get(Http::LowerCaseString("request_protocol"))[0]
+                            ->value()
+                            .getStringView());
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("foo")).empty());
 
   cleanup();
 }
@@ -359,7 +381,7 @@ TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -397,11 +419,11 @@ typed_config:
 
   waitForNextUpstreamRequest();
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("upstream_foo"))
+                       .get(Http::LowerCaseString("upstream_foo"))[0]
                        ->value()
                        .getStringView());
   EXPECT_EQ("4", upstream_request_->headers()
-                     .get(Http::LowerCaseString("upstream_body_size"))
+                     .get(Http::LowerCaseString("upstream_body_size"))[0]
                      ->value()
                      .getStringView());
 
@@ -417,7 +439,7 @@ TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -467,7 +489,7 @@ TEST_P(LuaIntegrationTest, UpstreamAsyncHttpCall) {
       R"EOF(
 name: envoy.filters.http.lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -517,7 +539,7 @@ TEST_P(LuaIntegrationTest, ChangeRoute) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:headers():remove(":path")
@@ -551,7 +573,7 @@ TEST_P(LuaIntegrationTest, SurviveMultipleCalls) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:streamInfo():dynamicMetadata()
@@ -587,7 +609,7 @@ TEST_P(LuaIntegrationTest, SignatureVerification) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function string.fromhex(str)
       return (str:gsub('..', function (cc)
@@ -662,12 +684,12 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("approved", upstream_request_->headers()
-                            .get(Http::LowerCaseString("signature_verification"))
+                            .get(Http::LowerCaseString("signature_verification"))[0]
                             ->value()
                             .getStringView());
 
   EXPECT_EQ("done", upstream_request_->headers()
-                        .get(Http::LowerCaseString("verification"))
+                        .get(Http::LowerCaseString("verification"))[0]
                         ->value()
                         .getStringView());
 
@@ -804,11 +826,11 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
     waitForNextUpstreamRequest(1);
 
-    auto* entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
+    auto entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
     if (!expected_value.empty()) {
-      EXPECT_EQ(expected_value, entry->value().getStringView());
+      EXPECT_EQ(expected_value, entry[0]->value().getStringView());
     } else {
-      EXPECT_EQ(nullptr, entry);
+      EXPECT_TRUE(entry.empty());
     }
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -888,11 +910,11 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
     waitForNextUpstreamRequest(1);
 
-    auto* entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
+    auto entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
     if (!expected_value.empty()) {
-      EXPECT_EQ(expected_value, entry->value().getStringView());
+      EXPECT_EQ(expected_value, entry[0]->value().getStringView());
     } else {
-      EXPECT_EQ(nullptr, entry);
+      EXPECT_TRUE(entry.empty());
     }
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -936,7 +958,7 @@ TEST_P(LuaIntegrationTest, RewriteResponseBuffer) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       local content_length = response_handle:body():setBytes("ok")
@@ -955,7 +977,7 @@ TEST_P(LuaIntegrationTest, RewriteChunkedBody) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       response_handle:headers():replace("content-length", 2)

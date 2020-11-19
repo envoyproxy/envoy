@@ -36,6 +36,7 @@ envoy_extension_cc_test(
     srcs = ["wrappers_test.cc"],
     extension_name = "envoy.filters.http.lua",
     deps = [
+        "//source/common/network:address_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:wrappers_lib",
         "//test/extensions/filters/common/lua:lua_wrappers_lib",

@@ -204,7 +204,7 @@ public:
               // string value. Hence for "header2" key, the value is "header2,header2-appended".
               absl::StrCat(header_to_append.first, ",", header_to_append.second)));
       const auto value = upstream_request_->headers()
-                             .get(Http::LowerCaseString(header_to_append.first))
+                             .get(Http::LowerCaseString(header_to_append.first))[0]
                              ->value()
                              .getStringView();
       EXPECT_TRUE(absl::EndsWith(value, "-appended"));
@@ -230,8 +230,8 @@ public:
 
     for (const auto& header_to_remove : headers_to_remove) {
       // The headers that were originally present in the request have now been removed.
-      EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}),
-                nullptr);
+      EXPECT_TRUE(
+          upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}).empty());
     }
 
     response_->waitForEndStream();
@@ -509,12 +509,8 @@ public:
     });
   }
 
-  void setupWithDisabledCaseSensitiveStringMatcher(bool disable_case_sensitive_matcher) {
+  void setup() {
     initializeConfig();
-
-    if (disable_case_sensitive_matcher) {
-      disableCaseSensitiveStringMatcher();
-    }
 
     HttpIntegrationTest::initialize();
 
@@ -552,13 +548,13 @@ public:
     // The "remove-me" header that was present in the downstream request has
     // been removed by envoy as a result of being present in
     // "x-envoy-auth-headers-to-remove".
-    EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{"remove-me"}), nullptr);
+    EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString{"remove-me"}).empty());
     // "x-envoy-auth-headers-to-remove" itself has also been removed because
     // it's only used for communication between the authorization server and
     // envoy itself.
-    EXPECT_EQ(
-        upstream_request_->headers().get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"}),
-        nullptr);
+    EXPECT_TRUE(upstream_request_->headers()
+                    .get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"})
+                    .empty());
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     response_->waitForEndStream();
@@ -691,19 +687,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher.
 TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
-  setupWithDisabledCaseSensitiveStringMatcher(false);
-  const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_EQ(header_entry, nullptr);
-}
-
-// Verifies that by setting "false" to
-// envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher, the string
-// matcher used by HTTP service will be case-insensitive.
-TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
-  setupWithDisabledCaseSensitiveStringMatcher(true);
-  const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_NE(header_entry, nullptr);
-  EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
+  setup();
+  const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
+  ASSERT_TRUE(header_entry.empty());
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, CheckTimesOutLegacy) { expectCheckRequestTimedout(false); }
@@ -827,13 +813,18 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   initializeConfig();
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   HttpIntegrationTest::initialize();
-  initiateClientConnection(4, Headers{}, Headers{});
 
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  int expected_grpc_client_creation_count = 0;
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
-    // Make sure one Google grpc client is created.
-    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+    // Make sure Google grpc client is created before the request coming in.
+    // Since this is not laziness creation, it should create one client per
+    // thread before the traffic comes.
+    expected_grpc_client_creation_count =
+        test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value();
   }
+
+  initiateClientConnection(4, Headers{}, Headers{});
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{});
 
@@ -860,8 +851,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   RELEASE_ASSERT(result, result.message());
 
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
-    // Make sure one Google grpc client is created.
-    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+    // Make sure no more Google grpc client is created no matter how many requests coming in.
+    EXPECT_EQ(expected_grpc_client_creation_count,
+              test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
   }
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{});
@@ -882,6 +874,12 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("200", response_->headers().getStatusValue());
   EXPECT_EQ(response_size_, response_->body().size());
+
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Make sure no more Google grpc client is created no matter how many requests coming in.
+    EXPECT_EQ(expected_grpc_client_creation_count,
+              test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+  }
 
   cleanup();
 }

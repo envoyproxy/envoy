@@ -30,6 +30,7 @@ public:
 private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  IoHandlePtr duplicate() override;
 
   const WritevOverrideProc writev_override_;
 };

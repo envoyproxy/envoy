@@ -2,12 +2,14 @@
 
 #include <csignal>
 #include <cstdint>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <string>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -18,6 +20,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -38,6 +41,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/signal/fatal_error_handler.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
@@ -147,7 +151,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
   snapped_counters_ = store.counters();
   counters_.reserve(snapped_counters_.size());
   for (const auto& counter : snapped_counters_) {
@@ -172,15 +176,17 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   for (const auto& text_readout : snapped_text_readouts_) {
     text_readouts_.push_back(*text_readout);
   }
+
+  snapshot_time_ = time_source.systemTime();
 }
 
-void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                       TimeSource& time_source) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store);
+  MetricSnapshotImpl snapshot(store, time_source);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -231,7 +237,7 @@ void InstanceImpl::updateServerStats() {
 
 void InstanceImpl::flushStatsInternal() {
   updateServerStats();
-  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
+  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_, timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(config_.statsFlushInterval());
@@ -254,7 +260,7 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
     envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
     load_function(bootstrap_v2, false);
     Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
-    MessageUtil::onVersionUpgradeWarn("v2 bootstrap");
+    MessageUtil::onVersionUpgradeDeprecation("v2 bootstrap", false);
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
@@ -414,6 +420,26 @@ void InstanceImpl::initialize(const Options& options,
         factory);
     bootstrap_extensions_.push_back(
         factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
+
+  // Register the fatal actions.
+  {
+    FatalAction::FatalActionPtrList safe_actions;
+    FatalAction::FatalActionPtrList unsafe_actions;
+    for (const auto& action_config : bootstrap_.fatal_actions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::FatalActionFactory>(
+              action_config.config());
+      auto action = factory.createFatalActionFromProto(action_config, this);
+
+      if (action->isAsyncSignalSafe()) {
+        safe_actions.push_back(std::move(action));
+      } else {
+        unsafe_actions.push_back(std::move(action));
+      }
+    }
+    Envoy::FatalErrorHandler::registerFatalActions(
+        std::move(safe_actions), std::move(unsafe_actions), api_->threadFactory());
   }
 
   if (!bootstrap_.default_socket_interface().empty()) {
@@ -678,8 +704,7 @@ void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
-                                                         "main_thread");
-  watchdog->startWatchdog(*dispatcher_);
+                                                         "main_thread", *dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
@@ -730,6 +755,7 @@ void InstanceImpl::terminate() {
   restarter_.shutdown();
   ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
+  FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }

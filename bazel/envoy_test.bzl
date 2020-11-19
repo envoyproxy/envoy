@@ -29,6 +29,7 @@ def _envoy_cc_test_infrastructure_library(
         tags = [],
         include_prefix = None,
         copts = [],
+        alwayslink = 1,
         **kargs):
     # Add implicit tcmalloc external dependency(if available) in order to enable CPU and heap profiling in tests.
     deps += tcmalloc_external_deps(repository)
@@ -44,7 +45,7 @@ def _envoy_cc_test_infrastructure_library(
         ],
         tags = tags,
         include_prefix = include_prefix,
-        alwayslink = 1,
+        alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         **kargs
     )
@@ -58,7 +59,6 @@ def _envoy_test_linkopts():
             "-image_base 100000000",
         ],
         "@envoy//bazel:windows_x86_64": [
-            "-DEFAULTLIB:advapi32.lib",
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
             "-WX",
@@ -205,6 +205,7 @@ def envoy_cc_test_library(
         tags = [],
         include_prefix = None,
         copts = [],
+        alwayslink = 1,
         **kargs):
     deps = deps + [
         repository + "//test/test_common:printers_includes",
@@ -222,6 +223,7 @@ def envoy_cc_test_library(
         include_prefix,
         copts,
         visibility = ["//visibility:public"],
+        alwayslink = alwayslink,
         **kargs
     )
 
