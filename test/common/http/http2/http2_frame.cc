@@ -323,6 +323,16 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
   return frame;
 }
 
+Http2Frame Http2Frame::makeMalformedResponseWithZerolenHeader(uint32_t stream_index) {
+  Http2Frame frame;
+  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
+                    makeNetworkOrderStreamId(stream_index));
+  frame.appendStaticHeader(StaticHeaderIndex::Status200);
+  frame.appendEmptyHeader();
+  frame.adjustPayloadSize();
+  return frame;
+}
+
 Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host,
                                    absl::string_view path) {
   Http2Frame frame;
