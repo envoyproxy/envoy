@@ -5,6 +5,7 @@ set -e
 LLVM_VERSION="10.0.0"
 CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ /\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
+LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 
 if [ "${CLANG_VERSION}" != "${LLVM_VERSION}" ]
 then
@@ -15,6 +16,12 @@ fi
 if [ "${LLVM_COV_VERSION}" != "${LLVM_VERSION}" ]
 then
   echo "llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}"
+  exit 1
+fi
+
+if [ "${LLVM_PROFDATA_VERSION}" != "${LLVM_VERSION}" ]
+then
+  echo "llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}"
   exit 1
 fi
 
