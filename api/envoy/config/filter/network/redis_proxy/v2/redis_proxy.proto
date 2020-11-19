@@ -114,10 +114,6 @@ message RedisProxy {
 
     // Read policy. The default is to read from the primary.
     ReadPolicy read_policy = 7 [(validate.rules).enum = {defined_only: true}];
-
-    // 支持 redis/memcached 协议
-    // 默认是 redis 协议
-    string backend = 6;
   }
 
   message PrefixRoutes {

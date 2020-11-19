@@ -61,6 +61,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
 
   if (cluster.common_lb_config().has_consistent_hashing_lb_config() &&
       cluster.common_lb_config().consistent_hashing_lb_config().use_hostname_for_hashing() &&
+      !cluster.has_cluster_type() &&
       cluster.type() != envoy::config::cluster::v3::Cluster::STRICT_DNS) {
     throw EnvoyException(fmt::format(
         "Cannot use hostname for consistent hashing loadbalancing for cluster of type: '{}'",

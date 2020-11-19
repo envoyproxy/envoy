@@ -4,7 +4,6 @@
 #include <forward_list>
 #include <string>
 #include <vector>
-#include <iostream>
 
 #include "common/common/logger.h"
 
@@ -64,7 +63,6 @@ private:
   PendingInteger pending_integer_;
   RespValuePtr pending_value_root_;
   std::forward_list<PendingValue> pending_value_stack_;
-  std::string backend_;
 };
 
 /**
@@ -118,15 +116,12 @@ private:
 class DecoderFactoryImpl : public DecoderFactory {
 public:
   // RedisProxy::DecoderFactory
-  DecoderPtr create(DecoderCallbacks& callbacks) override {
-//    if (callbacks.backends() == "memcached") {
-//      return DecoderPtr{new MemcachedDecoder(callbacks) };
-//    }
-    // TODO ???
-    // std::cout << "backends: " << callbacks.backends() << std::endl;
-    return DecoderPtr{new MemcachedDecoder(callbacks) };
+  DecoderPtr create(DecoderCallbacks& callbacks, Protocol protocol) override {
+    if (protocol == Protocol::Memcached) {
+      return DecoderPtr{new MemcachedDecoder(callbacks) };
+    }
 
-    // return DecoderPtr{new RedisDecoder(callbacks)};
+    return DecoderPtr{new DecoderImpl(callbacks)};
   }
 };
 
@@ -151,6 +146,17 @@ class MemcachedEncoder : public Encoder {
 public:
   // RedisProxy::Encoder
   void encode(const RespValue& value, Buffer::Instance& out) override;
+};
+
+class EncoderFactoryImpl {
+public:
+  static EncoderPtr create(Protocol protocol) {
+    if (protocol == Protocol::Memcached) {
+      return EncoderPtr{ new MemcachedEncoder() };
+    }
+
+    return EncoderPtr{ new EncoderImpl() };
+  }
 };
 
 } // namespace Redis

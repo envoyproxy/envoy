@@ -4,7 +4,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <iostream>
 
 #include "envoy/common/platform.h"
 
@@ -67,7 +66,6 @@ const std::vector<RespValue>& RespValue::asArray() const {
 }
 
 std::string& RespValue::asString() {
-  std::cout << "----- RespType " <<  int(type_) << " | " << string_ << "\n";
   ASSERT(type_ == RespType::BulkString || type_ == RespType::Error ||
          type_ == RespType::SimpleString);
   return string_;
@@ -123,6 +121,7 @@ void RespValue::cleanup() {
   }
   noreply_ = false;
 }
+
 void RespValue::type(RespType type) {
   cleanup();
 
@@ -340,8 +339,8 @@ RespValue::CompositeArray::CompositeArrayConstIterator::empty() {
   return *instance;
 }
 
-void DecoderImpl::decode(Buffer::Instance &data) {
-  for (const Buffer::RawSlice &slice : data.getRawSlices()) {
+void DecoderImpl::decode(Buffer::Instance& data) {
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     parseSlice(slice);
   }
 
@@ -1004,6 +1003,7 @@ void MemcachedEncoder::encode(const RespValue& value, Buffer::Instance& out) {
     out.add("END\r\n", 5);
   }
 }
+
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

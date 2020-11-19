@@ -38,7 +38,7 @@ struct RingHashLoadBalancerStats {
  * 3) Max request fallback to support hot shards (not all applications will want this).
  */
 class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase,
-                             Logger::Loggable<Logger::Id::upstream> {
+                             protected Logger::Loggable<Logger::Id::upstream> {
 public:
   RingHashLoadBalancer(
       const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
@@ -48,7 +48,6 @@ public:
 
   const RingHashLoadBalancerStats& stats() const { return stats_; }
 
-private:
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 
   struct RingEntry {
@@ -64,10 +63,22 @@ private:
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
+    virtual void doHash(const std::string& address_string, HashFunction hash_function, uint64_t i, std::vector<uint64_t> &hashes);
+
+  private:
+    void init() override;
     std::vector<RingEntry> ring_;
 
+    const NormalizedHostWeightVector& normalized_host_weights_;
+    double min_normalized_weight_;
+    uint64_t min_ring_size_;
+    uint64_t max_ring_size_;
+    HashFunction hash_function_;
+    bool use_hostname_for_hashing_;
     RingHashLoadBalancerStats& stats_;
   };
+
+private:
   using RingConstSharedPtr = std::shared_ptr<const Ring>;
 
   // ThreadAwareLoadBalancerBase
@@ -77,6 +88,7 @@ private:
     HashingLoadBalancerSharedPtr ring_hash_lb =
         std::make_shared<Ring>(normalized_host_weights, min_normalized_weight, min_ring_size_,
                                max_ring_size_, hash_function_, use_hostname_for_hashing_, stats_);
+    ring_hash_lb->init();
     if (hash_balance_factor_ == 0) {
       return ring_hash_lb;
     }
@@ -88,15 +100,16 @@ private:
   static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);
 
   Stats::ScopePtr scope_;
-  RingHashLoadBalancerStats stats_;
 
   static const uint64_t DefaultMinRingSize = 1024;
   static const uint64_t DefaultMaxRingSize = 1024 * 1024 * 8;
   const uint64_t min_ring_size_;
   const uint64_t max_ring_size_;
   const HashFunction hash_function_;
-  const bool use_hostname_for_hashing_;
   const uint32_t hash_balance_factor_;
+protected:
+  const bool use_hostname_for_hashing_;
+  RingHashLoadBalancerStats stats_;
 };
 
 } // namespace Upstream

@@ -28,15 +28,11 @@ ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
 Common::Redis::Client::PoolRequest* makeSingleServerRequest(
     const RouteSharedPtr& route, const std::string& command, const std::string& key,
     Common::Redis::RespValueConstSharedPtr incoming_request, ConnPool::PoolCallbacks& callbacks) {
-  // callbacks --> new SimpleRequest()
-  // SimpleRequest 一路继承实现了 ConnPool::PoolCallbacks 中的方法
-  // ConnPool::InstanceImpl.makeRequest()
   auto handler =
       route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request), callbacks);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
       if (mirror_policy->shouldMirror(command)) {
-        // TODO RespVariant
         mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
                                                null_pool_callbacks);
       }
@@ -143,9 +139,6 @@ void DelayFaultRequest::onDelayResponse() {
 
 void DelayFaultRequest::cancel() { delay_timer_->disableTimer(); }
 
-// TODO callbacks ???
-// router : PrefixRoutes 指针
-// config.cc 初始化 filter 时根据配置 创建的 PrefixRoutes 对象
 SplitRequestPtr SimpleRequest::create(Router& router,
                                       Common::Redis::RespValuePtr&& incoming_request,
                                       SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -216,7 +209,6 @@ SplitRequestPtr McRetrievalRequest::create(Router& router, Common::Redis::RespVa
   return nullptr;  
 }
 
-// TODO 聚合响应
 void McRetrievalRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
   pending_requests_[index].handle_ = nullptr;
 
@@ -238,7 +230,6 @@ void McRetrievalRequest::onChildResponse(Common::Redis::RespValuePtr&& value, ui
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
     updateStats(error_count_ == 0);
-    // ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
     callbacks_.onResponse(std::move(pending_response_));
   }
 }
@@ -545,12 +536,9 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
              mset_handler_);
 }
 
-// request ---> input buffer decode RespValue
-// callbacks ---> ProxyFilter
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
                                           SplitCallbacks& callbacks,
                                           Event::Dispatcher& dispatcher) {
-  ASSERT(request->type() == Common::Redis::RespType::Array);
   if ((request->type() != Common::Redis::RespType::Array) || request->asArray().empty()) {
     onInvalidRequest(callbacks);
     return nullptr;

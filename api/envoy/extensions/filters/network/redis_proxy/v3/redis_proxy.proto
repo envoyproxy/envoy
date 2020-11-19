@@ -28,7 +28,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -55,6 +55,16 @@ message RedisProxy {
       // Read from any node of the cluster. A random node is selected among the primary and
       // replicas, healthy nodes have precedent over unhealthy nodes.
       ANY = 4;
+    }
+
+    // Protocol controls how Envoy parse client's request. This is currently
+    // supported protocols are memcached and redis.
+    enum Protocol {
+      // Default mode. Parse for redis.
+      Redis = 0 [(udpa.annotations.enum_value_migrate).rename = "REDIS"];
+
+      // Parse for memcached.
+      Memcached = 1 [(udpa.annotations.enum_value_migrate).rename = "MEMCACHED"];
     }
 
     // Per-operation timeout in milliseconds. The timer starts when the first
@@ -119,9 +129,8 @@ message RedisProxy {
     // Read policy. The default is to read from the primary.
     ReadPolicy read_policy = 7 [(validate.rules).enum = {defined_only: true}];
 
-    // 支持 redis/memcached 协议
-    // 默认是 redis 协议
-    string backend = 9;
+    // Protocol. The default is for redis.
+    Protocol protocol = 9;
   }
 
   message PrefixRoutes {

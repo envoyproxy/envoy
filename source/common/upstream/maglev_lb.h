@@ -43,6 +43,7 @@ public:
 
   // Recommended table size in section 5.3 of the paper.
   static const uint64_t DefaultTableSize = 65537;
+  void init() override {}
 
 private:
   struct TableBuildEntry {

@@ -18,15 +18,28 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "twem_hash_lib",
+    srcs = [
+        "twem_hash.cc",
+        "twem_hash.h",
+    ],
+    external_deps = ["ssl"],
+)
+
+envoy_cc_library(
     name = "redis_cluster_lb",
     srcs = [
         "redis_cluster_lb.cc",
         "redis_cluster_lb.h",
+        "twem_cluster_lb.cc",
+        "twem_cluster_lb.h",
     ],
     deps = [
         ":crc16_lib",
+	":twem_hash_lib",
         "//include/envoy/upstream:thread_local_cluster_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters:well_known_names",
@@ -41,6 +54,8 @@ envoy_cc_extension(
     srcs = [
         "redis_cluster.cc",
         "redis_cluster.h",
+        "twem_cluster.cc",
+        "twem_cluster.h",
     ],
     category = "envoy.clusters",
     security_posture = "requires_trusted_downstream_and_upstream",

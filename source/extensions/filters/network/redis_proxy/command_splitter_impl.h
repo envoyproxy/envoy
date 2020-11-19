@@ -183,19 +183,6 @@ private:
 };
 
 /**
- * McSimpleRequest 把第一个参数当做 key 做 hash 计算
- */
-class McSimpleRequest: public SingleServerRequest {
-public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
-                                SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency);
-private:
-  McSimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
-  : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
-};
-
-/**
  * EvalRequest hashes the fourth argument as the key.
  */
 class EvalRequest : public SingleServerRequest {
@@ -273,7 +260,8 @@ private:
 };
 
 /**
- * Memcached get/gets command
+ * McRetrievalRequest takes each key from the command and sends a get/gets for each to the appropriate Memcached
+ * server. The response contains the result from each command.
  */
 class McRetrievalRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:

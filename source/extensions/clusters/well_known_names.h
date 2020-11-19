@@ -39,6 +39,9 @@ public:
   // Aggregate cluster which may contain different types of clusters. It allows load balance between
   // different type of clusters.
   const std::string Aggregate = "envoy.clusters.aggregate";
+
+  // Twem proxy cluster (cluster used a customed ketama distribution mode).
+  const std::string Twem = "envoy.clusters.twem";
 };
 
 using ClusterTypes = ConstSingleton<ClusterTypeValues>;

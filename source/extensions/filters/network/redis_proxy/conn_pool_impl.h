@@ -21,6 +21,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
+#include "source/extensions/clusters/redis/twem_cluster_lb.h"
 
 #include "extensions/common/redis/cluster_refresh_manager.h"
 #include "extensions/filters/network/common/redis/client.h"
@@ -183,7 +184,6 @@ private:
 
   const std::string cluster_name_;
   Upstream::ClusterManager& cm_;
-  std::string backends{""};
   Common::Redis::Client::ClientFactory& client_factory_;
   ThreadLocal::SlotPtr tls_;
   Common::Redis::Client::ConfigSharedPtr config_;

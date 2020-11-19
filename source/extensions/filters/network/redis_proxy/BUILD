@@ -112,6 +112,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network/common/redis:codec_interface",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

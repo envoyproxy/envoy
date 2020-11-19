@@ -184,6 +184,8 @@ public:
    * @return the read policy the proxy should use.
    */
   virtual ReadPolicy readPolicy() const PURE;
+
+  virtual Protocol protocol() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

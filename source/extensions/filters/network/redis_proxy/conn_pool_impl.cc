@@ -252,10 +252,15 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, config_->enableHashtagging(),
-                                                           is_redis_cluster_, getRequest(request),
-                                                           config_->readPolicy());
-  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+  Upstream::LoadBalancerContextBase *lb_context;
+  if (config_->protocol() == Common::Redis::Protocol::Memcached) {
+    lb_context = new Clusters::Redis::TwemLoadBalancerContextImpl(key);
+  } else {
+    lb_context = new Clusters::Redis::RedisLoadBalancerContextImpl(key, config_->enableHashtagging(),
+                        is_redis_cluster_, getRequest(request), config_->readPolicy());
+  }
+
+  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(lb_context);
   if (!host) {
     ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;
@@ -263,8 +268,6 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   pending_requests_.emplace_back(*this, std::move(request), callbacks);
   PendingRequest& pending_request = pending_requests_.back();
   ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
-  // TODO ClientImpl::makeRequest pending_request_
-  // 不同的 cmd 这里的 pending_request 不同
   pending_request.request_handler_ = client->redis_client_->makeRequest(
       getRequest(pending_request.incoming_request_), pending_request);
   if (pending_request.request_handler_) {

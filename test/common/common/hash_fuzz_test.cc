@@ -13,6 +13,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   { HashUtil::xxHash64(input); }
   { HashUtil::djb2CaseInsensitiveHash(input); }
   { MurmurHash::murmurHash2(input); }
+  { HashUtil::twemHash(input, len); }
+  { HashUtil::fnv1a64Hash(input); }
   if (len > 0) {
     // Split the input string into two parts to make a key-value pair.
     const size_t split_point = *reinterpret_cast<const uint8_t*>(buf) % len;

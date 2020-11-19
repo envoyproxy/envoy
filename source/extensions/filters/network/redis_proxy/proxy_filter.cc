@@ -1,4 +1,5 @@
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
+#include "extensions/filters/network/common/redis/supported_commands.h"
 
 #include <cstdint>
 #include <string>
@@ -16,6 +17,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
+using ConnProtocol = envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings;
+
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
@@ -26,9 +29,9 @@ ProxyFilterConfig::ProxyFilterConfig(
       downstream_auth_username_(
           Config::DataSource::read(config.downstream_auth_username(), true, api)),
       downstream_auth_password_(
-          Config::DataSource::read(config.downstream_auth_password(), true, api)),backends_("memcached") {
-  // TODO backends_ = config.settings().backends();
-}
+          Config::DataSource::read(config.downstream_auth_password(), true, api)),
+      protocol_(config.settings().protocol() == ConnProtocol::Memcached ? Common::Redis::Protocol::Memcached
+          : Common::Redis::Protocol::Redis) {}
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
@@ -38,7 +41,7 @@ ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Sc
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
                          Common::Redis::EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
                          ProxyFilterConfigSharedPtr config)
-    : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
+    : decoder_(factory.create(*this, config->protocol())), encoder_(std::move(encoder)), splitter_(splitter),
       config_(config) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
@@ -62,7 +65,7 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 }
 
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
-  if (value->asArray()[0].asString() == "quit") {
+  if (value->asArray()[0].asString() == Common::Redis::SupportedCommands::quit()) {
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
@@ -140,7 +143,6 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
   // The response we got might not be in order, so flush out what we can. (A new response may
   // unlock several out of order responses).
   while (!pending_requests_.empty() && pending_requests_.front().pending_response_) {
-    // TODO response encode
     encoder_->encode(*pending_requests_.front().pending_response_, encoder_buffer_);
     pending_requests_.pop_front();
   }

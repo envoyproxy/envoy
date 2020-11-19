@@ -24,6 +24,8 @@ namespace Redis {
  */
 enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array, CompositeArray };
 
+enum class Protocol { Redis, Memcached };
+
 /**
  * A variant implementation of a RESP value optimized for performance. A C++11 union is used for
  * the underlying type so that no unnecessary allocations/constructions are needed.
@@ -197,7 +199,7 @@ public:
   /**
    * Create a decoder given a set of decoder callbacks.
    */
-  virtual DecoderPtr create(DecoderCallbacks& callbacks) PURE;
+  virtual DecoderPtr create(DecoderCallbacks& callbacks, Protocol protocol) PURE;
 };
 
 /**

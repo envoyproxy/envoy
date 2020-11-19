@@ -14,13 +14,14 @@ namespace {
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 } // namespace
 
+using ConnProtocol = envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings;
+
 ConfigImpl::ConfigImpl(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
         config)
     : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
       enable_hashtagging_(config.enable_hashtagging()),
       enable_redirection_(config.enable_redirection()),
-      // TODO backend(""),
       max_buffer_size_before_flush_(
           config.max_buffer_size_before_flush()), // This is a scalar, so default is zero.
       buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
@@ -29,7 +30,9 @@ ConfigImpl::ConfigImpl(
                // as the buffer is flushed on each request immediately.
       max_upstream_unknown_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
-      enable_command_stats_(config.enable_command_stats()) {
+      enable_command_stats_(config.enable_command_stats()),
+      protocol_(config.protocol() == ConnProtocol::Memcached ? Common::Redis::Protocol::Memcached
+          : Common::Redis::Protocol::Redis) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;
@@ -72,7 +75,7 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
                        const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope)
-    : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
+    : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this, config.protocol())),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
@@ -98,11 +101,9 @@ void ClientImpl::flushBufferAndResetTimer() {
   if (flush_timer_->enabled()) {
     flush_timer_->disableTimer();
   }
-  std::cout << "encode buffer: " << encoder_buffer_.toString() << std::endl;
   connection_->write(encoder_buffer_, false);
 }
 
-// TODO request 是直接decode过来的或者1:n切出来的
 PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
@@ -155,7 +156,6 @@ void ClientImpl::onConnectOrOpTimeout() {
 }
 
 void ClientImpl::onData(Buffer::Instance& data) {
-  std::cout << data.toString() << std::endl;
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
@@ -207,9 +207,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-// 上游的readfilter有响应之后，回调了onData()函数，然后通过DecoderImpl::decode()再回调这里的onRespValue()
 void ClientImpl::onRespValue(RespValuePtr&& value) {
-  // TODO pending_requests_ 在哪里初始化 哪里修改 ?
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
   const bool canceled = request.canceled_;
@@ -322,7 +320,7 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
                                     const std::string& auth_password) {
-  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new MemcachedEncoder()},
+  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{EncoderFactoryImpl::create(config.protocol())},
                                         decoder_factory_, config, redis_command_stats, scope);
   client->initialize(auth_username, auth_password);
   return client;

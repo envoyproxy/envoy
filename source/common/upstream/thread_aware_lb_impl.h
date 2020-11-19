@@ -30,6 +30,7 @@ public:
   class HashingLoadBalancer {
   public:
     virtual ~HashingLoadBalancer() = default;
+    virtual void init() PURE;
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
     const absl::string_view hashKey(HostConstSharedPtr host, bool use_hostname) {
       const ProtobufWkt::Value& val = Config::Metadata::metadataValue(
@@ -65,6 +66,7 @@ public:
       ASSERT(hash_balance_factor > 0);
     }
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+    void init() override {}
 
   protected:
     virtual double hostOverloadFactor(const Host& host, double weight) const;

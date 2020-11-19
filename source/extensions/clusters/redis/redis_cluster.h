@@ -234,6 +234,7 @@ private:
     Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
       return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Primary;
     }
+    NetworkFilters::Common::Redis::Protocol protocol() const override { return  NetworkFilters::Common::Redis::Protocol::Redis; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

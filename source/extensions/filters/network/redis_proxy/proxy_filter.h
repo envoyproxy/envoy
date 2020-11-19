@@ -52,6 +52,8 @@ public:
                     Stats::Scope& scope, const Network::DrainDecision& drain_decision,
                     Runtime::Loader& runtime, Api::Api& api);
 
+  Common::Redis::Protocol protocol() { return protocol_; }
+
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;
   const std::string stat_prefix_;
@@ -59,7 +61,8 @@ public:
   ProxyStats stats_;
   const std::string downstream_auth_username_;
   const std::string downstream_auth_password_;
-  const std::string backends_;
+  const Common::Redis::Protocol protocol_;
+
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
 };
@@ -92,7 +95,7 @@ public:
   void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
   bool connectionAllowed() { return connection_allowed_; }
-  std::string backends() { return backends_; }
+
 private:
   friend class RedisProxyFilterTest;
 
@@ -127,7 +130,6 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
-  std::string backends_{"memcached"};
 };
 
 } // namespace RedisProxy
