@@ -949,7 +949,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
 
 // test that wasm imports/exports do not work when ABI restriction is enforced
 TEST_P(WasmCommonTest, RestrictCapabilities) {
-  if (GetParam() != "v8") {
+  if (GetParam() == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1001,7 +1001,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
 
 // test with proxy_on_vm_start allowed, but proxy_log restricted
 TEST_P(WasmCommonTest, AllowModuleImplementedCapabilities) {
-  if (GetParam() != "v8") {
+  if (GetParam() == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1051,7 +1051,7 @@ TEST_P(WasmCommonTest, AllowModuleImplementedCapabilities) {
 
 // test with both proxy_on_vm_start and proxy_log allowed, but WASI restricted
 TEST_P(WasmCommonTest, AllowLog) {
-  if (GetParam() != "v8") {
+  if (GetParam() == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1101,7 +1101,7 @@ TEST_P(WasmCommonTest, AllowLog) {
 
 // test with proxy_on_vm_start enabled, but
 TEST_P(WasmCommonTest, AllowWASI) {
-  if (GetParam() != "v8") {
+  if (GetParam() == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
@@ -1150,7 +1150,7 @@ TEST_P(WasmCommonTest, AllowWASI) {
 
 // test that a copy-constructed thread-local Wasm still enforces the same policy
 TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
-  if (GetParam() != "v8") {
+  if (GetParam() == "null") {
     return;
   }
   Stats::IsolatedStoreImpl stats_store;
