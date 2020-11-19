@@ -74,7 +74,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:84.9"
 "source/server:94.6"
 "source/server/config_validation:76.6"
-"source/server/admin:95.2"
+"source/server/admin:95.1"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
