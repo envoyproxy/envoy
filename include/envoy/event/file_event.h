@@ -20,10 +20,10 @@ struct FileReadyType {
 
 enum class FileTriggerType {
   // See @man 7 epoll(7)
-  // They are used on all platforms DNS and TCP listeners.
+  // They are used on all platforms for DNS and TCP listeners.
   Level,
   // See @man 7 epoll(7)
-  // They are used on all platofrms that support Edge triggering as the default trigger type.
+  // They are used on all platforms that support Edge triggering as the default trigger type.
   Edge,
   // These are synthetic edge events managed by Envoy. They are based on level events and when they
   // are activated they are immediately disabled. This makes them behave like Edge events. Then it
