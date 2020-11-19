@@ -628,18 +628,15 @@ testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const 
 
 FakeRawConnection::~FakeRawConnection() {
   if (read_filter_) {
-    EXPECT_TRUE(shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
-      connection.removeReadFilter(read_filter_);
-    }));
+    EXPECT_TRUE(shared_connection_.executeOnDispatcher(
+        [this](Network::Connection& connection) { connection.removeReadFilter(read_filter_); }));
   }
 }
 
 testing::AssertionResult FakeRawConnection::initialize() {
   read_filter_ = Network::ReadFilterSharedPtr{new ReadFilter(*this)};
-  testing::AssertionResult result =
-      shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
-        connection.addReadFilter(read_filter_);
-      });
+  testing::AssertionResult result = shared_connection_.executeOnDispatcher(
+      [this](Network::Connection& connection) { connection.addReadFilter(read_filter_); });
   if (!result) {
     return result;
   }
