@@ -87,6 +87,11 @@ void TcpUpstream::resetStream() {
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   upstream_request_->decodeData(data, end_stream);
+  // This ensures that if we get a reset after end_stream we won't propagate two
+  // "end streams" to the upstream_request_.
+  if (end_stream) {
+    upstream_request_ = nullptr;
+  }
 }
 
 void TcpUpstream::onEvent(Network::ConnectionEvent event) {
