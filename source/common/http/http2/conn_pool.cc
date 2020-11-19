@@ -45,7 +45,7 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
   // wait until the connection has been fully drained of streams and then check in the connection
   // event callback.
   if (!client.closed_with_active_rq_) {
-    checkForDrained();
+    checkForIdle();
   }
 }
 

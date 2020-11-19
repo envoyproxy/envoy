@@ -115,11 +115,10 @@ public:
     return *static_cast<T*>(&context);
   }
 
-  void addDrainedCallbackImpl(Instance::DrainedCb cb);
+  void addIdleCallbackImpl(Instance::IdleCb cb, Instance::DrainPool drain);
   void drainConnectionsImpl();
 
   bool hasActiveConnectionsImpl() const;
-  void addIdlePoolTimeoutCallbackImpl(Instance::IdlePoolTimeoutCb cb);
 
   // Closes and destroys all connections. This must be called in the destructor of
   // derived classes because the derived ActiveClient will downcast parent_ to a more
@@ -150,11 +149,9 @@ public:
 
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
-  // See if the drain process has started and/or completed.
-  void checkForDrained();
 
-  // See if the pool has gone idle (no active or pending streams).
-  void checkForIdlePool();
+  // See if the pool has gone idle. If we're draining, this will also close idle connections.
+  void checkForIdle();
 
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
@@ -209,8 +206,6 @@ protected:
     return pending_streams_.front().get();
   }
 
-  void disablePoolIdleTimer();
-
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
 
@@ -218,10 +213,7 @@ protected:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
-  std::list<Instance::DrainedCb> drained_callbacks_;
-
-  // Callbacks fired after the pool's idle timeout has been reached
-  std::list<Instance::IdlePoolTimeoutCb> idle_pool_callbacks_;
+  std::list<Instance::IdleCb> idle_callbacks_;
 
   // Clients that are ready to handle additional streams.
   // All entries are in state READY.
@@ -244,16 +236,14 @@ private:
   // to purge. We need this if one cancelled streams cancels a different pending stream
   std::list<PendingStreamPtr> pending_streams_to_purge_;
 
-  // After the pool enters a state in which it has no active connections, the idle timeout callbacks
-  // will be called after `idle_timeout_` milliseconds. When this is `absl::nullopt`, there is no
-  // idle timeout
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
-
-  // The timer that fires to trigger the idle timeout callbacks
-  Event::TimerPtr idle_timer_;
-
   // The number of streams currently attached to clients.
   uint64_t num_active_streams_{0};
+
+  // Whether the connection pool is currently in a draining state
+  bool is_draining_{false};
+
+  // Whether the pool has seen at least one client
+  bool has_seen_clients_{false};
 };
 
 } // namespace ConnectionPool

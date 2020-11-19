@@ -44,17 +44,18 @@ public:
   virtual ~Instance() = default;
 
   /**
-   * Called when a connection pool has been drained of pending streams, busy connections, and
-   * ready connections.
+   * Called when a connection pool has no pending streams, busy connections, or ready connections.
    */
-  using DrainedCb = std::function<void()>;
+  using IdleCb = std::function<void(bool is_drained)>;
+
+  enum class DrainPool { Yes, No };
 
   /**
-   * Register a callback that gets called when the connection pool is fully drained and kicks
-   * off a drain. The owner of the connection pool is responsible for not creating any
-   * new streams.
+   * Register a callback that gets called when the connection pool is fully idle. If `drain` is
+   * true, this also kicks off a drain. The owner of the connection pool is responsible for not
+   * creating any new streams.
    */
-  virtual void addDrainedCallback(DrainedCb cb) PURE;
+  virtual void addIdleCallback(IdleCb cb, DrainPool drain) PURE;
 
   /**
    * Actively drain all existing connection pool connections. This method can be used in cases
@@ -63,22 +64,6 @@ public:
    * occurs.
    */
   virtual void drainConnections() PURE;
-
-  /**
-   * Called when a connection pool has no pending requests or busy connections for a configured
-   * timeout duration.
-   */
-  using IdlePoolTimeoutCb = std::function<void()>;
-
-  /**
-   * Register a callback that gets called when the connection pool has had no pending requests or
-   * busy connections for a configured timeout duration.
-   *
-   * NOTE: The "idle" state is not the same as the "drained" state. A pool may be drained before it
-   * has a chance to go idle (e.g. a host is removed), and a pool is drained after it has
-   * gone idle.
-   */
-  virtual void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) PURE;
 
   /**
    * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.

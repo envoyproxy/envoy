@@ -58,10 +58,9 @@ public:
 
 class ConnPoolImplBaseTest : public testing::Test {
 public:
-  void initialize(absl::optional<std::chrono::milliseconds> pool_idle_timeout = absl::nullopt) {
-    pool_ =
-        std::make_unique<TestConnPoolImplBase>(host_, Upstream::ResourcePriority::Default,
-                                               dispatcher_, nullptr, nullptr, pool_idle_timeout);
+  ConnPoolImplBaseTest() {
+    pool_ = std::make_unique<TestConnPoolImplBase>(host_, Upstream::ResourcePriority::Default,
+                                                   dispatcher_, nullptr, nullptr, absl::nullopt);
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -72,14 +71,6 @@ public:
       ret->real_host_description_ = descr_;
       return ret;
     }));
-  }
-  ConnPoolImplBaseTest() = default;
-
-  ~ConnPoolImplBaseTest() override {
-    // Force drain before removal
-    if (pool_) {
-      pool_->addDrainedCallbackImpl([]() {});
-    }
   }
 
   uint32_t stream_limit_ = 100;
@@ -95,7 +86,6 @@ public:
 };
 
 TEST_F(ConnPoolImplBaseTest, BasicPrefetch) {
-  initialize();
   // Create more than one connection per new stream.
   ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
@@ -108,7 +98,6 @@ TEST_F(ConnPoolImplBaseTest, BasicPrefetch) {
 }
 
 TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
-  initialize();
   testing::InSequence s;
 
   // Create more than one connection per new stream.
@@ -131,7 +120,6 @@ TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
 }
 
 TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
-  initialize();
   // Create more than one connection per new stream.
   ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
@@ -147,7 +135,6 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
 }
 
 TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
-  initialize();
   // Create more than one connection per new stream.
   ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
@@ -163,41 +150,7 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
   pool_->destructAllConnections();
 }
 
-TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutTriggered) {
-  static constexpr std::chrono::milliseconds IDLE_TIMEOUT{5000};
-
-  // Default behavior for other timers associated with the pool
-  EXPECT_CALL(dispatcher_, createTimer_(_)).RetiresOnSaturation();
-  // Inject this timer into the pool so we can add some expectations
-  auto* timer_ptr = new NiceMock<Event::MockTimer>(&dispatcher_);
-
-  initialize(IDLE_TIMEOUT);
-
-  testing::MockFunction<void()> idle_pool_callback;
-  pool_->addIdlePoolTimeoutCallbackImpl(idle_pool_callback.AsStdFunction());
-
-  // Create a new stream using the pool
-  EXPECT_CALL(*pool_, instantiateActiveClient);
-  pool_->newStream(context_);
-  ASSERT_EQ(1, clients_.size());
-
-  // Emulate the new upstream connection establishment
-  EXPECT_CALL(*pool_, onPoolReady);
-  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
-
-  // Close the newly-created stream and expect the timer to be set
-  EXPECT_CALL(*timer_ptr, enableTimer(IDLE_TIMEOUT, _));
-  EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
-  pool_->onStreamClosed(*clients_.back(), false);
-
-  // Emulate the idle timeout firing and expect our callback to be triggered
-  EXPECT_CALL(idle_pool_callback, Call).Times(1);
-  dispatcher_.clearDeferredDeleteList();
-  timer_ptr->invokeCallback();
-}
-
 TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
-  initialize();
   // Create more than one connection per new stream.
   ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
   EXPECT_CALL(*pool_, instantiateActiveClient).Times(AnyNumber());
@@ -217,7 +170,6 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
 }
 
 TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
-  initialize();
   // Create more than one connection per new stream.
   ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
@@ -226,18 +178,8 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
   EXPECT_FALSE(pool_->maybePrefetch(1));
 }
 
-TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutNotTriggered) {
-  static constexpr std::chrono::milliseconds IDLE_TIMEOUT{5000};
-
-  // Default behavior for other timers associated with the pool
+TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutTriggered) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
-  // Inject this timer into the pool so we can add some expectations
-  auto* timer_ptr = new NiceMock<Event::MockTimer>(&dispatcher_);
-
-  initialize(IDLE_TIMEOUT);
-
-  testing::MockFunction<void()> idle_pool_callback;
-  pool_->addIdlePoolTimeoutCallbackImpl(idle_pool_callback.AsStdFunction());
 
   // Create a new stream using the pool
   EXPECT_CALL(*pool_, instantiateActiveClient);
@@ -248,20 +190,20 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutNotTriggered) {
   EXPECT_CALL(*pool_, onPoolReady);
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
 
-  // Close the newly-created stream and expect the timer to be set
-  EXPECT_CALL(*timer_ptr, enableTimer(IDLE_TIMEOUT, _));
   EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
   pool_->onStreamClosed(*clients_.back(), false);
 
-  EXPECT_CALL(*pool_, onPoolReady);
-  EXPECT_CALL(*timer_ptr, disableTimer);
-  pool_->newStream(context_);
-  ASSERT_EQ(1, clients_.size());
+  EXPECT_CALL(idle_pool_callback, Call(false)).Times(1);
+  dispatcher_.clearDeferredDeleteList();
 
-  // Close the newly-created stream and expect the timer to be set
-  EXPECT_CALL(*timer_ptr, enableTimer(IDLE_TIMEOUT, _));
-  EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
-  pool_->onStreamClosed(*clients_.back(), false);
+  clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  testing::MockFunction<void(bool)> drained_pool_callback;
+  EXPECT_CALL(idle_pool_callback, Call(true));
+  EXPECT_CALL(drained_pool_callback, Call(true));
+  pool_->addIdleCallbackImpl(drained_pool_callback.AsStdFunction(),
+                             ConnectionPool::Instance::DrainPool::Yes);
 }
+
 } // namespace ConnectionPool
 } // namespace Envoy

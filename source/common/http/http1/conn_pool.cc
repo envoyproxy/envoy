@@ -64,7 +64,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
       upstream_ready_cb_->scheduleCallbackCurrentIteration();
     }
 
-    checkForDrained();
+    checkForIdle();
   }
 }
 

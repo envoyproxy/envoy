@@ -131,10 +131,7 @@ public:
         })) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
-  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
-  void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) override {
-    addIdlePoolTimeoutCallbackImpl(cb);
-  }
+  void addIdleCallback(IdleCb cb, DrainPool drain) override { addIdleCallbackImpl(cb, drain); }
   void drainConnections() override {
     drainConnectionsImpl();
     // Legacy behavior for the TCP connection pool marks all connecting clients

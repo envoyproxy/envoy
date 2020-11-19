@@ -15,7 +15,8 @@ template <typename KEY_TYPE, typename POOL_TYPE> class PriorityConnPoolMap {
 public:
   using ConnPoolMapType = ConnPoolMap<KEY_TYPE, POOL_TYPE>;
   using PoolFactory = typename ConnPoolMapType::PoolFactory;
-  using DrainedCb = typename ConnPoolMapType::DrainedCb;
+  using IdleCb = typename ConnPoolMapType::IdleCb;
+  using DrainPool = typename ConnPoolMapType::DrainPool;
   using PoolOptRef = typename ConnPoolMapType::PoolOptRef;
 
   PriorityConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host);
@@ -49,7 +50,7 @@ public:
    * the state of `this`, there is a good chance it will cause corruption due to the callback firing
    * immediately.
    */
-  void addDrainedCallback(const DrainedCb& cb);
+  void addIdleCallback(const IdleCb& cb, DrainPool drain);
 
   /**
    * Instructs each connection pool to drain its connections.

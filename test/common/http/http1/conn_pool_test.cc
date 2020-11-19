@@ -976,8 +976,13 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   InSequence s;
   ReadyWatcher drained;
 
-  EXPECT_CALL(drained, ready());
-  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  conn_pool_->addIdleCallback(
+      [&](bool is_drained) -> void {
+        if (is_drained) {
+          drained.ready();
+        }
+      },
+      ConnectionPool::Instance::DrainPool::Yes);
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
@@ -1003,7 +1008,13 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
   Http::ConnectionPool::Cancellable* handle = conn_pool_->newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
-  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  conn_pool_->addIdleCallback(
+      [&](bool is_drained) -> void {
+        if (is_drained) {
+          drained.ready();
+        }
+      },
+      ConnectionPool::Instance::DrainPool::Yes);
   EXPECT_CALL(*conn_pool_->test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(drained, ready());

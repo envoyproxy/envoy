@@ -52,8 +52,8 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
   // We have room for a new pool. Allocate one and let it know about any cached callbacks.
   auto new_pool = factory();
   connPoolResource.inc();
-  for (const auto& cb : cached_callbacks_) {
-    new_pool->addDrainedCallback(cb);
+  for (const auto& [cb, drain] : cached_callbacks_) {
+    new_pool->addIdleCallback(cb, drain);
   }
 
   auto inserted = active_pools_.emplace(key, std::move(new_pool));
@@ -88,13 +88,13 @@ template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addIdleCallback(const IdleCb& cb, DrainPool drain) {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
-    pool_pair.second->addDrainedCallback(cb);
+    pool_pair.second->addIdleCallback(cb, drain);
   }
 
-  cached_callbacks_.emplace_back(std::move(cb));
+  cached_callbacks_.emplace_back(std::move(cb), drain);
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>

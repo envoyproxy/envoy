@@ -47,7 +47,7 @@ public:
                        absl::optional<std::chrono::milliseconds> pool_idle_timeout);
 
   // ConnectionPool::Instance
-  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
+  void addIdleCallback(IdleCb cb, DrainPool drain) override { addIdleCallbackImpl(cb, drain); }
   void drainConnections() override { drainConnectionsImpl(); }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
@@ -57,10 +57,6 @@ public:
     return Envoy::ConnectionPool::ConnPoolImplBase::maybePrefetch(ratio);
   }
   bool hasActiveConnections() const override { return hasActiveConnectionsImpl(); }
-
-  void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) override {
-    addIdlePoolTimeoutCallbackImpl(cb);
-  }
 
   // Creates a new PendingStream and enqueues it into the queue.
   ConnectionPool::Cancellable*
