@@ -523,6 +523,7 @@ public:
   MOCK_METHOD(void, copyOut, (size_t, uint64_t, void*), (const, override));
   MOCK_METHOD(void, drain, (uint64_t), (override));
   MOCK_METHOD(Buffer::RawSliceVector, getRawSlices, (absl::optional<uint64_t>), (const, override));
+  MOCK_METHOD(Buffer::RawSlice, frontSlice, (), (const, override));
   MOCK_METHOD(Buffer::SliceDataPtr, extractMutableFrontSlice, (), (override));
   MOCK_METHOD(uint64_t, length, (), (const, override));
   MOCK_METHOD(void*, linearize, (uint32_t), (override));

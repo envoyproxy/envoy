@@ -161,6 +161,14 @@ public:
   getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
 
   /**
+   * Fetch the valid data pointer and valid data length of the first non-zero-length
+   * slice in the buffer.
+   * @return RawSlice the first non-empty slice in the buffer, or {nullptr, 0} if the buffer
+   * is empty.
+   */
+  virtual RawSlice frontSlice() const PURE;
+
+  /**
    * Transfer ownership of the front slice to the caller. Must only be called if the
    * buffer is not empty otherwise the implementation will have undefined behavior.
    * If the underlying slice is immutable then the implementation must create and return

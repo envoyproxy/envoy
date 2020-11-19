@@ -72,7 +72,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wavm:0.0" # Noe enabled in coverage build
 "source/extensions/watchdog:69.6" # Death tests within extensions
 "source/extensions/watchdog/profile_action:84.9"
-"source/server:94.6"
+"source/server:94.5"
 "source/server/config_validation:76.6"
 "source/server/admin:95.2"
 )
