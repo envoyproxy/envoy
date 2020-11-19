@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <cstdio>
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

@@ -75,7 +75,6 @@ envoy_cc_win32_library(
     hdrs = ["win32/signal_impl.h"],
     strip_include_prefix = "win32",
     deps = [
-        ":dispatcher_includes",
         "//include/envoy/event:signal_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:thread_lib",

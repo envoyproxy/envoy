@@ -17,7 +17,7 @@ namespace Event {
 /**
  * libevent implementation of Event::SignalEvent.
  */
-class SignalEventImpl : public SignalEvent, ImplBase {
+class SignalEventImpl : public SignalEvent {
 public:
   SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num, SignalCb cb);
 
@@ -26,6 +26,10 @@ private:
   Network::IoHandlePtr read_handle_;
 };
 
+// Windows ConsoleControlHandler does not allow for a context. As a result the thread
+// spawned to handle the console events communicates with the main program with this socketpair.
+// Here we have a map from signal types to IoHandle. When we write to this handle we trigger an
+// event that notifies Envoy to act on the signal.
 using eventBridgeHandlersSingleton =
     ThreadSafeSingleton<absl::flat_hash_map<signal_t, std::shared_ptr<Network::IoHandle>>>;
 } // namespace Event
