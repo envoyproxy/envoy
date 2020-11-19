@@ -1073,7 +1073,7 @@ TEST_P(WasmCommonTest, AllowABIFunctions) {
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_abi_functions, scope, cluster_manager, *dispatcher);
 
-  // Restrict capabilites, but allow proxy_log
+  // Restrict capabilities, but allow proxy_log
   EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_on_vm_start"));
   EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_log"));
 
