@@ -14,6 +14,21 @@
 namespace Envoy {
 namespace Matcher {
 
+// This file describes a MatchTree<DataType>, which traverses a tree of matches until it
+// either matches (resulting in either an action or a new tree to traverse) or doesn't match.
+//
+// All the matching is performed on strings: a DataInput<DataType> is used to extract a specific
+// string from an instance of DataType, while an InputMatcher is used to determine whether the
+// extracted string is a match.
+//
+// For example, DataType might be the type HttpDataInput, allowing
+// for the use of HttpRequestHeaders : DataInput<HttpDataInput>, which is configured with the name
+// of the header to extract from the request headers.
+//
+// In cases where the data to match on becomes available over time, this would be fed into the
+// DataType over time, allowing matching to be re-attempted as more data is made available. As such
+// whenever we extract data from a DataInput, we make note of whether the data might change and pause
+// matching until we either match or have all the data.
 template <class DataType> class MatchTree;
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
