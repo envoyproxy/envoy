@@ -26,7 +26,7 @@ protected:
   }
 
   std::unique_ptr<KillRequestFilter> filter_;
-  Random::MockRandomGenerator random_generator_;
+  testing::NiceMock<Random::MockRandomGenerator> random_generator_;
   Http::TestRequestHeaderMapImpl request_headers_;
 };
 

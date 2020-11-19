@@ -3,8 +3,8 @@
 Kill Request
 ===============
 
-The KillRequest filter can be used to crash Envoy when receiving a Kill request
-and measure the blast radius. The KillRequest filter is disabled at build time by default.
+The KillRequest filter can be used to crash Envoy when receiving a Kill request.
+The KillRequest filter is disabled at build time by default.
 
 Configuration
 -------------
