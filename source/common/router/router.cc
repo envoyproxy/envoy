@@ -190,15 +190,15 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   }
 
   setTimeoutHeaders(route, expected_timeout, request_headers,
-                insert_envoy_expected_request_timeout_ms, grpc_request);
+                    insert_envoy_expected_request_timeout_ms, grpc_request);
 
   return timeout;
 }
 
 void FilterUtility::setTimeoutHeaders(const RouteEntry& route, uint64_t expected_timeout,
-                                  Http::RequestHeaderMap& request_headers,
-                                  bool insert_envoy_expected_request_timeout_ms,
-                                  bool grpc_request) {
+                                      Http::RequestHeaderMap& request_headers,
+                                      bool insert_envoy_expected_request_timeout_ms,
+                                      bool grpc_request) {
   if (insert_envoy_expected_request_timeout_ms && expected_timeout > 0) {
     request_headers.setEnvoyExpectedRequestTimeoutMs(expected_timeout);
   }
@@ -337,25 +337,26 @@ void Filter::chargeUpstreamCode(Http::Code code,
 }
 
 void Filter::finalizeTimeoutHeaders() {
-  // if we have a deadline, update the timeout headers.
+  // If we have a deadline, update the timeout headers to match how much time we have left.
   if (deadline_) {
-    // calculate how much time we have left
+    // Calculate how much time we have left
     std::chrono::milliseconds expected_timeout =
         std::chrono::duration_cast<std::chrono::milliseconds>(deadline_.value() -
                                                               config_.timeSource().monotonicTime());
-    // this _should_ be positive
-    // TODO: what should be done if it is not positive? as i believe this can happen in rare
-    // cases.
-    ASSERT(expected_timeout.count() > 0, "expected_timeout is not positive");
-    // if it is less than the current per try timeout, or there is no per try timeout, update
-    // timeout headers
-    if (timeout_.per_try_timeout_.count() == 0 || expected_timeout < timeout_.per_try_timeout_) {
-      FilterUtility::setTimeoutHeaders(*route_entry_, expected_timeout.count(), *downstream_headers_,
-                                   !config_.suppress_envoy_headers_, grpc_request_);
+    // This _should_ be positive, but might not be, as there are no guarantees on scheduling.
+    if (expected_timeout.count() <= 0) {
+      // If we don't have a positive timeout, do nothing. The timer should fire shortly and cancel
+      // this request.
+      return;
     }
-    // TODO: there is still an edge case where expected timeout <= 0; in this case we probably want
-    // to timeout the request; but not sure how to do this from here?
-    // perhaps do nothing and let the timer callback figure this out...
+
+    // If the expected timeout is less than the current per_try_timeout, or there is no
+    // per_try_timeout, update timeout headers to the expected_timeout.
+    if (timeout_.per_try_timeout_.count() == 0 || expected_timeout < timeout_.per_try_timeout_) {
+      FilterUtility::setTimeoutHeaders(*route_entry_, expected_timeout.count(),
+                                       *downstream_headers_, !config_.suppress_envoy_headers_,
+                                       grpc_request_);
+    }
   }
 }
 
@@ -561,14 +562,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                          grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
                                          config_.respect_expected_rq_timeout_);
 
-  if (route_entry_->measureTimeoutOnRequestStart() && timeout_.global_timeout_.count() > 0) {
-    // if we measure the timeout from the request start, calculate the deadline for the request
+  if (route_entry_->measureTimeoutOnRequestStart() && (timeout_.global_timeout_.count() > 0)) {
+    // If we measure the timeout from the request start, calculate the deadline for the request
     // so we can update timeout headers just before the request is sent upstream.
-    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    deadline_ = dispatcher.timeSource().monotonicTime() + timeout_.global_timeout_;
+    // TODO(yuval-k): We might want to set the deadline in startResponseTimer(), so it is set
+    // when the response timer is started via onRequestComplete as well.
+    deadline_ = callbacks_->dispatcher().timeSource().monotonicTime() + timeout_.global_timeout_;
     // start measuring timeout.
-    response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
-    response_timeout_->enableTimer(timeout_.global_timeout_);
+    startResponseTimer();
   }
 
   // If this header is set with any value, use an alternate response code on timeout
@@ -660,11 +661,6 @@ void Filter::sendNoHealthyUpstreamResponse() {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  // TODO: I'm not sure if this check is needed. can this method still be called
-  // if onResponseTimeout was called?
-  if (timedout_) {
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero
@@ -725,12 +721,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
-
-  // TODO: I'm not sure if this check is needed. can this method still be called
-  // if onResponseTimeout was called?
-  if (timedout_) {
-    return Http::FilterTrailersStatus::StopIteration;
-  }
 
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
@@ -804,6 +794,12 @@ void Filter::maybeDoShadowing() {
   }
 }
 
+void Filter::startResponseTimer() {
+  response_timeout_ =
+      callbacks_->dispatcher().createTimer([this]() -> void { onResponseTimeout(); });
+  response_timeout_->enableTimer(timeout_.global_timeout_);
+}
+
 void Filter::onRequestComplete() {
   // This should be called exactly once, when the downstream request has been received in full.
   ASSERT(!downstream_end_stream_);
@@ -820,8 +816,7 @@ void Filter::onRequestComplete() {
     // if response_timeout_ != nullptr then timeout was already started in decodeHeaders, no need to
     // start it again.
     if (timeout_.global_timeout_.count() > 0 && response_timeout_ == nullptr) {
-      response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
-      response_timeout_->enableTimer(timeout_.global_timeout_);
+      startResponseTimer();
     }
 
     for (auto& upstream_request : upstream_requests_) {
@@ -840,8 +835,6 @@ void Filter::onDestroy() {
 
 void Filter::onResponseTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream timeout", *callbacks_);
-
-  timedout_ = true;
 
   // If we had an upstream request that got a "good" response, save its
   // upstream timing information into the downstream stream info.

@@ -294,6 +294,11 @@ public:
     router_.decodeHeaders(default_request_headers_, end_stream);
   }
 
+  void sendResponse() {
+    response_decoder_->decodeHeaders(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+  }
+
   void enableRedirects(uint32_t max_internal_redirects = 1) {
     ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, enabled())
         .WillByDefault(Return(true));
@@ -5706,6 +5711,93 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
 }
 
+TEST_F(RouterTest, StartsTimerInDecodeHeadersIfMeasuringOnRequestStart) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(10)));
+  EXPECT_CALL(callbacks_.route_->route_entry_, measureTimeoutOnRequestStart())
+      .WillOnce(Return(true));
+  expectResponseTimerCreate();
+  // Timer should be created, even though it is not the end of the stream.
+  sendRequest(false);
+
+  // Make sure timer was created in decodeHeaders.
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Decode a response so that the filter's dtor doesn't assert.
+  sendResponse();
+}
+
+TEST_F(RouterTest, UpdatesTimeoutHeadersBasedOnDeadline) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(10)));
+  EXPECT_CALL(callbacks_.route_->route_entry_, measureTimeoutOnRequestStart())
+      .WillOnce(Return(true));
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            // Simulate a request that was stalled due to circuit breaker - move time forward 6 ms.
+            test_time_.advanceTimeWait(std::chrono::milliseconds(6));
+
+            response_decoder_ = &decoder;
+            EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AtLeast(2));
+
+            callbacks.onPoolReady(original_encoder_, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  HttpTestUtility::addDefaultHeaders(default_request_headers_);
+
+  Http::TestRequestHeaderMapImpl updated_timeout_headers = default_request_headers_;
+  // timeout should be 10-6=4.
+  updated_timeout_headers.setEnvoyExpectedRequestTimeoutMs(4);
+  EXPECT_CALL(original_encoder_, encodeHeaders(HeaderMapEqualRef(&updated_timeout_headers), true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
+        original_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
+      }));
+
+  router_.decodeHeaders(default_request_headers_, true);
+}
+
+TEST_F(RouterTest, DoesntUpdateTimeoutHeadersWhenTimerIsPastDue) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(10)));
+  EXPECT_CALL(callbacks_.route_->route_entry_, measureTimeoutOnRequestStart())
+      .WillOnce(Return(true));
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            // Simulate a request that was stalled due to circuit breaker - move time forward 6 ms.
+            test_time_.advanceTimeWait(std::chrono::milliseconds(11));
+
+            response_decoder_ = &decoder;
+            EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AtLeast(2));
+
+            callbacks.onPoolReady(original_encoder_, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  HttpTestUtility::addDefaultHeaders(default_request_headers_);
+
+  Http::TestRequestHeaderMapImpl updated_timeout_headers = default_request_headers_;
+  // timeout will be 10 as it set in decodeHeaders. as 11ms passed, we don't update the timeout
+  // headers as we assume that the timer callback will be called shortly
+  updated_timeout_headers.setEnvoyExpectedRequestTimeoutMs(10);
+  EXPECT_CALL(original_encoder_, encodeHeaders(HeaderMapEqualRef(&updated_timeout_headers), true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
+        original_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
+      }));
+
+  router_.decodeHeaders(default_request_headers_, true);
+}
+
 TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
   {
     NiceMock<MockRouteEntry> route;
@@ -6100,15 +6192,10 @@ public:
           1U, callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
     }
   }
-  void sendResponse() {
-    response_decoder_->decodeHeaders(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}, true);
-  }
 
   NiceMock<Http::MockRequestEncoder> encoder_;
   NiceMock<Http::MockStream> stream_;
   Http::StreamCallbacks* stream_callbacks_;
-  Http::ResponseDecoder* response_decoder_ = nullptr;
   Http::TestRequestHeaderMapImpl headers_;
   Http::ConnectionPool::Callbacks* pool_callbacks_{nullptr};
   int num_add_callbacks_{1};

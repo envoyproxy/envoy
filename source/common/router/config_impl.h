@@ -611,7 +611,9 @@ private:
       return parent_->shadowPolicies();
     }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
-    bool measureTimeoutOnRequestStart() const override { return parent_->measureTimeoutOnRequestStart(); }
+    bool measureTimeoutOnRequestStart() const override {
+      return parent_->measureTimeoutOnRequestStart();
+    }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override {
       return parent_->idleTimeout();
     }

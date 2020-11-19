@@ -790,8 +790,9 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
-   * @return bool measure timeout() from when the request is started, instead of when it is
-   * completly sent upstream.
+   * @return bool measure timeout() from when the request is started, before a connection is
+   * received from the connection pool. By default, timeout is measured when the request is
+   * completely sent upstream.
    */
   virtual bool measureTimeoutOnRequestStart() const PURE;
 

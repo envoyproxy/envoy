@@ -161,8 +161,8 @@ public:
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
   static void setTimeoutHeaders(const RouteEntry& route, uint64_t expected_timeout,
-                            Http::RequestHeaderMap& request_headers,
-                            bool insert_envoy_expected_request_timeout_ms, bool grpc_request);
+                                Http::RequestHeaderMap& request_headers,
+                                bool insert_envoy_expected_request_timeout_ms, bool grpc_request);
 
   static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
                                   TimeoutData& timeout);
@@ -493,6 +493,7 @@ private:
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();
   void onGlobalTimeout();
+  void startResponseTimer();
   void onRequestComplete();
   void onResponseTimeout();
   // Handle an upstream request aborted due to a local timeout.
@@ -559,7 +560,6 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
-  bool timedout_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 
