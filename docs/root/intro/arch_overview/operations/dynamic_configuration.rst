@@ -29,14 +29,14 @@ EDS
 CDS
 ---
 
-:ref:`集群发现服务（CDS） API <config_cluster_manager_cds>` 是 Envoy 的一种机制，在路由期间可以用来发现使用的上游集群。Envoy 将优雅地添加、更新和删除由 API 指定的集群。该 API 允许实现者构建一个拓扑，在这个拓扑中，Envoy 不需要在初始配置时就知道所有上游群集。通常，在与 CDS 一起进行 HTTP 路由（但没有路由发现服务）时，实现者将利用路由器将请求转发到 :ref:`HTTP request header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>` 中指定的集群。尽管可以通过指定全静态集群来使用不带 EDS 的 CDS，但我们仍建议通过 CDS 指定的群集使用 EDS API。在内部，更新集群定义时，操作是优雅的。但是，所有现有的连接池都将被排空并重新连接。EDS 不受此限制。当通过 EDS 添加和删除主机时，群集中的现有主机不受影响。
+:ref:`集群发现服务（CDS） API <config_cluster_manager_cds>` 是 Envoy 的一种机制，在路由期间可以用来发现使用的上游集群。Envoy 将优雅地添加、更新和删除由 API 指定的集群。该 API 允许实现者构建一个拓扑，在这个拓扑中，Envoy 不需要在初始配置时就知道所有上游群集。通常，在与 CDS 一起进行 HTTP 路由（但没有路由发现服务）时，实现者将利用路由器将请求转发到 :ref:`HTTP request header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>` 中指定的集群。尽管可以通过指定全静态集群来使用不带 EDS 的 CDS，i但是对于用 CDS 指定的集群，我们依旧建议使用 EDS API。在内部，更新集群定义时，操作是优雅的。但是，所有现有的连接池都将被排空并重新连接。EDS 不受此限制。当通过 EDS 添加和删除主机时，群集中的现有主机不受影响。
 
 .. _arch_overview_dynamic_config_rds:
 
 RDS
 ---
 
-ref:`路由发现服务（RDS） API <config_http_conn_man_rds>` 是 Envoy 的一种机制，可以在运行时发现用于 HTTP 连接管理器过滤器的整个路由配置。路由配置将优雅地交换，而不会影响现有的请求。该 API 与 EDS 和 CDS 一起使用时，允许执行者构建复杂的路由拓扑（流量转移，蓝/绿部署等），除了获取新的 Envoy 二进制文件外，不需要任何 Envoy 重启。
+ref:`路由发现服务（RDS） API <config_http_conn_man_rds>` 是 Envoy 的一种机制，可以在运行时发现用于 HTTP 连接管理器过滤器的整个路由配置。路由配置将优雅地交换，而不会影响现有的请求。该 API 与 EDS 和 CDS 一起使用时，允许执行者构建复杂的路由拓扑（ :ref:`流量转移 <config_http_conn_man_route_table_traffic_splitting>`、蓝/绿部署等），除了获取新的 Envoy 二进制文件外，不需要任何 Envoy 重启。
 
 VHDS
 ----
@@ -68,12 +68,12 @@ RTDS
 ECDS
 ----
 
-:ref:`扩展配置发现服务（ECDS） API <config_overview_extension_discovery>` 允许独立于监听器的进行配置扩展（如 HTTP 过滤器配置）。当构建更适合与主控制平面分开的系统（例如 WAF、故障测试等）时，此功能很有用。
+:ref:`扩展配置发现服务（ECDS） API <config_overview_extension_discovery>` 允许对独立于监听器的配置进行扩展（如 HTTP 过滤器配置）。当构建更适合与主控制平面分开的系统（例如 WAF、故障测试等）时，此功能很有用。
 
 聚合的 xDS ("ADS")
 ----------------------
 
-EDS、CDS 等都是单独的服务，具有不同的 REST/gRPC 服务名称，例如 StreamListeners、StreamSecrets。聚合的 xDS ，是一个单一的 gRPC 服务，它在单个 gRPC 流中承载所有资源类型（仅 gRPC 支持 ADS）。适用于希望控制不同类型的资源到达 Envoy 顺序的用户。
+EDS、CDS 等都是单独的服务，具有不同的 REST/gRPC 服务名称，例如 StreamListeners、StreamSecrets。对于那些希望能够控制不同类型的资源到达 Envoy 顺序的用户，聚合 xDS 是一个不错的选择，它是一个单一的 gRPC 服务，单个 gRPC 流中承载所有资源类型（仅 gRPC 支持 ADS）。
 :ref:`有关 ADS 的更多详细信息 <config_overview_ads>` 。
 
 .. _arch_overview_dynamic_config_delta:
@@ -81,5 +81,5 @@ EDS、CDS 等都是单独的服务，具有不同的 REST/gRPC 服务名称，�
 增量 gRPC xDS
 --------------
 
-标准的 xDS 是每个更新都必须包含所有的资源，而更新中没有资源信息意味着该资源已用尽。Envoy 支持 xDS（包括 ADS）的”增量”变体，其更新仅包含添加/更改/删除的资源信息。增量（Delta） xDS 是一个新的协议，其请求/响应 API 与 SotW 不同。
+标准的 xDS 是每个更新都必须包含所有的资源，而更新中没有资源信息意味着该资源已用尽。Envoy 支持 xDS（包括 ADS）的”增量（delta）”变体，其更新仅包含添加/更改/删除的资源信息。增量 xDS 是一个新的协议，其请求/响应 API 与 SotW 不同。
 :ref:`有关增量（Delta）的更多详细信息 <config_overview_delta>` 。
