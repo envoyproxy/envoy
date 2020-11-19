@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for restricting proxy-wasm capabilities available to modules.
 message CapabilityRestrictionConfig {
   // The list of proxy-wasm capabilities which will be exposed to the module.
-  repeated string allowed_abi_functions = 1;
+  repeated string allowed_capabilities = 1;
 }
 
 // Configuration for a Wasm VM.

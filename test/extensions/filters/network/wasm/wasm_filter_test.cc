@@ -46,7 +46,7 @@ public:
   ~WasmNetworkFilterTest() override = default;
 
   void setupConfig(const std::string& code, std::string vm_configuration, bool fail_open = false,
-                   absl::flat_hash_set<std::string> allowed_abi_functions = {}) {
+                   absl::flat_hash_set<std::string> allowed_capabilities = {}) {
     if (code.empty()) {
       setupWasmCode(vm_configuration);
     } else {
@@ -58,7 +58,7 @@ public:
           return new TestRoot(wasm, plugin);
         },
         "" /* root_id */, "" /* vm_configuration */, fail_open, "" /* plugin configuration*/,
-        allowed_abi_functions);
+        allowed_capabilities);
   }
 
   void setupFilter() { setupFilterBase<TestFilter>(); }
@@ -200,9 +200,9 @@ TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  absl::flat_hash_set<std::string> allowed_abi_functions = {
+  absl::flat_hash_set<std::string> allowed_capabilities = {
       "proxy_on_context_create", "proxy_get_property", "proxy_log", "proxy_on_new_connection"};
-  setupConfig("", "logging", false, allowed_abi_functions);
+  setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
   // Expect this call, because proxy_on_new_connection is allowed
@@ -223,10 +223,10 @@ TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  absl::flat_hash_set<std::string> allowed_abi_functions = {"proxy_on_context_create",
-                                                            "proxy_get_property", "proxy_log",
-                                                            "proxy_on_downstream_connection_close"};
-  setupConfig("", "logging", false, allowed_abi_functions);
+  absl::flat_hash_set<std::string> allowed_capabilities = {"proxy_on_context_create",
+                                                           "proxy_get_property", "proxy_log",
+                                                           "proxy_on_downstream_connection_close"};
+  setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
   // Do not expect this call, because proxy_on_new_connection is not allowed
@@ -247,10 +247,10 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  absl::flat_hash_set<std::string> allowed_abi_functions = {
+  absl::flat_hash_set<std::string> allowed_capabilities = {
       "proxy_on_context_create", "proxy_get_property", "proxy_on_new_connection",
       "proxy_on_downstream_connection_close"};
-  setupConfig("", "logging", false, allowed_abi_functions);
+  setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
   // Do not expect this call, because proxy_log is not allowed

@@ -30,9 +30,9 @@ void bmWasmSpeedTest(benchmark::State& state) {
   Envoy::Upstream::MockClusterManager cluster_manager;
   Envoy::Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   auto scope = Envoy::Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
-  absl::flat_hash_set<std::string> allowed_abi_functions;
+  absl::flat_hash_set<std::string> allowed_capabilities;
   auto wasm = std::make_unique<Envoy::Extensions::Common::Wasm::Wasm>(
-      "envoy.wasm.runtime.null", "", "", "", allowed_abi_functions, scope, cluster_manager,
+      "envoy.wasm.runtime.null", "", "", "", allowed_capabilities, scope, cluster_manager,
       *dispatcher);
 
   auto context = std::make_shared<Envoy::Extensions::Common::Wasm::Context>(wasm.get());

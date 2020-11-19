@@ -189,17 +189,17 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigABIUnrestrictedByDefault) {
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
-      allowed_abi_functions:
+      allowed_capabilities:
   )EOF"));
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
   auto wasm = filter_config.wasmForTest();
-  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_log"));
-  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_on_vm_start"));
-  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_http_call"));
-  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_on_log"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_log"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_http_call"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_log"));
   EXPECT_FALSE(filter_config.createFilter() == nullptr);
 }
 
@@ -216,7 +216,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigABIRestriction) {
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
-      allowed_abi_functions:
+      allowed_capabilities:
         - proxy_log
         - proxy_on_new_connection
   )EOF"));
@@ -225,10 +225,10 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigABIRestriction) {
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
   auto wasm = filter_config.wasmForTest();
-  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_log"));
-  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_on_new_connection"));
-  EXPECT_FALSE(wasm->abiFunctionAllowed("proxy_http_call"));
-  EXPECT_FALSE(wasm->abiFunctionAllowed("proxy_on_log"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_log"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_new_connection"));
+  EXPECT_FALSE(wasm->capabilityAllowed("proxy_http_call"));
+  EXPECT_FALSE(wasm->capabilityAllowed("proxy_on_log"));
   EXPECT_FALSE(filter_config.createFilter() == nullptr);
 }
 
@@ -245,7 +245,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
-      allowed_abi_functions:
+      allowed_capabilities:
         - proxy_on_vm_start
         - proxy_get_property
         - proxy_on_context_create
