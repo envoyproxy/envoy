@@ -10,7 +10,7 @@ tasks:
     test_flags:
       - "--config=remote-clang-libc++"
       - "--config=remote-ci"
-      - "--define=wasm=disabled"
+      - "--//source/extensions/wasm_runtime/v8:enabled=false"
       - "--jobs=75"
   coverage:
     name: "Coverage"

@@ -284,7 +284,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "deprecated_features=disabled"
     "--define" "use_new_codecs_in_integration_tests=false"
     "--define" "tcmalloc=gperftools"
-    "--define" "zlib=ng")
+    "--define" "zlib=ng"
+    "--//source/extensions/wasm_runtime/wavm:enabled")
 
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
@@ -296,22 +297,25 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     TEST_TARGETS=("@envoy//test/...")
   fi
   # Building all the dependencies from scratch to link them against libc++.
-  echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+  echo "Building and testing with wasmtime: ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" \
+    --//source/extensions/wasm_runtime/wasmtime:enabled \
+    --//source/extensions/wasm_runtime/wavm:enabled=false \
+    -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
-  echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+  echo "Building and testing with wavm: ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
   # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
   # integration tests with asan.
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
 
-  echo "Building binary with wasm=wavm..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+  echo "Building binary with wavm..."
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
