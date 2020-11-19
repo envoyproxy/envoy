@@ -4,7 +4,7 @@ package envoy.config.common.matcher.v4alpha;
 
 import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
-import "envoy/type/matcher/v4alpha/value.proto";
+import "envoy/type/matcher/v4alpha/string.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -72,9 +72,8 @@ message Matcher {
         oneof matcher {
           option (validate.required) = true;
 
-          // Use existing infrastructure for actually matching the
-          // value.
-          type.matcher.v4alpha.ValueMatcher value_match = 2;
+          // Built-in string matcher.
+          type.matcher.v4alpha.StringMatcher value_match = 2;
 
           // Extension for custom matching logic.
           core.v4alpha.TypedExtensionConfig custom_match = 3;
