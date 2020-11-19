@@ -20,7 +20,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:0.0"
 "source/common/common:96.1"
 "source/common/common/posix:94.1"
-"source/common/signal:90.4"
+"source/common/signal:83.1" # Death tests don't report LCOV
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:93.7"
 "source/extensions:96.3"
@@ -67,9 +67,12 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls:94.2"
 "source/extensions/transport_sockets/tls/ocsp:95.3"
 "source/extensions/transport_sockets/tls/private_key:76.9"
+"source/extensions/wasm_runtime:50.0" 
+"source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
+"source/extensions/wasm_runtime/wavm:0.0" # Noe enabled in coverage build
 "source/extensions/watchdog:69.6" # Death tests within extensions
 "source/extensions/watchdog/profile_action:84.9"
-"source/server:94.6"
+"source/server:94.5"
 "source/server/config_validation:76.6"
 "source/server/admin:95.2"
 )

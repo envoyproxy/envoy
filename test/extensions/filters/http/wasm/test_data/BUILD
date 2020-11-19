@@ -46,6 +46,15 @@ wasm_rust_binary(
 )
 
 wasm_rust_binary(
+    name = "resume_call_rust.wasm",
+    srcs = ["resume_call_rust.rs"],
+    deps = [
+        "//bazel/external/cargo:log",
+        "//bazel/external/cargo:proxy_wasm",
+    ],
+)
+
+wasm_rust_binary(
     name = "shared_data_rust.wasm",
     srcs = ["shared_data_rust.rs"],
     deps = [
@@ -72,6 +81,7 @@ envoy_cc_library(
         "test_cpp_null_plugin.cc",
         "test_grpc_call_cpp.cc",
         "test_grpc_stream_cpp.cc",
+        "test_resume_call_cpp.cc",
         "test_shared_data_cpp.cc",
         "test_shared_queue_cpp.cc",
     ],
@@ -97,6 +107,7 @@ envoy_wasm_cc_binary(
         "test_cpp.cc",
         "test_grpc_call_cpp.cc",
         "test_grpc_stream_cpp.cc",
+        "test_resume_call_cpp.cc",
         "test_shared_data_cpp.cc",
         "test_shared_queue_cpp.cc",
     ],

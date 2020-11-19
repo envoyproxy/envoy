@@ -1,9 +1,14 @@
 .. _install_sandboxes_load_reporting_service:
 
-Load Reporting Service (LRS)
-============================
+Load reporting service (``LRS``)
+================================
 
-This simple example demonstrates Envoy's Load Reporting Service (LRS) capability and how to use it.
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
+
+This simple example demonstrates Envoy's :ref:`Load reporting service (LRS) <arch_overview_load_reporting_service>`
+capability and how to use it.
 
 Lets say Cluster A (downstream) talks to Cluster B (Upstream) and Cluster C (Upstream). When enabling Load Report for
 Cluster A, LRS server should be sending LoadStatsResponse to Cluster A with LoadStatsResponse.Clusters to be B and C.
@@ -12,17 +17,18 @@ from Cluster A to Cluster C.
 
 In this example, all incoming requests are routed via Envoy to a simple goLang web server aka http_server.
 We scale up two containers and randomly send requests to each. Envoy is configured to initiate the connection with LRS Server.
-LRS Server enables the stats by sending LoadStatsResponse. Sending requests to http_server will be counted towards successful requests and will be visible in LRS Server logs.
+LRS Server enables the stats by sending LoadStatsResponse. Sending requests to http_server will be counted towards successful
+requests and will be visible in LRS Server logs.
 
-.. include:: _include/docker-env-setup.rst
-
-Step 3: Build the sandbox
+Step 1: Build the sandbox
 *************************
+
+Change to the ``examples/load-reporting-service`` directory.
 
 Terminal 1 ::
 
     $ pwd
-    envoy/examples/load_reporting_service
+    envoy/examples/load-reporting-service
     $ docker-compose pull
     $ docker-compose up --scale http_service=2
 
@@ -39,7 +45,7 @@ Terminal 2 ::
     load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:80->80/tcp
     load-reporting-service_lrs_server_1     go run main.go                 Up      0.0.0.0:18000->18000/tcp
 
-Step 4: Start sending stream of HTTP requests
+Step 2: Start sending stream of HTTP requests
 *********************************************
 
 Terminal 2 ::
@@ -48,9 +54,10 @@ Terminal 2 ::
   envoy/examples/load_reporting_service
   $ bash send_requests.sh
 
-The script above (``send_requests.sh``) sends requests randomly to each Envoy, which in turn forwards the requests to the backend service.
+The script above (:download:`send_requests.sh <_include/load-reporting-service/send_requests.sh>`) sends requests
+randomly to each Envoy, which in turn forwards the requests to the backend service.
 
-Step 5: See Envoy Stats
+Step 3: See Envoy Stats
 ***********************
 
 You should see
@@ -73,3 +80,11 @@ Terminal 1 ::
     ............................
     lrs_server_1    | 2020/02/12 17:09:09 Got stats from cluster `http_service` node `0022a319e1e2` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:3 total_issued_requests:3 > load_report_interval:<seconds:2 nanos:2458000 >
     lrs_server_1    | 2020/02/12 17:09:09 Got stats from cluster `http_service` node `2417806c9d9a` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:9 total_issued_requests:9 > load_report_interval:<seconds:2 nanos:6487000 >
+
+.. seealso::
+
+   :ref:`Load reporting service <arch_overview_load_reporting_service>`
+      Overview of Envoy's Load reporting service.
+
+   :ref:`Load reporting service API(V3) <envoy_v3_api_file_envoy/service/load_stats/v3/lrs.proto>`
+      The Load reporting service API.
