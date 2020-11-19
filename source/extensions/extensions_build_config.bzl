@@ -214,8 +214,17 @@ EXTENSIONS = {
     #
     # Watchdog actions
     #
+
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
 
+    #
+    # WebAssembly runtimes
+    #
+
+    "envoy.wasm.runtime.null":                          "//source/extensions/wasm_runtime/null:config",
+    "envoy.wasm.runtime.v8":                            "//source/extensions/wasm_runtime/v8:config",
+    "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
+    "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

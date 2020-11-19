@@ -57,7 +57,7 @@ public:
   void GetProof(const quic::QuicSocketAddress& server_address,
                 const quic::QuicSocketAddress& client_address, const std::string& hostname,
                 const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,
-                quiche::QuicheStringPiece chlo_hash,
+                absl::string_view chlo_hash,
                 std::unique_ptr<quic::ProofSource::Callback> callback) override;
 
   TicketCrypter* GetTicketCrypter() override { return nullptr; }
@@ -65,14 +65,14 @@ public:
   void ComputeTlsSignature(const quic::QuicSocketAddress& server_address,
                            const quic::QuicSocketAddress& client_address,
                            const std::string& hostname, uint16_t signature_algorithm,
-                           quiche::QuicheStringPiece in,
+                           absl::string_view in,
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 protected:
   virtual void signPayload(const quic::QuicSocketAddress& server_address,
                            const quic::QuicSocketAddress& client_address,
                            const std::string& hostname, uint16_t signature_algorithm,
-                           quiche::QuicheStringPiece in,
+                           absl::string_view in,
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) PURE;
 
 private:

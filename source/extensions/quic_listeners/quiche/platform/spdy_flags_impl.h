@@ -8,9 +8,9 @@
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
-#define GetSpdyReloadableFlagImpl(flag) quiche::FLAGS_spdy_reloadable_flag_##flag->value()
+#define GetSpdyReloadableFlagImpl(flag) quiche::FLAGS_quic_reloadable_flag_##flag->value()
 
-#define GetSpdyRestartFlagImpl(flag) quiche::FLAGS_spdy_restart_flag_##flag->value()
+#define GetSpdyRestartFlagImpl(flag) quiche::FLAGS_quic_restart_flag_##flag->value()
 
 #define SPDY_CODE_COUNT_N_IMPL(flag, instance, total)                                              \
   do {                                                                                             \
