@@ -1187,7 +1187,6 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
 }
 
-
 TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
   if (!initializeUpstreamFloodTest()) {
     return;

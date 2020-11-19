@@ -14,18 +14,14 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-template <typename Flag> constexpr uint8_t orFlags(Flag flag) {
-  return static_cast<uint8_t>(flag);
-}
+template <typename Flag> constexpr uint8_t orFlags(Flag flag) { return static_cast<uint8_t>(flag); }
 
 // All this templatized stuff is for the typesafe constexpr bitwise ORing of the "enum class" values
 template <typename First, typename... Rest> struct FirstArgType {
   using type = First; // NOLINT(readability-identifier-naming)
 };
 
-
-template <typename Flag, typename... Flags>
-constexpr uint8_t orFlags(Flag first, Flags... rest) {
+template <typename Flag, typename... Flags> constexpr uint8_t orFlags(Flag first, Flags... rest) {
   static_assert(std::is_same<Flag, typename FirstArgType<Flags...>::type>::value,
                 "All flag types must be the same!");
   return static_cast<uint8_t>(first) | orFlags(rest...);
