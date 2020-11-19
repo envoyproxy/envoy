@@ -371,6 +371,20 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_EQ(1u, manager_->listeners().size());
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, AllowOnlyDefaultFilterChain) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+default_filter_chain:
+  filters: []
+  )EOF";
+
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1, manager_->listeners().size());
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
   const std::string yaml = R"EOF(
 address:
