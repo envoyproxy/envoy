@@ -61,11 +61,10 @@ public:
     ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
     bool currentThreadRegistered() override { return parent_.registered_; }
     void runOnAllThreads(const UpdateCb& cb) override {
-      parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); });
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); });
     }
-    void runOnAllThreads(const UpdateCb& cb, Event::PostCb main_callback) override {
-      parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); },
-                              main_callback);
+    void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& main_callback) override {
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
     }
 
     void set(InitializeCb cb) override {

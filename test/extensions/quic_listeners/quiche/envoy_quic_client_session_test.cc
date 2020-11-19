@@ -49,9 +49,9 @@ public:
                                 Network::ConnectionSocketPtr&& connection_socket)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
                                   supported_versions, dispatcher, std::move(connection_socket)) {
-    SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
+    SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
   MOCK_METHOD(void, SendConnectionClosePacket, (quic::QuicErrorCode, const std::string&));
@@ -152,7 +152,8 @@ public:
     std::string host("www.abc.com");
     Http::TestRequestHeaderMapImpl request_headers{
         {":authority", host}, {":method", "GET"}, {":path", "/"}};
-    stream.encodeHeaders(request_headers, true);
+    const auto result = stream.encodeHeaders(request_headers, true);
+    ASSERT(result.ok());
     return stream;
   }
 

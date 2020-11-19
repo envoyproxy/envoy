@@ -13,11 +13,8 @@ ExtensionConfigBase::ExtensionConfigBase(
     TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher)
-    : proto_config_(proto_config), config_factory_(std::move(config_factory)),
-      tls_slot_(tls.allocateSlot()) {
-  tls_slot_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<TlsFilterConfig>();
-  });
+    : proto_config_(proto_config), config_factory_(std::move(config_factory)), tls_slot_(tls) {
+  tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<TlsFilterConfig>(); });
 
   switch (proto_config_.config_type_case()) {
   case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kAdminConfig: {
@@ -36,7 +33,7 @@ ExtensionConfigBase::ExtensionConfigBase(
       throw EnvoyException(
           fmt::format("Error: Specifying admin streaming output without configuring admin."));
     }
-    installNewTap(envoy::config::tap::v3::TapConfig(proto_config_.static_config()), nullptr);
+    installNewTap(proto_config_.static_config(), nullptr);
     ENVOY_LOG(debug, "initializing tap extension with static config");
     break;
   }
@@ -60,27 +57,22 @@ const absl::string_view ExtensionConfigBase::adminId() {
 }
 
 void ExtensionConfigBase::clearTapConfig() {
-  tls_slot_->runOnAllThreads([](ThreadLocal::ThreadLocalObjectSharedPtr object)
-                                 -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    object->asType<TlsFilterConfig>().config_ = nullptr;
-    return object;
-  });
+  tls_slot_.runOnAllThreads(
+      [](OptRef<TlsFilterConfig> tls_filter_config) { tls_filter_config->config_ = nullptr; });
 }
 
-void ExtensionConfigBase::installNewTap(envoy::config::tap::v3::TapConfig&& proto_config,
+void ExtensionConfigBase::installNewTap(const envoy::config::tap::v3::TapConfig& proto_config,
                                         Sink* admin_streamer) {
   TapConfigSharedPtr new_config =
-      config_factory_->createConfigFromProto(std::move(proto_config), admin_streamer);
-  tls_slot_->runOnAllThreads([new_config](ThreadLocal::ThreadLocalObjectSharedPtr object)
-                                 -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    object->asType<TlsFilterConfig>().config_ = new_config;
-    return object;
+      config_factory_->createConfigFromProto(proto_config, admin_streamer);
+  tls_slot_.runOnAllThreads([new_config](OptRef<TlsFilterConfig> tls_filter_config) {
+    tls_filter_config->config_ = new_config;
   });
 }
 
-void ExtensionConfigBase::newTapConfig(envoy::config::tap::v3::TapConfig&& proto_config,
+void ExtensionConfigBase::newTapConfig(const envoy::config::tap::v3::TapConfig& proto_config,
                                        Sink* admin_streamer) {
-  installNewTap(envoy::config::tap::v3::TapConfig(proto_config), admin_streamer);
+  installNewTap(proto_config, admin_streamer);
 }
 
 } // namespace Tap

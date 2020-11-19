@@ -96,12 +96,11 @@ public:
   MetricsServiceSinkTest() = default;
 
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
-  Event::SimulatedTimeSystem time_system_;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 };
 
 TEST_F(MetricsServiceSinkTest, CheckSendCall) {
-  MetricsServiceSink sink(streamer_, time_system_, false);
+  MetricsServiceSink sink(streamer_, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -125,7 +124,7 @@ TEST_F(MetricsServiceSinkTest, CheckSendCall) {
 }
 
 TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
-  MetricsServiceSink sink(streamer_, time_system_, false);
+  MetricsServiceSink sink(streamer_, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -156,7 +155,7 @@ TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
 
 // Test that verifies counters are correctly reported as current value when configured to do so.
 TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
-  MetricsServiceSink sink(streamer_, time_system_, false);
+  MetricsServiceSink sink(streamer_, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -174,7 +173,7 @@ TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
 
 // Test that verifies counters are reported as the delta between flushes when configured to do so.
 TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
-  MetricsServiceSink sink(streamer_, time_system_, true);
+  MetricsServiceSink sink(streamer_, true);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";

@@ -12,26 +12,19 @@ namespace Envoy {
 namespace ConnectionPool {
 
 using testing::AnyNumber;
+using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 
 class TestActiveClient : public ActiveClient {
 public:
-  TestActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-                   uint64_t concurrent_stream_limit)
-      : ActiveClient{parent, lifetime_stream_limit, concurrent_stream_limit} {
-    ON_CALL(*this, close).WillByDefault(Invoke([this]() {
-      onEvent(Network::ConnectionEvent::LocalClose);
-    }));
-    ON_CALL(*this, id).WillByDefault(Return(1));
-    ON_CALL(*this, closingWithIncompleteStream).WillByDefault(Return(false));
-    ON_CALL(*this, numActiveStreams).WillByDefault(Return(1));
-  }
+  using ActiveClient::ActiveClient;
+  void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
+  uint64_t id() const override { return 1; }
+  bool closingWithIncompleteStream() const override { return false; }
+  uint32_t numActiveStreams() const override { return active_streams_; }
 
-  MOCK_METHOD(void, close, (), (override));
-  MOCK_METHOD(uint64_t, id, (), (const override));
-  MOCK_METHOD(bool, closingWithIncompleteStream, (), (const override));
-  MOCK_METHOD(size_t, numActiveStreams, (), (const override));
+  uint32_t active_streams_{};
 };
 
 class TestPendingStream : public PendingStream {
@@ -47,7 +40,7 @@ public:
   using ConnPoolImplBase::ConnPoolImplBase;
   ConnectionPool::Cancellable* newPendingStream(AttachContext& context) override {
     auto entry = std::make_unique<TestPendingStream>(*this, context);
-    return addToPendingStreamsList(std::move(entry));
+    return addPendingStream(std::move(entry));
   }
   MOCK_METHOD(ActiveClientPtr, instantiateActiveClient, ());
   MOCK_METHOD(void, onPoolFailure,
@@ -58,31 +51,40 @@ public:
 
 class ConnPoolImplBaseTest : public testing::Test {
 public:
-  ConnPoolImplBaseTest() {
-    pool_ = std::make_unique<TestConnPoolImplBase>(host_, Upstream::ResourcePriority::Default,
-                                                   dispatcher_, nullptr, nullptr);
+  ConnPoolImplBaseTest()
+      : pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
-    ON_CALL(*pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
+    ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
       auto ret =
-          std::make_unique<NiceMock<TestActiveClient>>(*pool_, stream_limit_, concurrent_streams_);
+          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
     }));
+    ON_CALL(pool_, onPoolReady(_, _))
+        .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) -> void {
+          ++(reinterpret_cast<TestActiveClient*>(&client)->active_streams_);
+        }));
   }
+
+#define CHECK_STATE(active, pending, capacity)                                                     \
+  EXPECT_EQ(state_.pending_streams_, pending);                                                     \
+  EXPECT_EQ(state_.active_streams_, active);                                                       \
+  EXPECT_EQ(state_.connecting_stream_capacity_, capacity)
 
   uint32_t stream_limit_ = 100;
   uint32_t concurrent_streams_ = 1;
+  Upstream::ClusterConnectivityState state_;
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> descr_{
       new NiceMock<Upstream::MockHostDescription>()};
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::unique_ptr<TestConnPoolImplBase> pool_;
+  TestConnPoolImplBase pool_;
   AttachContext context_;
-  std::vector<NiceMock<TestActiveClient>*> clients_;
+  std::vector<TestActiveClient*> clients_;
 };
 
 TEST_F(ConnPoolImplBaseTest, BasicPrefetch) {
@@ -90,11 +92,14 @@ TEST_F(ConnPoolImplBaseTest, BasicPrefetch) {
   ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // On new stream, create 2 connections.
-  EXPECT_CALL(*pool_, instantiateActiveClient).Times(2);
-  auto cancelable = pool_->newStream(context_);
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(2);
+  auto cancelable = pool_.newStream(context_);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*connecting capacity*/);
 
   cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);
-  pool_->destructAllConnections();
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 1 /*connecting capacity*/);
+  pool_.destructAllConnections();
 }
 
 TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
@@ -104,19 +109,21 @@ TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
   ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // On new stream, create 2 connections.
-  EXPECT_CALL(*pool_, instantiateActiveClient).Times(2);
-  pool_->newStream(context_);
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(2);
+  pool_.newStream(context_);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*connecting capacity*/);
 
   // If a connection fails, existing connections are purged. If a retry causes
   // a new stream, make sure we create the correct number of connections.
-  EXPECT_CALL(*pool_, onPoolFailure).WillOnce(InvokeWithoutArgs([&]() -> void {
-    pool_->newStream(context_);
+  EXPECT_CALL(pool_, onPoolFailure).WillOnce(InvokeWithoutArgs([&]() -> void {
+    pool_.newStream(context_);
   }));
-  EXPECT_CALL(*pool_, instantiateActiveClient).Times(1);
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
   clients_[0]->close();
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*connecting capacity*/);
 
-  EXPECT_CALL(*pool_, onPoolFailure);
-  pool_->destructAllConnections();
+  EXPECT_CALL(pool_, onPoolFailure);
+  pool_.destructAllConnections();
 }
 
 TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
@@ -127,11 +134,12 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
   EXPECT_EQ(host_->health(), Upstream::Host::Health::Unhealthy);
 
   // On new stream, create 1 connection.
-  EXPECT_CALL(*pool_, instantiateActiveClient).Times(1);
-  auto cancelable = pool_->newStream(context_);
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
+  auto cancelable = pool_.newStream(context_);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 1 /*connecting capacity*/);
 
   cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);
-  pool_->destructAllConnections();
+  pool_.destructAllConnections();
 }
 
 TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
@@ -143,30 +151,32 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
   EXPECT_EQ(host_->health(), Upstream::Host::Health::Degraded);
 
   // On new stream, create 1 connection.
-  EXPECT_CALL(*pool_, instantiateActiveClient).Times(1);
-  auto cancelable = pool_->newStream(context_);
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
+  auto cancelable = pool_.newStream(context_);
 
   cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);
-  pool_->destructAllConnections();
+  pool_.destructAllConnections();
 }
 
 TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
   // Create more than one connection per new stream.
   ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
-  EXPECT_CALL(*pool_, instantiateActiveClient).Times(AnyNumber());
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(AnyNumber());
 
   // With global prefetch off, we won't prefetch.
-  EXPECT_FALSE(pool_->maybePrefetch(0));
+  EXPECT_FALSE(pool_.maybePrefetch(0));
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
   // With prefetch ratio of 1.1, we'll prefetch two connections.
   // Currently, no number of subsequent calls to prefetch will increase that.
-  EXPECT_TRUE(pool_->maybePrefetch(1.1));
-  EXPECT_TRUE(pool_->maybePrefetch(1.1));
-  EXPECT_FALSE(pool_->maybePrefetch(1.1));
+  EXPECT_TRUE(pool_.maybePrefetch(1.1));
+  EXPECT_TRUE(pool_.maybePrefetch(1.1));
+  EXPECT_FALSE(pool_.maybePrefetch(1.1));
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 2 /*connecting capacity*/);
 
   // With a higher prefetch ratio, more connections may be prefetched.
-  EXPECT_TRUE(pool_->maybePrefetch(3));
+  EXPECT_TRUE(pool_.maybePrefetch(3));
 
-  pool_->destructAllConnections();
+  pool_.destructAllConnections();
 }
 
 TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
@@ -175,36 +185,36 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
 
   // Prefetch won't occur if the host is not healthy.
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  EXPECT_FALSE(pool_->maybePrefetch(1));
+  EXPECT_FALSE(pool_.maybePrefetch(1));
 }
 
 TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggered) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
 
   // Create a new stream using the pool
-  EXPECT_CALL(*pool_, instantiateActiveClient);
-  pool_->newStream(context_);
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStream(context_);
   ASSERT_EQ(1, clients_.size());
 
   // Emulate the new upstream connection establishment
-  EXPECT_CALL(*pool_, onPoolReady);
+  EXPECT_CALL(pool_, onPoolReady);
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
 
-  EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
-  pool_->onStreamClosed(*clients_.back(), false);
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
 
   testing::MockFunction<void(bool)> idle_pool_callback;
   EXPECT_CALL(idle_pool_callback, Call(false)).Times(1);
-  pool_->addIdleCallbackImpl(idle_pool_callback.AsStdFunction(),
-                             ConnectionPool::Instance::DrainPool::No);
+  pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction(),
+                            ConnectionPool::Instance::DrainPool::No);
   dispatcher_.clearDeferredDeleteList();
   clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
 
   testing::MockFunction<void(bool)> drained_pool_callback;
   EXPECT_CALL(idle_pool_callback, Call(true));
   EXPECT_CALL(drained_pool_callback, Call(true));
-  pool_->addIdleCallbackImpl(drained_pool_callback.AsStdFunction(),
-                             ConnectionPool::Instance::DrainPool::Yes);
+  pool_.addIdleCallbackImpl(drained_pool_callback.AsStdFunction(),
+                            ConnectionPool::Instance::DrainPool::Yes);
 }
 
 } // namespace ConnectionPool

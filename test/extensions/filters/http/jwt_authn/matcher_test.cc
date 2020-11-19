@@ -6,6 +6,7 @@
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
@@ -40,6 +41,7 @@ TEST_F(MatcherTest, TestMatchPrefix) {
 }
 
 TEST_F(MatcherTest, TestMatchRegex) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const char config[] = R"(match:
   regex: "/[^c][au]t")";
   RequirementRule rule;
@@ -105,7 +107,8 @@ TEST_F(MatcherTest, TestMatchQuery) {
   prefix: "/"
   query_parameters:
   - name: foo
-    value: bar)";
+    string_match:
+      exact: bar)";
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
@@ -146,7 +149,8 @@ TEST_F(MatcherTest, TestMatchPathAndHeader) {
   path: "/boo"
   query_parameters:
   - name: foo
-    value: bar)";
+    string_match:
+      exact: bar)";
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);

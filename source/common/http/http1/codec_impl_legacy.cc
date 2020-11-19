@@ -365,7 +365,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
-void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   const HeaderEntry* host = headers.Host();
@@ -397,6 +397,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   encodeHeadersBase(headers, absl::nullopt, end_stream);
+  return okStatus();
 }
 
 http_parser_settings ConnectionImpl::settings_{
@@ -523,6 +524,16 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   // converts them to error statuses.
   return Utility::exceptionToStatus(
       [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
+  Http::Status status = ConnectionImpl::dispatch(data);
+  if (status.ok() && data.length() > 0) {
+    // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
+    // after a response is complete indicates an error.
+    return codecProtocolError("http/1.1 protocol error: extraneous data after response complete");
+  }
+  return status;
 }
 
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
