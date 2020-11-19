@@ -59,7 +59,8 @@ public:
 
   void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root,
                  std::string root_id = "", std::string vm_configuration = "",
-                 bool fail_open = false, std::string plugin_configuration = "") {
+                 bool fail_open = false, std::string plugin_configuration = "",
+                 std::unordered_set<std::string> allowed_abi_functions = {}) {
     envoy::extensions::wasm::v3::VmConfig vm_config;
     vm_config.set_vm_id("vm_id");
     vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
@@ -67,6 +68,9 @@ public:
     vm_configuration_string.set_value(vm_configuration);
     vm_config.mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config.mutable_code()->mutable_local()->set_inline_bytes(code);
+    envoy::extensions::wasm::v3::CapabilityRestrictionConfig cr_config;
+    *cr_config.mutable_allowed_abi_functions() = {allowed_abi_functions.begin(),
+                                                  allowed_abi_functions.end()};
     Api::ApiPtr api = Api::createApiForTest(stats_store_);
     scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
     auto name = "plugin_name";
@@ -76,7 +80,7 @@ public:
         envoy::config::core::v3::TrafficDirection::INBOUND, local_info_, &listener_metadata_);
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
-        vm_config, plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api,
+        vm_config, cr_config, plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api,
         lifecycle_notifier_, remote_data_provider_,
         [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     if (wasm_) {

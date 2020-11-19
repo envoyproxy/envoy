@@ -42,6 +42,7 @@ using proxy_wasm::WasmResult;
 using proxy_wasm::WasmStreamType;
 
 using VmConfig = envoy::extensions::wasm::v3::VmConfig;
+using CapabilityRestrictionConfig = envoy::extensions::wasm::v3::CapabilityRestrictionConfig;
 using GrpcService = envoy::config::core::v3::GrpcService;
 
 class Wasm;

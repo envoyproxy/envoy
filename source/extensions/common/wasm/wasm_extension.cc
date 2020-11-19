@@ -55,13 +55,15 @@ PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
 }
 
 WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
-  return [](const VmConfig vm_config, const Stats::ScopeSharedPtr& scope,
-            Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
-            Server::ServerLifecycleNotifier& lifecycle_notifier,
+  return [](const VmConfig vm_config, const CapabilityRestrictionConfig cr_config,
+            const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
+            Event::Dispatcher& dispatcher, Server::ServerLifecycleNotifier& lifecycle_notifier,
             absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
+    std::unordered_set<std::string> allowed_abi_functions(cr_config.allowed_abi_functions().begin(),
+                                                          cr_config.allowed_abi_functions().end());
     auto wasm = std::make_shared<Wasm>(vm_config.runtime(), vm_config.vm_id(),
-                                       anyToBytes(vm_config.configuration()), vm_key, scope,
-                                       cluster_manager, dispatcher);
+                                       anyToBytes(vm_config.configuration()), vm_key,
+                                       allowed_abi_functions, scope, cluster_manager, dispatcher);
     wasm->initializeLifecycle(lifecycle_notifier);
     return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));
   };

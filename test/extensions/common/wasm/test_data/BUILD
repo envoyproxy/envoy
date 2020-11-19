@@ -50,6 +50,24 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "test_restriction_cpp_plugin",
+    srcs = [
+        "test_restriction_cpp.cc",
+        "test_restriction_cpp_null_plugin.cc",
+    ],
+    copts = ["-DNULL_PLUGIN=1"],
+    deps = [
+        "//external:abseil_node_hash_map",
+        "//source/common/common:assert_lib",
+        "//source/common/common:c_smart_ptr_lib",
+        "//source/extensions/common/wasm:wasm_hdr",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//source/extensions/common/wasm:well_known_names",
+        "//source/extensions/common/wasm/ext:envoy_null_plugin",
+    ],
+)
+
 envoy_wasm_cc_binary(
     name = "test_cpp.wasm",
     srcs = ["test_cpp.cc"],
@@ -63,6 +81,14 @@ envoy_wasm_cc_binary(
     srcs = ["test_context_cpp.cc"],
     deps = [
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
+    ],
+)
+
+envoy_wasm_cc_binary(
+    name = "test_restriction_cpp.wasm",
+    srcs = ["test_restriction_cpp.cc"],
+    deps = [
+        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
     ],
 )
 

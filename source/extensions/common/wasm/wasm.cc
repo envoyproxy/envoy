@@ -100,10 +100,12 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
 }
 
 Wasm::Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
-           absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
-           Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
-    : WasmBase(createWasmVm(runtime, scope), vm_id, vm_configuration, vm_key), scope_(scope),
-      cluster_manager_(cluster_manager), dispatcher_(dispatcher),
+           absl::string_view vm_key, std::unordered_set<std::string> allowed_abi_functions,
+           const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
+           Event::Dispatcher& dispatcher)
+    : WasmBase(createWasmVm(runtime, scope), vm_id, vm_configuration, vm_key,
+               allowed_abi_functions),
+      scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       wasm_stats_(WasmStats{
           ALL_WASM_STATS(POOL_COUNTER_PREFIX(*scope_, absl::StrCat("wasm.", runtime, ".")),
@@ -314,8 +316,9 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-static bool createWasmInternal(const VmConfig& vm_config, const PluginSharedPtr& plugin,
-                               const Stats::ScopeSharedPtr& scope,
+static bool createWasmInternal(const VmConfig& vm_config,
+                               const CapabilityRestrictionConfig& cr_config,
+                               const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                                Upstream::ClusterManager& cluster_manager,
                                Init::Manager& init_manager, Event::Dispatcher& dispatcher,
                                Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
@@ -382,7 +385,7 @@ static bool createWasmInternal(const VmConfig& vm_config, const PluginSharedPtr&
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }
 
-  auto complete_cb = [cb, vm_config, plugin, scope, &cluster_manager, &dispatcher,
+  auto complete_cb = [cb, vm_config, cr_config, plugin, scope, &cluster_manager, &dispatcher,
                       &lifecycle_notifier, create_root_context_for_testing,
                       wasm_extension](std::string code) -> bool {
     if (code.empty()) {
@@ -393,10 +396,10 @@ static bool createWasmInternal(const VmConfig& vm_config, const PluginSharedPtr&
         proxy_wasm::makeVmKey(vm_config.vm_id(), anyToBytes(vm_config.configuration()), code);
     auto wasm_factory = wasm_extension->wasmFactory();
     proxy_wasm::WasmHandleFactory proxy_wasm_factory =
-        [&vm_config, scope, &cluster_manager, &dispatcher, &lifecycle_notifier,
+        [&vm_config, &cr_config, scope, &cluster_manager, &dispatcher, &lifecycle_notifier,
          wasm_factory](absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
-      return wasm_factory(vm_config, scope, cluster_manager, dispatcher, lifecycle_notifier,
-                          vm_key);
+      return wasm_factory(vm_config, cr_config, scope, cluster_manager, dispatcher,
+                          lifecycle_notifier, vm_key);
     };
     auto wasm = proxy_wasm::createWasm(
         vm_key, code, plugin, proxy_wasm_factory,
@@ -471,15 +474,16 @@ static bool createWasmInternal(const VmConfig& vm_config, const PluginSharedPtr&
   return true;
 }
 
-bool createWasm(const VmConfig& vm_config, const PluginSharedPtr& plugin,
-                const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
-                Init::Manager& init_manager, Event::Dispatcher& dispatcher, Api::Api& api,
+bool createWasm(const VmConfig& vm_config, const CapabilityRestrictionConfig& cr_config,
+                const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
+                Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+                Event::Dispatcher& dispatcher, Api::Api& api,
                 Envoy::Server::ServerLifecycleNotifier& lifecycle_notifier,
                 Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                 CreateWasmCallback&& cb, CreateContextFn create_root_context_for_testing) {
-  return createWasmInternal(vm_config, plugin, scope, cluster_manager, init_manager, dispatcher,
-                            api, lifecycle_notifier, remote_data_provider, std::move(cb),
-                            create_root_context_for_testing);
+  return createWasmInternal(vm_config, cr_config, plugin, scope, cluster_manager, init_manager,
+                            dispatcher, api, lifecycle_notifier, remote_data_provider,
+                            std::move(cb), create_root_context_for_testing);
 }
 
 PluginHandleSharedPtr

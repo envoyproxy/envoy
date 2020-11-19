@@ -104,9 +104,10 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       "", "", "", GetParam(), "", false, envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
       local_info, nullptr);
-  auto wasm = std::make_shared<WasmHandle>(
-      std::make_unique<Wasm>(absl::StrCat("envoy.wasm.runtime.", GetParam()), "",
-                             "vm_configuration", "", scope, cluster_manager, *dispatcher));
+  std::unordered_set<std::string> allowed_abi_functions;
+  auto wasm = std::make_shared<WasmHandle>(std::make_unique<Wasm>(
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), "", "vm_configuration", "",
+      allowed_abi_functions, scope, cluster_manager, *dispatcher));
   auto wasm_base = std::dynamic_pointer_cast<proxy_wasm::WasmHandleBase>(wasm);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCreateVM);
   EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::UnableToCreateVM);
@@ -182,9 +183,10 @@ TEST_P(WasmCommonTest, Logging) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   EXPECT_NE(wasm->buildVersion(), "");
   EXPECT_NE(std::unique_ptr<ContextBase>(wasm->createContext(plugin)), nullptr);
@@ -253,9 +255,10 @@ TEST_P(WasmCommonTest, BadSignature) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_FALSE(wasm->initialize(code, false));
   EXPECT_TRUE(wasm->isFailed());
 }
@@ -282,9 +285,10 @@ TEST_P(WasmCommonTest, Segv) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_TRUE(wasm->initialize(code, false));
   TestContext* root_context = nullptr;
   wasm->setCreateContextForTesting(
@@ -325,9 +329,10 @@ TEST_P(WasmCommonTest, DivByZero) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
   EXPECT_TRUE(wasm->initialize(code, false));
@@ -365,9 +370,10 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->initialize(code, false));
   wasm->setCreateContextForTesting(
@@ -405,9 +411,10 @@ TEST_P(WasmCommonTest, Utilities) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->initialize(code, false));
   wasm->setCreateContextForTesting(
@@ -470,9 +477,10 @@ TEST_P(WasmCommonTest, Stats) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->initialize(code, false));
   wasm->setCreateContextForTesting(
@@ -506,9 +514,10 @@ TEST_P(WasmCommonTest, Foreign) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
@@ -551,9 +560,10 @@ TEST_P(WasmCommonTest, OnForeign) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
@@ -598,9 +608,10 @@ TEST_P(WasmCommonTest, WASI) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  std::unordered_set<std::string> allowed_abi_functions;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
@@ -651,6 +662,7 @@ TEST_P(WasmCommonTest, VmCache) {
           }));
 
   VmConfig vm_config;
+  CapabilityRestrictionConfig cr_config;
   vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
@@ -666,7 +678,7 @@ TEST_P(WasmCommonTest, VmCache) {
   EXPECT_FALSE(code.empty());
   vm_config.mutable_code()->mutable_local()->set_inline_bytes(code);
   WasmHandleSharedPtr wasm_handle;
-  createWasm(vm_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
+  createWasm(vm_config, cr_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
              lifecycle_notifier, remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
   EXPECT_NE(wasm_handle, nullptr);
@@ -674,7 +686,7 @@ TEST_P(WasmCommonTest, VmCache) {
   lifecycle_callback(post_cb);
 
   WasmHandleSharedPtr wasm_handle2;
-  createWasm(vm_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
+  createWasm(vm_config, cr_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
              lifecycle_notifier, remote_data_provider,
              [&wasm_handle2](const WasmHandleSharedPtr& w) { wasm_handle2 = w; });
   EXPECT_NE(wasm_handle2, nullptr);
@@ -742,6 +754,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   VmConfig vm_config;
+  CapabilityRestrictionConfig cr_config;
   vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::BytesValue vm_configuration_bytes;
   vm_configuration_bytes.set_value(vm_configuration);
@@ -776,7 +789,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
-  createWasm(vm_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
+  createWasm(vm_config, cr_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
              lifecycle_notifier, remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
 
@@ -844,6 +857,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   VmConfig vm_config;
+  CapabilityRestrictionConfig cr_config;
   vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
@@ -891,7 +905,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
-  createWasm(vm_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
+  createWasm(vm_config, cr_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
              lifecycle_notifier, remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
 
@@ -931,6 +945,210 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   plugin.reset();
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher->clearDeferredDeleteList();
+}
+
+// test that wasm imports/exports do not work when ABI restriction is enforced
+TEST_P(WasmCommonTest, RestrictABIFunctions) {
+  if (GetParam() != "v8") {
+    return;
+  }
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  auto name = "";
+  auto root_id = "";
+  auto vm_id = "";
+  auto vm_configuration = "restrict_all";
+  auto plugin_configuration = "";
+  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      name, root_id, vm_id, GetParam(), plugin_configuration, false,
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+
+  // restriction enforced if allowed_abi_functions is non-empty
+  std::unordered_set<std::string> allowed_abi_functions{"foo"};
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
+
+  EXPECT_FALSE(wasm->abiFunctionAllowed("proxy_on_vm_start"));
+  EXPECT_FALSE(wasm->abiFunctionAllowed("proxy_log"));
+
+  EXPECT_NE(wasm, nullptr);
+  auto context = std::make_unique<TestContext>(wasm.get());
+  EXPECT_TRUE(wasm->initialize(code, false));
+
+  // on_vm_start will trigger proxy_log, but expect no call because both are restricted
+  // trigger on_configure, but expect it to be blocked because it is restricted
+  wasm->setCreateContextForTesting(
+      nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
+            .Times(0);
+        return root_context;
+      });
+  wasm->start(plugin);
+}
+
+// test with proxy_on_vm_start allowed, but proxy_log restricted
+TEST_P(WasmCommonTest, AllowModuleImplementedABIFunctions) {
+  if (GetParam() != "v8") {
+    return;
+  }
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  auto name = "";
+  auto root_id = "";
+  auto vm_id = "";
+  auto vm_configuration = "allow_on_vm_start";
+  auto plugin_configuration = "";
+  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      name, root_id, vm_id, GetParam(), plugin_configuration, false,
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions{"proxy_on_vm_start"};
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
+
+  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_on_vm_start"));
+  EXPECT_FALSE(wasm->abiFunctionAllowed("proxy_log"));
+
+  EXPECT_NE(wasm, nullptr);
+  auto context = std::make_unique<TestContext>(wasm.get());
+  EXPECT_TRUE(wasm->initialize(code, false));
+
+  // on_vm_start will trigger proxy_log, but expect no call because both are restricted
+  // trigger on_configure, but expect it to be blocked because it is restricted
+  wasm->setCreateContextForTesting(
+      nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
+            .Times(0);
+        return root_context;
+      });
+  wasm->start(plugin);
+}
+
+// test with both proxy_on_vm_start and proxy_log allowed
+TEST_P(WasmCommonTest, AllowABIFunctions) {
+  if (GetParam() != "v8") {
+    return;
+  }
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  auto name = "";
+  auto root_id = "";
+  auto vm_id = "";
+  auto vm_configuration = "allow_log";
+  auto plugin_configuration = "";
+  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      name, root_id, vm_id, GetParam(), plugin_configuration, false,
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions{"proxy_on_vm_start", "proxy_log"};
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
+
+  // Restrict capabilites, but allow proxy_log
+  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_on_vm_start"));
+  EXPECT_TRUE(wasm->abiFunctionAllowed("proxy_log"));
+
+  EXPECT_NE(wasm, nullptr);
+  auto context = std::make_unique<TestContext>(wasm.get());
+  EXPECT_TRUE(wasm->initialize(code, false));
+
+  // Module will call proxy_log, expect success since allowed
+  wasm->setCreateContextForTesting(
+      nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
+            .Times(1);
+        return root_context;
+      });
+  wasm->start(plugin);
+}
+
+// test that a copy-constructed thread-local Wasm still enforces the same policy
+TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
+  if (GetParam() != "v8") {
+    return;
+  }
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  auto name = "";
+  auto root_id = "";
+  auto vm_id = "";
+  auto vm_configuration = "restrict_all";
+  auto plugin_configuration = "";
+  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      name, root_id, vm_id, GetParam(), plugin_configuration, false,
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  std::unordered_set<std::string> allowed_abi_functions{"proxy_on_vm_start"};
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_abi_functions, scope, cluster_manager, *dispatcher);
+
+  // Restrict capabilities
+  EXPECT_FALSE(wasm->abiFunctionAllowed("on_vm_start"));
+  EXPECT_FALSE(wasm->abiFunctionAllowed("proxy_log"));
+
+  EXPECT_NE(wasm, nullptr);
+  auto context = std::make_unique<TestContext>(wasm.get());
+  EXPECT_TRUE(wasm->initialize(code, false));
+
+  auto wasm_handle = std::make_shared<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
+  auto thread_local_wasm = std::make_shared<Wasm>(wasm_handle, *dispatcher);
+
+  EXPECT_NE(thread_local_wasm, nullptr);
+  context = std::make_unique<TestContext>(thread_local_wasm.get());
+  EXPECT_TRUE(thread_local_wasm->initialize(code, false));
+
+  EXPECT_FALSE(thread_local_wasm->abiFunctionAllowed("on_vm_start"));
+  EXPECT_FALSE(thread_local_wasm->abiFunctionAllowed("proxy_log"));
+
+  // Module will call proxy_log, expect no call since all capabilities restricted
+  thread_local_wasm->setCreateContextForTesting(
+      nullptr, [](Wasm* thread_local_wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(thread_local_wasm, plugin);
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
+            .Times(0);
+        return root_context;
+      });
+  thread_local_wasm->start(plugin);
 }
 
 class WasmCommonContextTest

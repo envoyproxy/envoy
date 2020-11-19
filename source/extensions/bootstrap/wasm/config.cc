@@ -52,9 +52,10 @@ void WasmFactory::createWasm(const envoy::extensions::wasm::v3::WasmService& con
   };
 
   if (!Common::Wasm::createWasm(
-          config.config().vm_config(), plugin, context.scope().createScope(""),
-          context.clusterManager(), context.initManager(), context.dispatcher(), context.api(),
-          context.lifecycleNotifier(), remote_data_provider_, std::move(callback))) {
+          config.config().vm_config(), config.config().capability_restriction_config(), plugin,
+          context.scope().createScope(""), context.clusterManager(), context.initManager(),
+          context.dispatcher(), context.api(), context.lifecycleNotifier(), remote_data_provider_,
+          std::move(callback))) {
     // NB: throw if we get a synchronous configuration failures as this is how such failures are
     // reported to xDS.
     throw Common::Wasm::WasmException(
