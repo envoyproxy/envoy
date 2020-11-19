@@ -109,8 +109,10 @@ struct DataInputGetResult {
   };
 
   DataAvailability data_availability_;
-  // The data is available: result of looking up the data. If the lookup failed against partial or
-  // complete data this will remain absl::nullopt.
+  // The resulting data. This will be absl::nullopt if we don't have sufficient data available (as per data_availability_)
+  // or because no value was extracted. For example, consider a DataInput which attempts to look a key up in the map:
+  // if we don't have access to the map yet, we return absl::nullopt with NotAvailable. If we have the entire map, but
+  // the key doesn't exist in the map, we return absl::nullopt with AllDataAvailable.
   absl::optional<absl::string_view> data_;
 
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
