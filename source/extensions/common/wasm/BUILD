@@ -22,7 +22,7 @@ envoy_cc_library(
         "wasm_runtime_factory.h",
     ],
     deps = [
-        ":wasm_hdr",
+        "@proxy_wasm_cpp_host//:include",
     ],
 )
 
@@ -118,7 +118,8 @@ envoy_cc_library(
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public:value_export_util",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
-        "@proxy_wasm_cpp_host//:lib",
+        "@proxy_wasm_cpp_host//:common_lib",
+        "@proxy_wasm_cpp_host//:null_lib",
     ] + select(
         {
             "//bazel:windows_x86_64": [],
