@@ -1,3 +1,5 @@
+.. _api-v3_config_accesslog:
+
 Access loggers
 ==============
 

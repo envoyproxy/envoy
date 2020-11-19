@@ -182,6 +182,8 @@ def envoy_dependencies(skip_targets = []):
 
     _org_llvm_llvm()
     _com_github_wavm_wavm()
+    _com_github_wasmtime()
+    _com_github_wasm_c_api()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -350,7 +352,15 @@ def _com_github_zlib_ng_zlib_ng():
     )
 
 def _com_google_cel_cpp():
-    external_http_archive("com_google_cel_cpp")
+    external_http_archive(
+        "com_google_cel_cpp",
+        patch_args = ["-p1"],
+        # Patches to remove "fast" protobuf-internal access
+        # The patch can be removed when the "fast" access is safe to be enabled back.
+        # This requires public visibility of Reflection::LookupMapValue in protobuf and
+        # any release of cel-cpp after 10/27/2020.
+        patches = ["@envoy//bazel:cel-cpp.patch"],
+    )
     external_http_archive("rules_antlr")
 
     # Parser dependencies
@@ -854,6 +864,18 @@ def _com_github_wavm_wavm():
     native.bind(
         name = "wavm",
         actual = "@envoy//bazel/foreign_cc:wavm",
+    )
+
+def _com_github_wasmtime():
+    external_http_archive(
+        name = "com_github_wasmtime",
+        build_file = "@envoy//bazel/external:wasmtime.BUILD",
+    )
+
+def _com_github_wasm_c_api():
+    external_http_archive(
+        name = "com_github_wasm_c_api",
+        build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
     )
 
 def _kafka_deps():

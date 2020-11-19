@@ -216,7 +216,7 @@ envoy_cc_library(
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:scopes_interface",
         "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
@@ -405,6 +405,7 @@ envoy_cc_library(
     ],
     deps = [
         ":header_map_lib",
+        ":status_lib",
         ":utility_lib",
         "//include/envoy/common:regex_interface",
         "//include/envoy/http:header_map_interface",

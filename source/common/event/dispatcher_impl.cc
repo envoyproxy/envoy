@@ -58,6 +58,13 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
 
 DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
 
+void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                                      std::chrono::milliseconds min_touch_interval) {
+  ASSERT(!watchdog_registration_, "Each dispatcher can have at most one registered watchdog.");
+  watchdog_registration_ =
+      std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
+}
+
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const absl::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
@@ -140,17 +147,23 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
                    "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
                    "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
                    "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
-    return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
+    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.randomGenerator(),
+                                                           api_.rootScope());
   }
 #endif
-  return Network::DnsResolverSharedPtr{
-      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
+  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, use_tcp_for_dns_lookups);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
-  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
+  return FileEventPtr{new FileEventImpl(
+      *this, fd,
+      [this, cb](uint32_t events) {
+        touchWatchdog();
+        cb(events);
+      },
+      trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
@@ -179,11 +192,19 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
 
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
   ASSERT(isThreadSafe());
-  return base_scheduler_.createSchedulableCallback(cb);
+  return base_scheduler_.createSchedulableCallback([this, cb]() {
+    touchWatchdog();
+    cb();
+  });
 }
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
-  return scheduler_->createTimer(cb, *this);
+  return scheduler_->createTimer(
+      [this, cb]() {
+        touchWatchdog();
+        cb();
+      },
+      *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
@@ -254,6 +275,25 @@ void DispatcherImpl::runPostCallbacks() {
       post_callbacks_.pop_front();
     }
     callback();
+  }
+}
+
+void DispatcherImpl::runFatalActionsOnTrackedObject(
+    const FatalAction::FatalActionPtrList& actions) const {
+  // Only run if this is the dispatcher of the current thread and
+  // DispatcherImpl::Run has been called.
+  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+    return;
+  }
+
+  for (const auto& action : actions) {
+    action->run(current_object_);
+  }
+}
+
+void DispatcherImpl::touchWatchdog() {
+  if (watchdog_registration_) {
+    watchdog_registration_->touchWatchdog();
   }
 }
 

@@ -6,14 +6,16 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "quiche/common/platform/api/quiche_string_piece.h"
+#include "absl/strings/string_view.h"
 
 namespace quic {
+// NOLINTNEXTLINE(readability-identifier-naming)
+void QuicSaveTestOutputImpl(absl::string_view filename, absl::string_view data);
 
-void QuicSaveTestOutputImpl(quiche::QuicheStringPiece filename, quiche::QuicheStringPiece data);
+// NOLINTNEXTLINE(readability-identifier-naming)
+bool QuicLoadTestOutputImpl(absl::string_view filename, std::string* data);
 
-bool QuicLoadTestOutputImpl(quiche::QuicheStringPiece filename, std::string* data);
-
-void QuicRecordTraceImpl(quiche::QuicheStringPiece identifier, quiche::QuicheStringPiece data);
+// NOLINTNEXTLINE(readability-identifier-naming)
+void QuicRecordTraceImpl(absl::string_view identifier, absl::string_view data);
 
 } // namespace quic

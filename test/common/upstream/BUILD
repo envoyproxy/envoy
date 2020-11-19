@@ -51,7 +51,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -133,6 +132,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -147,12 +147,12 @@ envoy_benchmark_test(
 )
 
 envoy_cc_test_library(
-    name = "health_checker_impl_test_lib",
+    name = "health_check_fuzz_utils_lib",
     srcs = [
-        "health_checker_impl_test_utils.cc",
+        "health_check_fuzz_test_utils.cc",
     ],
     hdrs = [
-        "health_checker_impl_test_utils.h",
+        "health_check_fuzz_test_utils.h",
     ],
     deps = [
         ":utility_lib",
@@ -171,7 +171,7 @@ envoy_cc_test(
         "health_checker_impl_test.cc",
     ],
     deps = [
-        ":health_checker_impl_test_lib",
+        ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:headers_lib",
@@ -405,6 +405,7 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
@@ -607,6 +608,7 @@ envoy_cc_test(
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -712,7 +714,7 @@ envoy_cc_test_library(
     hdrs = ["health_check_fuzz.h"],
     deps = [
         ":health_check_fuzz_proto_cc_proto",
-        ":health_checker_impl_test_lib",
+        ":health_check_fuzz_utils_lib",
         ":utility_lib",
         "//test/fuzz:utility_lib",
     ],
@@ -735,5 +737,65 @@ envoy_cc_fuzz_test(
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "zone_aware_load_balancer_fuzz_proto",
+    srcs = ["zone_aware_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:load_balancer_fuzz_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "zone_aware_load_balancer_fuzz_lib",
+    srcs = ["zone_aware_load_balancer_fuzz_base.cc"],
+    hdrs = ["zone_aware_load_balancer_fuzz_base.h"],
+    deps = [
+        ":load_balancer_fuzz_lib",
+        ":zone_aware_load_balancer_fuzz_proto_cc_proto",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
+    ],
+)
+
+envoy_proto_library(
+    name = "round_robin_load_balancer_fuzz_proto",
+    srcs = ["round_robin_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "round_robin_load_balancer_fuzz_test",
+    srcs = ["round_robin_load_balancer_fuzz_test.cc"],
+    corpus = "//test/common/upstream:round_robin_load_balancer_corpus",
+    deps = [
+        ":round_robin_load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+        ":zone_aware_load_balancer_fuzz_lib",
+        "//test/fuzz:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "least_request_load_balancer_fuzz_proto",
+    srcs = ["least_request_load_balancer_fuzz.proto"],
+    deps = [
+        "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "least_request_load_balancer_fuzz_test",
+    srcs = ["least_request_load_balancer_fuzz_test.cc"],
+    corpus = "//test/common/upstream:least_request_load_balancer_corpus",
+    deps = [
+        ":least_request_load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+        ":zone_aware_load_balancer_fuzz_lib",
     ],
 )

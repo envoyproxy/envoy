@@ -57,7 +57,6 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.always_apply_route_header_rules",
-    "envoy.reloadable_features.activate_fds_next_event_loop",
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_prefetch",
@@ -87,6 +86,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.stop_faking_paths",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.tls_use_io_handle_bio",
+    "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.unify_grpc_handling",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
 };
@@ -100,6 +100,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // v2 is fatal-by-default.
+    "envoy.reloadable_features.enable_deprecated_v2_api",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
     // v2 url is removed from codebase.
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
@@ -111,8 +113,7 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.test_feature_false",
     // gRPC Timeout header is missing (#13580)
     "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
-    // The cluster which can't extract secret entity by SDS to be warming and never activate.
-    "envoy.reloadable_features.cluster_keep_warming_no_secret_entity",
+
 };
 
 RuntimeFeatures::RuntimeFeatures() {

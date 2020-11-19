@@ -156,7 +156,7 @@ public:
   bool connectRequest() const { return connect_request_; }
 
   // Http::RequestEncoder
-  void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+  Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
@@ -580,6 +580,7 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
   Status onMessageBegin() override { return okStatus(); }
   Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
