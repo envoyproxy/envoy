@@ -224,8 +224,8 @@ TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
     return;
   }
   absl::flat_hash_set<std::string> allowed_abi_functions = {"proxy_on_context_create",
-                                                           "proxy_get_property", "proxy_log",
-                                                           "proxy_on_downstream_connection_close"};
+                                                            "proxy_get_property", "proxy_log",
+                                                            "proxy_on_downstream_connection_close"};
   setupConfig("", "logging", false, allowed_abi_functions);
   setupFilter();
 
