@@ -1492,7 +1492,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(cp));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(cp));
   EXPECT_EQ(cp, cluster_manager_->httpConnPoolForCluster("fake_cluster", ResourcePriority::Default,
                                                          Http::Protocol::Http11, nullptr));
 
@@ -1649,7 +1649,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
         }));
     create(parseBootstrapFromV3Json(json));
 
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(cp1));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(cp1));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
                                              Http::Protocol::Http11, nullptr);
 
@@ -1660,7 +1660,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(cp2));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(cp2));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High,
                                              Http::Protocol::Http11, nullptr);
   }
@@ -1925,7 +1925,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
       .Times(4)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
@@ -2098,7 +2098,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
       .Times(4)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
@@ -2380,7 +2380,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
       .WillOnce(ReturnNew<Http::ConnectionPool::MockInstance>());
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
@@ -2462,7 +2462,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(mock_cp));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(mock_cp));
 
   MockTcpConnPoolWithDestroy* mock_tcp = new MockTcpConnPoolWithDestroy();
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(mock_tcp));
@@ -2911,7 +2911,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
       Network::SocketOptionFactory::buildIpTransparentOptions();
 
   EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(to_create));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(to_create));
 
   Http::ConnectionPool::Instance* cp = cluster_manager_->httpConnPoolForCluster(
       "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context);
@@ -2933,12 +2933,12 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
 
   EXPECT_CALL(context1, upstreamSocketOptions()).WillRepeatedly(Return(options1));
   EXPECT_CALL(context2, upstreamSocketOptions()).WillRepeatedly(Return(options2));
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(to_create1));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(to_create1));
 
   Http::ConnectionPool::Instance* cp1 = cluster_manager_->httpConnPoolForCluster(
       "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context1);
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(to_create2));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(to_create2));
   Http::ConnectionPool::Instance* cp2 = cluster_manager_->httpConnPoolForCluster(
       "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context2);
 
@@ -2963,7 +2963,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
   Network::Socket::OptionsSharedPtr options_to_return = nullptr;
 
   EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(to_create));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(to_create));
 
   Http::ConnectionPool::Instance* cp = cluster_manager_->httpConnPoolForCluster(
       "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context);
@@ -3863,7 +3863,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
       .Times(3)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
@@ -3967,7 +3967,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
       100);
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
       .Times(1)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
@@ -4104,7 +4104,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
   std::vector<Http::ConnectionPool::MockInstance*> conn_pool_vector;
   for (size_t i = 0; i < 3; ++i) {
     conn_pool_vector.push_back(new Http::ConnectionPool::MockInstance());
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(conn_pool_vector.back()));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(conn_pool_vector.back()));
     EXPECT_CALL(downstream_connection, hashKey)
         .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
     EXPECT_EQ(conn_pool_vector.back(),
@@ -4177,7 +4177,7 @@ TEST_F(PrefetchTest, PrefetchOff) {
   // With prefetch set to 0, each request for a connection pool will only
   // allocate that conn pool.
   initialize(0);
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
       .Times(1)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
   cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
@@ -4194,7 +4194,7 @@ TEST_F(PrefetchTest, PrefetchOn) {
   // prefetching, so create the pool for both the current connection and the
   // anticipated one.
   initialize(1.1);
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
       .Times(2)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
   cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,

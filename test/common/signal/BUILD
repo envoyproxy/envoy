@@ -23,3 +23,13 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "fatal_action_test",
+    srcs = ["fatal_action_test.cc"],
+    deps = [
+        "//source/common/signal:fatal_error_handler_lib",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
