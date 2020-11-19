@@ -150,8 +150,6 @@ protected:
   void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
   void checkForIdle();
 
-  bool hasActiveConnections() const { return !pending_requests_.empty() || !busy_conns_.empty(); }
-
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;

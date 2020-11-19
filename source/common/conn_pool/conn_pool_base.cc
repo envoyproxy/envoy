@@ -264,10 +264,6 @@ void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb, Instance::DrainP
   checkForIdle();
 }
 
-bool ConnPoolImplBase::hasActiveConnectionsImpl() const {
-  return (!pending_streams_.empty() || (num_active_streams_ > 0));
-}
-
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;

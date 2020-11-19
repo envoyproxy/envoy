@@ -123,8 +123,6 @@ public:
   void addIdleCallbackImpl(Instance::IdleCb cb, Instance::DrainPool drain);
   void drainConnectionsImpl();
 
-  bool hasActiveConnectionsImpl() const;
-
   // Closes and destroys all connections. This must be called in the destructor of
   // derived classes because the derived ActiveClient will downcast parent_ to a more
   // specific type of ConnPoolImplBase, but if the more specific part is already destructed
