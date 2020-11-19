@@ -129,7 +129,12 @@ public:
   /**
    * @return the number of bytes written prior to the "put" pointer into the buffer.
    */
-  int numValidBytesWrittenToBuffer() const;
+  int bytesWritten() const;
+
+  /**
+   * @return a string view of the written bytes.
+   */
+  absl::string_view contents() const;
 };
 
 /**
