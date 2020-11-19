@@ -18,7 +18,21 @@ struct FileReadyType {
   static const uint32_t Closed = 0x4;
 };
 
-enum class FileTriggerType { Level, Edge, EmulatedEdge };
+enum class FileTriggerType {
+  // See @man 7 epoll(7)
+  Level,
+  // See @man 7 epoll(7)
+  Edge,
+  // These are synthetic edge events managed by Envoy. They are based on level events and when they
+  // are activated they are immediatelly disabled. This makes them behave like Edge events. Then it
+  // is is the responsibility of the consumer of the event to reactivate the event
+  // when the socket operation would block.
+  //
+  // Their main application in Envoy is for Win32 which does not support edge-triggered events. They
+  // should be used in Win32 instead of level events. They can only be used in platforms where
+  // `PlatformDefaultTriggerType` is `FileTriggerType::EmulatedEdge`.
+  EmulatedEdge
+};
 
 // For POSIX developers to get the Windows behavior of file events
 // you need to add the following definition:
@@ -27,11 +41,7 @@ enum class FileTriggerType { Level, Edge, EmulatedEdge };
 // `--copt="-DFORCE_LEVEL_EVENTS"`
 constexpr FileTriggerType determinePlatformPreferredEventType() {
 #if defined(WIN32) || defined(FORCE_LEVEL_EVENTS)
-#ifdef DO_NOT_OPTIMIZE_LEVEL_EVENTS
-  return FileTriggerType::Level;
-#else
   return FileTriggerType::EmulatedEdge;
-#endif
 #else
   return FileTriggerType::Edge;
 #endif

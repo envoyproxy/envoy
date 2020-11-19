@@ -148,9 +148,11 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
   // TODO(davinci26): This can be optimized further in (w)epoll backends using the `EPOLLONESHOT`
   // flag. With this flag `EPOLLIN`/`EPOLLOUT` are automatically disabled when the event is
   // activated.
-  if (trigger_ == FileTriggerType::EmulatedEdge) {
-    unregisterEventIfEmulatedEdge(events &
-                                  (Event::FileReadyType::Write | Event::FileReadyType::Read));
+  if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
+    if (trigger_ == FileTriggerType::EmulatedEdge) {
+      unregisterEventIfEmulatedEdge(events &
+                                    (Event::FileReadyType::Write | Event::FileReadyType::Read));
+    }
   }
 
   cb_(events);
