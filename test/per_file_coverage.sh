@@ -3,7 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common/event:93.7" # Emulated edge events guards don't report LCOV
+"source/common/event:93.5" # Emulated edge events guards don't report LCOV
 "source/common/network:95.1"
 "source/common/http/http3:50.0"
 "source/common/tracing:94.9"
