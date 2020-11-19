@@ -1035,7 +1035,7 @@ TEST_P(WasmCommonTest, AllowModuleImplementedCapabilities) {
   auto context = std::make_unique<TestContext>(wasm.get());
   EXPECT_TRUE(wasm->initialize(code, false));
 
-  // on_vm_start will trigger proxy_log and fprintf, but expect no call because both are restricted
+  // on_vm_start will trigger proxy_log and fd_write, but expect no call because both are restricted
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
@@ -1127,7 +1127,7 @@ TEST_P(WasmCommonTest, AllowWASI) {
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
 
-  // Restrict capabilities, but allow proxy_log
+  // Restrict capabilities, but allow fd_write
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
   EXPECT_TRUE(wasm->capabilityAllowed("fd_write"));
