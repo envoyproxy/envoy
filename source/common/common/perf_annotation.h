@@ -43,9 +43,8 @@
   } while (false)
 
 /**
- * Initiates a duration measurement referenced by a combination of category and
- * description which can be finished in a different scope.
- * Please note that these kinds of measurements make sense only in a strictly
+ * Initiates a duration measurement which can be finished in a different scope.
+ * Please note that this kind of measurements makes sense only in a strictly
  * sequential flow, i.e. when a new stream isn't created until the current one
  * is destroyed.
  */
@@ -125,8 +124,11 @@ public:
   void begin(absl::string_view category, absl::string_view description);
 
   /**
-   * Ends and records duration measurement for a category and description.
-   * See begin()'s documentation for usage and applicability of this method.
+   * Ends and records duration measurement for a category and description, which are
+   * shown as separate columns in the generated output table. Before ending the
+   * measurement must be started first with a begin() call. The measurement can
+   * be started and ended in different scopes, but the flow of these start and
+   * stop points for the same category and description must be strictly sequential.
    *
    * @param category the name of a category for the recording.
    * @param description the name of description for the recording.

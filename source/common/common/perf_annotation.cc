@@ -35,8 +35,7 @@ PerfAnnotationContext::PerfAnnotationContext() = default;
 void PerfAnnotationContext::begin(absl::string_view category, absl::string_view description) {
   const CategoryDescription key = {std::string(category), std::string(description)};
   RELEASE_ASSERT(!timestamps_map_.contains(key),
-                 fmt::format("double perf measurement beginning for {}/{} is disallowed!", category,
-                             description));
+                 "double perf measurement beginning is disallowed!");
   timestamps_map_.insert({key, currentTime()});
 }
 
@@ -44,9 +43,7 @@ void PerfAnnotationContext::end(absl::string_view category, absl::string_view de
   const CategoryDescription key = {std::string(category), std::string(description)};
   const MonotonicTime end_time = currentTime();
   const auto result = timestamps_map_.extract(key);
-  RELEASE_ASSERT(!result.empty(),
-                 fmt::format("double perf measurement ending for {}/{} is disallowed!", category,
-                             description));
+  RELEASE_ASSERT(!result.empty(), "double perf measurement ending is disallowed!");
   const std::chrono::nanoseconds duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - result.mapped());
   record(duration, category, description);

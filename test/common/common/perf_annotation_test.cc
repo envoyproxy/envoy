@@ -28,12 +28,8 @@ TEST_F(PerfAnnotationTest, TestMacros) {
   PERF_RECORD(perf, "beta", "3");
   { PERF_BEGIN("gamma", "4"); }
   { PERF_BEGIN("sigma", "5"); }
-  { PERF_BEGIN("gamma", "6"); }
-  { PERF_BEGIN("sigma", "6"); }
   { PERF_END("gamma", "4"); }
   { PERF_END("sigma", "5"); }
-  { PERF_END("gamma", "6"); }
-  { PERF_END("sigma", "6"); }
   std::string report = PERF_TO_STRING();
   EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" 0 ") != std::string::npos) << report;
@@ -47,33 +43,25 @@ TEST_F(PerfAnnotationTest, TestMacros) {
   EXPECT_TRUE(report.find(" 4 ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" sigma ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" 5 ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" gamma ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 6 ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" sigma ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 6 ") != std::string::npos) << report;
   PERF_DUMP();
 }
 
 TEST_F(PerfAnnotationTest, TestBeginAsserts) {
   { PERF_BEGIN("alpha", "0"); }
-  EXPECT_DEATH({ PERF_BEGIN("alpha", "0"); },
-               "double perf measurement beginning for alpha/0 is disallowed!");
+  EXPECT_DEATH({ PERF_BEGIN("alpha", "0"); }, "double perf measurement beginning is disallowed!");
 
   { PERF_BEGIN("alpha", "1"); }
   { PERF_END("alpha", "1"); }
   { PERF_BEGIN("alpha", "1"); }
-  EXPECT_DEATH({ PERF_BEGIN("alpha", "1"); },
-               "double perf measurement beginning for alpha/1 is disallowed!");
+  EXPECT_DEATH({ PERF_BEGIN("alpha", "1"); }, "double perf measurement beginning is disallowed!");
 }
 
 TEST_F(PerfAnnotationTest, TestEndAsserts) {
-  EXPECT_DEATH({ PERF_END("alpha", "0"); },
-               "double perf measurement ending for alpha/0 is disallowed!");
+  EXPECT_DEATH({ PERF_END("alpha", "0"); }, "double perf measurement ending is disallowed!");
 
   { PERF_BEGIN("alpha", "1"); }
   { PERF_END("alpha", "1"); }
-  EXPECT_DEATH({ PERF_END("alpha", "1"); },
-               "double perf measurement ending for alpha/1 is disallowed!");
+  EXPECT_DEATH({ PERF_END("alpha", "1"); }, "double perf measurement ending is disallowed!");
 }
 
 // More detailed report-format testing, directly using the class.
