@@ -21,6 +21,7 @@ Minor Behavior Changes
 * watchdog: the watchdog action :ref:`abort_action <envoy_v3_api_msg_watchdog.v3alpha.AbortActionConfig>` is now the default action to terminate the process if watchdog kill / multikill is enabled.
 * xds: to support TTLs, heartbeating has been added to xDS. As a result, responses that contain empty resources without updating the version will no longer be propagated to the
   subscribers. To undo this for VHDS (which is the only subscriber that wants empty resources), the `envoy.reloadable_features.vhds_heartbeats` can be set to "false".
+* mongo proxy metrics: Swapped network connection remote and local closed counter (cx_destroy_local_with_active_rq and cx_destroy_remote_with_active_rq) that previously incorrectly set (reversed).
 
 Bug Fixes
 ---------
