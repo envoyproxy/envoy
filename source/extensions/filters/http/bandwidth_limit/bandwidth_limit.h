@@ -27,11 +27,11 @@ namespace BandwidthLimitFilter {
 /**
  * All bandwidth limit stats. @see stats_macros.h
  */
-#define ALL_BANDWIDTH_LIMIT_STATS(COUNTER)                                                      \
-  COUNTER(enabled)                                                                              \
-  COUNTER(enforced)                                                                             \
-  COUNTER(bandwidth_limited)                                                                    \
-  COUNTER(bandwidth_usage)                                                                      \
+#define ALL_BANDWIDTH_LIMIT_STATS(COUNTER)                                                         \
+  COUNTER(enabled)                                                                                 \
+  COUNTER(enforced)                                                                                \
+  COUNTER(bandwidth_limited)                                                                       \
+  COUNTER(bandwidth_usage)                                                                         \
   COUNTER(ok)
 
 /**
@@ -45,18 +45,20 @@ struct BandwidthLimitStats {
  * Configuration for the HTTP bandwidth limit filter.
  */
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
+  using EnableMode =
+      envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
+
 public:
   FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
-               TimeSource& time_source, bool per_route = false);
+               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source);
   ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
   BandwidthLimitStats& stats() const { return stats_; }
   Stats::Scope& scope() { return scope_; }
   TimeSource& timeSource() { return time_source_; }
   // Must call enabled() before calling limit().
-  uint64_t limit() const { return limit_kbps_.value(); }
-  envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit::EnableMode enable_mode() const;
+  uint64_t limit() const { return limit_kbps_; }
+  EnableMode enable_mode() const { return enable_mode_; };
   std::shared_ptr<TokenBucketImpl> tokenBucket() { return token_bucket_; }
   uint64_t fill_rate() const { return fill_rate_; }
 
@@ -69,8 +71,8 @@ private:
   Runtime::Loader& runtime_;
   Stats::Scope& scope_;
   TimeSource& time_source_;
-  const absl::optional<uint64_t> limit_kbps_;
-  const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit::EnableMode enable_mode_;
+  const uint64_t limit_kbps_;
+  const EnableMode enable_mode_;
   const absl::optional<uint64_t> enforce_threshold_Kbps_;
   const uint64_t fill_rate_;
   // Filter chain's shared token bucket
@@ -117,6 +119,9 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
+  // Http::StreamFilterBase
+  void onDestroy() override;
+
 private:
   friend class FilterTest;
   const FilterConfig* getConfig() const;
@@ -124,8 +129,8 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   FilterConfigSharedPtr config_;
-  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> downstream_limiter_;
-  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> upstream_limiter_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> ingress_limiter_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> egress_limiter_;
 };
 
 } // namespace BandwidthLimitFilter

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.bandwidth_limit.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -53,9 +55,9 @@ message BandwidthLimit {
   uint64 limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
 
   // Optional fill_rate for the token buckets (per second). Defaults to 64.
-  uint64 fill_rate = 4 [(validate.rules).uint64 = {gte: 1}];
+  google.protobuf.UInt64Value fill_rate = 4 [(validate.rules).uint64 = {gte: 1}];
 
   // If set, the bandwidth limit will be enforced only when total dataplane bandwidth usage
   // crosses this value. Defaults to 0 meaning limits are always applied.
-  uint64 enforce_threshold_kbps = 5 [(validate.rules).uint64 = {gte: 1}];
+  google.protobuf.UInt64Value enforce_threshold_kbps = 5 [(validate.rules).uint64 = {gte: 1}];
 }

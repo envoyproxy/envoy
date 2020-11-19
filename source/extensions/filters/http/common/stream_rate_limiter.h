@@ -5,11 +5,19 @@
 #include <vector>
 
 #include "envoy/runtime/runtime.h"
+#include "envoy/event/timer.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/token_bucket_impl.h"
 
 namespace Envoy {
+
+class ScopeTrackedObject;
+
+namespace Event{
+  class Timer;
+} // namespace Event
+
 namespace Extensions {
 namespace HttpFilters {
 namespace Common {
@@ -64,6 +72,8 @@ public:
   bool destroyed() { return token_timer_ == nullptr; }
 
 private:
+  using TimerPtr = std::unique_ptr<Event::Timer>;
+
   void onTokenTimer();
 
   const uint64_t bytes_per_time_slice_;

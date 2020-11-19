@@ -63,6 +63,7 @@ envoy_cc_library(
     hdrs = ["stream_rate_limiter.h"],
     deps = [
         "//include/envoy/event:timer_interface",
+        "//include/envoy/event:dispatcher_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
