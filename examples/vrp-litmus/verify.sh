@@ -2,7 +2,6 @@
 
 export NAME=vrp-litmus
 export DELAY=10
-export EXTRA_CURL_ARGS=(-k)
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -11,4 +10,5 @@ export EXTRA_CURL_ARGS=(-k)
 run_log "Test proxy"
 responds_with \
     normal \
-    https://localhost:10000/content
+    https://localhost:10000/content \
+    -k
