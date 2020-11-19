@@ -119,12 +119,18 @@ MemoryTest::Mode MemoryTest::mode() {
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   bool can_measure_memory = end_mem > start_mem;
 
+  // As of Oct 8, 2020, tcmalloc has changed such that Memory::Stats::totalCurrentlyAllocated
+  // is not deterministic, even with single-threaded tests. When possible, this should be fixed,
+  // and the following block of code uncommented. This affects approximate comparisons, not
+  // just exact ones.
+#if 0
   if (getenv("ENVOY_MEMORY_TEST_EXACT") != nullptr) { // Set in "ci/do_ci.sh" for 'release' tests.
     RELEASE_ASSERT(can_measure_memory,
                    "$ENVOY_MEMORY_TEST_EXACT is set for canonical memory measurements, "
                    "but memory measurement looks broken");
     return Mode::Canonical;
   }
+#endif
 
   // Different versions of STL and other compiler/architecture differences may
   // also impact memory usage, so when not compiling with MEMORY_TEST_EXACT,
