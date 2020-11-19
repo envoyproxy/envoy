@@ -12,12 +12,12 @@ template <typename T, T MinValue, T MaxValue> struct Interval {
 };
 
 // Utility type that represents a value of type T in the given interval.
-template <typename T, typename Interval> class IntervalValue {
+template <typename T, typename Interval> class ClosedIntervalValue {
 public:
-  static IntervalValue min() { return IntervalValue(Interval::min_value); }
-  static IntervalValue max() { return IntervalValue(Interval::max_value); }
+  static ClosedIntervalValue min() { return ClosedIntervalValue(Interval::min_value); }
+  static ClosedIntervalValue max() { return ClosedIntervalValue(Interval::max_value); }
 
-  constexpr explicit IntervalValue(T value)
+  constexpr explicit ClosedIntervalValue(T value)
       : value_(std::max<T>(Interval::min_value, std::min<T>(Interval::max_value, value))) {}
 
   T value() const { return value_; }
@@ -26,6 +26,6 @@ private:
   T value_;
 };
 
-using UnitFloat = IntervalValue<float, Interval<int, 0, 1>>;
+using UnitFloat = ClosedIntervalValue<float, Interval<int, 0, 1>>;
 
 } // namespace Envoy
