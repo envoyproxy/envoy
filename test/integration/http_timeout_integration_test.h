@@ -9,6 +9,7 @@
 
 namespace Envoy {
 class HttpTimeoutIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                   public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
   // Arbitrarily choose HTTP2 here, the tests for this class are around
