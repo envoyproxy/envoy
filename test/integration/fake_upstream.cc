@@ -626,6 +626,26 @@ testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const 
       timeout);
 }
 
+FakeRawConnection::~FakeRawConnection() {
+  if (read_filter_) {
+    EXPECT_TRUE(shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
+      connection.removeReadFilter(read_filter_);
+    }));
+  }
+}
+
+testing::AssertionResult FakeRawConnection::initialize() {
+  read_filter_ = Network::ReadFilterSharedPtr{new ReadFilter(*this)};
+  testing::AssertionResult result =
+      shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
+        connection.addReadFilter(read_filter_);
+      });
+  if (!result) {
+    return result;
+  }
+  return FakeConnectionBase::initialize();
+}
+
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,
                                                milliseconds timeout) {
   absl::MutexLock lock(&lock_);
@@ -671,14 +691,11 @@ AssertionResult FakeRawConnection::write(const std::string& data, bool end_strea
 
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
                                                             bool end_stream) {
-  if (auto maybe_parent = parent_.lock(); maybe_parent != nullptr) {
-    FakeRawConnection& parent = maybe_parent->get();
-    absl::MutexLock lock(&parent.lock_);
-    ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
-    parent.data_.append(data.toString());
-    parent.half_closed_ = end_stream;
-    data.drain(data.length());
-  }
+  absl::MutexLock lock(&parent_.lock_);
+  ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
+  parent_.data_.append(data.toString());
+  parent_.half_closed_ = end_stream;
+  data.drain(data.length());
   return Network::FilterStatus::StopIteration;
 }
 } // namespace Envoy

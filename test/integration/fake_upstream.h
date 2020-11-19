@@ -471,6 +471,7 @@ public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : FakeConnectionBase(shared_connection, time_system) {}
   using ValidatorFunction = const std::function<bool(const std::string&)>;
+  ~FakeRawConnection() override;
 
   // Writes to data. If data is nullptr, discards the received data.
   ABSL_MUST_USE_RESULT
@@ -493,16 +494,7 @@ public:
                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult initialize() override {
-    testing::AssertionResult result =
-        shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
-          connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(proxy_)});
-        });
-    if (!result) {
-      return result;
-    }
-    return FakeConnectionBase::initialize();
-  }
+  testing::AssertionResult initialize() override;
 
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
   // contained in the incoming data string. Unlike many of Envoy waitFor functions,
@@ -520,19 +512,17 @@ public:
   }
 
 private:
-  using WeakReference = std::weak_ptr<std::reference_wrapper<FakeRawConnection>>;
   struct ReadFilter : public Network::ReadFilterBaseImpl {
-    ReadFilter(WeakReference parent) : parent_(std::move(parent)) {}
+    ReadFilter(FakeRawConnection& parent) : parent_(parent) {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override;
 
-    WeakReference parent_;
+    FakeRawConnection& parent_;
   };
 
   std::string data_ ABSL_GUARDED_BY(lock_);
-  std::shared_ptr<std::reference_wrapper<FakeRawConnection>> proxy_{
-      std::make_shared<std::reference_wrapper<FakeRawConnection>>(*this)};
+  Network::ReadFilterSharedPtr read_filter_;
 };
 
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
