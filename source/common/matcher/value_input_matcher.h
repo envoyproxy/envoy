@@ -7,27 +7,21 @@
 namespace Envoy {
 namespace Matcher {
 
-class ValueInputMatcher : public InputMatcher {
+class StringInputMatcher : public InputMatcher {
 public:
-  explicit ValueInputMatcher(const envoy::type::matcher::v3::ValueMatcher& matcher)
-      : matcher_(Matchers::ValueMatcher::create(matcher)) {}
+  explicit StringInputMatcher(const envoy::type::matcher::v3::StringMatcher& matcher)
+      : matcher_(matcher) {}
 
   bool match(absl::optional<absl::string_view> input) override {
     if (!input) {
-      // TODO(snowp): This should match against the null matcher.
       return false;
     }
-    // TODO(snowp): Change this to properly match against the input and not go through a proto
-    // matcher.
-    ProtobufWkt::Value value;
-    value.set_string_value(std::string(*input));
-    const auto r = matcher_->match(value);
 
-    return r;
+    return matcher_.match(*input);
   }
 
 private:
-  const Matchers::ValueMatcherConstSharedPtr matcher_;
+  const Matchers::StringMatcherImpl matcher_;
 };
 
 } // namespace Matcher

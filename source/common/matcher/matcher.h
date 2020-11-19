@@ -144,7 +144,7 @@ private:
     switch (predicate.matcher_case()) {
     case envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::SinglePredicate::
         kValueMatch:
-      return std::make_unique<ValueInputMatcher>(predicate.value_match());
+      return std::make_unique<StringInputMatcher>(predicate.value_match());
     case envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::SinglePredicate::
         kCustomMatch: {
       auto& factory =

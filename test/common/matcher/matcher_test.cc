@@ -73,8 +73,7 @@ matcher_tree:
                     typed_config:
                       "@type": type.googleapis.com/google.protobuf.StringValue
                   value_match:
-                    string_match:
-                      exact: foo
+                    exact: foo
   )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
@@ -118,8 +117,7 @@ matcher_list:
                   typed_config:
                     "@type": type.googleapis.com/google.protobuf.StringValue
                 value_match:
-                  string_match:
-                    exact: foo
+                  exact: foo
     predicate:
       single_predicate:
         input:
@@ -127,8 +125,7 @@ matcher_list:
           typed_config:
             "@type": type.googleapis.com/google.protobuf.StringValue
         value_match:
-          string_match:
-            exact: foo
+          exact: foo
   )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
