@@ -23,8 +23,7 @@ Http::FilterFactoryCb KillRequestFilterFactory::createFilterFactoryFromProtoType
 /**
  * Static registration for the KillRequest filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(KillRequestFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.kill_request"};
+REGISTER_FACTORY(KillRequestFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace KillRequest
 } // namespace HttpFilters

@@ -47,17 +47,17 @@ TEST_F(KillRequestFilterTest, KillRequestWithMillionDenominatorCrashEnvoy) {
   SetUpTest(kill_request);
   request_headers_.addCopy("x-envoy-kill-request", "yes");
 
-  ON_CALL(random_generator_, random()).WillByDefault(Return(1000000));
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
 
 TEST_F(KillRequestFilterTest, KillRequestDisabledWhenIsKillRequestEnabledReturnsFalse) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
-  kill_request.mutable_probability()->set_numerator(100);
+  kill_request.mutable_probability()->set_numerator(0);
   SetUpTest(kill_request);
   request_headers_.addCopy("x-envoy-kill-request", "true");
 
-  ON_CALL(random_generator_, random()).WillByDefault(Return(99));
+  ON_CALL(random_generator_, random()).WillByDefault(Return(1));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 

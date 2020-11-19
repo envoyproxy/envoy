@@ -2,6 +2,8 @@
 
 #include <csignal>
 
+#include "common/protobuf/utility.h"
+
 #include "extensions/filters/common/fault/fault_config.h"
 
 namespace Envoy {
@@ -10,16 +12,8 @@ namespace HttpFilters {
 namespace KillRequest {
 
 bool KillRequestFilter::isKillRequestEnabled() {
-  uint32_t denominator = 100;
-  if (kill_request_.probability().denominator() ==
-      envoy::type::v3::FractionalPercent::TEN_THOUSAND) {
-    denominator = 10000;
-  } else if (kill_request_.probability().denominator() ==
-             envoy::type::v3::FractionalPercent::MILLION) {
-    denominator = 1000000;
-  }
-
-  return (random_generator_.random() % denominator) < kill_request_.probability().numerator();
+  return ProtobufPercentHelper::evaluateFractionalPercent(kill_request_.probability(),
+                                                          random_generator_.random());
 }
 
 Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
