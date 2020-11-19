@@ -1532,9 +1532,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   if (protocols.size() == 2 &&
       ((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
        (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11))) {
-    return std::make_unique<Http::HttpConnPoolImplMixed>(
-        dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
-        state);
+    return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
+                                                         priority, options,
+                                                         transport_socket_options, state);
   }
 
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
@@ -1543,8 +1543,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
                                          options, transport_socket_options, state);
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
-  return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                       options, transport_socket_options, state);
+  return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,
+                                       transport_socket_options, state);
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(

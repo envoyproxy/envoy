@@ -1526,7 +1526,7 @@ TEST_P(DISABLED_AdsClusterV2Test, XdsBatching) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13681.
-TEST_P(AdsClusterV2Test, TypeUrlAnnotationRegression) {
+TEST_P(DISABLED_AdsClusterV2Test, TypeUrlAnnotationRegression) {
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
       envoy::config::core::v3::ApiVersion::V2);

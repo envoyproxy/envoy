@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/raw_buffer_socket.h"
+
 #include "extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
@@ -164,20 +165,22 @@ public:
   bool supportsAlpn() const override { return true; }
 };
 
-class AlpnTestConfigFactory : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
+class AlpnTestConfigFactory
+    : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
 public:
   std::string name() const override { return "envoy.transport_sockets.alpn"; }
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
-      const Protobuf::Message&,
-      Server::Configuration::TransportSocketFactoryContext&) override {
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const Protobuf::Message&,
+                               Server::Configuration::TransportSocketFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();
   }
 };
 
-REGISTER_FACTORY(AlpnTestConfigFactory,
-Server::Configuration::UpstreamTransportSocketConfigFactory);
-
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
+  AlpnTestConfigFactory alpn_factory;
+  Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
+      registered_factory(alpn_factory);
+
   const std::string yaml = R"EOF(
   static_resources:
     clusters:

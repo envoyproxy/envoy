@@ -77,11 +77,12 @@ public:
             }));
   }
 
-  Http::ConnectionPool::InstancePtr allocateConnPool(
-      Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, std::vector<Http::Protocol>&,
-      const Network::ConnectionSocket::OptionsSharedPtr& options,
-      const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-      ClusterConnectivityState& state) override {
+  Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
+                   std::vector<Http::Protocol>&,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   ClusterConnectivityState& state) override {
     return Http::ConnectionPool::InstancePtr{
         allocateConnPool_(host, options, transport_socket_options, state)};
   }

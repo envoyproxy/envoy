@@ -25,8 +25,8 @@ namespace {
 
 class ConnPoolImplForTest : public HttpConnPoolImplMixed {
 public:
-  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterConnectivityState& state, Random::RandomGenerator& random,
-                      Upstream::ClusterInfoConstSharedPtr cluster)
+  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterConnectivityState& state,
+                      Random::RandomGenerator& random, Upstream::ClusterInfoConstSharedPtr cluster)
       : HttpConnPoolImplMixed(dispatcher, random,
                               Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                               Upstream::ResourcePriority::Default, nullptr, nullptr, state) {}
