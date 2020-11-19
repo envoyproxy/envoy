@@ -1162,4 +1162,58 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
 }
 
+TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  auto* upstream = fake_upstreams_.front().get();
+  Http2Frame buf = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  for (int i = 0; i < 2; i++) {
+    buf = Http2Frame::makeEmptyContinuationFrame(Http2Frame::makeClientStreamId(0));
+    ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
+}
+
+
+TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  auto* upstream = fake_upstreams_.front().get();
+  // Start the response with a 200 status.
+  Http2Frame buf = Http2Frame::makeHeadersFrameWithStatus("200", Http2Frame::makeClientStreamId(0),
+                                                          Http2Frame::HeadersFlags::EndHeaders);
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Send empty data frame.
+  for (int i = 0; i < 2; i++) {
+    buf = Http2Frame::makeEmptyDataFrame(Http2Frame::makeClientStreamId(0));
+    ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForReset();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
+}
+
 } // namespace Envoy
