@@ -1993,7 +1993,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnecti
 }
 
 // Should survive from multiple streamInfo():downstreamSslConnection() calls.
-// This is a regression test for #????.
+// This is a regression test for #14091.
 TEST_F(LuaHttpFilterTest, SurviveMultipleDownstreamSslConnectionCalls) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
