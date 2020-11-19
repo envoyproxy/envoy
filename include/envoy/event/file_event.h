@@ -24,7 +24,7 @@ enum class FileTriggerType {
   // See @man 7 epoll(7)
   Edge,
   // These are synthetic edge events managed by Envoy. They are based on level events and when they
-  // are activated they are immediatelly disabled. This makes them behave like Edge events. Then it
+  // are activated they are immediately disabled. This makes them behave like Edge events. Then it
   // is is the responsibility of the consumer of the event to reactivate the event
   // when the socket operation would block.
   //
