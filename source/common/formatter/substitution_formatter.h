@@ -107,12 +107,46 @@ private:
   std::vector<FormatterProviderPtr> providers_;
 };
 
+/**
+ * An formatter for structured log formats, which returns a Struct proto that
+ * can be converted easily into multiple formats.
+ */
+class StructFormatter {
+  public:
+  StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                    bool omit_empty_values)
+      : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+        struct_output_format_(toFormatMap(format_mapping)) {}
+
+  ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
+                     const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap& response_trailers,
+                     const StreamInfo::StreamInfo& stream_info,
+                     absl::string_view local_reply_body) const;
+
+private:
+  struct StructFormatMapWrapper;
+  using StructFormatMapValue =
+      absl::variant<const std::vector<FormatterProviderPtr>, const StructFormatMapWrapper>;
+  // Although not required for Struct/JSON, it is nice to have the order of
+  // properties preserved between the format and the log entry, thus std::map.
+  using StructFormatMap = std::map<std::string, StructFormatMapValue>;
+  using StructFormatMapPtr = std::unique_ptr<StructFormatMap>;
+  struct StructFormatMapWrapper {
+    StructFormatMapPtr value_;
+  };
+
+  bool omit_empty_values_;
+  bool preserve_types_;
+  const StructFormatMapWrapper struct_output_format_;
+  StructFormatMapWrapper toFormatMap(const ProtobufWkt::Struct& struct_format) const;
+};
+
 class JsonFormatterImpl : public Formatter {
 public:
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                     bool omit_empty_values)
-      : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
-        json_output_format_(toFormatMap(format_mapping)) {}
+      : struct_formatter_(StructFormatter(format_mapping, preserve_types, omit_empty_values)) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -122,27 +156,7 @@ public:
                      absl::string_view local_reply_body) const override;
 
 private:
-  struct JsonFormatMapWrapper;
-  using JsonFormatMapValue =
-      absl::variant<const std::vector<FormatterProviderPtr>, const JsonFormatMapWrapper>;
-  // Although not required for JSON, it is nice to have the order of properties
-  // preserved between the format and the log entry, thus std::map.
-  using JsonFormatMap = std::map<std::string, JsonFormatMapValue>;
-  using JsonFormatMapPtr = std::unique_ptr<JsonFormatMap>;
-  struct JsonFormatMapWrapper {
-    JsonFormatMapPtr value_;
-  };
-
-  bool omit_empty_values_;
-  bool preserve_types_;
-  const JsonFormatMapWrapper json_output_format_;
-
-  ProtobufWkt::Struct toStruct(const Http::RequestHeaderMap& request_headers,
-                               const Http::ResponseHeaderMap& response_headers,
-                               const Http::ResponseTrailerMap& response_trailers,
-                               const StreamInfo::StreamInfo& stream_info,
-                               absl::string_view local_reply_body) const;
-  JsonFormatMapWrapper toFormatMap(const ProtobufWkt::Struct& json_format) const;
+  StructFormatter struct_formatter_;
 };
 
 /**
