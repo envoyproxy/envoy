@@ -2,21 +2,13 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.bandwidth_limit.v3;
 
-import "envoy/config/core/v3/base.proto";
-import "envoy/type/v3/http_status.proto";
-import "envoy/type/v3/token_bucket.proto";
-
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3";
-option java_outer_classname = "LocalRateLimitProto";
-option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Bandwidth limit]
-// Local Rate limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
+// Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
 // [#extension: envoy.filters.http.bandwidth_limit]
 
 // [#next-free-field: 6]
@@ -56,7 +48,7 @@ message BandwidthLimit {
   // Optional fill_rate for the token buckets (per second). Defaults to 64.
   uint64 fill_rate = 4 [(validate.rules).uint64 = {gte: 1}];
 
-  // If set, the bandwidth limit will be applied only when total dataplane bandwidth usage crosses this
-  // value. Defaults to 0 meaning limits are always applied.
-  uint64 enable_threshold_kbps = 5 [(validate.rules).uint64 = {gte: 1}];
+  // If set, the bandwidth limit will be enforced only when total dataplane bandwidth usage
+  // crosses this value. Defaults to 0 meaning limits are always applied.
+  uint64 enforce_threshold_kbps = 5 [(validate.rules).uint64 = {gte: 1}];
 }

@@ -55,10 +55,10 @@ public:
   Stats::Scope& scope() { return scope_; }
   TimeSource& timeSource() { return time_source_; }
   // Must call enabled() before calling limit().
-  uint64_t limit() { return limit_kbps.value(); }
+  uint64_t limit() const { return limit_kbps.value(); }
   envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit::EnableMode enable_mode() const;
   std::shared_ptr<TokenBucketImpl> tokenBucket() { return token_bucket_; }
-  uint64_t fill_rate() { return fill_rate_; }
+  uint64_t fill_rate() const { return fill_rate_; }
 
 private:
   friend class FilterTest;
@@ -70,7 +70,7 @@ private:
   Stats::Scope& scope_;
   TimeSource& time_source_;
   const absl::optional<uint64_t> limit_kbps_;
-  const Filters::BandwidthLimit::Enable_Mode enable_mode_;
+  const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit::EnableMode enable_mode_;
   const absl::optional<uint64_t> enforce_threshold_Kbps_;
   const uint64_t fill_rate_;
   // Filter chain's shared token bucket

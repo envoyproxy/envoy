@@ -66,7 +66,7 @@ Http::FilterHeadersStatus BandwidthFilter::decodeHeaders(Http::RequestHeaderMap&
   if (mode & EnableMode::Ingress) {
     downstream_limiter_ =
         std::make_unique<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>(
-            rate_kbps.value(), decoder_callbacks_->decoderBufferLimit(),
+            config_->limit(), decoder_callbacks_->decoderBufferLimit(),
             [this] { decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark(); },
             [this] { decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark(); },
             [this](Buffer::Instance& data, bool end_stream) {
@@ -79,7 +79,7 @@ Http::FilterHeadersStatus BandwidthFilter::decodeHeaders(Http::RequestHeaderMap&
 
   if (mode & EnableMode::Egress) {
     upstream_limiter_ = std::make_unique<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>(
-        rate_kbps.value(), encoder_callbacks_->encoderBufferLimit(),
+        config_->limit(), encoder_callbacks_->encoderBufferLimit(),
         [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
         [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
