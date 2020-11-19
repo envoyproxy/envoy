@@ -11,15 +11,15 @@ envoy_package()
 
 selects.config_setting_group(
     name = "include_wasm_config",
-    match_all = ["//bazel:x86", "//bazel:wasm_v8"],
+    match_all = ["//bazel:x86"],
 )
 
 filegroup(
     name = "configs",
     srcs = glob(
-            [
-                "**/*.wasm",
-            ],
+        [
+            "**/*.wasm",
+        ],
     ) + select({
         ":include_wasm_config": glob(
             [
