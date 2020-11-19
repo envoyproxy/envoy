@@ -91,8 +91,6 @@ TEST_F(OauthIntegrationTest, UnauthenticatedFlow) {
                                          {":authority", "authority"}};
   auto encoder_decoder = codec_client_->startRequest(headers);
 
-  Buffer::OwnedImpl buffer;
-  encoder_decoder.first.encodeData(buffer, true);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
