@@ -236,16 +236,8 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
     }
   }
 
-  uint64_t bytes_to_write;
-  if (bytes_to_retry_) {
-    bytes_to_write = bytes_to_retry_;
-    bytes_to_retry_ = 0;
-  } else {
-    bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
-  }
-
   uint64_t total_bytes_written = 0;
-  while (bytes_to_write > 0) {
+  while (true) {
     // TODO(mattklein123): As it relates to our fairness efforts, we might want to limit the number
     // of iterations of this loop, either by pure iterations, bytes written, etc.
     const auto slice = write_buffer.maybeLinearize(16384, 4096);
@@ -261,12 +253,10 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       ctx_->stats().write_size_.recordValue(rc);
       total_bytes_written += rc;
       write_buffer.drain(rc);
-      bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
     } else {
       int err = SSL_get_error(rawSsl(), rc);
       switch (err) {
       case SSL_ERROR_WANT_WRITE:
-        bytes_to_retry_ = bytes_to_write;
         break;
       case SSL_ERROR_WANT_READ:
       // Renegotiation has started. We don't handle renegotiation so just fall through.

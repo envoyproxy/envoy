@@ -93,7 +93,6 @@ private:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
-  uint64_t bytes_to_retry_{};
   std::string failure_reason_;
 
   SslHandshakerImplSharedPtr info_;
