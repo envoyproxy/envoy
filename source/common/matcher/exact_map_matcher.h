@@ -34,7 +34,7 @@ public:
       if (result.matcher_) {
         return result.matcher_->match(data);
       } else {
-        return {true, OnMatch<DataType>{result.action_, nullptr}};
+        return {true, OnMatch<DataType>{result.action_cb_, nullptr}};
       }
     } else if (input.data_availability_ ==
                DataInputGetResult::DataAvailability::MoreDataAvailable) {

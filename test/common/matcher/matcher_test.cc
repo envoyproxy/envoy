@@ -47,6 +47,20 @@ private:
   const std::string value_;
 };
 
+class TestAction : public Action {};
+
+class TestActionFactory : public ActionFactory {
+public:
+  ActionFactoryCb createActionFactoryCb(const Protobuf::Message&) override {
+    return []() { return std::make_unique<TestAction>(); };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return "test_action"; }
+};
+
 TEST(Matcher, TestMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
@@ -62,7 +76,7 @@ matcher_tree:
             matchers:
             - on_match:
                 action:
-                  name: match
+                  name: test_action
                   typed_config:
                     "@type": type.googleapis.com/google.protobuf.StringValue
                     value: match!!
@@ -83,6 +97,9 @@ matcher_tree:
 
   MatchTreeFactory<TestData> factory(ProtobufMessage::getStrictValidationVisitor());
 
+  TestActionFactory action_factory;
+  Registry::InjectFactory<ActionFactory> inject_action(action_factory);
+
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   Registry::InjectFactory<DataInputFactory<TestData>> inject_outer(outer_factory);
 
@@ -93,7 +110,7 @@ matcher_tree:
   const auto result = match_tree->match(TestData());
   EXPECT_TRUE(result.match_completed_);
   EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_TRUE(result.on_match_->action_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
 }
 
 TEST(Matcher, TestRecursiveMatcher) {
@@ -106,7 +123,7 @@ matcher_list:
           matchers:
           - on_match:
               action:
-                name: match
+                name: test_action
                 typed_config:
                   "@type": type.googleapis.com/google.protobuf.StringValue
                   value: match!!
@@ -135,6 +152,9 @@ matcher_list:
 
   MatchTreeFactory<TestData> factory(ProtobufMessage::getStrictValidationVisitor());
 
+  TestActionFactory action_factory;
+  Registry::InjectFactory<ActionFactory> inject_action(action_factory);
+
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   Registry::InjectFactory<DataInputFactory<TestData>> inject_outer(outer_factory);
 
@@ -145,11 +165,11 @@ matcher_list:
   const auto result = match_tree->match(TestData());
   EXPECT_TRUE(result.match_completed_);
   EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_FALSE(result.on_match_->action_.has_value());
+  EXPECT_EQ(result.on_match_->action_cb_, nullptr);
 
   const auto recursive_result = evaluateMatch(*match_tree, TestData());
   EXPECT_TRUE(recursive_result.final_);
-  EXPECT_TRUE(recursive_result.result_.has_value());
+  EXPECT_NE(recursive_result.result_, nullptr);
 }
 } // namespace Matcher
 } // namespace Envoy

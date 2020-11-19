@@ -42,11 +42,28 @@ template <class DataType> class MatchTree;
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
 
-using TypedExtensionConfigOpt = absl::optional<envoy::config::core::v3::TypedExtensionConfig>;
+/**
+ * Action provides the interface for actions to perform when a match occurs. It provides no
+ * functions, as implementors are expected to downcast this to a more specific action.
+ */
+class Action {
+public:
+  virtual ~Action() = default;
+};
+
+using ActionPtr = std::unique_ptr<Action>;
+using ActionFactoryCb = std::function<ActionPtr()>;
+
+class ActionFactory : public Config::TypedFactory {
+public:
+  virtual ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config) PURE;
+
+  std::string category() const override { return "envoy.matching.action"; }
+};
 
 // On match, we either return the action to perform or another match tree to match against.
 template <class DataType> struct OnMatch {
-  const TypedExtensionConfigOpt action_;
+  const ActionFactoryCb action_cb_;
   const MatchTreeSharedPtr<DataType> matcher_;
 };
 
@@ -93,7 +110,7 @@ using InputMatcherPtr = std::unique_ptr<InputMatcher>;
  */
 class InputMatcherFactory : public Config::TypedFactory {
 public:
-  virtual InputMatcherPtr createInputMatcher(Protobuf::Message& config) PURE;
+  virtual InputMatcherPtr createInputMatcher(const Protobuf::Message& config) PURE;
 
   std::string category() const override { return "envoy.matching.input_matcher"; }
 };
@@ -109,10 +126,11 @@ struct DataInputGetResult {
   };
 
   DataAvailability data_availability_;
-  // The resulting data. This will be absl::nullopt if we don't have sufficient data available (as per data_availability_)
-  // or because no value was extracted. For example, consider a DataInput which attempts to look a key up in the map:
-  // if we don't have access to the map yet, we return absl::nullopt with NotAvailable. If we have the entire map, but
-  // the key doesn't exist in the map, we return absl::nullopt with AllDataAvailable.
+  // The resulting data. This will be absl::nullopt if we don't have sufficient data available (as
+  // per data_availability_) or because no value was extracted. For example, consider a DataInput
+  // which attempts to look a key up in the map: if we don't have access to the map yet, we return
+  // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
+  // map, we return absl::nullopt with AllDataAvailable.
   absl::optional<absl::string_view> data_;
 
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {

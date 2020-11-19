@@ -23,7 +23,7 @@ namespace Envoy {
 namespace Matcher {
 
 struct MaybeMatchResult {
-  const TypedExtensionConfigOpt result_;
+  const ActionPtr result_;
   const bool final_;
 };
 
@@ -33,18 +33,18 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
                                              const DataType& data) {
   const auto result = match_tree.match(data);
   if (!result.match_completed_) {
-    return MaybeMatchResult{absl::nullopt, false};
+    return MaybeMatchResult{nullptr, false};
   }
 
   if (!result.on_match_) {
-    return {{}, true};
+    return {nullptr, true};
   }
 
   if (result.on_match_->matcher_) {
     return evaluateMatch(*result.on_match_->matcher_, data);
   }
 
-  return MaybeMatchResult{*result.on_match_->action_, true};
+  return MaybeMatchResult{result.on_match_->action_cb_(), true};
 }
 
 /**
@@ -124,7 +124,10 @@ private:
     if (on_match.has_matcher()) {
       return OnMatch<DataType>{{}, create(on_match.matcher())};
     } else if (on_match.has_action()) {
-      return OnMatch<DataType>{on_match.action(), {}};
+      auto& factory = Config::Utility::getAndCheckFactory<ActionFactory>(on_match.action());
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          on_match.action().typed_config(), validation_visitor_, factory);
+      return OnMatch<DataType>{factory.createActionFactoryCb(*message), {}};
     }
 
     return absl::nullopt;
