@@ -43,8 +43,7 @@ public:
                        Event::Dispatcher& dispatcher,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                       Http::Protocol protocol,
-                       absl::optional<std::chrono::milliseconds> pool_idle_timeout);
+                       Http::Protocol protocol);
 
   // ConnectionPool::Instance
   void addIdleCallback(IdleCb cb, DrainPool drain) override { addIdleCallbackImpl(cb, drain); }

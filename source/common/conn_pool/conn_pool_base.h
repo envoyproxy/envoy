@@ -105,8 +105,7 @@ public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   absl::optional<std::chrono::milliseconds> pool_idle_timeout);
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
   virtual ~ConnPoolImplBase();
 
   // A helper function to get the specific context type from the base class context.

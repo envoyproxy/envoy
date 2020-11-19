@@ -26,10 +26,9 @@ namespace Http1 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                            Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                           absl::optional<std::chrono::milliseconds> pool_idle_timeout)
+                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http11, pool_idle_timeout),
+                           transport_socket_options, Protocol::Http11),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
@@ -141,11 +140,9 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                 absl::optional<std::chrono::milliseconds> pool_idle_timeout) {
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
   return std::make_unique<Http::Http1::ProdConnPoolImpl>(
-      dispatcher, random_generator, host, priority, options, transport_socket_options,
-      pool_idle_timeout);
+      dispatcher, random_generator, host, priority, options, transport_socket_options);
 }
 
 } // namespace Http1

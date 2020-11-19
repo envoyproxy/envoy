@@ -12,8 +12,7 @@ namespace ConnectionPool {
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-    absl::optional<std::chrono::milliseconds>)
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
       transport_socket_options_(transport_socket_options) {}
 

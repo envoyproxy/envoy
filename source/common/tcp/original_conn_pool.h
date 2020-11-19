@@ -24,8 +24,7 @@ public:
   OriginalConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                        Upstream::ResourcePriority priority,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                       absl::optional<std::chrono::milliseconds> pool_idle_timeout);
+                       Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
   ~OriginalConnPoolImpl() override;
 

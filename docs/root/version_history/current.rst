@@ -31,7 +31,7 @@ Removed Config or Runtime
 
 New Features
 ------------
-* cluster: added :ref:`connection_pool_idle_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_idle_timeout>`, which controls how long the cluster manager waits before deleting a pool that has seen no activity. The original and default behavior is that pools will not be deleted unless a limit would be exceeded.
+* cluster: added :ref:`erase_idle_pools <envoy_v3_api_field_config.cluster.v3.Cluster.erase_idle_pools>`, which configures whether a cluster should erase pools that no longer have any connections. The original and default behavior is that pools will not be deleted unless a limit would be exceeded.
 * config: added new runtime feature `envoy.features.enable_all_deprecated_features` that allows the use of all deprecated features.
 * grpc: implemented header value syntax support when defining :ref:`initial metadata <envoy_v3_api_field_config.core.v3.GrpcService.initial_metadata>` for gRPC-based `ext_authz` :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>` and :ref:`network <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.grpc_service>` filters, and :ref:`ratelimit <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.grpc_service>` filters.
 * hds: added support for delta updates in the :ref:`HealthCheckSpecifier <envoy_v3_api_msg_service.health.v3.HealthCheckSpecifier>`, making only the Endpoints and Health Checkers that changed be reconstructed on receiving a new message, rather than the entire HDS.

@@ -64,9 +64,8 @@ public:
 
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
-        pool_(std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
-                                                 Upstream::ResourcePriority::Default, nullptr,
-                                                 nullptr, absl::nullopt)) {
+        pool_(std::make_unique<TestConnPoolImpl>(
+            dispatcher_, random_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr)) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -318,8 +317,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   // our test transport socket factory.
   host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80");
   pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
-                                             Upstream::ResourcePriority::Default, nullptr, nullptr,
-                                             absl::nullopt);
+                                             Upstream::ResourcePriority::Default, nullptr, nullptr);
 
   // This requires some careful set up of expectations ordering: the call to createTransportSocket
   // happens before all the connection set up but after the test client is created (due to some)

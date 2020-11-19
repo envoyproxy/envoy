@@ -60,7 +60,7 @@ class ConnPoolImplBaseTest : public testing::Test {
 public:
   ConnPoolImplBaseTest() {
     pool_ = std::make_unique<TestConnPoolImplBase>(host_, Upstream::ResourcePriority::Default,
-                                                   dispatcher_, nullptr, nullptr, absl::nullopt);
+                                                   dispatcher_, nullptr, nullptr);
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -178,7 +178,7 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
   EXPECT_FALSE(pool_->maybePrefetch(1));
 }
 
-TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutTriggered) {
+TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggered) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
 
   // Create a new stream using the pool
@@ -193,9 +193,11 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutTriggered) {
   EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
   pool_->onStreamClosed(*clients_.back(), false);
 
+  testing::MockFunction<void(bool)> idle_pool_callback;
   EXPECT_CALL(idle_pool_callback, Call(false)).Times(1);
+  pool_->addIdleCallbackImpl(idle_pool_callback.AsStdFunction(),
+                             ConnectionPool::Instance::DrainPool::No);
   dispatcher_.clearDeferredDeleteList();
-
   clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
 
   testing::MockFunction<void(bool)> drained_pool_callback;

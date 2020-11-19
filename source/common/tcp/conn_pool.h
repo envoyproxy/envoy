@@ -121,10 +121,9 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options,
-               absl::optional<std::chrono::milliseconds> pool_idle_timeout)
+               Network::TransportSocketOptionsSharedPtr transport_socket_options)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
-                                                transport_socket_options, pool_idle_timeout),
+                                                transport_socket_options),
         upstream_ready_cb_(dispatcher.createSchedulableCallback([this]() {
           upstream_ready_enabled_ = false;
           onUpstreamReady();

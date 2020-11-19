@@ -685,7 +685,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
-      pool_idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, connection_pool_idle_timeout)),
+      erase_idle_pools_(config.erase_idle_pools()),
       per_upstream_prefetch_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.prefetch_policy(), per_upstream_prefetch_ratio, 1.0)),
       peekahead_ratio_(

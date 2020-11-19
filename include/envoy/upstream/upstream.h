@@ -733,9 +733,9 @@ public:
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
-   * @return the idle timeout for upstream connection pools.
+   * @return whether to erase pools that are idle and do not have any connections.
    */
-  virtual absl::optional<std::chrono::milliseconds> poolIdleTimeout() const PURE;
+  virtual bool eraseIdlePools() const PURE;
 
   /**
    * @return how many streams should be anticipated per each current stream.
