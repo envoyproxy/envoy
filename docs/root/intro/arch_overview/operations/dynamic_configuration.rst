@@ -3,7 +3,7 @@
 xDS 配置 API 概述
 ==============================
 
-Envoy 的架构支持使用不同类型的配置管理方法。部署中采用的方法将取决于实现者的需求。简单部署可以通过全静态配置来实现。更复杂的部署可以逐步地添加更复杂的动态配置，缺点是实现者必须提供一个或多个基于外部 gRPC/REST 配置的提供者 API。这些 API 统称为 :ref:`"xDS" <xds_protocol>` (* 服务发现)。本文档概述了当前可用的选项。
+Envoy 的架构支持使用不同类型的配置管理方法。部署中采用的方法将取决于实现者的需求。简单部署可以通过全静态配置来实现。更复杂的部署可以逐步地添加更复杂的动态配置，缺点是实现者必须提供一个或多个基于 gRPC/REST的外部配置提供 API。这些 API 统称为 :ref:`"xDS" <xds_protocol>` (* 服务发现)。本文档概述了当前可用的选项。
 
 * 顶级配置 :ref:`参考 <config>`。
 * :ref:`参考配置 <install_ref_configs>`。
@@ -22,14 +22,14 @@ Envoy 的架构支持使用不同类型的配置管理方法。部署中采用�
 EDS
 ---
 
-:ref:`端点发现服务（EDS） API <arch_overview_service_discovery_types_eds>` 提供了一种更先进的机制，通过它 Envoy 可以发现上游集群的成员。在静态配置基础上，EDS 允许 Envoy 部署避开 DNS 的限制（响应中的最大记录等），并消耗更多信息用于负载均衡和路由（例如，灰度发布、区域等）。
+:ref:`端点发现服务（EDS） API <arch_overview_service_discovery_types_eds>` 提供了一种更先进的机制，通过它 Envoy 可以发现上游集群的成员。在静态配置基础上，EDS 允许 Envoy 部署避开 DNS 的限制（响应中的最大记录等），并使用更多信息用于负载均衡和路由（例如，灰度发布、区域等）。
 
 .. _arch_overview_dynamic_config_cds:
 
 CDS
 ---
 
-:ref:`集群发现服务（CDS） API <config_cluster_manager_cds>` 是 Envoy 的一种机制，在路由期间可以用来发现使用的上游集群。Envoy 将优雅地添加、更新和删除由 API 指定的集群。该 API 允许实现者构建一个拓扑，在这个拓扑中，Envoy 不需要在初始配置时就知道所有上游群集。通常，在与 CDS 一起进行 HTTP 路由（但没有路由发现服务）时，实现者将利用路由器将请求转发到 :ref:`HTTP request header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>` 中指定的集群。尽管可以通过指定全静态集群来使用不带 EDS 的 CDS，i但是对于用 CDS 指定的集群，我们依旧建议使用 EDS API。在内部，更新集群定义时，操作是优雅的。但是，所有现有的连接池都将被排空并重新连接。EDS 不受此限制。当通过 EDS 添加和删除主机时，群集中的现有主机不受影响。
+:ref:`集群发现服务（CDS） API <config_cluster_manager_cds>` 是 Envoy 的一种机制，在路由期间可以用来发现使用的上游集群。Envoy 将优雅地添加、更新和删除由 API 指定的集群。该 API 允许实现者构建一个拓扑，在这个拓扑中，Envoy 不需要在初始配置时就知道所有上游群集。通常，当使用 CDS 进行 HTTP 路由时（但没有路由发现服务），实现者将利用路由器将请求转发到 :ref:`HTTP request header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>` 中指定的集群。尽管可以通过指定全静态集群来使用不带 EDS 的 CDS，i但是对于用 CDS 指定的集群，我们依旧建议使用 EDS API。在内部更新集群定义时，操作是优雅的。但是，所有现有的连接池都将被排空并重新连接。EDS 不受此限制。当通过 EDS 添加和删除主机时，群集中的现有主机不受影响。
 
 .. _arch_overview_dynamic_config_rds:
 
@@ -53,7 +53,7 @@ SRDS
 LDS
 ---
 
-:ref:`监听器发现服务（LDS） API <config_listeners_lds>` 是 Envoy 的一种机制，可以在运行时发现整个监听器。这包括所有的过滤器堆栈，并包含带有内嵌到 :ref:`RDS <config_http_conn_man_rds>` 应用的 HTTP 过滤器。将 LDS 添加到组合中，几乎可以动态配置 Envoy 的每个方面。仅在非常少见的配置更改（管理员、追踪驱动程序等）或二进制更新时才需要热重启。
+:ref:`监听器发现服务（LDS） API <config_listeners_lds>` 是 Envoy 的一种机制，可以在运行时发现整个监听器。这包括所有的过滤器堆栈，并包含带有内嵌到 :ref:`RDS <config_http_conn_man_rds>` 应用的 HTTP 过滤器。将 LDS 添加到组合中，几乎可以动态配置 Envoy 的每个方面。仅在非常少见的配置更改（管理员、追踪驱动程序等）、证书更换或二进制更新时才需要热重启。
 
 SDS
 ---
@@ -81,5 +81,5 @@ EDS、CDS 等都是单独的服务，具有不同的 REST/gRPC 服务名称，�
 增量 gRPC xDS
 --------------
 
-标准的 xDS 是每个更新都必须包含所有的资源，而更新中没有资源信息意味着该资源已用尽。Envoy 支持 xDS（包括 ADS）的”增量（delta）”变体，其更新仅包含添加/更改/删除的资源信息。增量 xDS 是一个新的协议，其请求/响应 API 与 SotW 不同。
+标准的 xDS 是每个更新都必须包含所有的资源，而更新中没有资源信息意味着该资源已消失。Envoy 支持 xDS（包括 ADS）的”增量（delta）”变体，其更新仅包含添加/更改/删除的资源信息。增量 xDS 是一个新的协议，其请求/响应 API 与 SotW 不同。
 :ref:`有关增量（Delta）的更多详细信息 <config_overview_delta>` 。
