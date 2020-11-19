@@ -1539,13 +1539,18 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     RELEASE_ASSERT(container.pools_.size() == original_size + 1, "Could not insert element");
     if (cluster_info_->eraseIdlePools()) {
       pool_iter->second->addIdleCallback(
-          [&container, &pool_map = parent_.host_tcp_conn_pool_map_, host, hash_key](bool drained) {
+          [&container, &pool_map = parent_.host_tcp_conn_pool_map_,
+           &dispatcher = parent_.thread_local_dispatcher_, host, hash_key](bool drained) {
             if (drained) {
               // We want to defer to the callback that is actually doing the draining
               return;
             }
             ENVOY_LOG(debug, "Idle pool timeout, erasing pool");
-            container.pools_.erase(hash_key);
+            auto erase_iter = container.pools_.find(hash_key);
+            if (erase_iter != container.pools_.end()) {
+              dispatcher.deferredDelete(std::move(erase_iter->second));
+              container.pools_.erase(erase_iter);
+            }
 
             // We want to clean up after ourselves if the host isn't particularly active (i.e. we
             // hit our configured timeout on the last pool and don't have any other pools for that
