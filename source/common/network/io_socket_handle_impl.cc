@@ -142,9 +142,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
 
-  // Some tests try to write without initializing the file_event.
-  if (result.wouldBlock() && file_event_) {
-    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+  // Emulated edge events need to registered if the socket operation did not complete
+  // because the socket would block.
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    // Some tests try to write without initializing the file_event.
+    if (result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+    }
   }
   return result;
 }
@@ -157,9 +161,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
     buffer.drain(static_cast<uint64_t>(result.rc_));
   }
 
-  // Some tests try to read without initializing the file_event.
-  if (result.wouldBlock() && file_event_) {
-    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+  // Emulated edge events need to registered if the socket operation did not complete
+  // because the socket would block.
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    // Some tests try to read without initializing the file_event.
+    if (result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+    }
   }
   return result;
 }
@@ -199,8 +207,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     message.msg_controllen = 0;
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
     auto io_result = sysCallResultToIoCallResult(result);
-    if (io_result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+    // Emulated edge events need to registered if the socket operation did not complete
+    // because the socket would block.
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      if (io_result.wouldBlock() && file_event_) {
+        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+      }
     }
     return io_result;
   } else {
@@ -245,8 +257,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     }
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
     auto io_result = sysCallResultToIoCallResult(result);
-    if (io_result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+    // Emulated edge events need to registered if the socket operation did not complete
+    // because the socket would block.
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      if (io_result.wouldBlock() && file_event_) {
+        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+      }
     }
     return io_result;
   }
