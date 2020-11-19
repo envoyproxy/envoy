@@ -27,8 +27,8 @@ services:
     environment:
       - HTTPS_PORT=0
 
-  http-upstream3:
+  https-upstream3:
     image: mendhak/http-https-echo
-    hostname: http-upstream3
+    hostname: https-upstream3
     environment:
       - HTTP_PORT=0

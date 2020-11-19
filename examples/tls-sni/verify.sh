@@ -20,7 +20,7 @@ mkdir -p certs
 run_log "Create certificates for each of the services"
 create_self_signed_certs domain1
 create_self_signed_certs domain2
-create_self_signed_certs domain3
+# create_self_signed_certs domain3
 
 bring_up_example
 
@@ -37,7 +37,7 @@ curl -sk --resolve domain2.example.com:10000:127.0.0.1 \
 run_log "Query domain3 with curl and tls/sni"
 curl -sk --resolve domain3.example.com:10000:127.0.0.1 \
      https://domain3.example.com:10000 \
-    | jq '.os.hostname' | grep http-upstream3
+    | jq '.os.hostname' | grep https-upstream3
 
 run_log "Query domain1 via Envoy sni client"
 curl -s http://localhost:20000/domain1 \
@@ -49,4 +49,4 @@ curl -s http://localhost:20000/domain2 \
 
 run_log "Query domain3 via Envoy sni client"
 curl -s http://localhost:20000/domain3 \
-    | jq '.os.hostname' | grep http-upstream3
+    | jq '.os.hostname' | grep https-upstream3

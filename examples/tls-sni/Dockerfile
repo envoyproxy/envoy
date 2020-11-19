@@ -6,4 +6,4 @@ RUN chmod go+r /etc/envoy.yaml \
 	&& chmod go+x /certs \
 	&& chmod go+r /certs/*
 
-CMD ["/usr/local/bin/envoy", "-c /etc/envoy.yaml"]
+CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml", "-l", "debug"]

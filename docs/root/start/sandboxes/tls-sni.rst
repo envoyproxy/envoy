@@ -14,7 +14,8 @@ TLS Server name indication (``SNI``)
 	Parse ``json`` output from the upstream echo servers.
 
 This example demonstrates an Envoy proxy that listens on multiple domains
-on the same ``IP`` address and provides separate ``TLS`` termination for each.
+on the same ``IP`` address and either provides separate ``TLS`` termination
+or proxies to an upstream ``TLS`` service for each.
 
 It also demonstrates Envoy acting as a client proxy connecting to upstream
 ``SNI`` services.
@@ -26,7 +27,7 @@ Step 1: Create keypairs for each of the domain endpoints
 
 Change directory to ``examples/tls-sni`` in the Envoy repository.
 
-The example creates three ``TLS`` endpoints and each will require their own
+The example creates two Envoy ``TLS`` endpoints and they will require their own
 keypairs.
 
 Create self-signed certificates for these endpoints as follows:
@@ -58,16 +59,6 @@ Create self-signed certificates for these endpoints as follows:
    writing new private key to 'certs/domain2.key.pem'
    -----
 
-   $ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
-	    -subj "/C=US/ST=CA/O=MyExample, Inc./CN=domain3.example.com" \
-	    -keyout certs/domain3.key.pem \
-	    -out certs/domain3.crt.pem
-   Generating a RSA private key
-   .............+++++
-   ...................+++++
-   writing new private key to 'certs/domain3.key.pem'
-   -----
-
 .. warning::
 
    ``SNI`` does *not* validate that the certificates presented are correct for the domain, or that they
@@ -83,9 +74,10 @@ Step 2: Start the containers
 
 Build and start the containers.
 
-This starts three upstream ``HTTP`` containers each listening on the internal Docker network on port ``80``.
+This starts two upstream ``HTTP`` containers listening on the internal Docker network on port ``80``, and
+an upstream ``HTTPS`` service listening on internal port ``443``
 
-In front of these is an Envoy proxy that listens on https://localhost:10000 and servers three ``SNI`` routed
+In front of these is an Envoy proxy that listens on https://localhost:10000 and serves three ``SNI`` routed
 ``TLS`` domains:
 
 - ``domain1.example.com``
@@ -122,7 +114,7 @@ You can use curl to query the ``SNI``-routed ``HTTPS`` endpoints of the Envoy pr
 
 To do this you must explicitly tell curl to resolve the ``DNS`` for the endpoints correctly.
 
-Each endpoint should proxy to the respective ``http-upstream`` service.
+Each endpoint should proxy to the respective ``http-upstream`` or ``https-upstream`` service.
 
 .. code-block:: console
 
@@ -139,14 +131,15 @@ Each endpoint should proxy to the respective ``http-upstream`` service.
    $ curl -sk --resolve domain3.example.com:10000:127.0.0.1 \
 	 https://domain3.example.com:10000 \
 	| jq -r '.os.hostname'
-   http-upstream3
+   https-upstream3
 
 Step 3: Query the ``SNI`` endpoints via an Envoy proxy client
 *************************************************************
 
 Next, query the Envoy proxy client using the routed paths.
 
-These route via the ``SNI`` proxy endpoints to the respective ``http-upstream`` services.
+These route via the ``SNI`` proxy endpoints to the respective ``http-upstream`` or
+``https-upstream`` services.
 
 .. code-block:: console
 
@@ -160,7 +153,7 @@ These route via the ``SNI`` proxy endpoints to the respective ``http-upstream`` 
 
    $ curl -s http://localhost:20000/domain3 \
         | jq '.os.hostname'
-   http-upstream3
+   https-upstream3
 
 .. seealso::
 
