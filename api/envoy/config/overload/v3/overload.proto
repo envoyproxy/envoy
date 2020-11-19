@@ -34,9 +34,9 @@ message ResourceMonitor {
   // resource monitor type. The built-in resource monitors are:
   //
   // * :ref:`envoy.resource_monitors.fixed_heap
-  //   <envoy_api_msg_config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig>`
+  //   <envoy_api_msg_config.resource_monitor.fixed_heap.v3.FixedHeapConfig>`
   // * :ref:`envoy.resource_monitors.injected_resource
-  //   <envoy_api_msg_config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig>`
+  //   <envoy_api_msg_config.resource_monitor.injected_resource.v3.InjectedResourceConfig>`
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Configuration for the resource monitor being instantiated.
