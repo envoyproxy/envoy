@@ -878,6 +878,7 @@ message UseDownstreamHttpConfig {
 // in the cluster. So a configuration like this, explicitly configuring the use of HTTP/2 upstream:
 //
 // .. code::
+//
 //   clusters:
 //     - name: some_service
 //       connect_timeout: 5s
@@ -892,6 +893,7 @@ message UseDownstreamHttpConfig {
 // Would now look like this:
 //
 // .. code::
+//
 //   clusters:
 //     - name: some_service
 //       connect_timeout: 5s
