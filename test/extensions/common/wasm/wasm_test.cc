@@ -979,6 +979,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
 
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
+  EXPECT_FALSE(wasm->capabilityAllowed("fd_write"));
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
@@ -992,6 +993,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
         EXPECT_CALL(*root_context,
                     log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
             .Times(0);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(0);
         return root_context;
       });
   wasm->start(plugin);
@@ -1027,26 +1029,28 @@ TEST_P(WasmCommonTest, AllowModuleImplementedCapabilities) {
 
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
+  EXPECT_FALSE(wasm->capabilityAllowed("fd_write"));
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
   EXPECT_TRUE(wasm->initialize(code, false));
 
-  // on_vm_start will trigger proxy_log, but expect no call because both are restricted
-  // trigger on_configure, but expect it to be blocked because it is restricted
+  // on_vm_start will trigger proxy_log and fprintf, but expect no call because both are restricted
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
         EXPECT_CALL(*root_context,
                     log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
             .Times(0);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(0);
+        EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("WASI write to stderr"))).Times(0);
         return root_context;
       });
   wasm->start(plugin);
 }
 
-// test with both proxy_on_vm_start and proxy_log allowed
-TEST_P(WasmCommonTest, AllowCapabilities) {
+// test with both proxy_on_vm_start and proxy_log allowed, but WASI restricted
+TEST_P(WasmCommonTest, AllowLog) {
   if (GetParam() != "v8") {
     return;
   }
@@ -1076,18 +1080,69 @@ TEST_P(WasmCommonTest, AllowCapabilities) {
   // Restrict capabilities, but allow proxy_log
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_log"));
+  EXPECT_FALSE(wasm->capabilityAllowed("fd_write"));
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
   EXPECT_TRUE(wasm->initialize(code, false));
 
-  // Module will call proxy_log, expect success since allowed
+  // Expect proxy_log since allowed, but no call to WASI since restricted
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
         EXPECT_CALL(*root_context,
                     log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
             .Times(1);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(0);
+        return root_context;
+      });
+  wasm->start(plugin);
+}
+
+// test with proxy_on_vm_start enabled, but
+TEST_P(WasmCommonTest, AllowWASI) {
+  if (GetParam() != "v8") {
+    return;
+  }
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  auto name = "";
+  auto root_id = "";
+  auto vm_id = "";
+  auto vm_configuration = "allow_log";
+  auto plugin_configuration = "";
+  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      name, root_id, vm_id, GetParam(), plugin_configuration, false,
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  absl::flat_hash_set<std::string> allowed_capabilities{"proxy_on_vm_start", "fd_write"};
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_capabilities, scope, cluster_manager, *dispatcher);
+
+  // Restrict capabilities, but allow proxy_log
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
+  EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
+  EXPECT_TRUE(wasm->capabilityAllowed("fd_write"));
+
+  EXPECT_NE(wasm, nullptr);
+  auto context = std::make_unique<TestContext>(wasm.get());
+  EXPECT_TRUE(wasm->initialize(code, false));
+
+  wasm->setCreateContextForTesting(
+      nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
+            .Times(0);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(1);
         return root_context;
       });
   wasm->start(plugin);
@@ -1116,14 +1171,15 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  absl::flat_hash_set<std::string> allowed_capabilities{"proxy_on_vm_start"};
+  absl::flat_hash_set<std::string> allowed_capabilities{"proxy_on_vm_start", "fd_write"};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
 
   // Restrict capabilities
-  EXPECT_FALSE(wasm->capabilityAllowed("on_vm_start"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
+  EXPECT_TRUE(wasm->capabilityAllowed("fd_write"));
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
@@ -1136,8 +1192,9 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
   context = std::make_unique<TestContext>(thread_local_wasm.get());
   EXPECT_TRUE(thread_local_wasm->initialize(code, false));
 
-  EXPECT_FALSE(thread_local_wasm->capabilityAllowed("on_vm_start"));
+  EXPECT_TRUE(thread_local_wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(thread_local_wasm->capabilityAllowed("proxy_log"));
+  EXPECT_TRUE(thread_local_wasm->capabilityAllowed("fd_write"));
 
   // Module will call proxy_log, expect no call since all capabilities restricted
   thread_local_wasm->setCreateContextForTesting(
@@ -1146,6 +1203,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
         EXPECT_CALL(*root_context,
                     log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
             .Times(0);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(1);
         return root_context;
       });
   thread_local_wasm->start(plugin);

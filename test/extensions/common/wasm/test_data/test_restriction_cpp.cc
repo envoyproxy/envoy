@@ -18,6 +18,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
   (void)(configuration_size);
   std::string level_message = "after on_vm_start, before proxy_log";
   proxy_log(LogLevel::info, level_message.c_str(), level_message.size());
+  fprintf(stdout, "WASI write to stdout\n");
   return 1;
 }
 
