@@ -146,7 +146,10 @@ Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, 
   root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->local_info_;
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin)
-    : ContextBase(wasm, root_context_id, plugin) {}
+    : ContextBase(wasm, root_context_id, plugin) {
+  ENVOY_LOG(trace, "wasm log{}: Context::Context(..., root_context_id={}, ...)", log_prefix(),
+            root_context_id);
+}
 
 Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
 Plugin* Context::plugin() const { return static_cast<Plugin*>(plugin_.get()); }
@@ -881,6 +884,7 @@ uint32_t Context::nextHttpCallToken() {
     }
     token = next_http_call_token_++;
   }
+  ENVOY_LOG(trace, "wasm log{}: nextHttpCallToken() generated token {}", log_prefix(), token);
   return token;
 }
 
@@ -889,10 +893,13 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
                              absl::string_view request_body, const Pairs& request_trailers,
                              int timeout_milliseconds, uint32_t* token_ptr) {
   if (timeout_milliseconds < 0) {
+    ENVOY_LOG(debug, "wasm log{}: httpCall() invalid timeout_milliseconds{}", log_prefix(),
+              timeout_milliseconds);
     return WasmResult::BadArgument;
   }
   auto cluster_string = std::string(cluster);
   if (clusterManager().getThreadLocalCluster(cluster_string) == nullptr) {
+    ENVOY_LOG(debug, "wasm log{}: httpCall() cluster required", log_prefix());
     return WasmResult::BadArgument;
   }
 
@@ -902,12 +909,23 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
   // Check that we were provided certain headers.
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
       message->headers().Host() == nullptr) {
+    if (message->headers().Path() == nullptr) {
+      ENVOY_LOG(debug, "wasm log{}: path required", log_prefix());
+    }
+    if (message->headers().Method() == nullptr) {
+      ENVOY_LOG(debug, "wasm log{}: method required", log_prefix());
+    }
+    if (message->headers().Host() == nullptr) {
+      ENVOY_LOG(debug, "wasm log{}: host required {}", log_prefix());
+    }
     return WasmResult::BadArgument;
   }
 
   if (!request_body.empty()) {
     message->body().add(request_body);
     message->headers().setContentLength(request_body.size());
+    ENVOY_LOG(trace, "wasm log{}: httpCall() request body size {}", log_prefix(),
+              request_body.size());
   }
 
   if (!request_trailers.empty()) {
@@ -933,12 +951,14 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
                           .send(std::move(message), handler, options);
   if (!http_request) {
     http_request_.erase(token);
+    ENVOY_LOG(trace, "wasm log{}: httpCall() failed, erased token {}", log_prefix(), token);
     return WasmResult::InternalFailure;
   }
   handler.context_ = this;
   handler.token_ = token;
   handler.request_ = http_request;
   *token_ptr = token;
+  ENVOY_LOG(debug, "wasm log{}: httpCall() started with token {}", log_prefix(), token);
   return WasmResult::Ok;
 }
 
@@ -1714,25 +1734,33 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
   // TODO: convert this into a function in proxy-wasm-cpp-host and use here.
   if (proxy_wasm::current_context_ != nullptr) {
     // We are in a reentrant call, so defer.
+    ENVOY_LOG(trace, "wasm log: deferring onHttpCallSuccess for token {}", token);
     wasm()->addAfterVmCallAction([this, token, response = response.release()] {
+      ENVOY_LOG(debug, "wasm log: re-attempting deferred onHttpCallSuccess for token {}", token);
       onHttpCallSuccess(token, std::unique_ptr<Envoy::Http::ResponseMessage>(response));
     });
+    ENVOY_LOG(trace, "wasm log: deferred onHttpCallSuccess for token {}", token);
     return;
   }
+  ENVOY_LOG(trace, "wasm log: onHttpCallSuccess for token {}", token);
   http_call_response_ = &response;
   uint32_t body_size = response->body().length();
   onHttpCallResponse(token, response->headers().size(), body_size,
                      headerSize(response->trailers()));
   http_call_response_ = nullptr;
   http_request_.erase(token);
+  ENVOY_LOG(trace, "wasm log: onHttpCallSuccess finished; erased token {}", token);
 }
 
 void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason) {
   if (proxy_wasm::current_context_ != nullptr) {
     // We are in a reentrant call, so defer.
+    ENVOY_LOG(trace, "wasm log: deferring onHttpCallFailure for token {}: reason {}", token,
+              reason);
     wasm()->addAfterVmCallAction([this, token, reason] { onHttpCallFailure(token, reason); });
     return;
   }
+  ENVOY_LOG(trace, "wasm log: onHttpCallFailure for token {}: reason {}", token, reason);
   status_code_ = static_cast<uint32_t>(WasmResult::BrokenConnection);
   // This is the only value currently.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
@@ -1740,6 +1768,7 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
   onHttpCallResponse(token, 0, 0, 0);
   status_message_ = "";
   http_request_.erase(token);
+  ENVOY_LOG(trace, "wasm log: onHttpCallFailure finished; erased token {}", token);
 }
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {
