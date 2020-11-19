@@ -28,7 +28,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/enum_to_int.h"
-#include "common/event/deferred_task.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
@@ -908,11 +907,15 @@ ClusterImplBase::ClusterImplBase(
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {
         FANCY_LOG(debug, "lambdai: schedule destroy cluster info {} on this thread", self->name());
-        if (!dispatcher.post([self]() {
-          FANCY_LOG(debug, "lambdai: execute destroy cluster info {} on this thread", self->name());
+        if (!dispatcher.tryPost([self]() {
+          // TODO(lambdai): Yet there is risk that master dispatcher receives the function but doesn't execute during the shutdown.
+          // We can either 
+          // 1) Introduce folly::function which supports with unique_ptr capture and destroy cluster info by RAII, or
+          // 2) Call run post callback in master thread after no worker post back.
+          FANCY_LOG(debug, "lambdai: execute destroy cluster info {} on this thread. Master thread is expected.", self->name());
           delete self;
         })) {
-          FANCY_LOG(debug, "lambdai: cannot post. Exited? Executing destroy cluster info {} on this thread", self->name());
+          FANCY_LOG(debug, "lambdai: cannot post. Has the master thread exited? Executing destroy cluster info {} on this thread.", self->name());
           delete self;
         }
       });

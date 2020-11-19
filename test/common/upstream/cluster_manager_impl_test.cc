@@ -3967,7 +3967,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
       hosts_added, {}, 100);
-  //cluster_manager_->removeCluster()
 }
 
 TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameStatic) {

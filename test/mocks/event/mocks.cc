@@ -24,7 +24,7 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
     to_delete_.clear();
   }));
   ON_CALL(*this, createTimer_(_)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
-  ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> bool { cb(); return true;}));
+  ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
 }
 
 MockDispatcher::~MockDispatcher() = default;

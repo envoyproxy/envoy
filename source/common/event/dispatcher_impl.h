@@ -72,7 +72,8 @@ public:
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
-  bool post(std::function<void()> callback) override;
+  void post(std::function<void()> callback) override;
+  bool tryPost(std::function<void()> callback) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
   const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) override {

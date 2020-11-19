@@ -211,7 +211,12 @@ public:
    * Posts a functor to the dispatcher. This is safe cross thread. The functor runs in the context
    * of the dispatcher event loop which may be on a different thread than the caller.
    */
-  virtual bool post(PostCb callback) PURE;
+  virtual void post(PostCb callback) PURE;
+
+  /**
+   * Similar to `post()` but return false if the dispatcher rejects.
+   */
+  virtual bool tryPost(PostCb callback) PURE;
 
   /**
    * Runs the event loop. This will not return until exit() is called either from within a callback

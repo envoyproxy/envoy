@@ -236,7 +236,20 @@ SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
 
-bool DispatcherImpl::post(std::function<void()> callback) {
+void DispatcherImpl::post(std::function<void()> callback) {
+  bool do_post;
+  {
+    Thread::LockGuard lock(post_lock_);
+    do_post = post_callbacks_.empty();
+    post_callbacks_.push_back(callback);
+  }
+
+  if (do_post) {
+    post_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
+bool DispatcherImpl::tryPost(std::function<void()> callback) {
   bool do_post;
   {
     Thread::LockGuard lock(post_lock_);
@@ -256,15 +269,24 @@ bool DispatcherImpl::post(std::function<void()> callback) {
 
 void DispatcherImpl::run(RunType type) {
   run_tid_ = api_.threadFactory().currentThreadId();
-
+  {
+    // Allows tryPost.
+    FANCY_LOG(debug, "lambdai: run {}", type);
+    Thread::LockGuard lock(post_lock_);
+    exited_ = false;
+  }
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
-  exited_ = false;
   base_scheduler_.run(type);
-  exited_ = true;
+  {
+    FANCY_LOG(debug, "lambdai: run return {}", type);
+    // Reject all the follow up tryPost.
+    Thread::LockGuard lock(post_lock_);
+    exited_ = true;
+  }
 }
 
 MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
