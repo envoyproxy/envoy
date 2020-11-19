@@ -20,7 +20,9 @@ class TestDataInput : public DataInput<TestData> {
 public:
   explicit TestDataInput(const std::string& value) : value_(value) {}
 
-  virtual DataInputGetResult get(const TestData&) override { return {false, false, value_}; }
+  virtual DataInputGetResult get(const TestData&) override {
+    return {DataInputGetResult::DataAvailability::AllDataAvailable, value_};
+  }
 
 private:
   const std::string value_;

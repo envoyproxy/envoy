@@ -16,6 +16,14 @@ namespace Matcher {
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
 // either matches (resulting in either an action or a new tree to traverse) or doesn't match.
+// The matching might stop early if either the data is not available at all yet, or if more data
+// might result in a match.
+
+// By returning a new tree when an OnMatch results in a new tree, matching can be resumed from
+// this tree should more data be required to complete matching. This avoids having to start
+// from the beginning every time. At some point we might support resuming for any node in the match
+// tree: this requires some careful handling of tracking which on_no_match to use should we fail to
+// match.
 //
 // All the matching is performed on strings: a DataInput<DataType> is used to extract a specific
 // string from an instance of DataType, while an InputMatcher is used to determine whether the
@@ -27,8 +35,9 @@ namespace Matcher {
 //
 // In cases where the data to match on becomes available over time, this would be fed into the
 // DataType over time, allowing matching to be re-attempted as more data is made available. As such
-// whenever we extract data from a DataInput, we make note of whether the data might change and pause
-// matching until we either match or have all the data.
+// whenever we extract data from a DataInput, we make note of whether the data might change and
+// pause matching until we either match or have all the data. It would then fall on the caller to
+// both provide more information to the DataType and to resume matching.
 template <class DataType> class MatchTree;
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
@@ -48,7 +57,7 @@ template <class DataType> class MatchTree {
 public:
   virtual ~MatchTree() = default;
 
-  // This encodes a three states:
+  // This encodes three states:
   // Not enough data to complete the match: {false, {}}
   // Completed the match, no match: {true, {}}
   // Completed the match, match: {true, on_match}
@@ -86,32 +95,41 @@ class InputMatcherFactory : public Config::TypedFactory {
 public:
   virtual InputMatcherPtr createInputMatcher(Protobuf::Message& config) PURE;
 
-  std::string category() const override { return "envoy.matching.matcher"; }
+  std::string category() const override { return "envoy.matching.input_matcher"; }
 };
 
 struct DataInputGetResult {
-  // The data has not arrived yet, nothing to match against.
-  bool not_available_yet;
-  // Some data is available, so matching can be attempted. If it fails, more data might arrive which
-  // could satisfy the match.
-  // TODO(snowp): Should this use the "can change result" pattern of predicate? Should we ever go
-  // from match to no match?
-  bool more_data_available;
+  enum class DataAvailability {
+    // The data is not yet available.
+    NotAvailable,
+    // Some data is available, but more might arrive.
+    MoreDataAvailable,
+    // All the data is available.
+    AllDataAvailable
+  };
+
+  DataAvailability data_availability_;
   // The data is available: result of looking up the data. If the lookup failed against partial or
   // complete data this will remain absl::nullopt.
   absl::optional<absl::string_view> data_;
 
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    out << "data input:";
-    out << "\nnot available: " << result.not_available_yet;
-    out << "\nmore available: " << result.more_data_available;
-    out << "\ndata: " << (result.data_ ? result.data_.value() : "n/a");
+    out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
+    switch (result.data_availability_) {
+    case DataInputGetResult::DataAvailability::NotAvailable:
+      out << " (not available)";
+      break;
+    case DataInputGetResult::DataAvailability::MoreDataAvailable:
+      out << " (more data available)";
+      break;
+    case DataInputGetResult::DataAvailability::AllDataAvailable:;
+    }
     return out;
   }
 };
 
 /**
- * Interface for types providing a data input extracted from a DataType.
+ * Interface for types providing a way to extract a string from the DataType to perform matching on.
  */
 template <class DataType> class DataInput {
 public:

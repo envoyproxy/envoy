@@ -74,12 +74,13 @@ public:
     const auto input = data_input_->get(data);
 
     ENVOY_LOG(debug, "Attempting to match {}", input);
-    if (input.not_available_yet) {
+    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
       return absl::nullopt;
     }
 
     const auto current_match = input_matcher_->match(input.data_);
-    if (!current_match && input.more_data_available) {
+    if (!current_match &&
+        input.data_availability_ == DataInputGetResult::DataAvailability::MoreDataAvailable) {
       ENVOY_LOG(debug, "No match yet; delaying result as more data might be available.");
       return absl::nullopt;
     }

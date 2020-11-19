@@ -53,7 +53,9 @@ public:
 
 TEST_F(ExactMapMatcherTest, NoMatch) {
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(DataInputGetResult{false, false, "blah"}), absl::nullopt);
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
+      absl::nullopt);
 
   TestData data;
   const auto result = matcher.match(data);
@@ -63,7 +65,8 @@ TEST_F(ExactMapMatcherTest, NoMatch) {
 TEST_F(ExactMapMatcherTest, NoMatchWithFallback) {
   const auto no_match_config = stringValue("no_match");
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(DataInputGetResult{false, false, "blah"}),
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
       OnMatch<TestData>{no_match_config, nullptr});
 
   TestData data;
@@ -74,7 +77,8 @@ TEST_F(ExactMapMatcherTest, NoMatchWithFallback) {
 TEST_F(ExactMapMatcherTest, Match) {
   const auto no_match_config = stringValue("no_match");
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(DataInputGetResult{false, false, "match"}),
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
       OnMatch<TestData>{no_match_config, nullptr});
 
   matcher.addChild("match", OnMatch<TestData>{stringValue("match"), nullptr});
@@ -87,9 +91,9 @@ TEST_F(ExactMapMatcherTest, Match) {
 TEST_F(ExactMapMatcherTest, DataNotAvailable) {
   const auto no_match_config = stringValue("no_match");
 
-  ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(DataInputGetResult{true, false, {}}),
-      OnMatch<TestData>{no_match_config, nullptr});
+  ExactMapMatcher<TestData> matcher(std::make_unique<TestInput>(DataInputGetResult{
+                                        DataInputGetResult::DataAvailability::NotAvailable, {}}),
+                                    OnMatch<TestData>{no_match_config, nullptr});
 
   matcher.addChild("match", OnMatch<TestData>{stringValue("match"), nullptr});
 
@@ -102,7 +106,8 @@ TEST_F(ExactMapMatcherTest, MoreDataAvailableNoMatch) {
   const auto no_match_config = stringValue("no_match");
 
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(DataInputGetResult{false, true, "no match"}),
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::MoreDataAvailable, "no match"}),
       OnMatch<TestData>{no_match_config, nullptr});
 
   matcher.addChild("match", OnMatch<TestData>{stringValue("match"), nullptr});
@@ -116,7 +121,8 @@ TEST_F(ExactMapMatcherTest, MoreDataAvailableMatch) {
   const auto no_match_config = stringValue("no_match");
 
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(DataInputGetResult{false, true, "match"}),
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::MoreDataAvailable, "match"}),
       OnMatch<TestData>{no_match_config, nullptr});
 
   matcher.addChild("match", OnMatch<TestData>{stringValue("match"), nullptr});

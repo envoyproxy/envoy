@@ -30,7 +30,7 @@ public:
     explicit TestInput(absl::optional<std::string> input) : input_(input) {}
 
     DataInputGetResult get(const TestData&) override {
-      return {false, false,
+      return {DataInputGetResult::DataAvailability::AllDataAvailable,
               input_ ? absl::make_optional(absl::string_view(*input_)) : absl::nullopt};
     }
 
