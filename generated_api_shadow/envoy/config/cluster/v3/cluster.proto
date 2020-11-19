@@ -770,6 +770,9 @@ message Cluster {
   // in the :ref:`http_protocol_options <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  // See ref:`upstream_http_protocol_options
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // for example usage.
   core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46 [deprecated = true];
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
@@ -779,6 +782,9 @@ message Cluster {
   // in the :ref:`http_protocol_options <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  // See ref:`upstream_http_protocol_options
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // for example usage.
   core.v3.HttpProtocolOptions common_http_protocol_options = 29 [deprecated = true];
 
   // Additional options when handling HTTP1 requests.
@@ -786,6 +792,9 @@ message Cluster {
   // :ref:`http_protocol_options <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  // See ref:`upstream_http_protocol_options
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // for example usage.
   core.v3.Http1ProtocolOptions http_protocol_options = 13 [deprecated = true];
 
   // Even if default HTTP2 protocol options are desired, this field must be
@@ -798,6 +807,9 @@ message Cluster {
   // :ref:`http_protocol_options <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions>`
   // message. http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  // See ref:`upstream_http_protocol_options
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // for example usage.
   core.v3.Http2ProtocolOptions http2_protocol_options = 14
       [deprecated = true, (udpa.annotations.security).configure_for_untrusted_upstream = true];
 
