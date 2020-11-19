@@ -176,7 +176,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
   EXPECT_EQ(filter_config.createFilter(), nullptr);
 }
 
-TEST_P(WasmNetworkFilterConfigTest, FilterConfigABIUnrestrictedByDefault) {
+TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefault) {
   if (GetParam() == "null") {
     return;
   }
@@ -189,7 +189,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigABIUnrestrictedByDefault) {
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
-      allowed_capabilities:
+      allowed_capabilities: []
   )EOF"));
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
@@ -203,7 +203,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigABIUnrestrictedByDefault) {
   EXPECT_FALSE(filter_config.createFilter() == nullptr);
 }
 
-TEST_P(WasmNetworkFilterConfigTest, FilterConfigABIRestriction) {
+TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
   if (GetParam() == "null") {
     return;
   }
