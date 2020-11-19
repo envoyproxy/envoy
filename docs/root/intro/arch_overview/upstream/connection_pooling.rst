@@ -64,9 +64,9 @@ By default, connection pools exist until their host is removed. This behavior ca
   circuit breaker threshold has been configured and the threshold is exceeded, Envoy will attempt to
   free up a connection pool that does not have any active connections.
 
-* If a cluster has :ref:`connection_pool_idle_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_idle_timeout>`
-  configured, then a connection pool associated with the cluster will be removed when the pool has not had any active
-  connections for the configured timeout duration.
+* If a cluster has :ref:`erase_idle_pools <envoy_v3_api_field_config.cluster.v3.Cluster.erase_idle_pools>`
+  configured, then a connection pool associated with the cluster will be removed when the pool no longer has any
+  active connections.
 
 
 .. _arch_overview_conn_pool_health_checking:
