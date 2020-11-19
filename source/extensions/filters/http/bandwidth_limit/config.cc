@@ -19,7 +19,7 @@ Http::FilterFactoryCb BandwidthLimitFilterConfig::createFilterFactoryFromProtoTy
   FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(
       proto_config, context.dispatcher(), context.scope(), context.runtime(), context.timeSource());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
+    callbacks.addStreamFilter(std::make_shared<BandwidthFilter>(filter_config));
   };
 }
 

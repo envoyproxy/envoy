@@ -55,7 +55,7 @@ public:
   Stats::Scope& scope() { return scope_; }
   TimeSource& timeSource() { return time_source_; }
   // Must call enabled() before calling limit().
-  uint64_t limit() const { return limit_kbps.value(); }
+  uint64_t limit() const { return limit_kbps_.value(); }
   envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit::EnableMode enable_mode() const;
   std::shared_ptr<TokenBucketImpl> tokenBucket() { return token_bucket_; }
   uint64_t fill_rate() const { return fill_rate_; }
