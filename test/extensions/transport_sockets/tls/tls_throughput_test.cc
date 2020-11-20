@@ -3,10 +3,11 @@
 #include "test/test_common/environment.h"
 
 #include "benchmark/benchmark.h"
-#include "tools/cpp/runfiles/runfiles.h"
 #include "openssl/ssl.h"
+#include "tools/cpp/runfiles/runfiles.h"
 
-namespace Envoy::Extensions::TransportSockets::Tls {
+namespace Envoy {
+namespace Extensions::TransportSockets::Tls {
 
 static void drainErrorQueue() {
   while (uint64_t err = ERR_get_error()) {
@@ -116,7 +117,10 @@ static void testThroughput(benchmark::State& state) {
     for (unsigned i = 0; i < 10; i++) {
       auto start_size = write_buf.length();
       Buffer::RawSlice slices[2];
-      write_buf.reserve(16384, slices, 2);
+      auto num_slices = write_buf.reserve(16384, slices, 2);
+      for (unsigned i = 0; i < num_slices; i++) {
+        memset(slices[i].mem_, 'a', slices[i].len_);
+      }
       write_buf.commit(slices, 2);
       RELEASE_ASSERT(write_buf.length() - start_size == 16384, "correct reserve/commit");
     }
@@ -163,4 +167,5 @@ static void TestParams(benchmark::internal::Benchmark* b) {
 
 BENCHMARK(testThroughput)->Unit(::benchmark::kMicrosecond)->Apply(TestParams);
 
-} // namespace Envoy::Extensions::TransportSockets::Tls
+} // namespace Extensions::TransportSockets::Tls
+} // namespace Envoy

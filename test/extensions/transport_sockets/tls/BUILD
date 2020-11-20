@@ -185,15 +185,15 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "tls_throughput_benchmark",
     srcs = ["tls_throughput_test.cc"],
+    data = [
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
     external_deps = [
         "benchmark",
         "ssl",
     ],
     deps = [
         "//source/common/buffer:buffer_lib",
-    ],
-    data = [
-        "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
 )
 
