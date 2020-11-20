@@ -230,7 +230,7 @@ private:
   do {                                                                                             \
   } while (false)
 
-// Empty declaration.
+// Empty declaration used when performance collection is disabled.
 #define PERF_OWNER(perf_var)
 
 #endif
