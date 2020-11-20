@@ -333,8 +333,8 @@ public:
   MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
   MOCK_METHOD(TextReadoutOptConstRef, findTextReadout, (StatName), (const));
 
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef, Mode) override {
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+                                       Mode) override {
     // We always just respond with the mocked counter, so the tags and mode don't matter.
     return counter(symbol_table_->toString(name));
   }
@@ -347,8 +347,8 @@ public:
                                            Histogram::Unit unit, Mode) override {
     return histogram(symbol_table_->toString(name), unit);
   }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef, Mode) override {
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+                                               Mode) override {
     // We always just respond with the mocked counter, so the tags and mode don't matter.
     return textReadout(symbol_table_->toString(name));
   }

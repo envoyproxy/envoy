@@ -498,7 +498,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counters_,
       central_cache_->rejected_stats_,
       [mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
-         const StatNameTagVector& tags) -> CounterSharedPtr {
+             const StatNameTagVector& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, tag_extracted_name, tags, mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_counter_);
@@ -550,7 +550,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->gauges_,
       central_cache_->rejected_stats_,
       [import_mode, mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
-                    const StatNameTagVector& tags) -> GaugeSharedPtr {
+                          const StatNameTagVector& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode, mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_gauge_);
@@ -667,7 +667,7 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->text_readouts_,
       central_cache_->rejected_stats_,
       [mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
-         const StatNameTagVector& tags) -> TextReadoutSharedPtr {
+             const StatNameTagVector& tags) -> TextReadoutSharedPtr {
         return allocator.makeTextReadout(name, tag_extracted_name, tags, mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_text_readout_);

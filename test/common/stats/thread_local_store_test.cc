@@ -393,32 +393,29 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
 
   {
     StatNameManagedStorage storage("c3", symbol_table_);
-    Counter& counter = scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags,
-                                                           Mode::Default);
+    Counter& counter =
+        scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags, Mode::Default);
     EXPECT_EQ(expectedTags, counter.tags());
     EXPECT_EQ(&counter, &scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags,
-                                                           Mode::Default));
+                                                             Mode::Default));
   }
   {
     StatNameManagedStorage storage("g3", symbol_table_);
     Gauge& gauge = scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
-                                                     Gauge::ImportMode::Accumulate,
-                                                           Mode::Default);
+                                                     Gauge::ImportMode::Accumulate, Mode::Default);
     EXPECT_EQ(expectedTags, gauge.tags());
-    EXPECT_EQ(&gauge, &scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
-                                                         Gauge::ImportMode::Accumulate,
-                                                           Mode::Default));
+    EXPECT_EQ(&gauge,
+              &scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                 Gauge::ImportMode::Accumulate, Mode::Default));
   }
   {
     StatNameManagedStorage storage("h3", symbol_table_);
     Histogram& histogram = scope1->histogramFromStatNameWithTags(
-        StatName(storage.statName()), tags, Stats::Histogram::Unit::Unspecified,
-                                                           Mode::Default);
+        StatName(storage.statName()), tags, Stats::Histogram::Unit::Unspecified, Mode::Default);
     EXPECT_EQ(expectedTags, histogram.tags());
-    EXPECT_EQ(&histogram,
-              &scope1->histogramFromStatNameWithTags(StatName(storage.statName()), tags,
-                                                     Stats::Histogram::Unit::Unspecified,
-                                                           Mode::Default));
+    EXPECT_EQ(&histogram, &scope1->histogramFromStatNameWithTags(
+                              StatName(storage.statName()), tags,
+                              Stats::Histogram::Unit::Unspecified, Mode::Default));
   }
 
   store_->shutdownThreading();

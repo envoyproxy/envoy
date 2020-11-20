@@ -17,14 +17,15 @@ public:
 
   // Scope
   ScopePtr createScope(const std::string& name) override;
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags, Mode mode) override;
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                       Mode mode) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode, Mode mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit, Mode mode) override;
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags, Mode mode) override;
+                                               StatNameTagVectorOptConstRef tags,
+                                               Mode mode) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
   Counter& counterFromString(const std::string& name) override {

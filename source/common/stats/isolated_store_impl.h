@@ -124,8 +124,8 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags, Mode) override {
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                       Mode) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
     Counter& counter = counters_.get(joiner.nameWithTags());
     return counter;

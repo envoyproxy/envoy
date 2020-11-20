@@ -154,8 +154,7 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags,
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                        Mode mode) override {
     return default_scope_->counterFromStatNameWithTags(name, tags, mode);
   }
@@ -167,16 +166,14 @@ public:
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode,
-                                   Mode mode) override {
+                                   Gauge::ImportMode import_mode, Mode mode) override {
     return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode, mode);
   }
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gaugeFromString(name, import_mode);
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit,
-                                           Mode mode) override {
+                                           Histogram::Unit unit, Mode mode) override {
     return default_scope_->histogramFromStatNameWithTags(name, tags, unit, mode);
   }
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
@@ -332,17 +329,14 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatNameWithTags(const StatName& name,
-                                         StatNameTagVectorOptConstRef tags,
+    Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                          Mode mode) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                     Gauge::ImportMode import_mode,
-                                     Mode mode) override;
+                                     Gauge::ImportMode import_mode, Mode mode) override;
     Histogram& histogramFromStatNameWithTags(const StatName& name,
                                              StatNameTagVectorOptConstRef tags,
-                                             Histogram::Unit unit,
-                                             Mode mode) override;
+                                             Histogram::Unit unit, Mode mode) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags,
                                                  Mode mode) override;

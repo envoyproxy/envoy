@@ -54,9 +54,11 @@ TEST_F(AllocatorImplTest, CountersWithSameName) {
 
 TEST_F(AllocatorImplTest, GaugesWithSameName) {
   StatName gauge_name = makeStat("gauges.name");
-  GaugeSharedPtr g1 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate, Mode::Default);
+  GaugeSharedPtr g1 =
+      alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate, Mode::Default);
   EXPECT_EQ(1, g1->use_count());
-  GaugeSharedPtr g2 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate, Mode::Default);
+  GaugeSharedPtr g2 =
+      alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate, Mode::Default);
   EXPECT_EQ(2, g1->use_count());
   EXPECT_EQ(2, g2->use_count());
   EXPECT_EQ(g1.get(), g2.get());

@@ -54,11 +54,11 @@ public:
       : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
         alloc_(alloc) {
     switch (mode) {
-      case Mode::Default:
-        break;
-      case Mode::ForceEnable:
-        flags_ |= Metric::Flags::ForceEnable;
-        break;
+    case Mode::Default:
+      break;
+    case Mode::ForceEnable:
+      flags_ |= Metric::Flags::ForceEnable;
+      break;
     }
   }
 
@@ -282,7 +282,8 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
   }
-  auto counter = CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags, mode));
+  auto counter =
+      CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags, mode));
   counters_.insert(counter.get());
   return counter;
 }
@@ -297,8 +298,8 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
   }
-  auto gauge =
-      GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode, mode));
+  auto gauge = GaugeSharedPtr(
+      new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode, mode));
   gauges_.insert(gauge.get());
   return gauge;
 }
@@ -313,8 +314,8 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   if (iter != text_readouts_.end()) {
     return TextReadoutSharedPtr(*iter);
   }
-  auto text_readout =
-      TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags, mode));
+  auto text_readout = TextReadoutSharedPtr(
+      new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags, mode));
   text_readouts_.insert(text_readout.get());
   return text_readout;
 }

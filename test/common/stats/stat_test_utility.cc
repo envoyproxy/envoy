@@ -174,8 +174,7 @@ Gauge& TestStore::gaugeFromString(const std::string& name, Gauge::ImportMode mod
 
 Gauge& TestStore::gaugeFromStatNameWithTags(const StatName& stat_name,
                                             StatNameTagVectorOptConstRef tags,
-                                            Gauge::ImportMode import_mode,
-                                            Mode mode) {
+                                            Gauge::ImportMode import_mode, Mode mode) {
   std::string name = symbolTable().toString(stat_name);
   Gauge*& gauge_ref = gauge_map_[name];
   if (gauge_ref == nullptr) {

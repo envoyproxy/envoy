@@ -45,7 +45,8 @@ protected:
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
     counters_.push_back(alloc_.makeCounter(name_storage.statName(),
-                                           tag_extracted_name_storage.statName(), cluster_tags));
+                                           tag_extracted_name_storage.statName(), cluster_tags,
+                                           Stats::Mode::Default));
   }
 
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
@@ -53,7 +54,7 @@ protected:
     Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
     gauges_.push_back(alloc_.makeGauge(name_storage.statName(),
                                        tag_extracted_name_storage.statName(), cluster_tags,
-                                       Stats::Gauge::ImportMode::Accumulate));
+                                       Stats::Gauge::ImportMode::Accumulate, Stats::Mode::Default));
   }
 
   using MockHistogramSharedPtr = Stats::RefcountPtr<NiceMock<Stats::MockParentHistogram>>;

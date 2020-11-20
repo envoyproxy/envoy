@@ -26,8 +26,8 @@ public:
   CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
                                const StatNameTagVector& stat_name_tags, Mode mode) override;
   GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags,
-                           Gauge::ImportMode import_mode, Mode mode) override;
+                           const StatNameTagVector& stat_name_tags, Gauge::ImportMode import_mode,
+                           Mode mode) override;
   TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                        const StatNameTagVector& stat_name_tags, Mode mode) override;
   SymbolTable& symbolTable() override { return symbol_table_; }

@@ -67,34 +67,29 @@ struct ElementVisitor {
 } // namespace
 
 Counter& Utility::counterFromElements(Scope& scope, const ElementVec& elements,
-                                      StatNameTagVectorOptConstRef tags,
-                                      Mode mode) {
+                                      StatNameTagVectorOptConstRef tags, Mode mode) {
   ElementVisitor visitor(scope.symbolTable(), elements);
   return scope.counterFromStatNameWithTags(visitor.statName(), tags, mode);
 }
 
 Counter& Utility::counterFromStatNames(Scope& scope, const StatNameVec& elements,
-                                       StatNameTagVectorOptConstRef tags,
-                                       Mode mode) {
+                                       StatNameTagVectorOptConstRef tags, Mode mode) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
   return scope.counterFromStatNameWithTags(StatName(joined.get()), tags, mode);
 }
 
 Gauge& Utility::gaugeFromElements(Scope& scope, const ElementVec& elements,
-                                  Gauge::ImportMode import_mode,
-                                  StatNameTagVectorOptConstRef tags,
+                                  Gauge::ImportMode import_mode, StatNameTagVectorOptConstRef tags,
                                   Mode mode) {
   ElementVisitor visitor(scope.symbolTable(), elements);
   return scope.gaugeFromStatNameWithTags(visitor.statName(), tags, import_mode, mode);
 }
 
 Gauge& Utility::gaugeFromStatNames(Scope& scope, const StatNameVec& elements,
-                                   Gauge::ImportMode import_mode,
-                                   StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode, StatNameTagVectorOptConstRef tags,
                                    Mode mode) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
-  return scope.gaugeFromStatNameWithTags(StatName(joined.get()), tags, import_mode,
-                                         mode);
+  return scope.gaugeFromStatNameWithTags(StatName(joined.get()), tags, import_mode, mode);
 }
 
 Histogram& Utility::histogramFromElements(Scope& scope, const ElementVec& elements,
@@ -105,23 +100,20 @@ Histogram& Utility::histogramFromElements(Scope& scope, const ElementVec& elemen
 }
 
 Histogram& Utility::histogramFromStatNames(Scope& scope, const StatNameVec& elements,
-                                           Histogram::Unit unit,
-                                           StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit, StatNameTagVectorOptConstRef tags,
                                            Mode mode) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
   return scope.histogramFromStatNameWithTags(StatName(joined.get()), tags, unit, mode);
 }
 
 TextReadout& Utility::textReadoutFromElements(Scope& scope, const ElementVec& elements,
-                                              StatNameTagVectorOptConstRef tags,
-                                              Mode mode) {
+                                              StatNameTagVectorOptConstRef tags, Mode mode) {
   ElementVisitor visitor(scope.symbolTable(), elements);
   return scope.textReadoutFromStatNameWithTags(visitor.statName(), tags, mode);
 }
 
 TextReadout& Utility::textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
-                                               StatNameTagVectorOptConstRef tags,
-                                               Mode mode) {
+                                               StatNameTagVectorOptConstRef tags, Mode mode) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
   return scope.textReadoutFromStatNameWithTags(StatName(joined.get()), tags, mode);
 }

@@ -38,7 +38,8 @@ Gauge& ScopePrefixer::gaugeFromStatNameWithTags(const StatName& name,
                                                 Gauge::ImportMode import_mode, Mode mode) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.gaugeFromStatNameWithTags(StatName(stat_name_storage.get()), tags, import_mode, mode);
+  return scope_.gaugeFromStatNameWithTags(StatName(stat_name_storage.get()), tags, import_mode,
+                                          mode);
 }
 
 Histogram& ScopePrefixer::histogramFromStatNameWithTags(const StatName& name,

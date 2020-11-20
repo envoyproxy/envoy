@@ -54,7 +54,8 @@ public:
    * @return TextReadoutSharedPtr a text readout.
    */
   virtual TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
-                                               const StatNameTagVector& stat_name_tags, Mode mode) PURE;
+                                               const StatNameTagVector& stat_name_tags,
+                                               Mode mode) PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
