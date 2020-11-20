@@ -41,6 +41,5 @@ private:
   // polling and activating new fd events.
   const bool activate_fd_events_next_event_loop_;
 };
-
 } // namespace Event
 } // namespace Envoy

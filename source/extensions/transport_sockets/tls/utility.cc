@@ -4,6 +4,7 @@
 #include "common/network/address_impl.h"
 
 #include "absl/strings/str_join.h"
+#include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -152,38 +153,34 @@ int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_sourc
   return 0;
 }
 
-absl::optional<std::string> Utility::getX509ExtensionValue(const X509& cert,
-                                                           absl::string_view extension_name) {
-  X509_EXTENSIONS* extensions(X509_get0_extensions(&cert));
-
-  if (extensions == nullptr) {
-    return absl::nullopt;
+absl::string_view Utility::getCertificateExtensionValue(X509& cert,
+                                                        absl::string_view extension_name) {
+  bssl::UniquePtr<ASN1_OBJECT> oid(
+      OBJ_txt2obj(std::string(extension_name).c_str(), 1 /* don't search names */));
+  if (oid == nullptr) {
+    return {};
   }
 
-  const size_t extension_count = sk_X509_EXTENSION_num(extensions);
-
-  for (size_t i = 0; i < extension_count; ++i) {
-    X509_EXTENSION* extension = sk_X509_EXTENSION_value(extensions, i);
-
-    ASN1_OBJECT* extension_object = X509_EXTENSION_get_object(extension);
-    const size_t size = OBJ_obj2txt(nullptr, 0, extension_object, 0);
-    std::vector<char> buffer;
-    // +1 to allow for NULL byte.
-    buffer.resize(size + 1);
-    OBJ_obj2txt(buffer.data(), buffer.size(), extension_object, 0);
-
-    if (absl::string_view(buffer.data(), size) == extension_name) {
-      ASN1_OCTET_STRING* octet_string = X509_EXTENSION_get_data(extension);
-      const unsigned char* octet_string_data = octet_string->data;
-      long xlen;
-      int tag, xclass;
-      ASN1_get_object(&octet_string_data, &xlen, &tag, &xclass, octet_string->length);
-
-      return std::string(reinterpret_cast<const char*>(octet_string_data), xlen);
-    }
+  int pos = X509_get_ext_by_OBJ(&cert, oid.get(), -1);
+  if (pos < 0) {
+    return {};
   }
 
-  return absl::nullopt;
+  X509_EXTENSION* extension = X509_get_ext(&cert, pos);
+  if (extension == nullptr) {
+    return {};
+  }
+
+  const ASN1_OCTET_STRING* octet_string = X509_EXTENSION_get_data(extension);
+  RELEASE_ASSERT(octet_string != nullptr, "");
+
+  // Return the entire DER-encoded value for this extension. Correct decoding depends on
+  // knowledge of the expected structure of the extension's value.
+  const unsigned char* octet_string_data = ASN1_STRING_get0_data(octet_string);
+  const int octet_string_length = ASN1_STRING_length(octet_string);
+
+  return {reinterpret_cast<const char*>(octet_string_data),
+          static_cast<absl::string_view::size_type>(octet_string_length)};
 }
 
 SystemTime Utility::getValidFrom(const X509& cert) {

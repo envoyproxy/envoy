@@ -312,7 +312,7 @@ public:
     return access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
-  Init::Manager& initManager();
+  Init::Manager& initManager() override;
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
@@ -393,7 +393,7 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
-  Network::ConnectionBalancerPtr connection_balancer_;
+  Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
 

@@ -138,7 +138,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
         "//test/mocks:common_lib",
-        "//test/mocks/server:main_mocks",
+        "//test/mocks/server:watchdog_config_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",

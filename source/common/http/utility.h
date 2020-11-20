@@ -367,6 +367,14 @@ void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& hos
                             absl::string_view& path);
 
 /**
+ * Takes a the path component from a file:/// URI and returns a local path for file access.
+ * @param file_path if we have file:///foo/bar, the file_path is foo/bar. For file:///c:/foo/bar
+ *                  it is c:/foo/bar. This is not prefixed with /.
+ * @return std::string with absolute path for local access, e.g. /foo/bar, c:/foo/bar.
+ */
+std::string localPathFromFilePath(const absl::string_view& file_path);
+
+/**
  * Prepare headers for a HttpUri.
  */
 RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);

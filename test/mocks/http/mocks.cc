@@ -87,7 +87,7 @@ void MockStreamDecoderFilterCallbacks::sendLocalReply_(
             if (modify_headers != nullptr) {
               modify_headers(*headers);
             }
-            encodeHeaders(std::move(headers), end_stream);
+            encodeHeaders(std::move(headers), end_stream, details_);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             encodeData(data, end_stream);

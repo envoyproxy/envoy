@@ -16,6 +16,7 @@ envoy_basic_cc_library(
         "platform.h",
         "pure.h",
     ],
+    external_deps = ["abseil_optional"],
     include_prefix = "envoy/common",
 )
 

@@ -71,7 +71,7 @@ fi
 
 # We want to allow per_file_coverage to fail without exiting this script.
 set +e
-if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "{FUZZ_COVERAGE}" == "false" ]]; then
+if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
   echo "Checking per-extension coverage"
   output=$(./test/per_file_coverage.sh)
 

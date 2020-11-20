@@ -32,7 +32,7 @@ public:
     upstream_handle_ = conn_pool_->newConnection(*this);
   }
 
-  bool cancelAnyPendingRequest() override {
+  bool cancelAnyPendingStream() override {
     if (upstream_handle_) {
       upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
       upstream_handle_ = nullptr;

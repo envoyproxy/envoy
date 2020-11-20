@@ -58,7 +58,7 @@ public:
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   Envoy::ConnectionPool::MockCancellable* newConnectionImpl(Callbacks& cb);
-  void poolFailure(PoolFailureReason reason);
+  void poolFailure(PoolFailureReason reason, bool host_null = false);
   void poolReady(Network::MockClientConnection& conn);
 
   // Invoked when connection_data_, having been assigned via poolReady is released.

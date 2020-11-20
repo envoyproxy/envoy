@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/init/manager.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -166,6 +167,11 @@ public:
    * @return pending connection backlog for TCP listeners.
    */
   virtual uint32_t tcpBacklogSize() const PURE;
+
+  /**
+   * @return init manager of the listener.
+   */
+  virtual Init::Manager& initManager() PURE;
 };
 
 /**

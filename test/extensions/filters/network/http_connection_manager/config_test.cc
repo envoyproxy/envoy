@@ -97,6 +97,18 @@ http_filters:
                             "Didn't find a registered implementation for name: 'foo'");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, InvalidServerName) {
+  const std::string yaml_string = R"EOF(
+server_name: >
+  foo
+route_config:
+  name: local_route
+stat_prefix: router
+  )EOF";
+
+  EXPECT_THROW(createHttpConnectionManagerConfig(yaml_string), ProtoValidationException);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, RouterInverted) {
   const std::string yaml_string = R"EOF(
 codec_type: http1

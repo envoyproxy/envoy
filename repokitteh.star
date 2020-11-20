@@ -26,6 +26,11 @@ use(
       "owner": "envoyproxy/api-watchers",
       "path": "api/envoy/",
     },
+    {
+      "owner": "envoyproxy/dependency-watchers",
+      "path":
+      "(bazel/repository_locations\.bzl)|(api/bazel/repository_locations\.bzl)|(.*/requirements\.txt)",
+    },
   ],
 )
 

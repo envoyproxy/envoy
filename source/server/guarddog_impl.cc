@@ -9,6 +9,7 @@
 
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/stats/scope.h"
@@ -28,13 +29,13 @@
 namespace Envoy {
 namespace Server {
 
-GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
+GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
                            Api::Api& api, std::unique_ptr<TestInterlockHook>&& test_interlock)
     : test_interlock_hook_(std::move(test_interlock)), stats_scope_(stats_scope),
-      time_source_(api.timeSource()), miss_timeout_(config.wdMissTimeout()),
-      megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
-      multi_kill_timeout_(config.wdMultiKillTimeout()),
-      multi_kill_fraction_(config.wdMultiKillThreshold() / 100.0),
+      time_source_(api.timeSource()), miss_timeout_(config.missTimeout()),
+      megamiss_timeout_(config.megaMissTimeout()), kill_timeout_(config.killTimeout()),
+      multi_kill_timeout_(config.multiKillTimeout()),
+      multi_kill_fraction_(config.multiKillThreshold() / 100.0),
       loop_interval_([&]() -> std::chrono::milliseconds {
         // The loop interval is simply the minimum of all specified intervals,
         // but we must account for the 0=disabled case. This lambda takes care
@@ -52,14 +53,14 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
               .statName())),
       dispatcher_(api.allocateDispatcher("guarddog_thread")),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })),
-      events_to_actions_([&](const Server::Configuration::Main& config) -> EventToActionsMap {
+      events_to_actions_([&](const Server::Configuration::Watchdog& config) -> EventToActionsMap {
         EventToActionsMap map;
 
         // We should be able to share the dispatcher since guard dog's lifetime
         // should eclipse those of actions.
         Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_};
 
-        const auto& actions = config.wdActions();
+        const auto& actions = config.actions();
         for (const auto& action : actions) {
           // Get factory and add the created cb
           auto& factory = Config::Utility::getAndCheckFactory<Configuration::GuardDogActionFactory>(
@@ -73,7 +74,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
   start(api);
 }
 
-GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
+GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
                            Api::Api& api)
     : GuardDogImpl(stats_scope, config, api, std::make_unique<TestInterlockHook>()) {}
 

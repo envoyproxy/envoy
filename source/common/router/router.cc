@@ -1300,9 +1300,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     onUpstreamComplete(upstream_request);
   }
 
-  callbacks_->streamInfo().setResponseCodeDetails(
-      StreamInfo::ResponseCodeDetails::get().ViaUpstream);
-  callbacks_->encodeHeaders(std::move(headers), end_stream);
+  callbacks_->encodeHeaders(std::move(headers), end_stream,
+                            StreamInfo::ResponseCodeDetails::get().ViaUpstream);
 }
 
 void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,

@@ -53,6 +53,10 @@ WatcherImpl::~WatcherImpl() {
 }
 
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
+  if (path == Platform::null_device_path) {
+    return;
+  }
+
   const PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here

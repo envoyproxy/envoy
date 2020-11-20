@@ -1,6 +1,8 @@
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #include "common/common/fancy_logger.h"
 #include "common/common/logger.h"
@@ -14,6 +16,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+using namespace std::chrono_literals;
 
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -148,6 +152,7 @@ TEST(Logger, SparseLogMacros) {
     void logSomethingThrice() { ENVOY_LOG_FIRST_N(error, 3, "foo4 '{}'", evaluations()++); }
     void logEverySeventh() { ENVOY_LOG_EVERY_NTH(error, 7, "foo5 '{}'", evaluations()++); }
     void logEveryPow2() { ENVOY_LOG_EVERY_POW_2(error, "foo6 '{}'", evaluations()++); }
+    void logEverySecond() { ENVOY_LOG_PERIODIC(error, 1s, "foo7 '{}'", evaluations()++); }
     std::atomic<int32_t>& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<int32_t>); };
   };
   constexpr uint32_t kNumThreads = 100;
@@ -185,11 +190,21 @@ TEST(Logger, SparseLogMacros) {
   // We should log on 2, 4, 8, 16, 32, 64, which means we can expect to add 6 more evaluations.
   EXPECT_EQ(27, helper.evaluations());
 
+  spamCall([&helper]() { helper.logEverySecond(); }, kNumThreads);
+  // First call ought to evaluate.
+  EXPECT_EQ(28, helper.evaluations());
+
+  // We expect one log entry / second. Therefore each spamCall ought to result in one
+  // more evaluation. This depends on real time and not sim time, hopefully 1 second
+  // is enough to not introduce flakes in practice.
+  std::this_thread::sleep_for(1s); // NOLINT
+  spamCall([&helper]() { helper.logEverySecond(); }, kNumThreads);
+  EXPECT_EQ(29, helper.evaluations());
+
   spamCall([&helper]() { helper.logSomethingBelowLogLevelOnce(); }, kNumThreads);
-  // Without fine-grained logging, we shouldn't observe additional argument evaluations
-  // for log lines below the configured log level.
-  // TODO(#12885): fancy logger shouldn't always evaluate variadic macro arguments.
-  EXPECT_EQ(::Envoy::Logger::Context::useFancyLogger() ? 28 : 27, helper.evaluations());
+  // We shouldn't observe additional argument evaluations for log lines below the configured
+  // log level.
+  EXPECT_EQ(29, helper.evaluations());
 }
 
 TEST(RegistryTest, LoggerWithName) {

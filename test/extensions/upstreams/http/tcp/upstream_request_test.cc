@@ -72,21 +72,21 @@ TEST_F(TcpConnPoolTest, OnPoolFailure) {
                             host_);
 
   // Make sure that the pool failure nulled out the pending request.
-  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
 }
 
 TEST_F(TcpConnPoolTest, Cancel) {
   // Initially cancel should fail as there is no pending request.
-  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
 
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
   conn_pool_->newStream(&mock_generic_callbacks_);
 
   // Canceling should now return true as there was an active request.
-  EXPECT_TRUE(conn_pool_->cancelAnyPendingRequest());
+  EXPECT_TRUE(conn_pool_->cancelAnyPendingStream());
 
   // A second cancel should return false as there is not a pending request.
-  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
 }
 
 class TcpUpstreamTest : public ::testing::Test {

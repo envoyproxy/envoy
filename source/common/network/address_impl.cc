@@ -300,6 +300,17 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
+EnvoyInternalInstance::EnvoyInternalInstance(const std::string& address_id,
+                                             const SocketInterface* sock_interface)
+    : InstanceBase(Type::EnvoyInternal, sockInterfaceOrDefault(sock_interface)),
+      internal_address_(address_id) {
+  friendly_name_ = absl::StrCat("envoy://", address_id);
+}
+
+bool EnvoyInternalInstance::operator==(const Instance& rhs) const {
+  return rhs.type() == Type::EnvoyInternal && asString() == rhs.asString();
+}
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

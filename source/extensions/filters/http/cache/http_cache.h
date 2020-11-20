@@ -170,6 +170,17 @@ using LookupResultPtr = std::unique_ptr<LookupResult>;
 // TODO(toddmgreer): Ensure that stability guarantees above are accurate.
 size_t stableHashKey(const Key& key);
 
+// The metadata associated with a cached response.
+// TODO(yosrym93): This could be changed to a proto if a need arises.
+// If a cache was created with the current interface, then it was changed to a proto, all the cache
+// entries will need to be invalidated.
+struct ResponseMetadata {
+  // The time at which a response was was most recently inserted, updated, or validated in this
+  // cache. This represents "response_time" in the age header calculations at:
+  // https://httpwg.org/specs/rfc7234.html#age.calculations
+  SystemTime response_time_;
+};
+
 // LookupRequest holds everything about a request that's needed to look for a
 // response in a cache, to evaluate whether an entry from a cache is usable, and
 // to determine what ranges are needed.
@@ -177,7 +188,7 @@ class LookupRequest {
 public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                const absl::flat_hash_set<std::string>& allowed_vary_headers);
+                const VaryHeader& vary_allow_list);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
@@ -190,25 +201,26 @@ public:
   // LookupHeadersCallback. Specifically,
   // - LookupResult::cache_entry_status_ is set according to HTTP cache
   // validation logic.
-  // - LookupResult::headers takes ownership of response_headers.
-  // - LookupResult::content_length == content_length.
-  // - LookupResult::response_ranges entries are satisfiable (as documented
+  // - LookupResult::headers_ takes ownership of response_headers.
+  // - LookupResult::content_length_ == content_length.
+  // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                uint64_t content_length) const;
+                                ResponseMetadata&& metadata, uint64_t content_length) const;
 
   // Warning: this should not be accessed out-of-thread!
   const Http::RequestHeaderMap& getVaryHeaders() const { return *vary_headers_; }
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
-  bool requiresValidation(const Http::ResponseHeaderMap& response_headers) const;
+  bool requiresValidation(const Http::ResponseHeaderMap& response_headers,
+                          SystemTime::duration age) const;
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
-  // The subset of this request's headers that are listed in
+  // The subset of this request's headers that match one of the rules in
   // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
   // storage implementation forwards lookup requests to a remote cache server that supports *vary*
   // headers, that server may need to see these headers. For local implementations, it may be
@@ -233,7 +245,8 @@ using InsertCallback = std::function<void(bool success_ready_for_more)>;
 class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
-  virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) PURE;
+  virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
+                             const ResponseMetadata& metadata, bool end_stream) PURE;
 
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
@@ -345,7 +358,8 @@ public:
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
   virtual void updateHeaders(const LookupContext& lookup_context,
-                             const Http::ResponseHeaderMap& response_headers) PURE;
+                             const Http::ResponseHeaderMap& response_headers,
+                             const ResponseMetadata& metadata) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;

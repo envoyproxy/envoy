@@ -292,12 +292,12 @@ TEST_F(ProfileActionTest, ShouldNotProfileIfNoTids) {
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 0);
 }
 
-TEST_F(ProfileActionTest, ShouldSaturateTids) {
+TEST_F(ProfileActionTest, ShouldSaturatedMaxProfiles) {
   // Create configuration that we'll run until it saturates.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
-  config.set_max_profiles_per_thread(1);
+  config.set_max_profiles(1);
 
   // Create the ProfileAction before we start running the dispatcher
   // otherwise the timer created will in ProfileActions ctor will

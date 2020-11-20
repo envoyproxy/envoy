@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.RouterCheckToolSchema;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
@@ -99,11 +100,15 @@ message ValidationAssert {
   // Match the returned redirect path.
   google.protobuf.StringValue path_redirect = 6;
 
-  // Match the listed request or response header fields.
+  // Match the listed request or response header fields. These fields are deprecated, use *_header_matches instead.
+  repeated envoy.config.core.v3.HeaderValue request_header_fields = 9 [deprecated = true];
+  repeated envoy.config.core.v3.HeaderValue response_header_fields = 10 [deprecated = true];
+
+  // Match the listed request or response headers.
   // Example header fields include the “:path”, “cookie”, and “date” fields.
   // The header fields are checked after all other test cases.
   // Thus, the header fields checked will be those of the redirected or rewritten routes when
   // applicable.
-  repeated envoy.config.core.v3.HeaderValue request_header_fields = 9;
-  repeated envoy.config.core.v3.HeaderValue response_header_fields = 10;
+  repeated envoy.config.route.v3.HeaderMatcher request_header_matches = 11;
+  repeated envoy.config.route.v3.HeaderMatcher response_header_matches = 12;
 }

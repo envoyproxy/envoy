@@ -27,7 +27,7 @@ public:
                                            downstream_protocol, ctx);
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
-  bool cancelAnyPendingRequest() override;
+  bool cancelAnyPendingStream() override;
   absl::optional<Envoy::Http::Protocol> protocol() const override;
 
   // Http::ConnectionPool::Callbacks

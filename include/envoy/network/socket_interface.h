@@ -49,7 +49,7 @@ public:
 using SocketInterfacePtr = std::unique_ptr<SocketInterface>;
 
 /**
- * Create IoHandle for given address
+ * Create IoHandle for given address.
  * @param type type of socket to be requested
  * @param addr address that is gleaned for address type, version and socket interface name
  * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor

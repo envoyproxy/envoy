@@ -98,7 +98,7 @@ message DownstreamTlsContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext";
@@ -243,4 +243,8 @@ message CommonTlsContext {
   //
   // There is no default for this parameter. If empty, Envoy will not expose ALPN.
   repeated string alpn_protocols = 4;
+
+  // Custom TLS handshaker. If empty, defaults to native TLS handshaking
+  // behavior.
+  config.core.v4alpha.TypedExtensionConfig custom_handshaker = 13;
 }

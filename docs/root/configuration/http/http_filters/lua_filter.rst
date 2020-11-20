@@ -26,7 +26,7 @@ supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT docu
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
-  there is no truly global data. Any globals create and populated at load time will be visible
+  there is no truly global data. Any globals created and populated at load time will be visible
   from each worker thread in isolation. True global support may be added via an API in the future.
 * All scripts are run as coroutines. This means that they are written in a synchronous style even
   though they may perform complex asynchronous tasks. This makes the scripts substantially easier
@@ -143,8 +143,8 @@ The ``GLOBAL`` Lua script will be overridden by the referenced script:
   <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use
   ``GLOBAL`` as name for other Lua scripts.
 
-Or We can define new Lua script in the LuaPerRoute configuration directly to override `GLOBAL`  
-Lua script as follow example configuration:
+Or we can define a new Lua script in the LuaPerRoute configuration directly to override the `GLOBAL`  
+Lua script as follows:
 
 .. code-block:: yaml
 
@@ -153,7 +153,7 @@ Lua script as follow example configuration:
       source_code:
         inline_string: |
           function envoy_on_response(response_handle)
-            response_handle:logInfo("Go Go C Plus Plus.")
+            response_handle:logInfo("Goodbye.")
           end
 
 
@@ -174,7 +174,7 @@ more details on the supported API.
 
   -- Called on the response path.
   function envoy_on_response(response_handle)
-    -- Wait for the entire response body and a response header with the body size.
+    -- Wait for the entire response body and add a response header with the body size.
     response_handle:headers():add("response_body_size", response_handle:body():length())
     -- Remove a response header named 'foo'
     response_handle:headers():remove("foo")
@@ -221,6 +221,20 @@ more details on the supported API.
       {[":status"] = "403",
        ["upstream_foo"] = headers["foo"]},
       "nope")
+  end
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Log information about the request
+    request_handle:logInfo("Authority: "..request_handle:headers():get(":authority"))
+    request_handle:logInfo("Method: "..request_handle:headers():get(":method"))
+    request_handle:logInfo("Path: "..request_handle:headers():get(":path"))
+  end
+
+  function envoy_on_response(response_handle)
+    -- Log response status code
+    response_handle:logInfo("Status: "..response_handle:headers():get(":status"))
   end
 
 .. _config_http_filters_lua_stream_handle_api:
@@ -343,7 +357,7 @@ the *:method*, *:path*, and *:authority* headers must be set. *body* is an optio
 data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
 
 *asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
-regardless of response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
+regardless of the response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
 until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
@@ -357,7 +371,7 @@ respond()
   handle:respond(headers, body)
 
 Respond immediately and do not continue further filter iteration. This call is *only valid in
-the request flow*. Additionally, a response is only possible if request headers have not yet been
+the request flow*. Additionally, a response is only possible if the request headers have not yet been
 passed to subsequent filters. Meaning, the following Lua code is invalid:
 
 .. code-block:: lua
@@ -437,7 +451,7 @@ verifySignature()
 
   local ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
 
-Verify signature using provided parameters. *hashFunction* is the variable for hash function which be used
+Verify signature using provided parameters. *hashFunction* is the variable for the hash function which be used
 for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported.
 *pubkey* is the public key. *signature* is the signature to be verified. *signatureLength* is
 the length of the signature. *data* is the content which will be hashed. *dataLength* is the length of data.
@@ -493,9 +507,9 @@ that supplies the header value.
 
 .. attention::
 
-  In the currently implementation, headers cannot be modified during iteration. Additionally, if
-  it is desired to modify headers after iteration, the iteration must be completed. Meaning, do
-  not use `break` or any other mechanism to exit the loop early. This may be relaxed in the future.
+  In the current implementation, headers cannot be modified during iteration. Additionally, if
+  it is necessary to modify headers after an iteration, the iteration must first be completed. This means that
+  `break` or any other way to exit the loop early must not be used. This may be more flexible in the future.
 
 remove()
 ^^^^^^^^
@@ -567,7 +581,7 @@ __pairs()
   end
 
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
-key. *value* is *metadata* entry value.
+key. *value* is a *metadata* entry value.
 
 .. _config_http_filters_lua_stream_info_wrapper:
 
@@ -631,7 +645,7 @@ set()
 
 Sets key-value pair of a *filterName*'s metadata. *filterName* is a key specifying the target filter name,
 e.g. *envoy.lb*. The type of *key* is *string*. The type of *value* is any Lua type that can be mapped
-to a metadata value: *table*, *numeric*, *boolean*, *string* and *nil*. When using a *table* as an argument,
+to a metadata value: *table*, *numeric*, *boolean*, *string* or *nil*. When using a *table* as an argument,
 its keys can only be *string* or *numeric*.
 
 .. code-block:: lua
@@ -659,7 +673,7 @@ __pairs()
   end
 
 Iterates through every *dynamicMetadata* entry. *key* is a string that supplies a *dynamicMetadata*
-key. *value* is *dynamicMetadata* entry value.
+key. *value* is a *dynamicMetadata* entry value.
 
 .. _config_http_filters_lua_connection_wrapper:
 
@@ -696,7 +710,7 @@ peerCertificatePresented()
     print("peer certificate is presented")
   end
 
-Returns bool whether the peer certificate is presented.
+Returns a bool representing whether the peer certificate is presented.
 
 peerCertificateValidated()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -770,7 +784,7 @@ uriSanPeerCertificate()
 
   downstreamSslConnection:uriSanPeerCertificate()
 
-Returns the URIs (as a table) in the SAN field of the peer certificate. Returns en empty table if
+Returns the URIs (as a table) in the SAN field of the peer certificate. Returns an empty table if
 there is no peer certificate, or no SAN field, or no URI SAN entries.
 
 subjectLocalCertificate()

@@ -51,7 +51,7 @@ template <class T>
 std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
   auto headers = T::create();
   for (auto entry : header_block) {
-    // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
+    // TODO(danzh): Avoid temporary strings and addCopy() with string_view.
     std::string key(entry.first);
     std::string value(entry.second);
     headers->addCopy(Http::LowerCaseString(key), value);

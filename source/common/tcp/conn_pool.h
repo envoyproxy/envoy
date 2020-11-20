@@ -26,10 +26,10 @@ struct TcpAttachContext : public Envoy::ConnectionPool::AttachContext {
   Tcp::ConnectionPool::Callbacks* callbacks_;
 };
 
-class TcpPendingRequest : public Envoy::ConnectionPool::PendingRequest {
+class TcpPendingStream : public Envoy::ConnectionPool::PendingStream {
 public:
-  TcpPendingRequest(Envoy::ConnectionPool::ConnPoolImplBase& parent, TcpAttachContext& context)
-      : Envoy::ConnectionPool::PendingRequest(parent), context_(context) {}
+  TcpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, TcpAttachContext& context)
+      : Envoy::ConnectionPool::PendingStream(parent), context_(context) {}
   Envoy::ConnectionPool::AttachContext& context() override { return context_; }
 
   TcpAttachContext context_;
@@ -95,8 +95,8 @@ public:
   void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
 
   void close() override { connection_->close(Network::ConnectionCloseType::NoFlush); }
-  size_t numActiveRequests() const override { return callbacks_ ? 1 : 0; }
-  bool closingWithIncompleteRequest() const override { return false; }
+  size_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
+  bool closingWithIncompleteStream() const override { return false; }
   uint64_t id() const override { return connection_->id(); }
 
   void onUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -137,11 +137,11 @@ public:
     // as draining.
     for (auto& connecting_client : connecting_clients_) {
       if (connecting_client->remaining_streams_ > 1) {
-        uint64_t old_limit = connecting_client->effectiveConcurrentRequestLimit();
+        uint64_t old_limit = connecting_client->effectiveConcurrentStreamLimit();
         connecting_client->remaining_streams_ = 1;
-        if (connecting_client->effectiveConcurrentRequestLimit() < old_limit) {
+        if (connecting_client->effectiveConcurrentStreamLimit() < old_limit) {
           connecting_stream_capacity_ -=
-              (old_limit - connecting_client->effectiveConcurrentRequestLimit());
+              (old_limit - connecting_client->effectiveConcurrentStreamLimit());
         }
       }
     }
@@ -160,9 +160,9 @@ public:
   }
 
   ConnectionPool::Cancellable*
-  newPendingRequest(Envoy::ConnectionPool::AttachContext& context) override {
-    Envoy::ConnectionPool::PendingRequestPtr pending_stream =
-        std::make_unique<TcpPendingRequest>(*this, typedContext<TcpAttachContext>(context));
+  newPendingStream(Envoy::ConnectionPool::AttachContext& context) override {
+    Envoy::ConnectionPool::PendingStreamPtr pending_stream =
+        std::make_unique<TcpPendingStream>(*this, typedContext<TcpAttachContext>(context));
     LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
     return pending_streams_.front().get();
   }

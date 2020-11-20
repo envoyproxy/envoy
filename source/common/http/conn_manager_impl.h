@@ -43,6 +43,7 @@
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
 #include "common/local_reply/local_reply.h"
+#include "common/router/scoped_rds.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -112,34 +113,35 @@ public:
 private:
   struct ActiveStream;
 
-  // Used to abstract making of RouteConfig update request.
-  // RdsRouteConfigUpdateRequester is used when an RdsRouteConfigProvider is configured,
-  // NullRouteConfigUpdateRequester is used in all other cases (specifically when
-  // ScopedRdsConfigProvider/InlineScopedRoutesConfigProvider is configured)
-  class RouteConfigUpdateRequester {
+  class RdsRouteConfigUpdateRequester {
   public:
-    virtual ~RouteConfigUpdateRequester() = default;
-    virtual void requestRouteConfigUpdate(const std::string, Event::Dispatcher&,
-                                          Http::RouteConfigUpdatedCallbackSharedPtr) {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    };
-  };
+    RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider,
+                                  ActiveStream& parent)
+        : route_config_provider_(route_config_provider), parent_(parent) {}
 
-  class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
-  public:
-    RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
-        : route_config_provider_(route_config_provider) {}
-    void requestRouteConfigUpdate(
-        const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
-        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
+                                  ActiveStream& parent)
+        // Expect the dynamic cast to succeed because only ScopedRdsConfigProvider is fully
+        // implemented. Inline provider will be cast to nullptr here but it is not full implemented
+        // and can't not be used at this point. Should change this implementation if we have a
+        // functional inline scope route provider in the future.
+        : scoped_route_config_provider_(
+              dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)),
+          parent_(parent) {}
+
+    void
+    requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    void requestVhdsUpdate(const std::string& host_header,
+                           Event::Dispatcher& thread_local_dispatcher,
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    void requestSrdsUpdate(Router::ScopeKeyPtr scope_key,
+                           Event::Dispatcher& thread_local_dispatcher,
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
-  };
-
-  class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
-  public:
-    NullRouteConfigUpdateRequester() = default;
+    Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
+    ActiveStream& parent_;
   };
 
   /**
@@ -229,19 +231,20 @@ private:
 
     // TODO(snowp): Create shared OptRef/OptConstRef helpers
     Http::RequestHeaderMapOptRef requestHeaders() override {
-      return request_headers_ ? std::make_optional(std::ref(*request_headers_)) : absl::nullopt;
+      return request_headers_ ? absl::make_optional(std::ref(*request_headers_)) : absl::nullopt;
     }
     Http::RequestTrailerMapOptRef requestTrailers() override {
-      return request_trailers_ ? std::make_optional(std::ref(*request_trailers_)) : absl::nullopt;
+      return request_trailers_ ? absl::make_optional(std::ref(*request_trailers_)) : absl::nullopt;
     }
     Http::ResponseHeaderMapOptRef continueHeaders() override {
-      return continue_headers_ ? std::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
+      return continue_headers_ ? absl::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
     }
     Http::ResponseHeaderMapOptRef responseHeaders() override {
-      return response_headers_ ? std::make_optional(std::ref(*response_headers_)) : absl::nullopt;
+      return response_headers_ ? absl::make_optional(std::ref(*response_headers_)) : absl::nullopt;
     }
     Http::ResponseTrailerMapOptRef responseTrailers() override {
-      return response_trailers_ ? std::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
+      return response_trailers_ ? absl::make_optional(std::ref(*response_trailers_))
+                                : absl::nullopt;
     }
 
     void endStream() override {
@@ -267,9 +270,6 @@ private:
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
     absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
-    void requestRouteConfigUpdate(
-        Event::Dispatcher& thread_local_dispatcher,
-        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -286,6 +286,8 @@ private:
 
     void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);
+    void requestRouteConfigUpdate(
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
     void refreshCachedTracingCustomTags();
 
@@ -362,8 +364,10 @@ private:
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
-    std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
+    std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
+
+    friend FilterManager;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

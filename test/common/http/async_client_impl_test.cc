@@ -854,7 +854,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->encodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false, "details");
 }
 
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {

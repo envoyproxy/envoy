@@ -325,6 +325,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
+      connection_balancer_(origin.connection_balancer_),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
@@ -488,12 +489,15 @@ void ListenerImpl::buildFilterChains() {
 
 void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.
-  if (config_.has_connection_balance_config()) {
-    // Currently exact balance is the only supported type and there are no options.
-    ASSERT(config_.connection_balance_config().has_exact_balance());
-    connection_balancer_ = std::make_unique<Network::ExactConnectionBalancerImpl>();
-  } else {
-    connection_balancer_ = std::make_unique<Network::NopConnectionBalancerImpl>();
+  if (connection_balancer_ == nullptr) {
+    // Not in place listener update.
+    if (config_.has_connection_balance_config()) {
+      // Currently exact balance is the only supported type and there are no options.
+      ASSERT(config_.connection_balance_config().has_exact_balance());
+      connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+    } else {
+      connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
+    }
   }
 
   if (config_.has_tcp_fast_open_queue_length()) {

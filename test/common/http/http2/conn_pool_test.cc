@@ -648,7 +648,7 @@ TEST_F(Http2ConnPoolImplTest, MaxConcurrentRequestsPerStream) {
 }
 
 // Verifies that requests are queued up in the conn pool until the connection becomes ready.
-TEST_F(Http2ConnPoolImplTest, PendingRequests) {
+TEST_F(Http2ConnPoolImplTest, PendingStreams) {
   InSequence s;
 
   // Create three requests. These should be queued up.
@@ -689,7 +689,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequests) {
 
 // Verifies that the correct number of CONNECTING connections are created for
 // the pending requests, when the total requests per connection is limited
-TEST_F(Http2ConnPoolImplTest, PendingRequestsNumberConnectingTotalRequestsPerConnection) {
+TEST_F(Http2ConnPoolImplTest, PendingStreamsNumberConnectingTotalRequestsPerConnection) {
   cluster_->max_requests_per_connection_ = 2;
   InSequence s;
 
@@ -728,7 +728,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsNumberConnectingTotalRequestsPerCon
 
 // Verifies that the correct number of CONNECTING connections are created for
 // the pending requests, when the concurrent requests per connection is limited
-TEST_F(Http2ConnPoolImplTest, PendingRequestsNumberConnectingConcurrentRequestsPerConnection) {
+TEST_F(Http2ConnPoolImplTest, PendingStreamsNumberConnectingConcurrentRequestsPerConnection) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
   InSequence s;
 
@@ -767,7 +767,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsNumberConnectingConcurrentRequestsP
 
 // Verifies that requests are queued up in the conn pool and fail when the connection
 // fails to be established.
-TEST_F(Http2ConnPoolImplTest, PendingRequestsFailure) {
+TEST_F(Http2ConnPoolImplTest, PendingStreamsFailure) {
   InSequence s;
   cluster_->max_requests_per_connection_ = 10;
 
@@ -820,7 +820,7 @@ TEST_F(Http2ConnPoolImplTest, LocalFailure) {
 
 // Verifies that requests are queued up in the conn pool and respect max request circuit breaking
 // when the connection is established.
-TEST_F(Http2ConnPoolImplTest, PendingRequestsRequestOverflow) {
+TEST_F(Http2ConnPoolImplTest, PendingStreamsRequestOverflow) {
   InSequence s;
 
   // Inflate the resource count to just under the limit.
@@ -855,7 +855,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsRequestOverflow) {
 }
 
 // Verifies that we honor the max pending requests circuit breaker.
-TEST_F(Http2ConnPoolImplTest, PendingRequestsMaxPendingCircuitBreaker) {
+TEST_F(Http2ConnPoolImplTest, PendingStreamsMaxPendingCircuitBreaker) {
   InSequence s;
 
   // Inflate the resource count to just under the limit.
@@ -1265,7 +1265,7 @@ TEST_F(Http2ConnPoolImplTest, ActiveConnectionsHasActiveRequestsTrue) {
 }
 
 // Show that pending requests are considered active.
-TEST_F(Http2ConnPoolImplTest, PendingRequestsConsideredActive) {
+TEST_F(Http2ConnPoolImplTest, PendingStreamsConsideredActive) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
 

@@ -78,7 +78,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   }
 
   // Advance time, to verify the original date header is preserved.
-  simTime().advanceTimeWait(std::chrono::seconds(10));
+  simTime().advanceTimeWait(Seconds(10));
 
   // Send second request, and get response from cache.
   {
@@ -88,9 +88,9 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_NE(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
+    EXPECT_THAT(response_decoder->headers(), HeaderHasValueRef(Http::Headers::get().Age, "10"));
     // Advance time to force a log flush.
-    simTime().advanceTimeWait(std::chrono::seconds(1));
+    simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
                 testing::HasSubstr("RFCF cache.response_from_cache_filter"));
   }
@@ -136,7 +136,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
 
   // Advance time for the cached response to be stale (expired)
   // Also to make sure response date header gets updated with the 304 date
-  simTime().advanceTimeWait(std::chrono::seconds(11));
+  simTime().advanceTimeWait(Seconds(11));
 
   // Send second request, the cached response should be validate then served
   {
@@ -164,11 +164,14 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
-    // Check that age header exists as this is a cached response
-    EXPECT_NE(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
+
+    // A response that has been validated should not contain an Age header as it is equivalent to a
+    // freshly served response from the origin, unless the 304 response has an Age header, which
+    // means it was served by an upstream cache.
+    EXPECT_EQ(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
 
     // Advance time to force a log flush.
-    simTime().advanceTimeWait(std::chrono::seconds(1));
+    simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
                 testing::HasSubstr("RFCF cache.response_from_cache_filter"));
   }
@@ -214,7 +217,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
 
   // Advance time for the cached response to be stale (expired)
   // Also to make sure response date header gets updated with the 304 date
-  simTime().advanceTimeWait(std::chrono::seconds(11));
+  simTime().advanceTimeWait(Seconds(11));
 
   // Send second request, validation of the cached response should be attempted but should fail
   // The new response should be served
@@ -249,7 +252,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
     EXPECT_EQ(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
 
     // Advance time to force a log flush.
-    simTime().advanceTimeWait(std::chrono::seconds(1));
+    simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
 }

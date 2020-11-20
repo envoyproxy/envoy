@@ -410,6 +410,10 @@ FilterStatus Router::UpstreamRequest::start() {
     return FilterStatus::StopIteration;
   }
 
+  if (upstream_host_ == nullptr) {
+    return FilterStatus::StopIteration;
+  }
+
   return FilterStatus::Continue;
 }
 
@@ -502,9 +506,8 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
-        AppException(
-            AppExceptionType::InternalError,
-            fmt::format("too many connections to '{}'", upstream_host_->address()->asString())),
+        AppException(AppExceptionType::InternalError,
+                     "thrift upstream request: too many connections"),
         true);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
@@ -519,7 +522,9 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
       parent_.callbacks_->sendLocalReply(
           AppException(
               AppExceptionType::InternalError,
-              fmt::format("connection failure '{}'", upstream_host_->address()->asString())),
+              fmt::format("connection failure '{}'", (upstream_host_ != nullptr)
+                                                         ? upstream_host_->address()->asString()
+                                                         : "to upstream")),
           true);
       return;
     }

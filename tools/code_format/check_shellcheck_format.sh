@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^tools|^test|^examples|^ci|^bin|^source|^bazel|^.github"}
+EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^test|^examples|^ci|^bin|^source|^bazel|^.github"}
 
 
 find_shell_files () {
@@ -24,10 +24,15 @@ run_shellcheck_on () {
 }
 
 run_shellchecks () {
-    local all_shellfiles failed failure filtered_shellfiles skipped_count success_count
-    failed=()
-    readarray -t all_shellfiles <<< "$(find_shell_files)"
-    readarray -t filtered_shellfiles <<< "$(find_shell_files | grep -vE "${EXCLUDED_SHELLFILES}")"
+    local all_shellfiles=() failed=() failure \
+	  filtered_shellfiles=() found_shellfiles \
+	  line skipped_count success_count
+
+    found_shellfiles=$(find_shell_files)
+    while read -r line; do all_shellfiles+=("$line"); done \
+	<<< "$found_shellfiles"
+    while read -r line; do filtered_shellfiles+=("$line"); done \
+	<<< "$(echo -e "$found_shellfiles" | grep -vE "${EXCLUDED_SHELLFILES}")"
 
     for file in "${filtered_shellfiles[@]}"; do
 	run_shellcheck_on "$file" || {

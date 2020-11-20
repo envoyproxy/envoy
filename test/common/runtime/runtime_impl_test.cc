@@ -848,7 +848,7 @@ public:
                                            generator_, validation_visitor_, *api_);
     loader_->initialize(cm_);
     for (auto* sub : rtds_subscriptions_) {
-      EXPECT_CALL(*sub, start(_));
+      EXPECT_CALL(*sub, start(_, _));
     }
 
     loader_->startRtdsSubscriptions(rtds_init_callback_.AsStdFunction());

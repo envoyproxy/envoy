@@ -48,5 +48,8 @@ envoy_cc_test_library(
 envoy_proto_library(
     name = "validation_proto",
     srcs = ["validation.proto"],
-    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
+    deps = [
+        "@envoy_api//envoy/config/core/v3:pkg",
+        "@envoy_api//envoy/config/route/v3:pkg",
+    ],
 )

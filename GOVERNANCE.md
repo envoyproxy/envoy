@@ -150,10 +150,46 @@ If a maintainer is no longer interested or cannot perform the maintainer duties 
 should volunteer to be moved to emeritus status. In extreme cases this can also occur by a vote of
 the maintainers per the voting process below.
 
+# xDS API shepherds
+
+The [xDS API shepherds](https://github.com/orgs/envoyproxy/teams/api-shepherds) are responsible for
+approving any PR that modifies the [api/](api/) tree. They ensure that API [style](api/STYLE.md) and
+[versioning](api/API_VERSIONING.md) policies are enforced and that a consistent approach is taken
+towards API evolution.
+
+The xDS API shepherds are also the xDS API maintainers; they work collaboratively with the community
+to drive the xDS API roadmap and review major proposed design changes. The API shepherds are
+intended to be representative of xDS client and control plane developers who are actively working on
+xDS development and evolution.
+
+As with maintainers, an API shepherd should be spending at least 25% of their time working on xDS
+developments and expect to be active in this space in the near future. API shepherds are expected to
+take on API shepherd review load and participate in meetings. They should be active on Slack `#xds`
+and responsive to GitHub issues and PRs on which they are tagged.
+
+The API shepherds are distinct to the [UDPA working
+group](https://github.com/cncf/udpa/blob/master/README.md), which aims to evolve xDS directionally
+towards a universal dataplane API. API shepherds are responsible for the execution of the xDS
+day-to-day and guiding xDS implementation changes. Proposals from UDPA-WG will be aligned with the
+xDS API shepherds to ensure that xDS is heading towards the UDPA goal. xDS API shepherds operate
+under the [envoyproxy](https://github.com/envoyproxy) organization but are expected to keep in mind
+the needs of all xDS clients (currently Envoy and gRPC, but we are aware of other in-house
+implementations) and the goals of UDPA-WG.
+
+If you wish to become an API shepherd and satisfy the above criteria, please contact an existing
+API shepherd. We will factor in PR and review history to determine if the above API shepherd
+requirements are met. We may ask you to shadow an existing API shepherd for a period of time to
+build confidence in consistent application of the API guidelines to PRs.
+
 # Extension addition policy
 
 Adding new [extensions](REPO_LAYOUT.md#sourceextensions-layout) has a dedicated policy. Please
 see [this](./EXTENSION_POLICY.md) document for more information.
+
+# Exernal dependency policy
+
+Adding new external dependencies has a dedicated policy. Please see [this](DEPENDENCY_POLICY.md)
+document for more information.
 
 # Conflict resolution and voting
 
