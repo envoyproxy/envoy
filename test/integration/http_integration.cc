@@ -829,7 +829,9 @@ void HttpIntegrationTest::testGrpcRetry() {
 }
 
 void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
-                                                       const std::string& via) {
+                                                       const std::string& via,
+                                                       bool disconnect_after_100) {
+  useAccessLog("%RESPONSE_CODE%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -865,6 +867,15 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
     upstream_request_->encode100ContinueHeaders(
         Http::TestResponseHeaderMapImpl{{":status", "100"}});
   }
+
+  if (disconnect_after_100) {
+    response->waitForContinueHeaders();
+    codec_client_->close();
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("100"));
+    return;
+  }
+
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(12, true);
 
@@ -879,6 +890,7 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   } else {
     EXPECT_EQ(via.c_str(), response->headers().getViaValue());
   }
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
 }
 
 void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_complete,
