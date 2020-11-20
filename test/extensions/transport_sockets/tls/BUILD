@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -178,4 +180,24 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "tls_throughput_benchmark",
+    srcs = ["tls_throughput_test.cc"],
+    external_deps = [
+        "benchmark",
+        "ssl",
+    ],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+    data = [
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "tls_throughput_benchmark_test",
+    benchmark_binary = "tls_throughput_benchmark",
 )

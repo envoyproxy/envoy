@@ -286,7 +286,7 @@ std::string TestEnvironment::substitute(const std::string& str,
   const absl::node_hash_map<std::string, std::string> path_map = {
       {"test_tmpdir", TestEnvironment::temporaryDirectory()},
       {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
-      {"test_rundir", runfiles_ != nullptr ? TestEnvironment::runfilesDirectory() : "invalid"},
+      {"test_rundir", runfiles_ != nullptr ? TestEnvironment::runfilesDirectory() : "."},
   };
 
   std::string out_json_string = str;
