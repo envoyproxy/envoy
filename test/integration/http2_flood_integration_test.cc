@@ -1163,30 +1163,31 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
 }
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
-TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader)
-if (!initializeUpstreamFloodTest()) {
-  return;
+TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  // Send client request which will send an upstream request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send an upstream reply.
+  auto* upstream = fake_upstreams_.front().get();
+  const auto buf =
+      Http2Frame::makeMalformedResponseWithZerolenHeader(Http2Frame::makeClientStreamId(0));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  response->waitForEndStream();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.rx_messaging_error")->value());
+  EXPECT_EQ(
+      1,
+      test_server_->counter("cluster.cluster_0.upstream_cx_destroy_local_with_active_rq")->value());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
-
-// Send client request which will send an upstream request.
-codec_client_ = makeHttpConnection(lookupPort("http"));
-auto response = codec_client_ -> makeHeaderOnlyRequest(default_request_headers_);
-waitForNextUpstreamRequest();
-
-// Send an upstream reply.
-auto* upstream = fake_upstreams_.front().get();
-const auto buf =
-    Http2Frame::makeMalformedResponseWithZerolenHeader(Http2Frame::makeClientStreamId(0));
-ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
-
-response->waitForEndStream();
-ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-
-EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.rx_messaging_error")->value());
-EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_destroy_local_with_active_rq")
-                 ->value());
-EXPECT_EQ("503", response->headers().getStatusValue());
-} // namespace Envoy
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
