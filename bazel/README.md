@@ -126,13 +126,18 @@ for how to update or override dependencies.
     Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
 
     When building Envoy, Bazel creates very long path names. One way to work around these excessive path
-    lengths is to change the output base directory for bazel to a very short root path. The CI pipeline
-    for Windows uses `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
+    lengths is to change the output base directory for bazel to a very short root path. An example Bazel configuration
+    to help with this is to use `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
     the following bazelrc configuration line in a system `%ProgramData%\bazel.bazelrc` file or the individual
     user's `%USERPROFILE%\.bazelrc` file (rather than including it on every bazel command line):
+
     ```
     startup --output_base=C:/_eb
     ```
+
+    Another option to shorten the the output root for Bazel is to set the `USERNAME` environment variable in your shell
+    session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
+    is set.
 
     Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
     using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
