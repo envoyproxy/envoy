@@ -125,23 +125,23 @@ static void testThroughput(benchmark::State& state) {
 
     state.ResumeTiming();
     uint32_t num_writes = 0;
-    if (full_linearize) {
-      while (write_buf.length() > 0) {
-        auto len = std::min<uint64_t>(write_buf.length(), 16384);
-        err = SSL_write(client_ssl, write_buf.linearize(len), len);
-        RELEASE_ASSERT(err == static_cast<int>(len), "SSL_write");
-        write_buf.drain(16384);
-        num_writes++;
+    while (write_buf.length() > 0) {
+      void* mem;
+      size_t len = std::min<uint64_t>(write_buf.length(), 16384);
+      if (full_linearize) {
+        mem = write_buf.linearize(len);
+      } else {
+        auto slice = write_buf.maybeLinearize(len, 4096);
+        mem = slice.mem_;
+        len = slice.len_;
       }
-    } else {
-      while (write_buf.length() > 0) {
-        auto slice = write_buf.maybeLinearize(16384, 4096);
-        err = SSL_write(client_ssl, slice.mem_, slice.len_);
-        RELEASE_ASSERT(err == static_cast<int>(slice.len_), "SSL_write");
-        write_buf.drain(slice.len_);
-        num_writes++;
-      }
+
+      err = SSL_write(client_ssl, mem, len);
+      RELEASE_ASSERT(err == static_cast<int>(len), "SSL_write");
+      write_buf.drain(16384);
+      num_writes++;
     }
+
     state.counters["writes_per_iteration"] = num_writes;
   }
   state.counters["throughput"] = benchmark::Counter(bytes_written, benchmark::Counter::kIsRate);
