@@ -343,8 +343,6 @@ envoy_cc_test(
         "http2_integration_test.h",
     ],
     shard_count = 4,
-    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -373,8 +371,6 @@ envoy_cc_test(
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
-    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/common/upstream:utility_lib",
@@ -435,7 +431,7 @@ envoy_cc_test(
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 5,
-    # TODO(envoyproxy/windows-dev): Largely resolved by Level Events PR #13787 - diagose remaining rare failure;
+    # TODO(envoyproxy/windows-dev): Diagose remaining rare failure;
     # Protocols/DownstreamProtocolIntegrationTest.LargeRequestUrlRejected/IPv6_HttpDownstream_HttpUpstream
     # test/integration/http_integration.cc(1035): error: Value of: response->complete()  Actual: false  Expected: true
     tags = ["flaky_on_windows"],
@@ -572,8 +568,6 @@ envoy_cc_test(
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 2,
-    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
@@ -929,8 +923,6 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
-    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1016,8 +1008,6 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
-    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -1238,8 +1228,6 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",

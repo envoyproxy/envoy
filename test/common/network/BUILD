@@ -135,7 +135,7 @@ envoy_cc_test(
         "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
     ],
     # TODO(envoyproxy/windows-dev): Resolve test failing when compiled with clang-cl opt build on Windows
-    tags = ["fails_on_windows_clang"],
+    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",

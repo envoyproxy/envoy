@@ -34,7 +34,7 @@ envoy_extension_cc_test(
     ],
     extension_name = "envoy.filters.network.sni_dynamic_forward_proxy",
     # TODO(envoyproxy/windows-dev): Resolve test failing when compiled with clang-cl opt build on Windows
-    tags = ["fails_on_windows_clang"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/listener/tls_inspector:config",
