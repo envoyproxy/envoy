@@ -391,7 +391,7 @@ stages:
               path: $(Build.StagingDirectory)/repository_cache
             continueOnError: true
           - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
-            displayName: "Run Windows CI"
+            displayName: "Run Windows msvc-cl CI"
             env:
               CI_TARGET: "windows"
               ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
@@ -415,9 +415,29 @@ stages:
               artifactName: windows.release
             condition: always()
 
-      - job: docker
+      - job: clang_cl
         dependsOn: ["release"]
         timeoutInMinutes: 120
+        pool:
+          vmImage: "windows-latest"
+        steps:
+          - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
+            displayName: "Run Windows clang-cl CI"
+            env:
+              ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
+              ENVOY_RBE: "true"
+              BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-clang-cl --jobs=$(RbeJobs)"
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathtoPublish: "$(Build.StagingDirectory)/envoy"
+              artifactName: windows.clang-cl
+            condition: always()
+
+      - job: docker
+        dependsOn: ["release"]
         pool:
           vmImage: "windows-latest"
         steps:
