@@ -79,13 +79,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 void Filter::onRead() {
-  try {
-    const ReadOrParseState read_state = onReadWorker();
-    if (read_state == ReadOrParseState::Error) {
-      config_->stats_.downstream_cx_proxy_proto_error_.inc();
-      cb_->continueFilterChain(false);
-    }
-  } catch (const EnvoyException& ee) {
+  const ReadOrParseState read_state = onReadWorker();
+  if (read_state == ReadOrParseState::Error) {
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
     cb_->continueFilterChain(false);
   }
@@ -268,22 +263,27 @@ bool Filter::parseV1Header(char* buf, size_t len) {
 
     // TODO(gsagula): parseInternetAddressAndPort() could be modified to take two string_view
     // arguments, so we can eliminate allocation here.
-    if (line_parts[1] == "TCP4") {
-      proxy_protocol_header_.emplace(
-          WireHeader{0, Network::Address::IpVersion::v4,
-                     Network::Utility::parseInternetAddressAndPort(
-                         std::string{line_parts[2]} + ":" + std::string{line_parts[4]}),
-                     Network::Utility::parseInternetAddressAndPort(
-                         std::string{line_parts[3]} + ":" + std::string{line_parts[5]})});
-    } else if (line_parts[1] == "TCP6") {
-      proxy_protocol_header_.emplace(
-          WireHeader{0, Network::Address::IpVersion::v6,
-                     Network::Utility::parseInternetAddressAndPort(
-                         "[" + std::string{line_parts[2]} + "]:" + std::string{line_parts[4]}),
-                     Network::Utility::parseInternetAddressAndPort(
-                         "[" + std::string{line_parts[3]} + "]:" + std::string{line_parts[5]})});
-    } else {
-      ENVOY_LOG(debug, "failed to read proxy protocol");
+    try {
+      if (line_parts[1] == "TCP4") {
+        proxy_protocol_header_.emplace(
+            WireHeader{0, Network::Address::IpVersion::v4,
+                       Network::Utility::parseInternetAddressAndPort(
+                           std::string{line_parts[2]} + ":" + std::string{line_parts[4]}),
+                       Network::Utility::parseInternetAddressAndPort(
+                           std::string{line_parts[3]} + ":" + std::string{line_parts[5]})});
+      } else if (line_parts[1] == "TCP6") {
+        proxy_protocol_header_.emplace(
+            WireHeader{0, Network::Address::IpVersion::v6,
+                       Network::Utility::parseInternetAddressAndPort(
+                           "[" + std::string{line_parts[2]} + "]:" + std::string{line_parts[4]}),
+                       Network::Utility::parseInternetAddressAndPort(
+                           "[" + std::string{line_parts[3]} + "]:" + std::string{line_parts[5]})});
+      } else {
+        ENVOY_LOG(debug, "failed to read proxy protocol");
+        return false;
+      }
+    } catch (const EnvoyException& ee) {
+      ENVOY_LOG(debug, "failed to parse IP address and port");
       return false;
     }
   }
