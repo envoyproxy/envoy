@@ -17,7 +17,7 @@ namespace {
 // See https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
 bool validateGrpcHeaderChars(absl::string_view key) {
   for (auto ch : key) {
-    if (!absl::ascii_isalnum(ch) || ch == '_' || ch == '.' || ch == '-') {
+    if (!(absl::ascii_isalnum(ch) || ch == '_' || ch == '.' || ch == '-')) {
       return false;
     }
   }
