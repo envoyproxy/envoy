@@ -200,7 +200,7 @@ void ConnectionImpl::setTransportSocketIsReadable() {
   transport_wants_read_ = true;
   // Only schedule a read activation if the connection is not read disabled to avoid spurious
   // wakeups. When read disabled, the connection will not read from the transport, and limit
-  // dispatch to the current contents of the read buffer if it's high-watermark is triggered and
+  // dispatch to the current contents of the read buffer if its high-watermark is triggered and
   // dispatch_buffered_data_ is set.
   if (read_disable_count_ == 0) {
     ioHandle().activateFileEvents(Event::FileReadyType::Read);
