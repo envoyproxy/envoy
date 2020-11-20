@@ -29,6 +29,7 @@ public:
   // Metric
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
+  Mode mode() const override { return Mode::Default; }
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }

@@ -36,9 +36,9 @@ protected:
 // Allocate 2 counters of the same name, and you'll get the same object.
 TEST_F(AllocatorImplTest, CountersWithSameName) {
   StatName counter_name = makeStat("counter.name");
-  CounterSharedPtr c1 = alloc_.makeCounter(counter_name, StatName(), {});
+  CounterSharedPtr c1 = alloc_.makeCounter(counter_name, StatName(), {}, Mode::Default);
   EXPECT_EQ(1, c1->use_count());
-  CounterSharedPtr c2 = alloc_.makeCounter(counter_name, StatName(), {});
+  CounterSharedPtr c2 = alloc_.makeCounter(counter_name, StatName(), {}, Mode::Default);
   EXPECT_EQ(2, c1->use_count());
   EXPECT_EQ(2, c2->use_count());
   EXPECT_EQ(c1.get(), c2.get());
@@ -54,9 +54,9 @@ TEST_F(AllocatorImplTest, CountersWithSameName) {
 
 TEST_F(AllocatorImplTest, GaugesWithSameName) {
   StatName gauge_name = makeStat("gauges.name");
-  GaugeSharedPtr g1 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+  GaugeSharedPtr g1 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate, Mode::Default);
   EXPECT_EQ(1, g1->use_count());
-  GaugeSharedPtr g2 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+  GaugeSharedPtr g2 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate, Mode::Default);
   EXPECT_EQ(2, g1->use_count());
   EXPECT_EQ(2, g2->use_count());
   EXPECT_EQ(g1.get(), g2.get());
@@ -89,8 +89,8 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceOrganic) {
     threads.push_back(thread_factory.createThread([&]() {
       go.WaitForNotification();
       for (uint32_t i = 0; i < iters; ++i) {
-        alloc_.makeCounter(counter_name, StatName(), {});
-        alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::NeverImport);
+        alloc_.makeCounter(counter_name, StatName(), {}, Mode::Default);
+        alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::NeverImport, Mode::Default);
       }
     }));
   }
@@ -113,7 +113,7 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   alloc_.sync().enable();
   alloc_.sync().waitOn(AllocatorImpl::DecrementToZeroSyncPoint);
   Thread::ThreadPtr thread = thread_factory.createThread([&]() {
-    CounterSharedPtr counter = alloc_.makeCounter(counter_name, StatName(), {});
+    CounterSharedPtr counter = alloc_.makeCounter(counter_name, StatName(), {}, Mode::Default);
     counter->inc();
     counter->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint
   });

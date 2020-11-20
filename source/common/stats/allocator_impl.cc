@@ -50,9 +50,17 @@ void AllocatorImpl::debugPrint() {
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
   StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-                  const StatNameTagVector& stat_name_tags)
+                  const StatNameTagVector& stat_name_tags, Mode mode)
       : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
-        alloc_(alloc) {}
+        alloc_(alloc) {
+    switch (mode) {
+      case Mode::Default:
+        break;
+      case Mode::ForceEnable:
+        flags_ |= Metric::Flags::ForceEnable;
+        break;
+    }
+  }
 
   ~StatsSharedImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
@@ -98,6 +106,13 @@ public:
    */
   virtual void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) PURE;
 
+  Mode mode() const override {
+    if ((flags_ & Metric::Flags::ForceEnable) != 0) {
+      return Mode::ForceEnable;
+    }
+    return Mode::Default;
+  }
+
 protected:
   AllocatorImpl& alloc_;
 
@@ -118,8 +133,8 @@ protected:
 class CounterImpl : public StatsSharedImpl<Counter> {
 public:
   CounterImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-              const StatNameTagVector& stat_name_tags)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
+              const StatNameTagVector& stat_name_tags, Mode mode)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags, mode) {}
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
@@ -147,8 +162,8 @@ private:
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
   GaugeImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-            const StatNameTagVector& stat_name_tags, ImportMode import_mode)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
+            const StatNameTagVector& stat_name_tags, ImportMode import_mode, Mode mode)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags, mode) {
     switch (import_mode) {
     case ImportMode::Accumulate:
       flags_ |= Flags::LogicAccumulate;
@@ -234,8 +249,8 @@ private:
 class TextReadoutImpl : public StatsSharedImpl<TextReadout> {
 public:
   TextReadoutImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-                  const StatNameTagVector& stat_name_tags)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
+                  const StatNameTagVector& stat_name_tags, Mode mode)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags, mode) {}
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.text_readouts_.erase(statName());
@@ -259,7 +274,7 @@ private:
 };
 
 CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,
-                                            const StatNameTagVector& stat_name_tags) {
+                                            const StatNameTagVector& stat_name_tags, Mode mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
@@ -267,14 +282,14 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
   }
-  auto counter = CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags));
+  auto counter = CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags, mode));
   counters_.insert(counter.get());
   return counter;
 }
 
 GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_name,
                                         const StatNameTagVector& stat_name_tags,
-                                        Gauge::ImportMode import_mode) {
+                                        Gauge::ImportMode import_mode, Mode mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
@@ -283,13 +298,14 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
     return GaugeSharedPtr(*iter);
   }
   auto gauge =
-      GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode));
+      GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode, mode));
   gauges_.insert(gauge.get());
   return gauge;
 }
 
 TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_extracted_name,
-                                                    const StatNameTagVector& stat_name_tags) {
+                                                    const StatNameTagVector& stat_name_tags,
+                                                    Mode mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(gauges_.find(name) == gauges_.end());
@@ -298,7 +314,7 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
     return TextReadoutSharedPtr(*iter);
   }
   auto text_readout =
-      TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags));
+      TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags, mode));
   text_readouts_.insert(text_readout.get());
   return text_readout;
 }
@@ -312,8 +328,8 @@ bool AllocatorImpl::isMutexLockedForTest() {
 }
 
 Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                            const StatNameTagVector& stat_name_tags) {
-  return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
+                                            const StatNameTagVector& stat_name_tags, Mode mode) {
+  return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags, mode);
 }
 
 } // namespace Stats

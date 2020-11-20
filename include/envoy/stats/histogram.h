@@ -117,6 +117,9 @@ public:
    * Records an unsigned value in the unit specified during the construction.
    */
   virtual void recordValue(uint64_t value) PURE;
+
+  /** @return the mode. */
+  virtual Mode mode() const PURE;
 };
 
 using HistogramSharedPtr = RefcountPtr<Histogram>;

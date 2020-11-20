@@ -10,6 +10,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -20,6 +21,7 @@ MockCounter::MockCounter() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, latch()).WillByDefault(ReturnPointee(&latch_));
+  ON_CALL(*this, mode()).WillByDefault(Return(Mode::Default));
 }
 MockCounter::~MockCounter() = default;
 

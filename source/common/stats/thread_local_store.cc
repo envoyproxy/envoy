@@ -85,7 +85,7 @@ template <class StatMapClass, class StatListClass>
 void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
   StatNameVec remove_list;
   for (auto& stat : map) {
-    if (rejects(stat.first)) {
+    if (stat.second->mode() != Mode::ForceEnable && rejects(stat.first)) {
       remove_list.push_back(stat.first);
     }
   }
@@ -467,8 +467,8 @@ StatTypeOptConstRef<StatType> ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
-  if (parent_.rejectsAll()) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Mode mode) {
+  if (parent_.rejectsAll() && mode != Mode::ForceEnable) {
     return parent_.null_counter_;
   }
 
@@ -497,9 +497,9 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   return safeMakeStat<Counter>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counters_,
       central_cache_->rejected_stats_,
-      [](Allocator& allocator, StatName name, StatName tag_extracted_name,
+      [mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
          const StatNameTagVector& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, tag_extracted_name, tags);
+        return allocator.makeCounter(name, tag_extracted_name, tags, mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
@@ -522,8 +522,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
-    Gauge::ImportMode import_mode) {
-  if (parent_.rejectsAll()) {
+    Gauge::ImportMode import_mode, Mode mode) {
+  if (parent_.rejectsAll() && mode != Mode::ForceEnable) {
     return parent_.null_gauge_;
   }
 
@@ -549,9 +549,9 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   Gauge& gauge = safeMakeStat<Gauge>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->gauges_,
       central_cache_->rejected_stats_,
-      [import_mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
+      [import_mode, mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
                     const StatNameTagVector& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
+        return allocator.makeGauge(name, tag_extracted_name, tags, import_mode, mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_gauge_);
   gauge.mergeImportMode(import_mode);
@@ -559,8 +559,9 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit) {
-  if (parent_.rejectsAll()) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit,
+    Mode mode) {
+  if (parent_.rejectsAll() && mode != Mode::ForceEnable) {
     return parent_.null_histogram_;
   }
 
@@ -617,7 +618,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       } else {
         stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
                                        tag_helper.tagExtractedName(), tag_helper.statNameTags(),
-                                       *buckets, parent_.next_histogram_id_++);
+                                       *buckets, parent_.next_histogram_id_++, mode);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
         }
@@ -635,8 +636,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 }
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
-  if (parent_.rejectsAll()) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Mode mode) {
+  if (parent_.rejectsAll() && mode != Mode::ForceEnable) {
     return parent_.null_text_readout_;
   }
 
@@ -665,9 +666,9 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
   return safeMakeStat<TextReadout>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->text_readouts_,
       central_cache_->rejected_stats_,
-      [](Allocator& allocator, StatName name, StatName tag_extracted_name,
+      [mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
          const StatNameTagVector& tags) -> TextReadoutSharedPtr {
-        return allocator.makeTextReadout(name, tag_extracted_name, tags);
+        return allocator.makeTextReadout(name, tag_extracted_name, tags, mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_text_readout_);
 }
@@ -757,12 +758,14 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
                                          ThreadLocalStoreImpl& thread_local_store,
                                          StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags,
-                                         ConstSupportedBuckets& supported_buckets, uint64_t id)
+                                         ConstSupportedBuckets& supported_buckets, uint64_t id,
+                                         Mode mode)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
       unit_(unit), thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, supported_buckets),
-      cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), id_(id) {}
+      cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), mode_(mode),
+      id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   thread_local_store_.releaseHistogramCrossThread(id_);

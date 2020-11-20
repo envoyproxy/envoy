@@ -61,6 +61,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
+  Mode mode() const override { return Mode::Default; } // not called currently.
 
 private:
   Histogram::Unit unit_;
@@ -83,7 +84,7 @@ class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
                       StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
-                      ConstSupportedBuckets& supported_buckets, uint64_t id);
+                      ConstSupportedBuckets& supported_buckets, uint64_t id, Mode mode);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -110,6 +111,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
+  Mode mode() const override { return mode_; }
 
   // RefcountInterface
   void incRefCount() override;
@@ -132,6 +134,7 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
+  const Mode mode_;
   std::atomic<bool> shutting_down_{false};
   std::atomic<uint32_t> ref_count_{0};
   const uint64_t id_; // Index into TlsCache::histogram_cache_.
@@ -152,8 +155,9 @@ public:
 
   // Stats::Scope
   Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    return default_scope_->counterFromStatNameWithTags(name, tags);
+                                       StatNameTagVectorOptConstRef tags,
+                                       Mode mode) override {
+    return default_scope_->counterFromStatNameWithTags(name, tags, mode);
   }
   Counter& counterFromString(const std::string& name) override {
     return default_scope_->counterFromString(name);
@@ -163,22 +167,25 @@ public:
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
+                                   Gauge::ImportMode import_mode,
+                                   Mode mode) override {
+    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode, mode);
   }
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gaugeFromString(name, import_mode);
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
+                                           Histogram::Unit unit,
+                                           Mode mode) override {
+    return default_scope_->histogramFromStatNameWithTags(name, tags, unit, mode);
   }
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     return default_scope_->histogramFromString(name, unit);
   }
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
-    return default_scope_->textReadoutFromStatNameWithTags(name, tags);
+                                               StatNameTagVectorOptConstRef tags,
+                                               Mode mode) override {
+    return default_scope_->textReadoutFromStatNameWithTags(name, tags, mode);
   }
   TextReadout& textReadoutFromString(const std::string& name) override {
     return default_scope_->textReadoutFromString(name);
@@ -326,15 +333,19 @@ private:
 
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
-                                         StatNameTagVectorOptConstRef tags) override;
+                                         StatNameTagVectorOptConstRef tags,
+                                         Mode mode) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                     Gauge::ImportMode import_mode) override;
+                                     Gauge::ImportMode import_mode,
+                                     Mode mode) override;
     Histogram& histogramFromStatNameWithTags(const StatName& name,
                                              StatNameTagVectorOptConstRef tags,
-                                             Histogram::Unit unit) override;
+                                             Histogram::Unit unit,
+                                             Mode mode) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags) override;
+                                                 StatNameTagVectorOptConstRef tags,
+                                                 Mode mode) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }

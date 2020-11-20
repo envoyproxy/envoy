@@ -24,12 +24,12 @@ public:
 
   // Allocator
   CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
-                               const StatNameTagVector& stat_name_tags) override;
+                               const StatNameTagVector& stat_name_tags, Mode mode) override;
   GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
                            const StatNameTagVector& stat_name_tags,
-                           Gauge::ImportMode import_mode) override;
+                           Gauge::ImportMode import_mode, Mode mode) override;
   TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
-                                       const StatNameTagVector& stat_name_tags) override;
+                                       const StatNameTagVector& stat_name_tags, Mode mode) override;
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
@@ -49,7 +49,7 @@ public:
 
 protected:
   virtual Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                       const StatNameTagVector& stat_name_tags);
+                                       const StatNameTagVector& stat_name_tags, Mode mode);
 
 private:
   template <class BaseClass> friend class StatsSharedImpl;

@@ -15,6 +15,8 @@
 namespace Envoy {
 namespace Stats {
 
+enum class Mode { ForceEnable, Default };
+
 /**
  * General interface for all stats objects.
  */
@@ -92,6 +94,7 @@ public:
     static const uint8_t Used = 0x01;
     static const uint8_t LogicAccumulate = 0x02;
     static const uint8_t NeverImport = 0x04;
+    static const uint8_t ForceEnable = 0x08;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
@@ -111,6 +114,7 @@ public:
   virtual uint64_t latch() PURE;
   virtual void reset() PURE;
   virtual uint64_t value() const PURE;
+  virtual Mode mode() const PURE;
 };
 
 using CounterSharedPtr = RefcountPtr<Counter>;
@@ -159,6 +163,9 @@ public:
    * @param import_mode the new import mode.
    */
   virtual void mergeImportMode(ImportMode import_mode) PURE;
+
+  /** @return the mode. */
+  virtual Mode mode() const PURE;
 };
 
 using GaugeSharedPtr = RefcountPtr<Gauge>;
@@ -186,6 +193,9 @@ public:
    * @return the copy of this TextReadout value.
    */
   virtual std::string value() const PURE;
+
+  /** @return the mode. */
+  virtual Mode mode() const PURE;
 };
 
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;

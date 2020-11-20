@@ -57,7 +57,7 @@ public:
    * @return a counter within the scope's namespace.
    */
   Counter& counterFromStatName(const StatName& name) {
-    return counterFromStatNameWithTags(name, absl::nullopt);
+    return counterFromStatNameWithTags(name, absl::nullopt, Mode::Default);
   }
   /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
@@ -67,7 +67,8 @@ public:
    * @return a counter within the scope's namespace.
    */
   virtual Counter& counterFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) PURE;
+                                               StatNameTagVectorOptConstRef tags,
+                                               Mode mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
@@ -83,7 +84,7 @@ public:
    * @return a gauge within the scope's namespace.
    */
   Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
-    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode);
+    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode, Mode::Default);
   }
 
   /**
@@ -95,7 +96,8 @@ public:
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Gauge::ImportMode import_mode) PURE;
+                                           Gauge::ImportMode import_mode,
+                                           Mode mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
@@ -117,7 +119,7 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
-    return histogramFromStatNameWithTags(name, absl::nullopt, unit);
+    return histogramFromStatNameWithTags(name, absl::nullopt, unit, Mode::Default);
   }
 
   /**
@@ -130,7 +132,8 @@ public:
    */
   virtual Histogram& histogramFromStatNameWithTags(const StatName& name,
                                                    StatNameTagVectorOptConstRef tags,
-                                                   Histogram::Unit unit) PURE;
+                                                   Histogram::Unit unit,
+                                                   Mode mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.
@@ -146,7 +149,7 @@ public:
    * @return a text readout within the scope's namespace.
    */
   TextReadout& textReadoutFromStatName(const StatName& name) {
-    return textReadoutFromStatNameWithTags(name, absl::nullopt);
+    return textReadoutFromStatNameWithTags(name, absl::nullopt, Mode::Default);
   }
 
   /**
@@ -157,7 +160,8 @@ public:
    * @return a text readout within the scope's namespace.
    */
   virtual TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                                       StatNameTagVectorOptConstRef tags) PURE;
+                                                       StatNameTagVectorOptConstRef tags,
+                                                       Mode mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use textReadoutFromStatName.

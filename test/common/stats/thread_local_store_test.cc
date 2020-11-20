@@ -393,26 +393,32 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
 
   {
     StatNameManagedStorage storage("c3", symbol_table_);
-    Counter& counter = scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags);
+    Counter& counter = scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                           Mode::Default);
     EXPECT_EQ(expectedTags, counter.tags());
-    EXPECT_EQ(&counter, &scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags));
+    EXPECT_EQ(&counter, &scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                           Mode::Default));
   }
   {
     StatNameManagedStorage storage("g3", symbol_table_);
     Gauge& gauge = scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
-                                                     Gauge::ImportMode::Accumulate);
+                                                     Gauge::ImportMode::Accumulate,
+                                                           Mode::Default);
     EXPECT_EQ(expectedTags, gauge.tags());
     EXPECT_EQ(&gauge, &scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
-                                                         Gauge::ImportMode::Accumulate));
+                                                         Gauge::ImportMode::Accumulate,
+                                                           Mode::Default));
   }
   {
     StatNameManagedStorage storage("h3", symbol_table_);
     Histogram& histogram = scope1->histogramFromStatNameWithTags(
-        StatName(storage.statName()), tags, Stats::Histogram::Unit::Unspecified);
+        StatName(storage.statName()), tags, Stats::Histogram::Unit::Unspecified,
+                                                           Mode::Default);
     EXPECT_EQ(expectedTags, histogram.tags());
     EXPECT_EQ(&histogram,
               &scope1->histogramFromStatNameWithTags(StatName(storage.statName()), tags,
-                                                     Stats::Histogram::Unit::Unspecified));
+                                                     Stats::Histogram::Unit::Unspecified,
+                                                           Mode::Default));
   }
 
   store_->shutdownThreading();
@@ -1618,7 +1624,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
 
     // Here we show that the counter cleanups have finished, because the use-count is 1.
     CounterSharedPtr counter =
-        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
+        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{}, Mode::Default);
     EXPECT_EQ(1, counter->use_count()) << "index=" << i;
   }
 }
@@ -1643,7 +1649,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
     // so we don't time out on asan/tsan tests, In opt builds this test takes
     // less than a second, and in fastbuild it takes less than 5.
     CounterSharedPtr counter =
-        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
+        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{}, Mode::Default);
     uint32_t use_count = counter->use_count() - 1; // Subtract off this instance.
     EXPECT_EQ((i + 1) * NumScopes * NumThreads, use_count);
   }

@@ -35,7 +35,7 @@ public:
    * @return CounterSharedPtr a counter.
    */
   virtual CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
-                                       const StatNameTagVector& stat_name_tags) PURE;
+                                       const StatNameTagVector& stat_name_tags, Mode mode) PURE;
 
   /**
    * @param name the full name of the stat.
@@ -45,7 +45,7 @@ public:
    */
   virtual GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
                                    const StatNameTagVector& stat_name_tags,
-                                   Gauge::ImportMode import_mode) PURE;
+                                   Gauge::ImportMode import_mode, Mode mode) PURE;
 
   /**
    * @param name the full name of the stat.
@@ -54,7 +54,7 @@ public:
    * @return TextReadoutSharedPtr a text readout.
    */
   virtual TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
-                                               const StatNameTagVector& stat_name_tags) PURE;
+                                               const StatNameTagVector& stat_name_tags, Mode mode) PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 

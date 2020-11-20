@@ -28,6 +28,7 @@ public:
   uint64_t latch() override { return 0; }
   void reset() override {}
   uint64_t value() const override { return 0; }
+  Mode mode() const override { return Mode::Default; }
 
   // Metric
   bool used() const override { return false; }

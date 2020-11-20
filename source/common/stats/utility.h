@@ -77,10 +77,12 @@ public:
    * @param scope The scope in which to create the counter.
    * @param elements The vector of mixed DynamicName and StatName
    * @param tags optionally specified tags.
+   * @param mode the mode
    * @return A counter named using the joined elements.
    */
   static Counter& counterFromElements(Scope& scope, const ElementVec& elements,
-                                      StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                      StatNameTagVectorOptConstRef tags = absl::nullopt,
+                                      Mode mode = Mode::Default);
 
   /**
    * Creates a counter from a vector of tokens which are used to create the
@@ -92,10 +94,12 @@ public:
    * @param scope The scope in which to create the counter.
    * @param names The vector of StatNames
    * @param tags optionally specified tags.
+   * @param mode the mode
    * @return A counter named using the joined elements.
    */
   static Counter& counterFromStatNames(Scope& scope, const StatNameVec& names,
-                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                       StatNameTagVectorOptConstRef tags = absl::nullopt,
+                                       Mode mode = Mode::Default);
 
   /**
    * Creates a gauge from a vector of tokens which are used to create the
@@ -111,11 +115,13 @@ public:
    * @param elements The vector of mixed DynamicName and StatName
    * @param import_mode Whether hot-restart should accumulate this value.
    * @param tags optionally specified tags.
+   * @param mode the mode
    * @return A gauge named using the joined elements.
    */
   static Gauge& gaugeFromElements(Scope& scope, const ElementVec& elements,
                                   Gauge::ImportMode import_mode,
-                                  StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                  StatNameTagVectorOptConstRef tags = absl::nullopt,
+                                  Mode mode = Mode::Default);
 
   /**
    * Creates a gauge from a vector of tokens which are used to create the
@@ -128,11 +134,13 @@ public:
    * @param names The vector of StatNames
    * @param import_mode Whether hot-restart should accumulate this value.
    * @param tags optionally specified tags.
+   * @param mode the mode
    * @return A gauge named using the joined elements.
    */
   static Gauge& gaugeFromStatNames(Scope& scope, const StatNameVec& elements,
                                    Gauge::ImportMode import_mode,
-                                   StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                   StatNameTagVectorOptConstRef tags = absl::nullopt,
+                                   Mode mode = Mode::Default);
 
   /**
    * Creates a histogram from a vector of tokens which are used to create the
@@ -148,11 +156,13 @@ public:
    * @param elements The vector of mixed DynamicName and StatName
    * @param unit The unit of measurement.
    * @param tags optionally specified tags.
+   * @param mode the mode
    * @return A histogram named using the joined elements.
    */
   static Histogram& histogramFromElements(Scope& scope, const ElementVec& elements,
                                           Histogram::Unit unit,
-                                          StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                          StatNameTagVectorOptConstRef tags = absl::nullopt,
+                                          Mode mode = Mode::Default);
 
   /**
    * Creates a histogram from a vector of tokens which are used to create the
@@ -165,11 +175,13 @@ public:
    * @param elements The vector of mixed DynamicName and StatName
    * @param unit The unit of measurement.
    * @param tags optionally specified tags.
+   * @param mode the mode
    * @return A histogram named using the joined elements.
    */
   static Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements,
                                            Histogram::Unit unit,
-                                           StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                           StatNameTagVectorOptConstRef tags = absl::nullopt,
+                                           Mode mode = Mode::Default);
 
   /**
    * Creates a TextReadout from a vector of tokens which are used to create the
@@ -185,10 +197,12 @@ public:
    * @param elements The vector of mixed DynamicName and StatName
    * @param unit The unit of measurement.
    * @param tags optionally specified tags.
+   * @param mode the mode
    * @return A TextReadout named using the joined elements.
    */
   static TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
-                                              StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                              StatNameTagVectorOptConstRef tags = absl::nullopt,
+                                              Mode mode = Mode::Default);
 
   /**
    * Creates a TextReadout from a vector of tokens which are used to create the
@@ -201,10 +215,12 @@ public:
    * @param elements The vector of mixed DynamicName and StatName
    * @param unit The unit of measurement.
    * @param tags optionally specified tags.
+   * @param mode the mode
    * @return A TextReadout named using the joined elements.
    */
   static TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
-                                               StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                               StatNameTagVectorOptConstRef tags = absl::nullopt,
+                                               Mode mode = Mode::Default);
 };
 
 /**

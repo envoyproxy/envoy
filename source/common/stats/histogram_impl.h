@@ -92,9 +92,9 @@ private:
 class HistogramImpl : public HistogramImplHelper {
 public:
   HistogramImpl(StatName name, Unit unit, Store& parent, StatName tag_extracted_name,
-                const StatNameTagVector& stat_name_tags)
+                const StatNameTagVector& stat_name_tags, Mode mode)
       : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, parent.symbolTable()),
-        unit_(unit), parent_(parent) {}
+        unit_(unit), mode_(mode), parent_(parent) {}
   ~HistogramImpl() override {
     // We must explicitly free the StatName here in order to supply the
     // SymbolTable reference. An RAII alternative would be to store a
@@ -109,9 +109,11 @@ public:
 
   bool used() const override { return true; }
   SymbolTable& symbolTable() final { return parent_.symbolTable(); }
+  Mode mode() const override { return mode_; }
 
 private:
   Unit unit_;
+  Mode mode_;
 
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
@@ -132,6 +134,7 @@ public:
 
   Unit unit() const override { return Unit::Null; };
   void recordValue(uint64_t) override {}
+  Mode mode() const override { return Mode::Default; }
 
 private:
   SymbolTable& symbol_table_;

@@ -22,16 +22,17 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
     : StoreImpl(symbol_table), alloc_(symbol_table),
       counters_([this](StatName name) -> CounterSharedPtr {
-        return alloc_.makeCounter(name, name, StatNameTagVector{});
+        return alloc_.makeCounter(name, name, StatNameTagVector{}, Mode::Default);
       }),
       gauges_([this](StatName name, Gauge::ImportMode import_mode) -> GaugeSharedPtr {
-        return alloc_.makeGauge(name, name, StatNameTagVector{}, import_mode);
+        return alloc_.makeGauge(name, name, StatNameTagVector{}, import_mode, Mode::Default);
       }),
       histograms_([this](StatName name, Histogram::Unit unit) -> HistogramSharedPtr {
-        return HistogramSharedPtr(new HistogramImpl(name, unit, *this, name, StatNameTagVector{}));
+        return HistogramSharedPtr(new HistogramImpl(name, unit, *this, name, StatNameTagVector{},
+                                                    Mode::Default));
       }),
       text_readouts_([this](StatName name, TextReadout::Type) -> TextReadoutSharedPtr {
-        return alloc_.makeTextReadout(name, name, StatNameTagVector{});
+        return alloc_.makeTextReadout(name, name, StatNameTagVector{}, Mode::Default);
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
       null_gauge_(new NullGaugeImpl(symbol_table)) {}
