@@ -149,6 +149,8 @@ static void testThroughput(benchmark::State& state) {
     state.counters["writes_per_iteration"] = num_writes;
   }
   state.counters["throughput"] = benchmark::Counter(bytes_written, benchmark::Counter::kIsRate);
+  ::close(sockets[0]);
+  ::close(sockets[1]);
 }
 
 static void TestParams(benchmark::internal::Benchmark* b) {
