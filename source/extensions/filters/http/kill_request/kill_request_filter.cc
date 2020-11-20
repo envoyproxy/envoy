@@ -4,8 +4,6 @@
 
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/common/fault/fault_config.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
