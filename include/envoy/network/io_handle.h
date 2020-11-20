@@ -4,6 +4,8 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
+#include "absl/container/fixed_array.h"
+
 namespace Envoy {
 namespace Buffer {
 struct RawSlice;
@@ -74,13 +76,26 @@ public:
                                           int flags, const Address::Ip* self_ip,
                                           const Address::Instance& peer_address) PURE;
 
+  struct RecvMsgPerPacketInfo {
+    // If true indicates a successful syscall, but the packet was dropped due to truncation. We do
+    // not support receiving truncated packets.
+    bool truncated_and_dropped_{false};
+  };
+
+  /**
+   * The output parameter type for recvmsg and recvmmsg.
+   */
   struct RecvMsgOutput {
     /*
+     * @param num_packets_per_call is the max number of packets allowed per
+     * recvmmsg call. For recvmsg call, any value larger than 0 is allowed, but
+     * only one packet will be returned.
      * @param dropped_packets points to a variable to store how many packets are
      * dropped so far. If nullptr, recvmsg() won't try to get this information
      * from transport header.
      */
-    RecvMsgOutput(uint32_t* dropped_packets) : dropped_packets_(dropped_packets) {}
+    RecvMsgOutput(size_t num_packets_per_call, uint32_t* dropped_packets)
+        : dropped_packets_(dropped_packets), msg_(num_packets_per_call) {}
 
     // If not nullptr, its value is the total number of packets dropped. recvmsg() will update it
     // when more packets are dropped.
@@ -89,6 +104,8 @@ public:
     std::shared_ptr<const Address::Instance> local_address_;
     // The the source address from transport header.
     std::shared_ptr<const Address::Instance> peer_address_;
+    // Per packet info.
+    absl::FixedArray<RecvMsgPerPacketInfo> msg_;
   };
 
   /**

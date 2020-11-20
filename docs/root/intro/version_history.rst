@@ -5,6 +5,7 @@ Version history
 ================
 Changes
 -------
+* udp: fixed issue in which receiving truncated UDP datagrams would cause Envoy to crash.
 
 1.13.6 (September 29, 2020)
 ===========================

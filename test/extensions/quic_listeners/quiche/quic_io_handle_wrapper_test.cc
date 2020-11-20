@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 
+#include <cstddef>
 #include <memory>
 
 #include "common/network/address_impl.h"
@@ -56,8 +57,8 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   EXPECT_CALL(os_sys_calls_, sendmsg(fd, _, 0)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
 
-  Network::IoHandle::RecvMsgOutput output(nullptr);
-  EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, 0)).WillOnce(Invoke([](int, struct msghdr* msg, int) {
+  Network::IoHandle::RecvMsgOutput output(1, nullptr);
+  EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, MSG_TRUNC)).WillOnce(Invoke([](int, msghdr* msg, int) {
     sockaddr_storage ss;
     auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
     memset(ipv6_addr, 0, sizeof(sockaddr_in6));
@@ -66,6 +67,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
     ipv6_addr->sin6_port = htons(54321);
     *reinterpret_cast<sockaddr_in6*>(msg->msg_name) = *ipv6_addr;
     msg->msg_namelen = sizeof(sockaddr_in6);
+    msg->msg_controllen = 0;
     return Api::SysCallSizeResult{5u, 0};
   }));
   wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output);
