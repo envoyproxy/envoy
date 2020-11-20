@@ -38,6 +38,7 @@ Bug Fixes
 * tls: fix detection of the upstream connection close event.
 * tls: fix read resumption after triggering buffer high-watermark and all remaining request/response bytes are stored in the SSL connection's internal buffers.
 * watchdog: touch the watchdog before most event loop operations to avoid misses when handling bursts of callbacks.
+* udp: fixed issue in which receiving truncated UDP datagrams would cause Envoy to crash.
 
 Removed Config or Runtime
 -------------------------
