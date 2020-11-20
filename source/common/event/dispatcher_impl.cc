@@ -251,6 +251,10 @@ void DispatcherImpl::post(std::function<void()> callback) {
 
 bool DispatcherImpl::tryPost(std::function<void()> callback) {
   bool do_post;
+  // Post master to master. Skip.
+  if (isThreadSafe()) {
+    return false;
+  }
   {
     Thread::LockGuard lock(post_lock_);
     // TODO(lambdai): For compatibility we should allow blind post.
@@ -273,7 +277,9 @@ void DispatcherImpl::run(RunType type) {
     // Allows tryPost.
     FANCY_LOG(debug, "lambdai: run {}", type);
     Thread::LockGuard lock(post_lock_);
-    exited_ = false;
+    if (type == RunType::Block) {
+      exited_ = false;
+    }
   }
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
@@ -287,6 +293,8 @@ void DispatcherImpl::run(RunType type) {
     Thread::LockGuard lock(post_lock_);
     exited_ = true;
   }
+  // TODO(lambdai): reconsider this.
+  runPostCallbacks();
 }
 
 MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
