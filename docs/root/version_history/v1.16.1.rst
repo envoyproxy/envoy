@@ -1,0 +1,6 @@
+1.16.1 (TBD)
+============
+
+Changes
+-------
+* udp: fixed issue in which receiving truncated UDP datagrams would cause Envoy to crash.
