@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "common/common/macros.h"
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -21,6 +20,7 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/utility.h"

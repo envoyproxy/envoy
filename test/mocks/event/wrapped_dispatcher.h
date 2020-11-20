@@ -94,6 +94,10 @@ public:
 
   void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
 
+  bool tryPost(std::function<void()> callback) override {
+    return impl_.tryPost(std::move(callback));
+  }
+
   void run(RunType type) override { impl_.run(type); }
 
   Buffer::WatermarkFactory& getWatermarkFactory() override { return impl_.getWatermarkFactory(); }
