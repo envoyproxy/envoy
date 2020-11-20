@@ -88,6 +88,26 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 #endif
 }
 
+TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalChars) {
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
+
+  auto& metadata = *grpc_service.mutable_initial_metadata()->Add();
+  metadata.set_key("illegalcharacter;");
+  metadata.set_value("value");
+
+#ifdef ENVOY_GOOGLE_GRPC
+  EXPECT_THROW_WITH_MESSAGE(
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
+      "Illegal characters in gRPC initial metadata.");
+#else
+  EXPECT_THROW_WITH_MESSAGE(
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
+      "Google C++ gRPC client is not linked");
+#endif
+}
+
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownOk) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
