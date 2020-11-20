@@ -116,8 +116,8 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   const bool isCompressible = isEnabledAndContentLengthBigEnough && isContentTypeAllowed(headers) &&
                               !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
                               !headers.getInline(content_encoding_handle.handle());
-  if (!end_stream && isEnabledAndContentLengthBigEnough && isAcceptEncodingAllowed(headers) &&
-      isCompressible && isTransferEncodingAllowed(headers)) {
+  if (!end_stream && isCompressible && isAcceptEncodingAllowed(headers) &&
+      isTransferEncodingAllowed(headers)) {
     skip_compression_ = false;
     sanitizeEtagHeader(headers);
     headers.removeContentLength();
