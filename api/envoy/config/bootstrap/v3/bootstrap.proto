@@ -175,7 +175,7 @@ message Bootstrap {
     gte {nanos: 1000000}
   }];
 
-  bool merge_histograms_on_admin_access = 28;
+  bool flush_stats_on_admin_access = 28;
 
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
