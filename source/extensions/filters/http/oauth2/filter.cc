@@ -60,8 +60,7 @@ constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
 constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
 constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
 constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
-
-const std::string& DEFAULT_AUTH_SCOPE = "user";
+constexpr absl::string_view DEFAULT_AUTH_SCOPE = "user";
 
 template <class T>
 std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
@@ -73,6 +72,27 @@ std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_pro
   }
 
   return matchers;
+}
+
+// Transforms the proto list of 'auth_scopes' into a vector of std::string, also
+// handling the default value logic
+template <class T>
+std::vector<std::string> authScopesList(const T& auth_scopes_protos) {
+  std::vector<std::string> scopes;
+
+  // if 'auth_scopes_protos' is zero sized, it means the list is empty in the yaml,
+  // then it should default to a list of single value
+  if (auth_scopes_protos.size() == 0) {
+    scopes.reserve(1);
+    scopes.emplace_back(DEFAULT_AUTH_SCOPE);
+  } else {
+    scopes.reserve(auth_scopes_protos.size());
+
+    for (const auto& scope : auth_scopes_protos) {
+      scopes.emplace_back(scope);
+    }
+  }
+  return scopes;
 }
 
 // Sets the auth token as the Bearer token in the authorization header.
@@ -92,8 +112,7 @@ FilterConfig::FilterConfig(
       redirect_matcher_(proto_config.redirect_path_matcher()),
       signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
-      auth_scopes_((!proto_config.auth_scopes().empty()) ? proto_config.auth_scopes()
-                                                         : DEFAULT_AUTH_SCOPE),
+      auth_scopes_(authScopesList(proto_config.auth_scopes())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
   if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
@@ -279,9 +298,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_redirect_uri =
         Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
-    const std::string new_url = fmt::format(
-        AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
-        config_->authScopes(), escaped_redirect_uri, escaped_state);
+    const std::string escaped_auth_scopes = absl::StrJoin(config_->authScopes(), "%20");
+
+    const std::string new_url =
+        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
+                    config_->clientId(), escaped_auth_scopes, escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
