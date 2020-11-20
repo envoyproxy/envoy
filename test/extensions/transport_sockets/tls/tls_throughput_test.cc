@@ -142,7 +142,7 @@ static void testThroughput(benchmark::State& state) {
 
       err = SSL_write(client_ssl, mem, len);
       RELEASE_ASSERT(err == static_cast<int>(len), "SSL_write");
-      write_buf.drain(16384);
+      write_buf.drain(len);
       num_writes++;
     }
 
