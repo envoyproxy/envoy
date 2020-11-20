@@ -371,6 +371,7 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
+        "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:hot_restart_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:options_mocks",

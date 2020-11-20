@@ -371,6 +371,20 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_EQ(1u, manager_->listeners().size());
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, AllowOnlyDefaultFilterChain) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+default_filter_chain:
+  filters: []
+  )EOF";
+
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1, manager_->listeners().size());
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
   const std::string yaml = R"EOF(
 address:
@@ -3566,7 +3580,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidPrivateKey) 
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException, "Failed to load private key from <inline>");
+                            EnvoyException,
+                            "Failed to load private key from <inline>, "
+                            "Cause: error:0900006e:PEM routines:OPENSSL_internal:NO_START_LINE");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
@@ -3589,6 +3605,28 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
                             EnvoyException, "Failed to load trusted CA certificates from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateCertPrivateKeyMismatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_key.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_REGEX(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
+      "Failed to load private key from .*, "
+      "Cause: error:0b000074:X.509 certificate routines:OPENSSL_internal:KEY_VALUES_MISMATCH");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {

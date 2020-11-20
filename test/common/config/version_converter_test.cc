@@ -71,6 +71,18 @@ TEST(VersionConverterProto, UpgradeNextVersion) {
   VersionConverter::upgrade(source, dst);
 }
 
+// Validate that even if we pass in a newer proto version that is being passed off as an older
+// version (e.g. via a type URL mistake), we don't crash. This is a regression test for
+// https://github.com/envoyproxy/envoy/issues/13681.
+TEST(VersionConverterProto, UpgradeWithConfusedTypes) {
+  test::common::config::NextVersion source_next;
+  source_next.mutable_new_message_in_this_version();
+  test::common::config::PreviousVersion source;
+  ASSERT_TRUE(source.ParseFromString(source_next.SerializeAsString()));
+  test::common::config::NextVersion dst;
+  VersionConverter::upgrade(source, dst);
+}
+
 // Bad UTF-8 can fail wire cast during upgrade.
 TEST(VersionConverterTest, UpgradeException) {
   API_NO_BOOST(envoy::api::v2::Cluster) source;
