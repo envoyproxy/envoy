@@ -393,6 +393,12 @@ stages:
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
+              testRunTitle: "windows"
+              searchFolder: $(Build.StagingDirectory)/tmp
+            condition: always()
           - task: PublishBuildArtifacts@1
             inputs:
               pathtoPublish: "$(Build.StagingDirectory)/envoy"
