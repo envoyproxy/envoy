@@ -522,7 +522,7 @@ private:
   };
 
   std::string data_ ABSL_GUARDED_BY(lock_);
-  Network::ReadFilterSharedPtr read_filter_;
+  std::weak_ptr<Network::ReadFilter> read_filter_;
 };
 
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
