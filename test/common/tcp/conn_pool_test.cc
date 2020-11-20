@@ -96,8 +96,6 @@ public:
                NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
                bool test_new_connection_pool);
 
-  void initialize();
-
   void addIdleCallback(IdleCb cb, DrainPool drain) override {
     conn_pool_->addIdleCallback(cb, drain);
   }
@@ -287,7 +285,7 @@ public:
           dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, state_);
     } else {
       conn_pool_ = std::make_unique<OriginalConnPoolImpl>(
-          dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, absl::nullopt);
+          dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr);
     }
   }
   ~TcpConnPoolImplDestructorTest() override = default;
@@ -1061,8 +1059,6 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
 }
 
 TEST_P(TcpConnPoolImplTest, TestIdleTimeout) {
-  conn_pool_.initialize();
-
   testing::MockFunction<void(bool)> idle_callback;
   conn_pool_.addIdleCallback(idle_callback.AsStdFunction(),
                              Envoy::ConnectionPool::Instance::DrainPool::No);
@@ -1142,7 +1138,6 @@ TEST_P(TcpConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
 }
 
 INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplTest, testing::Bool());
-INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplIdleTimeoutTest, testing::Bool());
 INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplDestructorTest, testing::Bool());
 
 } // namespace Tcp
