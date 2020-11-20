@@ -932,22 +932,14 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
                                                       const HostVector& hosts_removed) {
   const auto& host_set = cluster.prioritySet().hostSetsPerPriority()[priority];
 
-  tls_.runOnAllThreads(
-      [name = cluster.info()->name(), priority,
-       update_params = HostSetImpl::updateHostsParams(*host_set),
-       locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
-       overprovisioning_factor = host_set->overprovisioningFactor()](
-          OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-        cluster_manager->updateClusterMembership(name, priority, update_params, locality_weights,
-                                                 hosts_added, hosts_removed,
-                                                 overprovisioning_factor);
-      },
-      // This completion is guaranteed to be executed on master thread.
-      // Still the host can be snapped by dataplane and need to addressed separately.
-      [hosts_added_guard = hosts_added, hosts_removed_guard = hosts_removed]() {
-        UNREFERENCED_PARAMETER(hosts_added_guard);
-        UNREFERENCED_PARAMETER(hosts_removed_guard);
-      });
+  tls_.runOnAllThreads([name = cluster.info()->name(), priority,
+                        update_params = HostSetImpl::updateHostsParams(*host_set),
+                        locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
+                        overprovisioning_factor = host_set->overprovisioningFactor()](
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    cluster_manager->updateClusterMembership(name, priority, update_params, locality_weights,
+                                             hosts_added, hosts_removed, overprovisioning_factor);
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
