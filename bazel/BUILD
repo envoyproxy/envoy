@@ -188,7 +188,7 @@ config_setting(
 )
 
 # As select() can't be nested we need these specialized settings to avoid ambiguity when choosing
-# tcmalloc's flavor for x86_64 builds.
+# tcmalloc's flavor for x86_64 and aarch64 builds.
 config_setting(
     name = "disable_tcmalloc_on_linux_x86_64",
     values = {
@@ -210,6 +210,30 @@ config_setting(
     values = {
         "define": "tcmalloc=debug",
         "cpu": "k8",
+    },
+)
+
+config_setting(
+    name = "disable_tcmalloc_on_linux_aarch64",
+    values = {
+        "define": "tcmalloc=disabled",
+        "cpu": "aarch64",
+    },
+)
+
+config_setting(
+    name = "gperftools_tcmalloc_on_linux_aarch64",
+    values = {
+        "define": "tcmalloc=gperftools",
+        "cpu": "aarch64",
+    },
+)
+
+config_setting(
+    name = "debug_tcmalloc_on_linux_aarch64",
+    values = {
+        "define": "tcmalloc=debug",
+        "cpu": "aarch64",
     },
 )
 
@@ -316,11 +340,6 @@ config_setting(
 
 # TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
 config_setting(
-    name = "wasm_all",
-    values = {"define": "wasm=enabled"},
-)
-
-config_setting(
     name = "wasm_wavm",
     values = {"define": "wasm=wavm"},
 )
@@ -328,6 +347,11 @@ config_setting(
 config_setting(
     name = "wasm_v8",
     values = {"define": "wasm=v8"},
+)
+
+config_setting(
+    name = "wasm_wasmtime",
+    values = {"define": "wasm=wasmtime"},
 )
 
 config_setting(

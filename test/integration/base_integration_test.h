@@ -153,7 +153,7 @@ public:
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             const bool api_downgrade = true) {
+                             const bool api_downgrade = false) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
     } else {
@@ -189,7 +189,7 @@ public:
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, const bool api_downgrade = true) {
+                                 const std::string& version, const bool api_downgrade = false) {
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
@@ -209,7 +209,7 @@ public:
   void sendDeltaDiscoveryResponse(const std::string& type_url,
                                   const std::vector<T>& added_or_updated,
                                   const std::vector<std::string>& removed,
-                                  const std::string& version, const bool api_downgrade = true) {
+                                  const std::string& version, const bool api_downgrade = false) {
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
                                api_downgrade);
   }
@@ -218,7 +218,7 @@ public:
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
                              FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
-                             const bool api_downgrade = true) {
+                             const bool api_downgrade = false) {
     auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
                                                     aliases, api_downgrade);
     stream->sendGrpcMessage(response);
@@ -229,7 +229,7 @@ public:
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases,
-                               const bool api_downgrade = true) {
+                               const bool api_downgrade = false) {
 
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info("system_version_info_this_is_a_test");
@@ -244,7 +244,7 @@ public:
         temp_any.PackFrom(message);
         resource->mutable_resource()->PackFrom(message);
       }
-      resource->set_name(TestUtility::xdsResourceName(temp_any));
+      resource->set_name(intResourceName(message));
       resource->set_version(version);
       for (const auto& alias : aliases) {
         resource->add_aliases(alias);
@@ -257,6 +257,17 @@ public:
   }
 
 private:
+  std::string intResourceName(const envoy::config::listener::v3::Listener& m) { return m.name(); }
+  std::string intResourceName(const envoy::config::route::v3::RouteConfiguration& m) {
+    return m.name();
+  }
+  std::string intResourceName(const envoy::config::cluster::v3::Cluster& m) { return m.name(); }
+  std::string intResourceName(const envoy::config::endpoint::v3::ClusterLoadAssignment& m) {
+    return m.cluster_name();
+  }
+  std::string intResourceName(const envoy::config::route::v3::VirtualHost& m) { return m.name(); }
+  std::string intResourceName(const envoy::service::runtime::v3::Runtime& m) { return m.name(); }
+
   Event::GlobalTimeSystem time_system_;
 
 public:
@@ -437,6 +448,9 @@ protected:
   // By default the test server will use custom stats to notify on increment.
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
+
+  // Use a v2 bootstrap.
+  bool v2_bootstrap_{false};
 
 private:
   // The type for the Envoy-to-backend connection

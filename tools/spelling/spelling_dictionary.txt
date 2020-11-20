@@ -237,6 +237,7 @@ Postgre
 Postgres
 Prereq
 QDCOUNT
+QPACK
 QUIC
 QoS
 RAII
@@ -1206,6 +1207,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wasmtime
 websocket
 wepoll
 whitespace
