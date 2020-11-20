@@ -114,15 +114,15 @@ public:
 /**
  * Class used for creating non-memory allocating std::ostream.
  */
-class FixedSizeStreamBuffer : public std::streambuf {
+class MutableMemoryStreamBuffer : public std::streambuf {
 public:
-  FixedSizeStreamBuffer(char* base, size_t size);
+  MutableMemoryStreamBuffer(char* base, size_t size);
 };
 
 /**
  * std::ostream class that serializes writes into the provided buffer.
  */
-class OutputBufferStream : private FixedSizeStreamBuffer, public std::ostream {
+class OutputBufferStream : private MutableMemoryStreamBuffer, public std::ostream {
 public:
   OutputBufferStream(char* data, size_t size);
 
