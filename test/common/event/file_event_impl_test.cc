@@ -106,7 +106,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
 }
 
 TEST_P(FileEventImplActivateTest, ActivateChaining) {
-  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).rc_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();
@@ -170,7 +170,7 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
 }
 
 TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
-  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).rc_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();

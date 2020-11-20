@@ -202,17 +202,17 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   // is delayed since it is rescheduled with a non-zero delta.
   advanceMsAndLoop(5);
   if (activateMode() == ActivateMode::DelayActivateTimers) {
-#ifdef WIN32
-    // Force it to run again to pick up next iteration callbacks.
-    // The event loop runs for a single iteration in NonBlock mode on Windows as a hack to work
-    // around LEVEL trigger fd registrations constantly firing events and preventing the NonBlock
-    // event loop from ever reaching the no-fd event and no-expired timers termination condition. It
-    // is not possible to get consistent event loop behavior since the time system does not override
-    // the base scheduler's run behavior, and libevent does not provide a mode where it runs at most
-    // N iterations before breaking out of the loop for us to prefer over the single iteration mode
-    // used on Windows.
-    advanceMsAndLoop(0);
-#endif
+    if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
+      // Force it to run again to pick up next iteration callbacks.
+      // The event loop runs for a single iteration in NonBlock mode on Windows as a hack to work
+      // around LEVEL trigger fd registrations constantly firing events and preventing the NonBlock
+      // event loop from ever reaching the no-fd event and no-expired timers termination condition.
+      // It is not possible to get consistent event loop behavior since the time system does not
+      // override the base scheduler's run behavior, and libevent does not provide a mode where it
+      // runs at most N iterations before breaking out of the loop for us to prefer over the single
+      // iteration mode used on Windows.
+      advanceMsAndLoop(0);
+    }
     EXPECT_EQ("p013p4", output_);
   } else {
     EXPECT_EQ("p0134", output_);
@@ -252,11 +252,11 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
   // re-enabled with a non-zero timeout.
   advanceMsAndLoop(5);
   if (activateMode() == ActivateMode::DelayActivateTimers) {
-#ifdef WIN32
-    // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run again
-    // to pick up next iteration callbacks.
-    advanceMsAndLoop(0);
-#endif
+    if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
+      // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run
+      // again to pick up next iteration callbacks.
+      advanceMsAndLoop(0);
+    }
     EXPECT_THAT(output_, testing::AnyOf("p03p14", "p03p41"));
   } else {
     EXPECT_EQ("p0314", output_);
