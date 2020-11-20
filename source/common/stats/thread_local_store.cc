@@ -407,9 +407,10 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     const absl::optional<StatNameTagVector>& stat_name_tags,
     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
     StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
-    StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
+    StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat,
+    Mode mode) {
 
-  if (tls_rejected_stats != nullptr &&
+  if (mode != Mode::ForceEnable && tls_rejected_stats != nullptr &&
       tls_rejected_stats->find(full_stat_name) != tls_rejected_stats->end()) {
     return null_stat;
   }
@@ -429,7 +430,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   RefcountPtr<StatType>* central_ref = nullptr;
   if (iter != central_cache_map.end()) {
     central_ref = &(iter->second);
-  } else if (parent_.checkAndRememberRejection(full_stat_name, central_rejected_stats,
+  } else if (mode != Mode::ForceEnable &&
+             parent_.checkAndRememberRejection(full_stat_name, central_rejected_stats,
                                                tls_rejected_stats)) {
     return null_stat;
   } else {
@@ -501,7 +503,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
              const StatNameTagVector& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, tag_extracted_name, tags, mode);
       },
-      tls_cache, tls_rejected_stats, parent_.null_counter_);
+      tls_cache, tls_rejected_stats, parent_.null_counter_, mode);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
@@ -553,7 +555,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
                           const StatNameTagVector& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode, mode);
       },
-      tls_cache, tls_rejected_stats, parent_.null_gauge_);
+      tls_cache, tls_rejected_stats, parent_.null_gauge_, mode);
   gauge.mergeImportMode(import_mode);
   return gauge;
 }
@@ -587,7 +589,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       return *iter->second;
     }
     tls_rejected_stats = &entry.rejected_stats_;
-    if (tls_rejected_stats->find(final_stat_name) != tls_rejected_stats->end()) {
+    if (mode != Mode::ForceEnable &&
+        tls_rejected_stats->find(final_stat_name) != tls_rejected_stats->end()) {
       return parent_.null_histogram_;
     }
   }
@@ -597,7 +600,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   ParentHistogramImplSharedPtr* central_ref = nullptr;
   if (iter != central_cache_->histograms_.end()) {
     central_ref = &iter->second;
-  } else if (parent_.checkAndRememberRejection(final_stat_name, central_cache_->rejected_stats_,
+  } else if (mode != Mode::ForceEnable &&
+             parent_.checkAndRememberRejection(final_stat_name, central_cache_->rejected_stats_,
                                                tls_rejected_stats)) {
     return parent_.null_histogram_;
   } else {
@@ -670,7 +674,7 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
              const StatNameTagVector& tags) -> TextReadoutSharedPtr {
         return allocator.makeTextReadout(name, tag_extracted_name, tags, mode);
       },
-      tls_cache, tls_rejected_stats, parent_.null_text_readout_);
+      tls_cache, tls_rejected_stats, parent_.null_text_readout_, mode);
 }
 
 CounterOptConstRef ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {

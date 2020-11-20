@@ -733,19 +733,27 @@ TEST_F(LookupWithStatNameTest, NotFound) {
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
+  StatName makeStatName(absl::string_view name) { return pool_.add(name); }
+
   envoy::config::metrics::v3::StatsConfig stats_config_;
+  StatNamePool pool_{symbol_table_};
 };
 
-TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
-  InSequence s;
+// Testing No-op counters, gauges, histograms which match the prefix "noop".
+class StatsMatcherNoopTest : public StatsMatcherTLSTest {
+public:
+  StatsMatcherNoopTest() {
+    stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+        "noop");
+    store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+  }
 
-  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
-      "noop");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+  ~StatsMatcherNoopTest() { store_->shutdownThreading(); }
 
-  // Testing No-op counters, gauges, histograms which match the prefix "noop".
+  InSequence sequence_;
+};
 
-  // Counter
+TEST_F(StatsMatcherNoopTest, Counters) {
   Counter& noop_counter = store_->counterFromString("noop_counter");
   EXPECT_EQ(noop_counter.name(), "");
   EXPECT_EQ(noop_counter.value(), 0);
@@ -760,8 +768,19 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_FALSE(noop_counter.used());      // hardcoded to return false in NullMetricImpl.
   EXPECT_EQ(0, noop_counter.latch());     // hardcoded to 0.
   EXPECT_EQ(0, noop_counter.use_count()); // null counter is contained in ThreadLocalStoreImpl.
+  Counter& noop_counter_3 = store_->counterFromStatNameWithTags(makeStatName("noop_counter_3"),
+                                                                absl::nullopt, Mode::ForceEnable);
+  EXPECT_EQ(noop_counter_3.name(), "noop_counter_3");
+  EXPECT_EQ(noop_counter_3.value(), 0);
+  noop_counter_3.add(1);
+  EXPECT_EQ(noop_counter_3.value(), 1);
+  noop_counter_3.inc();
+  EXPECT_EQ(noop_counter_3.value(), 2);
+  noop_counter_3.reset();
+  EXPECT_EQ(noop_counter_3.value(), 0);
+}
 
-  // Gauge
+TEST_F(StatsMatcherNoopTest, Gauges) {
   Gauge& noop_gauge = store_->gaugeFromString("noop_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(noop_gauge.name(), "");
   EXPECT_EQ(noop_gauge.value(), 0);
@@ -782,7 +801,27 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   Gauge& noop_gauge_2 = store_->gaugeFromString("noop_gauge_2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&noop_gauge, &noop_gauge_2);
 
-  // TextReadout
+  Gauge& noop_gauge_3 =
+      store_->gaugeFromStatNameWithTags(makeStatName("noop_gauge_3"), absl::nullopt,
+                                        Gauge::ImportMode::Accumulate, Mode::ForceEnable);
+  EXPECT_EQ(noop_gauge_3.name(), "noop_gauge_3");
+  EXPECT_EQ(noop_gauge_3.value(), 0);
+  noop_gauge_3.add(1);
+  EXPECT_EQ(noop_gauge_3.value(), 1);
+  noop_gauge_3.inc();
+  EXPECT_EQ(noop_gauge_3.value(), 2);
+  noop_gauge_3.dec();
+  EXPECT_EQ(noop_gauge_3.value(), 1);
+  noop_gauge_3.set(2);
+  EXPECT_EQ(noop_gauge_3.value(), 2);
+  noop_gauge_3.sub(2);
+  EXPECT_EQ(noop_gauge_3.value(), 0);
+  EXPECT_EQ(Gauge::ImportMode::Accumulate, noop_gauge_3.importMode());
+  EXPECT_TRUE(noop_gauge_3.used());
+  EXPECT_EQ(1, noop_gauge_3.use_count());
+}
+
+TEST_F(StatsMatcherNoopTest, TextReadouts) {
   TextReadout& noop_string = store_->textReadoutFromString("noop_string");
   EXPECT_EQ(noop_string.name(), "");
   EXPECT_EQ("", noop_string.value());
@@ -797,7 +836,21 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   TextReadout& noop_string_2 = store_->textReadoutFromString("noop_string_2");
   EXPECT_EQ(&noop_string, &noop_string_2);
 
-  // Histogram
+  TextReadout& noop_string_3 = store_->textReadoutFromStatNameWithTags(
+      makeStatName("noop_string_3"), absl::nullopt, Mode::ForceEnable);
+  EXPECT_EQ(noop_string_3.name(), "noop_string_3");
+  EXPECT_EQ("", noop_string_3.value());
+  noop_string_3.set("hello");
+  EXPECT_EQ("hello", noop_string_3.value());
+  noop_string_3.set("hello");
+  EXPECT_EQ("hello", noop_string_3.value());
+  noop_string_3.set("goodbye");
+  EXPECT_EQ("goodbye", noop_string_3.value());
+  noop_string_3.set("hello");
+  EXPECT_EQ("hello", noop_string_3.value());
+}
+
+TEST_F(StatsMatcherNoopTest, Histograms) {
   Histogram& noop_histogram =
       store_->histogramFromString("noop_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(noop_histogram.name(), "");
@@ -807,7 +860,12 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
       store_->histogramFromString("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
 
-  store_->shutdownThreading();
+  Histogram& noop_histogram_3 = store_->histogramFromStatNameWithTags(
+      makeStatName("noop_histogram_3"), absl::nullopt, Stats::Histogram::Unit::Milliseconds,
+      Mode::ForceEnable);
+  EXPECT_EQ(noop_histogram_3.name(), "noop_histogram_3");
+  EXPECT_FALSE(noop_histogram_3.used());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, noop_histogram_3.unit());
 }
 
 // We only test the exclusion list -- the inclusion list is the inverse, and both are tested in

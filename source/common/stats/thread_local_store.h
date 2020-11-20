@@ -418,7 +418,7 @@ private:
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
-                           StatNameHashSet* tls_rejected_stats, StatType& null_stat);
+                           StatNameHashSet* tls_rejected_stats, StatType& null_stat, Mode mode);
 
     template <class StatType>
     using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
