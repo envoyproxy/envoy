@@ -8,3 +8,4 @@ Resource monitors
   :maxdepth: 2
 
   */v3/*
+  */v2alpha/*
