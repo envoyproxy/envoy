@@ -28,9 +28,9 @@ public:
   void raiseEvent(Network::ConnectionEvent) override { event_raised_ = true; }
   void flushWriteBuffer() override { write_buffer_flushed_ = true; }
 
-  bool event_raised() const { return event_raised_; }
-  bool transport_socket_is_readable() const { return transport_socket_is_readable_; }
-  bool write_buffer_flushed() const { return write_buffer_flushed_; }
+  bool eventRaised() const { return event_raised_; }
+  bool transportSocketIsReadable() const { return transport_socket_is_readable_; }
+  bool writeBufferFlushed() const { return write_buffer_flushed_; }
 
 private:
   bool event_raised_{false};
@@ -56,11 +56,11 @@ TEST_F(NoOpTransportSocketCallbacksTest, TestAllCallbacks) {
   EXPECT_FALSE(wrapped_callbacks_.shouldDrainReadBuffer());
 
   wrapped_callbacks_.setTransportSocketIsReadable();
-  EXPECT_FALSE(wrapper_callbacks_.transport_socket_is_readable());
+  EXPECT_FALSE(wrapper_callbacks_.transportSocketIsReadable());
   wrapped_callbacks_.raiseEvent(Network::ConnectionEvent::Connected);
-  EXPECT_FALSE(wrapper_callbacks_.event_raised());
+  EXPECT_FALSE(wrapper_callbacks_.eventRaised());
   wrapped_callbacks_.flushWriteBuffer();
-  EXPECT_FALSE(wrapper_callbacks_.write_buffer_flushed());
+  EXPECT_FALSE(wrapper_callbacks_.writeBufferFlushed());
 }
 
 } // namespace
