@@ -47,7 +47,10 @@ private:
   const std::string value_;
 };
 
-class TestAction : public Action {};
+class TestAction : public Action {
+public:
+  absl::string_view typeUrl() const override { return ""; }
+};
 
 class TestActionFactory : public ActionFactory {
 public:

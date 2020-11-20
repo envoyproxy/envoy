@@ -14,9 +14,13 @@ namespace Matcher {
 struct TestData {};
 
 struct StringAction : public Action {
-  explicit StringAction(const std::string& string) : string_(string) {}
+  explicit StringAction(const std::string& string)
+      : type_name_(ProtobufWkt::StringValue().GetTypeName()), string_(string) {}
 
-  std::string string_;
+  absl::string_view typeUrl() const override { return type_name_; }
+
+  const std::string type_name_;
+  const std::string string_;
 
   bool operator==(const StringAction& other) const { return string_ == other.string_; }
 };

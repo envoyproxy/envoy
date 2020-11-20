@@ -49,6 +49,20 @@ template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<D
 class Action {
 public:
   virtual ~Action() = default;
+
+  /**
+   * The underlying type of this action. This can be used to determine which
+   * type this action is before attempting to cast it.
+   */
+  virtual absl::string_view typeUrl() const PURE;
+
+  /**
+   * Helper to convert this action to its underlying type.
+   */
+  template <class T> T& getTyped() {
+    ASSERT(dynamic_cast<T*>(this) != nullptr);
+    return static_cast<T&>(*this);
+  }
 };
 
 using ActionPtr = std::unique_ptr<Action>;
