@@ -183,8 +183,8 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   parent_.checkProtocolConstraintViolation();
 }
 
-void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
-                                                     bool end_stream) {
+Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
+                                                       bool end_stream) {
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
   std::vector<nghttp2_nv> final_headers;
@@ -211,6 +211,7 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
     buildHeaders(final_headers, headers);
   }
   encodeHeadersBase(final_headers, end_stream);
+  return okStatus();
 }
 
 void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& headers,
@@ -992,7 +993,7 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
   StreamImpl* stream = getStream(stream_id);
-  if (!stream) {
+  if (!stream || stream->remote_end_stream_) {
     return 0;
   }
 
@@ -1005,7 +1006,7 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
                  stream_id, end_metadata);
 
   StreamImpl* stream = getStream(stream_id);
-  if (stream == nullptr) {
+  if (!stream || stream->remote_end_stream_) {
     return 0;
   }
 

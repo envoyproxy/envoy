@@ -447,6 +447,7 @@ envoy_cc_test(
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:continue_headers_only_inject_body",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
@@ -891,6 +892,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:process_context_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
@@ -1137,8 +1139,13 @@ envoy_cc_test(
         "sds_dynamic_integration_test.cc",
     ],
     data = [
+        "sds_dynamic_key_rotation_setup.sh",
         "//test/config/integration/certs",
     ],
+    # TODO(envoyproxy/windows-dev): The key rotation in SdsDynamicKeyRotationIntegrationTest via
+    # TestEnvironment::renameFile() fails on Windows. The renameFile() implementation does not
+    # correctly handle symlinks.
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
@@ -1238,7 +1245,7 @@ envoy_cc_test(
         ":http_protocol_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 

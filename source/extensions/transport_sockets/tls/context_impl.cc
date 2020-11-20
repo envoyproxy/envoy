@@ -417,9 +417,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                                     !tls_certificate.password().empty()
                                         ? const_cast<char*>(tls_certificate.password().c_str())
                                         : nullptr));
+
         if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
-          throw EnvoyException(
-              absl::StrCat("Failed to load private key from ", tls_certificate.privateKeyPath()));
+          throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}",
+                                           tls_certificate.privateKeyPath(),
+                                           Utility::getLastCryptoError().value_or("unknown")));
         }
 
 #ifdef BORINGSSL_FIPS
@@ -963,9 +965,9 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con);
   }
 
-  if (options && !has_alpn_defined && options->applicationProtocolFallback().has_value()) {
+  if (options && !has_alpn_defined && !options->applicationProtocolFallback().empty()) {
     // If ALPN hasn't already been set (either through TLS context or override), use the fallback.
-    parseAndSetAlpn({*options->applicationProtocolFallback()}, *ssl_con);
+    parseAndSetAlpn(options->applicationProtocolFallback(), *ssl_con);
   }
 
   if (allow_renegotiation_) {

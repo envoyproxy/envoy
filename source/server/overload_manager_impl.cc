@@ -5,7 +5,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/config/overload/v3/overload.pb.validate.h"
-#include "envoy/server/overload_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -384,7 +383,7 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
   return true;
 }
 
-ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() { return tls_.get(); }
+ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() { return *tls_; }
 
 Event::ScaledRangeTimerManagerPtr
 OverloadManagerImpl::createScaledRangeTimerManager(Event::Dispatcher& dispatcher) const {
@@ -442,9 +441,9 @@ void OverloadManagerImpl::flushResourceUpdates() {
     std::swap(*shared_updates, state_updates_to_flush_);
 
     tls_.runOnAllThreads(
-        [updates = std::move(shared_updates)](ThreadLocalOverloadStateImpl& overload_state) {
+        [updates = std::move(shared_updates)](OptRef<ThreadLocalOverloadStateImpl> overload_state) {
           for (const auto& [action, state] : *updates) {
-            overload_state.setState(action, state);
+            overload_state->setState(action, state);
           }
         });
   }

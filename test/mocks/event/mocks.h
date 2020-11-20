@@ -102,6 +102,8 @@ public:
   }
 
   // Event::Dispatcher
+  MOCK_METHOD(void, registerWatchdog,
+              (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, ());
@@ -225,6 +227,8 @@ public:
 
   MOCK_METHOD(void, activate, (uint32_t events));
   MOCK_METHOD(void, setEnabled, (uint32_t events));
+  MOCK_METHOD(void, registerEventIfEmulatedEdge, (uint32_t event));
+  MOCK_METHOD(void, unregisterEventIfEmulatedEdge, (uint32_t event));
 };
 
 } // namespace Event

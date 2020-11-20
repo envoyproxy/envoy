@@ -813,13 +813,18 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   initializeConfig();
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   HttpIntegrationTest::initialize();
-  initiateClientConnection(4, Headers{}, Headers{});
 
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  int expected_grpc_client_creation_count = 0;
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
-    // Make sure one Google grpc client is created.
-    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+    // Make sure Google grpc client is created before the request coming in.
+    // Since this is not laziness creation, it should create one client per
+    // thread before the traffic comes.
+    expected_grpc_client_creation_count =
+        test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value();
   }
+
+  initiateClientConnection(4, Headers{}, Headers{});
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{});
 
@@ -846,8 +851,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   RELEASE_ASSERT(result, result.message());
 
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
-    // Make sure one Google grpc client is created.
-    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+    // Make sure no more Google grpc client is created no matter how many requests coming in.
+    EXPECT_EQ(expected_grpc_client_creation_count,
+              test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
   }
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{});
@@ -868,6 +874,12 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("200", response_->headers().getStatusValue());
   EXPECT_EQ(response_size_, response_->body().size());
+
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Make sure no more Google grpc client is created no matter how many requests coming in.
+    EXPECT_EQ(expected_grpc_client_creation_count,
+              test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+  }
 
   cleanup();
 }
