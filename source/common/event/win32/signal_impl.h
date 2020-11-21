@@ -3,7 +3,6 @@
 #include "envoy/event/signal.h"
 #include "envoy/network/io_handle.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"
 #include "common/network/io_socket_handle_impl.h"

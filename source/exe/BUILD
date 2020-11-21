@@ -172,6 +172,7 @@ envoy_cc_win32_library(
         "//source/common/common:thread_lib",
         "//source/common/event:signal_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//source/common/buffer:buffer_lib",
     ],
 )
 
