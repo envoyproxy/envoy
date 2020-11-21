@@ -25,8 +25,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "bazel-toolchains",
         project_desc = "Bazel toolchain configs for RBE",
         project_url = "https://github.com/bazelbuild/bazel-toolchains",
-        version = "3.6.0",
-        sha256 = "4fb3ceea08101ec41208e3df9e56ec72b69f3d11c56629d6477c0ff88d711cf7",
+        version = "3.7.1",
+        sha256 = "8c9728dc1bb3e8356b344088dfd10038984be74e1c8d6e92dbb05f21cabbb8e4",
         strip_prefix = "bazel-toolchains-{version}",
         urls = [
             "https://github.com/bazelbuild/bazel-toolchains/releases/download/{version}/bazel-toolchains-{version}.tar.gz",
