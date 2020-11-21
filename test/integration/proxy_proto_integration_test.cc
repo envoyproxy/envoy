@@ -2,8 +2,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -241,10 +241,9 @@ TEST_P(ProxyProtoTcpIntegrationTest, AccessLog) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
     ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
+        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
     auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("accesslog");
