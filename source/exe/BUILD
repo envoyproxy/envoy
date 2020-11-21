@@ -170,7 +170,7 @@ envoy_cc_win32_library(
         ":platform_header_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
-        "//source/common/event:dispatcher_lib",
+        "//source/common/event:signal_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
 )
