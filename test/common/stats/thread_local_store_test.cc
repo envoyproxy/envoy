@@ -748,7 +748,7 @@ public:
     store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
   }
 
-  ~StatsMatcherNoopTest() { store_->shutdownThreading(); }
+  ~StatsMatcherNoopTest() override { store_->shutdownThreading(); }
 
   InSequence sequence_;
 };
