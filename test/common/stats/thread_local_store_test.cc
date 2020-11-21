@@ -1034,8 +1034,6 @@ public:
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
 
-    ScopePtr scope = store_.createScope("scope.");
-
     for (int j = 0; j < 5; ++j) {
       // Note: zero calls to reject() are made, as reject-all should short-circuit.
       EXPECT_EQ("", lookup_stat("reject", Mode::Default));
@@ -1049,8 +1047,6 @@ public:
     matcher->rejects_all_ = true;
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
-
-    ScopePtr scope = store_.createScope("scope.");
 
     for (int j = 0; j < 5; ++j) {
       // Note: zero calls to reject() are made, as reject-all should short-circuit.
