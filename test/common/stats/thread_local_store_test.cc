@@ -991,7 +991,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 class RememberStatsMatcherTest : public testing::TestWithParam<bool> {
 public:
   RememberStatsMatcherTest()
-      : heap_alloc_(symbol_table_), store_(heap_alloc_), scope_(store_.createScope("scope.")) {
+      : heap_alloc_(symbol_table_), store_(heap_alloc_), scope_(store_.createScope("scope.")),
+        pool_(symbol_table_) {
     if (GetParam()) {
       store_.initializeThreading(main_thread_dispatcher_, tls_);
     }
@@ -1002,7 +1003,9 @@ public:
     tls_.shutdownThread();
   }
 
-  using LookupStatFn = std::function<std::string(const std::string&)>;
+  StatName makeStatName(absl::string_view name) { return pool_.add(name); }
+
+  using LookupStatFn = std::function<std::string(const std::string&, Mode)>;
 
   // Helper function to test the rejection cache. The goal here is to use
   // mocks to ensure that we don't call rejects() more than once on any of the
@@ -1018,8 +1021,8 @@ public:
     EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
 
     for (int j = 0; j < 5; ++j) {
-      EXPECT_EQ("", lookup_stat("reject"));
-      EXPECT_EQ("scope.ok", lookup_stat("ok"));
+      EXPECT_EQ("", lookup_stat("reject", Mode::Default));
+      EXPECT_EQ("scope.ok", lookup_stat("ok", Mode::Default));
     }
   }
 
@@ -1035,7 +1038,24 @@ public:
 
     for (int j = 0; j < 5; ++j) {
       // Note: zero calls to reject() are made, as reject-all should short-circuit.
-      EXPECT_EQ("", lookup_stat("reject"));
+      EXPECT_EQ("", lookup_stat("reject", Mode::Default));
+    }
+  }
+
+  void testRejectsAllForceEnable(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    matcher->rejects_all_ = true;
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    ScopePtr scope = store_.createScope("scope.");
+
+    for (int j = 0; j < 5; ++j) {
+      // Note: zero calls to reject() are made, as reject-all should short-circuit.
+      EXPECT_EQ("scope.accept_despite_rejecgt_all",
+                lookup_stat("accept_despite_rejecgt_all", Mode::ForceEnable));
     }
   }
 
@@ -1049,42 +1069,39 @@ public:
 
     for (int j = 0; j < 5; ++j) {
       // Note: zero calls to reject() are made, as accept-all should short-circuit.
-      EXPECT_EQ("scope.ok", lookup_stat("ok"));
+      EXPECT_EQ("scope.ok", lookup_stat("ok", Mode::Default));
     }
   }
 
   LookupStatFn lookupCounterFn() {
-    return [this](const std::string& stat_name) -> std::string {
-      return scope_->counterFromString(stat_name).name();
+    return [this](const std::string& stat_name, Mode mode) -> std::string {
+      return scope_->counterFromStatNameWithTags(makeStatName(stat_name), absl::nullopt, mode)
+          .name();
     };
   }
 
   LookupStatFn lookupGaugeFn() {
-    return [this](const std::string& stat_name) -> std::string {
-      return scope_->gaugeFromString(stat_name, Gauge::ImportMode::Accumulate).name();
+    return [this](const std::string& stat_name, Mode mode) -> std::string {
+      return scope_
+          ->gaugeFromStatNameWithTags(makeStatName(stat_name), absl::nullopt,
+                                      Gauge::ImportMode::Accumulate, mode)
+          .name();
     };
   }
-
-// TODO(jmarantz): restore BoolIndicator tests when https://github.com/envoyproxy/envoy/pull/6280
-// is reverted.
-#define HAS_BOOL_INDICATOR 0
-#if HAS_BOOL_INDICATOR
-  LookupStatFn lookupBoolIndicator() {
-    return [this](const std::string& stat_name) -> std::string {
-      return scope_->boolIndicator(stat_name).name();
-    };
-  }
-#endif
 
   LookupStatFn lookupHistogramFn() {
-    return [this](const std::string& stat_name) -> std::string {
-      return scope_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified).name();
+    return [this](const std::string& stat_name, Mode mode) -> std::string {
+      return scope_
+          ->histogramFromStatNameWithTags(makeStatName(stat_name), absl::nullopt,
+                                          Stats::Histogram::Unit::Unspecified, mode)
+          .name();
     };
   }
 
   LookupStatFn lookupTextReadoutFn() {
-    return [this](const std::string& stat_name) -> std::string {
-      return scope_->textReadoutFromString(stat_name).name();
+    return [this](const std::string& stat_name, Mode mode) -> std::string {
+      return scope_->textReadoutFromStatNameWithTags(makeStatName(stat_name), absl::nullopt, mode)
+          .name();
     };
   }
 
@@ -1094,6 +1111,7 @@ public:
   AllocatorImpl heap_alloc_;
   ThreadLocalStoreImpl store_;
   ScopePtr scope_;
+  StatNamePool pool_;
 };
 
 INSTANTIATE_TEST_SUITE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
@@ -1105,27 +1123,29 @@ TEST_P(RememberStatsMatcherTest, CounterRejectOne) { testRememberMatcher(lookupC
 
 TEST_P(RememberStatsMatcherTest, CounterRejectsAll) { testRejectsAll(lookupCounterFn()); }
 
+TEST_P(RememberStatsMatcherTest, CounterRejectsAllForceEnable) {
+  testRejectsAllForceEnable(lookupCounterFn());
+}
+
 TEST_P(RememberStatsMatcherTest, CounterAcceptsAll) { testAcceptsAll(lookupCounterFn()); }
 
 TEST_P(RememberStatsMatcherTest, GaugeRejectOne) { testRememberMatcher(lookupGaugeFn()); }
 
 TEST_P(RememberStatsMatcherTest, GaugeRejectsAll) { testRejectsAll(lookupGaugeFn()); }
 
-TEST_P(RememberStatsMatcherTest, GaugeAcceptsAll) { testAcceptsAll(lookupGaugeFn()); }
-
-#if HAS_BOOL_INDICATOR
-TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectOne) {
-  testRememberMatcher(lookupBoolIndicator());
+TEST_P(RememberStatsMatcherTest, GaugeRejectsAllForceEnable) {
+  testRejectsAllForceEnable(lookupGaugeFn());
 }
 
-TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectsAll) { testRejectsAll(lookupBoolIndicator()); }
-
-TEST_P(RememberStatsMatcherTest, BoolIndicatorAcceptsAll) { testAcceptsAll(lookupBoolIndicator()); }
-#endif
+TEST_P(RememberStatsMatcherTest, GaugeAcceptsAll) { testAcceptsAll(lookupGaugeFn()); }
 
 TEST_P(RememberStatsMatcherTest, HistogramRejectOne) { testRememberMatcher(lookupHistogramFn()); }
 
 TEST_P(RememberStatsMatcherTest, HistogramRejectsAll) { testRejectsAll(lookupHistogramFn()); }
+
+TEST_P(RememberStatsMatcherTest, HistogramRejectsAllForceEnable) {
+  testRejectsAllForceEnable(lookupHistogramFn());
+}
 
 TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) { testAcceptsAll(lookupHistogramFn()); }
 
@@ -1134,6 +1154,10 @@ TEST_P(RememberStatsMatcherTest, TextReadoutRejectOne) {
 }
 
 TEST_P(RememberStatsMatcherTest, TextReadoutRejectsAll) { testRejectsAll(lookupTextReadoutFn()); }
+
+TEST_P(RememberStatsMatcherTest, TextReadoutRejectsAllForceEnable) {
+  testRejectsAllForceEnable(lookupTextReadoutFn());
+}
 
 TEST_P(RememberStatsMatcherTest, TextReadoutAcceptsAll) { testAcceptsAll(lookupTextReadoutFn()); }
 
