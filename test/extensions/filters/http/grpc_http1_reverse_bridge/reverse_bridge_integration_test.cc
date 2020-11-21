@@ -14,7 +14,9 @@
 #include "gtest/gtest.h"
 
 using Envoy::Http::HeaderValueOf;
-using std::string_literals::operator""s;
+
+// for ::operator""s (which Windows compiler does not support):
+using namespace std::string_literals;
 
 namespace Envoy {
 namespace {
@@ -52,11 +54,7 @@ typed_config:
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstream_connection_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { fake_upstream_connection_.reset(); }
 
 protected:
   FakeHttpConnection::Type upstream_protocol_;
@@ -143,7 +141,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   EXPECT_THAT(upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
   Http::TestResponseHeaderMapImpl response_headers;
@@ -175,5 +173,34 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
+TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
+  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-not-protobuf");
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 5, response_headers, 5);
+
+  EXPECT_TRUE(response->complete());
+
+  // The response should indicate an error.
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
+
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
 } // namespace
 } // namespace Envoy

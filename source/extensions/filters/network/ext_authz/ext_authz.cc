@@ -8,6 +8,8 @@
 #include "common/common/assert.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/filters/network/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -28,12 +30,18 @@ void Filter::callCheck() {
   config_->stats().total_.inc();
 
   calling_check_ = true;
-  client_->check(*this, check_request_, Tracing::NullSpan::instance(),
-                 filter_callbacks_->connection().streamInfo());
+  auto& connection = filter_callbacks_->connection();
+  client_->check(*this, connection.dispatcher(), check_request_, Tracing::NullSpan::instance(),
+                 connection.streamInfo());
   calling_check_ = false;
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
+  if (!filterEnabled(filter_callbacks_->connection().streamInfo().dynamicMetadata())) {
+    config_->stats().disabled_.inc();
+    return Network::FilterStatus::Continue;
+  }
+
   if (status_ == Status::NotStarted) {
     // By waiting to invoke the check at onData() the call to authorization service will have
     // sufficient information to fill out the checkRequest_.
@@ -70,6 +78,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Error:
     config_->stats().error_.inc();
+    if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
+      config_->stats().timeout_.inc();
+    }
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Denied:
     config_->stats().denied_.inc();
@@ -90,6 +101,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.
       config_->stats().failure_mode_allowed_.inc();
     }
+
+    if (!response->dynamic_metadata.fields().empty()) {
+      filter_callbacks_->connection().streamInfo().setDynamicMetadata(
+          NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
+    }
+
     // We can get completion inline, so only call continue if that isn't happening.
     if (!calling_check_) {
       filter_callbacks_->continueReading();

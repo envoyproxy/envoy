@@ -1,6 +1,7 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@config_validation_pip3//:requirements.bzl", "requirement")
+
+licenses(["notice"])  # Apache 2
 
 py_binary(
     name = "validate_fragment",

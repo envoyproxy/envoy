@@ -13,6 +13,7 @@ public:
   ~MockValidationVisitor() override;
 
   MOCK_METHOD(void, onUnknownField, (absl::string_view));
+  MOCK_METHOD(void, onDeprecatedField, (absl::string_view, bool));
 
   bool skipValidation() override { return skip_validation_; }
 

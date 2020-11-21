@@ -1,15 +1,15 @@
-licenses(["notice"])  # Apache 2
-
-# On-demand RDS update HTTP filter
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+# On-demand RDS update HTTP filter
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "on_demand_update_lib",
@@ -30,6 +30,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # TODO(#9953) classify and clean up.
+    extra_visibility = [
+        "//test/common/access_log:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",

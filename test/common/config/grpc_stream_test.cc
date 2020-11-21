@@ -4,10 +4,10 @@
 #include "common/protobuf/protobuf.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -33,7 +33,7 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Grpc::MockAsyncStream async_stream_;
   Stats::TestUtil::TestStore stats_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   NiceMock<MockGrpcStreamCallbacks> callbacks_;
   std::unique_ptr<Grpc::MockAsyncClient> async_client_owner_;
@@ -101,11 +101,10 @@ TEST_F(GrpcStreamTest, ReceiveMessage) {
   response_copy.set_type_url("faketypeURL");
   auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>(response_copy);
   envoy::service::discovery::v3::DiscoveryResponse received_message;
-  EXPECT_CALL(callbacks_, onDiscoveryResponse(_))
+  EXPECT_CALL(callbacks_, onDiscoveryResponse(_, _))
       .WillOnce([&received_message](
-                    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) {
-        received_message = *message;
-      });
+                    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+                    ControlPlaneStats&) { received_message = *message; });
   grpc_stream_.onReceiveMessage(std::move(response));
   EXPECT_TRUE(TestUtility::protoEqual(response_copy, received_message));
 }

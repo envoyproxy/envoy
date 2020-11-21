@@ -69,10 +69,10 @@ TEST_P(CustomClusterIntegrationTest, TestCustomConfig) {
   initialize();
 
   // Verify the cluster is correctly setup with the custom priority
-  const auto& cluster_map = test_server_->server().clusterManager().clusters();
-  EXPECT_EQ(1, cluster_map.size());
-  EXPECT_EQ(1, cluster_map.count("cluster_0"));
-  const auto& cluster_ref = cluster_map.find("cluster_0")->second;
+  const auto& cluster_maps = test_server_->server().clusterManager().clusters();
+  EXPECT_EQ(1, cluster_maps.active_clusters_.size());
+  EXPECT_EQ(1, cluster_maps.active_clusters_.count("cluster_0"));
+  const auto& cluster_ref = cluster_maps.active_clusters_.find("cluster_0")->second;
   const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
   EXPECT_EQ(11, hostset_per_priority.size());
   const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[10];

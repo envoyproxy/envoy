@@ -4,6 +4,7 @@
 #include <tuple>
 
 #include "extensions/filters/network/postgres_proxy/postgres_filter.h"
+#include "extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/network/postgres_proxy/postgres_test_utils.h"
 #include "test/mocks/network/mocks.h"
@@ -13,6 +14,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
+using testing::ReturnRef;
 using ::testing::WithArgs;
 
 // Decoder mock.
@@ -29,10 +31,21 @@ class PostgresFilterTest
                      std::function<uint32_t(const PostgresFilter*)>>> {
 public:
   PostgresFilterTest() {
-    config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, scope_);
+    config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, true, scope_);
     filter_ = std::make_unique<PostgresFilter>(config_);
 
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  void setMetadata() {
+    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+    EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+    ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().PostgresProxy, _))
+        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+          stream_info_.metadata_.mutable_filter_metadata()->insert(
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+                  NetworkFilterNames::get().PostgresProxy, obj));
+        }));
   }
 
   Stats::IsolatedStoreImpl scope_;
@@ -40,6 +53,8 @@ public:
   std::unique_ptr<PostgresFilter> filter_;
   PostgresFilterConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 
   // These variables are used internally in tests.
   Buffer::OwnedImpl data_;
@@ -236,6 +251,60 @@ TEST_F(PostgresFilterTest, EncryptedSessionStats) {
   filter_->onData(data_, false);
   ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 1);
+}
+
+// Test verifies that incorrect SQL statement does not create
+// Postgres metadata.
+TEST_F(PostgresFilterTest, MetadataIncorrectSQL) {
+  // Pretend that startup message has been received.
+  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+  setMetadata();
+
+  createPostgresMsg(data_, "Q", "BLAH blah blah");
+  filter_->onData(data_, false);
+
+  // SQL statement was wrong. No metadata should have been created.
+  ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
+                  NetworkFilterNames::get().PostgresProxy),
+              false);
+  ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 1);
+  ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 0);
+}
+
+// Test verifies that Postgres metadata is created for correct SQL statement.
+// and it happens only when parse_sql flag is true.
+TEST_F(PostgresFilterTest, QueryMessageMetadata) {
+  // Pretend that startup message has been received.
+  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+  setMetadata();
+
+  // Disable creating parsing SQL and creating metadata.
+  filter_->getConfig()->enable_sql_parsing_ = false;
+  createPostgresMsg(data_, "Q", "SELECT * FROM whatever");
+  filter_->onData(data_, false);
+
+  ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
+                  NetworkFilterNames::get().PostgresProxy),
+              false);
+  ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 0);
+  ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 0);
+
+  // Now enable SQL parsing and creating metadata.
+  filter_->getConfig()->enable_sql_parsing_ = true;
+  filter_->onData(data_, false);
+
+  auto& filter_meta = filter_->connection().streamInfo().dynamicMetadata().filter_metadata().at(
+      NetworkFilterNames::get().PostgresProxy);
+  auto& fields = filter_meta.fields();
+
+  ASSERT_THAT(fields.size(), 1);
+  ASSERT_THAT(fields.contains("whatever"), true);
+
+  const auto& operations = fields.at("whatever").list_value();
+  ASSERT_EQ("select", operations.values(0).string_value());
+
+  ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 0);
+  ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 1);
 }
 
 } // namespace PostgresProxy

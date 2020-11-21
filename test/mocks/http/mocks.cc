@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/header_map.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,6 +20,16 @@ MockConnectionCallbacks::~MockConnectionCallbacks() = default;
 
 MockServerConnectionCallbacks::MockServerConnectionCallbacks() = default;
 MockServerConnectionCallbacks::~MockServerConnectionCallbacks() = default;
+
+MockFilterManagerCallbacks::MockFilterManagerCallbacks() {
+  ON_CALL(*this, responseHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
+    if (response_headers_) {
+      return absl::make_optional(std::ref(*response_headers_));
+    }
+    return absl::nullopt;
+  }));
+}
+MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
 
 MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
@@ -78,16 +89,15 @@ void MockStreamDecoderFilterCallbacks::sendLocalReply_(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  details_ = std::string(details);
   Utility::sendLocalReply(
       stream_destroyed_,
       Utility::EncodeFunctions{
-          nullptr,
-          [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+          nullptr, nullptr,
+          [this, modify_headers, details](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             if (modify_headers != nullptr) {
               modify_headers(*headers);
             }
-            encodeHeaders(std::move(headers), end_stream);
+            encodeHeaders(std::move(headers), end_stream, details);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             encodeData(data, end_stream);

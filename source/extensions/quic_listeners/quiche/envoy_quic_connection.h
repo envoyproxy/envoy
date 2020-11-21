@@ -1,14 +1,16 @@
 #pragma once
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/quic_connection.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include <memory>
 
@@ -24,6 +26,7 @@ class EnvoyQuicConnection : public quic::QuicConnection,
                             protected Logger::Loggable<Logger::Id::connection> {
 public:
   EnvoyQuicConnection(const quic::QuicConnectionId& server_connection_id,
+                      quic::QuicSocketAddress initial_self_address,
                       quic::QuicSocketAddress initial_peer_address,
                       quic::QuicConnectionHelperInterface& helper,
                       quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,

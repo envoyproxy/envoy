@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
@@ -18,8 +17,11 @@
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -40,7 +42,7 @@ public:
   double successRate(SuccessRateMonitorType) const override { return -1; }
 
 private:
-  const absl::optional<MonotonicTime> time_;
+  const absl::optional<MonotonicTime> time_{};
 };
 
 /**
@@ -387,14 +389,32 @@ private:
   void updateDetectedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
   void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
 
+  // The helper to double write value and gauge. The gauge could be null value since because any
+  // stat might be deactivated.
+  class EjectionsActiveHelper {
+  public:
+    EjectionsActiveHelper(Envoy::Stats::Gauge& gauge) : ejections_active_ref_(gauge) {}
+    void inc() {
+      ejections_active_ref_.inc();
+      ++ejections_active_value_;
+    }
+    void dec() {
+      ejections_active_ref_.dec();
+      --ejections_active_value_;
+    }
+    uint64_t value() { return ejections_active_value_.load(); }
+    Envoy::Stats::Gauge& ejections_active_ref_;
+    std::atomic<uint64_t> ejections_active_value_{0};
+  };
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
   DetectionStats stats_;
+  EjectionsActiveHelper ejections_active_helper_{stats_.ejections_active_};
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
-  std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
+  absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
 
   // EjectionPair for external and local origin events.

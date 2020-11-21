@@ -29,7 +29,7 @@ class MockConcurrencyController : public Controller::ConcurrencyController {
 public:
   MOCK_METHOD(RequestForwardingAction, forwardingDecision, ());
   MOCK_METHOD(void, cancelLatencySample, ());
-  MOCK_METHOD(void, recordLatencySample, (std::chrono::nanoseconds));
+  MOCK_METHOD(void, recordLatencySample, (MonotonicTime));
 
   uint32_t concurrencyLimit() const override { return 0; }
 };
@@ -78,6 +78,76 @@ gradient_controller_config:
   min_rtt_calc_params:
     interval:
       seconds: 30
+    request_count: 50
+enabled:
+  default_value: true
+  runtime_key: "adaptive_concurrency.enabled"
+)EOF";
+
+  auto config = makeConfig(yaml_config);
+
+  auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
+      config, runtime_, "testprefix.", stats_, time_system_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // The filter should behave as normal here.
+
+  Http::TestRequestHeaderMapImpl request_headers;
+
+  // The filter will be disabled when the flag is overridden. Note there is no expected call to
+  // forwardingDecision() or recordLatencySample().
+
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.enabled", true))
+      .WillOnce(Return(false));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_body;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
+
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  filter_->encodeComplete();
+}
+
+TEST_F(AdaptiveConcurrencyFilterTest, TestNanosValidationFail) {
+  std::string yaml_config =
+      R"EOF(
+gradient_controller_config:
+  sample_aggregate_percentile:
+    value: 50
+  concurrency_limit_params:
+    concurrency_update_interval:
+      nanos: 100000000 # 100ms
+  min_rtt_calc_params:
+    interval:
+      nanos: 8
+    request_count: 50
+enabled:
+  default_value: true
+  runtime_key: "adaptive_concurrency.enabled"
+)EOF";
+
+  EXPECT_THROW(auto config = makeConfig(yaml_config), ProtoValidationException);
+}
+
+TEST_F(AdaptiveConcurrencyFilterTest, TestNanosValidationPass) {
+  std::string yaml_config =
+      R"EOF(
+gradient_controller_config:
+  sample_aggregate_percentile:
+    value: 50
+  concurrency_limit_params:
+    concurrency_update_interval:
+      nanos: 100000000 # 100ms
+  min_rtt_calc_params:
+    interval:
+      nanos: 1000000
     request_count: 50
 enabled:
   default_value: true
@@ -223,12 +293,12 @@ TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
       .WillOnce(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  const auto advance_time = std::chrono::nanoseconds(42);
-  time_system_.advanceTimeWait(advance_time);
+  const auto rq_rcv_time = time_system_.monotonicTime();
+  time_system_.advanceTimeWait(std::chrono::nanoseconds(42));
 
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
-  EXPECT_CALL(*controller_, recordLatencySample(advance_time));
+  EXPECT_CALL(*controller_, recordLatencySample(rq_rcv_time));
   filter_->encodeComplete();
 
   filter_->onDestroy();
@@ -248,16 +318,16 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTestWithBody) {
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  const auto advance_time = std::chrono::nanoseconds(42);
+  const auto rq_rcv_time = time_system_.monotonicTime();
   mt = time_system_.monotonicTime();
-  time_system_.setMonotonicTime(mt + advance_time);
+  time_system_.setMonotonicTime(mt + std::chrono::nanoseconds(42));
 
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
-  EXPECT_CALL(*controller_, recordLatencySample(advance_time));
+  EXPECT_CALL(*controller_, recordLatencySample(rq_rcv_time));
   filter_->encodeComplete();
 }
 
@@ -271,13 +341,13 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
       .WillOnce(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  const auto advance_time = std::chrono::nanoseconds(42);
+  const auto rq_rcv_time = time_system_.monotonicTime();
   mt = time_system_.monotonicTime();
-  time_system_.setMonotonicTime(mt + advance_time);
+  time_system_.setMonotonicTime(mt + std::chrono::nanoseconds(42));
 
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
-  EXPECT_CALL(*controller_, recordLatencySample(advance_time));
+  EXPECT_CALL(*controller_, recordLatencySample(rq_rcv_time));
   filter_->encodeComplete();
 }
 

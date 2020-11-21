@@ -10,6 +10,7 @@ Types
   ../type/v3/http_status.proto
   ../type/v3/percent.proto
   ../type/v3/range.proto
+  ../type/v3/ratelimit_unit.proto
   ../type/v3/semantic_version.proto
   ../type/v3/token_bucket.proto
   ../type/matcher/v3/metadata.proto

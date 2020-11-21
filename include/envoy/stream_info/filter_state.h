@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
@@ -14,6 +15,10 @@
 
 namespace Envoy {
 namespace StreamInfo {
+
+class FilterState;
+
+using FilterStateSharedPtr = std::shared_ptr<FilterState>;
 
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
@@ -90,11 +95,18 @@ public:
   template <typename T> const T& getDataReadOnly(absl::string_view data_name) const {
     const T* result = dynamic_cast<const T*>(getDataReadOnlyGeneric(data_name));
     if (!result) {
-      throw EnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
     return *result;
   }
+
+  /**
+   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @return a const reference to the stored data.
+   * An exception will be thrown if the data does not exist.
+   */
+  virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable only).
@@ -107,7 +119,7 @@ public:
   template <typename T> T& getDataMutable(absl::string_view data_name) {
     T* result = dynamic_cast<T*>(getDataMutableGeneric(data_name));
     if (!result) {
-      throw EnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
     return *result;
@@ -146,14 +158,11 @@ public:
    * @return the pointer of the parent FilterState that has longer life span. nullptr means this is
    * either the top LifeSpan or the parent is not yet created.
    */
-  virtual std::shared_ptr<FilterState> parent() const PURE;
+  virtual FilterStateSharedPtr parent() const PURE;
 
 protected:
-  virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 };
-
-using FilterStateSharedPtr = std::shared_ptr<FilterState>;
 
 } // namespace StreamInfo
 } // namespace Envoy

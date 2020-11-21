@@ -64,9 +64,9 @@ public:
    * @return WaitStatus whether the condition timed out or not.
    */
   template <class Rep, class Period>
-  WaitStatus waitFor(
-      MutexBasicLockable& mutex,
-      std::chrono::duration<Rep, Period> duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  WaitStatus waitFor(MutexBasicLockable& mutex,
+                     std::chrono::duration<Rep, Period> duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     return condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration))
                ? WaitStatus::Timeout
                : WaitStatus::NoTimeout;

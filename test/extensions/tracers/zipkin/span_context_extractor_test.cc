@@ -27,10 +27,10 @@ TEST(ZipkinSpanContextExtractorTest, Largest) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second);
   EXPECT_EQ(3, context.first.id());
-  EXPECT_EQ(2, context.first.parent_id());
+  EXPECT_EQ(2, context.first.parentId());
   EXPECT_TRUE(context.first.is128BitTraceId());
-  EXPECT_EQ(1, context.first.trace_id());
-  EXPECT_EQ(9, context.first.trace_id_high());
+  EXPECT_EQ(1, context.first.traceId());
+  EXPECT_EQ(9, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
@@ -42,10 +42,10 @@ TEST(ZipkinSpanContextExtractorTest, WithoutParentDebug) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second);
   EXPECT_EQ(3, context.first.id());
-  EXPECT_EQ(0, context.first.parent_id());
+  EXPECT_EQ(0, context.first.parentId());
   EXPECT_TRUE(context.first.is128BitTraceId());
-  EXPECT_EQ(1, context.first.trace_id());
-  EXPECT_EQ(9, context.first.trace_id_high());
+  EXPECT_EQ(1, context.first.traceId());
+  EXPECT_EQ(9, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
@@ -73,10 +73,10 @@ TEST(ZipkinSpanContextExtractorTest, DebugOnly) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_FALSE(context.second);
   EXPECT_EQ(0, context.first.id());
-  EXPECT_EQ(0, context.first.parent_id());
+  EXPECT_EQ(0, context.first.parentId());
   EXPECT_FALSE(context.first.is128BitTraceId());
-  EXPECT_EQ(0, context.first.trace_id());
-  EXPECT_EQ(0, context.first.trace_id_high());
+  EXPECT_EQ(0, context.first.traceId());
+  EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_FALSE(context.first.sampled());
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
@@ -87,10 +87,10 @@ TEST(ZipkinSpanContextExtractorTest, Sampled) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_FALSE(context.second);
   EXPECT_EQ(0, context.first.id());
-  EXPECT_EQ(0, context.first.parent_id());
+  EXPECT_EQ(0, context.first.parentId());
   EXPECT_FALSE(context.first.is128BitTraceId());
-  EXPECT_EQ(0, context.first.trace_id());
-  EXPECT_EQ(0, context.first.trace_id_high());
+  EXPECT_EQ(0, context.first.traceId());
+  EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_FALSE(context.first.sampled());
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
@@ -101,10 +101,10 @@ TEST(ZipkinSpanContextExtractorTest, SampledFalse) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_FALSE(context.second);
   EXPECT_EQ(0, context.first.id());
-  EXPECT_EQ(0, context.first.parent_id());
+  EXPECT_EQ(0, context.first.parentId());
   EXPECT_FALSE(context.first.is128BitTraceId());
-  EXPECT_EQ(0, context.first.trace_id());
-  EXPECT_EQ(0, context.first.trace_id_high());
+  EXPECT_EQ(0, context.first.traceId());
+  EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_FALSE(context.first.sampled());
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
@@ -116,10 +116,10 @@ TEST(ZipkinSpanContextExtractorTest, IdNotYetSampled128) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second);
   EXPECT_EQ(3, context.first.id());
-  EXPECT_EQ(0, context.first.parent_id());
+  EXPECT_EQ(0, context.first.parentId());
   EXPECT_TRUE(context.first.is128BitTraceId());
-  EXPECT_EQ(1, context.first.trace_id());
-  EXPECT_EQ(9, context.first.trace_id_high());
+  EXPECT_EQ(1, context.first.traceId());
+  EXPECT_EQ(9, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
@@ -130,10 +130,10 @@ TEST(ZipkinSpanContextExtractorTest, IdsUnsampled) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second);
   EXPECT_EQ(3, context.first.id());
-  EXPECT_EQ(0, context.first.parent_id());
+  EXPECT_EQ(0, context.first.parentId());
   EXPECT_FALSE(context.first.is128BitTraceId());
-  EXPECT_EQ(1, context.first.trace_id());
-  EXPECT_EQ(0, context.first.trace_id_high());
+  EXPECT_EQ(1, context.first.traceId());
+  EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
@@ -145,10 +145,10 @@ TEST(ZipkinSpanContextExtractorTest, ParentUnsampled) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second);
   EXPECT_EQ(3, context.first.id());
-  EXPECT_EQ(2, context.first.parent_id());
+  EXPECT_EQ(2, context.first.parentId());
   EXPECT_FALSE(context.first.is128BitTraceId());
-  EXPECT_EQ(1, context.first.trace_id());
-  EXPECT_EQ(0, context.first.trace_id_high());
+  EXPECT_EQ(1, context.first.traceId());
+  EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }
@@ -160,10 +160,10 @@ TEST(ZipkinSpanContextExtractorTest, ParentDebug) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second);
   EXPECT_EQ(3, context.first.id());
-  EXPECT_EQ(2, context.first.parent_id());
+  EXPECT_EQ(2, context.first.parentId());
   EXPECT_FALSE(context.first.is128BitTraceId());
-  EXPECT_EQ(1, context.first.trace_id());
-  EXPECT_EQ(0, context.first.trace_id_high());
+  EXPECT_EQ(1, context.first.traceId());
+  EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
@@ -174,10 +174,10 @@ TEST(ZipkinSpanContextExtractorTest, IdsWithDebug) {
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second);
   EXPECT_EQ(3, context.first.id());
-  EXPECT_EQ(0, context.first.parent_id());
+  EXPECT_EQ(0, context.first.parentId());
   EXPECT_FALSE(context.first.is128BitTraceId());
-  EXPECT_EQ(1, context.first.trace_id());
-  EXPECT_EQ(0, context.first.trace_id_high());
+  EXPECT_EQ(1, context.first.traceId());
+  EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
@@ -188,10 +188,10 @@ TEST(ZipkinSpanContextExtractorTest, WithoutSampled) {
   auto context = extractor.extractSpanContext(false);
   EXPECT_TRUE(context.second);
   EXPECT_EQ(3, context.first.id());
-  EXPECT_EQ(0, context.first.parent_id());
+  EXPECT_EQ(0, context.first.parentId());
   EXPECT_FALSE(context.first.is128BitTraceId());
-  EXPECT_EQ(1, context.first.trace_id());
-  EXPECT_EQ(0, context.first.trace_id_high());
+  EXPECT_EQ(1, context.first.traceId());
+  EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_FALSE(context.first.sampled());
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
 }

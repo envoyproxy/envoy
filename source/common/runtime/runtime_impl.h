@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
@@ -14,6 +14,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
@@ -28,25 +29,13 @@
 #include "common/init/target_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 
+#include "absl/container/node_hash_map.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Runtime {
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
-
-/**
- * Implementation of RandomGenerator that uses per-thread RANLUX generators seeded with current
- * time.
- */
-class RandomGeneratorImpl : public RandomGenerator {
-public:
-  // Runtime::RandomGenerator
-  uint64_t random() override;
-  std::string uuid() override;
-
-  static const size_t UUID_LENGTH;
-};
 
 /**
  * All runtime stats. @see stats_macros.h
@@ -72,15 +61,12 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot,
-                     public ThreadLocal::ThreadLocalObject,
-                     Logger::Loggable<Logger::Id::runtime> {
+class SnapshotImpl : public Snapshot, Logger::Loggable<Logger::Id::runtime> {
 public:
-  SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
+  SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
-  void countDeprecatedFeatureUse() const override;
   bool deprecatedFeatureEnabled(absl::string_view key, bool default_value) const override;
   bool runtimeFeatureEnabled(absl::string_view key) const override;
   bool featureEnabled(absl::string_view key, uint64_t default_value, uint64_t random_value,
@@ -126,9 +112,11 @@ private:
 
   const std::vector<OverrideLayerConstPtr> layers_;
   EntryMap values_;
-  RandomGenerator& generator_;
+  Random::RandomGenerator& generator_;
   RuntimeStats& stats_;
 };
+
+using SnapshotImplPtr = std::unique_ptr<SnapshotImpl>;
 
 /**
  * Base implementation of OverrideLayer that by itself provides an empty values map.
@@ -164,7 +152,7 @@ public:
    * Merge the provided values into our entry map. An empty value indicates that a key should be
    * removed from our map.
    */
-  void mergeValues(const std::unordered_map<std::string, std::string>& values);
+  void mergeValues(const absl::node_hash_map<std::string, std::string>& values);
 
 private:
   RuntimeStats& stats_;
@@ -207,30 +195,28 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string&) override;
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
-  }
 
   void start();
-  void validateUpdateSize(uint32_t num_resources);
+  void validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
+  void onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
+  void createSubscription();
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;
   Stats::Store& store_;
+  Stats::ScopePtr stats_scope_;
   Config::SubscriptionPtr subscription_;
   std::string resource_name_;
   Init::TargetImpl init_target_;
   ProtobufWkt::Struct proto_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
@@ -246,27 +232,29 @@ public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const envoy::config::bootstrap::v3::LayeredRuntime& config,
              const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-             RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
-             Api::Api& api);
+             Random::RandomGenerator& generator,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
-  std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
-  void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
+  SnapshotConstSharedPtr threadsafeSnapshot() override;
+  void mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
+  Stats::Scope& getRootScope() override;
+  void countDeprecatedFeatureUse() const override;
 
 private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
+  SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
-  void onRdtsReady();
+  void onRtdsReady();
 
-  RandomGenerator& generator_;
+  Random::RandomGenerator& generator_;
   RuntimeStats stats_;
   AdminLayerPtr admin_layer_;
   ThreadLocal::SlotPtr tls_;
@@ -279,9 +267,10 @@ private:
   Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
+  Stats::Store& store_;
 
   absl::Mutex snapshot_mutex_;
-  std::shared_ptr<const Snapshot> thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
+  SnapshotConstSharedPtr thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime

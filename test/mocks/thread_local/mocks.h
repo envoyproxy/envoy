@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <unordered_map>
 
 #include "envoy/thread_local/thread_local.h"
 
@@ -51,7 +50,8 @@ public:
 
     ~SlotImpl() override {
       // Do not actually clear slot data during shutdown. This mimics the production code.
-      if (!parent_.shutdown_) {
+      // The defer_delete mimics the recycle() code with Bookkeeper.
+      if (!parent_.shutdown_ && !parent_.defer_delete) {
         EXPECT_LT(index_, parent_.data_.size());
         parent_.data_[index_].reset();
       }
@@ -60,16 +60,11 @@ public:
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
     bool currentThreadRegistered() override { return parent_.registered_; }
-    void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
-    void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
-      parent_.runOnAllThreads(cb, main_callback);
-    }
     void runOnAllThreads(const UpdateCb& cb) override {
-      parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); });
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); });
     }
-    void runOnAllThreads(const UpdateCb& cb, Event::PostCb main_callback) override {
-      parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); },
-                              main_callback);
+    void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& main_callback) override {
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
     }
 
     void set(InitializeCb cb) override {
@@ -98,6 +93,7 @@ public:
   bool defer_data{};
   bool shutdown_{};
   bool registered_{true};
+  bool defer_delete{};
 };
 
 } // namespace ThreadLocal

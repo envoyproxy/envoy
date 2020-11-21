@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -35,7 +35,7 @@ envoy_cc_library(
     deps = [
         ":utils_lib",
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/stats:symbol_table_lib",
     ],

@@ -15,7 +15,7 @@ Features:
 Local reply content modification
 --------------------------------
 
-The local response content returned by Envoy can be customized. A list of :ref:`mappers <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mappers>` can be specified. Each mapper must have a :ref:`filter <envoy_v3_api_field_config.accesslog.v3.AccessLog.filter>`. It may have following rewrite rules; a :ref:`status_code <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.status_code>` rule to rewrite response code, a :ref:`body <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body>` rule to rewrite the local reply body and a :ref:`body_format_override <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format_override>` to specify the response body format. Envoy checks each `mapper` according to the specified order until the first one is matched. If a `mapper` is matched, all its rewrite rules will apply.
+The local response content returned by Envoy can be customized. A list of :ref:`mappers <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mappers>` can be specified. Each mapper must have a :ref:`filter <envoy_v3_api_field_config.accesslog.v3.AccessLog.filter>`. It may have following rewrite rules; a :ref:`status_code <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.status_code>` rule to rewrite response code, a :ref:`headers_to_add <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.headers_to_add>` rule to add/override/append response HTTP headers, a :ref:`body <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body>` rule to rewrite the local reply body and a :ref:`body_format_override <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format_override>` to specify the response body format. Envoy checks each `mapper` according to the specified order until the first one is matched. If a `mapper` is matched, all its rewrite rules will apply.
 
 Example of a LocalReplyConfig
 
@@ -29,6 +29,11 @@ Example of a LocalReplyConfig
           value:
             default_value: 400
             runtime_key: key_b
+    headers_to_add:
+      - header:
+          key: "foo"
+          value: "bar"
+        append: false
     status_code: 401
     body:
       inline_string: "not allowed"
@@ -44,6 +49,8 @@ The response body content type can be customized. If not specified, the content 
 
 Local reply format can be specified as :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`. It supports :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
 
+Optionally, content-type can be modified further via :ref:`content_type <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>` field. If not specified, default content-type is `text/plain` for :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and `application/json` for :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
+
 Example of a LocalReplyConfig with `body_format` field.
 
 .. code-block::
@@ -58,7 +65,8 @@ Example of a LocalReplyConfig with `body_format` field.
             runtime_key: key_b
     status_code: 401
     body_format_override:
-      text_format: "%LOCAL_REPLY_BODY% %REQ(:path)%"
+      text_format: "<h1>%LOCAL_REPLY_BODY% %REQ(:path)%</h1>"
+      content_type: "text/html; charset=UTF-8"
   - filter:
       status_code_filter:
         comparison:

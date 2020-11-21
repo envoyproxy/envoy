@@ -68,7 +68,12 @@ enum class StatusCode : int {
   /**
    * Indicates a client (local) side error which should not happen.
    */
-  CodecClientError = 4
+  CodecClientError = 4,
+
+  /**
+   * Indicates that peer sent too many consecutive DATA frames with empty payload.
+   */
+  InboundFramesWithEmptyPayload = 5,
 };
 
 using Status = absl::Status;
@@ -88,6 +93,7 @@ Status codecProtocolError(absl::string_view message);
 Status bufferFloodError(absl::string_view message);
 Status prematureResponseError(absl::string_view message, Http::Code http_code);
 Status codecClientError(absl::string_view message);
+Status inboundFramesWithEmptyPayloadError();
 
 /**
  * Returns Envoy::StatusCode of the given status object.
@@ -102,12 +108,47 @@ ABSL_MUST_USE_RESULT bool isCodecProtocolError(const Status& status);
 ABSL_MUST_USE_RESULT bool isBufferFloodError(const Status& status);
 ABSL_MUST_USE_RESULT bool isPrematureResponseError(const Status& status);
 ABSL_MUST_USE_RESULT bool isCodecClientError(const Status& status);
+ABSL_MUST_USE_RESULT bool isInboundFramesWithEmptyPayloadError(const Status& status);
 
 /**
  * Returns Http::Code value of the PrematureResponseError status.
  * IsPrematureResponseError(status) must be true which is checked by ASSERT.
  */
 Http::Code getPrematureResponseHttpCode(const Status& status);
+
+/**
+ * Macro that checks return value of expression that results in Status and returns from
+ * the current function is status is not OK.
+ *
+ * Example usage:
+ *   Status foo() {
+ *     RETURN_IF_ERROR(bar());
+ *     return okStatus();
+ *   }
+ */
+
+#define RETURN_IF_ERROR(expr)                                                                      \
+  do {                                                                                             \
+    if (::Envoy::Http::Details::StatusAdapter adapter{(expr)}) {                                   \
+    } else {                                                                                       \
+      return std::move(adapter.status_);                                                           \
+    }                                                                                              \
+  } while (false)
+
+namespace Details {
+// Helper class to convert `Status` to `bool` so it can be used inside `if` statements.
+struct StatusAdapter {
+  StatusAdapter(const Status& status) : status_(status) {}
+  StatusAdapter(Status&& status) : status_(std::move(status)) {}
+
+  StatusAdapter(const StatusAdapter&) = delete;
+  StatusAdapter& operator=(const StatusAdapter&) = delete;
+
+  explicit operator bool() const { return status_.ok(); }
+
+  Status status_;
+};
+} // namespace Details
 
 } // namespace Http
 } // namespace Envoy

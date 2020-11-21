@@ -6,10 +6,13 @@
 #include "extensions/health_checkers/redis/config.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/server/health_checker_factory_context.h"
+#include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,6 +23,7 @@ namespace {
 using CustomRedisHealthChecker = Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker;
 
 TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisDeprecated)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -36,11 +40,11 @@ TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisDeprecated)) {
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
 
   RedisHealthCheckerFactory factory;
-  EXPECT_NE(
-      nullptr,
-      dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
-              .get()));
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         factory
+                             .createCustomHealthChecker(
+                                 Upstream::parseHealthCheckFromV3Yaml(yaml, false), context)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, CreateRedis) {
@@ -64,11 +68,12 @@ TEST(HealthCheckerFactoryTest, CreateRedis) {
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
 }
 
 TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisWithoutKeyDeprecated)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -84,11 +89,11 @@ TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisWithoutKeyDepr
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
 
   RedisHealthCheckerFactory factory;
-  EXPECT_NE(
-      nullptr,
-      dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
-              .get()));
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         factory
+                             .createCustomHealthChecker(
+                                 Upstream::parseHealthCheckFromV3Yaml(yaml, false), context)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
@@ -111,7 +116,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
 }
 
@@ -136,7 +141,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithLogHCFailure) {
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
 }
 
@@ -157,7 +162,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
+  Random::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<Api::MockApi> api;
@@ -165,8 +170,8 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   EXPECT_NE(nullptr,
             dynamic_cast<CustomRedisHealthChecker*>(
                 Upstream::HealthCheckerFactory::create(
-                    Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,
-                    dispatcher, log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
+                    Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, dispatcher,
+                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
                     .get()));
 }
 } // namespace

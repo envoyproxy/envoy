@@ -17,6 +17,54 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
+/*
+ * Watchdog configuration.
+ */
+class Watchdog {
+public:
+  virtual ~Watchdog() = default;
+
+  /**
+   * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread
+   *         event as a "miss" statistic.
+   */
+  virtual std::chrono::milliseconds missTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread
+   *         event as a "mega miss" statistic.
+   */
+  virtual std::chrono::milliseconds megaMissTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval after which we kill the process due to a
+   *         single nonresponsive thread.
+   */
+  virtual std::chrono::milliseconds killTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval after which we kill the process due to
+   *         multiple nonresponsive threads.
+   */
+  virtual std::chrono::milliseconds multiKillTimeout() const PURE;
+
+  /**
+   * @return double the percentage of threads that need to meet the MultiKillTimeout before we
+   *         kill the process. This is used in the calculation below
+   *         Max(2, ceil(registered_threads * Fraction(MultiKillThreshold)))
+   *         which computes the number of threads that need to be be nonresponsive
+   *         for at least MultiKillTimeout before we kill the process.
+   */
+  virtual double multiKillThreshold() const PURE;
+
+  /**
+   * @return Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+   *         the WatchDog Actions that trigger on WatchDog Events.
+   */
+  virtual Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+  actions() const PURE;
+};
+
 /**
  * The main server configuration.
  */
@@ -42,28 +90,14 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
-   * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread
-   *         event as a "miss" statistic.
+   * @return const Watchdog& the configuration of the main thread watchdog.
    */
-  virtual std::chrono::milliseconds wdMissTimeout() const PURE;
+  virtual const Watchdog& mainThreadWatchdogConfig() const PURE;
 
   /**
-   * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread
-   *         event as a "mega miss" statistic.
+   * @return const Watchdog& the configuration of the worker watchdog.
    */
-  virtual std::chrono::milliseconds wdMegaMissTimeout() const PURE;
-
-  /**
-   * @return std::chrono::milliseconds the time interval after which we kill the process due to a
-   *         single nonresponsive thread.
-   */
-  virtual std::chrono::milliseconds wdKillTimeout() const PURE;
-
-  /**
-   * @return std::chrono::milliseconds the time interval after which we kill the process due to
-   *         multiple nonresponsive threads.
-   */
-  virtual std::chrono::milliseconds wdMultiKillTimeout() const PURE;
+  virtual const Watchdog& workerWatchdogConfig() const PURE;
 };
 
 /**

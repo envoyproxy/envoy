@@ -16,6 +16,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    accept_handle(Http::CustomHeaders::get().Accept);
+
 struct RcDetailsValues {
   // The gRPC HTTP/1 reverse bridge failed because the body payload was too
   // small to be a gRPC frame.
@@ -93,7 +96,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // gRPC content type variations such as application/grpc+proto.
     content_type_ = std::string(headers.getContentTypeValue());
     headers.setContentType(upstream_content_type_);
-    headers.setAccept(upstream_content_type_);
+    headers.setInline(accept_handle.handle(), upstream_content_type_);
 
     if (withhold_grpc_frames_) {
       // Adjust the content-length header to account for us removing the gRPC frame header.
@@ -133,17 +136,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     // If the response from upstream does not have the correct content-type,
     // perform an early return with a useful error message in grpc-message.
     if (content_type != upstream_content_type_) {
-      headers.setGrpcMessage(badContentTypeMessage(headers));
-      headers.setGrpcStatus(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown);
-      headers.setStatus(enumToInt(Http::Code::OK));
+      decoder_callbacks_->sendLocalReply(Http::Code::OK, badContentTypeMessage(headers), nullptr,
+                                         Grpc::Status::WellKnownGrpcStatus::Unknown,
+                                         RcDetails::get().GrpcBridgeFailedContentType);
 
-      if (content_type != nullptr) {
-        headers.setContentType(content_type_);
-      }
-
-      decoder_callbacks_->streamInfo().setResponseCodeDetails(
-          RcDetails::get().GrpcBridgeFailedContentType);
-      return Http::FilterHeadersStatus::ContinueAndEndStream;
+      return Http::FilterHeadersStatus::StopIteration;
     }
 
     // Restore the content-type to match what the downstream sent.

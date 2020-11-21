@@ -5,6 +5,7 @@
 #include "common/http/exception.h"
 
 #include "test/common/http/common.h"
+#include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/common/http/http2/frame_replay.h"
 #include "test/fuzz/fuzz_runner.h"
 
@@ -15,7 +16,7 @@ namespace {
 
 void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Create the client connection containing the nghttp2 session.
-  TestClientConnectionImpl connection(
+  TestClientConnectionImplNew connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       ProdNghttp2SessionFactory::get());
@@ -26,7 +27,7 @@ void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Setup a single stream to inject frames as a reply to.
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  codec.request_encoder_->encodeHeaders(request_headers, true);
+  codec.request_encoder_->encodeHeaders(request_headers, true).IgnoreError();
 
   // Send frames.
   status = codec.write(WellKnownFrames::defaultSettingsFrame(), connection);

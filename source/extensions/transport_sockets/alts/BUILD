@@ -1,16 +1,16 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # ALTS transport socket. This provides Google's ALTS protocol support in GCP to Envoy.
 # https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security/
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "grpc_tsi_wrapper",
@@ -33,6 +33,9 @@ envoy_cc_extension(
     ],
     hdrs = [
         "config.h",
+    ],
+    external_deps = [
+        "abseil_node_hash_set",
     ],
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [

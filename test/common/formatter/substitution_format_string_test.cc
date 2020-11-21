@@ -21,7 +21,8 @@ public:
     EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(Return(response_code));
   }
 
-  Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/bar/foo"}};
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "GET"}, {":path", "/bar/foo"}, {"content-type", "application/json"}};
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   StreamInfo::MockStreamInfo stream_info_;
@@ -54,6 +55,8 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
     text: "plain text"
     path: "%REQ(:path)%"
     code: "%RESPONSE_CODE%"
+    headers:
+      content-type: "%REQ(CONTENT-TYPE)%"
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
@@ -64,7 +67,10 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
   const std::string expected = R"EOF({
     "text": "plain text",
     "path": "/bar/foo",
-    "code": 200
+    "code": 200,
+    "headers": {
+      "content-type": "application/json"
+    }
 })EOF";
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
 }
@@ -79,17 +85,12 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   json_format:
     field: 200
 )",
-      R"(
-  json_format:
-    field:
-      nest_field: "value"
-)",
   };
   for (const auto& yaml : invalid_configs) {
     TestUtility::loadFromYaml(yaml, config_);
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_),
-                              EnvoyException,
-                              "Only string values are supported in the JSON access log format.");
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatStringUtils::fromProtoConfig(config_), EnvoyException,
+        "Only string values or nested structs are supported in the JSON access log format.");
   }
 }
 

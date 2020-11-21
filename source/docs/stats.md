@@ -16,7 +16,7 @@ values, they are passed from parent to child in an RPC protocol.
 They were previously held in shared memory, which imposed various restrictions.
 Unlike the shared memory implementation, the RPC passing *requires a mode-bit specified
 when constructing gauges indicating whether it should be accumulated across hot-restarts*.
-    
+
 ## Performance and Thread Local Storage
 
 A key tenant of the Envoy architecture is high performance on machines with
@@ -76,6 +76,18 @@ followed.
  * The main thread now goes through all histograms, collect them across each worker and
    accumulates in to *interval* histograms.
  * Finally the main *interval* histogram is merged to *cumulative* histogram.
+
+`ParentHistogram`s are held weakly a set in ThreadLocalStore. Like other stats,
+they keep an embedded reference count and are removed from the set and destroyed
+when the last strong reference disappears. Consequently, we must hold a lock for
+the set when decrementing histogram reference counts. A similar process occurs for
+other types of stats, but in those cases it is taken care of in `AllocatorImpl`.
+There are strong references to `ParentHistograms` in TlsCacheEntry::parent_histograms_.
+
+Thread-local `TlsHistogram`s are created on behalf of a `ParentHistogram`
+whenever accessed from a worker thread. They are strongly referenced in the
+`ParentHistogram` as well as in a cache in the `ThreadLocalStore`, to help
+maintain data continuity as scopes are re-created during operation.
 
 ## Stat naming infrastructure and memory consumption
 
@@ -168,23 +180,10 @@ showing the memory layout for a few scenarios of constructing and joining symbol
 
 ![Symbol Table Memory Diagram](symtab.png)
 
-### Current State and Strategy To Deploy Symbol Tables
+### Symbol Contention Risk
 
-As of September 5, 2019, the symbol table API has been integrated into the
-production code, using a temporary ["fake" symbol table
-implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h). This
-fake has enabled us to incrementally transform the codebase to pre-symbolize
-names as much as possible, avoiding contention in the hot-path.
-
-There are no longer any explicit production calls to create counters
-or gauges directly from a string via `Stats::Scope::counter(const
-std::string&)`, though they are ubiquitous in tests. There is also a
-`check_format` protection against reintroducting production calls to
-`counter()`.
-
-However, there are still several ways to create hot-path contention
-looking up stats by name, and there is no bulletproof way to prevent it from
-occurring.
+There are several ways to create hot-path contention looking up stats by name,
+and there is no bulletproof way to prevent it from occurring.
  * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests.
  * An explicit symbol-table lookup, via `StatNamePool` or `StatNameSet` can be
    made in the hot path.
@@ -192,22 +191,21 @@ occurring.
 It is difficult to search for those scenarios in the source code or prevent them
 with a format-check, but we can determine whether symbol-table lookups are
 occurring during via an admin endpoint that shows 20 recent lookups by name, at
-`ENVOY_HOST:ADMIN_PORT/stats?recentlookups`. This works only when real symbol
-tables are enabled, via command-line option `--use-fake-symbol-table 0`.
+`ENVOY_HOST:ADMIN_PORT/stats?recentlookups`.
 
-Once we are confident we've removed all hot-path symbol-table lookups, ideally
-through usage of real symbol tables in production, examining that endpoint, we
-can enable real symbol tables by default.
+As of October 6, 2020, the "fake" symbol table implementation has been removed
+from the system, and the "--use-fake-symbol-table" option is now a no-op,
+triggering a warning if set to "1". The option will be removed in a later
+release.
 
 ### Symbol Table Class Overview
 
 Class | Superclass | Description
 -----| ---------- | ---------
 SymbolTable | | Abstract class providing an interface for symbol tables
-FakeSymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName is represented as a flat string
 SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
 SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
-StatName | | Provides an API and a view into a StatName (dynamic, symbolized, or fake). Like absl::string_view, the backing store must be separately maintained.
+StatName | | Provides an API and a view into a StatName (dynamic orsymbolized). Like absl::string_view, the backing store must be separately maintained.
 StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
 StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
 StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free(). 

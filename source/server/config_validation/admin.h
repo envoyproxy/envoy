@@ -27,6 +27,7 @@ public:
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
+  uint32_t concurrency() const override { return 1; }
 
 private:
   ConfigTrackerImpl config_tracker_;

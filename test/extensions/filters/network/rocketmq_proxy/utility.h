@@ -3,8 +3,6 @@
 #include "extensions/filters/network/rocketmq_proxy/config.h"
 #include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
 
-#include "test/mocks/server/mocks.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {

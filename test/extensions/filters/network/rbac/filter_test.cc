@@ -22,8 +22,10 @@ namespace RBACFilter {
 
 class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
-  RoleBasedAccessControlFilterConfigSharedPtr setupConfig(bool with_policy = true,
-                                                          bool continuous = false) {
+  RoleBasedAccessControlFilterConfigSharedPtr
+  setupConfig(bool with_policy = true, bool continuous = false,
+              envoy::config::rbac::v3::RBAC::Action action = envoy::config::rbac::v3::RBAC::ALLOW) {
+
     envoy::extensions::filters::network::rbac::v3::RBAC config;
     config.set_stat_prefix("tcp.");
 
@@ -34,7 +36,7 @@ public:
           ".*cncf.io");
       policy_rules->add_rules()->set_destination_port(123);
       policy.add_principals()->set_any(true);
-      config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+      config.mutable_rules()->set_action(action);
       (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
       envoy::config::rbac::v3::Policy shadow_policy;
@@ -42,7 +44,7 @@ public:
       shadow_policy_rules->add_rules()->mutable_requested_server_name()->set_exact("xyz.cncf.io");
       shadow_policy_rules->add_rules()->set_destination_port(456);
       shadow_policy.add_principals()->set_any(true);
-      config.mutable_shadow_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+      config.mutable_shadow_rules()->set_action(action);
       (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
     }
 
@@ -72,12 +74,30 @@ public:
         .WillByDefault(Return(requested_server_name_));
   }
 
+  void checkAccessLogMetadata(bool expected) {
+    auto filter_meta = stream_info_.dynamicMetadata().filter_metadata().at(
+        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
+    EXPECT_EQ(expected,
+              filter_meta.fields()
+                  .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
+                  .bool_value());
+  }
+
   void setMetadata() {
     ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().Rbac, _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, ProtobufWkt::Struct>(NetworkFilterNames::get().Rbac,
                                                                   obj));
+        }));
+
+    ON_CALL(stream_info_,
+            setDynamicMetadata(
+                Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
+        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+          stream_info_.metadata_.mutable_filter_metadata()->insert(
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+                  Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
         }));
   }
 
@@ -171,6 +191,49 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
   EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policy_id").string_value());
   EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
+}
+
+// Log Tests
+TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldLog) {
+  config_ = setupConfig(true, false, envoy::config::rbac::v3::RBAC::LOG);
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+
+  checkAccessLogMetadata(true);
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldNotLog) {
+  config_ = setupConfig(true, false, envoy::config::rbac::v3::RBAC::LOG);
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+
+  setDestinationPort(456);
+  setMetadata();
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+
+  checkAccessLogMetadata(false);
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowNoChangeLog) {
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+
+  // Check that Allow action does not set access log metadata
+  EXPECT_EQ(stream_info_.dynamicMetadata().filter_metadata().end(),
+            stream_info_.dynamicMetadata().filter_metadata().find(
+                Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
 }
 
 } // namespace RBACFilter

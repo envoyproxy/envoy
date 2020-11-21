@@ -25,7 +25,7 @@ message DynamicOtConfig {
 
   // Dynamic library implementing the `OpenTracing API
   // <https://github.com/opentracing/opentracing-cpp>`_.
-  string library = 1 [(validate.rules).string = {min_bytes: 1}];
+  string library = 1 [(validate.rules).string = {min_len: 1}];
 
   // The configuration to use when creating a tracer from the given dynamic
   // library.

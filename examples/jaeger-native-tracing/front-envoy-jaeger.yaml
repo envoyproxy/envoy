@@ -3,19 +3,19 @@ static_resources:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 80
+        port_value: 8000
     traffic_direction: OUTBOUND
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           generate_request_id: true
           tracing:
             provider:
               name: envoy.tracers.dynamic_ot
               typed_config:
-                "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
+                "@type": type.googleapis.com/envoy.config.trace.v3.DynamicOtConfig
                 library: /usr/local/lib/libjaegertracing_plugin.so
                 config:
                   service_name: front-proxy
@@ -64,10 +64,4 @@ static_resources:
             address:
               socket_address:
                 address: service1
-                port_value: 80
-admin:
-  access_log_path: "/dev/null"
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 8001
+                port_value: 8000

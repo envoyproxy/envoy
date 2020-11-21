@@ -14,6 +14,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/ssl/connection.h"
 
+#include "common/http/filter_manager.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
 
@@ -44,7 +45,57 @@ public:
   ~MockConnectionCallbacks() override;
 
   // Http::ConnectionCallbacks
-  MOCK_METHOD(void, onGoAway, ());
+  MOCK_METHOD(void, onGoAway, (GoAwayErrorCode error_code));
+};
+
+class MockFilterManagerCallbacks : public FilterManagerCallbacks {
+public:
+  MockFilterManagerCallbacks();
+  ~MockFilterManagerCallbacks() override;
+
+  MOCK_METHOD(void, encodeHeaders, (ResponseHeaderMap&, bool));
+  MOCK_METHOD(void, encode100ContinueHeaders, (ResponseHeaderMap&));
+  MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool));
+  MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
+  MOCK_METHOD(void, encodeMetadata, (MetadataMapVector&));
+  MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
+  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
+  MOCK_METHOD(void, setContinueHeaders, (ResponseHeaderMapPtr &&));
+  MOCK_METHOD(void, setResponseHeaders_, (ResponseHeaderMap&));
+  void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) override {
+    // TODO(snowp): Repeat this pattern for all setters.
+    response_headers_ = std::move(response_headers);
+    setResponseHeaders_(*response_headers_);
+  }
+  MOCK_METHOD(void, setResponseTrailers, (ResponseTrailerMapPtr &&));
+  MOCK_METHOD(RequestHeaderMapOptRef, requestHeaders, ());
+  MOCK_METHOD(RequestTrailerMapOptRef, requestTrailers, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
+  MOCK_METHOD(void, endStream, ());
+  MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, upgradeFilterChainCreated, ());
+  MOCK_METHOD(void, disarmRequestTimeout, ());
+  MOCK_METHOD(void, resetIdleTimer, ());
+  MOCK_METHOD(void, recreateStream, (StreamInfo::FilterStateSharedPtr filter_state));
+  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(const Router::RouteEntry::UpgradeMap*, upgradeMap, ());
+  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
+  MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback& cb));
+  MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
+  MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
+  MOCK_METHOD(Tracing::Span&, activeSpan, ());
+  MOCK_METHOD(void, onResponseDataTooLarge, ());
+  MOCK_METHOD(void, onRequestDataTooLarge, ());
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(void, onLocalReply, (Code code));
+  MOCK_METHOD(Tracing::Config&, tracingConfig, ());
+  MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+
+  ResponseHeaderMapPtr response_headers_;
 };
 
 class MockServerConnectionCallbacks : public ServerConnectionCallbacks,
@@ -151,7 +202,7 @@ public:
   MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
   MOCK_METHOD(void, setDecoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, decoderBufferLimit, ());
-  MOCK_METHOD(bool, recreateStream, ());
+  MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
   MOCK_METHOD(void, addUpstreamSocketOptions, (const Network::Socket::OptionsSharedPtr& options));
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, getUpstreamSocketOptions, (), (const));
 
@@ -164,12 +215,20 @@ public:
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                     absl::string_view details) override {
+    stream_info_.setResponseCodeDetails(details);
     encodeHeaders_(*headers, end_stream);
   }
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override { encodeTrailers_(*trailers); }
   void encodeMetadata(MetadataMapPtr&& metadata_map) override {
     encodeMetadata_(std::move(metadata_map));
+  }
+  absl::string_view details() {
+    if (stream_info_.responseCodeDetails()) {
+      return stream_info_.responseCodeDetails().value();
+    }
+    return "";
   }
 
   MOCK_METHOD(void, continueDecoding, ());
@@ -195,7 +254,6 @@ public:
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
   testing::NiceMock<MockScopedTrackedObject> scope_;
-  std::string details_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
@@ -235,6 +293,11 @@ public:
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());
   MOCK_METHOD(void, modifyEncodingBuffer, (std::function<void(Buffer::Instance&)>));
+  MOCK_METHOD(void, sendLocalReply,
+              (Code code, absl::string_view body,
+               std::function<void(ResponseHeaderMap& headers)> modify_headers,
+               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               absl::string_view details));
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   Buffer::InstancePtr buffer_;
@@ -249,6 +312,7 @@ public:
   ~MockStreamDecoderFilter() override;
 
   // Http::StreamFilterBase
+  MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
 
   // Http::StreamDecoderFilter
@@ -258,6 +322,11 @@ public:
   MOCK_METHOD(FilterMetadataStatus, decodeMetadata, (Http::MetadataMap & metadata_map));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (StreamDecoderFilterCallbacks & callbacks));
   MOCK_METHOD(void, decodeComplete, ());
+  MOCK_METHOD(void, sendLocalReply,
+              (bool is_grpc_request, Code code, absl::string_view body,
+               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+               bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               absl::string_view details));
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
@@ -268,6 +337,7 @@ public:
   ~MockStreamEncoderFilter() override;
 
   // Http::StreamFilterBase
+  MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
 
   // Http::MockStreamEncoderFilter
@@ -288,6 +358,7 @@ public:
   ~MockStreamFilter() override;
 
   // Http::StreamFilterBase
+  MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
 
   // Http::StreamDecoderFilter
@@ -346,6 +417,8 @@ public:
   MOCK_METHOD(void, onSuccess_, (const Http::AsyncClient::Request&, ResponseMessage*));
   MOCK_METHOD(void, onFailure,
               (const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason));
+  MOCK_METHOD(void, onBeforeFinalizeUpstreamSpan,
+              (Envoy::Tracing::Span&, const Http::ResponseHeaderMap*));
 };
 
 class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {
@@ -415,21 +488,18 @@ public:
                                     testing::Matcher<absl::string_view> matcher)
       : key_(std::move(key)), matcher_(std::move(matcher)) {}
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Get all headers with matching keys.
     std::vector<absl::string_view> values;
-    std::pair<std::string, std::vector<absl::string_view>*> context =
-        std::make_pair(key_.get(), &values);
     Envoy::Http::HeaderMap::ConstIterateCb get_headers_cb =
-        [](const Envoy::Http::HeaderEntry& header, void* context) {
-          auto* typed_context =
-              static_cast<std::pair<std::string, std::vector<absl::string_view>*>*>(context);
-          if (header.key().getStringView() == typed_context->first) {
-            typed_context->second->push_back(header.value().getStringView());
+        [key = key_.get(), &values](const Envoy::Http::HeaderEntry& header) {
+          if (header.key().getStringView() == key) {
+            values.push_back(header.value().getStringView());
           }
           return Envoy::Http::HeaderMap::Iterate::Continue;
         };
-    headers.iterate(get_headers_cb, &context);
+    headers.iterate(get_headers_cb);
 
     if (values.empty()) {
       *listener << "which has no '" << key_.get() << "' header";
@@ -499,6 +569,14 @@ MATCHER_P(HttpStatusIs, expected_code, "") {
   return true;
 }
 
+inline HeaderMap::ConstIterateCb
+saveHeaders(std::vector<std::pair<absl::string_view, absl::string_view>>* output) {
+  return [output](const HeaderEntry& header) {
+    output->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
+    return HeaderMap::Iterate::Continue;
+  };
+}
+
 template <typename HeaderMapT>
 class IsSubsetOfHeadersMatcherImpl : public testing::MatcherInterface<HeaderMapT> {
 public:
@@ -511,17 +589,14 @@ public:
   IsSubsetOfHeadersMatcherImpl(const IsSubsetOfHeadersMatcherImpl& other)
       : expected_headers_(other.expected_headers_) {}
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Collect header maps into vectors, to use for IsSubsetOf.
-    auto get_headers_cb = [](const HeaderEntry& header, void* headers) {
-      static_cast<std::vector<std::pair<absl::string_view, absl::string_view>>*>(headers)
-          ->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
-      return HeaderMap::Iterate::Continue;
-    };
     std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
-    headers.iterate(get_headers_cb, &arg_headers_vec);
+    headers.iterate(saveHeaders(&arg_headers_vec));
+
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
-    expected_headers_.iterate(get_headers_cb, &expected_headers_vec);
+    expected_headers_.iterate(saveHeaders(&expected_headers_vec));
 
     return ExplainMatchResult(testing::IsSubsetOf(expected_headers_vec), arg_headers_vec, listener);
   }
@@ -530,7 +605,7 @@ public:
     *os << "is a subset of headers:\n" << expected_headers_;
   }
 
-  const TestHeaderMapImpl expected_headers_;
+  const TestRequestHeaderMapImpl expected_headers_;
 };
 
 class IsSubsetOfHeadersMatcher {
@@ -549,7 +624,7 @@ public:
   }
 
 private:
-  TestHeaderMapImpl expected_headers_;
+  TestRequestHeaderMapImpl expected_headers_;
 };
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers);
@@ -566,17 +641,14 @@ public:
   IsSupersetOfHeadersMatcherImpl(const IsSupersetOfHeadersMatcherImpl& other)
       : expected_headers_(other.expected_headers_) {}
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Collect header maps into vectors, to use for IsSupersetOf.
-    auto get_headers_cb = [](const HeaderEntry& header, void* headers) {
-      static_cast<std::vector<std::pair<absl::string_view, absl::string_view>>*>(headers)
-          ->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
-      return HeaderMap::Iterate::Continue;
-    };
     std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
-    headers.iterate(get_headers_cb, &arg_headers_vec);
+    headers.iterate(saveHeaders(&arg_headers_vec));
+
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
-    expected_headers_.iterate(get_headers_cb, &expected_headers_vec);
+    expected_headers_.iterate(saveHeaders(&expected_headers_vec));
 
     return ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
                               listener);
@@ -586,7 +658,7 @@ public:
     *os << "is a superset of headers:\n" << expected_headers_;
   }
 
-  const TestHeaderMapImpl expected_headers_;
+  const TestRequestHeaderMapImpl expected_headers_;
 };
 
 class IsSupersetOfHeadersMatcher {
@@ -605,7 +677,7 @@ public:
   }
 
 private:
-  TestHeaderMapImpl expected_headers_;
+  TestRequestHeaderMapImpl expected_headers_;
 };
 
 IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers);
@@ -624,7 +696,17 @@ MATCHER_P(HeaderMapEqual, rhs, "") {
   return equal;
 }
 
-MATCHER_P(HeaderMapEqualRef, rhs, "") { return arg == *rhs; }
+MATCHER_P(HeaderMapEqualRef, rhs, "") {
+  const bool equal = (arg == *rhs);
+  if (!equal) {
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("header map:") << "\n"
+                     << *rhs << TestUtility::addLeftAndRightPadding("is not equal to:") << "\n"
+                     << arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
 
 // Test that a HeaderMapPtr argument includes a given key-value pair, e.g.,
 //  HeaderHasValue("Upgrade", "WebSocket")

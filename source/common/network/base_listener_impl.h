@@ -3,10 +3,7 @@
 #include "envoy/network/listener.h"
 
 #include "common/event/dispatcher_impl.h"
-#include "common/event/libevent.h"
 #include "common/network/listen_socket_impl.h"
-
-#include "event2/event.h"
 
 namespace Envoy {
 namespace Network {
@@ -23,8 +20,6 @@ public:
   BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket);
 
 protected:
-  virtual Address::InstanceConstSharedPtr getLocalAddress(os_fd_t fd);
-
   Address::InstanceConstSharedPtr local_address_;
   Event::DispatcherImpl& dispatcher_;
   const SocketSharedPtr socket_;

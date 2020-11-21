@@ -58,6 +58,7 @@ namespace Http {
   COUNTER(downstream_rq_response_before_rq_complete)                                               \
   COUNTER(downstream_rq_rx_reset)                                                                  \
   COUNTER(downstream_rq_timeout)                                                                   \
+  COUNTER(downstream_rq_header_timeout)                                                            \
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_tx_reset)                                                                  \
@@ -290,6 +291,12 @@ public:
   virtual std::chrono::milliseconds requestTimeout() const PURE;
 
   /**
+   * @return request header timeout for incoming connection manager connections. Zero indicates a
+   *         disabled request header timeout.
+   */
+  virtual std::chrono::milliseconds requestHeadersTimeout() const PURE;
+
+  /**
    * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled
    *         timeout. See http_connection_manager.proto for a detailed description of this timeout.
    */
@@ -408,6 +415,12 @@ public:
    * @return bool supplies if the HttpConnectionManager should proxy the Expect: 100-Continue
    */
   virtual bool proxy100Continue() const PURE;
+
+  /**
+   * @return bool supplies if the HttpConnectionManager should handle invalid HTTP with a stream
+   * error or connection error.
+   */
+  virtual bool streamErrorOnInvalidHttpMessaging() const PURE;
 
   /**
    * @return supplies the http1 settings.

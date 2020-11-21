@@ -20,13 +20,18 @@
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
-#include "common/network/listener_impl.h"
+#include "common/network/tcp_listener_impl.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
+#endif
+
+#ifdef __APPLE__
+#include "common/network/apple_dns_impl.h"
 #endif
 
 namespace Envoy {
@@ -39,23 +44,25 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
 DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
                                Api::Api& api, Event::TimeSystem& time_system)
     : name_(name), api_(api), buffer_factory_(std::move(factory)),
-      scheduler_(time_system.createScheduler(base_scheduler_)),
-      deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
-      post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
+      scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
+      deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
+          [this]() -> void { clearDeferredDeleteList(); })),
+      post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
   ASSERT(!name_.empty());
-#ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::registerFatalErrorHandler(*this);
-#endif
+  FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
   base_scheduler_.registerOnPrepareCallback(
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() {
-#ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::removeFatalErrorHandler(*this);
-#endif
+DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
+
+void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                                      std::chrono::milliseconds min_touch_interval) {
+  ASSERT(!watchdog_registration_, "Each dispatcher can have at most one registered watchdog.");
+  watchdog_registration_ =
+      std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
@@ -103,13 +110,13 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ConnectionPtr
+Network::ServerConnectionPtr
 DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
                                        Network::TransportSocketPtr&& transport_socket,
                                        StreamInfo::StreamInfo& stream_info) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
-                                                   std::move(transport_socket), stream_info, true);
+  return std::make_unique<Network::ServerConnectionImpl>(
+      *this, std::move(socket), std::move(transport_socket), stream_info, true);
 }
 
 Network::ClientConnectionPtr
@@ -126,14 +133,37 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
-  return Network::DnsResolverSharedPtr{
-      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
+#ifdef __APPLE__
+  static bool use_apple_api_for_dns_lookups =
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups");
+  if (use_apple_api_for_dns_lookups) {
+    RELEASE_ASSERT(
+        resolvers.empty(),
+        "defining custom resolvers is not possible when using Apple APIs for DNS resolution. "
+        "Apple's API only allows overriding DNS resolvers via system settings. Delete resolvers "
+        "config or disable the envoy.restart_features.use_apple_api_for_dns_lookups runtime "
+        "feature.");
+    RELEASE_ASSERT(!use_tcp_for_dns_lookups,
+                   "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
+                   "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
+                   "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
+    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.randomGenerator(),
+                                                           api_.rootScope());
+  }
+#endif
+  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, use_tcp_for_dns_lookups);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
-  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
+  return FileEventPtr{new FileEventImpl(
+      *this, fd,
+      [this, cb](uint32_t events) {
+        touchWatchdog();
+        cb(events);
+      },
+      trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
@@ -142,13 +172,14 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 }
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
-                                                    Network::ListenerCallbacks& cb,
-                                                    bool bind_to_port) {
+                                                    Network::TcpListenerCallbacks& cb,
+                                                    bool bind_to_port, uint32_t backlog_size) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port);
+  return std::make_unique<Network::TcpListenerImpl>(
+      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
 }
 
-Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,
+Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
                                                           Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
@@ -159,16 +190,29 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   return createTimerInternal(cb);
 }
 
+Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
+  ASSERT(isThreadSafe());
+  return base_scheduler_.createSchedulableCallback([this, cb]() {
+    touchWatchdog();
+    cb();
+  });
+}
+
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
-  return scheduler_->createTimer(cb, *this);
+  return scheduler_->createTimer(
+      [this, cb]() {
+        touchWatchdog();
+        cb();
+      },
+      *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
   current_to_delete_->emplace_back(std::move(to_delete));
   ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
-  if (1 == current_to_delete_->size()) {
-    deferred_delete_timer_->enableTimer(std::chrono::milliseconds(0));
+  if (current_to_delete_->size() == 1) {
+    deferred_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
@@ -188,7 +232,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 
   if (do_post) {
-    post_timer_->enableTimer(std::chrono::milliseconds(0));
+    post_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
@@ -231,6 +275,25 @@ void DispatcherImpl::runPostCallbacks() {
       post_callbacks_.pop_front();
     }
     callback();
+  }
+}
+
+void DispatcherImpl::runFatalActionsOnTrackedObject(
+    const FatalAction::FatalActionPtrList& actions) const {
+  // Only run if this is the dispatcher of the current thread and
+  // DispatcherImpl::Run has been called.
+  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+    return;
+  }
+
+  for (const auto& action : actions) {
+    action->run(current_object_);
+  }
+}
+
+void DispatcherImpl::touchWatchdog() {
+  if (watchdog_registration_) {
+    watchdog_registration_->touchWatchdog();
   }
 }
 

@@ -4,7 +4,8 @@
 
 #include "extensions/tracers/dynamic_ot/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/tracer_factory.h"
+#include "test/mocks/server/tracer_factory_context.h"
 #include "test/test_common/environment.h"
 
 #include "fmt/printf.h"
@@ -34,7 +35,8 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
       R"EOF(
   http:
     name: envoy.tracers.dynamic_ot
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v3.DynamicOtConfig
       library: %s
       config:
         output_file: fake_file

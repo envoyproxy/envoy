@@ -9,7 +9,7 @@
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 
@@ -380,7 +380,7 @@ TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
   buffer.add("test");                                  // Body
 
   auto ctx = static_cast<ContextImpl*>(message_context_.get());
-  ctx->message_origin_data().move(buffer, buffer.length());
+  ctx->messageOriginData().move(buffer, buffer.length());
   startRequest(MessageType::Request);
   connectUpstream();
   destroyRouter();
@@ -484,7 +484,7 @@ TEST_F(DubboRouterTest, DestroyWhileConnecting) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
-  NiceMock<Tcp::ConnectionPool::MockCancellable> conn_pool_handle;
+  NiceMock<Envoy::ConnectionPool::MockCancellable> conn_pool_handle;
   EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
       .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
         return &conn_pool_handle;

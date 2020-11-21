@@ -29,7 +29,7 @@ public:
       filters:
         - name: thrift
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
+            "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy
             stat_prefix: thrift_stats
             route_config:
               name: "routes"
@@ -82,11 +82,6 @@ public:
     BaseThriftIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   Buffer::OwnedImpl downstream_request_bytes_;
   Buffer::OwnedImpl downstream_response_bytes_;
   Buffer::OwnedImpl upstream_request_bytes_;
@@ -121,7 +116,7 @@ TEST_P(ThriftTranslationIntegrationTest, Translates) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(downstream_request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(downstream_request_bytes_.toString()));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));

@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <regex>
-#include <unordered_map>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -21,6 +20,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/node_hash_map.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "integration.h"
@@ -118,8 +118,7 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
 }
 
 void XfccIntegrationTest::createUpstreams() {
-  fake_upstreams_.emplace_back(new FakeUpstream(
-      createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+  addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
 }
 
 void XfccIntegrationTest::initialize() {
@@ -429,8 +428,8 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
   // }
   // std::cout << "};" << std::endl;
 
-  std::unordered_map<std::string, std::string> tag_extracted_counter_map;
-  std::unordered_map<std::string, std::string> tag_extracted_gauge_map;
+  absl::node_hash_map<std::string, std::string> tag_extracted_counter_map;
+  absl::node_hash_map<std::string, std::string> tag_extracted_gauge_map;
 
   tag_extracted_counter_map = {
       {listenerStatPrefix("downstream_cx_total"), "listener.downstream_cx_total"},
@@ -745,10 +744,12 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"server.parent_connections", "server.parent_connections"},
       {"server.total_connections", "server.total_connections"},
       {"server.days_until_first_cert_expiring", "server.days_until_first_cert_expiring"},
+      {"server.seconds_until_first_ocsp_response_expiring",
+       "server.seconds_until_first_ocsp_response_expiring"},
       {"server.version", "server.version"}};
 
   auto test_name_against_mapping =
-      [](const std::unordered_map<std::string, std::string>& extracted_name_map,
+      [](const absl::node_hash_map<std::string, std::string>& extracted_name_map,
          const Stats::Metric& metric) {
         auto it = extracted_name_map.find(metric.name());
         // Ignore any metrics that are not found in the map for ease of addition

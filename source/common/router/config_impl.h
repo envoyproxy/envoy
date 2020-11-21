@@ -8,7 +8,6 @@
 #include <memory>
 #include <regex>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -32,6 +31,7 @@
 #include "common/router/tls_context_match_criteria_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -69,7 +69,7 @@ public:
   const RouteSpecificFilterConfig* get(const std::string& name) const;
 
 private:
-  std::unordered_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
+  absl::node_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
 };
 
 class RouteEntryImplBase;
@@ -272,6 +272,10 @@ public:
   }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
+  const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
+    return reset_headers_;
+  }
+  std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
@@ -294,6 +298,8 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
+  std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
+  std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
 };
 
@@ -492,6 +498,15 @@ public:
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return max_stream_duration_;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+    return grpc_timeout_header_max_;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+    return grpc_timeout_header_offset_;
+  }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
     return max_grpc_timeout_;
   }
@@ -597,6 +612,15 @@ private:
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override {
       return parent_->idleTimeout();
+    }
+    absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+      return parent_->max_stream_duration_;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+      return parent_->grpc_timeout_header_max_;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+      return parent_->grpc_timeout_header_offset_;
     }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return parent_->maxGrpcTimeout();
@@ -745,11 +769,16 @@ private:
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
+  const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
+  const std::string host_rewrite_path_regex_substitution_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const absl::optional<std::chrono::milliseconds> max_stream_duration_;
+  const absl::optional<std::chrono::milliseconds> grpc_timeout_header_max_;
+  const absl::optional<std::chrono::milliseconds> grpc_timeout_header_offset_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
   Runtime::Loader& loader_;
@@ -758,6 +787,8 @@ private:
   const std::string host_redirect_;
   const std::string port_redirect_;
   const std::string path_redirect_;
+  const bool path_redirect_has_query_;
+  const bool enable_preserve_query_in_path_redirects_;
   const bool https_redirect_;
   const std::string prefix_rewrite_redirect_;
   const bool strip_query_;
@@ -917,14 +948,14 @@ public:
 
 private:
   using WildcardVirtualHosts =
-      std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
+      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<std::string(const std::string&, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
 
   Stats::ScopePtr vhost_scope_;
-  std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
+  absl::node_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
   // A note on using an unordered_map versus a vector of (string, VirtualHostSharedPtr) pairs:

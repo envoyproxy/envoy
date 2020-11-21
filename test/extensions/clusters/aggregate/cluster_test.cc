@@ -8,8 +8,11 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/load_balancer.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
 
 using testing::Eq;
@@ -88,18 +91,19 @@ public:
 
   void initialize(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml_config);
+        Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::aggregate::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_store_,
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
-    cluster_ = std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, random_,
-                                         factory_context, std::move(scope), tls_, false);
+    cluster_ =
+        std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, api_->randomGenerator(),
+                                  factory_context, std::move(scope), tls_, false);
 
     thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
@@ -122,7 +126,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -130,7 +134,7 @@ public:
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+  Api::ApiPtr api_{Api::createApiForTest(stats_store_, random_)};
   std::shared_ptr<Cluster> cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
@@ -151,7 +155,7 @@ public:
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
         clusters:
         - primary
         - secondary
@@ -173,6 +177,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
 
   for (int i = 0; i <= 65; ++i) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    EXPECT_TRUE(lb_->peekAnotherHost(nullptr) == nullptr);
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
     EXPECT_EQ(host.get(), target.get());
   }

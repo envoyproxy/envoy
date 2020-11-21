@@ -4,9 +4,13 @@ from subprocess import check_output
 from subprocess import check_call
 import glob
 import os
+import shlex
 import shutil
 import sys
 import re
+
+# Needed for CI to pass down bazel options.
+BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 TARGETS = '@envoy_api//...'
 IMPORT_BASE = 'github.com/envoyproxy/go-control-plane'
@@ -14,7 +18,7 @@ OUTPUT_BASE = 'build_go'
 REPO_BASE = 'go-control-plane'
 BRANCH = 'master'
 MIRROR_MSG = 'Mirrored from envoyproxy/envoy @ '
-USER_NAME = 'go-control-plane(CircleCI)'
+USER_NAME = 'go-control-plane(Azure Pipelines)'
 USER_EMAIL = 'go-control-plane@users.noreply.github.com'
 
 
@@ -28,7 +32,11 @@ def generateProtobufs(output):
 
   # Each rule has the form @envoy_api//foo/bar:baz_go_proto.
   # First build all the rules to ensure we have the output files.
-  check_call(['bazel', 'build', '-c', 'fastbuild'] + go_protos)
+  # We preserve source info so comments are retained on generated code.
+  check_call([
+      'bazel', 'build', '-c', 'fastbuild',
+      '--experimental_proto_descriptor_sets_include_source_info'
+  ] + BAZEL_BUILD_OPTIONS + go_protos)
 
   for rule in go_protos:
     # Example rule:
@@ -40,8 +48,8 @@ def generateProtobufs(output):
     # Example output directory:
     # go_out/envoy/config/bootstrap/v2
     rule_dir, proto = rule.decode()[len('@envoy_api//'):].rsplit(':', 1)
-    input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir, 'linux_amd64_stripped',
-                             proto + '%', IMPORT_BASE, rule_dir)
+    input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir, proto + '_', IMPORT_BASE,
+                             rule_dir)
     input_files = glob.glob(os.path.join(input_dir, '*.go'))
     output_dir = os.path.join(output, rule_dir)
 
@@ -63,9 +71,7 @@ def git(repo, *args):
 
 def cloneGoProtobufs(repo):
   # Create a local clone of go-control-plane
-  git(None, 'clone', 'git@github.com:envoyproxy/go-control-plane', repo)
-  git(repo, 'fetch')
-  git(repo, 'checkout', '-B', BRANCH, 'origin/master')
+  git(None, 'clone', 'git@github.com:envoyproxy/go-control-plane', repo, '-b', BRANCH)
 
 
 def findLastSyncSHA(repo):
@@ -80,7 +86,7 @@ def findLastSyncSHA(repo):
 
 def updatedSinceSHA(repo, last_sha):
   # Determine if there are changes to API since last SHA
-  return git(None, 'rev-list', '%s..HEAD' % last_sha, 'api/envoy').split()
+  return git(None, 'rev-list', '%s..HEAD' % last_sha).split()
 
 
 def writeRevisionInfo(repo, sha):
@@ -97,6 +103,7 @@ def syncGoProtobufs(output, repo):
   git(repo, 'rm', '-r', 'envoy')
   # Copy subtree at envoy from output to repo
   shutil.copytree(os.path.join(output, 'envoy'), dst)
+  git(repo, 'add', 'envoy')
 
 
 def publishGoProtobufs(repo, sha):
@@ -108,17 +115,22 @@ def publishGoProtobufs(repo, sha):
   git(repo, 'push', 'origin', BRANCH)
 
 
+def updated(repo):
+  return len(
+      [f for f in git(repo, 'diff', 'HEAD', '--name-only').splitlines() if f != 'envoy/COMMIT']) > 0
+
+
 if __name__ == "__main__":
   workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
   output = os.path.join(workspace, OUTPUT_BASE)
   generateProtobufs(output)
   repo = os.path.join(workspace, REPO_BASE)
   cloneGoProtobufs(repo)
+  syncGoProtobufs(output, repo)
   last_sha = findLastSyncSHA(repo)
   changes = updatedSinceSHA(repo, last_sha)
-  if changes:
+  if updated(repo):
     print('Changes detected: %s' % changes)
     new_sha = changes[0]
-    syncGoProtobufs(output, repo)
     writeRevisionInfo(repo, new_sha)
     publishGoProtobufs(repo, new_sha)

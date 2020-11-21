@@ -6,22 +6,21 @@
 namespace Envoy {
 namespace Http {
 
-class MockStreamDecoder : public virtual StreamDecoder {
+class MockRequestDecoder : public RequestDecoder {
 public:
-  MockStreamDecoder();
-  ~MockStreamDecoder() override;
+  MockRequestDecoder();
+  ~MockRequestDecoder() override;
 
   void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
 
   // Http::StreamDecoder
   MOCK_METHOD(void, decodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, decodeMetadata_, (MetadataMapPtr & metadata_map));
-};
-
-class MockRequestDecoder : public MockStreamDecoder, public RequestDecoder {
-public:
-  MockRequestDecoder();
-  ~MockRequestDecoder() override;
+  MOCK_METHOD(void, sendLocalReply,
+              (bool is_grpc_request, Code code, absl::string_view body,
+               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               absl::string_view details));
 
   void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override {
     decodeHeaders_(headers, end_stream);
@@ -33,10 +32,16 @@ public:
   MOCK_METHOD(void, decodeTrailers_, (RequestTrailerMapPtr & trailers));
 };
 
-class MockResponseDecoder : public MockStreamDecoder, public ResponseDecoder {
+class MockResponseDecoder : public ResponseDecoder {
 public:
   MockResponseDecoder();
   ~MockResponseDecoder() override;
+
+  void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
+
+  // Http::StreamDecoder
+  MOCK_METHOD(void, decodeData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, decodeMetadata_, (MetadataMapPtr & metadata_map));
 
   void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     decode100ContinueHeaders_(headers);

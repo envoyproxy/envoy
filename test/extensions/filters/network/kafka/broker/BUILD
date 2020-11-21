@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -9,6 +7,8 @@ load(
     "envoy_extension_cc_test",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_extension_cc_test(
@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
 
@@ -26,6 +26,7 @@ envoy_extension_cc_test(
     srcs = ["filter_unit_test.cc"],
     extension_name = "envoy.filters.network.kafka_broker",
     deps = [
+        "//include/envoy/event:timer_interface",
         "//source/extensions/filters/network/kafka:kafka_broker_filter_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",

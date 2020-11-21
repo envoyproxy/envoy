@@ -4,6 +4,7 @@
 #include <list>
 #include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
@@ -26,6 +27,9 @@ namespace Http {
 class CodecClientCallbacks {
 public:
   virtual ~CodecClientCallbacks() = default;
+
+  // Called in onPreDecodeComplete
+  virtual void onStreamPreDecodeComplete() {}
 
   /**
    * Called every time an owned stream is destroyed, whether complete or not.
@@ -76,7 +80,7 @@ public:
   /**
    * @return the underlying connection ID.
    */
-  uint64_t id() { return connection_->id(); }
+  uint64_t id() const { return connection_->id(); }
 
   /**
    * @return the underlying codec protocol.
@@ -131,9 +135,9 @@ protected:
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 
   // Http::ConnectionCallbacks
-  void onGoAway() override {
+  void onGoAway(GoAwayErrorCode error_code) override {
     if (codec_callbacks_) {
-      codec_callbacks_->onGoAway();
+      codec_callbacks_->onGoAway(error_code);
     }
   }
 
@@ -155,9 +159,11 @@ protected:
   }
 
   const Type type_;
-  ClientConnectionPtr codec_;
-  Network::ClientConnectionPtr connection_;
+  // The order of host_, connection_, and codec_ matter as during destruction each can refer to
+  // the previous, at least in tests.
   Upstream::HostDescriptionConstSharedPtr host_;
+  Network::ClientConnectionPtr connection_;
+  ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
 
@@ -198,7 +204,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     // StreamDecoderWrapper
-    void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
+    void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
     RequestEncoder* encoder_{};
@@ -211,7 +217,7 @@ private:
    * Called when a response finishes decoding. This is called *before* forwarding on to the
    * wrapped decoder.
    */
-  void responseDecodeComplete(ActiveRequest& request);
+  void responsePreDecodeComplete(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);
@@ -243,7 +249,8 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+                  Random::RandomGenerator& random_generator);
 };
 
 } // namespace Http

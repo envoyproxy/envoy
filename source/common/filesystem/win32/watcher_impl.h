@@ -7,16 +7,20 @@
 #include <list>
 #include <locale>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
+#include "envoy/network/io_handle.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/thread_impl.h"
+#include "common/network/io_socket_handle_impl.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -32,7 +36,7 @@ public:
 private:
   static void issueFirstRead(ULONG_PTR param);
   static void directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLAPPED overlapped);
-  static void endDirectoryWatch(os_fd_t sock, HANDLE hEvent);
+  static void endDirectoryWatch(Network::IoHandle& io_handle, HANDLE hEvent);
   void watchLoop();
   void onDirectoryEvent();
 
@@ -56,10 +60,9 @@ private:
   typedef std::unique_ptr<DirectoryWatch> DirectoryWatchPtr;
 
   Api::Api& api_;
-  std::unordered_map<std::string, DirectoryWatchPtr> callback_map_;
-  Event::FileEventPtr directory_event_;
-  os_fd_t event_write_;
-  os_fd_t event_read_;
+  absl::node_hash_map<std::string, DirectoryWatchPtr> callback_map_;
+  Network::IoHandlePtr read_handle_;
+  Network::IoHandlePtr write_handle_;
   Thread::ThreadPtr watch_thread_;
   Thread::ThreadFactoryImplWin32 thread_factory_;
   HANDLE thread_exit_event_;

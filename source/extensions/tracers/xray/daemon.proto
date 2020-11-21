@@ -14,7 +14,9 @@ message Segment {
   string trace_id = 3 [(validate.rules).string = {len: 35}];
   double start_time = 4 [(validate.rules).double = {gt: 0}];
   double end_time = 5 [(validate.rules).double = {gt: 0}];
+  string origin = 9;
   string parent_id = 6;
+  google.protobuf.Struct aws = 10;
   http_annotations http = 7;
   message http_annotations {
     google.protobuf.Struct request = 1;

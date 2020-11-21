@@ -1,12 +1,12 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "evaluator_lib",
@@ -34,6 +34,7 @@ envoy_cc_library(
         "//source/common/stream_info:utility_lib",
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public:cel_value_producer",
+        "@com_google_cel_cpp//eval/public/structs:cel_proto_wrapper",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

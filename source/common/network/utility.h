@@ -9,8 +9,6 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 
-#include "common/network/socket_impl.h"
-
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -74,6 +72,7 @@ public:
    * Resolve a URL.
    * @param url supplies the url to resolve.
    * @return Address::InstanceConstSharedPtr the resolved address.
+   * @throw EnvoyException if url is invalid.
    */
   static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
 
@@ -288,7 +287,7 @@ public:
    * @param proto_address the address protobuf
    * @return socket type
    */
-  static Address::SocketType
+  static Socket::Type
   protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address);
 
   /**

@@ -5,9 +5,9 @@
 #include "envoy/service/accesslog/v3/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -24,7 +24,7 @@ void clearPort(envoy::config::core::v3::Address& address) {
   address.mutable_socket_address()->clear_port_specifier();
 }
 
-class TcpGrpcAccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class TcpGrpcAccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                         public BaseIntegrationTest {
 public:
   TcpGrpcAccessLogIntegrationTest()
@@ -32,15 +32,9 @@ public:
     enable_half_close_ = true;
   }
 
-  ~TcpGrpcAccessLogIntegrationTest() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void initialize() override {
@@ -59,6 +53,7 @@ public:
       envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig access_log_config;
       auto* common_config = access_log_config.mutable_common_config();
       common_config->set_log_name("foo");
+      common_config->set_transport_api_version(apiVersion());
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
@@ -81,7 +76,8 @@ public:
     envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
-    EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
+    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.accesslog.{}.AccessLogService",
+                                                  "StreamAccessLogs", apiVersion()),
               access_log_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
@@ -104,7 +100,10 @@ public:
       node->clear_extensions();
       node->clear_user_agent_build_version();
     }
-    EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
+    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
+                                        /*ignore_repeated_field_ordering=*/false));
 
     return AssertionSuccess();
   }
@@ -124,7 +123,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, TcpGrpcAccessLogIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic full access logging flow.
 TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
@@ -136,11 +135,11 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
 
   ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
-  tcp_client->write("bar", false);
+  ASSERT_TRUE(tcp_client->write("bar", false));
 
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   tcp_client->waitForHalfClose();
-  tcp_client->write("", true);
+  ASSERT_TRUE(tcp_client->write("", true));
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(3));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
@@ -148,15 +147,14 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
 
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(waitForAccessLogRequest(
-      fmt::format(R"EOF(
+  ASSERT_TRUE(
+      waitForAccessLogRequest(fmt::format(R"EOF(
 identifier:
   node:
     id: node_name
     cluster: cluster_name
     locality:
       zone: zone_name
-    build_version: {}
     user_agent_name: "envoy"
   log_name: foo
 tcp_logs:
@@ -182,11 +180,11 @@ tcp_logs:
       received_bytes: 3
       sent_bytes: 5
 )EOF",
-                  VersionInfo::version(), Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()))));
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()))));
 
   cleanup();
 }

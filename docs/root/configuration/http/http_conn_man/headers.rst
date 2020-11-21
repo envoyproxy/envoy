@@ -571,6 +571,12 @@ Supported variable names are:
   TCP
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
 
+%DOWNSTREAM_PEER_FINGERPRINT_1%
+  HTTP
+    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+
 %DOWNSTREAM_PEER_SERIAL%
   HTTP
     The serial number of the client certificate used to establish the downstream TLS connection.
@@ -614,6 +620,12 @@ Supported variable names are:
 
     Upstream metadata cannot be added to request headers as the upstream host has not been selected
     when custom request headers are generated.
+
+%DYNAMIC_METADATA(["namespace", "key", ...])%
+    Similar to UPSTREAM_METADATA, populates the header with dynamic metadata available in a request
+    (e.g.: added by filters like the header-to-metadata filter).
+
+    This works both on request and response headers.
 
 %UPSTREAM_REMOTE_ADDRESS%
     Remote address of the upstream host. If the address is an IP address it includes both address

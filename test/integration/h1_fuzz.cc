@@ -14,7 +14,6 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
                                    bool ignore_response) {
   PERSISTENT_FUZZ_VAR bool initialized = [this]() -> bool {
     initialize();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     return true;
   }();
   UNREFERENCED_PARAMETER(initialized);
@@ -30,7 +29,7 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
     }
     switch (event.event_selector_case()) {
     case test::integration::Event::kDownstreamSendBytes:
-      tcp_client->write(event.downstream_send_bytes(), false, false);
+      ASSERT_TRUE(tcp_client->write(event.downstream_send_bytes(), false, false));
       break;
     case test::integration::Event::kDownstreamRecvBytes:
       // TODO(htuch): Should we wait for some data?
@@ -69,7 +68,7 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
       AssertionResult result = fake_upstream_connection->close();
       RELEASE_ASSERT(result, result.message());
     }
-    AssertionResult result = fake_upstream_connection->waitForDisconnect(true);
+    AssertionResult result = fake_upstream_connection->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
   }
   tcp_client->close();

@@ -291,7 +291,7 @@ static void bufferSearch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
-    result += buffer.search(Pattern.c_str(), Pattern.length(), 0);
+    result += buffer.search(Pattern.c_str(), Pattern.length(), 0, 0);
   }
   benchmark::DoNotOptimize(result);
 }
@@ -314,7 +314,7 @@ static void bufferSearchPartialMatch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
-    result += buffer.search(Pattern.c_str(), Pattern.length(), 0);
+    result += buffer.search(Pattern.c_str(), Pattern.length(), 0, 0);
   }
   benchmark::DoNotOptimize(result);
 }

@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/macros.h"
 #include "common/config/api_type_oracle.h"
 #include "common/protobuf/visitor.h"
 #include "common/protobuf/well_known.h"
@@ -13,8 +14,6 @@ namespace Envoy {
 namespace Config {
 
 namespace {
-
-const char DeprecatedFieldShadowPrefix[] = "hidden_envoy_deprecated_";
 
 class ProtoVisitor {
 public:
@@ -61,29 +60,46 @@ DynamicMessagePtr createForDescriptorWithCast(const Protobuf::Message& message,
   return dynamic_message;
 }
 
+} // namespace
+
+void VersionConverter::upgrade(const Protobuf::Message& prev_message,
+                               Protobuf::Message& next_message) {
+  wireCast(prev_message, next_message);
+  // Track original type to support recoverOriginal().
+  annotateWithOriginalType(*prev_message.GetDescriptor(), next_message);
+}
+
 // This needs to be recursive, since sub-messages are consumed and stored
 // internally, we later want to recover their original types.
-void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
-                              Protobuf::Message& next_message) {
+void VersionConverter::annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
+                                                Protobuf::Message& upgraded_message) {
   class TypeAnnotatingProtoVisitor : public ProtobufMessage::ProtoVisitor {
   public:
     void onMessage(Protobuf::Message& message, const void* ctxt) override {
       const Protobuf::Descriptor* descriptor = message.GetDescriptor();
       const Protobuf::Reflection* reflection = message.GetReflection();
-      const Protobuf::Descriptor& prev_descriptor = *static_cast<const Protobuf::Descriptor*>(ctxt);
+      const Protobuf::Descriptor* prev_descriptor = static_cast<const Protobuf::Descriptor*>(ctxt);
+      // If there is no previous descriptor for this message, we don't need to annotate anything.
+      if (prev_descriptor == nullptr) {
+        return;
+      }
       // If they are the same type, there's no possibility of any different type
       // further down, so we're done.
-      if (descriptor->full_name() == prev_descriptor.full_name()) {
+      if (descriptor->full_name() == prev_descriptor->full_name()) {
         return;
       }
       auto* unknown_field_set = reflection->MutableUnknownFields(&message);
       unknown_field_set->AddLengthDelimited(ProtobufWellKnown::OriginalTypeFieldNumber,
-                                            prev_descriptor.full_name());
+                                            prev_descriptor->full_name());
     }
 
     const void* onField(Protobuf::Message&, const Protobuf::FieldDescriptor& field,
                         const void* ctxt) override {
-      const Protobuf::Descriptor& prev_descriptor = *static_cast<const Protobuf::Descriptor*>(ctxt);
+      const Protobuf::Descriptor* prev_descriptor = static_cast<const Protobuf::Descriptor*>(ctxt);
+      // If there is no previous descriptor for this field, we don't need to annotate anything.
+      if (prev_descriptor == nullptr) {
+        return nullptr;
+      }
       // TODO(htuch): This is a terrible hack, there should be no per-resource
       // business logic in this file. The reason this is required is that
       // endpoints, when captured in configuration such as inlined hosts in
@@ -93,27 +109,18 @@ void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
       // In theory, we should be able to just clean up these annotations in
       // ClusterManagerImpl with type erasure, but protobuf doesn't free up memory
       // as expected, we probably need some arena level trick to address this.
-      if (prev_descriptor.full_name() == "envoy.api.v2.Cluster" &&
+      if (prev_descriptor->full_name() == "envoy.api.v2.Cluster" &&
           (field.name() == "hidden_envoy_deprecated_hosts" || field.name() == "load_assignment")) {
         // This will cause the sub-message visit to abort early.
         return field.message_type();
       }
       const Protobuf::FieldDescriptor* prev_field =
-          prev_descriptor.FindFieldByNumber(field.number());
+          prev_descriptor->FindFieldByNumber(field.number());
       return prev_field != nullptr ? prev_field->message_type() : nullptr;
     }
   };
   TypeAnnotatingProtoVisitor proto_visitor;
-  ProtobufMessage::traverseMutableMessage(proto_visitor, next_message, &prev_descriptor);
-}
-
-} // namespace
-
-void VersionConverter::upgrade(const Protobuf::Message& prev_message,
-                               Protobuf::Message& next_message) {
-  wireCast(prev_message, next_message);
-  // Track original type to support recoverOriginal().
-  annotateWithOriginalType(*prev_message.GetDescriptor(), next_message);
+  ProtobufMessage::traverseMutableMessage(proto_visitor, upgraded_message, &prev_descriptor);
 }
 
 void VersionConverter::eraseOriginalTypeInformation(Protobuf::Message& message) {
@@ -160,6 +167,7 @@ VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
   DynamicMessagePtr dynamic_message;
   switch (api_version) {
   case envoy::config::core::v3::ApiVersion::AUTO:
+    FALLTHRU;
   case envoy::config::core::v3::ApiVersion::V2: {
     // TODO(htuch): this works as long as there are no new fields in the v3+
     // DiscoveryRequest. When they are added, we need to do a full v2 conversion
@@ -217,6 +225,8 @@ void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
   HiddenFieldScrubbingProtoVisitor proto_visitor;
   ProtobufMessage::traverseMutableMessage(proto_visitor, message, nullptr);
 }
+
+const char VersionUtil::DeprecatedFieldShadowPrefix[] = "hidden_envoy_deprecated_";
 
 } // namespace Config
 } // namespace Envoy

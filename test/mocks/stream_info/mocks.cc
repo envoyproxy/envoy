@@ -27,6 +27,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setResponseCodeDetails(_)).WillByDefault(Invoke([this](absl::string_view details) {
     response_code_details_ = std::string(details);
   }));
+  ON_CALL(*this, setConnectionTerminationDetails(_))
+      .WillByDefault(
+          Invoke([this](absl::string_view details) { connection_termination_details_ = details; }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
@@ -89,6 +92,8 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
   ON_CALL(*this, responseCodeDetails()).WillByDefault(ReturnPointee(&response_code_details_));
+  ON_CALL(*this, connectionTerminationDetails())
+      .WillByDefault(ReturnPointee(&connection_termination_details_));
   ON_CALL(*this, addBytesReceived(_)).WillByDefault(Invoke([this](uint64_t bytes_received) {
     bytes_received_ += bytes_received;
   }));
@@ -129,6 +134,10 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, upstreamTransportFailureReason())
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
+  ON_CALL(*this, connectionID()).WillByDefault(Return(connection_id_));
+  ON_CALL(*this, setConnectionID(_)).WillByDefault(Invoke([this](uint64_t id) {
+    connection_id_ = id;
+  }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

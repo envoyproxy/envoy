@@ -16,24 +16,21 @@
 #include "common/http/message_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/tracers/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
 
-static Buffer::InstancePtr serializeGrpcMessage(const lightstep::BufferChain& buffer_chain) {
-  Buffer::InstancePtr body(new Buffer::OwnedImpl());
+static void serializeGrpcMessage(const lightstep::BufferChain& buffer_chain,
+                                 Buffer::Instance& body) {
   auto size = buffer_chain.num_bytes();
   Buffer::RawSlice iovec;
-  body->reserve(size, &iovec, 1);
+  body.reserve(size, &iovec, 1);
   ASSERT(iovec.len_ >= size);
   iovec.len_ = size;
   buffer_chain.CopyOut(static_cast<char*>(iovec.mem_), size);
-  body->commit(&iovec, 1);
-  Grpc::Common::prependGrpcFrameHeader(*body);
-  return body;
+  body.commit(&iovec, 1);
+  Grpc::Common::prependGrpcFrameHeader(body);
 }
 
 static std::vector<lightstep::PropagationMode>
@@ -129,7 +126,7 @@ void LightStepDriver::LightStepTransporter::Send(std::unique_ptr<lightstep::Buff
   Http::RequestMessagePtr message = Grpc::Common::prepareHeaders(
       driver_.cluster(), lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
       absl::optional<std::chrono::milliseconds>(timeout));
-  message->body() = serializeGrpcMessage(*report);
+  serializeGrpcMessage(*report, message->body());
 
   if (collector_cluster_.exists()) {
     active_report_ = std::move(report);
@@ -198,7 +195,7 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
                                       pool_.add(lightstep::CollectorServiceFullName()),
                                       pool_.add(lightstep::CollectorMethodName())} {
 
-  Config::Utility::checkCluster(TracerNames::get().Lightstep, lightstep_config.collector_cluster(),
+  Config::Utility::checkCluster("envoy.tracers.lightstep", lightstep_config.collector_cluster(),
                                 cm_, /* allow_added_via_api */ true);
   cluster_ = lightstep_config.collector_cluster();
 

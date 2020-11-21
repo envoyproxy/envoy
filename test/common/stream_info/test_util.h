@@ -4,8 +4,8 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
+#include "common/common/random_generator.h"
 #include "common/http/request_id_extension_impl.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -40,6 +40,12 @@ public:
   }
   void setResponseCodeDetails(absl::string_view rc_details) override {
     response_code_details_.emplace(rc_details);
+  }
+  const absl::optional<std::string>& connectionTerminationDetails() const override {
+    return connection_termination_details_;
+  }
+  void setConnectionTerminationDetails(absl::string_view details) override {
+    connection_termination_details_.emplace(details);
   }
   void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesSent() const override { return 2; }
@@ -227,7 +233,11 @@ public:
     return upstream_cluster_info_;
   }
 
-  Runtime::RandomGeneratorImpl random_;
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
+
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+
+  Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -243,6 +253,7 @@ public:
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
@@ -266,6 +277,7 @@ public:
   Envoy::Event::SimulatedTimeSystem test_time_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
   Http::RequestIDExtensionSharedPtr request_id_extension_;
+  absl::optional<uint64_t> connection_id_;
 };
 
 } // namespace Envoy

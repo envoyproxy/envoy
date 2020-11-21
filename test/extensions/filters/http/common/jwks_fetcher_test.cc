@@ -10,6 +10,7 @@
 
 #include "test/extensions/filters/http/common/mock.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 using envoy::config::core::v3::HttpUri;

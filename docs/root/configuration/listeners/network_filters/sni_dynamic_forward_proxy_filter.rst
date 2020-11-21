@@ -25,48 +25,5 @@ SNI dynamic forward proxy.
   The following config doesn't terminate TLS in listener, so there is no need to configure TLS context
   in cluster. The TLS handshake is passed through by Envoy.
 
-.. code-block:: yaml
-
-  admin:
-    access_log_path: /tmp/admin_access.log
-    address:
-      socket_address:
-        protocol: TCP
-        address: 127.0.0.1
-        port_value: 9901
-  static_resources:
-    listeners:
-    - name: listener_0
-      address:
-        socket_address:
-          protocol: TCP
-          address: 0.0.0.0
-          port_value: 10000
-      listener_filters:
-        - name: envoy.filters.listener.tls_inspector
-      filter_chains:
-        - filters:
-            - name: envoy.filters.network.sni_dynamic_forward_proxy
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
-                port_value: 443
-                dns_cache_config:
-                  name: dynamic_forward_proxy_cache_config
-                  dns_lookup_family: V4_ONLY
-            - name: envoy.tcp_proxy
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-                stat_prefix: tcp
-                cluster: dynamic_forward_proxy_cluster
-    clusters:
-    - name: dynamic_forward_proxy_cluster
-      connect_timeout: 1s
-      lb_policy: CLUSTER_PROVIDED
-      cluster_type:
-        name: envoy.clusters.dynamic_forward_proxy
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-          dns_cache_config:
-            name: dynamic_forward_proxy_cache_config
-            dns_lookup_family: V4_ONLY
-
+.. literalinclude:: _include/sni-dynamic-forward-proxy-filter.yaml
+    :language: yaml

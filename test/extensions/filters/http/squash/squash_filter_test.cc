@@ -9,8 +9,8 @@
 
 #include "extensions/filters/http/squash/squash_filter.h"
 
-#include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -222,7 +222,7 @@ protected:
   void completeRequest(const std::string& status, const std::string& body) {
     Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", status}}}));
-    msg->body() = std::make_unique<Buffer::OwnedImpl>(body);
+    msg->body().add(body);
     popPendingCallback()->onSuccess(request_, std::move(msg));
   }
 
@@ -410,6 +410,19 @@ TEST_F(SquashFilterTest, InvalidJsonForGetAttachment) {
   auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   completeRequest("200", "This is not a JSON object");
+}
+
+TEST_F(SquashFilterTest, InvalidResponseWithNoBody) {
+  doDownstreamRequest();
+  // Expect the get attachment request
+  expectAsyncClientSend();
+  completeCreateRequest();
+
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "0"}}}));
+  popPendingCallback()->onSuccess(request_, std::move(msg));
 }
 
 TEST_F(SquashFilterTest, DestroyedInFlight) {
