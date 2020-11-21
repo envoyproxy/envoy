@@ -1,10 +1,10 @@
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
@@ -13,7 +13,12 @@
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_config_peer.h"
+#include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
+#include "quiche/quic/test_tools/qpack/qpack_encoder_test_utils.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "test/test_common/environment.h"
@@ -43,7 +48,7 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               quiche::QuicheOptional<quic::EncryptionLevel> level));
+               absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
 
   absl::string_view requestedServerName() const override {
@@ -87,7 +92,7 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               quiche::QuicheOptional<quic::EncryptionLevel> level));
+               absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
 
   absl::string_view requestedServerName() const override {
@@ -163,6 +168,29 @@ enum class QuicVersionType {
   GquicTls,
   Iquic,
 };
+
+std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) {
+  quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
+  quic::test::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
+  auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate);
+  qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
+  // QpackEncoder does not use the dynamic table by default,
+  // therefore the value of |stream_id| does not matter.
+  std::string payload = qpack_encoder->EncodeHeaderList(/* stream_id = */ 0, header, nullptr);
+  std::unique_ptr<char[]> headers_buffer;
+  quic::QuicByteCount headers_frame_header_length =
+      quic::HttpEncoder::SerializeHeadersFrameHeader(payload.length(), &headers_buffer);
+  absl::string_view headers_frame_header(headers_buffer.get(), headers_frame_header_length);
+  return absl::StrCat(headers_frame_header, payload);
+}
+
+std::string bodyToHttp3StreamPayload(const std::string& body) {
+  std::unique_ptr<char[]> data_buffer;
+  quic::QuicByteCount data_frame_header_length =
+      quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
+  absl::string_view data_frame_header(data_buffer.get(), data_frame_header_length);
+  return absl::StrCat(data_frame_header, body);
+}
 
 // A test suite with variation of ip version and a knob to turn on/off IETF QUIC implementation.
 class QuicMultiVersionTest

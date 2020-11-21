@@ -16,6 +16,7 @@
 #include "common/config/pausable_ack_queue.h"
 #include "common/config/watch_map.h"
 #include "common/grpc/common.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -48,6 +49,8 @@ public:
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
+  void registerVersionedTypeUrl(const std::string& type_url);
+
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
       ControlPlaneStats& control_plane_stats) override;
@@ -65,8 +68,9 @@ public:
 
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_namespace_matching)
-        : watch_map_(use_namespace_matching), sub_state_(type_url, watch_map_, local_info) {}
+                      const bool use_namespace_matching, Event::Dispatcher& dispatcher)
+        : watch_map_(use_namespace_matching),
+          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -151,6 +155,9 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+  Event::Dispatcher& dispatcher_;
+
+  const bool enable_type_url_downgrade_and_upgrade_;
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

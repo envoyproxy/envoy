@@ -21,12 +21,14 @@ An example entry for the `nghttp2` dependency is:
 ```python
 com_github_nghttp2_nghttp2 = dict(
     project_name = "Nghttp2",
+    project_desc = "Implementation of HTTP/2 and its header compression ...",
     project_url = "https://nghttp2.org",
     version = "1.41.0",
     sha256 = "eacc6f0f8543583ecd659faf0a3f906ed03826f1d4157b536b4b385fe47c5bb8",
     strip_prefix = "nghttp2-{version}",
     urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
     use_category = ["dataplane"],
+    last_updated = "2020-06-02",
     cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
 ),
 ```
@@ -40,14 +42,19 @@ Dependency declarations must:
   `{dash_version}`.
 * Versions should prefer release versions over master branch GitHub SHA tarballs. A comment is
   necessary if the latter is used. This comment should contain the reason that a non-release
-  version is being used and the YYYY-MM-DD when the last update was performed.
+  version is being used.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
   or control plane implications of the dependency.
+* Reflect the UTC date (YYYY-MM-DD format) for the dependency release. This is when
+  the dependency was updated in its repository. For dependencies that have
+  releases, this is the date of the release. For dependencies without releases
+  or for scenarios where we temporarily need to use a commit, this date should
+  be the date of the commit in UTC.
 * CPEs are compulsory for all dependencies that are not purely build/test.
   [CPEs](https://en.wikipedia.org/wiki/Common_Platform_Enumeration) provide metadata that allow us
   to correlate with related CVEs in dashboards and other tooling, and also provide a machine
-  consumable join key. You can consult the latest [CPE
-  dictionary](https://nvd.nist.gov/products/cpe) to find a CPE for a dependency.`"N/A"` should only
+  consumable join key. You can consult [CPE
+  search](https://nvd.nist.gov/products/cpe/search) to find a CPE for a dependency.`"N/A"` should only
   be used if no CPE for the project is available in the CPE database. CPEs should be _versionless_
   with a `:*` suffix, since the version can be computed from `version`.
 
@@ -92,6 +99,14 @@ basis:
 
 Where possible, we prefer the latest release version for external dependencies, rather than master
 branch GitHub SHA tarballs.
+
+## Dependency shepherds
+
+Sign-off from the [dependency
+shepherds](https://github.com/orgs/envoyproxy/teams/dependency-shepherds) is
+required for every PR that modifies external dependencies. The shepherds will
+look to see that the policy in this document is enforced and that metadata is
+kept up-to-date.
 
 ## Dependency patches
 

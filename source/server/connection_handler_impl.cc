@@ -1,5 +1,7 @@
 #include "server/connection_handler_impl.h"
 
+#include <chrono>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/exception.h"
@@ -26,9 +28,10 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 }
 } // namespace
 
-ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), per_handler_stat_prefix_(dispatcher.name() + "."),
-      disable_listeners_(false) {}
+ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
+                                             absl::optional<uint32_t> worker_index)
+    : worker_index_(worker_index), dispatcher_(dispatcher),
+      per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
 
@@ -44,22 +47,29 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
-          listener.second.tcp_listener_->get().updateListenerConfig(config);
+          listener.second.tcpListener()->get().updateListenerConfig(config);
           return;
         }
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
     auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
-    details.tcp_listener_ = *tcp_listener;
+    details.typed_listener_ = *tcp_listener;
     details.listener_ = std::move(tcp_listener);
   } else {
     ASSERT(config.udpListenerFactory() != nullptr, "UDP listener factory is not initialized.");
-    details.listener_ =
-        config.udpListenerFactory()->createActiveUdpListener(*this, dispatcher_, config);
+    ASSERT(worker_index_.has_value());
+    ConnectionHandler::ActiveUdpListenerPtr udp_listener =
+        config.udpListenerFactory()->createActiveUdpListener(*worker_index_, *this, dispatcher_,
+                                                             config);
+    details.typed_listener_ = *udp_listener;
+    details.listener_ = std::move(udp_listener);
   }
   if (disable_listeners_) {
     details.listener_->pauseListening();
+  }
+  if (auto* listener = details.listener_->listener(); listener != nullptr) {
+    listener->setRejectFraction(listener_reject_fraction_);
   }
   listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
 }
@@ -74,12 +84,39 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
   }
 }
 
+ConnectionHandlerImpl::ActiveListenerDetailsOptRef
+ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
+  // TODO(mattklein123): We should probably use a hash table here to lookup the tag
+  // instead of iterating through the listener list.
+  for (auto& listener : listeners_) {
+    if (listener.second.listener_->listener() != nullptr &&
+        listener.second.listener_->listenerTag() == listener_tag) {
+      return listener.second;
+    }
+  }
+
+  return absl::nullopt;
+}
+
+Network::UdpListenerCallbacksOptRef
+ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
+  auto listener = findActiveListenerByTag(listener_tag);
+  if (listener.has_value()) {
+    // If the tag matches this must be a UDP listener.
+    auto udp_listener = listener->get().udpListener();
+    ASSERT(udp_listener.has_value());
+    return udp_listener;
+  }
+
+  return absl::nullopt;
+}
+
 void ConnectionHandlerImpl::removeFilterChains(
     uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
     std::function<void()> completion) {
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
-      listener.second.tcp_listener_->get().deferredRemoveFilterChains(filter_chains);
+      listener.second.tcpListener()->get().deferredRemoveFilterChains(filter_chains);
       // Completion is deferred because the above removeFilterChains() may defer delete connection.
       Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
       return;
@@ -113,6 +150,13 @@ void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& listener : listeners_) {
     listener.second.listener_->resumeListening();
+  }
+}
+
+void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
+  listener_reject_fraction_ = reject_fraction;
+  for (auto& listener : listeners_) {
+    listener.second.listener_->listener()->setRejectFraction(reject_fraction);
   }
 }
 
@@ -205,15 +249,14 @@ ConnectionHandlerImpl::findActiveTcpListenerByAddress(const Network::Address::In
   // We do not return stopped listeners.
   auto listener_it = std::find_if(
       listeners_.begin(), listeners_.end(),
-      [&address](
-          const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>& p) {
-        return p.second.tcp_listener_.has_value() && p.second.listener_->listener() != nullptr &&
+      [&address](std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>& p) {
+        return p.second.tcpListener().has_value() && p.second.listener_->listener() != nullptr &&
                p.first->type() == Network::Address::Type::Ip && *(p.first) == address;
       });
 
   // If there is exact address match, return the corresponding listener.
   if (listener_it != listeners_.end()) {
-    return listener_it->second.tcp_listener_;
+    return listener_it->second.tcpListener();
   }
 
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
@@ -223,11 +266,16 @@ ConnectionHandlerImpl::findActiveTcpListenerByAddress(const Network::Address::In
       listeners_.begin(), listeners_.end(),
       [&address](
           const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>& p) {
-        return p.second.tcp_listener_.has_value() && p.second.listener_->listener() != nullptr &&
+        return absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+                   p.second.typed_listener_) &&
+               p.second.listener_->listener() != nullptr &&
                p.first->type() == Network::Address::Type::Ip &&
                p.first->ip()->port() == address.ip()->port() && p.first->ip()->isAnyAddress();
       });
-  return (listener_it != listeners_.end()) ? listener_it->second.tcp_listener_ : absl::nullopt;
+  return (listener_it != listeners_.end())
+             ? ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(
+                   listener_it->second.typed_listener_))
+             : absl::nullopt;
 }
 
 void ConnectionHandlerImpl::ActiveTcpSocket::onTimeout() {
@@ -355,6 +403,17 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocke
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
 }
 
+void ConnectionHandlerImpl::ActiveTcpListener::onReject(RejectCause cause) {
+  switch (cause) {
+  case RejectCause::GlobalCxLimit:
+    stats_.downstream_global_cx_overflow_.inc();
+    break;
+  case RejectCause::OverloadAction:
+    stats_.downstream_cx_overload_reject_.inc();
+    break;
+  }
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections,
     bool rebalanced) {
@@ -387,8 +446,24 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   }
 }
 
+void ConnectionHandlerImpl::ActiveTcpListener::pauseListening() {
+  if (listener_ != nullptr) {
+    listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
+  if (listener_ != nullptr) {
+    listener_->enable();
+  }
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+  // Refresh local address in case it was restored by a listener filter like the original_dst
+  // filter.
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
@@ -406,6 +481,10 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
+  if (const auto timeout = filter_chain->transportSocketConnectTimeout();
+      timeout != std::chrono::milliseconds::zero()) {
+    server_conn_ptr->setTransportSocketConnectTimeout(timeout);
+  }
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher_.timeSource(), std::move(stream_info)));
@@ -477,21 +556,18 @@ void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr
 
   parent_.dispatcher_.post(
       [socket_to_rebalance, tag = config_->listenerTag(), &parent = parent_]() {
-        // TODO(mattklein123): We should probably use a hash table here to lookup the tag instead of
-        // iterating through the listener list.
-        for (const auto& listener : parent.listeners_) {
-          if (listener.second.listener_->listener() != nullptr &&
-              listener.second.listener_->listenerTag() == tag) {
-            // If the tag matches this must be a TCP listener.
-            ASSERT(listener.second.tcp_listener_.has_value());
-            listener.second.tcp_listener_.value().get().onAcceptWorker(
-                std::move(socket_to_rebalance->socket),
-                listener.second.tcp_listener_.value()
-                    .get()
-                    .config_->handOffRestoredDestinationConnections(),
-                true);
-            return;
-          }
+        auto listener = parent.findActiveListenerByTag(tag);
+        if (listener.has_value()) {
+          // If the tag matches this must be a TCP listener.
+          ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+              listener->get().typed_listener_));
+          auto& tcp_listener =
+              absl::get<std::reference_wrapper<ActiveTcpListener>>(listener->get().typed_listener_)
+                  .get();
+          tcp_listener.onAcceptWorker(std::move(socket_to_rebalance->socket),
+                                      tcp_listener.config_->handOffRestoredDestinationConnections(),
+                                      true);
+          return;
         }
       });
 }
@@ -520,6 +596,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
   listener.stats_.downstream_cx_active_.inc();
   listener.per_worker_stats_.downstream_cx_total_.inc();
   listener.per_worker_stats_.downstream_cx_active_.inc();
+  stream_info_->setConnectionID(connection_->id());
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept
@@ -542,33 +619,102 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
   listener.parent_.decNumConnections();
 }
 
-ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+ConnectionHandlerImpl::ActiveTcpListenerOptRef
+ConnectionHandlerImpl::ActiveListenerDetails::tcpListener() {
+  auto* val = absl::get_if<std::reference_wrapper<ActiveTcpListener>>(&typed_listener_);
+  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+}
+
+ConnectionHandlerImpl::UdpListenerCallbacksOptRef
+ConnectionHandlerImpl::ActiveListenerDetails::udpListener() {
+  auto* val = absl::get_if<std::reference_wrapper<Network::UdpListenerCallbacks>>(&typed_listener_);
+  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+}
+
+ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
+                                             Network::ConnectionHandler& parent,
+                                             Network::Socket& listen_socket,
+                                             Network::UdpListenerPtr&& listener,
+                                             Network::ListenerConfig* config)
+    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_index_(worker_index),
+      concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
+      udp_listener_(std::move(listener)) {
+  ASSERT(worker_index_ < concurrency_);
+  config_->udpListenerWorkerRouter()->get().registerWorkerForListener(*this);
+}
+
+ActiveUdpListenerBase::~ActiveUdpListenerBase() {
+  config_->udpListenerWorkerRouter()->get().unregisterWorkerForListener(*this);
+}
+
+void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
+  ASSERT(!udp_listener_->dispatcher().isThreadSafe(),
+         "Shouldn't be post'ing if thread safe; use onWorkerData() instead.");
+
+  // It is not possible to capture a unique_ptr because the post() API copies the lambda, so we must
+  // bundle the socket inside a shared_ptr that can be captured.
+  // TODO(mattklein123): It may be possible to change the post() API such that the lambda is only
+  // moved, but this is non-trivial and needs investigation.
+  auto data_to_post = std::make_shared<Network::UdpRecvData>();
+  *data_to_post = std::move(data);
+
+  udp_listener_->dispatcher().post(
+      [data_to_post, tag = config_->listenerTag(), &parent = parent_]() {
+        Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag);
+        if (listener.has_value()) {
+          listener->get().onDataWorker(std::move(*data_to_post));
+        }
+      });
+}
+
+void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
+  uint32_t dest = worker_index_;
+
+  // For concurrency == 1, the packet will always go to the current worker.
+  if (concurrency_ > 1) {
+    dest = destination(data);
+    ASSERT(dest < concurrency_);
+  }
+
+  if (dest == worker_index_) {
+    onDataWorker(std::move(data));
+  } else {
+    config_->udpListenerWorkerRouter()->get().deliver(dest, std::move(data));
+  }
+}
+
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+                                           Network::ConnectionHandler& parent,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(parent, config.listenSocketFactory().getListenSocket(), dispatcher,
-                           config) {}
+    : ActiveRawUdpListener(worker_index, concurrency, parent,
+                           config.listenSocketFactory().getListenSocket(), dispatcher, config) {}
 
-ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+                                           Network::ConnectionHandler& parent,
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(parent, *listen_socket_ptr, listen_socket_ptr, dispatcher, config) {}
+    : ActiveRawUdpListener(worker_index, concurrency, parent, *listen_socket_ptr, listen_socket_ptr,
+                           dispatcher, config) {}
 
-ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+                                           Network::ConnectionHandler& parent,
                                            Network::Socket& listen_socket,
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(parent, listen_socket,
-                           dispatcher.createUdpListener(std::move(listen_socket_ptr), *this),
-                           config) {}
+    : ActiveRawUdpListener(worker_index, concurrency, parent, listen_socket,
+                           dispatcher.createUdpListener(listen_socket_ptr, *this), config) {}
 
-ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+                                           Network::ConnectionHandler& parent,
                                            Network::Socket& listen_socket,
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
-    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config),
-      udp_listener_(std::move(listener)), read_filter_(nullptr), listen_socket_(listen_socket) {
+    : ActiveUdpListenerBase(worker_index, concurrency, parent, listen_socket, std::move(listener),
+                            &config),
+      read_filter_(nullptr) {
   // Create the filter chain on creating a new udp listener
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
@@ -584,7 +730,7 @@ ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
       listen_socket_.ioHandle(), config.listenerScope());
 }
 
-void ActiveRawUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
+void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) { read_filter_->onData(data); }
 
 void ActiveRawUdpListener::onReadReady() {}
 

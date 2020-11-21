@@ -19,7 +19,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/lifecycle_notifier.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/process_context.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
@@ -63,11 +63,6 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
-
-  /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Envoy::Random::RandomGenerator& random() PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.

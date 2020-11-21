@@ -67,7 +67,7 @@ public:
 
   // Implementation of SimulatedTimeSystemHelper::Alarm methods.
   bool isEnabled(Alarm& alarm) ABSL_LOCKS_EXCLUDED(mutex_);
-  void enableAlarm(Alarm& alarm, const std::chrono::microseconds& duration)
+  void enableAlarm(Alarm& alarm, const std::chrono::microseconds duration)
       ABSL_LOCKS_EXCLUDED(mutex_);
   void disableAlarm(Alarm& alarm) ABSL_LOCKS_EXCLUDED(mutex_) {
     absl::MutexLock lock(&mutex_);
@@ -235,11 +235,11 @@ public:
 
   // Timer
   void disableTimer() override;
-  void enableTimer(const std::chrono::milliseconds& duration,
+  void enableTimer(const std::chrono::milliseconds duration,
                    const ScopeTrackedObject* scope) override {
     enableHRTimer(duration, scope);
   };
-  void enableHRTimer(const std::chrono::microseconds& duration,
+  void enableHRTimer(const std::chrono::microseconds duration,
                      const ScopeTrackedObject* scope) override;
   bool enabled() override { return simulated_scheduler_.isEnabled(*this); }
 
@@ -264,7 +264,7 @@ bool SimulatedTimeSystemHelper::SimulatedScheduler::isEnabled(Alarm& alarm) {
 }
 
 void SimulatedTimeSystemHelper::SimulatedScheduler::enableAlarm(
-    Alarm& alarm, const std::chrono::microseconds& duration) {
+    Alarm& alarm, const std::chrono::microseconds duration) {
   {
     absl::MutexLock lock(&mutex_);
     if (duration.count() == 0 && triggered_alarms_.contains(alarm)) {
@@ -348,7 +348,7 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
-    const std::chrono::microseconds& duration, const ScopeTrackedObject* /*scope*/) {
+    const std::chrono::microseconds duration, const ScopeTrackedObject* /*scope*/) {
   simulated_scheduler_.enableAlarm(*this, duration);
 }
 

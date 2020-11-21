@@ -19,4 +19,7 @@ inline bool GetGooglePacketHeadersFromControlMessageImpl(struct ::cmsghdr* /*cms
   return false;
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+inline void SetGoogleSocketOptionsImpl(int /*fd*/) {}
+
 } // namespace quic

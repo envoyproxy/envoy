@@ -8,16 +8,17 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/quic_types.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_error_codes.h"
@@ -65,7 +66,10 @@ spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& heade
 quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetReason reason);
 
 // Called when a RST_STREAM frame is received.
-Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode rst_err);
+Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamErrorCode rst_err);
+
+// Called when a QUIC stack reset the stream.
+Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStreamErrorCode rst_err);
 
 // Called when underlying QUIC connection is closed either locally or by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error);

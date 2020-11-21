@@ -201,6 +201,17 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
   return raw_slices;
 }
 
+RawSlice OwnedImpl::frontSlice() const {
+  // Ignore zero-size slices and return the first slice with data.
+  for (const auto& slice : slices_) {
+    if (slice->dataSize() > 0) {
+      return RawSlice{slice->data(), slice->dataSize()};
+    }
+  }
+
+  return {nullptr, 0};
+}
+
 SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
   RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
   // Remove zero byte fragments from the front of the queue to ensure
@@ -325,24 +336,6 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
     length -= copy_size;
   }
   other.postProcess();
-}
-
-Api::IoCallUint64Result OwnedImpl::read(Network::IoHandle& io_handle, uint64_t max_length) {
-  if (max_length == 0) {
-    return Api::ioCallUint64ResultNoError();
-  }
-  constexpr uint64_t MaxSlices = 2;
-  RawSlice slices[MaxSlices];
-  const uint64_t num_slices = reserve(max_length, slices, MaxSlices);
-  Api::IoCallUint64Result result = io_handle.readv(max_length, slices, num_slices);
-  uint64_t bytes_to_commit = result.ok() ? result.rc_ : 0;
-  ASSERT(bytes_to_commit <= max_length);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    slices[i].len_ = std::min(slices[i].len_, static_cast<size_t>(bytes_to_commit));
-    bytes_to_commit -= slices[i].len_;
-  }
-  commit(slices, num_slices);
-  return result;
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
@@ -514,16 +507,6 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
 
   // Less data in slices than length() reported.
   NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-Api::IoCallUint64Result OwnedImpl::write(Network::IoHandle& io_handle) {
-  constexpr uint64_t MaxSlices = 16;
-  RawSliceVector slices = getRawSlices(MaxSlices);
-  Api::IoCallUint64Result result = io_handle.writev(slices.begin(), slices.size());
-  if (result.ok() && result.rc_ > 0) {
-    drain(static_cast<uint64_t>(result.rc_));
-  }
-  return result;
 }
 
 OwnedImpl::OwnedImpl() = default;

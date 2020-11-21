@@ -129,6 +129,13 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
 }
 
+// TODO(#13399): remove this test once we remove the option.
+TEST_F(OptionsImplTest, FakeSymtabWarning) {
+  EXPECT_LOG_CONTAINS("warning", "Fake symbol tables have been removed",
+                      createOptionsImpl("envoy --use-fake-symbol-table 1"));
+  EXPECT_NO_LOGS(createOptionsImpl("envoy --use-fake-symbol-table 0"));
+}
+
 // Either variants of allow-unknown-[static-]-fields works.
 TEST_F(OptionsImplTest, AllowUnknownFields) {
   {
@@ -293,8 +300,7 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 4. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
   // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
   // 6. hot restart version - print the hot restart version and exit.
-  // 7. log-format-prefix-with-location - short-term override for rollout of dynamic log format.
-  const uint32_t options_not_in_proto = 7;
+  const uint32_t options_not_in_proto = 6;
 
   // There are two deprecated options: "max_stats" and "max_obj_name_len".
   const uint32_t deprecated_options = 2;
@@ -450,17 +456,10 @@ TEST_F(OptionsImplTest, LogFormatDefault) {
   EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
 }
 
-TEST_F(OptionsImplTest, LogFormatDefaultNoPrefix) {
-  std::unique_ptr<OptionsImpl> options =
-      createOptionsImpl({"envoy", "-c", "hello", "--log-format-prefix-with-location", "0"});
-  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
-}
-
 TEST_F(OptionsImplTest, LogFormatOverride) {
   std::unique_ptr<OptionsImpl> options =
-      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
-                         "--log-format-prefix-with-location 1"});
-  EXPECT_EQ(options->logFormat(), "%%v [%g:%#] %v %t [%g:%#] %v");
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
+  EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {

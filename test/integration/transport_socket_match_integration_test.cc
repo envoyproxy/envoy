@@ -34,7 +34,7 @@ match:
 transport_socket:
   name: tls
   typed_config:
-    "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
     common_tls_context:
       tls_certificates:
       - certificate_chain: { filename: "%s" }

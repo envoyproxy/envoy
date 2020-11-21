@@ -1,15 +1,14 @@
-#ifdef __GNUC__
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
+
 #include "quiche/quic/test_tools/test_certificates.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
-#else
-#include "quiche/quic/test_tools/test_certificates.h"
 #endif
 
 #include <memory>
@@ -37,7 +36,7 @@ protected:
   void signPayload(const quic::QuicSocketAddress& /*server_address*/,
                    const quic::QuicSocketAddress& /*client_address*/,
                    const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
-                   quiche::QuicheStringPiece in,
+                   absl::string_view in,
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
     callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"),
                   std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain_));

@@ -40,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -234,11 +234,18 @@ message Bootstrap {
   // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
   // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
+  // Setting this value causes failure if the
+  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
+  // server startup. Apple' API only uses UDP for DNS resolution.
   bool use_tcp_for_dns_lookups = 20;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
   repeated core.v3.TypedExtensionConfig bootstrap_extensions = 21;
+
+  // Specifies optional extensions instantiated at startup time and
+  // invoked during crash time on the request that caused the crash.
+  repeated FatalAction fatal_actions = 28;
 
   // Configuration sources that will participate in
   // *udpa.core.v1.ResourceLocator* authority resolution. The algorithm is as
@@ -417,6 +424,20 @@ message Watchdog {
   type.v3.Percent multikill_threshold = 5;
 }
 
+// Fatal actions to run while crashing. Actions can be safe (meaning they are
+// async-signal safe) or unsafe. We run all safe actions before we run unsafe actions.
+// If using an unsafe action that could get stuck or deadlock, it important to
+// have an out of band system to terminate the process.
+//
+// The interface for the extension is ``Envoy::Server::Configuration::FatalAction``.
+// *FatalAction* extensions live in the ``envoy.extensions.fatal_actions`` API
+// namespace.
+message FatalAction {
+  // Extension specific configuration for the action. It's expected to conform
+  // to the ``Envoy::Server::Configuration::FatalAction`` interface.
+  core.v3.TypedExtensionConfig config = 1;
+}
+
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).
 message Runtime {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Runtime";
@@ -503,7 +524,7 @@ message RuntimeLayer {
 
   // Descriptive name for the runtime layer. This is only used for the runtime
   // :http:get:`/runtime` output.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof layer_specifier {
     option (validate.required) = true;

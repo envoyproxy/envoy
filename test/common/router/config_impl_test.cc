@@ -141,9 +141,17 @@ Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::st
 envoy::config::route::v3::RouteConfiguration
 parseRouteConfigurationFromYaml(const std::string& yaml) {
   envoy::config::route::v3::RouteConfiguration route_config;
+  // Most tests should be v3 and not boost.
+  bool avoid_boosting = true;
+  // If we're under TestDeprecatedV2Api, allow boosting.
+  auto* runtime = Runtime::LoaderSingleton::getExisting();
+  if (runtime != nullptr && runtime->threadsafeSnapshot()->runtimeFeatureEnabled(
+                                "envoy.reloadable_features.enable_deprecated_v2_api")) {
+    avoid_boosting = false;
+  }
   // Load the file and keep the annotations (in case of an upgrade) to make sure
-  // validate() observes the upgrade
-  TestUtility::loadFromYaml(yaml, route_config, true);
+  // validate() observes the upgrade.
+  TestUtility::loadFromYaml(yaml, route_config, true, avoid_boosting);
   TestUtility::validate(route_config);
   return route_config;
 }
@@ -316,6 +324,7 @@ class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
 
 // When removing legacy fields this test can be removed.
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestLegacyRoutes)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: regex
@@ -1242,6 +1251,7 @@ virtual_hosts:
 
 // When deprecating regex: this test can be removed.
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestRoutesWithInvalidRegexLegacy)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   std::string invalid_route = R"EOF(
 virtual_hosts:
   - name: regex
@@ -1954,6 +1964,7 @@ virtual_hosts:
 // Verify the fixes for https://github.com/envoyproxy/envoy/issues/2406
 // When removing regex_match this test can be removed entirely.
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(InvalidHeaderMatchedRoutingConfigLegacy)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   std::string value_with_regex_chars = R"EOF(
 virtual_hosts:
   - name: local_service
@@ -2028,6 +2039,7 @@ virtual_hosts:
 
 // When removing value: simply remove that section of the config and the relevant test.
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(QueryParamMatchedRouting)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -2145,6 +2157,7 @@ virtual_hosts:
 
 // When removing value: this test can be removed.
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(InvalidQueryParamMatchedRoutingConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   std::string value_with_regex_chars = R"EOF(
 virtual_hosts:
   - name: local_service
@@ -2852,7 +2865,38 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, GrpcTimeoutOffset) {
+TEST_F(RouteMatcherTest, DurationTimeouts) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: local_service_grpc
+  - match:
+      prefix: "/"
+    route:
+      max_stream_duration:
+        max_stream_duration: 0.01s
+        grpc_timeout_header_max: 0.02s
+        grpc_timeout_header_offset: 0.03s
+      cluster: local_service_grpc
+      )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    auto entry = config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry();
+    EXPECT_EQ(std::chrono::milliseconds(10), entry->maxStreamDuration());
+    EXPECT_EQ(std::chrono::milliseconds(20), entry->grpcTimeoutHeaderMax());
+    EXPECT_EQ(std::chrono::milliseconds(30), entry->grpcTimeoutHeaderOffset());
+  }
+}
+
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(GrpcTimeoutOffset)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -2882,7 +2926,7 @@ virtual_hosts:
                                ->grpcTimeoutOffset());
 }
 
-TEST_F(RouteMatcherTest, GrpcTimeoutOffsetOfDynamicRoute) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(GrpcTimeoutOffsetOfDynamicRoute)) {
   // A DynamicRouteEntry will be created when 'cluster_header' is set.
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -3135,6 +3179,7 @@ virtual_hosts:
 
 // TODO(dereka) DEPRECATED_FEATURE_TEST can be removed when `request_mirror_policy` is removed.
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(Shadow)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -3205,6 +3250,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(ShadowPolicyAndPolicies)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -3230,6 +3276,7 @@ class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
 
 // When removing runtime_key: this test can be removed.
 TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RequestMirrorPolicy)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: mirror
@@ -3992,7 +4039,7 @@ virtual_hosts:
   routes:
   - match: { prefix: "/foo" }
     route:
-      host_rewrite: "new_host\ndroptable"
+      host_rewrite_literal: "new_host\ndroptable"
       cluster: www
   )EOF";
 
@@ -4009,7 +4056,7 @@ virtual_hosts:
   routes:
   - match: { prefix: "/foo" }
     route:
-      auto_host_rewrite_header: "x-host\ndroptable"
+      host_rewrite_header: "x-host\ndroptable"
       cluster: www
   )EOF";
 
@@ -5261,7 +5308,8 @@ virtual_hosts:
       "RouteValidationError.Match: \\[\"value is required\"\\]");
 }
 
-TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
+TEST_F(BadHttpRouteConfigurationsTest, DEPRECATED_FEATURE_TEST(BadRouteEntryConfigPrefixAndRegex)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -5309,7 +5357,8 @@ virtual_hosts:
       "caused by field: \"action\", reason: is required");
 }
 
-TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
+TEST_F(BadHttpRouteConfigurationsTest, DEPRECATED_FEATURE_TEST(BadRouteEntryConfigPathAndRegex)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -5483,6 +5532,7 @@ virtual_hosts:
 // When allow_origin: and allow_origin_regex: are removed, simply remove them
 // and the relevant checks below.
 TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestVHostCorsConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"
@@ -5600,6 +5650,7 @@ virtual_hosts:
 
 // When allow-origin: is removed, this test can be removed.
 TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TTestVHostCorsLegacyConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
@@ -5640,6 +5691,7 @@ virtual_hosts:
 
 // When allow-origin: is removed, this test can be removed.
 TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestRouteCorsLegacyConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
@@ -5675,7 +5727,8 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
-TEST_F(RoutePropertyTest, TestBadCorsConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestBadCorsConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
@@ -7089,6 +7142,29 @@ virtual_hosts:
   EXPECT_FALSE(upgrade_map.find("disabled")->second);
 }
 
+TEST_F(RouteConfigurationV2, EmptyFilterConfigRejected) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+            - upgrade_type: disabled
+            - enabled: false
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Proto constraint validation failed.*");
+}
+
 TEST_F(RouteConfigurationV2, DuplicateUpgradeConfigs) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -7380,6 +7456,7 @@ public:
 };
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(TypedConfigFilterError)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   {
     const std::string yaml = R"EOF(
 virtual_hosts:
@@ -7420,6 +7497,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(UnknownFilterStruct)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -7456,6 +7534,7 @@ virtual_hosts:
 // Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
 // error.
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(DefaultFilterImplementationStruct)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -7488,6 +7567,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(RouteLocalConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -7526,6 +7606,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -7572,6 +7653,7 @@ virtual_hosts:
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterFallthroughConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar

@@ -6,17 +6,21 @@
 
 #include "absl/strings/str_cat.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #include "quiche/quic/core/crypto/proof_source.h"
 #include "quiche/quic/core/quic_versions.h"
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/platform/api/quic_reference_counted.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
 #include "quiche/common/platform/api/quiche_string_piece.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "openssl/ssl.h"
 #include "envoy/network/filter.h"
@@ -53,7 +57,7 @@ public:
   void GetProof(const quic::QuicSocketAddress& server_address,
                 const quic::QuicSocketAddress& client_address, const std::string& hostname,
                 const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,
-                quiche::QuicheStringPiece chlo_hash,
+                absl::string_view chlo_hash,
                 std::unique_ptr<quic::ProofSource::Callback> callback) override;
 
   TicketCrypter* GetTicketCrypter() override { return nullptr; }
@@ -61,14 +65,14 @@ public:
   void ComputeTlsSignature(const quic::QuicSocketAddress& server_address,
                            const quic::QuicSocketAddress& client_address,
                            const std::string& hostname, uint16_t signature_algorithm,
-                           quiche::QuicheStringPiece in,
+                           absl::string_view in,
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 protected:
   virtual void signPayload(const quic::QuicSocketAddress& server_address,
                            const quic::QuicSocketAddress& client_address,
                            const std::string& hostname, uint16_t signature_algorithm,
-                           quiche::QuicheStringPiece in,
+                           absl::string_view in,
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) PURE;
 
 private:

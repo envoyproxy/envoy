@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
@@ -56,15 +55,14 @@ public:
                             ThreadLocal::SlotAllocator& tls,
                             Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-                            Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                            AccessLog::AccessLogManager& log_manager,
+                            Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
                             const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                             Singleton::Manager& singleton_manager,
                             Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
       : cluster_manager_(cluster_manager), stats_(stats), tls_(tls),
         dns_resolver_(std::move(dns_resolver)), ssl_context_manager_(ssl_context_manager),
-        runtime_(runtime), random_(random), dispatcher_(dispatcher), log_manager_(log_manager),
+        runtime_(runtime), dispatcher_(dispatcher), log_manager_(log_manager),
         local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager),
         outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api),
         validation_visitor_(validation_visitor), api_(api) {}
@@ -75,7 +73,6 @@ public:
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
   Runtime::Loader& runtime() override { return runtime_; }
-  Random::RandomGenerator& random() override { return random_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   AccessLog::AccessLogManager& logManager() override { return log_manager_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
@@ -95,7 +92,6 @@ private:
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
   Runtime::Loader& runtime_;
-  Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   AccessLog::AccessLogManager& log_manager_;
   const LocalInfo::LocalInfo& local_info_;
@@ -121,7 +117,7 @@ public:
   create(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
          Stats::Store& stats, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
-         Runtime::Loader& runtime, Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
          Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,

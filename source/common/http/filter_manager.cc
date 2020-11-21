@@ -1,5 +1,7 @@
 #include "common/http/filter_manager.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
@@ -110,8 +112,7 @@ bool ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(
 }
 
 bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatus status,
-                                                              bool& end_stream,
-                                                              bool& headers_only) {
+                                                              bool& end_stream) {
   ASSERT(!headers_continued_);
   ASSERT(canIterate());
 
@@ -125,14 +126,7 @@ bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatu
   case FilterHeadersStatus::StopAllIterationAndWatermark:
     iteration_state_ = IterationState::StopAllWatermark;
     break;
-  case FilterHeadersStatus::ContinueAndEndStream:
-    // Set headers_only to true so we know to end early if necessary,
-    // but continue filter iteration so we actually write the headers/run the cleanup code.
-    headers_only = true;
-    ENVOY_STREAM_LOG(debug, "converting to headers only", parent_);
-    break;
   case FilterHeadersStatus::ContinueAndDontEndStream:
-    headers_only = false;
     end_stream = false;
     headers_continued_ = true;
     ENVOY_STREAM_LOG(debug, "converting to headers and body (body not available yet)", parent_);
@@ -447,13 +441,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
-    (*entry)->end_stream_ = state_.decoding_headers_only_ ||
-                            (end_stream && continue_data_entry == decoder_filters_.end());
+    (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
-    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),
-           "Filters should not return FilterHeadersStatus::ContinueAndEndStream from decodeHeaders "
-           "when end_stream is already true");
     ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "decodeHeaders when end_stream is already false");
@@ -464,12 +454,10 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     (*entry)->decode_headers_called_ = true;
 
-    // decoding_headers_only_ is set if the filter returns ContinueAndEndStream.
-    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
-        status, end_stream, state_.decoding_headers_only_);
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
 
     // If this filter ended the stream, decodeComplete() should be called for it.
-    if ((*entry)->end_stream_ || state_.decoding_headers_only_) {
+    if ((*entry)->end_stream_) {
       (*entry)->handle_->decodeComplete();
     }
 
@@ -513,11 +501,6 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
                                FilterIterationStartState filter_iteration_start_state) {
   ScopeTrackerScopeState scope(&*this, dispatcher_);
   filter_manager_callbacks_.resetIdleTimer();
-
-  // If we previously decided to decode only the headers, do nothing here.
-  if (state_.decoding_headers_only_) {
-    return;
-  }
 
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
@@ -653,11 +636,6 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
 MetadataMapVector& FilterManager::addDecodedMetadata() { return *getRequestMetadataMapVector(); }
 
 void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers) {
-  // If we previously decided to decode only the headers, do nothing here.
-  if (state_.decoding_headers_only_) {
-    return;
-  }
-
   // See decodeData() above for why we check local_complete_ here.
   if (state_.local_complete_) {
     return;
@@ -812,7 +790,16 @@ void FilterManager::sendLocalReplyViaFilterChain(
   Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
-          modify_headers,
+          [this, modify_headers](ResponseHeaderMap& headers) -> void {
+            if (streamInfo().route_entry_ &&
+                Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+              streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
+            }
+            if (modify_headers) {
+              modify_headers(headers);
+            }
+          },
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
             // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
@@ -846,7 +833,16 @@ void FilterManager::sendDirectLocalReply(
   Http::Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
-          modify_headers,
+          [this, modify_headers](ResponseHeaderMap& headers) -> void {
+            if (streamInfo().route_entry_ &&
+                Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+              streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
+            }
+            if (modify_headers) {
+              modify_headers(headers);
+            }
+          },
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()
@@ -862,17 +858,14 @@ void FilterManager::sendDirectLocalReply(
             state_.non_100_response_headers_encoded_ = true;
             filter_manager_callbacks_.encodeHeaders(*filter_manager_callbacks_.responseHeaders(),
                                                     end_stream);
+
             maybeEndEncode(end_stream);
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             filter_manager_callbacks_.encodeData(data, end_stream);
             maybeEndEncode(end_stream);
           }},
-      Utility::LocalReplyData{
-          filter_manager_callbacks_.requestHeaders().has_value() &&
-              Grpc::Common::hasGrpcContentType(filter_manager_callbacks_.requestHeaders()->get()),
-          code, body, grpc_status, is_head_request});
-  maybeEndEncode(state_.local_complete_);
+      Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
 }
 
 void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
@@ -935,13 +928,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
-    (*entry)->end_stream_ = state_.encoding_headers_only_ ||
-                            (end_stream && continue_data_entry == encoder_filters_.end());
+    (*entry)->end_stream_ = (end_stream && continue_data_entry == encoder_filters_.end());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
 
-    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),
-           "Filters should not return FilterHeadersStatus::ContinueAndEndStream from encodeHeaders "
-           "when end_stream is already true");
     ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "encodeHeaders when end_stream is already false");
@@ -952,19 +941,11 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     (*entry)->encode_headers_called_ = true;
 
-    // encoding_headers_only_ is set if the filter returns ContinueAndEndStream.
-    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
-        status, end_stream, state_.encoding_headers_only_);
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
 
     // If this filter ended the stream, encodeComplete() should be called for it.
-    if ((*entry)->end_stream_ || state_.encoding_headers_only_) {
+    if ((*entry)->end_stream_) {
       (*entry)->handle_->encodeComplete();
-    }
-
-    // If we're encoding a headers only response, then mark the local as complete. This ensures
-    // that we don't attempt to reset the downstream request in doEndStream.
-    if (state_.encoding_headers_only_) {
-      state_.local_complete_ = true;
     }
 
     if (!continue_iteration) {
@@ -981,8 +962,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     }
   }
 
-  const bool modified_end_stream = state_.encoding_headers_only_ ||
-                                   (end_stream && continue_data_entry == encoder_filters_.end());
+  const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
   maybeEndEncode(modified_end_stream);
@@ -1061,11 +1041,6 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
                                FilterIterationStartState filter_iteration_start_state) {
   filter_manager_callbacks_.resetIdleTimer();
 
-  // If we previously decided to encode only the headers, do nothing here.
-  if (state_.encoding_headers_only_) {
-    return;
-  }
-
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, end_stream, filter_iteration_start_state);
@@ -1117,7 +1092,6 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   }
 
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
-  ASSERT(!state_.encoding_headers_only_);
   filter_manager_callbacks_.encodeData(data, modified_end_stream);
   maybeEndEncode(modified_end_stream);
 
@@ -1131,11 +1105,6 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
                                    ResponseTrailerMap& trailers) {
   filter_manager_callbacks_.resetIdleTimer();
-
-  // If we previously decided to encode only the headers, do nothing here.
-  if (state_.encoding_headers_only_) {
-    return;
-  }
 
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
@@ -1286,7 +1255,7 @@ void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
 
 uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
-bool ActiveStreamDecoderFilter::recreateStream() {
+bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
@@ -1296,6 +1265,18 @@ bool ActiveStreamDecoderFilter::recreateStream() {
 
   parent_.stream_info_.setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
+
+  if (headers != nullptr) {
+    // The call to setResponseHeaders is needed to ensure that the headers are properly logged in
+    // access logs before the stream is destroyed. Since the function expects a ResponseHeaderPtr&&,
+    // ownership of the headers must be passed. This cannot happen earlier in the flow (such as in
+    // the call to setupRedirect) because at that point it is still possible for the headers to be
+    // used in a different logical branch. We work around this by creating a copy and passing
+    // ownership of the copy instead.
+    ResponseHeaderMapPtr headers_copy = createHeaderMap<ResponseHeaderMapImpl>(*headers);
+    parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers_copy));
+    parent_.filter_manager_callbacks_.chargeStats(*headers);
+  }
 
   parent_.filter_manager_callbacks_.recreateStream(parent_.stream_info_.filter_state_);
 
@@ -1419,6 +1400,14 @@ void ActiveStreamEncoderFilter::modifyEncodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
   ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
   callback(*parent_.buffered_response_data_.get());
+}
+
+void ActiveStreamEncoderFilter::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  parent_.sendLocalReply(parent_.state_.is_grpc_request_, code, body, modify_headers, grpc_status,
+                         details);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {

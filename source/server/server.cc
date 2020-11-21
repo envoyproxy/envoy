@@ -2,12 +2,14 @@
 
 #include <csignal>
 #include <cstdint>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <string>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -18,6 +20,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -38,6 +41,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/signal/fatal_error_handler.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
@@ -67,14 +71,14 @@ InstanceImpl::InstanceImpl(
                                              options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system,
+      random_generator_(std::move(random_generator)),
+      api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_)),
-      random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks),
+      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       terminated_(false),
@@ -147,7 +151,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
   snapped_counters_ = store.counters();
   counters_.reserve(snapped_counters_.size());
   for (const auto& counter : snapped_counters_) {
@@ -172,15 +176,17 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   for (const auto& text_readout : snapped_text_readouts_) {
     text_readouts_.push_back(*text_readout);
   }
+
+  snapshot_time_ = time_source.systemTime();
 }
 
-void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                       TimeSource& time_source) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store);
+  MetricSnapshotImpl snapshot(store, time_source);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -216,6 +222,13 @@ void InstanceImpl::updateServerStats() {
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
+
+  auto secs_until_ocsp_response_expires =
+      sslContextManager().secondsUntilFirstOcspResponseExpires();
+  if (secs_until_ocsp_response_expires) {
+    server_stats_->seconds_until_first_ocsp_response_expiring_.set(
+        secs_until_ocsp_response_expires.value());
+  }
   server_stats_->state_.set(
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
@@ -224,7 +237,7 @@ void InstanceImpl::updateServerStats() {
 
 void InstanceImpl::flushStatsInternal() {
   updateServerStats();
-  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
+  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_, timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(config_.statsFlushInterval());
@@ -235,9 +248,9 @@ bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 namespace {
 // Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
-void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
-                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                  std::function<void(Protobuf::Message&, bool)> load_function) {
+void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
+                   envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                   std::function<void(Protobuf::Message&, bool)> load_function) {
 
   if (!bootstrap_version.has_value()) {
     load_function(bootstrap, true);
@@ -247,6 +260,7 @@ void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
     envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
     load_function(bootstrap_v2, false);
     Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
+    MessageUtil::onVersionUpgradeDeprecation("v2 bootstrap", false);
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
@@ -268,7 +282,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    loadBootsrap(
+    loadBootstrap(
         options.bootstrapVersion(), bootstrap,
         [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
           MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
@@ -276,10 +290,11 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    loadBootsrap(options.bootstrapVersion(), bootstrap_override,
-                 [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
-                   MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
-                 });
+    loadBootstrap(
+        options.bootstrapVersion(), bootstrap_override,
+        [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
+          MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
+        });
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -407,6 +422,26 @@ void InstanceImpl::initialize(const Options& options,
         factory.createBootstrapExtension(*config, serverFactoryContext()));
   }
 
+  // Register the fatal actions.
+  {
+    FatalAction::FatalActionPtrList safe_actions;
+    FatalAction::FatalActionPtrList unsafe_actions;
+    for (const auto& action_config : bootstrap_.fatal_actions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::FatalActionFactory>(
+              action_config.config());
+      auto action = factory.createFatalActionFromProto(action_config, this);
+
+      if (action->isAsyncSignalSafe()) {
+        safe_actions.push_back(std::move(action));
+      } else {
+        unsafe_actions.push_back(std::move(action));
+      }
+    }
+    Envoy::FatalErrorHandler::registerFatalActions(
+        std::move(safe_actions), std::move(unsafe_actions), api_->threadFactory());
+  }
+
   if (!bootstrap_.default_socket_interface().empty()) {
     auto& sock_name = bootstrap_.default_socket_interface();
     auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
@@ -478,8 +513,8 @@ void InstanceImpl::initialize(const Options& options,
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
-      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
+      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
       *singleton_manager_);
 
@@ -542,7 +577,7 @@ void InstanceImpl::onRuntimeReady() {
                                                        stats_store_, false)
             ->create(),
         hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
+        stats_store_, *ssl_context_manager_, info_factory_, access_log_manager_,
         *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }
@@ -574,8 +609,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
-      server.stats(), server.random(), server.messageValidationContext().dynamicValidationVisitor(),
-      server.api());
+      server.stats(), server.api().randomGenerator(),
+      server.messageValidationContext().dynamicValidationVisitor(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
@@ -669,8 +704,7 @@ void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
-                                                         "main_thread");
-  watchdog->startWatchdog(*dispatcher_);
+                                                         "main_thread", *dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
@@ -721,6 +755,7 @@ void InstanceImpl::terminate() {
   restarter_.shutdown();
   ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
+  FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }

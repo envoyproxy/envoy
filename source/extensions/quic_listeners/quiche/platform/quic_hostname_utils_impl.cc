@@ -1,4 +1,3 @@
-
 // NOLINT(namespace-envoy)
 
 // This file is part of the QUICHE platform implementation, and is not to be
@@ -9,7 +8,7 @@
 
 #include <string>
 
-#include "common/http/url_utility.h"
+#include "common/http/utility.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
@@ -20,7 +19,8 @@
 namespace quic {
 
 // static
-bool QuicHostnameUtilsImpl::IsValidSNI(quiche::QuicheStringPiece sni) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+bool QuicHostnameUtilsImpl::IsValidSNI(absl::string_view sni) {
   // TODO(wub): Implement it on top of GoogleUrl, once it is available.
 
   return sni.find_last_of('.') != std::string::npos &&
@@ -28,7 +28,8 @@ bool QuicHostnameUtilsImpl::IsValidSNI(quiche::QuicheStringPiece sni) {
 }
 
 // static
-std::string QuicHostnameUtilsImpl::NormalizeHostname(quiche::QuicheStringPiece hostname) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+std::string QuicHostnameUtilsImpl::NormalizeHostname(absl::string_view hostname) {
   // TODO(wub): Implement it on top of GoogleUrl, once it is available.
   std::string host = absl::AsciiStrToLower(hostname);
 

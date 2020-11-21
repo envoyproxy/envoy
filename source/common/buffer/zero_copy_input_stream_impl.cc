@@ -29,10 +29,9 @@ void ZeroCopyInputStreamImpl::drainLastSlice() {
 bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
   drainLastSlice();
 
-  Buffer::RawSliceVector slices = buffer_->getRawSlices(1);
+  Buffer::RawSlice slice = buffer_->frontSlice();
 
-  if (!slices.empty() && slices[0].len_ > 0) {
-    auto& slice = slices[0];
+  if (slice.len_ > 0) {
     *data = slice.mem_;
     *size = slice.len_;
     position_ = slice.len_;

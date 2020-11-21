@@ -83,11 +83,17 @@ protected:
       }
       void addFilter(Network::FilterSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void addReadFilter(Network::ReadFilterSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      void removeReadFilter(Network::ReadFilterSharedPtr) override {
+        NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      }
       bool initializeReadFilters() override { return true; }
 
       // Network::Connection
       void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.push_back(&cb);
+      }
+      void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
+        callbacks_.remove(&cb);
       }
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -121,6 +127,7 @@ protected:
       Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
       absl::string_view requestedServerName() const override { return EMPTY_STRING; }
       State state() const override { return Network::Connection::State::Open; }
+      bool connecting() const override { return false; }
       void write(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void setBufferLimits(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       uint32_t bufferLimit() const override { return 65000; }
@@ -133,6 +140,7 @@ protected:
       const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
+      absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
 
       SyntheticReadCallbacks& parent_;
       StreamInfo::StreamInfoImpl stream_info_;
