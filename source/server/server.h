@@ -267,6 +267,8 @@ public:
     return config_.statsFlushInterval();
   }
 
+  bool flushStatsOnAdminAccess() const override { return bootstrap_.flush_stats_on_admin_access(); }
+
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }

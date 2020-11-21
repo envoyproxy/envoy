@@ -88,6 +88,8 @@ public:
     http_context_.setDefaultTracingConfig(tracing_config);
   }
 
+  bool flushStatsOnAdminAccess() const override { return true; }
+
   TimeSource& timeSource() override { return time_system_; }
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;

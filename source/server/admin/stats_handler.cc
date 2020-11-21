@@ -74,6 +74,9 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
 
+  if (server_.flushStatsOnAdminAccess()) {
+    server_.flushStats();
+  }
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {
