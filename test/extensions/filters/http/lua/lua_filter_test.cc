@@ -1884,7 +1884,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
 
-  auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+  const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
@@ -2005,7 +2005,7 @@ TEST_F(LuaHttpFilterTest, SurviveMultipleDownstreamSslConnectionCalls) {
 
   setup(SCRIPT);
 
-  auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+  const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
