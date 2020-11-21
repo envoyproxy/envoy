@@ -223,8 +223,6 @@ TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
 
 ProxyProtoTcpIntegrationTest::ProxyProtoTcpIntegrationTest()
     : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
-  enable_half_close_ = true;
-
   config_helper_.addConfigModifier(insertProxyProtocolFilterConfigModifier);
   config_helper_.renameListener("tcp_proxy");
 }
@@ -260,13 +258,13 @@ TEST_P(ProxyProtoTcpIntegrationTest, AccessLog) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello", true));
+  ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello", false));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
-  ASSERT_TRUE(fake_upstream_connection->write("", true));
-  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   std::string log_result;
