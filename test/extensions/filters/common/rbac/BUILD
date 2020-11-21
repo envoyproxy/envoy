@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -9,6 +7,8 @@ load(
     "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -41,6 +41,15 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    extension_name = "envoy.filters.http.rbac",
+    deps = [
+        "//source/extensions/filters/common/rbac:utility_lib",
     ],
 )
 

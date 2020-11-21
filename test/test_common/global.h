@@ -88,7 +88,8 @@ private:
   std::string describeActiveSingletonsHelper();
 
   Thread::MutexBasicLockable map_mutex_;
-  absl::flat_hash_map<std::string, std::weak_ptr<Singleton>> singleton_map_ GUARDED_BY(map_mutex_);
+  absl::flat_hash_map<std::string, std::weak_ptr<Singleton>>
+      singleton_map_ ABSL_GUARDED_BY(map_mutex_);
 };
 
 /**

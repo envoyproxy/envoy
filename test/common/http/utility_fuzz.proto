@@ -3,6 +3,7 @@ syntax = "proto3";
 package test.common.http;
 
 import "validate/validate.proto";
+import "envoy/config/core/v3/protocol.proto";
 
 // Structured input for utility_fuzz_test.
 
@@ -43,5 +44,7 @@ message UtilityTestCase {
     string find_query_string = 9
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE, strict: false}];
     CookieValue make_set_cookie_value = 10;
+    string parse_authority_string = 11;
+    envoy.config.core.v3.Http2ProtocolOptions initialize_and_validate = 12;
   }
 }

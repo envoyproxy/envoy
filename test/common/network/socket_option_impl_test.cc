@@ -13,7 +13,7 @@ TEST_F(SocketOptionImplTest, BadFd) {
   Api::SysCallIntResult result =
       SocketOptionImpl::setSocketOption(socket_, {}, zero.data(), zero.size());
   EXPECT_EQ(-1, result.rc_);
-  EXPECT_EQ(ENOTSUP, result.errno_);
+  EXPECT_EQ(SOCKET_ERROR_NOT_SUP, result.errno_);
 }
 
 TEST_F(SocketOptionImplTest, HasName) {

@@ -25,14 +25,14 @@ public:
   /**
    * @return HeaderMap of current headers
    */
-  const Http::HeaderMap& headers() const { return headers_; }
-  Http::HeaderMap& headers() { return headers_; }
+  const Http::HeaderMap& headers() const { return *headers_; }
+  Http::HeaderMap& headers() { return *headers_; }
 
 private:
   bool is_oneway_{false};
   absl::optional<std::string> topic_name_{};
 
-  Http::HeaderMapImpl headers_;
+  Http::HeaderMapPtr headers_{Http::RequestHeaderMapImpl::create()};
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;

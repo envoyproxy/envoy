@@ -5,13 +5,11 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/common/version.h"
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/well_known_names.h"
+#include "common/version/version.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +28,7 @@ Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
                                 POOL_COUNTER_PREFIX(scope, "tracing.datadog."))},
       tls_(tls.allocateSlot()) {
 
-  Config::Utility::checkCluster(TracerNames::get().Datadog, datadog_config.collector_cluster(), cm_,
+  Config::Utility::checkCluster("envoy.tracers.datadog", datadog_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = datadog_config.collector_cluster();
 
@@ -97,9 +95,7 @@ void TraceReporter::flushTraces() {
       message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }
 
-    Buffer::InstancePtr body(new Buffer::OwnedImpl());
-    body->add(encoder_->payload());
-    message->body() = std::move(body);
+    message->body().add(encoder_->payload());
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
@@ -140,7 +136,7 @@ void TraceReporter::onSuccess(const Http::AsyncClient::Request& request,
   } else {
     ENVOY_LOG(debug, "traces successfully submitted to datadog agent");
     driver_.tracerStats().reports_sent_.inc();
-    encoder_->handleResponse(http_response->body()->toString());
+    encoder_->handleResponse(http_response->bodyAsString());
   }
 }
 

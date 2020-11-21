@@ -27,7 +27,7 @@ public:
 private:
   // It's ok for non-existent subs to be paused/resumed. The cleanest way to support that is to give
   // the pause state its own map. (Map key is type_url.)
-  absl::flat_hash_map<std::string, bool> paused_;
+  absl::flat_hash_map<std::string, uint32_t> pauses_;
   std::list<UpdateAck> storage_;
 };
 

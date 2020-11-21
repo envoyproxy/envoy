@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <queue>
 
 #include "envoy/api/api.h"
@@ -9,7 +10,7 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
-#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/linked_object.h"
@@ -18,8 +19,10 @@
 #include "common/grpc/google_grpc_context.h"
 #include "common/grpc/stat_names.h"
 #include "common/grpc/typed_async_client.h"
+#include "common/router/header_parser.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/container/node_hash_set.h"
 #include "grpcpp/generic/generic_stub.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/support/proto_buffer_writer.h"
@@ -28,6 +31,9 @@ namespace Envoy {
 namespace Grpc {
 
 class GoogleAsyncStreamImpl;
+
+using GoogleAsyncStreamImplPtr = std::unique_ptr<GoogleAsyncStreamImpl>;
+
 class GoogleAsyncRequestImpl;
 
 struct GoogleAsyncTag {
@@ -105,8 +111,10 @@ private:
   Thread::ThreadPtr completion_thread_;
   // Track all streams that are currently using this CQ, so we can notify them
   // on shutdown.
-  std::unordered_set<GoogleAsyncStreamImpl*> streams_;
+  absl::node_hash_set<GoogleAsyncStreamImpl*> streams_;
 };
+
+using GoogleAsyncClientThreadLocalPtr = std::unique_ptr<GoogleAsyncClientThreadLocal>;
 
 // Google gRPC client stats. TODO(htuch): consider how a wider set of stats collected by the
 // library, such as the census related ones, can be externalized as needed.
@@ -128,6 +136,8 @@ public:
               grpc::CompletionQueue* cq) PURE;
 };
 
+using GoogleStubSharedPtr = std::shared_ptr<GoogleStub>;
+
 class GoogleGenericStub : public GoogleStub {
 public:
   GoogleGenericStub(std::shared_ptr<grpc::Channel> channel) : stub_(channel) {}
@@ -148,12 +158,12 @@ public:
   virtual ~GoogleStubFactory() = default;
 
   // Create a stub from a given channel.
-  virtual std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) PURE;
+  virtual GoogleStubSharedPtr createStub(std::shared_ptr<grpc::Channel> channel) PURE;
 };
 
 class GoogleGenericStubFactory : public GoogleStubFactory {
 public:
-  std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) override {
+  GoogleStubSharedPtr createStub(std::shared_ptr<grpc::Channel> channel) override {
     return std::make_shared<GoogleGenericStub>(channel);
   }
 };
@@ -185,13 +195,13 @@ private:
   // This is shared with child streams, so that they can cleanup independent of
   // the client if it gets destructed. The streams need to wait for their tags
   // to drain from the CQ.
-  std::shared_ptr<GoogleStub> stub_;
-  std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
+  GoogleStubSharedPtr stub_;
+  std::list<GoogleAsyncStreamImplPtr> active_streams_;
   const std::string stat_prefix_;
-  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
   uint64_t per_stream_buffer_limit_bytes_;
+  Router::HeaderParserPtr metadata_parser_;
 
   friend class GoogleAsyncClientThreadLocal;
   friend class GoogleAsyncRequestImpl;
@@ -201,7 +211,7 @@ private:
 class GoogleAsyncStreamImpl : public RawAsyncStream,
                               public Event::DeferredDeletable,
                               Logger::Loggable<Logger::Id::grpc>,
-                              LinkedObject<GoogleAsyncStreamImpl> {
+                              public LinkedObject<GoogleAsyncStreamImpl> {
 public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                         absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
@@ -252,7 +262,7 @@ private:
     // End-of-stream with no additional message.
     PendingMessage() = default;
 
-    const absl::optional<grpc::ByteBuffer> buf_;
+    const absl::optional<grpc::ByteBuffer> buf_{};
     const bool end_stream_{true};
   };
 
@@ -272,7 +282,7 @@ private:
   Event::Dispatcher& dispatcher_;
   // We hold a ref count on the stub_ to allow the stream to wait for its tags
   // to drain from the CQ on cleanup.
-  std::shared_ptr<GoogleStub> stub_;
+  GoogleStubSharedPtr stub_;
   std::string service_full_name_;
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;

@@ -7,7 +7,9 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "absl/types/optional.h"
@@ -30,6 +32,10 @@ enum class LimitStatus {
   OverLimit
 };
 
+using DescriptorStatusList =
+    std::vector<envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus>;
+using DescriptorStatusListPtr = std::unique_ptr<DescriptorStatusList>;
+
 /**
  * Async callbacks used during limit() calls.
  */
@@ -41,7 +47,8 @@ public:
    * Called when a limit request is complete. The resulting status,
    * response headers and request headers to be forwarded to the upstream are supplied.
    */
-  virtual void complete(LimitStatus status, Http::ResponseHeaderMapPtr&& response_headers_to_add,
+  virtual void complete(LimitStatus status, DescriptorStatusListPtr&& descriptor_statuses,
+                        Http::ResponseHeaderMapPtr&& response_headers_to_add,
                         Http::RequestHeaderMapPtr&& request_headers_to_add) PURE;
 };
 
@@ -71,7 +78,7 @@ public:
    */
   virtual void limit(RequestCallbacks& callbacks, const std::string& domain,
                      const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                     Tracing::Span& parent_span) PURE;
+                     Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;

@@ -11,7 +11,9 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -34,7 +36,7 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
   // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
   // internal cases this should practically never happen.
   if (data.startsWith(Http2::CLIENT_MAGIC_PREFIX)) {
-    return Http2::ALPN_STRING;
+    return Utility::AlpnNames::get().Http2;
   }
 
   return "";
@@ -42,23 +44,35 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
 
 ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
-    ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
+    ServerConnectionCallbacks& callbacks, Stats::Scope& scope, Random::RandomGenerator& random,
     Http1::CodecStats::AtomicPtr& http1_codec_stats,
     Http2::CodecStats::AtomicPtr& http2_codec_stats, const Http1Settings& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action) {
-  if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
+  if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
-    return std::make_unique<Http2::ServerConnectionImpl>(
-        connection, callbacks, stats, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      return std::make_unique<Http2::ServerConnectionImpl>(
+          connection, callbacks, stats, random, http2_options, max_request_headers_kb,
+          max_request_headers_count, headers_with_underscores_action);
+    } else {
+      return std::make_unique<Legacy::Http2::ServerConnectionImpl>(
+          connection, callbacks, stats, random, http2_options, max_request_headers_kb,
+          max_request_headers_count, headers_with_underscores_action);
+    }
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
-    return std::make_unique<Http1::ServerConnectionImpl>(
-        connection, stats, callbacks, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      return std::make_unique<Http1::ServerConnectionImpl>(
+          connection, stats, callbacks, http1_settings, max_request_headers_kb,
+          max_request_headers_count, headers_with_underscores_action);
+    } else {
+      return std::make_unique<Legacy::Http1::ServerConnectionImpl>(
+          connection, stats, callbacks, http1_settings, max_request_headers_kb,
+          max_request_headers_count, headers_with_underscores_action);
+    }
   }
 }
 

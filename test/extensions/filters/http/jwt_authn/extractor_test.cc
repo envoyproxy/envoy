@@ -112,7 +112,7 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
 
   // Test token remove
   tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.Authorization());
+  EXPECT_FALSE(headers.has(Http::CustomHeaders::get().Authorization));
 }
 
 // Test extracting JWT as Bearer token from the default header location: "Authorization" -
@@ -167,7 +167,15 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
 
   // Test token remove
   tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.get(Http::LowerCaseString("token-header")));
+  EXPECT_FALSE(headers.has(Http::LowerCaseString("token-header")));
+}
+
+// Make sure a double custom header concatenates the token
+TEST_F(ExtractorTest, TestDoubleCustomHeaderToken) {
+  auto headers = TestRequestHeaderMapImpl{{"token-header", "jwt_token"}, {"token-header", "foo"}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+  EXPECT_EQ(tokens[0]->token(), "jwt_token,foo");
 }
 
 // Test extracting token from the custom header: "prefix-header"
@@ -195,7 +203,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
 
   // Test token remove
   tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
+  EXPECT_FALSE(headers.has(Http::LowerCaseString("prefix-header")));
 }
 
 // Test extracting token from the custom header: "prefix-header"

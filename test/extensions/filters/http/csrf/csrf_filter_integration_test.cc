@@ -5,7 +5,7 @@ namespace {
 const std::string CSRF_ENABLED_CONFIG = R"EOF(
 name: csrf
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
+  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 100
@@ -19,7 +19,7 @@ typed_config:
 const std::string CSRF_FILTER_ENABLED_CONFIG = R"EOF(
 name: csrf
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
+  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 100
@@ -29,7 +29,7 @@ typed_config:
 const std::string CSRF_SHADOW_ENABLED_CONFIG = R"EOF(
 name: csrf
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
+  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 0
@@ -43,7 +43,7 @@ typed_config:
 const std::string CSRF_DISABLED_CONFIG = R"EOF(
 name: csrf
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
+  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 0
@@ -84,7 +84,7 @@ TEST_P(CsrfFilterIntegrationTest, TestCsrfSuccess) {
       {":method", "PUT"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "localhost"},
+      {"origin", "http://localhost"},
       {"host", "localhost"},
   }};
   const auto& response = sendRequestAndWaitForResponse(headers);
@@ -98,7 +98,7 @@ TEST_P(CsrfFilterIntegrationTest, TestCsrfDisabled) {
       {":method", "PUT"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "cross-origin"},
+      {"origin", "http://cross-origin"},
       {"host", "test-origin"},
   }};
   const auto& response = sendRequestAndWaitForResponse(headers);
@@ -112,7 +112,7 @@ TEST_P(CsrfFilterIntegrationTest, TestNonMutationMethod) {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "cross-origin"},
+      {"origin", "http://cross-origin"},
       {"host", "test-origin"},
   }};
   const auto& response = sendRequestAndWaitForResponse(headers);
@@ -126,7 +126,7 @@ TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
       {":method", "PUT"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "cross-origin"},
+      {"origin", "http://cross-origin"},
       {"host", "test-origin"},
   }};
   const auto& response = sendRequest(headers);
@@ -140,7 +140,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesPost) {
       {":method", "POST"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "cross-origin"},
+      {"origin", "http://cross-origin"},
       {"host", "test-origin"},
   }};
   const auto& response = sendRequest(headers);
@@ -154,7 +154,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesDelete) {
       {":method", "DELETE"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "cross-origin"},
+      {"origin", "http://cross-origin"},
       {"host", "test-origin"},
   }};
   const auto& response = sendRequest(headers);
@@ -168,7 +168,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesPatch) {
       {":method", "PATCH"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "cross-origin"},
+      {"origin", "http://cross-origin"},
       {"host", "test-origin"},
   }};
   const auto& response = sendRequest(headers);
@@ -181,7 +181,7 @@ TEST_P(CsrfFilterIntegrationTest, TestRefererFallback) {
   Http::TestRequestHeaderMapImpl headers = {{":method", "DELETE"},
                                             {":path", "/"},
                                             {":scheme", "http"},
-                                            {"referer", "test-origin"},
+                                            {"referer", "http://test-origin"},
                                             {"host", "test-origin"}};
   const auto& response = sendRequestAndWaitForResponse(headers);
   EXPECT_TRUE(response->complete());
@@ -203,7 +203,7 @@ TEST_P(CsrfFilterIntegrationTest, TestShadowOnlyMode) {
       {":method", "PUT"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "cross-origin"},
+      {"origin", "http://cross-origin"},
       {"host", "localhost"},
   }};
   const auto& response = sendRequestAndWaitForResponse(headers);
@@ -217,7 +217,7 @@ TEST_P(CsrfFilterIntegrationTest, TestFilterAndShadowEnabled) {
       {":method", "PUT"},
       {":path", "/"},
       {":scheme", "http"},
-      {"origin", "cross-origin"},
+      {"origin", "http://cross-origin"},
       {"host", "localhost"},
   }};
   const auto& response = sendRequest(headers);

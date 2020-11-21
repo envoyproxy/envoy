@@ -25,10 +25,8 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
   switch (proto_config.invocation_mode()) {
   case Config_InvocationMode_ASYNCHRONOUS:
     return InvocationMode::Asynchronous;
-    break;
   case Config_InvocationMode_SYNCHRONOUS:
     return InvocationMode::Synchronous;
-    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

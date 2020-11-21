@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
 #include "envoy/http/request_id_extension.h"
 
 #include "common/runtime/runtime_impl.h"
@@ -11,7 +12,7 @@ namespace Http {
 // configured.
 class UUIDRequestIDExtension : public RequestIDExtension {
 public:
-  explicit UUIDRequestIDExtension(Envoy::Runtime::RandomGenerator& random) : random_(random) {}
+  explicit UUIDRequestIDExtension(Envoy::Random::RandomGenerator& random) : random_(random) {}
 
   void set(RequestHeaderMap& request_headers, bool force) override;
   void setInResponse(ResponseHeaderMap& response_headers,
@@ -22,7 +23,7 @@ public:
 
 private:
   // Reference to the random generator used to generate new request IDs
-  Envoy::Runtime::RandomGenerator& random_;
+  Envoy::Random::RandomGenerator& random_;
 
   // Byte on this position has predefined value of 4 for UUID4.
   static const int TRACE_BYTE_POSITION = 14;

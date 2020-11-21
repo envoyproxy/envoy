@@ -99,6 +99,20 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithLog) {
   EXPECT_EQ(expected_logs, driver_->recorder().top().logs);
 }
 
+TEST_F(OpenTracingDriverTest, FlushSpanWithBaggage) {
+  setupValidDriver();
+
+  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                   start_time_, {Tracing::Reason::Sampling, true});
+  first_span->setBaggage("abc", "123");
+  first_span->finishSpan();
+
+  const std::map<std::string, std::string> expected_baggage = {{"abc", "123"}};
+
+  EXPECT_EQ(1, driver_->recorder().spans().size());
+  EXPECT_EQ(expected_baggage, driver_->recorder().top().span_context.baggage);
+}
+
 TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {
   setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
 
@@ -175,7 +189,7 @@ TEST_F(OpenTracingDriverTest, InjectFailure) {
 
     const auto span_context_injection_error_count =
         stats_.counter("tracing.opentracing.span_context_injection_error").value();
-    EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+    EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
     span->injectContext(request_headers_);
 
     EXPECT_EQ(span_context_injection_error_count + 1,

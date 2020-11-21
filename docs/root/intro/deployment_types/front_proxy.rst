@@ -21,6 +21,5 @@ reverse proxy provides the following features:
 Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The source distribution includes an example front proxy configuration that is very similar to
-the version that Lyft runs in production. See :ref:`here <install_ref_configs>` for more
-information.
+The source distribution includes an example front proxy configuration. See
+:ref:`here <intro_deployment_types>` for more information.

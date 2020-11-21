@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_hot_restart",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -17,6 +17,7 @@ envoy_cc_library(
         "//include/envoy/api:api_interface",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:socket_lib",
     ],
 )
 

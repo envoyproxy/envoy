@@ -1,22 +1,23 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # Redis proxy L4 network filter. Implements consistent hashing and observability for large redis
 # clusters.
 # Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "command_splitter_interface",
     hdrs = ["command_splitter.h"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
     ],
 )
@@ -64,6 +65,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/stats:timespan_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
     ],
@@ -118,6 +120,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # TODO(#9953) clean up.
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "//include/envoy/upstream:upstream_interface",
@@ -125,6 +131,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:redis_command_stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",

@@ -7,6 +7,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/upstream/host_description.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 
 namespace Event {
@@ -226,6 +228,11 @@ public:
   virtual void addReadFilter(ReadFilterSharedPtr filter) PURE;
 
   /**
+   * Remove a read filter from the connection.
+   */
+  virtual void removeReadFilter(ReadFilterSharedPtr filter) PURE;
+
+  /**
    * Initialize all of the installed read filters. This effectively calls onNewConnection() on
    * each of them.
    * @return true if read filters were initialized successfully, otherwise false.
@@ -269,6 +276,21 @@ public:
    * @param success boolean telling whether the filter execution was successful or not.
    */
   virtual void continueFilterChain(bool success) PURE;
+
+  /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter.
+   * @param value the struct to set on the namespace. A merge will be performed with new values for
+   * the same key overriding existing.
+   */
+  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
+   * connection.
+   */
+  virtual envoy::config::core::v3::Metadata& dynamicMetadata() PURE;
+  virtual const envoy::config::core::v3::Metadata& dynamicMetadata() const PURE;
 };
 
 /**
@@ -341,6 +363,13 @@ public:
   virtual const TransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
+   * @return std::chrono::milliseconds the amount of time to wait for the transport socket to report
+   * that a connection has been established. If the timeout is reached, the connection is closed. 0
+   * specifies a disabled timeout.
+   */
+  virtual std::chrono::milliseconds transportSocketConnectTimeout() const PURE;
+
+  /**
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
@@ -355,6 +384,8 @@ class DrainableFilterChain : public FilterChain {
 public:
   virtual void startDraining() PURE;
 };
+
+using DrainableFilterChainSharedPtr = std::shared_ptr<DrainableFilterChain>;
 
 /**
  * Interface for searching through configured filter chains.

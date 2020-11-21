@@ -23,8 +23,8 @@ class BasicResourceLimitImpl : public ResourceLimit {
 public:
   BasicResourceLimitImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key)
       : max_(max), runtime_(&runtime), runtime_key_(runtime_key) {}
-  BasicResourceLimitImpl(uint64_t max) : max_(max), runtime_(nullptr) {}
-  BasicResourceLimitImpl() : max_(std::numeric_limits<uint64_t>::max()), runtime_(nullptr) {}
+  BasicResourceLimitImpl(uint64_t max) : max_(max) {}
+  BasicResourceLimitImpl() : max_(std::numeric_limits<uint64_t>::max()) {}
 
   bool canCreate() override { return current_.load() < max(); }
 

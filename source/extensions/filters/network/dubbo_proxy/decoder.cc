@@ -19,22 +19,22 @@ DecoderStateMachine::onDecodeStreamHeader(Buffer::Instance& buffer) {
   }
 
   auto context = ret.first;
-  if (metadata->message_type() == MessageType::HeartbeatRequest ||
-      metadata->message_type() == MessageType::HeartbeatResponse) {
-    if (buffer.length() < (context->header_size() + context->body_size())) {
+  if (metadata->messageType() == MessageType::HeartbeatRequest ||
+      metadata->messageType() == MessageType::HeartbeatResponse) {
+    if (buffer.length() < (context->headerSize() + context->bodySize())) {
       ENVOY_LOG(debug, "dubbo decoder: need more data for {} protocol heartbeat", protocol_.name());
       return {ProtocolState::WaitForData};
     }
 
     ENVOY_LOG(debug, "dubbo decoder: this is the {} heartbeat message", protocol_.name());
-    buffer.drain(context->header_size() + context->body_size());
+    buffer.drain(context->headerSize() + context->bodySize());
     delegate_.onHeartbeat(metadata);
     return {ProtocolState::Done};
   }
 
   active_stream_ = delegate_.newStream(metadata, context);
   ASSERT(active_stream_);
-  context->message_origin_data().move(buffer, context->header_size());
+  context->messageOriginData().move(buffer, context->headerSize());
 
   return {ProtocolState::OnDecodeStreamData};
 }
@@ -49,8 +49,7 @@ DecoderStateMachine::onDecodeStreamData(Buffer::Instance& buffer) {
     return {ProtocolState::WaitForData};
   }
 
-  active_stream_->context_->message_origin_data().move(buffer,
-                                                       active_stream_->context_->body_size());
+  active_stream_->context_->messageOriginData().move(buffer, active_stream_->context_->bodySize());
   active_stream_->onStreamDecoded();
   active_stream_ = nullptr;
 

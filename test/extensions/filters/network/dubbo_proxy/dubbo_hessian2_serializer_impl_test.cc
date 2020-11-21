@@ -32,14 +32,14 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
         0x04, 't', 'e', 's', 't',      // method name
     }));
     std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
-    context->set_body_size(buffer.length());
+    context->setBodySize(buffer.length());
     auto result = serializer.deserializeRpcInvocation(buffer, context);
     EXPECT_TRUE(result.second);
 
     auto invo = result.first;
-    EXPECT_STREQ("test", invo->method_name().c_str());
-    EXPECT_STREQ("test", invo->service_name().c_str());
-    EXPECT_STREQ("0.0.0", invo->service_version().value().c_str());
+    EXPECT_STREQ("test", invo->methodName().c_str());
+    EXPECT_STREQ("test", invo->serviceName().c_str());
+    EXPECT_STREQ("0.0.0", invo->serviceVersion().value().c_str());
   }
 
   // incorrect body size
@@ -54,7 +54,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
     std::string exception_string = fmt::format("RpcInvocation size({}) large than body size({})",
                                                buffer.length(), buffer.length() - 1);
     std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
-    context->set_body_size(buffer.length() - 1);
+    context->setBodySize(buffer.length() - 1);
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcInvocation(buffer, context), EnvoyException,
                               exception_string);
   }
@@ -70,7 +70,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x94',                   // return type
         0x04, 't', 'e', 's', 't', // return body
     }));
-    context->set_body_size(4);
+    context->setBodySize(4);
     auto result = serializer.deserializeRpcResult(buffer, context);
     EXPECT_TRUE(result.second);
     EXPECT_FALSE(result.first->hasException());
@@ -82,7 +82,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x93',                   // return type
         0x04, 't', 'e', 's', 't', // return body
     }));
-    context->set_body_size(4);
+    context->setBodySize(4);
     auto result = serializer.deserializeRpcResult(buffer, context);
     EXPECT_TRUE(result.second);
     EXPECT_TRUE(result.first->hasException());
@@ -94,7 +94,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x90',                   // return type
         0x04, 't', 'e', 's', 't', // return body
     }));
-    context->set_body_size(4);
+    context->setBodySize(4);
     auto result = serializer.deserializeRpcResult(buffer, context);
     EXPECT_TRUE(result.second);
     EXPECT_TRUE(result.first->hasException());
@@ -106,7 +106,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x91',                   // return type
         0x04, 't', 'e', 's', 't', // return body
     }));
-    context->set_body_size(4);
+    context->setBodySize(4);
     auto result = serializer.deserializeRpcResult(buffer, context);
     EXPECT_TRUE(result.second);
     EXPECT_TRUE(result.first->hasException());
@@ -119,7 +119,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x94',                   // return type
         0x05, 't', 'e', 's', 't', // return body
     }));
-    context->set_body_size(0);
+    context->setBodySize(0);
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
                               "RpcResult size(1) large than body size(0)");
   }
@@ -131,7 +131,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x96',                   // incorrect return type
         0x05, 't', 'e', 's', 't', // return body
     }));
-    context->set_body_size(buffer.length());
+    context->setBodySize(buffer.length());
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
                               "not supported return type 6");
   }
@@ -146,7 +146,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
     std::string exception_string =
         fmt::format("RpcResult is no value, but the rest of the body size({}) not equal 0",
                     buffer.length() - 1);
-    context->set_body_size(buffer.length());
+    context->setBodySize(buffer.length());
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
                               exception_string);
   }
@@ -180,7 +180,7 @@ TEST(HessianProtocolTest, serializeRpcResult) {
 
   size_t body_size = mock_response.size() + sizeof(mock_response_type);
   std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
-  context->set_body_size(body_size);
+  context->setBodySize(body_size);
   auto result = serializer.deserializeRpcResult(buffer, context);
   EXPECT_TRUE(result.first->hasException());
 }

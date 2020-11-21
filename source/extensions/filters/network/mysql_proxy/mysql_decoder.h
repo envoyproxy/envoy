@@ -6,6 +6,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "extensions/common/sqlutils/sqlutils.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
@@ -45,6 +46,14 @@ public:
 
   virtual void onData(Buffer::Instance& data) PURE;
   virtual MySQLSession& getSession() PURE;
+
+  const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {
+    return attributes_;
+  }
+
+protected:
+  // Decoder attributes.
+  Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes attributes_;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;

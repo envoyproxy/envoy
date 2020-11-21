@@ -1,16 +1,16 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that performs gzip compression
 # Public docs: docs/root/configuration/http_filters/gzip_filter.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "gzip_filter_lib",

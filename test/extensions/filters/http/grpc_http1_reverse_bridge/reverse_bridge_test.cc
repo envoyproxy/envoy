@@ -38,7 +38,7 @@ protected:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   std::shared_ptr<Router::MockRoute> route_ = std::make_shared<Router::MockRoute>();
   Router::RouteSpecificFilterConfig filter_config_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
@@ -60,7 +60,8 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -76,7 +77,7 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
                                 Http::Utility::PercentEncoding::encode("invalid request body")));
     }));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
-    EXPECT_EQ(decoder_callbacks_.details_, "grpc_bridge_data_too_small");
+    EXPECT_EQ(decoder_callbacks_.details(), "grpc_bridge_data_too_small");
   }
 }
 
@@ -174,7 +175,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoManageFrameHeader) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "25"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -234,7 +236,8 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -313,7 +316,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
     // Ensure that we don't insert a content-length header.
     EXPECT_EQ(nullptr, headers.ContentLength());
   }
@@ -396,7 +400,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestHeaderOnlyResponse) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -441,7 +446,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -516,7 +522,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponseNoContentType) {
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -525,9 +532,6 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponseNoContentType) {
     buffer.add("abcdefgh", 8);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
     EXPECT_EQ("fgh", buffer.toString());
-    EXPECT_CALL(decoder_callbacks_, streamInfo());
-    EXPECT_CALL(decoder_callbacks_.stream_info_,
-                setResponseCodeDetails(absl::string_view("grpc_bridge_content_type_wrong")));
   }
 
   {
@@ -542,15 +546,14 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponseNoContentType) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 
   Http::TestResponseHeaderMapImpl headers({{":status", "400"}});
-  EXPECT_EQ(Http::FilterHeadersStatus::ContinueAndEndStream,
-            filter_->encodeHeaders(headers, false));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
-  EXPECT_THAT(
-      headers,
-      HeaderValueOf(
-          Http::Headers::get().GrpcMessage,
-          "envoy reverse bridge: upstream responded with no content-type header, status code 400"));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::OK,
+          "envoy reverse bridge: upstream responded with no content-type header, status code 400",
+          _, absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)), _));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
 }
 
 // Tests that a gRPC is downgraded to application/x-protobuf and that if the response
@@ -566,7 +569,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -575,9 +579,6 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
     buffer.add("abcdefgh", 8);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
     EXPECT_EQ("fgh", buffer.toString());
-    EXPECT_CALL(decoder_callbacks_, streamInfo());
-    EXPECT_CALL(decoder_callbacks_.stream_info_,
-                setResponseCodeDetails(absl::string_view("grpc_bridge_content_type_wrong")));
   }
 
   {
@@ -593,13 +594,15 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
 
   Http::TestResponseHeaderMapImpl headers(
       {{":status", "400"}, {"content-type", "application/json"}});
-  EXPECT_EQ(Http::FilterHeadersStatus::ContinueAndEndStream,
-            filter_->encodeHeaders(headers, false));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcMessage,
-                                     "envoy reverse bridge: upstream responded with unsupported "
-                                     "content-type application/json, status code 400"));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::OK,
+          "envoy reverse bridge: upstream responded with unsupported "
+          "content-type application/json, status code 400",
+          _, absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)), _));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
 }
 
 // Tests that the filter passes a GRPC request through without modification because it is disabled
@@ -656,7 +659,8 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -742,7 +746,8 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {

@@ -1,10 +1,10 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -60,7 +60,7 @@ class ConnectionManager : public Network::ReadFilter,
                           public DecoderCallbacks,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
-  ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+  ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system);
   ~ConnectionManager() override;
 
@@ -91,6 +91,7 @@ private:
 
     // ProtocolConverter
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus messageEnd() override;
     FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
                             int16_t& field_id) override;
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
@@ -221,7 +222,7 @@ private:
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
       ActiveRpcDecoderFilterPtr wrapper = std::make_unique<ActiveRpcDecoderFilter>(*this, filter);
       filter->setDecoderFilterCallbacks(*wrapper);
-      wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+      LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
     }
 
     FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
@@ -267,7 +268,7 @@ private:
   DecoderPtr decoder_;
   std::list<ActiveRpcPtr> rpcs_;
   Buffer::OwnedImpl request_buffer_;
-  Runtime::RandomGenerator& random_generator_;
+  Random::RandomGenerator& random_generator_;
   bool stopped_{false};
   bool half_closed_{false};
   TimeSource& time_source_;

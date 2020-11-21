@@ -1,15 +1,19 @@
 #pragma once
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
 
 #include "quiche/quic/core/http/quic_server_session_base.h"
+#include "quiche/quic/core/quic_crypto_server_stream.h"
+#include "quiche/quic/core/tls_server_handshaker.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include <memory>
 
@@ -33,7 +37,8 @@ public:
                          quic::QuicCryptoServerStreamBase::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                         Network::ListenerConfig& listener_config);
 
   ~EnvoyQuicServerSession() override;
 
@@ -50,6 +55,7 @@ public:
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
   void OnCanWrite() override;
+  void OnTlsHandshakeComplete() override;
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
@@ -73,8 +79,10 @@ protected:
 
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
+  void maybeCreateNetworkFilters();
 
   std::unique_ptr<EnvoyQuicConnection> quic_connection_;
+  Network::ListenerConfig& listener_config_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};

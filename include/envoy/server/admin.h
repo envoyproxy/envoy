@@ -153,6 +153,11 @@ public:
    * @param handler the handler that will receive this Admin's listener.
    */
   virtual void addListenerToHandler(Network::ConnectionHandler* handler) PURE;
+
+  /**
+   * @return the number of worker threads to run in the server.
+   */
+  virtual uint32_t concurrency() const PURE;
 };
 
 } // namespace Server

@@ -17,8 +17,10 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
-      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
+      service_method_(
+          Grpc::VersionedMethods("envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats",
+                                 "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
+              .getMethodDescriptorForVersion(transport_api_version)),
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
@@ -60,19 +62,19 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
+  auto all_clusters = cm_.clusters();
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
-    auto cluster_info_map = cm_.clusters();
-    auto it = cluster_info_map.find(cluster_name);
-    if (it == cluster_info_map.end()) {
+    auto it = all_clusters.active_clusters_.find(cluster_name);
+    if (it == all_clusters.active_clusters_.end()) {
       ENVOY_LOG(debug, "Cluster {} does not exist", cluster_name);
       continue;
     }
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
-    if (cluster.info()->eds_service_name().has_value()) {
-      cluster_stats->set_cluster_service_name(cluster.info()->eds_service_name().value());
+    if (cluster.info()->edsServiceName().has_value()) {
+      cluster_stats->set_cluster_service_name(cluster.info()->edsServiceName().value());
     }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
@@ -138,9 +140,9 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& me
 void LoadStatsReporter::onReceiveMessage(
     std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
-  stats_.requests_.inc();
   message_ = std::move(message);
   startLoadReportPeriod();
+  stats_.requests_.inc();
 }
 
 void LoadStatsReporter::startLoadReportPeriod() {
@@ -150,9 +152,10 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // problems due to referencing of temporaries in the below loop with Google's
   // internal string type. Consider this optimization when the string types
   // converge.
-  std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
+  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
-    for (const auto& p : cm_.clusters()) {
+    auto cluster_info_map = cm_.clusters();
+    for (const auto& p : cluster_info_map.active_clusters_) {
       const std::string& cluster_name = p.first;
       if (clusters_.count(cluster_name) > 0) {
         existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
@@ -171,9 +174,10 @@ void LoadStatsReporter::startLoadReportPeriod() {
     clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
                                         ? existing_clusters[cluster_name]
                                         : time_source_.monotonicTime().time_since_epoch());
+    // TODO(lambdai): Move the clusters() call out of this lambda.
     auto cluster_info_map = cm_.clusters();
-    auto it = cluster_info_map.find(cluster_name);
-    if (it == cluster_info_map.end()) {
+    auto it = cluster_info_map.active_clusters_.find(cluster_name);
+    if (it == cluster_info_map.active_clusters_.end()) {
       return;
     }
     // Don't reset stats for existing tracked clusters.
@@ -191,7 +195,8 @@ void LoadStatsReporter::startLoadReportPeriod() {
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
   };
   if (message_->send_all_clusters()) {
-    for (const auto& p : cm_.clusters()) {
+    auto cluster_info_map = cm_.clusters();
+    for (const auto& p : cluster_info_map.active_clusters_) {
       const std::string& cluster_name = p.first;
       handle_cluster_func(cluster_name);
     }

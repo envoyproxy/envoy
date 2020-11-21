@@ -134,7 +134,7 @@ void HealthCheckFilter::onComplete() {
       for (const auto& item : *cluster_min_healthy_percentages_) {
         details = &RcDetails::get().HealthCheckClusterHealthy;
         const std::string& cluster_name = item.first;
-        const double min_healthy_percentage = item.second;
+        const uint64_t min_healthy_percentage = static_cast<uint64_t>(item.second);
         auto* cluster = clusterManager.get(cluster_name);
         if (cluster == nullptr) {
           // If the cluster does not exist at all, consider the service unhealthy.
@@ -148,7 +148,7 @@ void HealthCheckFilter::onComplete() {
         if (membership_total == 0) {
           // If the cluster exists but is empty, consider the service unhealthy unless
           // the specified minimum percent healthy for the cluster happens to be zero.
-          if (min_healthy_percentage == 0.0) {
+          if (min_healthy_percentage == 0UL) {
             continue;
           } else {
             final_status = Http::Code::ServiceUnavailable;
@@ -158,10 +158,8 @@ void HealthCheckFilter::onComplete() {
         }
         // In the general case, consider the service unhealthy if fewer than the
         // specified percentage of the servers in the cluster are available (healthy + degraded).
-        // TODO(brian-pane) switch to purely integer-based math here, because the
-        //                  int-to-float conversions and floating point division are slow.
-        if ((stats.membership_healthy_.value() + stats.membership_degraded_.value()) <
-            membership_total * min_healthy_percentage / 100.0) {
+        if ((100UL * (stats.membership_healthy_.value() + stats.membership_degraded_.value())) <
+            membership_total * min_healthy_percentage) {
           final_status = Http::Code::ServiceUnavailable;
           details = &RcDetails::get().HealthCheckClusterUnhealthy;
           break;

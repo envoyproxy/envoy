@@ -19,6 +19,18 @@ AuthRequest::AuthRequest(const std::string& password) {
   asArray().swap(values);
 }
 
+AuthRequest::AuthRequest(const std::string& username, const std::string& password) {
+  std::vector<RespValue> values(3);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "auth";
+  values[1].type(RespType::BulkString);
+  values[1].asString() = username;
+  values[2].type(RespType::BulkString);
+  values[2].asString() = password;
+  type(RespType::Array);
+  asArray().swap(values);
+}
+
 RespValuePtr makeError(const std::string& error) {
   Common::Redis::RespValuePtr response(new RespValue());
   response->type(Common::Redis::RespType::Error);

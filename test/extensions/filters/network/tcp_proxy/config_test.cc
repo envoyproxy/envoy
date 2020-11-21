@@ -5,7 +5,8 @@
 
 #include "extensions/filters/network/tcp_proxy/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -71,6 +72,7 @@ INSTANTIATE_TEST_SUITE_P(IpList, RouteIpListConfigTest,
                                                 ],)EOF"));
 
 TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -91,7 +93,7 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   )EOF";
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proto_config;
-  TestUtility::loadFromJson(json_string, proto_config);
+  TestUtility::loadFromJson(json_string, proto_config, true, false);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;

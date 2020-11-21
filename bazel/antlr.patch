@@ -1,0 +1,26 @@
+diff --git a/runtime/Cpp/runtime/src/atn/ATNDeserializer.cpp b/runtime/Cpp/runtime/src/atn/ATNDeserializer.cpp
+index c6cceda13..e86533759 100755
+--- a/runtime/Cpp/runtime/src/atn/ATNDeserializer.cpp
++++ b/runtime/Cpp/runtime/src/atn/ATNDeserializer.cpp
+@@ -104,7 +104,7 @@ void deserializeSets(
+
+ }
+
+-ATNDeserializer::ATNDeserializer(): ATNDeserializer(ATNDeserializationOptions::getDefaultOptions()) {
++ATNDeserializer::ATNDeserializer(): ATNDeserializer(ATNDeserializationOptions()) {
+ }
+
+ ATNDeserializer::ATNDeserializer(const ATNDeserializationOptions& dso): deserializationOptions(dso) {
+diff --git a/runtime/Cpp/runtime/src/atn/LexerATNSimulator.cpp b/runtime/Cpp/runtime/src/atn/LexerATNSimulator.cpp
+index 827c3d59f..62914cf55 100755
+--- a/runtime/Cpp/runtime/src/atn/LexerATNSimulator.cpp
++++ b/runtime/Cpp/runtime/src/atn/LexerATNSimulator.cpp
+@@ -69,7 +69,7 @@ void LexerATNSimulator::copyState(LexerATNSimulator *simulator) {
+ }
+
+ size_t LexerATNSimulator::match(CharStream *input, size_t mode) {
+-  match_calls++;
++  // match_calls++;
+   _mode = mode;
+   ssize_t mark = input->mark();
+

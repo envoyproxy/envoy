@@ -3,22 +3,22 @@
 
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
+#include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
-using testing::AtLeast;
-using testing::NiceMock;
-using testing::Return;
-
 namespace Envoy {
 namespace Config {
 namespace {
+using ::testing::AtLeast;
+using ::testing::NiceMock;
+using ::testing::Return;
 
 class AsyncDataSourceTest : public testing::Test {
 protected:
@@ -29,7 +29,7 @@ protected:
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   Api::ApiPtr api_{Api::createApiForTest()};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
@@ -244,7 +244,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+    response->body().add(body);
 
     callbacks.onSuccess(request_, std::move(response));
     return nullptr;
@@ -289,7 +289,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+    response->body().add(body);
 
     callbacks.onSuccess(request_, std::move(response));
     return nullptr;
@@ -371,7 +371,7 @@ TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
       Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
           Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-      response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+      response->body().add(body);
 
       callbacks.onSuccess(request_, std::move(response));
       return nullptr;
@@ -446,7 +446,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
                     Http::ResponseMessagePtr response(
                         new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                             new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-                    response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+                    response->body().add(body);
 
                     callbacks.onSuccess(request_, std::move(response));
                     return nullptr;

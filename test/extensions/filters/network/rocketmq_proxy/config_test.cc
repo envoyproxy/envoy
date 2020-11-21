@@ -4,7 +4,8 @@
 #include "extensions/filters/network/rocketmq_proxy/config.h"
 
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
@@ -21,9 +22,10 @@ namespace RocketmqProxy {
 
 using RocketmqProxyProto = envoy::extensions::filters::network::rocketmq_proxy::v3::RocketmqProxy;
 
-RocketmqProxyProto parseRocketmqProxyFromV2Yaml(const std::string& yaml) {
+RocketmqProxyProto parseRocketmqProxyFromV3Yaml(const std::string& yaml,
+                                                bool avoid_boosting = true) {
   RocketmqProxyProto rocketmq_proxy;
-  TestUtility::loadFromYaml(yaml, rocketmq_proxy);
+  TestUtility::loadFromYaml(yaml, rocketmq_proxy, false, avoid_boosting);
   return rocketmq_proxy;
 }
 
@@ -85,7 +87,7 @@ TEST_F(RocketmqFilterConfigTest, RocketmqProxyWithFullConfig) {
     transient_object_life_span:
       seconds: 30
     )EOF";
-  RocketmqProxyProto config = parseRocketmqProxyFromV2Yaml(yaml);
+  RocketmqProxyProto config = parseRocketmqProxyFromV3Yaml(yaml);
   testConfig(config);
 }
 

@@ -6,6 +6,7 @@
 #include "common/network/utility.h"
 #include "common/stats/stat_merger.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
 
 #include "server/listener_impl.h"
 
@@ -14,10 +15,11 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
-HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch)
+HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
+                                         const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
-  child_address_ = createDomainSocketAddress(restart_epoch_ + 1, "child");
-  bindDomainSocket(restart_epoch_, "parent");
+  child_address_ = createDomainSocketAddress(restart_epoch_ + 1, "child", socket_path, socket_mode);
+  bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
@@ -85,16 +87,8 @@ void HotRestartingParent::onSocketEvent() {
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
 HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(server) {
-  // Track the hot-restart generation. Using gauge's accumulate semantics,
-  // the increments will be combined across hot-restart. This may be useful
-  // at some point, though the main motivation for this stat is to enable
-  // an integration test showing that dynamic stat-names can be coalesced
-  // across hot-restarts. There's no other reason this particular stat-name
-  // needs to be created dynamically.
-  Stats::StatNameDynamicPool pool(server_->stats().symbolTable());
-  Stats::Gauge& gauge = server_->stats().gaugeFromStatName(
-      pool.add("server.hot_restart_generation"), Stats::Gauge::ImportMode::Accumulate);
-  gauge.inc();
+  Stats::Gauge& hot_restart_generation = hotRestartGeneration(server->stats());
+  hot_restart_generation.inc();
 }
 
 HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
@@ -115,9 +109,9 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
     Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
     if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
       if (socket_factory.sharedSocket().has_value()) {
-        // Pass the socket to the new process iff it is already shared across workers.
+        // Pass the socket to the new process if it is already shared across workers.
         wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-            socket_factory.sharedSocket()->get().ioHandle().fd());
+            socket_factory.sharedSocket()->get().ioHandle().fdDoNotUse());
       }
       break;
     }

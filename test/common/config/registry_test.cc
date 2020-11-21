@@ -15,6 +15,8 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+using ::testing::Optional;
+
 class InternalFactory : public Config::UntypedFactory {
 public:
   ~InternalFactory() override = default;
@@ -103,6 +105,18 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(WithDeprecatedFactoryPublished)) {
                           ->name());
 }
 
+class NoNamePublishedFactory : public PublishedFactory {
+public:
+  std::string name() const override { return ""; }
+};
+
+TEST(RegistryTest, DEPRECATED_FEATURE_TEST(AssertsIfNoDeprecatedNameGiven)) {
+  // Expects an assert to raise if we register a factory that has an empty name
+  // and no associated deprecated names.
+  EXPECT_DEBUG_DEATH((Registry::RegisterFactory<NoNamePublishedFactory, PublishedFactory>({})),
+                     "Attempted to register a factory without a name or deprecated name");
+}
+
 class TestVersionedFactory : public PublishedFactory {
 public:
   std::string name() const override { return "testing.published.versioned"; }
@@ -180,6 +194,48 @@ TEST(RegistryTest, TestDoubleRegistrationByName) {
   EXPECT_THROW_WITH_MESSAGE((Registry::RegisterFactory<TestPublishedFactory, PublishedFactory>()),
                             EnvoyException,
                             "Double registration for name: 'testing.published.test'");
+}
+
+class PublishedFactoryWithNameAndCategory : public PublishedFactory {
+public:
+  std::string category() const override { return "testing.published.additional.category"; }
+  std::string name() const override {
+    return "testing.published.versioned.instead_name_and_category";
+  }
+};
+
+TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactoryAndNewCategory)) {
+  PublishedFactoryWithNameAndCategory test;
+
+  // Check the category is not registered
+  ASSERT_FALSE(Registry::FactoryCategoryRegistry::isRegistered(test.category()));
+
+  auto factory = Registry::RegisterFactory<PublishedFactoryWithNameAndCategory, PublishedFactory>(
+      FACTORY_VERSION(0, 0, 1, {{"build.kind", "private"}}),
+      {"testing.published.versioned.deprecated_name_and_category"});
+
+  // Check the category now registered
+  ASSERT_TRUE(Registry::FactoryCategoryRegistry::isRegistered(test.category()));
+
+  const auto& factories = Envoy::Registry::FactoryCategoryRegistry::registeredFactories();
+
+  auto version =
+      factories.find("testing.published.additional.category")
+          ->second->getFactoryVersion("testing.published.versioned.instead_name_and_category");
+
+  ASSERT_TRUE(version.has_value());
+  EXPECT_EQ(0, version.value().version().major_number());
+  EXPECT_EQ(0, version.value().version().minor_number());
+  EXPECT_EQ(1, version.value().version().patch());
+  EXPECT_EQ(1, version.value().metadata().fields().size());
+  EXPECT_EQ("private", version.value().metadata().fields().at("build.kind").string_value());
+
+  // Get the version using deprecated name and check that it matches the
+  // version obtained through the new name.
+  auto deprecated_version =
+      factories.find("testing.published.additional.category")
+          ->second->getFactoryVersion("testing.published.versioned.deprecated_name_and_category");
+  EXPECT_THAT(deprecated_version, Optional(ProtoEq(version.value())));
 }
 
 } // namespace

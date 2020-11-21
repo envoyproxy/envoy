@@ -14,11 +14,10 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/store_impl.h"
-#include "common/stats/symbol_table_creator.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/timespan_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -31,12 +30,11 @@ namespace Stats {
 
 class TestSymbolTableHelper {
 public:
-  TestSymbolTableHelper() : symbol_table_(SymbolTableCreator::makeSymbolTable()) {}
-  SymbolTable& symbolTable() { return *symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return *symbol_table_; }
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
 private:
-  SymbolTablePtr symbol_table_;
+  SymbolTableImpl symbol_table_;
 };
 
 class TestSymbolTable {
@@ -187,6 +185,7 @@ public:
   MOCK_METHOD(void, dec, ());
   MOCK_METHOD(void, inc, ());
   MOCK_METHOD(void, set, (uint64_t value));
+  MOCK_METHOD(void, setParentValue, (uint64_t parent_value));
   MOCK_METHOD(void, sub, (uint64_t amount));
   MOCK_METHOD(void, mergeImportMode, (ImportMode));
   MOCK_METHOD(bool, used, (), (const));
@@ -263,9 +262,9 @@ public:
   MockTextReadout();
   ~MockTextReadout() override;
 
-  MOCK_METHOD1(set, void(absl::string_view value));
-  MOCK_CONST_METHOD0(used, bool());
-  MOCK_CONST_METHOD0(value, std::string());
+  MOCK_METHOD(void, set, (absl::string_view value), (override));
+  MOCK_METHOD(bool, used, (), (const, override));
+  MOCK_METHOD(std::string, value, (), (const, override));
 
   bool used_;
   std::string value_;
@@ -281,10 +280,13 @@ public:
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
 
+  SystemTime snapshotTime() const override { return snapshot_time_; }
+
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;
   std::vector<std::reference_wrapper<const ParentHistogram>> histograms_;
   std::vector<std::reference_wrapper<const TextReadout>> text_readouts_;
+  SystemTime snapshot_time_;
 };
 
 class MockSink : public Sink {

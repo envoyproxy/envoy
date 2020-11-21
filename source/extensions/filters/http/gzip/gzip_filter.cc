@@ -28,7 +28,7 @@ GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip:
                                    const std::string& stats_prefix, Stats::Scope& scope,
                                    Runtime::Loader& runtime)
     : CompressorFilterConfig(compressorConfig(gzip), stats_prefix + "gzip.", scope, runtime,
-                             Http::Headers::get().ContentEncodingValues.Gzip),
+                             Http::CustomHeaders::get().ContentEncodingValues.Gzip),
       compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       memory_level_(memoryLevelUint(gzip.memory_level().value())),

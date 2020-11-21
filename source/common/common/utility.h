@@ -5,7 +5,6 @@
 #include <set>
 #include <sstream>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/interval_set.h"
@@ -18,6 +17,14 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+/**
+ * Retrieve string description of error code
+ * @param int error code
+ * @return const std::string error detail description
+ */
+const std::string errorDetails(int error_code);
+
 /**
  * Utility class for formatting dates given an absl::FormatTime style format string.
  */
@@ -610,6 +617,15 @@ template <class Value> struct TrieLookupTable {
   }
 
   TrieEntry<Value> root_;
+};
+
+/**
+ * A global utility class to take care of all the exception throwing behaviors in header files.
+ * Its functions simply forward the throwing into .cc file.
+ */
+class ExceptionUtil {
+public:
+  [[noreturn]] static void throwEnvoyException(const std::string& message);
 };
 
 // Mix-in class for allocating classes with variable-sized inlined storage.

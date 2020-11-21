@@ -2,6 +2,8 @@
 
 #include "envoy/network/filter.h"
 
+#include "common/common/assert.h"
+
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
@@ -12,19 +14,15 @@ ListenerFilterMatcherPtr ListenerFilterMatcherBuilder::buildListenerFilterMatche
   switch (match_config.rule_case()) {
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kAnyMatch:
     return std::make_unique<ListenerFilterAnyMatcher>();
-  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kNotMatch: {
+  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kNotMatch:
     return std::make_unique<ListenerFilterNotMatcher>(match_config.not_match());
-  }
-  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kAndMatch: {
+  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kAndMatch:
     return std::make_unique<ListenerFilterAndMatcher>(match_config.and_match().rules());
-  }
-  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kOrMatch: {
+  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kOrMatch:
     return std::make_unique<ListenerFilterOrMatcher>(match_config.or_match().rules());
-  }
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::
-      kDestinationPortRange: {
+      kDestinationPortRange:
     return std::make_unique<ListenerFilterDstPortMatcher>(match_config.destination_port_range());
-  }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

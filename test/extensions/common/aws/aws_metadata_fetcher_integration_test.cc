@@ -23,12 +23,12 @@ public:
       filters:
         name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: metadata_test
           http_filters:
             - name: fault
               typed_config:
-                "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+                "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
                 delay:
                   fixed_delay:
                     seconds: {}
@@ -71,11 +71,6 @@ public:
   }
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 
 class AwsMetadataIntegrationTestSuccess : public AwsMetadataIntegrationTestBase {

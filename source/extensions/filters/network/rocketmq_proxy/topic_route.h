@@ -1,10 +1,11 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "common/protobuf/utility.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +38,7 @@ private:
 class BrokerData {
 public:
   BrokerData(const std::string& cluster, const std::string& broker_name,
-             std::unordered_map<int64_t, std::string>&& broker_addrs)
+             absl::node_hash_map<int64_t, std::string>&& broker_addrs)
       : cluster_(cluster), broker_name_(broker_name), broker_addrs_(broker_addrs) {}
 
   void encode(ProtobufWkt::Struct& data_struct);
@@ -46,12 +47,12 @@ public:
 
   const std::string& brokerName() const { return broker_name_; }
 
-  std::unordered_map<int64_t, std::string>& brokerAddresses() { return broker_addrs_; }
+  absl::node_hash_map<int64_t, std::string>& brokerAddresses() { return broker_addrs_; }
 
 private:
   std::string cluster_;
   std::string broker_name_;
-  std::unordered_map<int64_t, std::string> broker_addrs_;
+  absl::node_hash_map<int64_t, std::string> broker_addrs_;
 };
 
 class TopicRouteData {

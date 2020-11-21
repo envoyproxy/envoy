@@ -5,10 +5,12 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
@@ -35,7 +37,7 @@ using JwtConstValues = ConstSingleton<JwtConstValueStruct>;
 // A base JwtLocation object to store token and specified_issuers.
 class JwtLocationBase : public JwtLocation {
 public:
-  JwtLocationBase(const std::string& token, const std::unordered_set<std::string>& issuers)
+  JwtLocationBase(const std::string& token, const absl::node_hash_set<std::string>& issuers)
       : token_(token), specified_issuers_(issuers) {}
 
   // Get the token string
@@ -50,13 +52,13 @@ private:
   // Extracted token.
   const std::string token_;
   // Stored issuers specified the location.
-  const std::unordered_set<std::string>& specified_issuers_;
+  const absl::node_hash_set<std::string>& specified_issuers_;
 };
 
 // The JwtLocation for header extraction.
 class JwtHeaderLocation : public JwtLocationBase {
 public:
-  JwtHeaderLocation(const std::string& token, const std::unordered_set<std::string>& issuers,
+  JwtHeaderLocation(const std::string& token, const absl::node_hash_set<std::string>& issuers,
                     const LowerCaseString& header)
       : JwtLocationBase(token, issuers), header_(header) {}
 
@@ -70,7 +72,7 @@ private:
 // The JwtLocation for param extraction.
 class JwtParamLocation : public JwtLocationBase {
 public:
-  JwtParamLocation(const std::string& token, const std::unordered_set<std::string>& issuers,
+  JwtParamLocation(const std::string& token, const absl::node_hash_set<std::string>& issuers,
                    const std::string&)
       : JwtLocationBase(token, issuers) {}
 
@@ -118,7 +120,7 @@ private:
     // The value prefix. e.g. for "Bearer <token>", the value_prefix is "Bearer ".
     std::string value_prefix_;
     // Issuers that specified this header.
-    std::unordered_set<std::string> specified_issuers_;
+    absl::node_hash_set<std::string> specified_issuers_;
   };
   using HeaderLocationSpecPtr = std::unique_ptr<HeaderLocationSpec>;
   // The map of (header + value_prefix) to HeaderLocationSpecPtr
@@ -127,7 +129,7 @@ private:
   // ParamMap value type to store issuers that specified this header.
   struct ParamLocationSpec {
     // Issuers that specified this param.
-    std::unordered_set<std::string> specified_issuers_;
+    absl::node_hash_set<std::string> specified_issuers_;
   };
   // The map of a parameter key to set of issuers specified the parameter
   std::map<std::string, ParamLocationSpec> param_locations_;
@@ -153,7 +155,7 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
   }
   // If not specified, use default locations.
   if (provider.from_headers().empty() && provider.from_params().empty()) {
-    addHeaderConfig(provider.issuer(), Http::Headers::get().Authorization,
+    addHeaderConfig(provider.issuer(), Http::CustomHeaders::get().Authorization,
                     JwtConstValues::get().BearerPrefix);
     addQueryParamConfig(provider.issuer(), JwtConstValues::get().AccessTokenParam);
   }
@@ -186,9 +188,10 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
     ENVOY_LOG(debug, "extract {}", location_it.first);
-    const Http::HeaderEntry* entry = headers.get(location_spec->header_);
-    if (entry) {
-      auto value_str = entry->value().getStringView();
+    const auto result =
+        Http::HeaderUtility::getAllOfHeaderAsString(headers, location_spec->header_);
+    if (result.result().has_value()) {
+      auto value_str = result.result().value();
       if (!location_spec->value_prefix_.empty()) {
         const auto pos = value_str.find(location_spec->value_prefix_);
         if (pos == absl::string_view::npos) {
@@ -208,7 +211,7 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   }
 
   // Check query parameter locations.
-  const auto& params = Http::Utility::parseQueryString(headers.getPathValue());
+  const auto& params = Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
   for (const auto& location_it : param_locations_) {
     const auto& param_key = location_it.first;
     const auto& location_spec = location_it.second;

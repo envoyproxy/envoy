@@ -75,7 +75,6 @@ TEST_F(WatcherImplTest, Create) {
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target")); }
 
   WatchCallback callback;
-  EXPECT_CALL(callback, called(Watcher::Events::MovedTo));
   watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_link"),
                     Watcher::Events::MovedTo, [&](uint32_t events) -> void {
                       callback.called(events);
@@ -85,6 +84,7 @@ TEST_F(WatcherImplTest, Create) {
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/other_file")); }
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
+  EXPECT_CALL(callback, called(Watcher::Events::MovedTo));
   TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
                                  TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
@@ -109,7 +109,7 @@ TEST_F(WatcherImplTest, Modify) {
   file << "text" << std::flush;
   file.close();
   EXPECT_CALL(callback, called(Watcher::Events::Modified));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(WatcherImplTest, BadPath) {
@@ -152,6 +152,9 @@ TEST_F(WatcherImplTest, RootDirectoryPath) {
 #endif
 }
 
+// Skipping this test on Windows as there is no Windows API able to atomically move a
+// directory/symlink when the new name is a non-empty directory
+#ifndef WIN32
 TEST_F(WatcherImplTest, SymlinkAtomicRename) {
   Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
 
@@ -181,6 +184,7 @@ TEST_F(WatcherImplTest, SymlinkAtomicRename) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 } // namespace Filesystem
 } // namespace Envoy

@@ -78,7 +78,7 @@ Envoy proxy tracks the topology of the cluster by sending periodic
 following information:
 
 * List of known nodes.
-* The masters for each shard.
+* The primaries for each shard.
 * Nodes entering or leaving the cluster.
 
 For topology configuration details, see the Redis Cluster
@@ -106,7 +106,7 @@ Per-cluster command statistics can be enabled via the setting :ref:`enable_comma
   upstream_commands.[command].failure, Counter, Total number of failed or cancelled requests for a specific Redis command
   upstream_commands.[command].total, Counter, Total number of requests for a specific Redis command (sum of success and failure)
   upstream_commands.[command].latency, Histogram, Latency of requests for a specific Redis command
-  
+
 Supported commands
 ------------------
 

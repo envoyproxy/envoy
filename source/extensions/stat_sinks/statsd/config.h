@@ -17,12 +17,14 @@ class StatsdSinkFactory : Logger::Loggable<Logger::Id::config>,
 public:
   // StatsSinkFactory
   Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                 Server::Instance& server) override;
+                                 Server::Configuration::ServerFactoryContext& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   std::string name() const override;
 };
+
+DECLARE_FACTORY(StatsdSinkFactory);
 
 } // namespace Statsd
 } // namespace StatSinks

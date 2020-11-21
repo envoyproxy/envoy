@@ -1,16 +1,16 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP filter that implements the Squash microservice debugger
 # Public docs: docs/root/configuration/http_filters/squash_filter.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "squash_filter_lib",
@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/squash/v3:pkg_cc_proto",
     ],

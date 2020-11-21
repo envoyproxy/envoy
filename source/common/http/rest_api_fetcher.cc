@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Http {
 
 RestApiFetcher::RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
-                               Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                               Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                std::chrono::milliseconds refresh_interval,
                                std::chrono::milliseconds request_timeout)
     : remote_cluster_name_(remote_cluster_name), cm_(cm), random_(random),

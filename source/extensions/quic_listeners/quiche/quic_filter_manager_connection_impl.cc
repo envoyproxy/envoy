@@ -30,6 +30,10 @@ void QuicFilterManagerConnectionImpl::addReadFilter(Network::ReadFilterSharedPtr
   filter_manager_.addReadFilter(filter);
 }
 
+void QuicFilterManagerConnectionImpl::removeReadFilter(Network::ReadFilterSharedPtr filter) {
+  filter_manager_.removeReadFilter(filter);
+}
+
 bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_.initializeReadFilters();
 }
@@ -130,7 +134,13 @@ void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool 
 }
 
 void QuicFilterManagerConnectionImpl::adjustBytesToSend(int64_t delta) {
+  const size_t bytes_to_send_old = bytes_to_send_;
   bytes_to_send_ += delta;
+  if (delta < 0) {
+    ASSERT(bytes_to_send_old > bytes_to_send_);
+  } else {
+    ASSERT(bytes_to_send_old <= bytes_to_send_);
+  }
   write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
 }

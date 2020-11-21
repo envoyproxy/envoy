@@ -6,6 +6,7 @@
 #include "common/http/exception.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -15,7 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -283,10 +284,11 @@ public:
   CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource()) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
     auto socket = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getAnyAddress(GetParam()), nullptr, true);
+        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
-    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true);
+    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true,
+                                                     ENVOY_TCP_BACKLOG_SIZE);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
@@ -346,7 +348,7 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
-  Network::MockListenerCallbacks listener_callbacks_;
+  Network::MockTcpListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Http::MockClientConnection* codec_;
@@ -372,6 +374,7 @@ TEST_P(CodecNetworkTest, SendData) {
   upstream_connection_->write(data, false);
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     EXPECT_EQ(full_data, data.toString());
+    data.drain(data.length());
     dispatcher_->exit();
     return Http::okStatus();
   }));
@@ -395,10 +398,12 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
       .Times(2)
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ("", data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }));
   // Because the headers are not complete, the disconnect will reset the stream.
@@ -433,6 +438,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
       .Times(2)
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {

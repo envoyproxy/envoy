@@ -134,7 +134,7 @@ void ActiveMessage::fillBrokerData(std::vector<BrokerData>& list, const std::str
   }
 
   if (!found) {
-    std::unordered_map<int64_t, std::string> addresses;
+    absl::node_hash_map<int64_t, std::string> addresses;
     addresses.emplace(broker_id, address);
 
     list.emplace_back(BrokerData(cluster, broker_name, std::move(addresses)));
@@ -153,7 +153,7 @@ void ActiveMessage::onQueryTopicRoute() {
     cluster = cluster_manager.get(cluster_name);
   }
   if (cluster) {
-    ENVOY_LOG(trace, "Enovy has an operating cluster {} for topic {}", cluster_name, topic_name);
+    ENVOY_LOG(trace, "Envoy has an operating cluster {} for topic {}", cluster_name, topic_name);
     std::vector<QueueData> queue_data_list;
     std::vector<BrokerData> broker_data_list;
     for (auto& host_set : cluster->prioritySet().hostSetsPerPriority()) {

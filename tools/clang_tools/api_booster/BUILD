@@ -24,6 +24,7 @@ clang_tools_cc_library(
     srcs = ["proto_cxx_utils.cc"],
     hdrs = ["proto_cxx_utils.h"],
     deps = [
+        "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
     ],

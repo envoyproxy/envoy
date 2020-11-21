@@ -19,8 +19,7 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest()
-      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {
+  AdminStatsTest() : alloc_(symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
   }
@@ -34,12 +33,12 @@ public:
                                      true /*pretty_print*/);
   }
 
-  Stats::SymbolTablePtr symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
-  std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
+  Stats::ThreadLocalStoreImplPtr store_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
@@ -511,7 +510,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, StatsInvalidRegex) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
   EXPECT_LOG_CONTAINS(
       "error", "Invalid regex: ",
@@ -526,7 +525,7 @@ TEST_P(AdminInstanceTest, StatsInvalidRegex) {
 }
 
 TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
   EXPECT_LOG_CONTAINS(
       "error", ": *.ptest",
@@ -549,7 +548,7 @@ TEST_P(AdminInstanceTest, TracingStatsDisabled) {
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats?format=json", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("{\"stats\":["));
@@ -557,7 +556,7 @@ TEST_P(AdminInstanceTest, GetRequestJson) {
 }
 
 TEST_P(AdminInstanceTest, RecentLookups) {
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
 
   // Recent lookup tracking is disabled by default.

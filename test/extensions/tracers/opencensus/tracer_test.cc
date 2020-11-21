@@ -76,7 +76,7 @@ public:
 
 private:
   mutable absl::Mutex mu_;
-  std::vector<SpanData> spans_ GUARDED_BY(mu_);
+  std::vector<SpanData> spans_ ABSL_GUARDED_BY(mu_);
 };
 
 // Use a Singleton SpanCatcher.
@@ -123,6 +123,10 @@ TEST(OpenCensusTracerTest, Span) {
     child->finishSpan();
     span->setSampled(false); // Abandon tracer.
     span->finishSpan();
+
+    // Baggage methods are a noop in opencensus and won't affect events.
+    span->setBaggage("baggage_key", "baggage_value");
+    ASSERT_EQ("", span->getBaggage("baggage_key"));
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
@@ -170,10 +174,10 @@ MATCHER_P2(ContainHeader, header, expected_value,
            "contains the header " + PrintToString(header) + " with value " +
                PrintToString(expected_value)) {
   const auto found_value = arg.get(Http::LowerCaseString(header));
-  if (found_value == nullptr) {
+  if (found_value.empty()) {
     return false;
   }
-  return found_value->value().getStringView() == expected_value;
+  return found_value[0]->value().getStringView() == expected_value;
 }
 
 // Given incoming headers, test that trace context propagation works and generates all the expected

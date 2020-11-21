@@ -10,7 +10,7 @@ namespace GrpcCommon {
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(grpc_access_logger_cache);
 
-std::shared_ptr<GrpcCommon::GrpcAccessLoggerCache>
+GrpcCommon::GrpcAccessLoggerCacheSharedPtr
 getGrpcAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
   return context.singletonManager().getTyped<GrpcCommon::GrpcAccessLoggerCache>(
       SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_logger_cache), [&context] {

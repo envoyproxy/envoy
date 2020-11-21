@@ -26,10 +26,10 @@ message RateLimit {
       "envoy.config.filter.network.rate_limit.v2.RateLimit";
 
   // The prefix to use when emitting :ref:`statistics <config_network_filters_rate_limit_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The rate limit domain to use in the rate limit service request.
-  string domain = 2 [(validate.rules).string = {min_bytes: 1}];
+  string domain = 2 [(validate.rules).string = {min_len: 1}];
 
   // The rate limit descriptor list to use in the rate limit service request.
   repeated common.ratelimit.v3.RateLimitDescriptor descriptors = 3

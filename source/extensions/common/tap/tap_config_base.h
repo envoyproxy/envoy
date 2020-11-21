@@ -7,13 +7,16 @@
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
+#include "extensions/common/matcher/matcher.h"
 #include "extensions/common/tap/tap.h"
-#include "extensions/common/tap/tap_matcher.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
+
+using Matcher = Envoy::Extensions::Common::Matcher::Matcher;
+using MatcherPtr = Envoy::Extensions::Common::Matcher::MatcherPtr;
 
 /**
  * Common utilities for tapping.
@@ -53,7 +56,9 @@ public:
       const uint32_t start_offset_trim = std::min<uint32_t>(start_offset, slice.len_);
       slice.len_ -= start_offset_trim;
       start_offset -= start_offset_trim;
-      slice.mem_ = static_cast<char*>(slice.mem_) + start_offset_trim;
+      if (slice.mem_ != nullptr) {
+        slice.mem_ = static_cast<char*>(slice.mem_) + start_offset_trim;
+      }
 
       const uint32_t final_length = std::min<uint32_t>(length, slice.len_);
       slice.len_ = final_length;
@@ -96,7 +101,7 @@ public:
   bool streaming() const override { return streaming_; }
 
 protected:
-  TapConfigBaseImpl(envoy::config::tap::v3::TapConfig&& proto_config,
+  TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                     Common::Tap::Sink* admin_streamer);
 
 private:

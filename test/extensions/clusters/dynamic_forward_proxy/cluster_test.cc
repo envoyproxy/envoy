@@ -10,9 +10,13 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/load_balancer.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::AtLeast;
 using testing::DoAll;
@@ -30,17 +34,17 @@ class ClusterTest : public testing::Test,
 public:
   void initialize(const std::string& yaml_config, bool uses_tls) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml_config);
+        Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_store_,
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
     if (uses_tls) {
-      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
+      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _, _));
     }
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     // Below we return a nullptr handle which has no effect on the code under test but isn't
@@ -107,7 +111,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -135,7 +138,7 @@ connect_timeout: 0.25s
 cluster_type:
   name: dynamic_forward_proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
     dns_cache_config:
       name: foo
       dns_lookup_family: AUTO
@@ -199,13 +202,12 @@ TEST_F(ClusterTest, PopulatedCache) {
 
 class ClusterFactoryTest : public testing::Test {
 protected:
-  void createCluster(const std::string& yaml_config) {
+  void createCluster(const std::string& yaml_config, bool avoid_boosting = true) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml_config);
+        Upstream::parseClusterFromV3Yaml(yaml_config, avoid_boosting);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, random_, dispatcher_,
-        log_manager_, local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_,
-        *api_);
+        cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, dispatcher_, log_manager_,
+        local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_, *api_);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
     std::tie(cluster_, thread_aware_lb_) =
@@ -216,7 +218,6 @@ private:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -232,6 +233,7 @@ private:
 
 // Verify that using 'sni' causes a failure.
 TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidSNI)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -250,12 +252,13 @@ tls_context:
 )EOF");
 
   EXPECT_THROW_WITH_MESSAGE(
-      createCluster(yaml_config), EnvoyException,
+      createCluster(yaml_config, false), EnvoyException,
       "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
 }
 
 // Verify that using 'verify_subject_alt_name' causes a failure.
 TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidVerifySubjectAltName)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -274,7 +277,7 @@ tls_context:
 )EOF");
 
   EXPECT_THROW_WITH_MESSAGE(
-      createCluster(yaml_config), EnvoyException,
+      createCluster(yaml_config, false), EnvoyException,
       "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
 }
 
@@ -285,7 +288,7 @@ connect_timeout: 0.25s
 cluster_type:
   name: dynamic_forward_proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
     dns_cache_config:
       name: foo
 upstream_http_protocol_options: {}
@@ -295,6 +298,23 @@ upstream_http_protocol_options: {}
       createCluster(yaml_config), EnvoyException,
       "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true when "
       "configured with upstream_http_protocol_options");
+}
+
+TEST_F(ClusterFactoryTest, InsecureUpstreamHttpProtocolOptions) {
+  const std::string yaml_config = TestEnvironment::substitute(R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    allow_insecure_cluster_options: true
+    dns_cache_config:
+      name: foo
+upstream_http_protocol_options: {}
+)EOF");
+
+  createCluster(yaml_config);
 }
 
 } // namespace DynamicForwardProxy

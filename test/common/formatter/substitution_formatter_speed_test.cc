@@ -11,19 +11,21 @@ namespace Envoy {
 namespace {
 
 std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool typed) {
-  absl::flat_hash_map<std::string, std::string> JsonLogFormat = {
-      {"remote_address", "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
-      {"start_time", "%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%"},
-      {"method", "%REQ(:METHOD)%"},
-      {"url", "%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"},
-      {"protocol", "%PROTOCOL%"},
-      {"respoinse_code", "%RESPONSE_CODE%"},
-      {"bytes_sent", "%BYTES_SENT%"},
-      {"duration", "%DURATION%"},
-      {"referer", "%REQ(REFERER)%"},
-      {"user-agent", "%REQ(USER-AGENT)%"}};
-
-  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed);
+  ProtobufWkt::Struct JsonLogFormat;
+  const std::string format_yaml = R"EOF(
+    remote_address: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
+    start_time: '%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%'
+    method: '%REQ(:METHOD)%'
+    url: '%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%'
+    protocol: '%PROTOCOL%'
+    respoinse_code: '%RESPONSE_CODE%'
+    bytes_sent: '%BYTES_SENT%'
+    duration: '%DURATION%'
+    referer: '%REQ(REFERER)%'
+    user-agent: '%REQ(USER-AGENT)%'
+  )EOF";
+  TestUtility::loadFromYaml(format_yaml, JsonLogFormat);
+  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed, false);
 }
 
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
@@ -45,7 +47,7 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
       "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
 
   std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
-      std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat);
+      std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;

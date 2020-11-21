@@ -100,6 +100,8 @@ void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
   proxied_response_headers.removeDate();
   proxied_response_headers.removeServer();
 
+  ASSERT_TRUE(proxied_response_headers.TransferEncoding() == nullptr);
+
   commonValidate(proxied_response_headers, original_response_headers);
 
   EXPECT_THAT(&proxied_response_headers, HeaderMapEqualIgnoreOrder(&original_response_headers));
@@ -206,7 +208,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   // Verify both the data and the disconnect went through.
   response_->waitForBodyData(5);
   EXPECT_EQ("world", response_->body());
-  waitForClientDisconnectOrReset();
+  waitForClientDisconnectOrReset(Http::StreamResetReason::ConnectError);
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
@@ -418,9 +420,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
   // transfer-encoding: chunked.
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
-  }
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response_->headers().TransferEncoding() != nullptr);
   }
 
   // Send both a chunked request body and "websocket" payload.

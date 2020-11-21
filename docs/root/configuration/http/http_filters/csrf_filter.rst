@@ -57,7 +57,7 @@ valid. The reason it is able to do this while still mitigating cross-site reques
 forgery attempts is because the target origin has already been reached by the time
 front-envoy is applying the filter. This means that while endpoints may support
 cross-origin requests they are still protected from malicious third-parties who
-have not been whitelisted.
+have not been allowlisted.
 
 It's important to note that requests should generally originate from the same
 origin as the target but there are use cases where that may not be possible.

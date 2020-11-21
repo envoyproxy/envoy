@@ -53,6 +53,8 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override;
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                    const Http::ResponseHeaderMap*) override {}
 
   /**
    * Fetch data from remote.

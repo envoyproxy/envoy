@@ -166,9 +166,7 @@ public:
 
   const absl::optional<LastConfigInfo>& configInfo() const { return config_info_; }
 
-  ConfigProvider::ConfigConstSharedPtr getConfig() const {
-    return tls_->getTyped<ThreadLocalConfig>().config_;
-  }
+  ConfigProvider::ConfigConstSharedPtr getConfig() { return tls_->config_; }
 
   /**
    * Must be called by derived classes when the onConfigUpdate() callback associated with the
@@ -199,7 +197,7 @@ protected:
   ConfigSubscriptionCommonBase(const std::string& name, const uint64_t manager_identifier,
                                ConfigProviderManagerImplBase& config_provider_manager,
                                Server::Configuration::ServerFactoryContext& factory_context)
-      : name_(name), tls_(factory_context.threadLocal().allocateSlot()),
+      : name_(name), tls_(factory_context.threadLocal()),
         local_init_target_(
             fmt::format("ConfigSubscriptionCommonBase local init target '{}'", name_),
             [this]() { start(); }),
@@ -234,7 +232,7 @@ protected:
   absl::optional<LastConfigInfo> config_info_;
   // This slot holds a Config implementation in each thread, which is intended to be shared between
   // config providers from the same config source.
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 
 private:
   // Local init target which signals first RPC interaction with management server.
@@ -283,7 +281,7 @@ public:
    * with the underlying subscription, shared across all providers and workers.
    */
   void initialize(const ConfigProvider::ConfigConstSharedPtr& initial_config) {
-    tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    tls_.set([initial_config](Event::Dispatcher&) {
       return std::make_shared<ThreadLocalConfig>(initial_config);
     });
   }
@@ -328,9 +326,8 @@ protected:
    * underlying subscription for each worker thread.
    */
   void initialize(const std::function<ConfigProvider::ConfigConstSharedPtr()>& init_cb) {
-    tls_->set([init_cb](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalConfig>(init_cb());
-    });
+    tls_.set(
+        [init_cb](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(init_cb()); });
   }
 };
 
@@ -391,10 +388,10 @@ public:
 protected:
   // Ordered set for deterministic config dump output.
   using ConfigProviderSet = std::set<ConfigProvider*>;
-  using ConfigProviderMap = std::unordered_map<ConfigProviderInstanceType,
-                                               std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
+  using ConfigProviderMap = absl::node_hash_map<ConfigProviderInstanceType,
+                                                std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
   using ConfigSubscriptionMap =
-      std::unordered_map<uint64_t, std::weak_ptr<ConfigSubscriptionCommonBase>>;
+      absl::node_hash_map<uint64_t, std::weak_ptr<ConfigSubscriptionCommonBase>>;
 
   ConfigProviderManagerImplBase(Server::Admin& admin, const std::string& config_name);
 
