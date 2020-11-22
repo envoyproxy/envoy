@@ -90,7 +90,7 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
 
   int64_t val;
   void* mem = data.linearize(sizeof(int64_t));
-  safe_memcpy(&val, reinterpret_cast<const uint64_t*>(mem));
+  safeMemcpy(&val, reinterpret_cast<const uint64_t*>(mem));
   data.drain(sizeof(int64_t));
   return le64toh(val);
 }

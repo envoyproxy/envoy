@@ -61,7 +61,7 @@ public:
 private:
   static inline uint64_t unalignedLoad(const char* p) {
     uint64_t result;
-    safe_memcpy(&result, reinterpret_cast<const uint64_t*>(p));
+    safeMemcpy(&result, reinterpret_cast<const uint64_t*>(p));
     return result;
   }
 

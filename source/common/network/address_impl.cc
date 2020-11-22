@@ -176,7 +176,7 @@ std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result;
   static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
-  safe_memcpy(&result, reinterpret_cast<const absl::uint128*>(&address_.sin6_addr.s6_addr));
+  safeMemcpy(&result, reinterpret_cast<const absl::uint128*>(&address_.sin6_addr.s6_addr));
   return result;
 }
 

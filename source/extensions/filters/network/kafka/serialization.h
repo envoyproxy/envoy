@@ -190,7 +190,7 @@ public:
 
       // Read next byte from input.
       uint8_t el;
-      safe_memcpy(&el, data.data());
+      safeMemcpy(&el, data.data());
       data = {data.data() + 1, data.size() - 1};
       processed++;
 
