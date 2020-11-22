@@ -126,13 +126,18 @@ for how to update or override dependencies.
     Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
 
     When building Envoy, Bazel creates very long path names. One way to work around these excessive path
-    lengths is to change the output base directory for bazel to a very short root path. The CI pipeline
-    for Windows uses `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
+    lengths is to change the output base directory for bazel to a very short root path. An example Bazel configuration
+    to help with this is to use `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
     the following bazelrc configuration line in a system `%ProgramData%\bazel.bazelrc` file or the individual
     user's `%USERPROFILE%\.bazelrc` file (rather than including it on every bazel command line):
+
     ```
     startup --output_base=C:/_eb
     ```
+
+    Another option to shorten the the output root for Bazel is to set the `USERNAME` environment variable in your shell
+    session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
+    is set.
 
     Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
     using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
@@ -721,12 +726,17 @@ https://github.com/bazelbuild/bazel/issues/2805.
 
 # Coverage builds
 
-To generate coverage results, make sure you are using a clang toolchain and have `llvm-cov` and
+To generate coverage results, make sure you are using a Clang toolchain and have `llvm-cov` and
 `llvm-profdata` in your `PATH`. Then run:
 
 ```
 test/run_envoy_bazel_coverage.sh
 ```
+
+**Note** that it is important to ensure that the versions of `clang`, `llvm-cov` and `llvm-profdata`
+are consistent and that they match the most recent Clang/LLVM toolchain version in use by Envoy (see
+the [build container
+toolchain](https://github.com/envoyproxy/envoy-build-tools/blob/master/build_container/build_container_ubuntu.sh) for reference).
 
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
