@@ -546,7 +546,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
-  // Just setup the timer only if flush stats on admin access is set to false. If it true,
+  // Just setup the timer only if flush stats on admin access is set to false. If it true, stats
+  // will be flushed on /stats admin endpoint access.
   if (!bootstrap_.flush_stats_on_admin_access()) {
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
     stat_flush_timer_->enableTimer(config_.statsFlushInterval());

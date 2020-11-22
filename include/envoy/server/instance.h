@@ -217,7 +217,7 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
-   * @return the flush interval of stats sinks.
+   * @return the flushStatsOnAdminAccess configuration.
    */
   virtual bool flushStatsOnAdminAccess() const PURE;
 
