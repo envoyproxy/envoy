@@ -68,6 +68,8 @@ New Features
 * sds: improved support for atomic :ref:`key rotations <xds_certificate_rotation>` and added configurable rotation triggers for
   :ref:`TlsCertificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.watched_directory>` and
   :ref:`CertificateValidationContext <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.watched_directory>`.
+* stats: added support for flushing stats on :ref:`admin access <envoy_api_msg_bootstrap.v3.flush_stats_on_admin_access>`.
+
 * tcp: added a new :ref:`envoy.overload_actions.reject_incoming_connections <config_overload_manager_overload_actions>` action to reject incoming TCP connections.
 * tls: added support for RSA certificates with 4096-bit keys in FIPS mode.
 * tracing: added SkyWalking tracer.

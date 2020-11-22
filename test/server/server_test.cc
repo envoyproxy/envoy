@@ -331,6 +331,25 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   server_thread->join();
 }
 
+// Validates that server stats are not flushed via timer when flush_stats_on_admin_access is set to
+// true.
+TEST_P(ServerInstanceImplTest, StatsAreNotFlushedWhenFlushOnAdminAccessIsEnabled) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_flush_admin_bootstrap.yaml", true);
+
+  // Advance time for default stats flush interval.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(5000));
+
+  // Validate that flush is not called.
+  EXPECT_EQ(0L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // Validates that the "server.version" is updated with stats_server_version_override from bootstrap.
 TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
   auto server_thread =

@@ -164,17 +164,20 @@ message Bootstrap {
   // Configuration for internal processing of stats.
   metrics.v4alpha.StatsConfig stats_config = 13;
 
-  // Optional duration between flushes to configured stats sinks. For
-  // performance reasons Envoy latches counters and only flushes counters and
-  // gauges at a periodic interval. If not specified the default is 5000ms (5
-  // seconds).
-  // Duration must be at least 1ms and at most 5 min.
-  google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
-    lt {seconds: 300}
-    gte {nanos: 1000000}
-  }];
+  oneof flush_mode {
+    // Optional duration between flushes to configured stats sinks. For
+    // performance reasons Envoy latches counters and only flushes counters and
+    // gauges at a periodic interval. If not specified the default is 5000ms (5
+    // seconds).
+    // Duration must be at least 1ms and at most 5 min.
+    google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
+      lt {seconds: 300}
+      gte {nanos: 1000000}
+    }];
 
-  bool flush_stats_on_admin_access = 28;
+    // When set to true, stats are flushed to stats sinks only on admin access.
+    bool flush_stats_on_admin_access = 28;
+  }
 
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
