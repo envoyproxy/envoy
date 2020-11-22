@@ -171,7 +171,8 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
       state = DnsQueryParseState::Flags;
       break;
     case DnsQueryParseState::Flags:
-      safeMemcpy(&(context->header_.flags), &data);
+      ::memcpy(static_cast<void*>(&context->header_.flags), &data, // NOLINT(safe-memcpy)
+               field_size);
       state = DnsQueryParseState::Questions;
       break;
     case DnsQueryParseState::Questions:
