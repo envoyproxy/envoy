@@ -8,7 +8,7 @@ find_shell_files () {
     shellfiles=()
     shellfiles+=("$(git grep "^#!/bin/bash" | cut -d: -f1)")
     shellfiles+=("$(git grep "^#!/bin/sh" | cut -d: -f1)")
-    shellfiles+=("$(find . -name "*.sh" | cut -d/ -f2-)")
+    shellfiles+=("$(git ls-files|grep '\.sh$')")
     shellfiles=("$(echo "${shellfiles[@]}" | tr ' ' '\n' | sort | uniq)")
     for file in "${shellfiles[@]}"; do
 	echo "$file"
