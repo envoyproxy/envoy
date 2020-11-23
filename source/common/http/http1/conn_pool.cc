@@ -66,7 +66,6 @@ void ActiveClient::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
 void ActiveClient::StreamWrapper::onDecodeComplete() {
   ASSERT(!decode_complete_);
   decode_complete_ = encode_complete_;
-
   ENVOY_CONN_LOG(debug, "response complete", *parent_.codec_client_);
 
   if (!parent_.stream_wrapper_->encode_complete_) {
@@ -110,10 +109,11 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state) {
   return std::make_unique<FixedHttpConnPoolImpl>(
       std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
-      random_generator,
+      random_generator, state,
       [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(

@@ -28,7 +28,7 @@ Change to the ``examples/load-reporting-service`` directory.
 Terminal 1 ::
 
     $ pwd
-    envoy/examples/load_reporting_service
+    envoy/examples/load-reporting-service
     $ docker-compose pull
     $ docker-compose up --scale http_service=2
 

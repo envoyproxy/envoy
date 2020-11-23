@@ -2,7 +2,7 @@
 
 set -e
 
-TEST_CERTS=test/config/integration/certs
+TEST_CERTS="${TEST_SRCDIR}"/envoy/test/config/integration/certs
 
 ROOT="${TEST_TMPDIR}"/root
 SERVER_KEYCERT="${ROOT}"/server
