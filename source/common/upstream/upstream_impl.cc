@@ -897,7 +897,7 @@ ClusterImplBase::ClusterImplBase(
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           factory_context.singletonManager(), factory_context.dispatcher())),
-          time_source_(time_source) {
+      time_source_(time_source) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(

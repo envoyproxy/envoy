@@ -120,9 +120,7 @@ public:
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
-      TimeSource& timeSource() const {
-      return time_source_;
-    }
+  TimeSource& timeSource() const { return time_source_; }
 
 private:
   friend class RedisClusterTest;

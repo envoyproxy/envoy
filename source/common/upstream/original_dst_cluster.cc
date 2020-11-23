@@ -107,7 +107,8 @@ OriginalDstCluster::OriginalDstCluster(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api, factory_context.dispatcher().timeSource()),
+    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api,
+                      factory_context.dispatcher().timeSource()),
       dispatcher_(factory_context.dispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),

@@ -83,7 +83,6 @@ private:
   HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;
-  TimeSource& time_source_;
 };
 
 using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;
