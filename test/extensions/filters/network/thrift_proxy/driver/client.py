@@ -15,7 +15,7 @@ from fbthrift import THeaderTransport
 from twitter.common.rpc.finagle.protocol import TFinagleProtocol
 
 # On Windows we run this test on Python3
-if sys.version_info[0] is not 2:
+if sys.version_info[0] != 2:
   sys.stdin.reconfigure(encoding='utf-8')
   sys.stdout.reconfigure(encoding='utf-8')
 
