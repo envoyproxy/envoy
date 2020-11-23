@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/event/scaled_timer_minimum.h"
 #include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local_object.h"
 
@@ -56,6 +57,10 @@ public:
 
   // Get a scaled timer whose minimum corresponds to the configured value for the given timer type.
   virtual Event::TimerPtr createScaledTimer(OverloadTimerType timer_type,
+                                            Event::TimerCb callback) PURE;
+
+  // Get a scaled timer whose minimum is determined by the given scaling rule.
+  virtual Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,
                                             Event::TimerCb callback) PURE;
 };
 
