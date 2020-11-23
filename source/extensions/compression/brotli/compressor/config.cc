@@ -11,10 +11,10 @@ namespace {
 const uint32_t DefaultInputBlockBits = 24;
 
 // Default compression window size.
-const uint32_t DefaultWindowBits = 22;
+const uint32_t DefaultWindowBits = 18;
 
 // Default quality.
-const uint32_t DefaultQuality = 11;
+const uint32_t DefaultQuality = 3;
 
 // Default zlib chunk size.
 const uint32_t DefaultChunkSize = 4096;
