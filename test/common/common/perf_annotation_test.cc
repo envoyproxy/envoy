@@ -16,6 +16,8 @@ namespace Envoy {
 class PerfAnnotationTest : public testing::Test {
 protected:
   void TearDown() override { PERF_CLEAR(); }
+
+  PERF_OWNER(owned_perf);
 };
 
 // Tests that the macros produce something in the report that includes the categories
@@ -26,6 +28,10 @@ TEST_F(PerfAnnotationTest, TestMacros) {
   PERF_RECORD(perf, "beta", "1");
   PERF_RECORD(perf, "alpha", "2");
   PERF_RECORD(perf, "beta", "3");
+
+  { PERF_OWNED_OPERATION(owned_perf); }
+  { PERF_OWNED_RECORD(owned_perf, "gamma", "4"); }
+
   std::string report = PERF_TO_STRING();
   EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" 0 ") != std::string::npos) << report;
@@ -35,6 +41,8 @@ TEST_F(PerfAnnotationTest, TestMacros) {
   EXPECT_TRUE(report.find(" 2 ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" 3 ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" gamma ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 4 ") != std::string::npos) << report;
   PERF_DUMP();
 }
 
