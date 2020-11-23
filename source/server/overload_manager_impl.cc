@@ -5,7 +5,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/config/overload/v3/overload.pb.validate.h"
-#include "envoy/server/overload_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
