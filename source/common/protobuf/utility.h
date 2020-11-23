@@ -131,6 +131,14 @@ uint64_t fractionalPercentDenominatorToInt(
 
 namespace Envoy {
 
+/**
+ * Exception class for rejecting a deprecated major version.
+ */
+class DeprecatedMajorVersionException : public EnvoyException {
+public:
+  DeprecatedMajorVersionException(const std::string& message) : EnvoyException(message) {}
+};
+
 class MissingFieldException : public EnvoyException {
 public:
   MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
@@ -367,8 +375,9 @@ public:
    * Invoke when a version upgrade (e.g. v2 -> v3) is detected. This may warn or throw
    * depending on where we are in the major version deprecation cycle.
    * @param desc description of upgrade to include in warning or exception.
+   * @param reject should a DeprecatedMajorVersionException be thrown on failure?
    */
-  static void onVersionUpgradeWarn(absl::string_view desc);
+  static void onVersionUpgradeDeprecation(absl::string_view desc, bool reject = true);
 
   /**
    * Obtain a string field from a protobuf message dynamically.
