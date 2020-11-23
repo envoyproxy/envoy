@@ -3,7 +3,7 @@
 请求的生命周期
 =================
 
-下面，我们描述通过 Envoy 代理传递的请求的生命周期中的事件。首先，我们描述 Envoy 如何适应请求的请求路径，
+下面，我们描述一个请求通过 Envoy 代理传递时，它生命周期中的事件。首先，我们描述 Envoy 如何适用于请求的请求路径，
 然后描述在请求从下游到达 Envoy 代理之后发生的内部事件。 我们追踪该请求，直到相应的上游调度和响应路径为止。
 
 术语
@@ -13,11 +13,11 @@ Envoy 在其代码库和文档中使用以下术语：
 
 * *集群（Cluster）*: Envoy 将请求转发到的一组端点的逻辑服务。
 * *下游（Downstream）*: 连接到 Envoy 的实体。可能是本地应用程序（使用 Sidecar 模型）或网络节点。在非 Sidecar 模型中，是一个远程客户端。
-* *端点（Endpoints）*: 实现逻辑服务的网络节点。他们组成集群。集群中的端点就是 Envoy 代理的 上游。
+* *端点（Endpoints）*: 实现逻辑服务的网络节点。它们组成集群。集群中的端点就是 Envoy 代理的上游。
 * *过滤器（Filter）*: 在连接或请求处理管道中提供某些方面请求处理的模块。就好比 Unix 是小型实用程序（过滤器）与 Unix 管道（过滤器链）的组合。
 * *过滤器链（Filter chain）*: 一系列的过滤器。
 * *监听器（Listeners）*: 负责绑定 IP/port、接受新的 TCP 链接（或者 UDP 数据包）以及管理面向请求处理的下游的模块。
-* *上游（Upstream）*: 转发服务请求时，Envoy 连接到的端点（网络节点）。可能是本地应用程序（使用 Sidecar 模型）或网络节点。在非 Sidecar 模型中，对应于远程后端。
+* *上游（Upstream）*:  转发请求到一个服务时，Envoy 连接到的端点（网络节点）。可能是本地应用程序（使用 Sidecar 模型）或网络节点。在非 Sidecar 模型中，对应于远程后端。
 
 网络拓扑结构
 ----------------
@@ -29,8 +29,8 @@ Envoy 最初是作为 `服务网格 <https://blog.envoyproxy.io/service-mesh-dat
 从应用中分离了负载均衡、路由、可观察性、安全性和服务发现等功能。在服务网格模型中，请求流经 Envoy 作为网络的网关。
 请求通过入口或出口监听器到达 Envoy：
 
-* 入口（Ingress）监听器从服务网格中的其他节点获取请求，并将其转发到本地应用程序。本地应用程序的响应通过 Envoy 流回到下游。
-* 出口（Engress）监听器从本地应用程序获取请求，并将其转发到网络中的其他节点。这些接收节点通常还将运行 Envoy 并通过其入口监听器接受请求。
+* 入口（Ingress）监听器从服务网格中的其它节点获取请求，并将其转发到本地应用程序。本地应用程序的响应通过 Envoy 流回到下游。
+* 出口（Engress）监听器从本地应用程序获取请求，并将其转发到网络中的其它节点。这些接收节点通常还将运行 Envoy 并通过其入口监听器接受请求。
 
 .. image:: /_static/lor-topology-service-mesh.svg
    :width: 80%
@@ -53,7 +53,7 @@ Envoy 可用于服务网格之外的各种配置。例如它还可以充当内�
    :width: 90%
    :align: center
 
-在服务网格中，通常混合使用这些方法，Envoy 同时作为内部负载均衡器以及在边缘上作为代理。请求路径可能会遍历多个 Envoy。
+在实践当中，通常混合使用这些方法，Envoy 在服务网格中，它在边缘并且作为内部负载均衡器。一个请求路径可能会经过多个 Envoy。
 
 .. image:: /_static/lor-topology-hybrid.svg
    :width: 90%
@@ -71,7 +71,7 @@ Envoy 可以在多层拓扑中进行配置，以实现可伸缩性和可靠性�
 配置
 -------------
 
-Envoy是一个易于扩展的平台。这导致了请求路径的多种可能，具体取决于：
+Envoy是一个易于扩展的平台。这将导致可能的请求路径组合非常多，具体取决于：
 
 * L3/4 协议，例如 TCP、UDP、Unix 域套接字。
 * L7 协议，例如 HTTP/1、HTTP/2、HTTP/3、gRPC、Thrift、Dubbo、Kafka、Redis 和各种数据库。
@@ -81,11 +81,11 @@ Envoy是一个易于扩展的平台。这导致了请求路径的多种可能，
 * 熔断机制和异常值检测配置以及激活状态。
 * 网络、HTTP、监听器、访问日志、运行状况检查、跟踪和统计信息扩展的许多其他配置。
 
-一次专注于一个示例是很有帮助的，因此此示例涵盖以下内容：
+一次只专注于一个方面内容是很有效的，因此此示例涵盖以下内容：
 
 * 通过 TCP 连接向下游和上游的 :ref:`TLS <arch_overview_ssl>` 发出的 HTTP/2 请求。
-* :ref:`HTTP连接管理器 <arch_overview_http_conn_man>` 是唯一的 :ref:`网络过滤器 <arch_overview_network_filters>`。
-* 假设的自定义过滤器和 :ref:`路由器 <arch_overview_http_routing>` 过滤器作为 :ref:`HTTP过滤器 <arch_overview_http_filters>` 链。
+* :ref:`HTTP 连接管理器 <arch_overview_http_conn_man>` 是唯一的 :ref:`网络过滤器 <arch_overview_network_filters>`。
+* 假设的自定义过滤器和 :ref:`路由器 <arch_overview_http_routing>` 过滤器作为 :ref:`HTTP 过滤器 <arch_overview_http_filters>` 链。
 * :ref:`文件系统访问日志记录 <arch_overview_access_logs_sinks>`。
 * :ref:`统计下沉 <envoy_v3_api_msg_config.metrics.v3.StatsSink>`。
 * 具有静态端点的单个 :ref:`集群 <arch_overview_cluster_manager>`。
@@ -101,7 +101,7 @@ Envoy是一个易于扩展的平台。这导致了请求路径的多种可能，
 Envoy 中的请求处理路径包括两个主要部分：
 
 * :ref:`监听器子系统 <arch_overview_listeners>` 对**下游**请求进行处理。它还负责管理下游请求生命周期以及到客户端的响应路径。下游 HTTP/2 编解码器位于此处。
-* :ref:`集群子系统 <arch_overview_cluster_manager>` 负责选择和配置到端点的**上游**连接。这是了解集群和端点运行状况并具有负载均衡和连接池功能。上游 HTTP/2 编解码器位于此处。
+* :ref:`集群子系统 <arch_overview_cluster_manager>` 负责选择和配置到端点的**上游**连接。这里可以了解集群和端点健康度，负载均衡和连接池存在情况。上游 HTTP/2 编解码器位于此处。
 
 这两个子系统与 HTTP 路由过滤器桥接，该过滤器将 HTTP 请求从下游转发到上游。
 
@@ -115,11 +115,11 @@ Envoy 中的请求处理路径包括两个主要部分：
 例如监听器、过滤器链、编解码器、连接池和负载均衡等数据结构。
 
 Envoy 具有 `基于事件的线程模型 <https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310>`_。
-主线程负责服务器的生命周期，配置处理，信息统计等。:ref:`工作线程 <arch_overview_threading>` 负责请求处理。
+主线程负责服务器的生命周期，配置处理，信息统计等。还有一些 :ref:`工作线程 <arch_overview_threading>` 负责请求处理。
 所有线程都围绕事件循环（`libevent <https://libevent.org/>`_）运行，并且任何给定的下游 TCP 连接
 （包括其上的所有多路复用流）都将由一个工作线程在其生命周期内完全处理。每个工作线程都维护自己的与上游端点的 TCP 连接池。
 利用 SO_REUSEPORT 使内核始终将源/目标 IP:port 元组散列到同一工作线程进行 :ref:`UDP <arch_overview_listeners_udp>` 处理。
-UDP过滤器状态被给定的工作线程共享，使用该过滤器可以根据需要提供会话语义。这与我们下面讨论的面向连接的 TCP 过滤器形成对比，
+UDP 过滤器状态被给定的工作线程共享，使用该过滤器可以根据需要提供会话语义。这与我们下面讨论的面向连接的 TCP 过滤器不同，
 在 TCP 过滤器中，每个连接均存在过滤器状态，而对于 HTTP 过滤器，则是基于请求进行过滤。
 
 请求流程
@@ -131,7 +131,7 @@ UDP过滤器状态被给定的工作线程共享，使用该过滤器可以根�
 使用上面的示例配置简要概述请求和响应的生命周期：
 
 1. 在 :ref:`工作线程 <arch_overview_threading>` 上运行的 Envoy :ref:`监听器 <arch_overview_listeners>` 接受来自下游的 TCP 连接。
-2. :ref:`监听过滤器 <arch_overview_listener_filters>` 链已创建并运行。 它可以提供 SNI 和 pre-TLS 信息。完成后，
+2. :ref:`监听过滤器 <arch_overview_listener_filters>` 链被创建并运行后。 它可以提供 SNI 和 pre-TLS 信息。一旦完成后，
    监听器将匹配网络过滤器链。每个监听器可能具有多个过滤器链，这些过滤器链是在目标 IP CIDR 范围、SNI、ALPN、源端口等的某种组合上匹配。
    传输套接字（在我们的情况下为 TLS 传输套接字）与此过滤器链相关联。
 3. 在进行网络读取时， :ref:`TLS <arch_overview_ssl>` 传输套接字将从 TCP 连接读取的数据解密为解密的数据流，以进行进一步处理。
@@ -146,22 +146,22 @@ UDP过滤器状态被给定的工作线程共享，使用该过滤器可以根�
 9. 上游端点连接的 TLS 传输套接字对这些字节进行加密，并将其写入上游连接的 TCP 套接字。
 10. 由请求头，可选的请求体和尾部组成的请求在上游被代理，而响应在下游被代理。响应以与请求 :ref:`逆序 <arch_overview_http_filters_ordering>` 通过 HTTP 过滤器，
     从路由器过滤器开始并通过自定义过滤器，然后再发送到下游。
-11. 当响应完成后，请求流将被销毁。请求后处理程序将更新统计信息，写入访问日志并最终确定追踪 span。
+11. 当响应完成后，请求流将被销毁。请求后，处理程序将更新统计信息，写入访问日志并最终确定追踪 span。
 
 我们将在以下各节中详细介绍每个步骤。
 
-1. 监听 TCP 流量进入
+1. 监听器接入 TCP
 ^^^^^^^^^^^^^^^^^^^^^^
 
 .. image:: /_static/lor-listeners.svg
    :width: 90%
    :align: center
 
-*ListenerManager* 负责获取代表 :ref:`监听器 <arch_overview_listeners>` 的配置，并实例化绑定到其各自 IP/ports 的多个监听器实例。监听器可能处于以下三种状态之一：
+*ListenerManager* 负责获取描述 :ref:`监听器 <arch_overview_listeners>` 的配置，然后实例化多个监听器实例，并绑定到其各自的 IP/ports。监听器可能处于以下三种状态之一：
 
 * *Warming*: 监听器正在等待配置依赖项（例如路由配置、动态密钥）。监听器尚未准备好接受 TCP 连接。
 * *Active*: 监听器绑定到其 IP/port 并接受 TCP 连接。
-* *Draining*: 监听器不再接受新的 TCP 连接，只允许现有的 TCP 连接继续运行直至结束。
+* *Draining*: 监听器不再接受新的 TCP 连接，只允许现有的 TCP 连接在排空（draining）期内继续运行。
 
 每个 :ref:`工作线程<arch_overview_threading>` 为每个已配置的监听器维护自己的*监听器*实例。每个监听器都可以通过 SO_REUSEPORT 绑定到同一端口，
 或者共享一个绑定到该端口的套接字。当新的 TCP 连接到达时，内核决定哪个工作线程将接受该连接，并且该工作线程的监听器将对 
@@ -173,7 +173,7 @@ UDP过滤器状态被给定的工作线程共享，使用该过滤器可以根�
 工作线程的侦听器将创建并运行 :ref:`监听过滤器 <arch_overview_listener_filters>` 链。过滤器链是通过应用每个过滤器的*过滤器工厂*而创建的。 
 过滤器工厂知道过滤器的配置，并为每个连接或流创建一个新的过滤器实例。
 
-对于我们的 TLS 监听器配置，监听过滤器链由 :ref:`TLS 检查器 <config_listener_filters_tls_inspector>` （``envoy.filters.listener.tls_inspector``）组成。
+对于我们的 TLS 监听器配置，监听过滤器链由 :ref:`TLS 检查 <config_listener_filters_tls_inspector>` （``envoy.filters.listener.tls_inspector``）过滤器组成。
 该过滤器检查初始 TLS 握手并提取服务器名称（SNI）。然后使用 SNI 进行过滤器链匹配。同时，TLS 检查器明确显示在监听过滤器链配置中，每当监听器的过滤器链中需要 
 SNI（或 ALPN ） Envoy 还可以自动插入。
 
@@ -181,7 +181,7 @@ SNI（或 ALPN ） Envoy 还可以自动插入。
    :width: 80%
    :align: center
 
-TLS 检查器过滤器实现 :repo:`ListenerFilter <include/envoy/network/filter.h>` 接口。所有过滤器接口，无论是监听器还是网络/HTTP，都要求过滤器实现特定连接或流事件的回调。
+TLS 检查过滤器实现 :repo:`ListenerFilter <include/envoy/network/filter.h>` 接口。所有过滤器接口，无论是监听器还是网络层/HTTP 层，都要求过滤器实现特定连接或流事件的回调。
 在 ListenerFilter 的情况下为：
 
 .. code-block:: cpp
@@ -191,7 +191,7 @@ TLS 检查器过滤器实现 :repo:`ListenerFilter <include/envoy/network/filter
 ``onAccept()`` 允许筛选器在 TCP 接受处理期间运行。通过回调返回的 ``FilterStatus`` 来控制监听过滤链将如何继续工作。监听过滤器可以暂停过滤器链，然后稍后恢复，
 例如：响应对另一个服务进行的 RPC。
 
-从监听听过滤器和连接属性中提取的信息用于匹配过滤器链，从而提供网络过滤器链和将用于处理连接的传输套接字。
+从监听过滤器和连接属性中提取的信息用于匹配过滤器链，从而提供网络过滤器链和将用于处理连接的传输套接字。
 
 .. image:: /_static/lor-filter-chain-match.svg
    :width: 50%
