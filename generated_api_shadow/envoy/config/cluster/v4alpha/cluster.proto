@@ -814,7 +814,7 @@ message Cluster {
   // connections to happen over plain text.
   // This has been deprecated in favor of http2_protocol_options fields in the in the
   // :ref:`http_protocol_options <envoy_api_msg_extensions.filters.network.http_connection_manager.v4alpha.HttpProtocolOptions>`
-  // message. http_protocol_options can be set via the cluster's
+  // message. http2_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v4alpha.Cluster.typed_extension_protocol_options>`.
   core.v4alpha.Http2ProtocolOptions hidden_envoy_deprecated_http2_protocol_options = 14
       [deprecated = true, (udpa.annotations.security).configure_for_untrusted_upstream = true];
