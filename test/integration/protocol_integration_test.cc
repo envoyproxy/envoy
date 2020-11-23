@@ -387,8 +387,13 @@ TEST_P(ProtocolIntegrationTest, FaultyFilterWithConnect) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Missing host for CONNECT
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}});
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
+
+  auto response = (downstream_protocol_ == Http::CodecClient::Type::HTTP1)
+                      ? std::move((codec_client_->startRequest(headers)).second)
+                      : codec_client_->makeHeaderOnlyRequest(headers);
+
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -992,6 +997,14 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("500"));
   test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
 }
+
+// The downstream connection is closed when it is read disabled, and on OSX the
+// connection error is not detected under these circumstances.
+#if !defined(__APPLE__)
+TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
+  testEnvoyHandling100Continue(false, "", true);
+}
+#endif
 
 TEST_P(ProtocolIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
@@ -2069,8 +2082,10 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
 TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
+  auto encoder_decoder = codec_client_->startRequest(
       Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
 
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     // Because CONNECT requests for HTTP/1 do not include a path, they will fail

@@ -1450,7 +1450,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
             !upstream_options->empty() ? upstream_options : nullptr,
-            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
+            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+            parent_.cluster_manager_state_);
       });
 
   if (pool.has_value()) {
@@ -1499,7 +1500,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
         have_options ? context->downstreamConnection()->socketOptions() : nullptr,
-        have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
+        have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+        parent_.cluster_manager_state_);
   }
 
   return container.pools_[hash_key].get();
@@ -1515,27 +1517,29 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    ClusterConnectivityState& state) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options);
+                                         options, transport_socket_options, state);
   } else if (protocol == Http::Protocol::Http3) {
     // Quic connection pool is not implemented.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
     return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options);
+                                         options, transport_socket_options, state);
   }
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    ClusterConnectivityState& state) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
     return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
-                                               transport_socket_options);
+                                               transport_socket_options, state);
   } else {
     return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
         dispatcher, host, priority, options, transport_socket_options)};
