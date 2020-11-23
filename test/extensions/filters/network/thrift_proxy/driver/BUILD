@@ -24,7 +24,7 @@ py_binary(
         "//test/extensions/filters/network/thrift_proxy/driver/finagle:finagle_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
         "@com_github_twitter_common_rpc//:twitter_common_rpc",
-        requirement("six")
+        requirement("six"),
     ],
 )
 
@@ -37,6 +37,6 @@ py_binary(
         "//test/extensions/filters/network/thrift_proxy/driver/finagle:finagle_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
         "@com_github_twitter_common_rpc//:twitter_common_rpc",
-        requirement("six")
+        requirement("six"),
     ],
 )
