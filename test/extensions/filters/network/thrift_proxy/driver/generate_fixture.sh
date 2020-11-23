@@ -90,7 +90,11 @@ else
 fi
 
 # start server
-"${DRIVER_DIR}/server.py" "${SERVICE_FLAGS[@]}" &
+if [[ "$OSTYPE" == "win32" ]]; then
+    "${DRIVER_DIR}/server.exe" "${SERVICE_FLAGS[@]}" &
+else
+    "${DRIVER_DIR}/server" "${SERVICE_FLAGS[@]}" &
+fi
 SERVER_PID="$!"
 
 trap 'kill ${SERVER_PID}' EXIT;
