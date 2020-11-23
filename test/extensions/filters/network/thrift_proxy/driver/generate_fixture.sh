@@ -99,15 +99,16 @@ SERVER_PID="$!"
 
 trap 'kill ${SERVER_PID}' EXIT;
 
-
-if [[ -n "$HEADERS" ]]; then
-    SERVICE_FLAGS+=("--headers")
-    SERVICE_FLAGS+=("$HEADERS")
+CLIENT_COMMAND=""
+if [[ "$OSTYPE" == "win32" ]]; then
+    CLIENT_COMMAND="${DRIVER_DIR}/client.exe"
+else
+    CLIENT_COMMAND="${DRIVER_DIR}/client"
 fi
 
 echo  "${METHOD}" "$@"
 
-"${DRIVER_DIR}/client.py" "${SERVICE_FLAGS[@]}" \
-                       --request "${REQUEST_FILE}" \
-                       --response "${RESPONSE_FILE}" \
-                       "${METHOD}" "$@"
+$CLIENT_COMMAND "${SERVICE_FLAGS[@]}" \
+                --request "${REQUEST_FILE}" \
+                --response "${RESPONSE_FILE}" \
+                "${METHOD}" "$@"
