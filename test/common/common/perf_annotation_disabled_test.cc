@@ -16,6 +16,8 @@ TEST(PerfAnnotationDisabled, testPerfAnnotation) {
   PERF_RECORD(perf, "beta", "1");
   PERF_RECORD(perf, "alpha", "2");
   PERF_RECORD(perf, "beta", "3");
+  { PERF_OWNED_OPERATION(op); }
+  { PERF_OWNED_RECORD(op, "gamma", "4"); }
   std::string report = PERF_TO_STRING();
   EXPECT_TRUE(report.empty());
   PERF_CLEAR();
