@@ -11,5 +11,5 @@ Envoy 在启动时的初始化是很复杂的。本章将从高层次上解释�
 * 如果 LDS 本身返回需要 RDS 响应的监听器，则 Envoy 会进一步等待 :ref:`一段有限的时间 <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`，直到接收到 RDS 响应（或失败）为止。请注意，这个过程会在后续每个通过 LDS 添加的监听器进行，称为 :ref:`监听器热身 <config_listeners_lds>`。
 * 在完成前面的所有步骤之后，监听器开始接受新的连接。该流程可确保在热重启期间，新进程完全能够在旧进程被驱逐之前接受并处理新连接。
 
-初始化的关键设计原则是，始终确保 Envoy 在 :ref:`一段有限时间 <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` 内进行初始化，在管理服务器可用性的前提下，尽最大努力获得完整的xDS配置集。
+初始化的关键设计原则是，始终确保 Envoy 在 :ref:`一段有限时间 <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` 内进行初始化，在管理服务器可用性的前提下，尽最大努力获得完整的 xDS 配置集。
 
