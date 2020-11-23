@@ -4724,6 +4724,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   auto transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
+  EXPECT_EQ(true, transport_socket->canFlushClose());
   Buffer::OwnedImpl buffer;
   Network::IoResult result = transport_socket->doRead(buffer);
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
@@ -4759,6 +4760,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
+  EXPECT_EQ(true, transport_socket->canFlushClose());
   Buffer::OwnedImpl buffer;
   Network::IoResult result = transport_socket->doRead(buffer);
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
