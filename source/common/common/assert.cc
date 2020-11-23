@@ -83,7 +83,7 @@ private:
 
   using EnvoyBugMap = absl::flat_hash_map<std::string, uint64_t>;
   static absl::Mutex mutex_;
-  static EnvoyBugMap counters_ GUARDED_BY(mutex_);
+  static EnvoyBugMap counters_ ABSL_GUARDED_BY(mutex_);
 };
 
 std::function<void()> ActionRegistrationImpl::debug_assertion_failure_record_action_;
