@@ -51,6 +51,11 @@ public:
     return scaled_timer_manager_->createTimer(minimum, std::move(callback));
   }
 
+  Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,
+                                    Event::TimerCb callback) override {
+    return scaled_timer_manager_->createTimer(minimum, std::move(callback));
+  }
+
   void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
     actions_[action.index()] = state;
     if (scaled_timer_action_.has_value() && scaled_timer_action_.value() == action) {
