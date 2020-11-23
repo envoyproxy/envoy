@@ -61,18 +61,25 @@ mkdir -p "${FIXTURE_DIR}"
 
 DRIVER_DIR="${TEST_SRCDIR}/envoy/test/extensions/filters/network/thrift_proxy/driver"
 
+# On UNIX python supports AF_UNIX socket which are more reliable and efficient for communication
+# between the client and the server, so we use it. On Windows, we find a random unused port
+# on and let the communication happen via TCP.
 
-while
-  port=$(shuf -n 1 -i 49152-65535)
-  netstat -atn | grep -q "$port" >> /dev/null
-do
-  continue
-done
+SOCKET=""
+if [[ "$OSTYPE" == "msys" ]]; then
+    while
+        port=$(shuf -n 1 -i 49152-65535)
+        netstat -atn | grep -q "$port" >> /dev/null
+    do
+    continue
+    done
+    SOCKET="127.0.0.1:${port}"
+else
+    SOCKET="${TEST_TMPDIR}/fixture.sock"
+    rm -f "${SOCKET}"
+fi
 
-
-SOCKET="127.0.0.1:${port}"
 echo "Using address ${SOCKET}"
-
 SERVICE_FLAGS=("--addr" "${SOCKET}"
                "--response" "${MODE}"
                "--transport" "${TRANSPORT}"
@@ -90,17 +97,18 @@ else
 fi
 
 # start server
-if [[ "$OSTYPE" == "win32" ]]; then
+if [[ "$OSTYPE" == "msys" ]]; then
+    echo "${SERVICE_FLAGS[@]}"
     "${DRIVER_DIR}/server.exe" "${SERVICE_FLAGS[@]}" &
 else
-    "${DRIVER_DIR}/server" "${SERVICE_FLAGS[@]}" &
+    "${DRIVER_DIR}/server" "--unix" "${SERVICE_FLAGS[@]}" &
 fi
 SERVER_PID="$!"
 
 trap 'kill ${SERVER_PID}' EXIT;
 
 CLIENT_COMMAND=""
-if [[ "$OSTYPE" == "win32" ]]; then
+if [[ "$OSTYPE" == "msys" ]]; then
     CLIENT_COMMAND="${DRIVER_DIR}/client.exe"
 else
     CLIENT_COMMAND="${DRIVER_DIR}/client"
