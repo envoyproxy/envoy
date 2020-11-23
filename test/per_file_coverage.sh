@@ -12,6 +12,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/singleton:95.1"
 "source/common/api:72.9"
 "source/common/api/posix:71.8"
+"source/common/event:92.9"
 "source/common/filter:96.3"
 "source/common/filter/http:96.3"
 "source/common/init:96.2"
