@@ -14,8 +14,10 @@ from thrift.transport import TTransport
 from fbthrift import THeaderTransport
 from twitter.common.rpc.finagle.protocol import TFinagleProtocol
 
-sys.stdin.reconfigure(encoding='utf-8')
-sys.stdout.reconfigure(encoding='utf-8')
+# On Windows we run this test on Python3
+if sys.version_info[0] is not 2:
+  sys.stdin.reconfigure(encoding='utf-8')
+  sys.stdout.reconfigure(encoding='utf-8')
 
 
 class TRecordingTransport(TTransport.TTransportBase):
