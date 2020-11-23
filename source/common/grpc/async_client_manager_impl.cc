@@ -81,7 +81,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   ASSERT(google_tls_slot_ != nullptr);
 #endif
 
-  // Check metadata for grpc API compliance. Uppercases are lowered in the HeaderParser.
+  // Check metadata for gRPC API compliance. Uppercased characters are lowered in the HeaderParser.
   // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
   for (const auto& header : config.initial_metadata()) {
     if (!validateGrpcHeaderChars(header.key()) || !validateGrpcHeaderChars(header.value())) {
