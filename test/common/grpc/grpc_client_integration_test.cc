@@ -80,11 +80,7 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
         {":status", std::to_string(http_response_status)}};
     stream->expectInitialMetadata(empty_metadata_);
     stream->expectTrailingMetadata(empty_metadata_);
-    // Technically this should be
-    // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
-    // this as WellKnownGrpcStatus::Canceled.
-    stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Canceled);
+    stream->expectGrpcStatus(Grpc::Utility::httpToGrpcStatus(http_response_status));
     stream->fake_stream_->encodeHeaders(reply_headers, true);
     dispatcher_helper_.runDispatcher();
   }

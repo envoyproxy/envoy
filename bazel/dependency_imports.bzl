@@ -4,7 +4,7 @@ load("@envoy_build_tools//toolchains:rbe_toolchains_config.bzl", "rbe_toolchains
 load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
-load("@upb//bazel:repository_defs.bzl", upb_bazel_version_repository = "bazel_version_repository")
+load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@io_bazel_rules_rust//rust:repositories.bzl", "rust_repositories")
 load("@io_bazel_rules_rust//:workspace.bzl", "bazel_version")
 load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
@@ -27,7 +27,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     apple_rules_dependencies()
     rust_repositories()
     bazel_version(name = "bazel_version")
-    upb_bazel_version_repository(name = "upb_bazel_version")
+    upb_deps()
     antlr_dependencies(472)
 
     custom_exec_properties(
