@@ -84,18 +84,18 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   }
 
   switch (bootstrap.stats_flush_case()) {
-    case envoy::config::bootstrap::v3::Bootstrap::kStatsFlushInterval: {
-      stats_flush_interval_ =
-       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
-       break;
-    }
-    case envoy::config::bootstrap::v3::Bootstrap::kStatsFlushOnAdmin: {
-      stats_flush_on_admin_ = bootstrap.stats_flush_on_admin();
-      break;
-    }
-    default: {
-      stats_flush_interval_ = std::chrono::milliseconds(5000);
-    }
+  case envoy::config::bootstrap::v3::Bootstrap::kStatsFlushInterval: {
+    stats_flush_interval_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
+    break;
+  }
+  case envoy::config::bootstrap::v3::Bootstrap::kStatsFlushOnAdmin: {
+    stats_flush_on_admin_ = bootstrap.stats_flush_on_admin();
+    break;
+  }
+  default: {
+    stats_flush_interval_ = std::chrono::milliseconds(5000);
+  }
   }
 
   initializeWatchdogs(bootstrap, server);
