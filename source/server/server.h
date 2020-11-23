@@ -263,6 +263,7 @@ public:
     return server_contexts_;
   }
 
+  bool statsFlushOnAdmin() const override { return config_.statsFlushOnAdmin(); }
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }

@@ -547,8 +547,12 @@ void InstanceImpl::initialize(const Options& options,
 
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
   // Just setup the timer.
-  stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+  if (!config_.statsFlushOnAdmin()) {
+    stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
+    stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+  } else {
+    stat_flush_timer_.reset();
+  }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.

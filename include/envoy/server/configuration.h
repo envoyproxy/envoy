@@ -90,6 +90,11 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
+   * @return bool indicator to flush stats on-demand via the admin interface instead of on a timer.
+   */
+  virtual bool statsFlushOnAdmin() const PURE;
+
+  /**
    * @return const Watchdog& the configuration of the main thread watchdog.
    */
   virtual const Watchdog& mainThreadWatchdogConfig() const PURE;

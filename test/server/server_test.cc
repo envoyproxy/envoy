@@ -521,8 +521,10 @@ protected:
 
   void flushStats() {
     if (manual_flush_) {
-      server_->flushStats();
-      server_->dispatcher().run(Event::Dispatcher::RunType::Block);
+      // drive the flush through the admin interface
+      Http::TestResponseHeaderMapImpl response_headers;
+      std::string body;
+      EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
     } else {
       // Default flush interval is 5 seconds.
       simTime().advanceTimeAndRun(std::chrono::seconds(6), server_->dispatcher(),
@@ -548,7 +550,11 @@ INSTANTIATE_TEST_SUITE_P(
     ipFlushingModeTestParamsToString);
 
 TEST_P(ServerStatsTest, FlushStats) {
+  if (manual_flush_) {
+    options_.config_proto_.set_stats_flush_on_admin(true);
+  }
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
+
   Stats::Gauge& recent_lookups = stats_store_.gaugeFromString(
       "server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
   EXPECT_EQ(0, recent_lookups.value());
