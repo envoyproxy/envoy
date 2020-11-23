@@ -60,7 +60,7 @@ changes may be in [docs/root](docs/root) and/or inline with the API protos. Plea
 N/A if there were no documentation changes.
 
 Any PRs with structural changes to the dataplane should also update the [Life of a
-Request](docs/root/intro/life_of_a_request.md) documentation as appropriate.
+Request](https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request) documentation as appropriate.
 
 ### <a name="relnotes"></a>Release notes
 
