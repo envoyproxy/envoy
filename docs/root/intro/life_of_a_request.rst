@@ -1,53 +1,36 @@
 .. _life_of_a_request:
 
-Life of a Request
+请求的生命周期
 =================
 
-Below we describe the events in the life of a request passing through an Envoy proxy. We first
-describe how Envoy fits into the request path for a request and then the internal events that take
-place following the arrival of a request at the Envoy proxy from downstream. We follow the request
-until the corresponding dispatch upstream and the response path.
+下面，我们描述一个请求通过 Envoy 代理传递时，它生命周期中的事件。首先，我们描述 Envoy 如何适用于请求的请求路径，
+然后描述在请求从下游到达 Envoy 代理之后发生的内部事件。 我们追踪该请求，直到相应的上游调度和响应路径为止。
 
-
-Terminology
+术语
 -----------
 
-Envoy uses the following terms through its codebase and documentation:
+Envoy 在其代码库和文档中使用以下术语：
 
-* *Cluster*: a logical service with a set of endpoints that Envoy forwards requests to.
-* *Downstream*: an entity connecting to Envoy. This may be a local application (in a sidecar model) or
-  a network node. In non-sidecar models, this is a remote client.
-* *Endpoints*: network nodes that implement a logical service. They are grouped into clusters.
-  Endpoints in a cluster are *upstream* of an Envoy proxy.
-* *Filter*: a module in the connection or request processing pipeline providing some aspect of
-  request handling. An analogy from Unix is the composition of small utilities (filters) with Unix
-  pipes (filter chains).
-* *Filter chain*: a series of filters.
-* *Listeners*: Envoy module responsible for binding to an IP/port, accepting new TCP connections (or
-  UDP datagrams) and orchestrating the downstream facing aspects of request processing.
-* *Upstream*: an endpoint (network node) that Envoy connects to when forwarding requests for a
-  service. This may be a local application (in a sidecar model) or a network node. In non-sidecar
-  models, this corresponds with a remote backend.
+* *集群（Cluster）*: Envoy 将请求转发到的一组端点的逻辑服务。
+* *下游（Downstream）*: 连接到 Envoy 的实体。可能是本地应用程序（使用 Sidecar 模型）或网络节点。在非 Sidecar 模型中，是一个远程客户端。
+* *端点（Endpoints）*: 实现逻辑服务的网络节点。它们组成集群。集群中的端点就是 Envoy 代理的上游。
+* *过滤器（Filter）*: 在连接或请求处理管道中提供某些方面请求处理的模块。就好比 Unix 是小型实用程序（过滤器）与 Unix 管道（过滤器链）的组合。
+* *过滤器链（Filter chain）*: 一系列的过滤器。
+* *监听器（Listeners）*: 负责绑定 IP/port、接受新的 TCP 链接（或者 UDP 数据包）以及管理面向请求处理的下游的模块。
+* *上游（Upstream）*:  转发请求到一个服务时，Envoy 连接到的端点（网络节点）。可能是本地应用程序（使用 Sidecar 模型）或网络节点。在非 Sidecar 模型中，对应于远程后端。
 
-Network topology
+网络拓扑结构
 ----------------
 
-How a request flows through the components in a network (including Envoy) depends on the network’s
-topology. Envoy can be used in a wide variety of networking topologies. We focus on the inner
-operation of Envoy below, but briefly we address how Envoy relates to the rest of the network in
-this section.
+请求如何流经网络中的各个组件（包括 Envoy ）取决于网络的拓扑结构。Envoy 可用于多种网络拓扑中。 
+我们在下面重点介绍 Envoy 的内部操作，但在本节中我们将简要地介绍下 Envoy 与网络其余部分的关系。
 
-Envoy originated as a `service mesh
-<https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc>`_ sidecar proxy,
-factoring out load balancing, routing, observability, security and discovery services from
-applications. In the service mesh model, requests flow through Envoys as a gateway to the network.
-Requests arrive at an Envoy via either ingress or egress listeners:
+Envoy 最初是作为 `服务网格 <https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc>`_ sidecar 代理，
+从应用中分离了负载均衡、路由、可观察性、安全性和服务发现等功能。在服务网格模型中，请求流经 Envoy 作为网络的网关。
+请求通过入口或出口监听器到达 Envoy：
 
-* Ingress listeners take requests from other nodes in the service mesh and forward them to the
-  local application. Responses from the local application flow back through Envoy to the downstream.
-* Egress listeners take requests from the local application and forward them to other nodes in the
-  network. These receiving nodes will also be typically running Envoy and accepting the request via
-  their ingress listeners.
+* 入口（Ingress）监听器从服务网格中的其它节点获取请求，并将其转发到本地应用程序。本地应用程序的响应通过 Envoy 流回到下游。
+* 出口（Engress）监听器从本地应用程序获取请求，并将其转发到网络中的其它节点。这些接收节点通常还将运行 Envoy 并通过其入口监听器接受请求。
 
 .. image:: /_static/lor-topology-service-mesh.svg
    :width: 80%
@@ -58,218 +41,157 @@ Requests arrive at an Envoy via either ingress or egress listeners:
    :align: center
 
 
-Envoy is used in a variety of configurations beyond the service mesh. For example, it can also act
-as an internal load balancer:
+Envoy 可用于服务网格之外的各种配置。例如它还可以充当内部负载均衡器：
 
 .. image:: /_static/lor-topology-ilb.svg
    :width: 65%
    :align: center
 
-Or as an ingress/egress proxy on the network edge:
+或作为网络边缘上的入口/出口代理：
 
 .. image:: /_static/lor-topology-edge.svg
    :width: 90%
    :align: center
 
-In practice, a hybrid of these is often used, where Envoy features in a service mesh, on the edge
-and as an internal load balancer. A request path may traverse multiple Envoys.
+在实践当中，通常混合使用这些方法，Envoy 在服务网格中，它在边缘并且作为内部负载均衡器。一个请求路径可能会经过多个 Envoy。
 
 .. image:: /_static/lor-topology-hybrid.svg
    :width: 90%
    :align: center
 
-Envoy may be configured in multi-tier topologies for scalability and reliability, with a request
-first passing through an edge Envoy prior to passing through a second Envoy tier:
+Envoy 可以在多层拓扑中进行配置，以实现可伸缩性和可靠性，其中请求首先通过边缘 Envoy，然后再通过第二层 Envoy：
 
 .. image:: /_static/lor-topology-tiered.svg
    :width: 80%
    :align: center
 
-In all the above cases, a request will arrive at a specific Envoy via TCP, UDP or Unix domain
-sockets from downstream. Envoy will forward requests upstream via TCP, UDP or Unix domain sockets.
-We focus on a single Envoy proxy below.
+在上述所有情况下，请求将从下游通过 TCP，UDP 或 Unix 域套接字到达特定的 Envoy。 Envoy 将通过 TCP，UDP 或 Unix 
+域套接字向上游转发请求。我们在下面仅关注单个 Envoy 代理。
 
-Configuration
+配置
 -------------
 
-Envoy is a very extensible platform. This results in a combinatorial explosion of possible request
-paths, depending on:
+Envoy是一个易于扩展的平台。这将导致可能的请求路径组合非常多，具体取决于：
 
-* L3/4 protocol, e.g. TCP, UDP, Unix domain sockets.
-* L7 protocol, e.g. HTTP/1, HTTP/2, HTTP/3, gRPC, Thrift, Dubbo, Kafka, Redis and various databases.
-* Transport socket, e.g. plain text, TLS, ALTS.
-* Connection routing, e.g. PROXY protocol, original destination, dynamic forwarding.
-* Authentication and authorization.
-* Circuit breakers and outlier detection configuration and activation state.
-* Many other configurations for networking, HTTP, listener, access logging, health checking, tracing
-  and stats extensions.
+* L3/4 协议，例如 TCP、UDP、Unix 域套接字。
+* L7 协议，例如 HTTP/1、HTTP/2、HTTP/3、gRPC、Thrift、Dubbo、Kafka、Redis 和各种数据库。
+* socket 传输，例如纯文本、TLS、ALTS。
+* 连接路由，例如 PROXY 协议、原始目的地、动态转发。
+* 认证和授权。
+* 熔断机制和异常值检测配置以及激活状态。
+* 网络、HTTP、监听器、访问日志、运行状况检查、跟踪和统计信息扩展的许多其他配置。
 
-It's helpful to focus on one at a time, so this example covers the following:
+一次只专注于一个方面内容是很有效的，因此此示例涵盖以下内容：
 
-* An HTTP/2 request with :ref:`TLS <arch_overview_ssl>` over a TCP connection for both downstream
-  and upstream.
-* The :ref:`HTTP connection manager <arch_overview_http_conn_man>` as the only :ref:`network filter
-  <arch_overview_network_filters>`.
-* A hypothetical CustomFilter and the `router <arch_overview_http_routing>` filter as the :ref:`HTTP
-  filter <arch_overview_http_filters>` chain.
-* :ref:`Filesystem access logging <arch_overview_access_logs_sinks>`.
-* :ref:`Statsd sink <envoy_v3_api_msg_config.metrics.v3.StatsSink>`.
-* A single :ref:`cluster <arch_overview_cluster_manager>` with static endpoints.
+* 通过 TCP 连接向下游和上游的 :ref:`TLS <arch_overview_ssl>` 发出的 HTTP/2 请求。
+* :ref:`HTTP 连接管理器 <arch_overview_http_conn_man>` 是唯一的 :ref:`网络过滤器 <arch_overview_network_filters>`。
+* 假设的自定义过滤器和 :ref:`路由器 <arch_overview_http_routing>` 过滤器作为 :ref:`HTTP 过滤器 <arch_overview_http_filters>` 链。
+* :ref:`文件系统访问日志记录 <arch_overview_access_logs_sinks>`。
+* :ref:`统计下沉 <envoy_v3_api_msg_config.metrics.v3.StatsSink>`。
+* 具有静态端点的单个 :ref:`集群 <arch_overview_cluster_manager>`。
 
-We assume a static bootstrap configuration file for simplicity:
+为了简单起见，我们假定使用静态引导程序配置文件：
 
 .. literalinclude:: _include/life-of-a-request.yaml
     :language: yaml
 
-High level architecture
+高层架构
 -----------------------
 
-The request processing path in Envoy has two main parts:
+Envoy 中的请求处理路径包括两个主要部分：
 
-* :ref:`Listener subsystem <arch_overview_listeners>` which handles **downstream** request
-  processing. It is also responsible for managing the downstream request lifecycle and for the
-  response path to the client. The downstream HTTP/2 codec lives here.
-* :ref:`Cluster subsystem <arch_overview_cluster_manager>` which is responsible for selecting and
-  configuring the **upstream** connection to an endpoint. This is where knowledge of cluster and
-  endpoint health, load balancing and connection pooling exists. The upstream HTTP/2 codec lives
-  here.
+* :ref:`监听器子系统 <arch_overview_listeners>` 对**下游**请求进行处理。它还负责管理下游请求生命周期以及到客户端的响应路径。下游 HTTP/2 编解码器位于此处。
+* :ref:`集群子系统 <arch_overview_cluster_manager>` 负责选择和配置到端点的**上游**连接。这里可以了解集群和端点健康度，负载均衡和连接池存在情况。上游 HTTP/2 编解码器位于此处。
 
-The two subsystems are bridged with the HTTP router filter, which forwards the HTTP request from
-downstream to upstream.
+这两个子系统与 HTTP 路由过滤器桥接，该过滤器将 HTTP 请求从下游转发到上游。
 
 .. image:: /_static/lor-architecture.svg
    :width: 80%
    :align: center
 
-We use the terms :ref:`listener subsystem <arch_overview_listeners>` and :ref:`cluster subsystem
-<arch_overview_cluster_manager>` above to refer to the group of modules and instance classes that
-are created by the top level `ListenerManager` and `ClusterManager` classes. There are many
-components that we discuss below that are instantiated before and during the course of a request by
-these management systems, for example listeners, filter chains, codecs, connection pools and load
-balancing data structures.
+我们使用上面的术语 :ref:`监听器子系统 <arch_overview_listeners>` 和 :ref:`集群子系统 
+<arch_overview_cluster_manager>` 来指代由顶级 `ListenerManager` 和 `ClusterManager` 
+类创建的模块和实例类的组。这些管理系统在请求之前和请求的过程中会实例化许多我们在下面讨论的组件，
+例如监听器、过滤器链、编解码器、连接池和负载均衡等数据结构。
 
-Envoy has an `event-based thread model
-<https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310>`_. A main thread is responsible for
-the server lifecycle, configuration processing, stats, etc. and some number of :ref:`worker threads
-<arch_overview_threading>` process requests. All threads operate around an event loop (`libevent
-<https://libevent.org/>`_) and any given downstream TCP connection (including all the multiplexed
-streams on it) will be handled by exactly one worker thread for its lifetime. Each worker thread
-maintains its own pool of TCP connections to upstream endpoints. :ref:`UDP
-<arch_overview_listeners_udp>` handling makes use of SO_REUSEPORT to have the kernel consistently
-hash the source/destination IP:port tuples to the same worker thread. UDP filter state is shared for
-a given worker thread, with the filter responsible for providing session semantics as needed. This
-is in contrast to the connection oriented TCP filters we discuss below, where filter state exists on
-a per connection and, in the case of HTTP filters, per-request basis.
+Envoy 具有 `基于事件的线程模型 <https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310>`_。
+主线程负责服务器的生命周期，配置处理，信息统计等。还有一些 :ref:`工作线程 <arch_overview_threading>` 负责请求处理。
+所有线程都围绕事件循环（`libevent <https://libevent.org/>`_）运行，并且任何给定的下游 TCP 连接
+（包括其上的所有多路复用流）都将由一个工作线程在其生命周期内完全处理。每个工作线程都维护自己的与上游端点的 TCP 连接池。
+利用 SO_REUSEPORT 使内核始终将源/目标 IP:port 元组散列到同一工作线程进行 :ref:`UDP <arch_overview_listeners_udp>` 处理。
+UDP 过滤器状态被给定的工作线程共享，使用该过滤器可以根据需要提供会话语义。这与我们下面讨论的面向连接的 TCP 过滤器不同，
+在 TCP 过滤器中，每个连接均存在过滤器状态，而对于 HTTP 过滤器，则是基于请求进行过滤。
 
-Worker threads rarely share state and operate in a trivially parallel fashion. This threading model
-enables scaling to very high core count CPUs.
-
-Request flow
+请求流程
 ------------
 
-Overview
+总览
 ^^^^^^^^
 
-A brief outline of the life cycle of a request and response using the example configuration above:
+使用上面的示例配置简要概述请求和响应的生命周期：
 
-1. A TCP connection from downstream is accepted by an Envoy :ref:`listener
-   <arch_overview_listeners>` running on a :ref:`worker thread <arch_overview_threading>`.
-2. The :ref:`listener filter <arch_overview_listener_filters>` chain is created and runs. It can
-   provide SNI and other pre-TLS info. Once completed, the listener will match a network filter
-   chain. Each listener may have multiple filter chains which match on some combination of
-   destination IP CIDR range, SNI, ALPN, source ports, etc. A transport socket, in our case the TLS
-   transport socket, is associated with this filter chain.
-3. On network reads, the :ref:`TLS <arch_overview_ssl>` transport socket decrypts the data read from
-   the TCP connection to a decrypted data stream for further processing.
-4. The :ref:`network filter <arch_overview_network_filters>` chain is created and runs. The most
-   important filter for HTTP is the HTTP connection manager, which is the last network filter in the
-   chain.
-5. The HTTP/2 codec in :ref:`HTTP connection manager <arch_overview_http_conn_man>` deframes and
-   demultiplexes the decrypted data stream from the TLS connection to a number of independent
-   streams. Each stream handles a single request and response.
-6. For each HTTP stream, an :ref:`HTTP filter <arch_overview_http_filters>` chain is created and
-   runs. The request first passes through CustomFilter which may read and modify the request. The
-   most important HTTP filter is the router filter which sits at the end of the HTTP filter chain.
-   When `decodeHeaders` is invoked on the router filter, the route is selected and a cluster is
-   picked. The request headers on the stream are forwarded to an upstream endpoint in that cluster.
-   The :ref:`router <arch_overview_http_routing>` filter obtains an HTTP :ref:`connection pool
-   <arch_overview_conn_pool>` from the cluster manager for the matched cluster to do this.
-7. Cluster specific :ref:`load balancing <arch_overview_load_balancing>` is performed to find an
-   endpoint. The cluster’s circuit breakers are checked to determine if a new stream is allowed. A
-   new connection to the endpoint is created if the endpoint's connection pool is empty or lacks
-   capacity.
-8. The upstream endpoint connection's HTTP/2 codec multiplexes and frames the request’s stream with
-   any other streams going to that upstream over a single TCP connection.
-9. The upstream endpoint connection's TLS transport socket encrypts these bytes and writes them to a
-   TCP socket for the upstream connection.
-10. The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
-    response is proxied downstream. The response passes through the HTTP filters in the
-    :ref:`opposite order <arch_overview_http_filters_ordering>` from the request, starting at the
-    router filter and passing through CustomFilter, before being sent downstream.
-11. When the response is complete, the stream is destroyed. Post-request processing will update
-    stats, write to the access log and finalize trace spans.
+1. 在 :ref:`工作线程 <arch_overview_threading>` 上运行的 Envoy :ref:`监听器 <arch_overview_listeners>` 接受来自下游的 TCP 连接。
+2. :ref:`监听过滤器 <arch_overview_listener_filters>` 链被创建并运行后。 它可以提供 SNI 和 pre-TLS 信息。一旦完成后，
+   监听器将匹配网络过滤器链。每个监听器可能具有多个过滤器链，这些过滤器链是在目标 IP CIDR 范围、SNI、ALPN、源端口等的某种组合上匹配。
+   传输套接字（在我们的情况下为 TLS 传输套接字）与此过滤器链相关联。
+3. 在进行网络读取时， :ref:`TLS <arch_overview_ssl>` 传输套接字将从 TCP 连接读取的数据解密为解密的数据流，以进行进一步处理。
+4. :ref:`网络过滤器 <arch_overview_network_filters>` 链已创建并运行。HTTP 最重要的过滤器是 HTTP 连接管理器，它是链中的最后一个网络过滤器。
+5.  :ref:`HTTP 连接管理器 <arch_overview_http_conn_man>` 中的 HTTP/2 编解码器将解密后的数据流从 TLS 连接解帧并解复用为多个独立的流。每个流只处理一个请求和响应。
+6. 对于每个 HTTP 请求流，都会创建并运行 :ref:`HTTP 过滤器 <arch_overview_http_filters>` 链。该请求首先通过可以读取和修改请求的自定义过滤器。
+   路由过滤器是最重要的 HTTP 过滤器，它位于 HTTP 过滤器链的末尾。在路由过滤器上调用 `decodeHeaders` 时，将选择路由和集群。数据流上的请求
+   头被转发到该集群中的上游端点。 :ref:`路由 <arch_overview_http_routing>` 过滤器通过从集群管理器中匹配到的集群获取HTTP连接池，以执行操作。
+7. 执行集群特定的 :ref:`负载均衡 <arch_overview_load_balancing>` 以查找端点。通过检查集群的断路器，以确定是否允许新的数据流。如果端点的连接池
+   为空或容量不足，则会创建到端点的新连接。
+8. 上游端点连接的 HTTP/2 编解码器将请求流与通过单个 TCP 连接流向上游的任何其他流进行多路复用和帧化。
+9. 上游端点连接的 TLS 传输套接字对这些字节进行加密，并将其写入上游连接的 TCP 套接字。
+10. 由请求头，可选的请求体和尾部组成的请求在上游被代理，而响应在下游被代理。响应以与请求 :ref:`逆序 <arch_overview_http_filters_ordering>` 通过 HTTP 过滤器，
+    从路由器过滤器开始并通过自定义过滤器，然后再发送到下游。
+11. 当响应完成后，请求流将被销毁。请求后，处理程序将更新统计信息，写入访问日志并最终确定追踪 span。
 
-We elaborate on each of these steps in the sections below.
+我们将在以下各节中详细介绍每个步骤。
 
-1. Listener TCP accept
+1. 监听器接入 TCP
 ^^^^^^^^^^^^^^^^^^^^^^
 
 .. image:: /_static/lor-listeners.svg
    :width: 90%
    :align: center
 
-The *ListenerManager* is responsible for taking configuration representing :ref:`listeners
-<arch_overview_listeners>` and instantiating a number of *Listener* instances bound to their
-respective IP/ports. Listeners may be in one of three states:
+*ListenerManager* 负责获取描述 :ref:`监听器 <arch_overview_listeners>` 的配置，然后实例化多个监听器实例，并绑定到其各自的 IP/ports。监听器可能处于以下三种状态之一：
 
-* *Warming*: the listener is waiting for configuration dependencies (e.g. route configuration,
-  dynamic secrets). The listener is not yet ready to accept TCP connections.
-* *Active*: the listener is bound to its IP/port and accepts TCP connections.
-* *Draining*: the listener no longer accepts new TCP connections while its existing TCP connections
-  are allowed to continue for a drain period.
+* *Warming*: 监听器正在等待配置依赖项（例如路由配置、动态密钥）。监听器尚未准备好接受 TCP 连接。
+* *Active*: 监听器绑定到其 IP/port 并接受 TCP 连接。
+* *Draining*: 监听器不再接受新的 TCP 连接，只允许现有的 TCP 连接在排空（draining）期内继续运行。
 
-Each :ref:`worker thread <arch_overview_threading>` maintains its own *Listener* instance for each
-of the configured listeners. Each listener may bind to the same port via SO_REUSEPORT or share a
-single socket bound to this port. When a new TCP connection arrives, the kernel decides which
-worker thread will accept the connection and the *Listener* for this worker thread will have its
-``Server::ConnectionHandlerImpl::ActiveTcpListener::onAccept()`` callback invoked.
+每个 :ref:`工作线程<arch_overview_threading>` 为每个已配置的监听器维护自己的*监听器*实例。每个监听器都可以通过 SO_REUSEPORT 绑定到同一端口，
+或者共享一个绑定到该端口的套接字。当新的 TCP 连接到达时，内核决定哪个工作线程将接受该连接，并且该工作线程的监听器将对 
+``Server::ConnectionHandlerImpl::ActiveTcpListener::onAccept()`` 进行回调。
 
-2. Listener filter chains and network filter chain matching
+2. 监听过滤器链和网络过滤器链匹配
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The worker thread’s *Listener* then creates and runs the :ref:`listener filter
-<arch_overview_listener_filters>` chain. Filter chains are created by applying each filter’s *filter
-factory*. The factory is aware of the filter’s configuration and creates a new instance of the
-filter for each connection or stream.
+工作线程的侦听器将创建并运行 :ref:`监听过滤器 <arch_overview_listener_filters>` 链。过滤器链是通过应用每个过滤器的*过滤器工厂*而创建的。 
+过滤器工厂知道过滤器的配置，并为每个连接或流创建一个新的过滤器实例。
 
-In the case of our TLS listener configuration, the listener filter chain consists of the :ref:`TLS
-inspector <config_listener_filters_tls_inspector>` filter
-(``envoy.filters.listener.tls_inspector``). This filter examines the initial TLS handshake and
-extracts the server name (SNI). The SNI is then made available for filter chain matching. While the
-TLS inspector appears explicitly in the listener filter chain configuration, Envoy is also capable
-of inserting this automatically whenever there is a need for SNI (or ALPN) in a listener’s filter
-chain.
+对于我们的 TLS 监听器配置，监听过滤器链由 :ref:`TLS 检查 <config_listener_filters_tls_inspector>` （``envoy.filters.listener.tls_inspector``）过滤器组成。
+该过滤器检查初始 TLS 握手并提取服务器名称（SNI）。然后使用 SNI 进行过滤器链匹配。同时，TLS 检查器明确显示在监听过滤器链配置中，每当监听器的过滤器链中需要 
+SNI（或 ALPN ） Envoy 还可以自动插入。
 
 .. image:: /_static/lor-listener-filters.svg
    :width: 80%
    :align: center
 
-The TLS inspector filter implements the :repo:`ListenerFilter <include/envoy/network/filter.h>`
-interface. All filter interfaces, whether listener or network/HTTP, require that filters implement
-callbacks for specific connection or stream events. In the case of `ListenerFilter`, this is:
-
+TLS 检查过滤器实现 :repo:`ListenerFilter <include/envoy/network/filter.h>` 接口。所有过滤器接口，无论是监听器还是网络层/HTTP 层，都要求过滤器实现特定连接或流事件的回调。
+在 ListenerFilter 的情况下为：
 
 .. code-block:: cpp
 
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
 
-``onAccept()`` allows a filter to run during the TCP accept processing. The ``FilterStatus``
-returned by the callback controls how the listener filter chain will continue. Listener filters may
-pause the filter chain and then later resume, e.g. in response to an RPC made to another service.
+``onAccept()`` 允许筛选器在 TCP 接受处理期间运行。通过回调返回的 ``FilterStatus`` 来控制监听过滤链将如何继续工作。监听过滤器可以暂停过滤器链，然后稍后恢复，
+例如：响应对另一个服务进行的 RPC。
 
-Information extracted from the listener filters and connection properties is then used to match a
-filter chain, giving the network filter chain and transport socket that will be used to handle the
-connection.
+从监听过滤器和连接属性中提取的信息用于匹配过滤器链，从而提供网络过滤器链和将用于处理连接的传输套接字。
 
 .. image:: /_static/lor-filter-chain-match.svg
    :width: 50%
@@ -277,13 +199,11 @@ connection.
 
 .. _life_of_a_request_tls_decryption:
 
-3. TLS transport socket decryption
+3. TLS 传输套接字解密
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Envoy offers pluggable transport sockets via the
-:repo:`TransportSocket <include/envoy/network/transport_socket.h>`
-extension interface. Transport sockets follow the lifecycle events of a TCP connection and
-read/write into network buffers. Some key methods that transport sockets must implement are:
+Envoy 通过 :repo:`TransportSocket <include/envoy/network/transport_socket.h>` 扩展接口提供可插拔的传输套接字。传输套接字遵循 TCP 连接的生命周期事件，
+并读写网络缓冲区。传输套接字必须实现的一些关键方法有：
 
 .. code-block:: cpp
 
@@ -292,44 +212,33 @@ read/write into network buffers. Some key methods that transport sockets must im
   virtual IoResult doWrite(Buffer::Instance& buffer, bool end_stream) PURE;
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
 
-When data is available on a TCP connection, ``Network::ConnectionImpl::onReadReady()`` invokes the
-:ref:`TLS <arch_overview_ssl>` transport socket via ``SslSocket::doRead()``. The transport socket
-then performs a TLS handshake on the TCP connection. When the handshake completes,
-``SslSocket::doRead()`` provides a decrypted byte stream to an instance of
-``Network::FilterManagerImpl``, responsible for managing the network filter chain.
+当 TCP 连接上有可用数据时， ``Network::ConnectionImpl::onReadReady()`` 通过  ``SslSocket::doRead()`` 调用 :ref:`TLS <arch_overview_ssl>` 传输套接字。
+之后，传输套接字在 TCP 连接上执行 TLS 握手。完成握手后，``SslSocket::doRead()`` 将解密的字节流提供给 ``Network::FilterManagerImpl`` 负责管理网络过滤器链的实例。
 
 .. image:: /_static/lor-transport-socket.svg
    :width: 80%
    :align: center
 
-It’s important to note that no operation, whether it’s a TLS handshake or a pause of a filter
-pipeline is truly blocking. Since Envoy is event-based, any situation in which processing requires
-additional data will lead to early event completion and yielding of the CPU to another event. When
-the network makes more data available to read, a read event will trigger the resumption of a TLS
-handshake.
+需要特别注意的是，无论是 TLS 握手还是过滤器管道暂停，任何操作都无法真正阻塞。 由于 Envoy 是基于事件的，因此任何需要额外数据处理的情况都会导致事件提前完成，
+并使 CPU 产生另一个事件。当网络使更多数据可供读取时，读取事件将触发 TLS 握手的恢复。
 
-4. Network filter chain processing
+4. 网络过滤器链处理
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-As with the listener filter chain, Envoy, via `Network::FilterManagerImpl`, will instantiate a
-series of :ref:`network filters <arch_overview_network_filters>` from their filter factories. The
-instance is fresh for each new connection. Network filters, like transport sockets, follow TCP
-lifecycle events and are invoked as data becomes available from the transport socket.
+与监听滤器链一样，Envoy 将通过 `Network::FilterManagerImpl` 实例化其过滤器工厂中的一系列 :ref:`网络过滤器 <arch_overview_network_filters>`。
+该实例对于每个新连接都是新的。网络过滤器（如传输套接字）跟随 TCP 生命周期事件，并作为可以从传输套接字使用的数据被调用。
 
 .. image:: /_static/lor-network-filters.svg
    :width: 80%
    :align: center
 
-Network filters are composed as a pipeline, unlike transport sockets which are one-per-connection.
-Network filters come in three varieties:
+网络过滤器是由管道组成的，与每次连接一个的传输套接字不同。 网络过滤器分为三种：
 
-* :repo:`ReadFilter <include/envoy/network/filter.h>` implementing ``onData()``, called when data is
-  available from the connection (due to some request).
-* :repo:`WriteFilter <include/envoy/network/filter.h>` implementing ``onWrite()``, called when data
-  is about to be written to the connection (due to some response).
-* :repo:`Filter <include/envoy/network/filter.h>` implementing both *ReadFilter* and *WriteFilter*.
+* :repo:`ReadFilter <include/envoy/network/filter.h>` 实现 ``onData()``，当连接中有数据可用时而调用（由于某些请求）。
+* :repo:`WriteFilter <include/envoy/network/filter.h>` 实现 ``onWrite()``，在即将将数据写入连接时调用（由于某些响应）。
+* :repo:`Filter <include/envoy/network/filter.h>` 同时实现 *ReadFilter* 和 *WriteFilter*。
 
-The method signatures for the key filter methods are:
+主要的过滤器方法的方法签名为：
 
 .. code-block:: cpp
 
@@ -337,21 +246,17 @@ The method signatures for the key filter methods are:
   virtual FilterStatus onData(Buffer::Instance& data, bool end_stream) PURE;
   virtual FilterStatus onWrite(Buffer::Instance& data, bool end_stream) PURE;
 
-As with the listener filter, the ``FilterStatus`` allows filters to pause execution of the filter
-chain. For example, if a rate limiting service needs to be queried, a rate limiting network filter
-would return ``Network::FilterStatus::StopIteration`` from ``onData()`` and later invoke
-``continueReading()`` when the query completes.
+与监听过滤器一样， ``FilterStatus`` 允许过滤器暂停执行过滤器链。例如，如果需要查询限速服务，则限速网络过滤器将从 ``onData()`` 返回 
+``Network::FilterStatus::StopIteration``，然后在查询完成时调用 ``continueReading()``。
 
-The last network filter for a listener dealing with HTTP is :ref:`HTTP connection manager
-<arch_overview_http_conn_man>` (HCM). This is responsible for creating the HTTP/2 codec and managing
-the HTTP filter chain. In our example, this is the only network filter. An example network filter
-chain making use of multiple network filters would look like:
+用于处理 HTTP 的侦听器的最后一个网络过滤器是 :ref:` HTTP 连接管理器 <arch_overview_http_conn_man>`（HCM）。它负责创建 HTTP/2 编解码器并管理HTTP筛选器链。 
+在我们的示例中，这是唯一的网络过滤器。 使用多个网络过滤器的示例网络过滤器链如下所示：
 
 .. image:: /_static/lor-network-read.svg
    :width: 80%
    :align: center
 
-On the response path, the network filter chain is executed in the reverse order to the request path.
+在响应路径上，以与请求路径相反的顺序执行网络筛选器链。
 
 .. image:: /_static/lor-network-write.svg
    :width: 80%
@@ -359,41 +264,34 @@ On the response path, the network filter chain is executed in the reverse order 
 
 .. _life_of_a_request_http2_decoding:
 
-5. HTTP/2 codec decoding
+5. HTTP/2 编解码器解码
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The HTTP/2 codec in Envoy is based on `nghttp2 <https://nghttp2.org/>`_. It is invoked by the HCM
-with plaintext bytes from the TCP connection (after network filter chain transformation). The codec
-decodes the byte stream as a series of HTTP/2 frames and demultiplexes the connection into a number
-of independent HTTP streams. Stream multiplexing is a key feature in HTTP/2, providing significant
-performance advantages over HTTP/1. Each HTTP stream handles a single request and response.
+Envoy 中的 HTTP/2 编解码器基于 `nghttp2 <https://nghttp2.org/>`_。HCM 用 TCP 连接中的纯文本字节调用它（在网络过滤器链转换之后）。
+编解码器将字节流解码为一系列 HTTP/2 帧，并将连接解复用为多个独立的 HTTP 流。流多路复用是 HTTP/2 中的一项关键功能，与 HTTP/1 相比，它具有显着的性能优势。 
+每个 HTTP 流都处理单个请求和响应。
 
-The codec is also responsible for handling HTTP/2 setting frames and both stream and connection
-level :repo:`flow control <source/docs/flow_control.md>`.
+编码解码器还负责处理 HTTP/2 帧设置、流和连接级别的 :repo:`流量控制 <source/docs/flow_control.md>`。
 
-The codecs are responsible for abstracting the specifics of the HTTP connection, presenting a
-standard view to the HTTP connection manager and HTTP filter chain of a connection split into
-streams, each with request/response headers/body/trailers. This is true regardless of whether the
-protocol is HTTP/1, HTTP/2 or HTTP/3.
+编解码器负责抽象 HTTP 连接的细节，向 HTTP 连接管理器提供标准视图，并将连接的 HTTP 过滤器链拆分为多个流，每个流均带有请求/响应标头/正文/尾部。 
+无论协议是 HTTP/1、HTTP/2 还是 HTTP/3 都是如此。
 
-6. HTTP filter chain processing
+6. HTTP 过滤器链处理
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For each HTTP stream, the HCM instantiates an :ref:`HTTP filter <arch_overview_http_filters>` chain,
-following the pattern established above for listener and network filter chains.
+对于每个 HTTP 流，HCM 都按照上面为监听器和网络过滤器链建立的模式实例化 :ref:`HTTP 过滤器 <arch_overview_http_filters>` 链。
 
 .. image:: /_static/lor-http-filters.svg
    :width: 80%
    :align: center
 
-There are three kinds of HTTP filter interfaces:
+HTTP 过滤器接口共有三种：
 
-* :repo:`StreamDecoderFilter <include/envoy/http/filter.h>` with callbacks for request processing.
-* :repo:`StreamEncoderFilter <include/envoy/http/filter.h>` with callbacks for response processing.
-* :repo:`StreamFilter <include/envoy/http/filter.h>` implementing both `StreamDecoderFilter` and
-  `StreamEncoderFilter`.
+* :repo:`StreamDecoderFilter <include/envoy/http/filter.h>` 带有用于处理请求的回调。
+* :repo:`StreamEncoderFilter <include/envoy/http/filter.h>` 带有用于响应处理的回调。
+* :repo:`StreamFilter <include/envoy/http/filter.h>` 同时实现 `StreamDecoderFilter` 和 `StreamEncoderFilter`。
 
-Looking at the decoder filter interface:
+查看解码器过滤器接口：
 
 .. code-block:: cpp
 
@@ -401,156 +299,118 @@ Looking at the decoder filter interface:
   virtual FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) PURE;
   virtual FilterTrailersStatus decodeTrailers(RequestTrailerMap& trailers) PURE;
 
-Rather than operating on connection buffers and events, HTTP filters follow the lifecycle of an HTTP
-request, e.g. ``decodeHeaders()`` takes HTTP headers as an argument rather than a byte buffer. The
-returned ``FilterStatus`` provides, as with network and listener filters, the ability to manage filter
-chain control flow.
+HTTP 过滤器遵循 HTTP 请求的生命周期，而不是对连接缓冲区和事件进行操作，例如 ``decodeHeaders()`` 将 HTTP 请求头作为参数而不是字节缓冲区。 
+与网络和监听器过滤器一样，返回的 ``FilterStatus`` 提供了管理过滤器链控制流的功能。
 
-When the HTTP/2 codec makes available the HTTP requests headers, these are first passed to
-``decodeHeaders()`` in CustomFilter. If the returned ``FilterHeadersStatus`` is ``Continue``, HCM
-then passes the headers (possibly mutated by CustomFilter) to the router filter.
+当 HTTP/2 编解码器使 HTTP 请求头可用时，它们首先被传递到自定义过滤器中的 ``decodeHeaders()``。如果返回的 ``FilterHeadersStatus`` 为 ``Continue``，
+然后 HCM 将请求头（可能由自定义过滤器导致）传递到路由器过滤器。
 
-Decoder and encoder-decoder filters are executed on the request path. Encoder and encoder-decoder
-filters are executed on the response path, in :ref:`reverse direction
-<arch_overview_http_filters_ordering>`. Consider the following example filter chain:
+解码器和编/解码器过滤器在请求路径上执行。编码器和编/解码器过滤器在响应路径上以 :ref:`相反的方向 <arch_overview_http_filters_ordering>` 执行。 
+思考以下示例过滤器链：
 
 .. image:: /_static/lor-http.svg
    :width: 80%
    :align: center
 
-The request path will look like:
+请求路径如下所示：
 
 .. image:: /_static/lor-http-decode.svg
    :width: 80%
    :align: center
 
-While the response path will look like:
+响应路径如下所示：
 
 .. image:: /_static/lor-http-encode.svg
    :width: 80%
    :align: center
 
-When ``decodeHeaders()`` is invoked on the :ref:`router <arch_overview_http_routing>` filter, the
-route selection is finalized and a cluster is picked. The HCM selects a route from its
-``RouteConfiguration`` at the start of HTTP filter chain execution. This is referred to as the
-*cached route*. Filters may modify headers and cause a new route to be selected, by asking HCM to
-clear the route cache and requesting HCM to reevaluate the route selection. When the router filter
-is invoked, the route is finalized. The selected route’s configuration will point at an upstream
-cluster name. The router filter then asks the `ClusterManager` for an HTTP :ref:`connection pool
-<arch_overview_conn_pool>` for the cluster. This involves load balancing and the connection pool,
-discussed in the next section.
+当在 :ref:`路由器 <arch_overview_http_routing>` 过滤器上调用 ``decodeHeaders()`` 时，将完成路由选择并选择一个集群（cluster）。HCM 在 HTTP 过滤器链
+执行开始时从其 ``RouteConfiguration`` 中选择一条路由。这称为缓存路由。过滤器可以通过要求 HCM 清除*路由缓存*并请求 HCM 重新评估路由选择来修改标头致使选择新路由。 
+调用路由器过滤器时，路由将最终确定。所选路由的配置将指向上游集群名称。 然后路由器过滤器向 `ClusterManager` 询问群集的 :ref:`connection pool 
+<arch_overview_conn_pool>`。这涉及负载均衡和连接池，将在下一节中讨论。
 
 .. image:: /_static/lor-route-config.svg
    :width: 70%
    :align: center
 
-The resulting HTTP connection pool is used to build an `UpstreamRequest` object in the router, which
-encapsulates the HTTP encoding and decoding callback methods for the upstream HTTP request. Once a
-stream is allocated on a connection in the HTTP connection pool, the request headers are forwarded
-to the upstream endpoint by the invocation of ``UpstreamRequest::encoderHeaders()``.
+生成的 HTTP 连接池用于在路由器中构建 `UpstreamRequest` 对象，该对象封装了上游 HTTP 请求的 HTTP 编码和解码回调方法。一旦在 HTTP 连接池中的连接上分配了流，
+就可以通过调用 ``UpstreamRequest::encoderHeaders()`` 将请求标头转发到上游端点。
 
-The router filter is responsible for all aspects of upstream request lifecycle management on the
-stream allocated from the HTTP connection pool. It also is responsible for request timeouts, retries
-and affinity.
+路由器过滤器负责从 HTTP 连接池分配的流上的上游请求生命周期管理的所有方面。它还负责请求超时，重试和关联。
 
-7. Load balancing
+7. 负载均衡
 ^^^^^^^^^^^^^^^^^
 
-Each cluster has a :ref:`load balancer <arch_overview_load_balancing>` which picks an endpoint when
-a new request arrives. Envoy supports a variety of load balancing algorithms, e.g. weighted
-round-robin, Maglev, least-loaded, random. Load balancers obtain their effective assignments from a
-combination of static bootstrap configuration, DNS, dynamic xDS (the CDS and EDS discovery services)
-and active/passive health checks. Further details on how load balancing works in Envoy are provided
-in the :ref:`load balancing documentation <arch_overview_load_balancing>`.
+每个集群都有一个 :ref:`负载均衡器 <arch_overview_load_balancing>` ，当新请求到达时，该负载均衡器会选择一个端点。Envoy 支持多种负载均衡算法，例如加权轮循（weighted round-robin）、磁悬浮（Maglev）、最小负荷（least-loaded）、随机（random）。负载均衡器从静态引导程序配置、DNS、动态 xDS（CDS 和 EDS 发现服务）以及主动/被动运行状况检查的组合中获得有效分配。:ref:`负载均衡文档 
+<arch_overview_load_balancing>` 中提供了有关 Envoy 中负载均衡的工作方式的更多详细信息。
 
-Once an endpoint is selected, the :ref:`connection pool <arch_overview_conn_pool>` for this endpoint
-is used to find a connection to forward the request on. If no connection to the host exists, or all
-connections are at their maximum concurrent stream limit, a new connection is established and placed
-in the connection pool, unless the circuit breaker for maximum connections for the cluster has
-tripped. If a maximum lifetime stream limit for a connection is configured and reached, a new
-connection is allocated in the pool and the affected HTTP/2 connection is drained. Other circuit
-breakers, e.g. maximum concurrent requests to a cluster are also checked. See :repo:`circuit
-breakers <arch_overview_circuit_breakers>` and :ref:`connection pools <arch_overview_conn_pool>` for
-further details.
+选择端点后，将使用该端点的 :ref:`连接池 <arch_overview_conn_pool>` 来查找用于转发请求的连接。如果不存在与主机的连接，或者所有连接都处于其最大并发流限制，
+则除非触发连接最大集群的熔断机制，否则将建立新连接并将其放置在连接池中。如果配置并达到了连接的最大生存期流限制，则会在池中分配一个新的连接，并且等待 HTTP/2 
+连接结束。 其他的熔断机制，例如检查对集群的最大并发请求。有关更多详细信息请参见 :repo:`熔断机制 <arch_overview_circuit_breakers>` 和 :ref:`连接池 
+<arch_overview_conn_pool>`。
 
 .. image:: /_static/lor-lb.svg
    :width: 80%
    :align: center
 
-8. HTTP/2 codec encoding
+8. HTTP/2 编解码器编码
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The selected connection's HTTP/2 codec multiplexes the request stream with any other streams going
-to the same upstream over a single TCP connection. This is the reverse of :ref:`HTTP/2 codec
-decoding <life_of_a_request_http2_decoding>`.
+所选连接的 HTTP/2 编解码器将请求流与通过单个 TCP 连接流向同一上游的任何其他流进行多路复用。这与 :ref:`HTTP/2 编解码器解码 <life_of_a_request_http2_decoding>`
+相反。
 
-As with the downstream HTTP/2 codec, the upstream codec is responsible for taking Envoy’s standard
-abstraction of HTTP, i.e. multiple streams multiplexed on a single connection with request/response
-headers/body/trailers, and mapping this to the specifics of HTTP/2 by generating a series of HTTP/2
-frames.
+与下游 HTTP/2 编解码器一样，上游编解码器负责获取 Envoy 对 HTTP 的标准抽象，即多个流在单个连接上与请求/响应标头/正文/尾部复用，通过生成一系列 HTTP/2 帧来将其映射到指定的 HTTP/2 。
 
-9. TLS transport socket encryption
+9. TLS 传输套接字加密
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The upstream endpoint connection's TLS transport socket encrypts the bytes from the HTTP/2 codec
-output and writes them to a TCP socket for the upstream connection. As with :ref:`TLS transport
-socket decryption <life_of_a_request_tls_decryption>`, in our example the cluster has a transport
-socket configured that provides TLS transport security. The same interfaces exist for upstream and
-downstream transport socket extensions.
+上游端点连接的 TLS 传输套接字对 HTTP/2 编解码器输出中的字节进行加密，并将其写入用于上游连接的 TCP 套接字。与 TLS 传输套接字解密一样，在我们的示例中，集群配置了提供
+TLS 传输安全性的传输套接字。上游和下游传输套接字扩展存在相同的接口。
 
 .. image:: /_static/lor-client.svg
    :width: 70%
    :align: center
 
-10. Response path and HTTP lifecycle
+10. 响应路径和 HTTP 生命周期
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
-response is proxied downstream. The response passes through the HTTP and network filters in the
-:ref:`opposite order <arch_overview_http_filters_ordering>`. from the request.
+由请求头、可选的正文和尾部组成的请求在上游被代理，响应在下游被代理。响应以与请求 :ref:`逆序 <arch_overview_http_filters_ordering>` 通过HTTP和网络过滤器。
 
+解码器/编码器请求生命周期事件的各种回调将在 HTTP 过滤器中调用，例如当响应片尾被转发或请求主体被流式传输时。 同样，当请求期间数据继续在两个方向上流动时，
+读/写网络过滤器也将调用其各自的回调。
 Various callbacks for decoder/encoder request lifecycle events will be invoked in HTTP filters, e.g.
 when response trailers are being forwarded or the request body is streamed. Similarly, read/write
 network filters will also have their respective callbacks invoked as data continues to flow in both
 directions during a request.
 
-:ref:`Outlier detection <arch_overview_outlier_detection>` status for the endpoint is revised as the
-request progresses.
+端点的 :ref:`异常检测 <arch_overview_outlier_detection>` 状态会随着请求的进行而修改。
 
-A request completes when the upstream response reaches its end-of-stream, i.e. when trailers or the
-response header/body with end-stream set are received. This is handled in
-``Router::Filter::onUpstreamComplete()``.
+当上游响应到达其流的末尾时，即当接收到带有尾流的片尾或响应头/主体时，表示请求完成。这在 ``Router::Filter::onUpstreamComplete()`` 中处理。
 
-It is possible for a request to terminate early. This may be due to (but not limited to):
+请求有可能提前终止。这可能是由于（但不限于）：
 
-* Request timeout.
-* Upstream endpoint steam reset.
-* HTTP filter stream reset.
-* Circuit breaking.
-* Unavailability of upstream resources, e.g. missing a cluster for a route.
-* No healthy endpoints.
-* DoS protection.
-* HTTP protocol violations.
-* Local reply from either the HCM or an HTTP filter. E.g. a rate limit HTTP filter returning a 429
-  response.
+* 请求超时。
+* 上游端点流重置。
+* HTTP筛选器流重置。
+* 熔断机制。
+* 上游资源不可用，例如缺少路由集群。
+* 没有健康的端点。
+* DoS 保护。
+* HTTP 协议违规。
+* 来自 HCM 或 HTTP 过滤器的本地回复。例如速率限制 HTTP 过滤器返回429响应。
 
-If any of these occur, Envoy may either send an internally generated response, if upstream response
-headers have not yet been sent, or will reset the stream, if response headers have already been
-forwarded downstream. The Envoy :ref:`debugging FAQ <faq_overview_debug>` has further information on
-interpreting these early stream terminations.
+如果发生这些情况中的任何一种，Envoy 可能会发送内部生成的响应（如果尚未发送上游响应头），或者将流重置（如果响应头已经转发至下游）。Envoy :ref:`调试常见问题
+解答 <faq_overview_debug>` 提供了有关解释这些早期流终止的更多信息。
 
-11. Post-request processing
+11. 请求后处理过程
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Once a request completes, the stream is destroyed. The following also takes places:
+请求完成后，流将被销毁。还会发生以下情况：
 
-* The post-request :ref:`statistics <arch_overview_statistics>` are updated (e.g. timing, active
-  requests, upgrades, health checks). Some statistics are updated earlier however, during request
-  processing. Stats are not written to the stats :ref:`sink
-  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>` at this point, they are batched
-  and written by the main thread periodically. In our example this is a statsd sink.
-* :ref:`Access logs <arch_overview_access_logs>` are written to the access log :ref:`sinks
-  <arch_overview_access_logs_sinks>`. In our example this is a file access log.
-* :ref:`Trace <arch_overview_tracing>` spans are finalized. If our example request was traced, a
-  trace span, describing the duration and details of the request would be created by the HCM when
-  processing request headers and then finalized by the HCM during post-request processing.
+* 请求后 :ref:`统计信息 <arch_overview_statistics>` 将进行更新（例如计时、活动请求、升级、运行状况检查）。但是在请求处理期间，某些统计信息会更早更新。 此时，
+  统计信息尚未写入统计 :ref:`信息接收器 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>`，而是由主线程定期进行批处理和写入。在我们的示例中，
+  这是一个统计信接收器。
+
+* :ref:`访问日志 <arch_overview_access_logs>` 将写入访问日志 :ref:`接收器 <arch_overview_access_logs_sinks>`。 在我们的示例中，这是一个文件访问日志。
+
+* :ref:`追踪 <arch_overview_tracing>` span 已完成。如果跟踪了我们的示例请求，则描述请求的持续时间和详细信息的跟踪范围将由 HCM 在处理请求标头时创建，然后由 HCM 在请求后处理期间最终确定。
