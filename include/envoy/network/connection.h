@@ -119,6 +119,11 @@ public:
   virtual void enableHalfClose(bool enabled) PURE;
 
   /**
+   * @return true if half-close semantics are enabled, false otherwise.
+   */
+  virtual bool isHalfCloseEnabled() PURE;
+
+  /**
    * Close the connection.
    */
   virtual void close(ConnectionCloseType type) PURE;

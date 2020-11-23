@@ -89,6 +89,7 @@ protected:
   uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
+  bool connect_request_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
 
@@ -166,7 +167,6 @@ public:
 private:
   bool upgrade_request_{};
   bool head_request_{};
-  bool connect_request_{};
 };
 
 /**

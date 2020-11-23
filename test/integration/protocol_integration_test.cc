@@ -387,8 +387,13 @@ TEST_P(ProtocolIntegrationTest, FaultyFilterWithConnect) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Missing host for CONNECT
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}});
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
+
+  auto response = (downstream_protocol_ == Http::CodecClient::Type::HTTP1)
+                      ? std::move((codec_client_->startRequest(headers)).second)
+                      : codec_client_->makeHeaderOnlyRequest(headers);
+
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -2077,8 +2082,10 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
 TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
+  auto encoder_decoder = codec_client_->startRequest(
       Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
 
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     // Because CONNECT requests for HTTP/1 do not include a path, they will fail
