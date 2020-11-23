@@ -106,6 +106,11 @@ else
     CLIENT_COMMAND="${DRIVER_DIR}/client"
 fi
 
+if [[ -n "$HEADERS" ]]; then	
+    SERVICE_FLAGS+=("--headers")	
+    SERVICE_FLAGS+=("$HEADERS")	
+fi
+
 echo  "${METHOD}" "$@"
 
 $CLIENT_COMMAND "${SERVICE_FLAGS[@]}" \
