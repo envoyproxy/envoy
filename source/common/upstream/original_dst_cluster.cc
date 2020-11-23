@@ -107,7 +107,7 @@ OriginalDstCluster::OriginalDstCluster(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
+    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api, factory_context.dispatcher().timeSource()),
       dispatcher_(factory_context.dispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
@@ -115,7 +115,7 @@ OriginalDstCluster::OriginalDstCluster(
       use_http_header_(info_->lbOriginalDstConfig()
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
-      host_map_(std::make_shared<HostMap>()), time_source_(dispatcher_.timeSource()) {
+      host_map_(std::make_shared<HostMap>()) {
   // TODO(dio): Remove hosts check once the hosts field is removed.
   if (config.has_load_assignment() || !config.hidden_envoy_deprecated_hosts().empty()) {
     throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");

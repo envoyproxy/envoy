@@ -25,7 +25,7 @@ RedisCluster::RedisCluster(
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api),
+                                       added_via_api, dispatcher_.timeSource()),
       cluster_manager_(cluster_manager),
       cluster_refresh_rate_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
@@ -58,8 +58,7 @@ RedisCluster::RedisCluster(
           failure_refresh_threshold_, host_degraded_refresh_threshold_,
           [&]() {
             redis_discovery_session_.resolve_timer_->enableTimer(std::chrono::milliseconds(0));
-          })),
-      time_source_(dispatcher_.timeSource()) {
+          })) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -278,8 +277,7 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     const int rand_idx = parent_.random_.random() % discovery_address_list_.size();
     auto it = discovery_address_list_.begin();
     std::next(it, rand_idx);
-    host = Upstream::HostSharedPtr{
-        new RedisHost(parent_.info(), "", *it, parent_, true, parent_.time_source_)};
+    host = std::make_shared<Upstream::Host>(RedisHost(parent_.info(), "", *it, parent_, true, parent_.timeSource()));
   } else {
     const int rand_idx = parent_.random_.random() % parent_.hosts_.size();
     host = parent_.hosts_[rand_idx];

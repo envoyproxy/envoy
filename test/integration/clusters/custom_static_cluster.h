@@ -26,9 +26,9 @@ public:
   CustomStaticCluster(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                       Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                       Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
-                      std::string address, uint32_t port, TimeSource& time_source)
-      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
-        priority_(priority), address_(std::move(address)), port_(port), time_source_(time_source),
+                      std::string address, uint32_t port)
+      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api, factory_context.dispatcher().timeSource()),
+        priority_(priority), address_(std::move(address)), port_(port),
         host_(makeHost()) {}
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -76,7 +76,6 @@ private:
   const uint32_t priority_;
   const std::string address_;
   const uint32_t port_;
-  TimeSource& time_source_;
   const Upstream::HostSharedPtr host_;
 
   friend class CustomStaticClusterFactoryBase;
@@ -99,7 +98,7 @@ private:
     auto new_cluster = std::make_shared<CustomStaticCluster>(
         cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
         context.addedViaApi(), proto_config.priority(), proto_config.address(),
-        proto_config.port_value(), socket_factory_context.dispatcher().timeSource());
+        proto_config.port_value());
     return std::make_pair(new_cluster, create_lb_ ? new_cluster->threadAwareLb() : nullptr);
   }
 

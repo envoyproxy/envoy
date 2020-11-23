@@ -114,10 +114,15 @@ public:
       values[1].asString() = "SLOTS";
       asArray().swap(values);
     }
+
     static ClusterSlotsRequest instance_;
   };
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+      TimeSource& timeSource() const {
+      return time_source_;
+    }
 
 private:
   friend class RedisClusterTest;
@@ -284,8 +289,6 @@ private:
   const std::string cluster_name_;
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
-
-  TimeSource& time_source_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

@@ -48,7 +48,7 @@ LogicalDnsCluster::LogicalDnsCluster(
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api, factory_context.dispatcher().timeSource()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -59,8 +59,7 @@ LogicalDnsCluster::LogicalDnsCluster(
       load_assignment_(
           cluster.has_load_assignment()
               ? convertPriority(cluster.load_assignment())
-              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())),
-      time_source_(factory_context.dispatcher().timeSource()) {
+              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
           cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());

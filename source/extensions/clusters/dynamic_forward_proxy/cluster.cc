@@ -22,12 +22,11 @@ Cluster::Cluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api),
+                                       added_via_api, factory_context.dispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
-      host_map_(std::make_shared<HostInfoMap>()),
-      time_source_(factory_context.dispatcher().timeSource()) {
+      host_map_(std::make_shared<HostInfoMap>()) {
   // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
   // support these parameters dynamically in the future. This is not an exhaustive list of
   // parameters that don't make sense but should be the most obvious ones that a user might set

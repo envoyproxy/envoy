@@ -158,7 +158,7 @@ protected:
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
   Network::TransportSocketFactory& socket_factory_;
-  MonotonicTime creation_time_;
+  const MonotonicTime creation_time_;
 };
 
 /**
@@ -776,7 +776,7 @@ public:
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                   Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                  Stats::ScopePtr&& stats_scope, bool added_via_api);
+                  Stats::ScopePtr&& stats_scope, bool added_via_api, TimeSource& time_source);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -814,6 +814,7 @@ protected:
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
+  TimeSource& time_source_;
 
 protected:
   PrioritySetImpl priority_set_;
