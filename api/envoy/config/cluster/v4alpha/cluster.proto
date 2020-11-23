@@ -648,7 +648,6 @@ message Cluster {
     //
     // If both this and prefetch_ratio are set, Envoy will make sure both predicted needs are met,
     // basically prefetching max(predictive-prefetch, per-upstream-prefetch), for each upstream.
-    // FIXME (alyssawilk do not land this without a plan for mobile.
     // TODO(alyssawilk) per LB docs and LB overview docs when unhiding.
     google.protobuf.DoubleValue predictive_prefetch_ratio = 2
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
