@@ -26,6 +26,12 @@ private:
   T value_;
 };
 
+// C++17 doesn't allow templating on floating point values, otherwise that's
+// what we should do here instead of relying on a int => float implicit
+// conversion. TODO(akonradi): when Envoy is using C++20, switch these template
+// parameters to floats.
+
+// Floating point value in the range [0, 1].
 using UnitFloat = ClosedIntervalValue<float, Interval<int, 0, 1>>;
 
 } // namespace Envoy
