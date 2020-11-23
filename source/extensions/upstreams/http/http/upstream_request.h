@@ -32,7 +32,6 @@ public:
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingStream() override;
-  absl::optional<Envoy::Http::Protocol> protocol() const override;
 
   // Http::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -40,7 +39,8 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo& info) override;
+                   const StreamInfo::StreamInfo& info,
+                   absl::optional<Envoy::Http::Protocol> protocol) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   bool valid() { return conn_pool_ != nullptr; }

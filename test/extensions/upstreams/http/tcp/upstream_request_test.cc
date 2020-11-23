@@ -57,7 +57,7 @@ TEST_F(TcpConnPoolTest, Basic) {
   conn_pool_->newStream(&mock_generic_callbacks_);
 
   EXPECT_CALL(mock_generic_callbacks_, upstreamToDownstream());
-  EXPECT_CALL(mock_generic_callbacks_, onPoolReady(_, _, _, _));
+  EXPECT_CALL(mock_generic_callbacks_, onPoolReady(_, _, _, _, _));
   auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
   EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection));
   conn_pool_->onPoolReady(std::move(data), host_);
