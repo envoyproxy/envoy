@@ -42,6 +42,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/cache/simple_http_cache:95.2"
 "source/extensions/filters/http/dynamic_forward_proxy:94.9"
 "source/extensions/filters/http/ip_tagging:91.2"
+"source/extensions/filters/http/kill_request:94.4" # Death tests don't report LCOV
 "source/extensions/filters/http/grpc_json_transcoder:93.3"
 "source/extensions/filters/http/oauth2:96.5"
 "source/extensions/filters/listener:96.0"
