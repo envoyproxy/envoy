@@ -214,7 +214,7 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   memcpy(current_slice_mem_, prefix.data(), prefix.size()); // NOLINT(safe-memcpy)
   current_slice_mem_ += prefix.size();
   *current_slice_mem_++ = '.';
-  memcpy(current_slice_mem_, name.c_str(), name.size()); // NOLINT(safe-memcpy)
+  memcpy(current_slice_mem_, name.data(), name.size()); // NOLINT(safe-memcpy)
   current_slice_mem_ += name.size();
   *current_slice_mem_++ = ':';
   current_slice_mem_ += StringUtil::itoa(current_slice_mem_, 30, value);

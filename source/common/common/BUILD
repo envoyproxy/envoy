@@ -366,7 +366,6 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":hash_lib",
-        ":mem_block_builder_lib",
         ":non_copyable",
         "//include/envoy/common:interval_set_interface",
         "//include/envoy/common:time_interface",

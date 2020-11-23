@@ -10,12 +10,11 @@
 
 #include "gtest/gtest.h"
 
-using namespace testing;
+using testing::Eq;
 
 namespace Envoy {
 
 TEST(SafeMemcpyTest, CopyUint8) {
-
   const uint8_t src[] = {0, 1, 1, 2, 3, 5, 8, 13};
   std::array<uint8_t, 8> dst;
   safeMemcpy(reinterpret_cast<uint8_t(*)[8]>(dst.data()), &src);
@@ -24,7 +23,6 @@ TEST(SafeMemcpyTest, CopyUint8) {
 
 // Additional (integration) test - not ordinary copy
 TEST(SafeMemcpyTest, PrependGrpcFrameHeader) {
-
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add("test", 4);
   std::array<char, 5> expected_header;
