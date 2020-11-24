@@ -44,9 +44,7 @@ message ZipkinConfig {
     GRPC = 3;
   }
 
-  // The cluster manager cluster that hosts the Zipkin collectors. Note that the
-  // Zipkin cluster must be defined in the :ref:`Bootstrap static cluster
-  // resources <envoy_api_field_config.bootstrap.v4alpha.Bootstrap.StaticResources.clusters>`.
+  // The cluster manager cluster that hosts the Zipkin collectors.
   string collector_cluster = 1 [(validate.rules).string = {min_len: 1}];
 
   // The API endpoint of the Zipkin service where the spans will be sent. When

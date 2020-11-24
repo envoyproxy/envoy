@@ -43,7 +43,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::ParsedQuicVersionVector& supported_versions, Event::Dispatcher& dispatcher,
     Network::ConnectionSocketPtr&& connection_socket)
     : EnvoyQuicConnection(
-          server_connection_id,
+          server_connection_id, quic::QuicSocketAddress(),
           envoyIpAddressToQuicSocketAddress(connection_socket->remoteAddress()->ip()), helper,
           alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT, supported_versions,
           std::move(connection_socket)),
@@ -62,9 +62,9 @@ void EnvoyQuicClientConnection::processPacket(
           std::chrono::duration_cast<std::chrono::microseconds>(receive_time.time_since_epoch())
               .count());
   ASSERT(buffer->getRawSlices().size() == 1);
-  Buffer::RawSliceVector slices = buffer->getRawSlices(/*max_slices=*/1);
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slices[0].mem_), slices[0].len_,
-                                  timestamp, /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+  Buffer::RawSlice slice = buffer->frontSlice();
+  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
+                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   ProcessUdpPacket(envoyIpAddressToQuicSocketAddress(local_address->ip()),
