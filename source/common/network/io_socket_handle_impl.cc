@@ -20,24 +20,6 @@ namespace {
  * sockets is different. We use this function to get the
  * length of the platform specific struct.
  */
-constexpr socklen_t udsAddressLength() {
-#if defined(__APPLE__)
-  return sizeof(sockaddr);
-#elif defined(WIN32)
-  return sizeof(sockaddr_un);
-#else
-  return sizeof(sa_family_t);
-#endif
-}
-
-constexpr int messageTypeContainsIP() {
-#ifdef IP_RECVDSTADDR
-  return IP_RECVDSTADDR;
-#else
-  return IP_PKTINFO;
-#endif
-}
-
 constexpr int messageTruncatedOption() {
 #if defined(__APPLE__)
   // OSX does not support passing `MSG_TRUNC` to recvmsg and recvmmsg. This does not effect
