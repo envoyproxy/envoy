@@ -33,6 +33,7 @@ envoy_cc_library(
     hdrs = [
         "upstream_request.h",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:conn_pool_interface",

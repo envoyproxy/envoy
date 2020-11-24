@@ -1247,7 +1247,7 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeTimer) {
 }
 
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
-  os_fd_t fd = os_sys_calls_.socket(AF_INET6, SOCK_STREAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(AF_INET6, SOCK_DGRAM, 0).rc_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   ReadyWatcher watcher;
@@ -1258,7 +1258,7 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
   file_event->activate(FileReadyType::Read);
 
   InSequence s;
-  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(*watchdog_, touch()).Times(2);
   EXPECT_CALL(watcher, ready());
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }

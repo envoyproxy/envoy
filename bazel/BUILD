@@ -277,8 +277,8 @@ config_setting(
 )
 
 config_setting(
-    name = "enable_new_codecs_in_integration_tests",
-    values = {"define": "use_new_codecs_in_integration_tests=true"},
+    name = "enable_legacy_codecs_in_integration_tests",
+    values = {"define": "use_new_codecs_in_integration_tests=false"},
 )
 
 cc_proto_library(
