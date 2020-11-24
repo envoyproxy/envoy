@@ -62,18 +62,6 @@ MATCHER_P(AuthzErrorResponse, status, "") {
   return arg->status == status;
 }
 
-MATCHER(AuthzTimedoutResponse, "") {
-  // These fields should be always empty when the status is a timeout error.
-  if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() || !arg->body.empty()) {
-    return false;
-  }
-  // HTTP status code should be always set to Forbidden.
-  if (arg->status_code != Http::Code::Forbidden) {
-    return false;
-  }
-  return arg->status == CheckStatus::Error && arg->error_kind == ErrorKind::Timedout;
-}
-
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
   const bool equal_status = arg->status == response.status;
   const bool equal_metadata =
