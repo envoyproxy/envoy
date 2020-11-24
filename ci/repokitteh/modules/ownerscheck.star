@@ -159,7 +159,7 @@ def _reconcile(config, specs=None):
   return results
 
 
-def _comment(config, results, assignees, requested_reviewers, force=False):
+def _comment(config, results, assignees, force=False):
   lines = []
 
   for spec, approved in results:
@@ -205,7 +205,7 @@ def _comment(config, results, assignees, requested_reviewers, force=False):
           break
       # Otherwise we need to see if there is a reviewer picked from the team? If so, first wins.
       if not api_assignee:
-        for reviewer in requested_reviewers:
+        for reviewer in github.pr_list_reviewers():
           user = reviewer['login']
           if user in members:
             api_assignee = user
@@ -220,17 +220,17 @@ def _comment(config, results, assignees, requested_reviewers, force=False):
     github.issue_create_comment('\n'.join(lines))
 
 
-def _reconcile_and_comment(config, assignees, requested_reviewers):
-  _comment(config, _reconcile(config), assignees, requested_reviewers)
+def _reconcile_and_comment(config, assignees):
+  _comment(config, _reconcile(config), assignees)
 
 
-def _force_reconcile_and_comment(config, assignees, requested_reviewers):
-  _comment(config, _reconcile(config), assignees, requested_reviewers, force=True)
+def _force_reconcile_and_comment(config, assignees):
+  _comment(config, _reconcile(config), assignees, force=True)
 
 
-def _pr(action, config, assignees, requested_reviewers):
+def _pr(action, config, assignees):
   if action in ['synchronize', 'opened']:
-    _reconcile_and_comment(config, assignees, requested_reviewers)
+    _reconcile_and_comment(config, assignees)
 
 
 def _pr_review(action, review_state, config):
