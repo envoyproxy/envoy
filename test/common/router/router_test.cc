@@ -467,6 +467,37 @@ TEST_F(RouterTest, RouteNotFound) {
   EXPECT_EQ(callbacks_.details(), "route_not_found");
 }
 
+TEST_F(RouterTest, MissingRequiredHeaders) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.removeMethod();
+
+  EXPECT_CALL(encoder, encodeHeaders(_, _))
+      .WillOnce(Invoke([](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        return Http::HeaderUtility::checkRequiredHeaders(headers);
+      }));
+  EXPECT_CALL(callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable,
+                             testing::Eq("missing required header: :method"), _, _,
+                             "filter_removed_required_headers{missing required header: :method}"))
+      .WillOnce(testing::InvokeWithoutArgs([] {}));
+  router_.decodeHeaders(headers, true);
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
+  router_.onDestroy();
+}
+
 TEST_F(RouterTest, ClusterNotFound) {
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
 
@@ -2355,7 +2386,6 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  // expectPerTryTimerCreate();
   per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
   EXPECT_EQ(0U,
@@ -2687,6 +2717,8 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
@@ -2708,8 +2740,6 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
-
-  EXPECT_CALL(encoder1.stream_, resetStream(_));
 
   // Now send a 5xx back and make sure we don't ask whether we should retry it.
   Http::ResponseHeaderMapPtr response_headers1(

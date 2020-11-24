@@ -194,6 +194,19 @@ TEST_F(TcpUpstreamTest, ResetAfterEndStream) {
   tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Verifies that if we send data after the upstream has been reset nothing crashes.
+TEST_F(TcpUpstreamTest, DataAfterReset) {
+  tcp_upstream_->onEvent(Network::ConnectionEvent::LocalClose);
+  Buffer::OwnedImpl buffer("something");
+  tcp_upstream_->onUpstreamData(buffer, true);
+}
+
+// Verifies that if we send headers after the upstream has been reset nothing crashes.
+TEST_F(TcpUpstreamTest, HeadersAfterReset) {
+  tcp_upstream_->onEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
+}
+
 TEST_F(TcpUpstreamTest, TrailersEndStream) {
   // Swallow the headers.
   EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
