@@ -190,7 +190,4 @@ static void duplicateUpdate(State& state) {
   }
 }
 
-BENCHMARK(duplicateUpdate)
-    ->Range(64, 100000)
-    ->Unit(benchmark::kMillisecond)
-    ->Complexity();
+BENCHMARK(duplicateUpdate)->Range(64, 100000)->Unit(benchmark::kMillisecond)->Complexity();
