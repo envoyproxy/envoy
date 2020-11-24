@@ -437,11 +437,7 @@ static_resources:
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    http2_protocol_options: {}
     load_assignment:
       cluster_name: local_service_grpc
       endpoints:
@@ -460,14 +456,10 @@ static_resources:
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options:
-            connection_keepalive:
-              interval: 30s
-              timeout: 5s
+    http2_protocol_options:
+      connection_keepalive:
+        interval: 30s
+        timeout: 5s
     load_assignment:
       cluster_name: rds
       endpoints:
@@ -508,12 +500,8 @@ static_resources:
                 address: collector-grpc.lightstep.com
                 port_value: 443
                 protocol: TCP
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options:
-            max_concurrent_streams: 100
+    http2_protocol_options:
+      max_concurrent_streams: 100
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:

@@ -153,11 +153,7 @@ static_resources:
               filename: certs/cacert.pem
             match_subject_alt_names:
               exact: "front-proxy.yourcompany.net"
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    http2_protocol_options: {}
   - name: lightstep_saas
     type: LOGICAL_DNS
     connect_timeout: 1s
@@ -172,11 +168,7 @@ static_resources:
                 address: collector-grpc.lightstep.com
                 port_value: 443
                 protocol: TCP
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    http2_protocol_options: {}
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:

@@ -120,12 +120,8 @@ void WebsocketIntegrationTest::initialize() {
   if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          ConfigHelper::HttpProtocolOptions protocol_options;
-          protocol_options.mutable_explicit_http_config()
-              ->mutable_http2_protocol_options()
-              ->set_allow_connect(true);
-          ConfigHelper::setProtocolOptions(
-              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+          cluster->mutable_http2_protocol_options()->set_allow_connect(true);
         });
   }
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {

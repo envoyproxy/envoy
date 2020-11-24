@@ -16,11 +16,7 @@ std::string tdsBootstrapConfig(absl::string_view api_type) {
 static_resources:
   clusters:
   - name: dummy_cluster
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {{}}
+    http2_protocol_options: {{}}
     load_assignment:
       cluster_name: dummy_cluster
       endpoints:
@@ -31,11 +27,7 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 0
   - name: rtds_cluster
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {{}}
+    http2_protocol_options: {{}}
     load_assignment:
       cluster_name: rtds_cluster
       endpoints:

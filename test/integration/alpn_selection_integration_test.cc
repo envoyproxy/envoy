@@ -31,7 +31,7 @@ public:
       auto* cluster = static_resources->mutable_clusters(0);
 
       if (use_h2_) {
-        ConfigHelper::setHttp2(*cluster);
+        cluster->mutable_http2_protocol_options();
       }
       const std::string transport_socket_yaml = absl::StrFormat(
           R"EOF(

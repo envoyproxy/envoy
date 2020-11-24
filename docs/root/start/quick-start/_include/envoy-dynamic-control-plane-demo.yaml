@@ -20,11 +20,7 @@ static_resources:
   clusters:
   - connect_timeout: 1s
     type: strict_dns
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    http2_protocol_options: {}
     name: xds_cluster
     load_assignment:
       cluster_name: xds_cluster

@@ -43,11 +43,7 @@ A sample filter configuration could be:
   clusters:
     - name: ext-authz
       type: static
-      typed_extension_protocol_options:
-        envoy.filters.network.http_connection_manager:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {}
+      http2_protocol_options: {}
       load_assignment:
         cluster_name: ext-authz
         endpoints:

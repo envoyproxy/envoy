@@ -45,13 +45,13 @@ protected:
       auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       lds_cluster->set_name("lds_cluster");
-      ConfigHelper::setHttp2(*lds_cluster);
+      lds_cluster->mutable_http2_protocol_options();
 
       // Add the static cluster to serve RDS.
       auto* rds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       rds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       rds_cluster->set_name("rds_cluster");
-      ConfigHelper::setHttp2(*rds_cluster);
+      rds_cluster->mutable_http2_protocol_options();
     });
 
     config_helper_.addConfigModifier(

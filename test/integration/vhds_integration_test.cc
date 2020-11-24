@@ -35,11 +35,7 @@ static_resources:
   clusters:
   - name: xds_cluster
     type: STATIC
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {{}}
+    http2_protocol_options: {{}}
     load_assignment:
       cluster_name: xds_cluster
       endpoints:
@@ -51,11 +47,7 @@ static_resources:
                 port_value: 0
   - name: my_service
     type: STATIC
-    typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {{}}
+    http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_service
       endpoints:
