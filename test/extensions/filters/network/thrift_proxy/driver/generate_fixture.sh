@@ -75,7 +75,8 @@ if [[ "$OSTYPE" == "msys" ]]; then
     done
     SOCKET="127.0.0.1:${port}"
 else
-    SOCKET="${TEST_TMPDIR}/fixture.sock"
+    TEST_UDSDIR=$(mktemp -d /tmp/envoy_test_thrift.XXXXXX)
+    SOCKET="${TEST_UDSDIR}/fixture.sock"
     rm -f "${SOCKET}"
 fi
 
