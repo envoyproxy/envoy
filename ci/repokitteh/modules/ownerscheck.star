@@ -261,7 +261,7 @@ def _lgtm_by_comment(config, comment_id, command, sender, sha):
 
   react(comment_id, None)
 
-  _reconcile(config, assignee, requested_reviewers, specs)
+  _reconcile(config, specs)
 
 
 handlers.pull_request(func=_pr)
