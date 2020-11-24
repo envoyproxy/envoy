@@ -8,10 +8,12 @@
 
 namespace Envoy {
 namespace Upstream {
+
 using ::testing::_;
 using ::testing::Eq;
 using ::testing::Return;
 using ::testing::ReturnRef;
+
 MockClusterManager::MockClusterManager(TimeSource&) : MockClusterManager() {}
 
 MockClusterManager::MockClusterManager() {
@@ -28,6 +30,19 @@ MockClusterManager::MockClusterManager() {
   ON_CALL(*this, get(_)).WillByDefault(Return(&thread_local_cluster_));
   ON_CALL(*this, get(Eq(""))).WillByDefault(Return(nullptr));
   ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));
+}
+
+void MockClusterManager::initializeClusters(const std::vector<std::string>& active_cluster_names,
+                                            const std::vector<std::string>&) {
+  ClusterManager::ClusterInfoMaps info_map;
+  for (const auto& name : active_cluster_names) {
+    auto new_cluster = std::make_unique<NiceMock<MockCluster>>();
+    new_cluster->info_->name_ = name;
+    info_map.active_clusters_.emplace(name, *new_cluster);
+    active_clusters_.emplace(name, std::move(new_cluster));
+  }
+
+  ON_CALL(*this, clusters()).WillByDefault(Return(info_map));
 }
 
 MockClusterManager::~MockClusterManager() = default;

@@ -166,8 +166,13 @@ public:
   virtual void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
-  using ClusterInfoMap = absl::node_hash_map<std::string, std::reference_wrapper<const Cluster>>;
+  using ClusterInfoMap = absl::flat_hash_map<std::string, std::reference_wrapper<const Cluster>>;
   struct ClusterInfoMaps {
+    bool hasCluster(absl::string_view cluster) const {
+      return active_clusters_.find(cluster) != active_clusters_.end() ||
+             warming_clusters_.find(cluster) != warming_clusters_.end();
+    }
+
     ClusterInfoMap active_clusters_;
     ClusterInfoMap warming_clusters_;
   };

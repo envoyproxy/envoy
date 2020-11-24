@@ -34,6 +34,9 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
+  void initializeClusters(const std::vector<std::string>& active_cluster_names,
+                          const std::vector<std::string>& warming_cluster_names);
+
   // Upstream::ClusterManager
   MOCK_METHOD(bool, addOrUpdateCluster,
               (const envoy::config::cluster::v3::Cluster& cluster,
@@ -76,6 +79,8 @@ public:
   absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
+  absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
+  absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
 };
 } // namespace Upstream
 
