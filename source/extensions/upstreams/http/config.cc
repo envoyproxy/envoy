@@ -19,7 +19,7 @@ namespace {
 
 const envoy::config::core::v3::Http1ProtocolOptions&
 getHttpOptions(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
-  if (options.use_downstream_protocol_config()) {
+  if (options.has_use_downstream_protocol_config()) {
     return options.use_downstream_protocol_config().http_protocol_options();
   }
   return options.explicit_http_config().http_protocol_options();
@@ -27,7 +27,7 @@ getHttpOptions(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions
 
 const envoy::config::core::v3::Http2ProtocolOptions&
 getHttp2Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
-  if (options.use_downstream_protocol_config()) {
+  if (options.has_use_downstream_protocol_config()) {
     return options.use_downstream_protocol_config().http2_protocol_options();
   }
   return options.explicit_http_config().http2_protocol_options();
