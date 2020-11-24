@@ -480,8 +480,8 @@ void UpstreamRequest::clearRequestEncoder() {
   // Before clearing the encoder, unsubscribe from callbacks.
   if (upstream_) {
     parent_.callbacks()->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+    parent_.callbacks()->dispatcher().deferredDelete(std::move(upstream_));
   }
-  parent_.callbacks()->dispatcher().deferredDelete(std::move(upstream_));
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
