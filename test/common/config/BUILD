@@ -502,3 +502,13 @@ envoy_cc_test(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "watched_directory_test",
+    srcs = ["watched_directory_test.cc"],
+    deps = [
+        "//source/common/config:watched_directory_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
+    ],
+)

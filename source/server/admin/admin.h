@@ -14,7 +14,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -134,6 +134,7 @@ public:
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
+  std::chrono::milliseconds requestHeadersTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
@@ -255,6 +256,10 @@ private:
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
       Event::TimerPtr createScaledTimer(OverloadTimerType, Event::TimerCb callback) override {
+        return dispatcher_.createTimer(callback);
+      }
+      Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum,
+                                        Event::TimerCb callback) override {
         return dispatcher_.createTimer(callback);
       }
 

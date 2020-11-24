@@ -20,15 +20,17 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
 
       .. code-block:: console
 
-	 $ envoy --version
+         $ envoy --version
+         ...
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm \
-	       envoyproxy/|envoy_docker_image| \
-	           --version
+         $ docker run --rm \
+               envoyproxy/|envoy_docker_image| \
+                   --version
+         ...
 
 .. _start_quick_start_help:
 
@@ -44,15 +46,17 @@ flag:
 
       .. code-block:: console
 
-	 $ envoy --help
+         $ envoy --help
+         ...
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm \
-	       envoyproxy/|envoy_docker_image| \
-	           --help
+         $ docker run --rm \
+               envoyproxy/|envoy_docker_image| \
+                   --help
+         ...
 
 .. _start_quick_start_config:
 
@@ -70,7 +74,8 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. code-block:: console
 
-	 $ envoy -c envoy-demo.yaml
+         $ envoy -c envoy-demo.yaml
+         ...
 
    .. tab:: Docker
 
@@ -79,10 +84,11 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d \
+         $ docker run --rm -it \
                -p 9901:9901 \
-	       -p 10000:10000 \
-	       envoyproxy/|envoy_docker_image|
+               -p 10000:10000 \
+               envoyproxy/|envoy_docker_image|
+         ...
 
       To specify a custom configuration you can mount the config into the container, and specify the path with ``-c``.
 
@@ -90,44 +96,52 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d \
-	       -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml \
-	       -p 9901:9901 \
-	       -p 10000:10000 \
-	       envoyproxy/|envoy_docker_image| \
-	           -c /envoy-custom.yaml
+         $ docker run --rm -it \
+               -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml \
+               -p 9901:9901 \
+               -p 10000:10000 \
+               envoyproxy/|envoy_docker_image| \
+                   -c /envoy-custom.yaml
+         ...
 
-Check Envoy is proxying on http://localhost:10000
+Check Envoy is proxying on http://localhost:10000.
 
 .. code-block:: console
 
    $ curl -v localhost:10000
+   ...
 
-The Envoy admin endpoint should also be available at http://localhost:9901
+The Envoy admin endpoint should also be available at http://localhost:9901.
 
 .. code-block:: console
 
    $ curl -v localhost:9901
+   ...
+
+You can exit the server with `Ctrl-c`.
+
+See the :ref:`admin quick start guide <start_quick_start_admin>` for more information about the Envoy admin interface.
 
 .. _start_quick_start_override:
 
-Override the default configuration by merging a config file
------------------------------------------------------------
+Override the default configuration
+----------------------------------
 
-You can provide a configuration override file using ``--config-yaml`` which will merge with the main
+You can provide an override configuration using :option:`--config-yaml` which will merge with the main
 configuration.
+
+This option can only be specified once.
 
 Save the following snippet to ``envoy-override.yaml``:
 
 .. code-block:: yaml
 
-   listeners:
-     - name: listener_0
-       address:
-         socket_address:
-           port_value: 20000
+   admin:
+     address:
+       socket_address:
+         port_value: 9902
 
-Next, start the Envoy server using the override configuration.
+Next, start the Envoy server using the override configuration:
 
 .. tabs::
 
@@ -135,26 +149,199 @@ Next, start the Envoy server using the override configuration.
 
       .. code-block:: console
 
-	 $ envoy -c envoy-demo.yaml --config-yaml envoy-override.yaml
+         $ envoy -c envoy-demo.yaml --config-yaml "$(cat envoy-override.yaml)"
+         ...
 
    .. tab:: Docker
 
       .. substitution-code-block:: console
 
-	 $ docker run --rm -d \
-	       -v $(pwd)/envoy-override.yaml:/envoy-override.yaml \
-	       -p 20000:20000 \
-	       envoyproxy/|envoy_docker_image| \
-	           --config-yaml /envoy-override.yaml
+         $ docker run --rm -it \
+               -p 9902:9902 \
+               -p 10000:10000 \
+               envoyproxy/|envoy_docker_image| \
+                   -c /etc/envoy/envoy.yaml \
+                   --config-yaml "$(cat envoy-override.yaml)"
+         ...
 
-Envoy should now be proxying on http://localhost:20000
-
-.. code-block:: console
-
-   $ curl -v localhost:20000
-
-The Envoy admin endpoint should also be available at http://localhost:9901
+The Envoy admin interface should now be available on http://localhost:9902.
 
 .. code-block:: console
 
-   $ curl -v localhost:9901
+   $ curl -v localhost:9902
+   ...
+
+.. note::
+
+   When merging ``yaml`` lists (e.g. :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`
+   or :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`) the merged configurations
+   are appended.
+
+   You cannot therefore use an override file to change the configurations of previously specified
+   :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>` or
+   :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
+
+Validating your Envoy configuration
+-----------------------------------
+
+You can start Envoy in :option:`validate mode <--mode>`.
+
+This allows you to check that Envoy is able to start with your configuration, without actually starting
+or restarting the service, or making any network connections.
+
+If the configuration is valid the process will print ``OK`` and exit with a return code of ``0``.
+
+For invalid configuration the process will print the errors and exit with ``1``.
+
+.. tabs::
+
+   .. tab:: System
+
+      .. code-block:: console
+
+         $ envoy --mode validate -c my-envoy-config.yaml
+         [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
+         - name: base
+           static_layer:
+             {}
+         - name: admin
+           admin_layer:
+             {}
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)
+         [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
+         [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
+         configuration 'my-envoy-config.yaml' OK
+
+   .. tab:: Docker
+
+      .. substitution-code-block:: console
+
+         $ docker run --rm \
+               -v $(pwd)/my-envoy-config.yaml:/my-envoy-config.yaml \
+               envoyproxy/|envoy_docker_image| \
+                   --mode validate \
+                   -c my-envoy-config.yaml
+         [2020-11-08 12:36:06.543][11][info][main] [source/server/server.cc:583] runtime: layers:
+         - name: base
+           static_layer:
+             {}
+         - name: admin
+           admin_layer:
+             {}
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:95] loading tracing configuration
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:70] loading 0 static secret(s)
+         [2020-11-08 12:36:06.543][11][info][config] [source/server/configuration_impl.cc:76] loading 1 cluster(s)
+         [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
+         [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
+         configuration 'my-envoy-config.yaml' OK
+
+Envoy logging
+-------------
+
+By default Envoy system logs are sent to ``/dev/stderr``.
+
+This can be overridden using :option:`--log-path`.
+
+.. tabs::
+
+   .. tab:: System
+
+      .. code-block:: console
+
+         $ mkdir logs
+         $ envoy -c envoy-demo.yaml --log-path logs/custom.log
+
+   .. tab:: Docker
+
+      .. substitution-code-block:: console
+
+         $ mkdir logs
+         $ chmod go+rwx logs/
+         $ docker run --rm -it \
+               -p 10000:10000 \
+               -v $(pwd)/logs:/logs \
+               envoyproxy/|envoy_docker_image| \
+                   -c /etc/envoy/envoy.yaml \
+                   --log-path logs/custom.log
+
+:ref:`Access log <arch_overview_access_logs>` paths can be set for the
+:ref:`admin interface <start_quick_start_admin>`, and for configured
+:ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
+
+The :download:`demo configuration <_include/envoy-demo.yaml>` is configured with a
+:ref:`listener <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>` that logs access
+to ``/dev/stdout``:
+
+.. literalinclude:: _include/envoy-demo.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 12
+   :lines: 12-22
+   :emphasize-lines: 4-8
+
+The default configuration in the Envoy Docker container also logs access in this way.
+
+Logging to ``/dev/stderr`` and ``/dev/stdout`` for system and access logs respectively can
+be useful when running Envoy inside a container as the streams can be separated, and logging requires no
+additional files or directories to be mounted.
+
+Some Envoy :ref:`filters and extensions <api-v3_config>` may also have additional logging capabilities.
+
+Envoy can be configured to log to :ref:`different formats <config_access_log>`, and to
+:ref:`different outputs <api-v3_config_accesslog>` in addition to files and ``stdout/err``.
+
+.. note::
+
+   If you are running Envoy on a Windows system Envoy will output to ``CON`` by default.
+
+   This can also be used as a logging path when configuring logging.
+
+Debugging Envoy
+---------------
+
+The log level for Envoy system logs can be set using the :option:`-l or --log-level <--log-level>` option.
+
+The available log levels are:
+
+- ``trace``
+- ``debug``
+- ``info``
+- ``warning/warn``
+- ``error``
+- ``critical``
+- ``off``
+
+The default  is ``info``.
+
+You can also set the log level for specific components using the :option:`--component-log-level` option.
+
+The following example inhibits all logging except for the ``upstream`` and ``connection`` components,
+which are set to ``debug`` and ``trace`` respectively.
+
+.. tabs::
+
+   .. tab:: System
+
+      .. code-block:: console
+
+         $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
+         ...
+
+   .. tab:: Docker
+
+      .. substitution-code-block:: console
+
+         $ docker run --rm -d \
+               -p 9901:9901 \
+               -p 10000:10000 \
+               envoyproxy/|envoy_docker_image| \
+                   -c /etc/envoy/envoy.yaml \
+                   -l off \
+                   --component-log-level upstream:debug,connection:trace
+         ...
+
+.. tip::
+
+   See ``ALL_LOGGER_IDS`` in :repo:`logger.h </source/common/common/logger.h#L29>` for a list of components.

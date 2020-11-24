@@ -38,7 +38,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -229,6 +229,10 @@ message Bootstrap {
   // Each item contains extension specific configuration.
   repeated core.v4alpha.TypedExtensionConfig bootstrap_extensions = 21;
 
+  // Specifies optional extensions instantiated at startup time and
+  // invoked during crash time on the request that caused the crash.
+  repeated FatalAction fatal_actions = 28;
+
   // Configuration sources that will participate in
   // *udpa.core.v1.ResourceLocator* authority resolution. The algorithm is as
   // follows:
@@ -410,6 +414,23 @@ message Watchdog {
   // nonresponsive threads required for the *multikill_timeout*.
   // If not specified the default is 0.
   type.v3.Percent multikill_threshold = 5;
+}
+
+// Fatal actions to run while crashing. Actions can be safe (meaning they are
+// async-signal safe) or unsafe. We run all safe actions before we run unsafe actions.
+// If using an unsafe action that could get stuck or deadlock, it important to
+// have an out of band system to terminate the process.
+//
+// The interface for the extension is ``Envoy::Server::Configuration::FatalAction``.
+// *FatalAction* extensions live in the ``envoy.extensions.fatal_actions`` API
+// namespace.
+message FatalAction {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v3.FatalAction";
+
+  // Extension specific configuration for the action. It's expected to conform
+  // to the ``Envoy::Server::Configuration::FatalAction`` interface.
+  core.v4alpha.TypedExtensionConfig config = 1;
 }
 
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).

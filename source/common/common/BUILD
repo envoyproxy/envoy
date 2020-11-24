@@ -414,6 +414,6 @@ envoy_cc_library(
     name = "statusor_lib",
     hdrs = ["statusor.h"],
     deps = [
-        "//third_party/statusor:statusor_lib",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
