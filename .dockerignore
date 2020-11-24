@@ -1,5 +1,5 @@
 /*
-!/build*
+!/build_envoy
 !/ci
 !/configs/google-vrp
 !/configs/*yaml
