@@ -1,4 +1,5 @@
 /*
+!/build*
 !/ci
 !/configs/google-vrp
 !/configs/*yaml
