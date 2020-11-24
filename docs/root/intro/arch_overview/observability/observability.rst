@@ -1,4 +1,4 @@
-Observability
+可观察性
 =============
 
 .. toctree::
