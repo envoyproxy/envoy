@@ -6230,7 +6230,7 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
 
   Buffer::OwnedImpl data;
   EXPECT_CALL(encoder_, getStream()).Times(2).WillRepeatedly(ReturnRef(stream_));
-    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder_->decodeData(data, true);
 }
 
