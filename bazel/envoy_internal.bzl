@@ -46,7 +46,8 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:windows_x86_64": msvc_options,
                "//conditions:default": posix_options,
            }) + select({
-               # Simplify the amount of symbolic debug info for test binaries,
+               # Simplify the amount of symbolic debug info for test binaries, since
+               # debugging info detailing some 1600 test binaries would be wasteful.
                # targets listed in order from generic to increasing specificity.
                # Bazel adds an implicit -DNDEBUG for opt targets.
                repository + "//bazel:opt_build": [] if test else ["-ggdb3", "-gsplit-dwarf"],
@@ -68,7 +69,7 @@ def envoy_copts(repository, test = False):
                ],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
                # Allow 'nodiscard' function results values to be discarded for test code only
-               # TODO: Replace with /Zc:preprocessor for cl.exe versions >= 16.5
+               # TODO(envoyproxy/windows-dev): Replace with /Zc:preprocessor for cl.exe versions >= 16.5
                repository + "//bazel:windows_x86_64": ["-wd4834", "-experimental:preprocessor", "-Wv:19.4"] if test else ["-experimental:preprocessor", "-Wv:19.4"],
                repository + "//bazel:clang_cl_build": ["-Wno-unused-result"] if test else [],
                "//conditions:default": [],
