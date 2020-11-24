@@ -4,11 +4,8 @@ package envoy.extensions.upstreams.http.v4alpha;
 
 import "envoy/config/core/v4alpha/protocol.proto";
 
-import "google/protobuf/any.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.v4alpha";
 option java_outer_classname = "HttpProtocolOptionsProto";
@@ -16,7 +13,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: HTTP Protocol Options]
-// [#extension: envoy.filters.upstreams.http.http_protocol_options]
+// [#extension: envoy.upstreams.http.http_protocol_options]
 
 // HttpProtocolOptions specifies Http upstream protocol options. This object
 // is used in
@@ -59,7 +56,6 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //              http2_protocol_options:
 //                max_concurrent_streams: 100
 //        .... [further cluster config]
-//
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.upstreams.http.v3.HttpProtocolOptions";

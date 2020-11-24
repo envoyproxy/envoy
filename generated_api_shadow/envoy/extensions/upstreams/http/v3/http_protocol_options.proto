@@ -4,11 +4,7 @@ package envoy.extensions.upstreams.http.v3;
 
 import "envoy/config/core/v3/protocol.proto";
 
-import "google/protobuf/any.proto";
-
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.v3";
 option java_outer_classname = "HttpProtocolOptionsProto";
@@ -16,7 +12,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP Protocol Options]
-// [#extension: envoy.filters.upstreams.http.http_protocol_options]
+// [#extension: envoy.upstreams.http.http_protocol_options]
 
 // HttpProtocolOptions specifies Http upstream protocol options. This object
 // is used in
@@ -59,7 +55,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //              http2_protocol_options:
 //                max_concurrent_streams: 100
 //        .... [further cluster config]
-//
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols (HTTP/1.1, HTTP/2).
   // If :ref:`http2_protocol_options <envoy_api_field_config.cluster.v3.Cluster.http2_protocol_options>` are

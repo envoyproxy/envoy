@@ -19,18 +19,18 @@ namespace {
 
 const envoy::config::core::v3::Http1ProtocolOptions&
 getHttpOptions(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
-  if (options.has_explicit_http_config()) {
-    return options.explicit_http_config().http_protocol_options();
+  if (options.use_downstream_protocol_config()) {
+    return options.use_downstream_protocol_config().http_protocol_options();
   }
-  return options.use_downstream_protocol_config().http_protocol_options();
+  return options.explicit_http_config().http_protocol_options();
 }
 
 const envoy::config::core::v3::Http2ProtocolOptions&
 getHttp2Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
-  if (options.has_explicit_http_config()) {
-    return options.explicit_http_config().http2_protocol_options();
+  if (options.use_downstream_protocol_config()) {
+    return options.use_downstream_protocol_config().http2_protocol_options();
   }
-  return options.use_downstream_protocol_config().http2_protocol_options();
+  return options.explicit_http_config().http2_protocol_options();
 }
 
 } // namespace
