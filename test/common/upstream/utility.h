@@ -9,6 +9,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
+#include "common/config/metadata.h"
+#include "common/config/well_known_names.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -115,6 +117,21 @@ makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
   return std::make_shared<HostImpl>(cluster, "", Network::Utility::resolveUrl(url), nullptr, weight,
                                     envoy::config::core::v3::Locality(), health_check_config, 0,
                                     envoy::config::core::v3::UNKNOWN, time_source);
+}
+
+inline HostSharedPtr makeTestHostWithHashKey(ClusterInfoConstSharedPtr cluster,
+                                             const std::string& hash_key, const std::string& url,
+                                             TimeSource& time_source, uint32_t weight = 1) {
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().HASH_KEY)
+      .set_string_value(hash_key);
+  return std::make_shared<HostImpl>(
+      cluster, "", Network::Utility::resolveUrl(url),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), weight,
+      envoy::config::core::v3::Locality(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN, time_source);
 }
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,

@@ -339,6 +339,8 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
