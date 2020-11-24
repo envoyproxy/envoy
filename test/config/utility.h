@@ -14,6 +14,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/config/api_version.h"
@@ -263,8 +264,7 @@ public:
   // Set new codecs to use for upstream and downstream codecs.
   void setNewCodecs();
 
-  using HttpProtocolOptions =
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions;
+  using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
   static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);

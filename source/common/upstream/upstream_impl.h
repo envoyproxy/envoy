@@ -54,7 +54,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
-#include "extensions/filters/network/http_connection_manager/config.h"
+#include "extensions/upstreams/http/config.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
@@ -516,7 +516,7 @@ private:
 class ClusterInfoImpl : public ClusterInfo, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   using HttpProtocolOptionsConfigImpl =
-      Envoy::Extensions::NetworkFilters::HttpConnectionManager::ProtocolOptionsConfigImpl;
+      Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,

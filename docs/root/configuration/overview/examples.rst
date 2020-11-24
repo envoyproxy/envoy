@@ -109,8 +109,8 @@ on 127.0.0.1:5678 is provided below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       typed_extension_protocol_options:
-        envoy.filters.network.http_connection_manager:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options:
               connection_keepalive:
@@ -197,8 +197,8 @@ below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       typed_extension_protocol_options:
-        envoy.filters.network.http_connection_manager:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options:
               # Configure an HTTP/2 keep-alive to detect connection issues and reconnect

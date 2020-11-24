@@ -135,8 +135,8 @@ upstream.healthy_panic_threshold
   Defaults to 50%.
 
 upstream.use_http2
-  Whether the cluster utilizes the *http2* if configured in `HttpProtocolOptions <envoy_v3_msg_config.filters.network.http_connection_manager.v3.HttpProtocolOptions>`.
-  Set to 0 to disable HTTP/2 even if the feature is configured. Defaults to enabled. FIXME
+  Whether the cluster utilizes the *http2* if configured in `HttpProtocolOptions <envoy_v3_msg_config.upstreams.http.v3.HttpProtocolOptions>`.
+  Set to 0 to disable HTTP/2 even if the feature is configured. Defaults to enabled.
 
 .. _config_cluster_manager_cluster_runtime_zone_routing:
 

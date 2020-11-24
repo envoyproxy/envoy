@@ -2369,8 +2369,8 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
-                            "Didn't find a registered network or http filter implementation for "
-                            "name: 'no_such_filter'");
+                            "Didn't find a registered network or http filter or "
+                            "protocol options implementation for name: 'no_such_filter'");
 }
 
 TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
@@ -2393,8 +2393,8 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                            "Didn't find a registered network or http filter implementation for "
-                            "name: 'no_such_filter'");
+                            "Didn't find a registered network or http filter or "
+                            "protocol options implementation for name: 'no_such_filter'");
 }
 
 // This test case can't be converted for V3 API as it is specific for extension_protocol_options
@@ -2556,8 +2556,8 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
 
   const std::string explicit_timeout_new = R"EOF(
     typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF";
@@ -2579,8 +2579,8 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
 
   const std::string no_timeout_new = R"EOF(
     typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         common_http_protocol_options:
           idle_timeout: 0s
   )EOF";

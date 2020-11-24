@@ -162,10 +162,15 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
         Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
             name);
   }
+  if (factory == nullptr) {
+    factory =
+        Registry::FactoryRegistry<Server::Configuration::ProtocolOptionsFactory>::getFactory(name);
+  }
 
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
-        "Didn't find a registered network or http filter implementation for name: '{}'", name));
+    throw EnvoyException(fmt::format("Didn't find a registered network or http filter or protocol "
+                                     "options implementation for name: '{}'",
+                                     name));
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyProtocolOptionsProto();
@@ -176,7 +181,6 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
 
   Envoy::Config::Utility::translateOpaqueConfig(
       typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
-
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
@@ -720,7 +724,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
-                                    "envoy.filters.network.http_connection_manager"))),
+                                    "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"))),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -867,7 +871,6 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   if (i != extension_protocol_options_.end()) {
     return i->second;
   }
-
   return nullptr;
 }
 

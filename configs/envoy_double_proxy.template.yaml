@@ -154,8 +154,8 @@ static_resources:
             match_subject_alt_names:
               exact: "front-proxy.yourcompany.net"
     typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
   - name: lightstep_saas
@@ -173,8 +173,8 @@ static_resources:
                 port_value: 443
                 protocol: TCP
     typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
     transport_socket:

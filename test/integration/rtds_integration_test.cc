@@ -17,8 +17,8 @@ static_resources:
   clusters:
   - name: dummy_cluster
     typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {{}}
     load_assignment:
@@ -32,8 +32,8 @@ static_resources:
                 port_value: 0
   - name: rtds_cluster
     typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {{}}
     load_assignment:

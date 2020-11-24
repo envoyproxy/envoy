@@ -382,7 +382,7 @@ TEST_P(TcpTunnelingIntegrationTest, InvalidCluster) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
     ConfigHelper::HttpProtocolOptions protocol_options;
     (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.filters.network.http_connection_manager"]
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
             .PackFrom(protocol_options);
   });
   initialize();

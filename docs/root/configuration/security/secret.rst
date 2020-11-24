@@ -124,8 +124,8 @@ This example shows how to configure secrets fetched from remote SDS servers:
     clusters:
       - name: sds_server_mtls
         typed_extension_protocol_options:
-          envoy.filters.network.http_connection_manager:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
             explicit_http_config:
               http2_protocol_options:
                 connection_keepalive:
@@ -152,8 +152,8 @@ This example shows how to configure secrets fetched from remote SDS servers:
                 filename: certs/sds_key.pem
       - name: sds_server_uds
         typed_extension_protocol_options:
-          envoy.filters.network.http_connection_manager:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
             explicit_http_config:
               http2_protocol_options: {}
         load_assignment:
@@ -237,8 +237,8 @@ In contrast, :ref:`sds_server_example` requires a restart to reload xDS certific
                   address: controlplane
                   port_value: 8443
       typed_extension_protocol_options:
-        envoy.filters.network.http_connection_manager:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {}
       transport_socket:
