@@ -1,28 +1,14 @@
 .. _arch_overview_jwt_authn:
 
-JSON Web Token (JWT) Authentication
+JSON Web Token（JWT）认证
 ===================================
 
-* :ref:`HTTP filter configuration <config_http_filters_jwt_authn>`.
+* :ref:`HTTP 过滤器配置 <config_http_filters_jwt_authn>`。
 
-The JSON Web Token (JWT) Authentication filter checks if the incoming request has a valid
-`JSON Web Token (JWT) <https://tools.ietf.org/html/rfc7519>`_. It checks the validity of the JWT by
-verifying the JWT signature, audiences and issuer based on the
-:ref:`HTTP filter configuration <config_http_filters_jwt_authn>`. The JWT Authentication filter
-could be configured to either reject the request with invalid JWT immediately or defer the decision
-to later filters by passing the JWT payload to other filters.
+JSON Web Token (JWT) 认证过滤器检查传入的请求是否具有有效的 JSON Web Token (JWT)。它通过基于 :ref:`HTTP 过滤器配置 <config_http_filters_jwt_authn>` 来验证 JWT 签名、受众和发行者来检查 JWT 的有效性。JWT 认证过滤器可以配置为立即拒绝无效的 JWT 请求，或者继续将 JWT 有效负载传递给其它过滤器，由后续的过滤器来决定是否拒绝。
 
-The JWT Authentication filter supports to check the JWT under various conditions of the request, it
-could be configured to check JWT only on specific paths so that you could allowlist some paths from
-the JWT authentication, which is useful if a path is accessible publicly and doesn't require any JWT
-authentication.
+JWT 认证过滤器支持在请求的各种条件下检查 JWT，可以将其配置为仅在特定路径上检查 JWT，这样您就可以允许列出来自 JWT 认证的一些路径，如果路径是可公开访问的，并且不需要任何 JWT 认证，那么这将非常有用。
 
-The JWT Authentication filter supports to extract the JWT from various locations of the request and
-could combine multiple JWT requirements for the same request. The
-`JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517>`_ needed for the JWT signature
-verification could be either specified inline in the filter config or fetched from remote server
-via HTTP/HTTPS.
+JWT 认证过滤器支持从请求的不同位置提取 JWT，并且可以合并针对同一请求的多个 JWT 要求。JWT 签名验证所需的 `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517>`_ 可以在过滤器配置中内联指定，也可以通过 HTTP/HTTPS 从远程服务器获取。
 
-The JWT Authentication filter also supports to write the payloads of the successfully verified JWT
-to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>` so that later filters could use
-it to make their own decisions based on the JWT payloads.
+JWT 认证过滤器还支持将成功验证的 JWT 的有效载荷写入 :ref:`动态状态 <arch_overview_data_sharing_between_filters>`，以便后续的过滤器可以使用它来基于 JWT 有效负载做出自己的决定。
