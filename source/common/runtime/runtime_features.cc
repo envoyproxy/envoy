@@ -111,9 +111,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.upstream_http2_flood_checks",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
-    // gRPC Timeout header is missing (#13580)
-    "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
-
 };
 
 RuntimeFeatures::RuntimeFeatures() {
