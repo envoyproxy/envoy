@@ -64,7 +64,6 @@ DRIVER_DIR="${TEST_SRCDIR}/envoy/test/extensions/filters/network/thrift_proxy/dr
 # On UNIX python supports AF_UNIX socket which are more reliable and efficient for communication
 # between the client and the server, so we use it. On Windows, we find a random unused port
 # on and let the communication happen via TCP.
-
 SOCKET=""
 if [[ "$OSTYPE" == "msys" ]]; then
     while
@@ -75,7 +74,9 @@ if [[ "$OSTYPE" == "msys" ]]; then
     done
     SOCKET="127.0.0.1:${port}"
 else
-    TEST_UDSDIR=$(mktemp -d /tmp/envoy_test_thrift.XXXXXX)
+    if [[ -z "${TEST_UDSDIR}" ]]; then	
+        TEST_UDSDIR=$(mktemp -d /tmp/envoy_test_thrift.XXXXXX)	
+    fi
     SOCKET="${TEST_UDSDIR}/fixture.sock"
     rm -f "${SOCKET}"
 fi
@@ -101,10 +102,20 @@ fi
 if [[ "$OSTYPE" == "msys" ]]; then
     echo "${SERVICE_FLAGS[@]}"
     "${DRIVER_DIR}/server.exe" "${SERVICE_FLAGS[@]}" &
+    SERVER_PID="$!"
 else
-    "${DRIVER_DIR}/server" "--unix" "${SERVICE_FLAGS[@]}" &
+    SERVICE_FLAGS+=("--unix")	
+    "${DRIVER_DIR}/server" "${SERVICE_FLAGS[@]}" &
+    SERVER_PID="$!"
+    while [[ ! -a "${SOCKET}" ]]; do
+        sleep 0.1
+
+        if ! kill -0 "${SERVER_PID}"; then
+            echo "server failed to start"
+            exit 1	fi
+        fi	
+    done
 fi
-SERVER_PID="$!"
 
 trap 'kill ${SERVER_PID}' EXIT;
 
