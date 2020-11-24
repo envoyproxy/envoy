@@ -5,7 +5,6 @@
 
 #include "gtest/gtest.h"
 
-using ::testing::ElementsAre;
 using ::testing::Pair;
 
 namespace Envoy {
