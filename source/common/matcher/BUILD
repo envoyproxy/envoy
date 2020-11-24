@@ -21,6 +21,7 @@ envoy_cc_library(
     hdrs = ["value_input_matcher.h"],
     deps = [
         "//include/envoy/matcher:matcher_interface",
+        "//source/common/common:matchers_lib",
     ],
 )
 
