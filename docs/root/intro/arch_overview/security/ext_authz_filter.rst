@@ -1,38 +1,24 @@
 .. _arch_overview_ext_authz:
 
-External Authorization
+外部授权
 ======================
 
-* :ref:`Network filter configuration <config_network_filters_ext_authz>`.
-* :ref:`HTTP filter configuration <config_http_filters_ext_authz>`.
+* :ref:`网络层过滤器配置 <config_network_filters_ext_authz>`。
+* :ref:`HTTP 过滤器配置 <config_http_filters_ext_authz>`。
 
-The External authorization filter calls an authorization service to check if the incoming request
-is authorized or not. The filter can be either configured as a
-:ref:`network filter <config_network_filters_ext_authz>`, or as a
-:ref:`HTTP filter <config_http_filters_ext_authz>` or both. If the request is deemed
-unauthorized by the network filter then the connection will be closed. If the request is deemed
-unauthorized at the HTTP filter the request will be denied with 403 (Forbidden) response.
+外部授权过滤器调用授权服务以检查传入请求是否被授权。过滤器可以配置为 :ref:`网络层过滤器 <config_network_filters_ext_authz>` 或 :ref:`HTTP 过滤器 <config_http_filters_ext_authz>` 或同时配置两者。如果该请求被网络层过滤器视为未被授权，则连接将被关闭。如果该请求在 HTTP 过滤器中被视为未被授权，则该请求将被 403（禁止）响应拒绝。
 
 .. tip::
-  It is recommended that these filters are configured as the first filter in the filter chain so
-  that requests are authorized prior to rest of the filters processing the request.
+  建议将授权过滤器配置为过滤器链中的第一个过滤器，以便在其余过滤器处理请求之前对请求进行授权处理。
 
-The external authorization service cluster may be either statically configured or configured via
-the :ref:`Cluster Discovery Service <config_cluster_manager_cds>`. If the external service is not
-available when a request comes in then whether the request is authorized or not is defined by the
-configuration setting of *failure_mode_allow* configuration in the applicable
-:ref:`network filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>` or
-:ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`. If it is set to
-true then the request will be permitted (fail open) otherwise it will be denied.
-The default setting is *false*.
+外部授权服务群集可以是静态配置的，也可以是通过 :ref:`集群服务发现 <config_cluster_manager_cds>` 配置的。如果在请求到达时外部服务不可用，则该请求是否被授权由 :ref:`网络层过滤器 <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>` 或 :ref:`HTTP 过滤器 <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>` 中的 *failure_mode_allow* 配置项的设置决定。如果将其设置为 true，则该请求将被放行（故障打开），否则将被拒绝。
+默认设置为 false。
 
-Service Definition
+服务定义
 ------------------
 
-The context of the traffic is passed on to an external authorization service using the service
-definition listed here.
-The content of the request that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
+与外部授权服务通信的上下文使用此处的定义
+传递给授权服务的请求内容由 :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>` 指定。
 
 .. toctree::
   :glob:
