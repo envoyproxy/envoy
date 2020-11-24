@@ -814,9 +814,9 @@ protected:
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
-  TimeSource& time_source_;
 
 protected:
+  TimeSource& time_source_;
   PrioritySetImpl priority_set_;
 
   void validateEndpointsForZoneAwareRouting(

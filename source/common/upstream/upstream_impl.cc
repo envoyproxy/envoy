@@ -893,11 +893,11 @@ ClusterImplBase::ClusterImplBase(
     Stats::ScopePtr&& stats_scope, bool added_via_api, TimeSource& time_source)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      time_source_(time_source),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
-          factory_context.singletonManager(), factory_context.dispatcher())),
-      time_source_(time_source) {
+          factory_context.singletonManager(), factory_context.dispatcher())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
