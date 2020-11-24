@@ -80,7 +80,9 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
         {":status", std::to_string(http_response_status)}};
     stream->expectInitialMetadata(empty_metadata_);
     stream->expectTrailingMetadata(empty_metadata_);
-    stream->expectGrpcStatus(Grpc::Utility::httpToGrpcStatus(http_response_status));
+    // Translate status per
+    // // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
+    stream->expectGrpcStatus(Utility::httpToGrpcStatus(http_response_status));
     stream->fake_stream_->encodeHeaders(reply_headers, true);
     dispatcher_helper_.runDispatcher();
   }
