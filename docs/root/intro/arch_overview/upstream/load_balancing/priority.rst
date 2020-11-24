@@ -1,98 +1,73 @@
 .. _arch_overview_load_balancing_priority_levels:
 
-Priority levels
+优先级别
 ------------------
 
-During load balancing, Envoy will generally only consider hosts configured at the highest priority
-level. For each EDS :ref:`LocalityLbEndpoints<envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>` an optional
-priority may also be specified. When endpoints at the highest priority level (P=0) are healthy, all
-traffic will land on endpoints in that priority level. As endpoints for the highest priority level
-become unhealthy, traffic will begin to trickle to lower priority levels.
+在负载均衡过程中，Envoy 一般只会考虑处于最高优先级的主机。对于每个 EDS :ref:`LocalityLbEndpoints <envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>` 还可以指定一个可选的优先级。当最高优先级（P=0）的端点是健康的，所有的流量将流转在该优先级的端点上。当最高优先级的端点变得不健康时，流量将开始流向较低优先级的端点。
 
-The system can be overprovisioned with a configurable
-:ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>`, which
-currently defaults to 1.4 (this document will assume this value). If 80% of the endpoints in a
-priority level are healthy, that level is still considered fully healthy because 80*1.4 > 100.
-So, level 0 endpoints will continue to receive all traffic until less than ~71.4% of them are
-healthy.
+系统可以通过 :ref:`超额供给系数 <arch_overview_load_balancing_overprovisioning_factor>` 配置超额供给流量，目前默认值为 1.4（本文档中的默认值）。如果一个优先级中 80% 的端点是健康的，那么这个级别仍然被认为是完全健康的，因为 80 * 1.4 > 100。因此，P=0 级别端点将继续接收所有流量，直到健康的节点占比低于 71.4%。
 
-The priority level logic works with integer health scores. The health score of a level is
-(percent of healthy hosts in the level) * (overprovisioning factor), capped at 100%. P=0
-endpoints receive (level 0's health score) percent of the traffic, with the rest flowing
-to P=1 (assuming P=1 is 100% healthy - more on that later). For instance, when 50% of P=0
-endpoints are healthy, they will receive 50 * 1.4 = 70% of the traffic.
-The integer percents of traffic that each priority level receives are collectively called the
-system's "priority load". More examples (with 2 priority levels, P=1 100% healthy):
+优先级逻辑适用于整数健康分数。一个优先级级别的健康分数是（该级别中健康主机的百分比）*（超额供给系数），上限为 100%。P=0 的端点收到（0 级的健康分数）% 的流量，其余的流量流向 P=1（假设 P=1 是 100% 健康的 — 后文再进一步说明）。例如，当 50% 的 P=0 端点是健康的，它们将收到 50 * 1.4 = 70% 的流量。每个优先级收到的流量的整数百分比，统称为系统的“优先级负载”。以下是一个例子（有 2 个优先级，P=1 100% 健康）：
 
-+----------------------------+----------------+-----------------+
-| P=0 healthy endpoints      | Traffic to P=0 |  Traffic to P=1 |
-+============================+================+=================+
-| 100%                       | 100%           |   0%            |
-+----------------------------+----------------+-----------------+
-| 72%                        | 100%           |   0%            |
-+----------------------------+----------------+-----------------+
-| 71%                        | 99%            |   1%            |
-+----------------------------+----------------+-----------------+
-| 50%                        | 70%            |   30%           |
-+----------------------------+----------------+-----------------+
-| 25%                        | 35%            |   65%           |
-+----------------------------+----------------+-----------------+
-| 0%                         | 0%             |   100%          |
-+----------------------------+----------------+-----------------+
++--------------+---------------+---------------+
+| P=0 健康端点 | 到 P=0 的流量 | 到 P=1 的流量 |
++==============+===============+===============+
+| 100%         | 100%          | 0%            |
++--------------+---------------+---------------+
+| 72%          | 100%          | 0%            |
++--------------+---------------+---------------+
+| 71%          | 99%           | 1%            |
++--------------+---------------+---------------+
+| 50%          | 70%           | 30%           |
++--------------+---------------+---------------+
+| 25%          | 35%           | 65%           |
++--------------+---------------+---------------+
+| 0%           | 0%            | 100%          |
++--------------+---------------+---------------+
 
 .. attention::
 
-  In order for the load distribution algorithm and normalized total health calculation to work
-  properly, each priority level must be able to handle (100% * overprovision factor) of the
-  traffic: Envoy assumes a 100% healthy P=1 can take over entirely for an unhealthy P=0, etc.
-  If P=0 has 10 hosts but P=1 only has 2 hosts, that assumption probably will not hold.
+  为了使负载分配算法和归一化总健康计算能够正常工作，每个优先级必须能够处理（100% * 超额供给系数）的流量：Envoy 假设一个 100% 健康的 P=1 可以完全取代一个不健康的 P=0，等等。如果 P=0 有 10 台主机，但 P=1 只有 2 台主机，这个假设可能就不成立了。
 
-The health score represents a level's current ability to handle traffic, after factoring in how
-overprovisioned the level originally was, and how many endpoints are currently unhealthy.
-Therefore, if the sum across all levels' health scores is < 100, then Envoy believes there are not
-enough healthy endpoints to fully handle the traffic. This sum is called the "normalized total
-health." When normalized total health drops below 100, traffic is distributed after normalizing
-the levels' health scores to that sub-100 total. E.g. healths of {20, 30} (yielding a normalized
-total health of 50) would be normalized, and result in a priority load of {40%, 60%} of traffic.
+健康分数代表了该级别当前处理流量的能力，它会受该级别最初的超额配置以及当前有不健康节点数量所影响。因此，如果所有级别的健康分数之和小于 100，那么 Envoy 认为没有足够的健康端点来完全处理流量。这个总和称为‘归一化总健康度“。当归一化总健康度降到 100 以下时，将各层的健康度分数归一化到该 100 以下的总分后再分配流量。如：健康度为 {20，30}（得出归一化的总健康度为 50）将被归一化，最终流量优先负载为 {40%，60%} 。
 
-+------------------------+-------------------------+-----------------+----------------+
-| P=0 healthy endpoints  | P=1 healthy endpoints   | Traffic to  P=0 | Traffic to P=1 |
-+========================+=========================+=================+================+
-| 100%                   |  100%                   | 100%            |   0%           |
-+------------------------+-------------------------+-----------------+----------------+
-| 72%                    |  72%                    | 100%            |   0%           |
-+------------------------+-------------------------+-----------------+----------------+
-| 71%                    |  71%                    | 99%             |   1%           |
-+------------------------+-------------------------+-----------------+----------------+
-| 50%                    |  50%                    | 70%             |   30%          |
-+------------------------+-------------------------+-----------------+----------------+
-| 25%                    |  100%                   | 35%             |   65%          |
-+------------------------+-------------------------+-----------------+----------------+
-| 25%                    |  25%                    | 50%             |   50%          |
-+------------------------+-------------------------+-----------------+----------------+
++--------------+--------------+---------------+---------------+
+| P=0 健康端点 | P=1 健康端点 | 到 P=0 的流量 | 到 P=1 的流量 |
++==============+==============+===============+===============+
+| 100%         | 100%         | 100%          | 0%            |
++--------------+--------------+---------------+---------------+
+| 72%          | 72%          | 100%          | 0%            |
++--------------+--------------+---------------+---------------+
+| 71%          | 71%          | 99%           | 1%            |
++--------------+--------------+---------------+---------------+
+| 50%          | 50%          | 70%           | 30%           |
++--------------+--------------+---------------+---------------+
+| 25%          | 100%         | 35%           | 65%           |
++--------------+--------------+---------------+---------------+
+| 25%          | 25%          | 50%           | 50%           |
++--------------+--------------+---------------+---------------+
 
-As more priorities are added, each level consumes load equal to its normalized effective health,
-unless the healths of the levels above it sum to 100%, in which case it receives no load.
+随着更多优先级的增加，每一级都会消耗相当于其归一化的有效健康值的负载，除非它上面各层的健康值之和达到 100%，在这种情况下，它不会收到负载。
 
-+-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
-| P=0 healthy endpoints | P=1 healthy endpoints | P=2 healthy endpoints | Traffic to P=0 | Traffic to P=1 | Traffic to P=2 |
-+=======================+=======================+=======================+================+================+================+
-| 100%                  |  100%                 |  100%                 | 100%           |   0%           |   0%           |
-+-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
-| 72%                   |  72%                  |  100%                 | 100%           |   0%           |   0%           |
-+-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
-| 71%                   |  71%                  |  100%                 | 99%            |   1%           |   0%           |
-+-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
-| 50%                   |  50%                  |  100%                 | 70%            |   30%          |   0%           |
-+-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
-| 25%                   |  100%                 |  100%                 | 35%            |   65%          |   0%           |
-+-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
-| 25%                   |  25%                  |  100%                 | 35%            |   35%          |   30%          |
-+-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
-| 25%                   |  25%                  |   20%                 | 36%            |   36%          |   28%          |
-+-----------------------+-----------------------+-----------------------+----------------+----------------+----------------+
++--------------+--------------+--------------+---------------+---------------+---------------+
+| P=0 健康端点 | P=1 健康端点 | P=2 健康端点 | 到 P=0 的流量 | 到 P=1 的流量 | 到 P=2 的流量 |
++==============+==============+==============+===============+===============+===============+
+| 100%         | 100%         | 100%         | 100%          | 0%            | 0%            |
++--------------+--------------+--------------+---------------+---------------+---------------+
+| 72%          | 72%          | 100%         | 100%          | 0%            | 0%            |
++--------------+--------------+--------------+---------------+---------------+---------------+
+| 71%          | 71%          | 100%         | 99%           | 1%            | 0%            |
++--------------+--------------+--------------+---------------+---------------+---------------+
+| 50%          | 50%          | 100%         | 70%           | 30%           | 0%            |
++--------------+--------------+--------------+---------------+---------------+---------------+
+| 25%          | 100%         | 100%         | 35%           | 65%           | 0%            |
++--------------+--------------+--------------+---------------+---------------+---------------+
+| 25%          | 25%          | 100%         | 35%           | 35%           | 30%           |
++--------------+--------------+--------------+---------------+---------------+---------------+
+| 25%          | 25%          | 20%          | 36%           | 36%           | 28%           |
++--------------+--------------+--------------+---------------+---------------+---------------+
 
-To sum this up in pseudo algorithms:
+用伪代码来来总结一下算法：
 
 ::
 
@@ -102,6 +77,4 @@ To sum this up in pseudo algorithms:
   priority_load(P_X) = min(100 - Σ(priority_load(P_0)..priority_load(P_X-1)),
                            health(P_X) * 100 / normalized_total_health)
 
-Note: This sectioned talked about healthy priorities, but this also extends to
-:ref:`degraded priorities <arch_overview_load_balancing_degraded>`.
-
+注意：这一节讲的是健康的优先级，但这也可以应用到 :ref:`降级的优先级 <arch_overview_load_balancing_degraded>`。
