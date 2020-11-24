@@ -1,47 +1,46 @@
 .. _arch_overview_external_deps:
 
-External dependencies
+外部依赖
 =====================
 
-Below we enumerate the external dependencies that may be linked into the Envoy binary. We exclude
-dependencies that only are used in CI or developer tooling above.
+下面列举了可能被链接到 Envoy 二进制文件中的外部依赖项，排除了那些只在 CI 或开发者工具中使用的依赖项。
 
-Data plane (core)
+数据平面（核心）
 -----------------
 
 .. include:: external_dep_dataplane_core.rst
 
-Data plane (extensions)
+数据平面（扩展）
 -----------------------
 
 .. include:: external_dep_dataplane_ext.rst
 
-Control plane
+控制平面
 -------------
 
 .. include:: external_dep_controlplane.rst
 
-Observability (core)
+可观测性（核心）
 --------------------
 
 .. include:: external_dep_observability_core.rst
 
-Observability (extensions)
+可观测性（扩展）
 --------------------------
 
 .. include:: external_dep_observability_ext.rst
 
-Test only
+仅测试
 ---------
 
 .. include:: external_dep_test_only.rst
 
-Build
+构建
 -----
 
 .. include:: external_dep_build.rst
 
-Miscellaneous
+其他
 -------------
 
 .. include:: external_dep_other.rst
