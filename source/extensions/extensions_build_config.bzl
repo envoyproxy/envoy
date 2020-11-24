@@ -71,7 +71,8 @@ EXTENSIONS = {
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
-    "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
+    # !!! kill_request filter should not be built into Envoy. !!!
+    # "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
     "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
     "envoy.filters.http.oauth2":                         "//source/extensions/filters/http/oauth2:config",

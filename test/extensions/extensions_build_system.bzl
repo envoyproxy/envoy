@@ -8,7 +8,8 @@ def envoy_extension_cc_test(
         name,
         extension_name,
         **kwargs):
-    if not extension_name in EXTENSIONS:
+    # Even though extension "envoy.filters.http.kill_request" is commented out in EXTENSIONS, it is still desired to run its tests.
+    if not extension_name in EXTENSIONS and extension_name != "envoy.filters.http.kill_request":
         return
 
     envoy_cc_test(name, **kwargs)
