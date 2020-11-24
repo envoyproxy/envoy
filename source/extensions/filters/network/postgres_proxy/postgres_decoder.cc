@@ -301,14 +301,10 @@ void DecoderImpl::decodeBackendStatements() {
   }
   std::string statement = message_.substr(0, position);
 
-  ENVOY_LOG(debug, "statement = {} {}", statement, statement.length());
-
   auto it = BE_statements_.find(statement);
   if (it != BE_statements_.end()) {
-    ENVOY_LOG(debug, "FOUND statement", statement);
     (*it).second(this);
   } else {
-    ENVOY_LOG(debug, "NOT FOUND statement", statement);
     callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
