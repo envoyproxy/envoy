@@ -33,6 +33,7 @@ using testing::DoubleNear;
 using testing::Eq;
 using testing::Invoke;
 using testing::Mock;
+using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -538,6 +539,30 @@ TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
   factory1_.monitor_->setPressure(0.6);
 
   timer_cb_();
+}
+
+TEST_F(OverloadManagerImplTest, CreateScaledTimerWithProvidedMinimum) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+  manager->start();
+
+  auto* mock_scaled_timer = new Event::MockTimer();
+  MockFunction<Event::TimerCb> mock_callback;
+  EXPECT_CALL(*scaled_timer_manager, createTimer_)
+      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
+        // This timer was created with an absolute minimum. Test that by checking an arbitrary
+        // value.
+        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(3));
+        return mock_scaled_timer;
+      });
+
+  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
+      Event::AbsoluteMinimum(std::chrono::seconds(3)), mock_callback.AsStdFunction());
+  EXPECT_EQ(timer.get(), mock_scaled_timer);
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {

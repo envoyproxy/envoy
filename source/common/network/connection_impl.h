@@ -62,6 +62,7 @@ public:
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
+  bool isHalfCloseEnabled() override { return enable_half_close_; }
   void close(ConnectionCloseType type) final;
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;

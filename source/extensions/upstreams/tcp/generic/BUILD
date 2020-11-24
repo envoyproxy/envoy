@@ -19,6 +19,7 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     visibility = ["//visibility:public"],
     deps = [
+        "//source/common/http:codec_client_lib",
         "//source/common/tcp_proxy:upstream_lib",
         "@envoy_api//envoy/extensions/upstreams/tcp/generic/v3:pkg_cc_proto",
     ],

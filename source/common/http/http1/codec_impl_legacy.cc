@@ -78,8 +78,8 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
-      is_response_to_head_request_(false), is_response_to_connect_request_(false),
-      header_key_formatter_(header_key_formatter) {
+      connect_request_(false), is_response_to_head_request_(false),
+      is_response_to_connect_request_(false), header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -262,6 +262,10 @@ void StreamEncoderImpl::endEncode() {
 
   connection_.flushOutput(true);
   connection_.onEncodeComplete();
+  // With CONNECT half-closing the connection is used to signal end stream.
+  if (connect_request_) {
+    connection_.connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+  }
 }
 
 void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) {
@@ -381,6 +385,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     head_request_ = true;
   } else if (method->value() == Headers::get().MethodValues.Connect) {
     disableChunkEncoding();
+    connection_.connection().enableHalfClose(true);
     connect_request_ = true;
   }
   if (Utility::isUpgrade(headers)) {
@@ -524,6 +529,16 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   // converts them to error statuses.
   return Utility::exceptionToStatus(
       [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
+  Http::Status status = ConnectionImpl::dispatch(data);
+  if (status.ok() && data.length() > 0) {
+    // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
+    // after a response is complete indicates an error.
+    return codecProtocolError("http/1.1 protocol error: extraneous data after response complete");
+  }
+  return status;
 }
 
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {

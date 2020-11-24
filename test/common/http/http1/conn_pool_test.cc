@@ -56,6 +56,7 @@ public:
       : FixedHttpConnPoolImpl(
             Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
             Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr, random_generator,
+            state_,
             [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) {
               return nullptr; // Not used: createCodecClient overloaded.
@@ -66,7 +67,7 @@ public:
   ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_clients_.size());
     EXPECT_EQ(0U, busy_clients_.size());
-    EXPECT_EQ(0U, pending_streams_.size());
+    EXPECT_FALSE(hasPendingStreams());
   }
 
   struct TestCodecClient {
@@ -121,6 +122,7 @@ public:
 
   void expectAndRunUpstreamReady() { post_cb_(); }
 
+  Upstream::ClusterConnectivityState state_;
   Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
   Event::PostCb post_cb_;
