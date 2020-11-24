@@ -51,10 +51,7 @@ private:
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
-class TestAction : public Action {
-public:
-  absl::string_view typeUrl() const override { return ""; }
-};
+class TestAction : public ActionBase<ProtobufWkt::StringValue> {};
 
 class TestActionFactory : public ActionFactory {
 public:

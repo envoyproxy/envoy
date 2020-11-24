@@ -13,6 +13,7 @@ TEST(ValueInputMatcher, TestMatch) {
 
   EXPECT_TRUE(matcher.match("exact"));
   EXPECT_FALSE(matcher.match("not"));
+  EXPECT_FALSE(matcher.match(absl::nullopt));
 }
 
 } // namespace Matcher

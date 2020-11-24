@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 
 #include "common/matcher/exact_map_matcher.h"
+#include "common/matcher/matcher.h"
 
 #include "test/test_common/utility.h"
 
@@ -13,13 +14,9 @@ namespace Matcher {
 
 struct TestData {};
 
-struct StringAction : public Action {
-  explicit StringAction(const std::string& string)
-      : type_name_(ProtobufWkt::StringValue().GetTypeName()), string_(string) {}
+struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
+  explicit StringAction(const std::string& string) : string_(string) {}
 
-  absl::string_view typeUrl() const override { return type_name_; }
-
-  const std::string type_name_;
   const std::string string_;
 
   bool operator==(const StringAction& other) const { return string_ == other.string_; }
@@ -27,7 +24,7 @@ struct StringAction : public Action {
 
 struct TestInput : public DataInput<TestData> {
   explicit TestInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) { return result_; }
+  DataInputGetResult get(const TestData&) override { return result_; }
 
   DataInputGetResult result_;
 };

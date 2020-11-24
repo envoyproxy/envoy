@@ -22,6 +22,16 @@
 namespace Envoy {
 namespace Matcher {
 
+template <class ProtoType> class ActionBase : public Action {
+public:
+  ActionBase() : type_name_(ProtoType().GetTypeName()) {}
+
+  absl::string_view typeUrl() const override { return type_name_; }
+
+private:
+  const std::string type_name_;
+};
+
 struct MaybeMatchResult {
   const ActionPtr result_;
   const bool final_;
@@ -110,14 +120,25 @@ private:
 
   MatchTreeSharedPtr<DataType>
   createTreeMatcher(const envoy::config::common::matcher::v3::Matcher& matcher) {
-    auto multimap_matcher = std::make_shared<ExactMapMatcher<DataType>>(
-        createDataInput(matcher.matcher_tree().input()), createOnMatch(matcher.on_no_match()));
+    switch (matcher.matcher_tree().tree_type_case()) {
+    case envoy::config::common::matcher::v3::Matcher_MatcherTree::kExactMatchMap: {
+      auto multimap_matcher = std::make_shared<ExactMapMatcher<DataType>>(
+          createDataInput(matcher.matcher_tree().input()), createOnMatch(matcher.on_no_match()));
 
-    for (const auto& children : matcher.matcher_tree().exact_match_map().map()) {
-      multimap_matcher->addChild(children.first, *MatchTreeFactory::createOnMatch(children.second));
+      for (const auto& children : matcher.matcher_tree().exact_match_map().map()) {
+        multimap_matcher->addChild(children.first,
+                                   *MatchTreeFactory::createOnMatch(children.second));
+      }
+
+      return multimap_matcher;
     }
-
-    return multimap_matcher;
+    case envoy::config::common::matcher::v3::Matcher_MatcherTree::kPrefixMatchMap:
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    case envoy::config::common::matcher::v3::Matcher_MatcherTree::kCustomMatch:
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
   absl::optional<OnMatch<DataType>>
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch& on_match) {
