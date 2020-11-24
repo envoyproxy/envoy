@@ -42,6 +42,11 @@ void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
 
+bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() {
+  // Quic doesn't support half close.
+  return false;
+}
+
 void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   // Currently read buffer is capped by connection level flow control. And write buffer limit is set
   // during construction. Changing the buffer limit during the life time of the connection is not

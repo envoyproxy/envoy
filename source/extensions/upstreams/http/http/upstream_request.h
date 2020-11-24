@@ -45,7 +45,7 @@ public:
 
   bool valid() { return conn_pool_ != nullptr; }
 
-private:
+protected:
   // Points to the actual connection pool to create streams from.
   Envoy::Http::ConnectionPool::Instance* conn_pool_{};
   Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
