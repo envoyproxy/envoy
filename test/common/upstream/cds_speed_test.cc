@@ -89,7 +89,6 @@ public:
         std::chrono::milliseconds(), false);
   }
 
-  // Set up a bunch of clusters that vary only in name, and add them to the configuration.
   void clusterHelper(bool ignore_unknown_dynamic_fields, size_t num_clusters) {
     state_.PauseTiming();
 
@@ -102,7 +101,6 @@ public:
       envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
       cluster_load_assignment.set_cluster_name("fare_" + std::to_string(i));
 
-      // Add a whole bunch of hosts in a single place:
       auto* endpoints = cluster_load_assignment.add_endpoints();
       endpoints->set_priority(1);
       auto* locality = endpoints->mutable_locality();
