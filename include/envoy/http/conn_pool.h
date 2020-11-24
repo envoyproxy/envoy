@@ -40,6 +40,7 @@ public:
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
    * @param info supplies the stream info object associated with the upstream L4 connection.
+   * @param protocol supplies the protocol associated with the stream, or absl::nullopt for raw TCP.
    */
   virtual void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
                            const StreamInfo::StreamInfo& info,
