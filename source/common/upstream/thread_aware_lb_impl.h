@@ -3,6 +3,8 @@
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "common/config/metadata.h"
+#include "common/config/well_known_names.h"
 #include "common/upstream/load_balancer_impl.h"
 
 #include "absl/synchronization/mutex.h"
@@ -27,6 +29,17 @@ public:
   public:
     virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
+    const std::string hashKey(HostConstSharedPtr host, bool use_hostname) {
+      std::string hash_key = Config::Metadata::metadataValue(
+                                 host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
+                                 Config::MetadataEnvoyLbKeys::get().HASH_KEY)
+                                 .string_value();
+
+      if (hash_key.empty()) {
+        hash_key = use_hostname ? host->hostname() : host->address()->asString();
+      }
+      return hash_key;
+    }
   };
   using HashingLoadBalancerSharedPtr = std::shared_ptr<HashingLoadBalancer>;
 
