@@ -112,7 +112,7 @@ else
 
         if ! kill -0 "${SERVER_PID}"; then
             echo "server failed to start"
-            exit 1	fi
+            exit 1
         fi	
     done
 fi
