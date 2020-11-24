@@ -7,9 +7,11 @@
 
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
@@ -17,6 +19,7 @@
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+#include "extensions/filters/common/ratelimit/ratelimit.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -43,19 +46,25 @@ struct LocalRateLimitStats {
 /**
  * Global configuration for the HTTP local rate limit filter.
  */
-class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
+class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig,
+                     Logger::Loggable<Logger::Id::filter> {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
-               bool per_route = false);
+               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+               Stats::Scope& scope, Runtime::Loader& runtime, bool per_route = false);
   ~FilterConfig() override = default;
+  const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  bool requestAllowed() const;
   bool enabled() const;
   bool enforced() const;
+  bool requestAllowed(std::vector<Envoy::RateLimit::LocalDescriptor> route_descriptors) const;
   LocalRateLimitStats& stats() const { return stats_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   Http::Code status() const { return status_; }
+
+  uint64_t stage() const { return stage_; }
+
+  bool areDescriptorsConfigured() const;
 
 private:
   friend class FilterTest;
@@ -73,10 +82,14 @@ private:
   const Http::Code status_;
   mutable LocalRateLimitStats stats_;
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
+
+  const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   Router::HeaderParserPtr response_headers_parser_;
+  const uint64_t stage_;
+  const bool are_descriptors_configured_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -88,7 +101,6 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class Filter : public Http::PassThroughFilter {
 public:
   Filter(FilterConfigSharedPtr config) : config_(config) {}
-
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -96,8 +108,10 @@ public:
 private:
   friend class FilterTest;
 
-  const FilterConfig* getConfig() const;
+  void getRouteSpecificDescriptors(std::vector<Envoy::RateLimit::LocalDescriptor>& descriptors,
+                                   Http::RequestHeaderMap& headers);
 
+  const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
 };
 

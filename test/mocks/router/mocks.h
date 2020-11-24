@@ -195,6 +195,12 @@ public:
                const Network::Address::Instance& remote_address,
                const envoy::config::core::v3::Metadata* dynamic_metadata),
               (const));
+  MOCK_METHOD(void, populateLocalDescriptors,
+              (const RouteEntry& route, std::vector<Envoy::RateLimit::LocalDescriptor>& descriptors,
+               const std::string& local_service_cluster, const Http::HeaderMap& headers,
+               const Network::Address::Instance& remote_address,
+               const envoy::config::core::v3::Metadata* dynamic_metadata),
+              (const));
 
   uint64_t stage_{};
   std::string disable_key_;
