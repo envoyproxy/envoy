@@ -1,140 +1,85 @@
 .. _arch_overview_dynamic_config:
 
-xDS configuration API overview
+xDS 配置 API 概述
 ==============================
 
-Envoy is architected such that different types of configuration management approaches are possible.
-The approach taken in a deployment will be dependent on the needs of the implementor. Simple
-deployments are possible with a fully static configuration. More complicated deployments can
-incrementally add more complex dynamic configuration, the downside being that the implementor must
-provide one or more external gRPC/REST based configuration provider APIs. These APIs are
-collectively known as :ref:`"xDS" <xds_protocol>` (* discovery service). This document gives an
-overview of the options currently available.
+Envoy 的架构支持使用不同类型的配置管理方法。部署中采用的方法将取决于实现者的需求。简单部署可以通过全静态配置来实现。更复杂的部署可以逐步地添加更复杂的动态配置，缺点是实现者必须提供一个或多个基于 gRPC/REST的外部配置提供 API。这些 API 统称为 :ref:`"xDS" <xds_protocol>` (* 服务发现)。本文档概述了当前可用的选项。
 
-* Top level configuration :ref:`reference <config>`.
-* :ref:`Reference configurations <install_ref_configs>`.
-* Envoy :ref:`v3 API overview <config_overview>`.
-* :ref:`xDS API endpoints <config_overview_management_server>`.
+* 顶级配置 :ref:`参考 <config>`。
+* :ref:`参考配置 <install_ref_configs>`。
+* Envoy :ref:`v3 API 概述 <config_overview>`。
+* :ref:`xDS API 端点 <config_overview_management_server>`。
 
-Fully static
+全静态
 ------------
 
-In a fully static configuration, the implementor provides a set of :ref:`listeners
-<config_listeners>` (and :ref:`filter chains <envoy_v3_api_msg_config.listener.v3.Filter>`), :ref:`clusters
-<config_cluster_manager>`, etc. Dynamic host discovery is only possible via DNS based
-:ref:`service discovery <arch_overview_service_discovery>`. Configuration reloads must take place
-via the built in :ref:`hot restart <arch_overview_hot_restart>` mechanism.
+在全静态配置中，实现者提供一组:ref:`监听器 <config_listeners>` （和 :ref:`过滤器链 <envoy_v3_api_msg_config.listener.v3.Filter>`）、:ref:`集群 <config_cluster_manager>` 等。动态主机发现仅能通过基于 DNS 的 :ref:`服务发现 <arch_overview_service_discovery>`。配置重载必须通过内置的 :ref:`热重启 <arch_overview_hot_restart>` 机制进行。
 
-Though simplistic, fairly complicated deployments can be created using static configurations and
-graceful hot restarts.
+虽然简单，但可以使用静态配置和优雅的热重启来创建相当复杂的部署。
 
 .. _arch_overview_dynamic_config_eds:
 
 EDS
 ---
 
-The :ref:`Endpoint Discovery Service (EDS) API <arch_overview_service_discovery_types_eds>` provides
-a more advanced mechanism by which Envoy can discover members of an upstream cluster. Layered on top
-of a static configuration, EDS allows an Envoy deployment to circumvent the limitations of DNS
-(maximum records in a response, etc.) as well as consume more information used in load balancing and
-routing (e.g., canary status, zone, etc.).
+:ref:`端点发现服务（EDS） API <arch_overview_service_discovery_types_eds>` 提供了一种更先进的机制，通过它 Envoy 可以发现上游集群的成员。在静态配置基础上，EDS 允许 Envoy 部署避开 DNS 的限制（响应中的最大记录等），并使用更多信息用于负载均衡和路由（例如，灰度发布、区域等）。
 
 .. _arch_overview_dynamic_config_cds:
 
 CDS
 ---
 
-The :ref:`Cluster Discovery Service (CDS) API <config_cluster_manager_cds>` layers on a mechanism by
-which Envoy can discover upstream clusters used during routing. Envoy will gracefully add, update,
-and remove clusters as specified by the API. This API allows implementors to build a topology in
-which Envoy does not need to be aware of all upstream clusters at initial configuration time.
-Typically, when doing HTTP routing along with CDS (but without route discovery service),
-implementors will make use of the router's ability to forward requests to a cluster specified in an
-:ref:`HTTP request header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>`.
-
-Although it is possible to use CDS without EDS by specifying fully static clusters, we recommend
-still using the EDS API for clusters specified via CDS. Internally, when a cluster definition is
-updated, the operation is graceful. However, all existing connection pools will be drained and
-reconnected. EDS does not suffer from this limitation. When hosts are added and removed via EDS, the
-existing hosts in the cluster are unaffected.
+:ref:`集群发现服务（CDS） API <config_cluster_manager_cds>` 是 Envoy 的一种机制，在路由期间可以用来发现使用的上游集群。Envoy 将优雅地添加、更新和删除由 API 指定的集群。该 API 允许实现者构建一个拓扑，在这个拓扑中，Envoy 不需要在初始配置时就知道所有上游群集。通常，当使用 CDS 进行 HTTP 路由时（但没有路由发现服务），实现者将利用路由器将请求转发到 :ref:`HTTP request header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>` 中指定的集群。尽管可以通过指定全静态集群来使用不带 EDS 的 CDS，i但是对于用 CDS 指定的集群，我们依旧建议使用 EDS API。在内部更新集群定义时，操作是优雅的。但是，所有现有的连接池都将被排空并重新连接。EDS 不受此限制。当通过 EDS 添加和删除主机时，群集中的现有主机不受影响。
 
 .. _arch_overview_dynamic_config_rds:
 
 RDS
 ---
 
-The :ref:`Route Discovery Service (RDS) API <config_http_conn_man_rds>` layers on a mechanism by
-which Envoy can discover the entire route configuration for an HTTP connection manager filter at
-runtime. The route configuration will be gracefully swapped in without affecting existing requests.
-This API, when used alongside EDS and CDS, allows implementors to build a complex routing topology
-(:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting>`, blue/green
-deployment, etc).
+ref:`路由发现服务（RDS） API <config_http_conn_man_rds>` 是 Envoy 的一种机制，可以在运行时发现用于 HTTP 连接管理器过滤器的整个路由配置。路由配置将优雅地交换，而不会影响现有的请求。该 API 与 EDS 和 CDS 一起使用时，允许执行者构建复杂的路由拓扑（ :ref:`流量转移 <config_http_conn_man_route_table_traffic_splitting>`、蓝/绿部署等），除了获取新的 Envoy 二进制文件外，不需要任何 Envoy 重启。
 
 VHDS
 ----
-The :ref:`Virtual Host Discovery Service <config_http_conn_man_vhds>` allows the virtual hosts belonging
-to a route configuration to be requested as needed separately from the route configuration itself. This
-API is typically used in deployments in which there are a large number of virtual hosts in a route
-configuration.
+
+:ref:`虚拟主机发现服务 <config_http_conn_man_vhds>` 允许根据需要分别请求属于路由配置的虚拟主机和路由配置。该 API 通常用于路由配置中存在大量虚拟主机的部署中。
 
 SRDS
 ----
 
-The :ref:`Scoped Route Discovery Service (SRDS) API <arch_overview_http_routing_route_scope>` allows
-a route table to be broken up into multiple pieces. This API is typically used in deployments of
-HTTP routing with massive route tables in which simple linear searches are not feasible.
+:ref:`作用域路由发现服务（SRDS） API <arch_overview_http_routing_route_scope>` 允许将路由表划分成多个部分。该 API 通常用于具有大量路由表的 HTTP 路由部署中，在这种情况下，简单的线性搜索是不可行的。 
 
 .. _arch_overview_dynamic_config_lds:
 
 LDS
 ---
 
-The :ref:`Listener Discovery Service (LDS) API <config_listeners_lds>` layers on a mechanism by which
-Envoy can discover entire listeners at runtime. This includes all filter stacks, up to and including
-HTTP filters with embedded references to :ref:`RDS <config_http_conn_man_rds>`. Adding LDS into
-the mix allows almost every aspect of Envoy to be dynamically configured. Hot restart should
-only be required for very rare configuration changes (admin, tracing driver, etc.), certificate
-rotation, or binary updates.
+:ref:`监听器发现服务（LDS） API <config_listeners_lds>` 是 Envoy 的一种机制，可以在运行时发现整个监听器。这包括所有的过滤器堆栈，并包含带有内嵌到 :ref:`RDS <config_http_conn_man_rds>` 应用的 HTTP 过滤器。将 LDS 添加到组合中，几乎可以动态配置 Envoy 的每个方面。仅在非常少见的配置更改（管理员、追踪驱动程序等）、证书更换或二进制更新时才需要热重启。
 
 SDS
 ---
 
-The :ref:`Secret Discovery Service (SDS) API <config_secret_discovery_service>` layers on a mechanism
-by which Envoy can discover cryptographic secrets (certificate plus private key, TLS session
-ticket keys) for its listeners, as well as configuration of peer certificate validation logic
-(trusted root certs, revocations, etc).
+:ref:`加密发现服务（SDS） API <config_secret_discovery_service>` 是 Envoy 的一种机制，通过该机制，Envoy 可以为其监听器发现加密数据（证书加私钥、TLS session 密钥），以及配置对等证书验证逻辑（可信根证书、撤销等）。
 
 RTDS
 ----
 
-The :ref:`RunTime Discovery Service (RTDS) API <config_runtime_rtds>` allows
-:ref:`runtime <config_runtime>` layers to be fetched via an xDS API. This may be favorable to,
-or augmented by, file system layers.
+:ref:`运行时发现服务（RTDS） API <config_runtime_rtds>` 允许通过 xDS API 来获取 :ref:`运行时 <config_runtime>`。这可能有利于文件系统层，或说是对文件系统层的增强。
 
 ECDS
 ----
 
-The :ref:`Extension Config Discovery Service (ECDS) API <config_overview_extension_discovery>`
-allows extension configurations (e.g. HTTP filter configuration) to be served independently from
-the listener. This is useful when building systems that are more appropriately split from the
-primary control plane such as WAF, fault testing, etc.
+:ref:`扩展配置发现服务（ECDS） API <config_overview_extension_discovery>` 允许对独立于监听器的配置进行扩展（如 HTTP 过滤器配置）。当构建更适合与主控制平面分开的系统（例如 WAF、故障测试等）时，此功能很有用。
 
-Aggregated xDS ("ADS")
+聚合的 xDS ("ADS")
 ----------------------
 
-EDS, CDS, etc. are each separate services, with different REST/gRPC service names, e.g.
-StreamListeners, StreamSecrets. For users looking to enforce the order in which resources of
-different types reach Envoy, there is aggregated xDS, a single gRPC service that carries all
-resource types in a single gRPC stream. (ADS is only supported by gRPC).
-:ref:`More details about ADS <config_overview_ads>`.
+EDS、CDS 等都是单独的服务，具有不同的 REST/gRPC 服务名称，例如 StreamListeners、StreamSecrets。对于那些希望能够控制不同类型的资源到达 Envoy 顺序的用户，聚合 xDS 是一个不错的选择，它是一个单一的 gRPC 服务，单个 gRPC 流中承载所有资源类型（仅 gRPC 支持 ADS）。
+:ref:`有关 ADS 的更多详细信息 <config_overview_ads>` 。
 
 .. _arch_overview_dynamic_config_delta:
 
-Delta gRPC xDS
+增量 gRPC xDS
 --------------
 
-Standard xDS is "state-of-the-world": every update must contain every resource, with the absence of
-a resource from an update implying that the resource is gone. Envoy supports a "delta" variant of
-xDS (including ADS), where updates only contain resources added/changed/removed. Delta xDS is a
-new protocol, with request/response APIs different from SotW.
-:ref:`More details about delta <config_overview_delta>`.
+标准的 xDS 是每个更新都必须包含所有的资源，而更新中没有资源信息意味着该资源已消失。Envoy 支持 xDS（包括 ADS）的”增量（delta）”变体，其更新仅包含添加/更改/删除的资源信息。增量 xDS 是一个新的协议，其请求/响应 API 与 SotW 不同。
+:ref:`有关增量（Delta）的更多详细信息 <config_overview_delta>` 。
