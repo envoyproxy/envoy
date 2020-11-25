@@ -1202,10 +1202,13 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_http2_protocol_options()
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
         ->mutable_override_stream_error_on_invalid_http_message()
         ->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   if (!initializeUpstreamFloodTest()) {
     return;

@@ -164,6 +164,8 @@ TEST_F(OptionsImplTest, SetAll) {
   bool fake_symbol_table_enabled = options->fakeSymbolTableEnabled();
 
   options->setBaseId(109876);
+  options->setUseDynamicBaseId(true);
+  options->setBaseIdPath("foo");
   options->setConcurrency(42);
   options->setConfigPath("foo");
   envoy::config::bootstrap::v3::Bootstrap bootstrap_foo{};
@@ -194,6 +196,8 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setSocketMode(0644);
 
   EXPECT_EQ(109876, options->baseId());
+  EXPECT_EQ(true, options->useDynamicBaseId());
+  EXPECT_EQ("foo", options->baseIdPath());
   EXPECT_EQ(42U, options->concurrency());
   EXPECT_EQ("foo", options->configPath());
   envoy::config::bootstrap::v3::Bootstrap bootstrap_bar{};

@@ -270,8 +270,8 @@ static_resources:
   clusters:
   - name: my_cds_cluster
     typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {{}}
     load_assignment:
@@ -348,8 +348,8 @@ static_resources:
                 port_value: 0
     lb_policy: ROUND_ROBIN
     typed_extension_protocol_options:
-      envoy.filters.network.http_connection_manager:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {{}}
 admin:
@@ -381,8 +381,8 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                   port_value: {}
       lb_policy: ROUND_ROBIN
       typed_extension_protocol_options:
-        envoy.filters.network.http_connection_manager:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
@@ -404,8 +404,8 @@ ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy
           ads: {{}}
       lb_policy: {}
       typed_extension_protocol_options:
-        envoy.filters.network.http_connection_manager:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
@@ -437,8 +437,8 @@ ConfigHelper::buildTlsCluster(const std::string& name, const std::string& lb_pol
                 filename: {}
       lb_policy: {}
       typed_extension_protocol_options:
-        envoy.filters.network.http_connection_manager:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpProtocolOptions
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
@@ -636,7 +636,7 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn) {
       ConfigHelper::HttpProtocolOptions new_protocol_options;
 
       HttpProtocolOptions old_protocol_options = MessageUtil::anyConvert<
-          envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions>(
+          ConfigHelper::HttpProtocolOptions>(
           (*cluster->mutable_typed_extension_protocol_options())
               ["envoy.filters.network.http_connection_manager"]);
       protocol_options.MergeFrom(old_protocol_options);
@@ -655,14 +655,6 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn) {
           ["envoy.filters.network.http_connection_manager"]
               .PackFrom(new_protocol_options);
     }
-
-    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-    auto* validation_context =
-        tls_context.mutable_common_tls_context()->mutable_validation_context();
-    validation_context->mutable_trusted_ca()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-    cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
   });
 }
 
@@ -692,15 +684,14 @@ void ConfigHelper::setNewCodecs() {
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                       HttpProtocolOptions& protocol_options) {
   if (cluster.typed_extension_protocol_options().contains(
-          "envoy.filters.network.http_connection_manager")) {
-    HttpProtocolOptions old_options = MessageUtil::anyConvert<
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpProtocolOptions>(
+          "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+    HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
-            ["envoy.filters.network.http_connection_manager"]);
+            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     protocol_options.MergeFrom(old_options);
   }
   (*cluster.mutable_typed_extension_protocol_options())
-      ["envoy.filters.network.http_connection_manager"]
+      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
           .PackFrom(protocol_options);
 }
 

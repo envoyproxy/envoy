@@ -77,35 +77,16 @@ getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
 }
 
 uint64_t
-parseFeatures(const envoy::config::cluster::v3::Cluster& config,
-              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
+parseFeatures(std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
   uint64_t features = 0;
-
-  if (options) {
-    if (options->use_http2_) {
-      features |= ClusterInfoImpl::Features::HTTP2;
-    }
-    if (options->use_downstream_protocol_) {
-      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
-    if (options->use_alpn_) {
-      features |= ClusterInfoImpl::Features::USE_ALPN;
-    }
-  } else {
-    if (config.has_http2_protocol_options()) {
-      features |= ClusterInfoImpl::Features::HTTP2;
-    }
-    if (config.protocol_selection() ==
-        envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
-      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
-    } else {
-      if (config.has_http2_protocol_options() && config.has_http_protocol_options()) {
-        features |= ClusterInfoImpl::Features::USE_ALPN;
-      }
-    }
+  if (options->use_http2_) {
+    features |= ClusterInfoImpl::Features::HTTP2;
   }
-  if (config.close_connections_on_host_health_failure()) {
-    features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
+  if (options->use_downstream_protocol_) {
+    features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
+  }
+  if (options->use_alpn_) {
+    features |= ClusterInfoImpl::Features::USE_ALPN;
   }
   return features;
 }
@@ -169,10 +150,15 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
         Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
             name);
   }
+  if (factory == nullptr) {
+    factory =
+        Registry::FactoryRegistry<Server::Configuration::ProtocolOptionsFactory>::getFactory(name);
+  }
 
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
-        "Didn't find a registered network or http filter implementation for name: '{}'", name));
+    throw EnvoyException(fmt::format("Didn't find a registered network or http filter or protocol "
+                                     "options implementation for name: '{}'",
+                                     name));
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyProtocolOptionsProto();
@@ -183,7 +169,6 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
 
   Envoy::Config::Utility::translateOpaqueConfig(
       typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
-
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
@@ -698,8 +683,15 @@ const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> crea
   if (options) {
     return std::move(options);
   }
-  bool use_downstream_protocol =
-      config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL;
+
+  if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_CONFIGURED_PROTOCOL) {
+    // Make sure multiple protocol configurations are not present
+    if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {
+      throw EnvoyException(fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
+                                       "configured with non-default 'protocol_selection' values"));
+    }
+  }
+
   return std::make_shared<ClusterInfoImpl::HttpProtocolOptionsConfigImpl>(
       config.http_protocol_options(), config.http2_protocol_options(),
       config.common_http_protocol_options(),
@@ -707,9 +699,8 @@ const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> crea
            ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
                  config.upstream_http_protocol_options())
            : absl::nullopt),
-      config.has_http2_protocol_options() && config.has_http_protocol_options() &&
-          (!use_downstream_protocol),
-      use_downstream_protocol, config.has_http2_protocol_options());
+      config.has_http2_protocol_options() && config.has_http_protocol_options(),
+      config.has_http2_protocol_options());
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
@@ -721,7 +712,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
-                                    "envoy.filters.network.http_connection_manager"))),
+                                    "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"))),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -742,7 +733,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
                                   ? std::make_unique<OptionalClusterStats>(config, *stats_scope_)
                                   : nullptr),
-      features_(parseFeatures(config, http_protocol_options_)),
+      features_(parseFeatures(http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
@@ -868,7 +859,6 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   if (i != extension_protocol_options_.end()) {
     return i->second;
   }
-
   return nullptr;
 }
 
