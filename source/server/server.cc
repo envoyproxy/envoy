@@ -249,9 +249,9 @@ bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 ProcessContextOptRef InstanceImpl::processContext() {
   if (process_context_ == nullptr) {
     return absl::nullopt;
-  } else {
-    return *process_context_;
   }
+
+  return *process_context_;
 }
 
 namespace {
