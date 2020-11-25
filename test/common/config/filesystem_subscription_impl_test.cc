@@ -164,7 +164,7 @@ TEST_F(FilesystemCollectionSubscriptionImplTest, InlineEntrySuccess) {
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, ""));
   // Initial config load.
   const auto inline_entry =
-      TestUtility::parseYaml<udpa::core::v1::CollectionEntry::InlineEntry>(R"EOF(
+      TestUtility::parseYaml<xds::core::v3::CollectionEntry::InlineEntry>(R"EOF(
 name: foo
 version: resource.1
 resource:
@@ -192,7 +192,7 @@ resource:
   EXPECT_TRUE(statsAre(2, 1, 0, 0, 1471442407191366964, "system.1"));
   // Update.
   const auto inline_entry_2 =
-      TestUtility::parseYaml<udpa::core::v1::CollectionEntry::InlineEntry>(R"EOF(
+      TestUtility::parseYaml<xds::core::v3::CollectionEntry::InlineEntry>(R"EOF(
 name: foo
 version: resource.2
 resource:

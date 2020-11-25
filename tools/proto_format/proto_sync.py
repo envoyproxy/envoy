@@ -204,8 +204,8 @@ def GetImportDeps(proto_path):
           imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
           continue
         # Special case handling for UDPA core.
-        if import_path.startswith('udpa/core/v1/'):
-          imports.append('@com_github_cncf_udpa//udpa/core/v1:pkg')
+        if import_path.startswith('xds/core/v3/'):
+          imports.append('@com_github_cncf_udpa//xds/core/v3:pkg')
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:

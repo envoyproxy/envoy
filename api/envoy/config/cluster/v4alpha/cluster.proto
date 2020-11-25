@@ -19,8 +19,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/collection_entry.proto";
-import "udpa/core/v1/resource_locator.proto";
+import "xds/core/v3/collection_entry.proto";
+import "xds/core/v3/resource_locator.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
@@ -41,7 +41,7 @@ message ClusterCollection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.v3.ClusterCollection";
 
-  udpa.core.v1.CollectionEntry entries = 1;
+  xds.core.v3.CollectionEntry entries = 1;
 }
 
 // Configuration for a single upstream cluster.
@@ -195,7 +195,7 @@ message Cluster {
 
       // Resource locator for EDS. This is mutually exclusive to *service_name*.
       // [#not-implemented-hide:]
-      udpa.core.v1.ResourceLocator eds_resource_locator = 3;
+      xds.core.v3.ResourceLocator eds_resource_locator = 3;
     }
   }
 

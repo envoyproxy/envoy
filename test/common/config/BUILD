@@ -290,7 +290,7 @@ envoy_cc_test(
     srcs = ["subscription_factory_impl_test.cc"],
     deps = [
         "//source/common/config:subscription_factory_lib",
-        "//source/common/config:udpa_resource_lib",
+        "//source/common/config:xds_resource_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
@@ -457,29 +457,29 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "udpa_context_params_test",
-    srcs = ["udpa_context_params_test.cc"],
+    name = "xds_context_params_test",
+    srcs = ["xds_context_params_test.cc"],
     deps = [
-        ":udpa_test_utility_lib",
-        "//source/common/config:udpa_context_params_lib",
+        ":xds_test_utility_lib",
+        "//source/common/config:xds_context_params_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
 envoy_cc_test(
-    name = "udpa_resource_test",
-    srcs = ["udpa_resource_test.cc"],
+    name = "xds_resource_test",
+    srcs = ["xds_resource_test.cc"],
     deps = [
-        ":udpa_test_utility_lib",
-        "//source/common/config:udpa_resource_lib",
+        ":xds_test_utility_lib",
+        "//source/common/config:xds_resource_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
 envoy_cc_test_library(
-    name = "udpa_test_utility_lib",
-    hdrs = ["udpa_test_utility.h"],
+    name = "xds_test_utility_lib",
+    hdrs = ["xds_test_utility.h"],
 )
 
 envoy_proto_library(

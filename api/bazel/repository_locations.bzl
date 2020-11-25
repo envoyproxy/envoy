@@ -22,14 +22,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["api"],
     ),
     com_github_cncf_udpa = dict(
-        project_name = "Universal Data Plane API",
-        project_desc = "Universal Data Plane API Working Group (UDPA-WG)",
+        project_name = "xDS API",
+        project_desc = "xDS API Working Group (xDS-WG)",
         project_url = "https://github.com/cncf/udpa",
-        version = "0.0.1",
-        sha256 = "83a7dcc316d741031f34c0409021432b74a39c4811845a177133f02f948fe2d8",
+        # During the UDPA -> xDS migration, we aren't working with releases.
+        version = "5459f2c994033b0afed7e4a70ac7e90c90c1ffee",
+        sha256 = "c1f5c2438cf725b5f66aa4210dbc4bb691020c5ed4f64d2bc6638b06a11482f1",
         strip_prefix = "udpa-{version}",
-        urls = ["https://github.com/cncf/udpa/archive/v{version}.tar.gz"],
-        release_date = "2020-06-29",
+        urls = ["https://github.com/cncf/udpa/archive/{version}.tar.gz"],
+        release_date = "2020-11-20",
         use_category = ["api"],
     ),
     com_github_openzipkin_zipkinapi = dict(
