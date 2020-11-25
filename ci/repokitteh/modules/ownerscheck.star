@@ -179,10 +179,6 @@ def _comment(config, results, assignees, force=False):
 
     mode = spec.owner[-1] == '!' and 'approval' or 'fyi'
 
-    print('debug')
-    print(spec.owner)
-    print(mode)
-
     key = "ownerscheck/%s/%s" % (spec.owner, spec.path_match)
 
     if (not force) and (store_get(key) == mode):
@@ -195,7 +191,7 @@ def _comment(config, results, assignees, force=False):
     elif mode == 'fyi':
       lines.append('CC %s: FYI only%s.' % (mention, match_description))
 
-    if spec.auto_assign:
+    if mode != 'skip' and spec.auto_assign:
       api_assignee = None
       # Find owners via github.team_get_by_name, github.team_list_members
       team_name = owner.split('/')[1]
