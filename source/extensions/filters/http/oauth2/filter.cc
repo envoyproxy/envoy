@@ -76,8 +76,7 @@ std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_pro
 
 // Transforms the proto list of 'auth_scopes' into a vector of std::string, also
 // handling the default value logic
-template <class T>
-std::vector<std::string> authScopesList(const T& auth_scopes_protos) {
+template <class T> std::vector<std::string> authScopesList(const T& auth_scopes_protos) {
   std::vector<std::string> scopes;
 
   // if 'auth_scopes_protos' is zero sized, it means the list is empty in the yaml,
