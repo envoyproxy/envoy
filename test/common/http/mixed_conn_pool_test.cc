@@ -28,7 +28,6 @@ public:
                              random, state, {Http::Protocol::Http2, Http::Protocol::Http11}) {}
 
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override { return nullptr; }
-  Http::Protocol protocol() const override { return Http::Protocol::Http2; }
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData&) override {
     return nullptr;
   }

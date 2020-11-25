@@ -17,6 +17,7 @@ Minor Behavior Changes
 * ext_authz filter: disable `envoy.reloadable_features.ext_authz_measure_timeout_on_check_created` by default.
 * ext_authz filter: the deprecated field :ref:`use_alpha <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.use_alpha>` is no longer supported and cannot be set anymore.
 * grpc_web filter: if a `grpc-accept-encoding` header is present it's passed as-is to the upstream and if it isn't `grpc-accept-encoding:identity` is sent instead. The header was always overwriten with `grpc-accept-encoding:identity,deflate,gzip` before.
+* http: upstream protocol will now only be logged if an upstream stream was established.
 * jwt_authn filter: added support of Jwt time constraint verification with a clock skew (default to 60 seconds) and added a filter config field :ref:`clock_skew_seconds <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.clock_skew_seconds>` to configure it.
 * memory: enable new tcmalloc with restartable sequences for aarch64 builds.
 * mongo proxy metrics: swapped network connection remote and local closed counters previously set reversed (`cx_destroy_local_with_active_rq` and `cx_destroy_remote_with_active_rq`).
