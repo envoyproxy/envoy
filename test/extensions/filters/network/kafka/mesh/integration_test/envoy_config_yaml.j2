@@ -7,7 +7,8 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.filters.network.kafka_mesh
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh
           advertised_host: "127.0.0.1"
           advertised_port: {{ data['kafka_envoy_port'] }}
           upstream_clusters:
