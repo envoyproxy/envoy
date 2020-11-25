@@ -1411,6 +1411,28 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
   ASSERT_TRUE(disabled_filter_found);
 }
 
+TEST_P(ServerInstanceImplTest, NullProcessContextTest) {
+  // These are already the defaults. Repeated here for clarity.
+  process_object_ = nullptr;
+  process_context_ = nullptr;
+
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  ProcessContextOptRef context = server_->processContext();
+  EXPECT_FALSE(context.has_value());
+
+  // Prior to the commit when this test was added, the code would return a
+  // context where has_value() was true, producing an opt ref that has a value
+  // which is a reference pointing to null.  Doing anything on that reference
+  // would cause a crash.  The rest of this test is ensuring that case doesn't
+  // occur again.
+  if (context.has_value()) {
+    // Compiler will not directly let us compare the rhs with null
+    // as it is assumed this is impossible.
+    void* foo = &context->get();
+    EXPECT_FALSE(foo == nullptr);
+  }
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
