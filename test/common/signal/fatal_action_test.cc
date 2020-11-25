@@ -62,8 +62,8 @@ protected:
 
 TEST_F(FatalActionTest, ShouldNotBeAbleToRunActionsBeforeRegistration) {
   // Call the actions
-  EXPECT_EQ(FatalErrorHandler::runSafeActions(), Status::ActionManangerUnset);
-  EXPECT_EQ(FatalErrorHandler::runUnsafeActions(), Status::ActionManangerUnset);
+  EXPECT_EQ(FatalErrorHandler::runSafeActions(), Status::ActionManagerUnset);
+  EXPECT_EQ(FatalErrorHandler::runUnsafeActions(), Status::ActionManagerUnset);
 }
 
 TEST_F(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
