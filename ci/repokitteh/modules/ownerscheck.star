@@ -203,14 +203,6 @@ def _comment(config, results, assignees, force=False):
         if assignee in members:
           api_assignee = assignee
           break
-      # Otherwise we need to see if there is a reviewer picked from the team? If so, first wins.
-      if not api_assignee:
-        reviewers = github.pr_list_reviews()
-        for reviewer in reviewers:
-          user = reviewer['login']
-          if user in members:
-            api_assignee = user
-            break
       # Otherwise, pick at "random" (we just use timestamp).
       if not api_assignee:
         api_assignee = members[now().second % len(members)]
