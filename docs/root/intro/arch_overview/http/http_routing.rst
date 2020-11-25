@@ -41,8 +41,7 @@ Envoy 包含一个可以被安装用来执行高级路由任务的 HTTP :ref:`�
 作用域 RDS（SRDS）API 包含一组 :ref:`作用域 <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` 资源，每个资源定义了独立的路由配置，同时一个 :ref:`ScopeKeyBuilder 
 <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.ScopeKeyBuilder>` 定义了 Envoy 用于查找与每个请求相对应作用域的密钥构造算法。
 
-例如，对于以下作用域的路由配置，Envoy 将查看“addr”请求头的值，并将请求头值通过“;”分割，并将键“x-foo-key”的第一个值用作作用域的键。如果“addr”请求头的值为“foo=1; x-foo-key=127.0.0.1; 
-x-bar-key=1.1.1.1”，则将“ 127.0.0.1”计算后作为作用域关键字，以查找相应的路由配置。
+例如，对于以下作用域的路由配置，Envoy 将查看“addr”请求头的值，并将请求头值通过“;”分割，并将键“x-foo-key”的第一个值用作作用域的键。如果“addr”请求头的值为“foo=1; x-foo-key=127.0.0.1; x-bar-key=1.1.1.1”，则将“ 127.0.0.1”计算后作为作用域关键字，以查找相应的路由配置。
 
 .. code-block:: yaml
 
@@ -69,11 +68,11 @@ HTTP 连接管理器的 :ref:`配置 <config_http_conn_man>` 中拥有所有已�
 
 .. _arch_overview_http_routing_retry:
 
-重试配置
+重试语义
 ---------------
 
 Envoy 允许在 :ref:`路由配置 <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` 以及通过 :ref:`请求头 <config_http_filters_router_headers_consumed>` 的特定请求中配置重试。
-以下配置是可能的：
+有以下可用的配置：
 
 * **最大重试次数**：Envoy 将继续重试任何次数。重试之间的时间间隔可以通过指数退避算法（默认），也可以基于上游服务器通过请求头（如果存在）的反馈来确定。此外 *所有重试都包含在整个请求超时内*。 
   这避免了由于大量重试而导致请求时间较长。
@@ -94,7 +93,7 @@ Envoy 允许在 :ref:`路由配置 <envoy_v3_api_field_config.route.v3.RouteActi
 Envoy 支持请求对冲，可以通过指定 :ref:`对冲策略 <envoy_v3_api_msg_config.route.v3.HedgePolicy>` 来启用。这意味着 Envoy 将争用多个同时发生的上游请求，并将与第一个可接受的响应头相关联的响应返回到下游。
 重试策略用于确定是否应返回响应或是否应等待更多响应。
 
-当前对冲功能只能响应请求超时来执行。这意味着将在不取消初始超时请求的情况下发出重试请求，并且将等待延迟响应。根据重试策略的第一个“good”响应将在下游返回。
+当前对冲功能只能在响应请求超时来执行。这意味着将在不取消初始超时请求的情况下发出重试请求，并且将等待延迟响应。根据重试策略的第一个“good”响应将在下游返回。
 
 该实现确保相同的上游请求不会重试两次。可能会发生请求超时导致得5xx响应并创建两个可重试事件。
 
