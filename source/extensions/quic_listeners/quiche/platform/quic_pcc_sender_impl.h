@@ -20,8 +20,8 @@ class RttStats;
 class SendAlgorithmInterface;
 
 // Interface for creating a `PCC` SendAlgorithmInterface.
-// NOLINTNEXTLINE(readability-identifier-naming)
 inline SendAlgorithmInterface*
+// NOLINTNEXTLINE(readability-identifier-naming)
 CreatePccSenderImpl(const QuicClock* /*clock*/, const RttStats* /*rtt_stats*/,
                     const QuicUnackedPacketMap* /*unacked_packets*/, QuicRandom* /*random*/,
                     QuicConnectionStats* /*stats*/, QuicPacketCount /*initial_congestion_window*/,
