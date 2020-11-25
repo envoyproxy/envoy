@@ -79,7 +79,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
                         absl::FixedArray<Buffer::RawSlice>({Buffer::RawSlice{data, 5}}));
   EXPECT_CALL(os_sys_calls_, recvmmsg(fd, _, num_packet_per_call, _, nullptr))
       .WillOnce(Invoke([](os_fd_t, struct mmsghdr*, unsigned int, int, struct timespec*) {
-        return Api::SysCallIntResult{-1, SOCKET_ERROR_AGAIN};
+        return Api::SysCallIntResult{-1, EAGAIN};
       }));
   wrapper_->recvmmsg(slices, /*self_port=*/12345, output2);
 
