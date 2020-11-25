@@ -523,6 +523,7 @@ deallocate
 deallocated
 deallocating
 deallocation
+deadcode
 dec
 dechunk
 dechunked
