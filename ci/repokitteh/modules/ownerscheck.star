@@ -200,9 +200,8 @@ def _comment(config, results, assignees, force=False):
       # Is a team member already assigned? The first assigned team member is picked. Bad O(n^2) as
       # Starlark doesn't have sets, n is small.
       for assignee in assignees:
-        user = assignee['login']
-        if user in members:
-          api_assignee = user
+        if assignee in members:
+          api_assignee = assignee
           break
       # Otherwise we need to see if there is a reviewer picked from the team? If so, first wins.
       if not api_assignee:
