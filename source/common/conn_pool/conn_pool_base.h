@@ -4,6 +4,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/linked_object.h"
 
@@ -28,8 +29,8 @@ class ActiveClient : public LinkedObject<ActiveClient>,
                      public Event::DeferredDeletable,
                      protected Logger::Loggable<Logger::Id::pool> {
 public:
-  ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-               uint64_t concurrent_stream_limit);
+  ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+               uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
   void releaseResources();
@@ -44,8 +45,12 @@ public:
 
   // Returns the concurrent stream limit, accounting for if the total stream limit
   // is less than the concurrent stream limit.
-  uint64_t effectiveConcurrentStreamLimit() const {
+  uint32_t effectiveConcurrentStreamLimit() const {
     return std::min(remaining_streams_, concurrent_stream_limit_);
+  }
+
+  uint32_t currentUnusedCapacity() const {
+    return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
   }
 
   // Closes the underlying connection.
@@ -55,7 +60,7 @@ public:
   // Returns true if this closed with an incomplete stream, for stats tracking/ purposes.
   virtual bool closingWithIncompleteStream() const PURE;
   // Returns the number of active streams on this connection.
-  virtual size_t numActiveStreams() const PURE;
+  virtual uint32_t numActiveStreams() const PURE;
 
   enum class State {
     CONNECTING, // Connection is not yet established.
@@ -67,8 +72,8 @@ public:
   };
 
   ConnPoolImplBase& parent_;
-  uint64_t remaining_streams_;
-  const uint64_t concurrent_stream_limit_;
+  uint32_t remaining_streams_;
+  const uint32_t concurrent_stream_limit_;
   State state_{State::CONNECTING};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
@@ -105,7 +110,8 @@ public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   Upstream::ClusterConnectivityState& state);
   virtual ~ConnPoolImplBase();
 
   // A helper function to get the specific context type from the base class context.
@@ -196,6 +202,22 @@ protected:
 
   float perUpstreamPrefetchRatio() const;
 
+  ConnectionPool::Cancellable*
+  addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
+    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
+    state_.incrPendingStreams(1);
+    return pending_streams_.front().get();
+  }
+
+  bool hasActiveStreams() const { return num_active_streams_ > 0; }
+
+  void decrConnectingStreamCapacity(int32_t delta) {
+    state_.decrConnectingStreamCapacity(delta);
+    connecting_stream_capacity_ -= delta;
+  }
+
+  Upstream::ClusterConnectivityState& state_;
+
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
 
@@ -204,7 +226,6 @@ protected:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
   std::list<Instance::DrainedCb> drained_callbacks_;
-  std::list<PendingStreamPtr> pending_streams_;
 
   // When calling purgePendingStreams, this list will be used to hold the streams we are about
   // to purge. We need this if one cancelled streams cancels a different pending stream
@@ -220,12 +241,15 @@ protected:
   // Clients that are not ready to handle additional streams because they are CONNECTING.
   std::list<ActiveClientPtr> connecting_clients_;
 
+private:
+  std::list<PendingStreamPtr> pending_streams_;
+
   // The number of streams currently attached to clients.
-  uint64_t num_active_streams_{0};
+  uint32_t num_active_streams_{0};
 
   // The number of streams that can be immediately dispatched
   // if all CONNECTING connections become connected.
-  uint64_t connecting_stream_capacity_{0};
+  uint32_t connecting_stream_capacity_{0};
 };
 
 } // namespace ConnectionPool

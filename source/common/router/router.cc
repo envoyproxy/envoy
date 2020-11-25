@@ -1421,7 +1421,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location) &&
-      callbacks_->recreateStream()) {
+      callbacks_->recreateStream(&headers)) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
   }

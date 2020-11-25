@@ -138,7 +138,7 @@ public:
               EXPECT_CALL(encoder.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address1_));
               callbacks.onPoolReady(encoder, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectResponseTimerCreate();
@@ -176,7 +176,7 @@ public:
               EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address1_));
               callbacks.onPoolReady(encoder1, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectPerTryTimerCreate();
@@ -205,7 +205,7 @@ public:
               EXPECT_CALL(encoder2.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address2_));
               callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectPerTryTimerCreate();

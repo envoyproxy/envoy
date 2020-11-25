@@ -214,6 +214,7 @@ PRNG
 PROT
 Postgres
 QDCOUNT
+QPACK
 QUIC
 QoS
 RAII
@@ -1157,6 +1158,7 @@ workspace
 writev
 xDS
 xDSes
+xdstp
 xeon
 xform
 xhtml
