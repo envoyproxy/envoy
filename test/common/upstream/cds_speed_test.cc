@@ -161,7 +161,7 @@ static void addClusters(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     Envoy::Upstream::CdsSpeedTest speed_test(state, state.range(0));
     // if we've been instructed to skip tests, only run once no matter the argument:
     uint32_t clusters = skipExpensiveBenchmarks() ? 1 : state.range(2);
@@ -179,7 +179,7 @@ static void duplicateUpdate(State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     Envoy::Upstream::CdsSpeedTest speed_test(state, false);
     uint32_t clusters = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
