@@ -205,7 +205,7 @@ Class | Superclass | Description
 SymbolTable | | Abstract class providing an interface for symbol tables
 SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
 SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
-StatName | | Provides an API and a view into a StatName (dynamic orsymbolized). Like absl::string_view, the backing store must be separately maintained.
+StatName | | Provides an API and a view into a StatName (dynamic or symbolized). Like absl::string_view, the backing store must be separately maintained.
 StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
 StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
 StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free(). 
