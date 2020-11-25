@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/response_map/v3/response_map.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
@@ -15,7 +14,7 @@ public:
   virtual ~ResponseMap() = default;
 
   /**
-   * rewrite the response status code, body and content_type.
+   * rewrite the response status code, body and content_type
    * @param request_headers supplies the information about request headers required by filters.
    * @param stream_info supplies the information about streams required by filters.
    * @param code status code.
@@ -24,11 +23,12 @@ public:
    */
   virtual void rewrite(const Http::RequestHeaderMap* request_headers,
                        Http::ResponseHeaderMap& response_headers,
-                       StreamInfo::StreamInfo& stream_info, std::string& body,
+                       StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        absl::string_view& content_type) const PURE;
 
   virtual bool match(const Http::RequestHeaderMap* request_headers,
                      const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap* response_trailers,
                      StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
@@ -42,10 +42,10 @@ public:
   /**
    * Create a ResponseMap object from ProtoConfig
    */
-  static ResponseMapPtr
-  create(const envoy::extensions::filters::http::response_map::v3::ResponseMap& config,
-         Server::Configuration::CommonFactoryContext& context,
-         ProtobufMessage::ValidationVisitor& validationVisitor);
+  template <typename T>
+  static ResponseMapPtr create(const T& config,
+                               Server::Configuration::CommonFactoryContext& context,
+                               ProtobufMessage::ValidationVisitor& validationVisitor);
 
   /**
    * Create a default ResponseMap object with empty config.

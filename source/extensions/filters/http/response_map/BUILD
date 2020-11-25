@@ -3,17 +3,14 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
-    "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_extension_package()
-
-# L7 HTTP filter which implements response_map processing
+# L7 HTTP filter that implements response modifications using matchers.
 # Public docs: docs/root/configuration/http_filters/response_map_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "response_map_filter_lib",
@@ -29,6 +26,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/response_map:response_map_lib",
         "//source/extensions/filters/http:well_known_names",
+        "@envoy_api//envoy/extensions/filters/http/response_map/v3:pkg_cc_proto",
     ],
 )
 

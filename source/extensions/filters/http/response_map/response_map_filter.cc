@@ -20,7 +20,7 @@ namespace ResponseMapFilter {
 ResponseMapFilterConfig::ResponseMapFilterConfig(
     const envoy::extensions::filters::http::response_map::v3::ResponseMap& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context)
-    : response_map_(ResponseMap::Factory::create(proto_config, context,
+    : response_map_(ResponseMap::Factory::create(proto_config.response_map(), context,
                                                  context.messageValidationVisitor())) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(
@@ -117,9 +117,10 @@ Http::FilterHeadersStatus ResponseMapFilter::encodeHeaders(Http::ResponseHeaderM
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Use the response_map_ to match on the request/response pair...
+  // Use the response_map_ to match on the request/response pair. We do not match on trailers.
   const ResponseMap::ResponseMapPtr& response_map = *response_map_;
-  do_rewrite_ = response_map->match(request_headers_, headers, encoder_callbacks_->streamInfo());
+  do_rewrite_ =
+      response_map->match(request_headers_, headers, nullptr, encoder_callbacks_->streamInfo());
   ENVOY_LOG(trace, "response map filter: used response_map_, do_rewrite_ = {}", do_rewrite_);
 
   // ...and if we decided not to do a rewrite, simply pass through to other filters.
@@ -204,8 +205,9 @@ void ResponseMapFilter::doRewrite(void) {
   // decodeHeaders and encodeHeaders paths, respectively.
   std::string new_body;
   absl::string_view new_content_type;
+  auto code = static_cast<Http::Code>(Http::Utility::getResponseStatus(*response_headers_));
   response_map->rewrite(request_headers_, *response_headers_, encoder_callbacks_->streamInfo(),
-                        new_body, new_content_type);
+                        code, new_body, new_content_type);
 
   // Encoding buffer may be null here even if we saw data in encodeData above. This
   // happens when sendLocalReply sends a response downstream. By adding encoded data

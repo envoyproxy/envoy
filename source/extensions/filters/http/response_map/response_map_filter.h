@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/response_map/v3/response_map.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
