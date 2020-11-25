@@ -79,8 +79,9 @@ public:
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> descr_{
       new NiceMock<Upstream::MockHostDescription>()};
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<Event::MockDispatcher> dispatcher_;
+  Upstream::HostSharedPtr host_{
+      Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_.timeSource())};
   TestConnPoolImplBase pool_;
   AttachContext context_;
   std::vector<ActiveClient*> clients_;

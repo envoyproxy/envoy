@@ -227,7 +227,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
+      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
+      timeSystem())};
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
                                                   host_description, downstream_protocol_);
 }

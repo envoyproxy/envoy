@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 

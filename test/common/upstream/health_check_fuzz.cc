@@ -102,8 +102,9 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   allocHttpHealthCheckerFromProto(input.health_check_config());
   ON_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillByDefault(testing::Return(input.http_verify_cluster()));
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
     cluster_->info_->stats().upstream_cx_total_.inc();
   }
@@ -213,8 +214,9 @@ void TcpHealthCheckFuzz::allocTcpHealthCheckerFromProto(
 
 void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
   allocTcpHealthCheckerFromProto(input.health_check_config());
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
     cluster_->info_->stats().upstream_cx_total_.inc();
   }
@@ -321,8 +323,9 @@ void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
 void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
   test_session_ = std::make_unique<TestSession>();
   allocGrpcHealthCheckerFromProto(input.health_check_config());
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
     cluster_->info_->stats().upstream_cx_total_.inc();
   }
@@ -338,11 +341,11 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
             std::shared_ptr<Upstream::MockClusterInfo> cluster{
                 new NiceMock<Upstream::MockClusterInfo>()};
             Event::MockDispatcher dispatcher_;
-
+            auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
             test_session.codec_client_ = new CodecClientForTest(
                 Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
                 test_session.codec_, nullptr,
-                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", *time_source), dispatcher_);
             return test_session.codec_client_;
           }));
   expectStreamCreate();

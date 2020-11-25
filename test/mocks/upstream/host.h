@@ -98,6 +98,7 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
+  MOCK_METHOD(MonotonicTime, creationTime, (), (const));
   Stats::StatName localityZoneStatName() const override {
     Stats::SymbolTable& symbol_table = *symbol_table_;
     locality_zone_stat_name_ =
@@ -192,6 +193,7 @@ public:
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
+  MOCK_METHOD(MonotonicTime, creationTime, (), (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::TransportSocketFactoryPtr socket_factory_;

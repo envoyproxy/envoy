@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
@@ -18,13 +19,14 @@ public:
               const Network::Address::InstanceConstSharedPtr& address,
               const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
               const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-              const Network::TransportSocketOptionsSharedPtr& override_transport_socket_options)
+              const Network::TransportSocketOptionsSharedPtr& override_transport_socket_options,
+              TimeSource& time_source)
       : HostImpl(cluster, hostname, address,
                  // TODO(zyfjeff): Created through metadata shared pool
                  std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
                  lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
-                 lb_endpoint.health_status()),
+                 lb_endpoint.health_status(), time_source),
         override_transport_socket_options_(override_transport_socket_options) {}
 
   // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
@@ -104,6 +106,7 @@ public:
     // checking.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  MonotonicTime creationTime() const override { return logical_host_->creationTime(); }
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 

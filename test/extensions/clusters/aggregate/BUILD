@@ -26,6 +26,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:load_balancer_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/aggregate/v3:pkg_cc_proto",
     ],

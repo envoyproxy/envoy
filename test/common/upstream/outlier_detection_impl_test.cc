@@ -64,7 +64,7 @@ public:
   MOCK_METHOD(void, check, (HostSharedPtr host));
 };
 
-class OutlierDetectorImplTest : public testing::Test {
+class OutlierDetectorImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   OutlierDetectorImplTest()
       : outlier_detection_ejections_active_(cluster_.info_->stats_store_.gauge(
@@ -88,7 +88,7 @@ public:
   void addHosts(std::vector<std::string> urls, bool primary = true) {
     HostVector& hosts = primary ? hosts_ : failover_hosts_;
     for (auto& url : urls) {
-      hosts.emplace_back(makeTestHost(cluster_.info_, url));
+      hosts.emplace_back(makeTestHost(cluster_.info_, url, simTime()));
     }
   }
 

@@ -30,7 +30,7 @@ envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
-class AggregateClusterUpdateTest : public testing::Test {
+class AggregateClusterUpdateTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AggregateClusterUpdateTest()
       : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()) {}
@@ -51,7 +51,6 @@ public:
   NiceMock<Upstream::TestClusterManagerFactory> factory_;
   Upstream::ThreadLocalCluster* cluster_;
 
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::unique_ptr<Upstream::TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
@@ -140,11 +139,14 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
   EXPECT_NE(nullptr, secondary);
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host1 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80");
+  Upstream::HostSharedPtr host1 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80", simTime());
   host1->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host2 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80");
+  Upstream::HostSharedPtr host2 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80", simTime());
   host2->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host3 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80");
+  Upstream::HostSharedPtr host3 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80", simTime());
   Upstream::Cluster& cluster = cluster_manager_->activeClusters().find("primary")->second;
   cluster.prioritySet().updateHosts(
       0,
@@ -154,11 +156,14 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
       nullptr, {host1, host2, host3}, {}, 100);
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host4 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.4:80");
+  Upstream::HostSharedPtr host4 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.4:80", simTime());
   host4->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host5 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.5:80");
+  Upstream::HostSharedPtr host5 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.5:80", simTime());
   host5->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host6 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.6:80");
+  Upstream::HostSharedPtr host6 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.6:80", simTime());
   Upstream::Cluster& cluster1 = cluster_manager_->activeClusters().find("secondary")->second;
   cluster1.prioritySet().updateHosts(
       0,
@@ -192,11 +197,14 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
   EXPECT_EQ(nullptr, cluster_manager_->get("primary"));
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host7 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.7:80");
+  Upstream::HostSharedPtr host7 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.7:80", simTime());
   host7->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host8 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.8:80");
+  Upstream::HostSharedPtr host8 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.8:80", simTime());
   host8->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host9 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.9:80");
+  Upstream::HostSharedPtr host9 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.9:80", simTime());
   cluster1.prioritySet().updateHosts(
       1,
       Upstream::HostSetImpl::partitionHosts(
@@ -275,11 +283,14 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   EXPECT_EQ("127.0.0.1:80", host->address()->asString());
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host1 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80");
+  Upstream::HostSharedPtr host1 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80", simTime());
   host1->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host2 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80");
+  Upstream::HostSharedPtr host2 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80", simTime());
   host2->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host3 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80");
+  Upstream::HostSharedPtr host3 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80", simTime());
   Upstream::Cluster& cluster = cluster_manager_->activeClusters().find("primary")->second;
   cluster.prioritySet().updateHosts(
       0,

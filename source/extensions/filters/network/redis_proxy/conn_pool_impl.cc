@@ -335,7 +335,7 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
         cluster_->info(), "", address_ptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::config::core::v3::UNKNOWN)};
+        envoy::config::core::v3::UNKNOWN, dispatcher_.timeSource())};
     host_address_map_[host_address_map_key] = new_host;
     created_via_redirect_hosts_.push_back(new_host);
     it = host_address_map_.find(host_address_map_key);

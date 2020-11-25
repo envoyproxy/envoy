@@ -22,7 +22,7 @@ Cluster::Cluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api),
+                                       added_via_api, factory_context.dispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
@@ -107,7 +107,7 @@ void Cluster::addOrUpdateWorker(
       new_host_map->try_emplace(host, host_info,
                                 std::make_shared<Upstream::LogicalHost>(
                                     info(), host, host_info->address(), dummy_locality_lb_endpoint_,
-                                    dummy_lb_endpoint_, nullptr));
+                                    dummy_lb_endpoint_, nullptr, time_source_));
   if (hosts_added == nullptr) {
     hosts_added = std::make_unique<Upstream::HostVector>();
   }
