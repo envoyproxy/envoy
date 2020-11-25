@@ -70,7 +70,7 @@ public:
     collector_endpoint: /api/v1/spans
     collector_endpoint_version: {}
     )EOF",
-                                                version);
+                                          version);
     if (!hostname.empty()) {
       yaml_string = yaml_string + fmt::format(R"EOF(
     collector_hostname: {}
@@ -84,8 +84,9 @@ public:
     setup(zipkin_config, true);
   }
 
-  void expectValidFlushSeveralSpansWithHostname(const std::string& version, const std::string& content_type,
-      const std::string& hostname) {
+  void expectValidFlushSeveralSpansWithHostname(const std::string& version,
+                                                const std::string& content_type,
+                                                const std::string& hostname) {
     setupValidDriverWithHostname(version, hostname);
 
     Http::MockAsyncClientRequest request(&cm_.async_client_);
@@ -137,9 +138,7 @@ public:
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
   }
 
-  void setupValidDriver(const std::string& version) {
-    setupValidDriverWithHostname(version, "");
-  }
+  void setupValidDriver(const std::string& version) { setupValidDriverWithHostname(version, ""); }
 
   void expectValidFlushSeveralSpans(const std::string& version, const std::string& content_type) {
     expectValidFlushSeveralSpansWithHostname(version, content_type, "");
@@ -224,8 +223,7 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpJson) {
 }
 
 TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpJsonWithHostname) {
-  expectValidFlushSeveralSpansWithHostname("HTTP_JSON", "application/json",
-      "zipkin.fakedomain.io");
+  expectValidFlushSeveralSpansWithHostname("HTTP_JSON", "application/json", "zipkin.fakedomain.io");
 }
 
 TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpProto) {

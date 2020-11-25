@@ -80,8 +80,8 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = zipkin_config.collector_cluster();
-  hostname_ = !zipkin_config.collector_hostname().empty() ?
-      zipkin_config.collector_hostname() : zipkin_config.collector_cluster();
+  hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
+                                                          : zipkin_config.collector_cluster();
 
   CollectorInfo collector;
   if (!zipkin_config.collector_endpoint().empty()) {
